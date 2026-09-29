@@ -1,0 +1,6 @@
+{
+  "name": "Mystery Hub",
+  "description": "Your All-in-One Digital Solution in Ghana — Buy data, create your website, and access essential digital utilities in one place.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
