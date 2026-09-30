@@ -255,31 +255,43 @@ export class WaitlistStore {
    */
   static async updateWaitlistStatus(
     id: string,
-    status: string,
-    adminNote?: string | null
+    updates: { status?: string; adminNote?: string | null } | string,
+    legacyNote?: string | null
   ): Promise<WaitlistRecord | null> {
+    const status = typeof updates === 'string' ? updates : updates.status;
+    const adminNote = typeof updates === 'string' ? legacyNote : updates.adminNote;
+
     const nowIso = new Date().toISOString();
-    const contactedAt = ['contacted', 'notified'].includes(status) ? nowIso : null;
+    const isContactTransition = status && ['contacted', 'notified'].includes(status);
+    const contactedAt = isContactTransition ? nowIso : null;
     const pool = getPool();
 
     if (pool) {
       const query = `
         UPDATE waitlist
-        SET status = $1, 
-            admin_note = COALESCE($2, admin_note),
-            contacted_at = CASE WHEN $3::timestamp with time zone IS NOT NULL THEN $3::timestamp with time zone ELSE contacted_at END,
-            updated_at = $4
-        WHERE id = $5
+        SET status = COALESCE($1, status), 
+            admin_note = CASE WHEN $2::boolean THEN $3 ELSE admin_note END,
+            contacted_at = CASE WHEN $4::timestamp with time zone IS NOT NULL THEN $4::timestamp with time zone ELSE contacted_at END,
+            updated_at = $5
+        WHERE id = $6
         RETURNING *;
       `;
-      const res = await pool.query(query, [status, adminNote !== undefined ? adminNote : null, contactedAt, nowIso, id]);
+      const isNoteProvided = adminNote !== undefined;
+      const res = await pool.query(query, [
+        status || null,
+        isNoteProvided,
+        adminNote !== undefined ? adminNote : null,
+        contactedAt,
+        nowIso,
+        id,
+      ]);
       if (res.rows.length === 0) return null;
       return res.rows[0] as WaitlistRecord;
     }
 
     for (const [key, w] of devWaitlistStore.entries()) {
       if (w.id === id) {
-        w.status = status as any;
+        if (status) w.status = status as any;
         if (adminNote !== undefined) w.admin_note = adminNote;
         if (contactedAt) w.contacted_at = contactedAt;
         w.updated_at = nowIso;

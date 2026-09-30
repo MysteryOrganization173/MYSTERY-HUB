@@ -173,11 +173,11 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
               <h4 className="text-xs font-bold text-white">Database Store</h4>
             </div>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              components.database.status === 'healthy'
+              components.database.status === 'connected'
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                 : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
             }`}>
-              {components.database.status === 'healthy' ? 'PostgreSQL Connected' : 'Dev Memory Store'}
+              {components.database.status === 'connected' ? 'PostgreSQL Pool' : 'Dev Memory Store'}
             </span>
           </div>
           <p className="text-xs text-slate-400 font-mono">
@@ -196,11 +196,11 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
               <h4 className="text-xs font-bold text-white">Paystack Gateway</h4>
             </div>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              components.paystack.status === 'healthy'
+              components.paystack.status === 'configured'
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                 : 'bg-red-500/10 text-red-400 border border-red-500/30'
             }`}>
-              {components.paystack.status === 'healthy' ? 'Configured' : 'Missing Key'}
+              {components.paystack.status === 'configured' ? 'Configured' : 'Missing Key'}
             </span>
           </div>
           <div className="text-xs space-y-1">
@@ -220,11 +220,13 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
               <h4 className="text-xs font-bold text-white">Success Biz Hub (API v2)</h4>
             </div>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              components.successBizHub.status === 'healthy'
+              components.successBizHub.status === 'connected'
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                : 'bg-red-500/10 text-red-400 border border-red-500/30'
+                : components.successBizHub.status === 'error'
+                ? 'bg-red-500/10 text-red-400 border border-red-500/30'
+                : 'bg-slate-800 text-slate-400'
             }`}>
-              {components.successBizHub.status === 'healthy' ? 'Connected' : 'Unavailable'}
+              {components.successBizHub.status === 'connected' ? 'Connected' : components.successBizHub.status === 'error' ? 'Error' : 'Unconfigured'}
             </span>
           </div>
 
@@ -258,11 +260,11 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
               <h4 className="text-xs font-bold text-white">Mystery AI Assistant</h4>
             </div>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              components.geminiAi.status === 'healthy'
+              components.geminiAi.status === 'configured'
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                 : 'bg-slate-800 text-slate-400'
             }`}>
-              {components.geminiAi.status === 'healthy' ? 'Active' : 'Fallback Mode'}
+              {components.geminiAi.status === 'configured' ? 'Configured' : 'Missing Key'}
             </span>
           </div>
           <p className="text-xs text-slate-400">
@@ -292,7 +294,7 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
             Safety kill-switch prevents live dispatches when Paystack is in test mode.
           </p>
           <div className="pt-2 border-t border-slate-800/60 text-[11px] text-slate-500">
-            Kill-switch configured via ENABLE_SUPPLIER_FULFILMENT.
+            Kill-switch configured via SUCCESS_BIZ_HUB_FULFILLMENT_ENABLED.
           </div>
         </div>
       </div>

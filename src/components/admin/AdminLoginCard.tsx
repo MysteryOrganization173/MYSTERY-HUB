@@ -8,7 +8,7 @@ export const AdminLoginCard: React.FC = () => {
   const { loginUser, setActivePage, showToast } = useApp();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -36,7 +36,7 @@ export const AdminLoginCard: React.FC = () => {
       });
 
       if (response && response.user && response.token) {
-        loginUser(response.user, response.token);
+        loginUser(response.user, response.token, rememberMe);
 
         if (response.user.role === 'admin') {
           showToast(`Welcome back, Admin ${response.user.name.split(' ')[0]}!`, 'success');

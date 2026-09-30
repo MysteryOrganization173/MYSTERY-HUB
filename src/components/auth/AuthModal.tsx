@@ -10,7 +10,7 @@ export const AuthModal: React.FC = () => {
   const [name, setName] = useState('');
   const [identifier, setIdentifier] = useState(''); // phone or email
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -46,7 +46,7 @@ export const AuthModal: React.FC = () => {
         setName('');
         setIdentifier('');
         setPassword('');
-        loginUser(res.user, res.token);
+        loginUser(res.user, res.token, rememberMe);
       } else {
         const res = await loginOnServer({
           identifier: identifier.trim(),
@@ -57,7 +57,7 @@ export const AuthModal: React.FC = () => {
         setName('');
         setIdentifier('');
         setPassword('');
-        loginUser(res.user, res.token);
+        loginUser(res.user, res.token, rememberMe);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Authentication failed. Please try again.';

@@ -40,7 +40,7 @@ interface AppContextType {
   closeAuth: () => void;
   user: SafeUserProfile | null;
   sessionToken: string | null;
-  loginUser: (profile: SafeUserProfile, token: string) => void;
+  loginUser: (profile: SafeUserProfile, token: string, rememberMe?: boolean) => void;
   logoutUser: () => void;
   selectedTemplatePreview: WebsiteTemplate | null;
   openTemplatePreview: (template: WebsiteTemplate) => void;
@@ -111,7 +111,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [sessionToken, setSessionToken] = useState<string | null>(() => {
     try {
-      return localStorage.getItem('mystery_hub_session_token');
+      return localStorage.getItem('mystery_hub_session_token') || sessionStorage.getItem('mystery_hub_session_token');
     } catch {
       return null;
     }
@@ -119,7 +119,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [user, setUser] = useState<SafeUserProfile | null>(() => {
     try {
-      const saved = localStorage.getItem('mystery_hub_user');
+      const saved = localStorage.getItem('mystery_hub_user') || sessionStorage.getItem('mystery_hub_user');
       if (saved) return JSON.parse(saved);
     } catch {
       // fallback
@@ -129,7 +129,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Verify server-side session token on startup
   useEffect(() => {
-    const token = localStorage.getItem('mystery_hub_session_token');
+    const token = localStorage.getItem('mystery_hub_session_token') || sessionStorage.getItem('mystery_hub_session_token');
     if (!token) return;
 
     let isMounted = true;
@@ -138,7 +138,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (isMounted && res.success && res.user) {
           setUser(res.user);
           try {
-            localStorage.setItem('mystery_hub_user', JSON.stringify(res.user));
+            if (localStorage.getItem('mystery_hub_session_token')) {
+              localStorage.setItem('mystery_hub_user', JSON.stringify(res.user));
+            } else if (sessionStorage.getItem('mystery_hub_session_token')) {
+              sessionStorage.setItem('mystery_hub_user', JSON.stringify(res.user));
+            }
           } catch {
             // ignore
           }
@@ -151,6 +155,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           try {
             localStorage.removeItem('mystery_hub_session_token');
             localStorage.removeItem('mystery_hub_user');
+            sessionStorage.removeItem('mystery_hub_session_token');
+            sessionStorage.removeItem('mystery_hub_user');
           } catch {
             // ignore
           }
@@ -302,12 +308,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthModalOpen(false);
   };
 
-  const loginUser = (profile: SafeUserProfile, token: string) => {
+  const loginUser = (profile: SafeUserProfile, token: string, rememberMe = false) => {
     setUser(profile);
     setSessionToken(token);
     try {
-      localStorage.setItem('mystery_hub_user', JSON.stringify(profile));
-      localStorage.setItem('mystery_hub_session_token', token);
+      if (rememberMe) {
+        localStorage.setItem('mystery_hub_user', JSON.stringify(profile));
+        localStorage.setItem('mystery_hub_session_token', token);
+        sessionStorage.removeItem('mystery_hub_user');
+        sessionStorage.removeItem('mystery_hub_session_token');
+      } else {
+        sessionStorage.setItem('mystery_hub_user', JSON.stringify(profile));
+        sessionStorage.setItem('mystery_hub_session_token', token);
+        localStorage.removeItem('mystery_hub_user');
+        localStorage.removeItem('mystery_hub_session_token');
+      }
     } catch {
       // ignore
     }
@@ -316,13 +331,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logoutUser = () => {
-    const token = sessionToken || localStorage.getItem('mystery_hub_session_token');
+    const token = sessionToken || localStorage.getItem('mystery_hub_session_token') || sessionStorage.getItem('mystery_hub_session_token');
     logoutOnServer(token);
     setUser(null);
     setSessionToken(null);
     try {
       localStorage.removeItem('mystery_hub_user');
       localStorage.removeItem('mystery_hub_session_token');
+      sessionStorage.removeItem('mystery_hub_user');
+      sessionStorage.removeItem('mystery_hub_session_token');
     } catch {
       // ignore
     }

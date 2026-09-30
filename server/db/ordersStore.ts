@@ -354,6 +354,58 @@ export class OrdersStore {
   }
 
   /**
+   * Batch calculate order count and total paid pesewas for a list of user IDs
+   * Eliminates N+1 database queries on admin user listing
+   */
+  static async getUserOrderAggregates(
+    userIds: string[]
+  ): Promise<Map<string, { orderCount: number; totalSpentMinor: number }>> {
+    const map = new Map<string, { orderCount: number; totalSpentMinor: number }>();
+    if (!userIds || userIds.length === 0) return map;
+
+    for (const uid of userIds) {
+      map.set(uid, { orderCount: 0, totalSpentMinor: 0 });
+    }
+
+    const pool = getPool();
+    if (pool) {
+      const query = `
+        SELECT user_id, 
+               COUNT(*)::int as order_count,
+               COALESCE(SUM(CASE WHEN payment_status = 'success' THEN amount ELSE 0 END), 0)::bigint as total_spent_minor
+        FROM orders
+        WHERE user_id = ANY($1::text[])
+        GROUP BY user_id;
+      `;
+      const res = await pool.query(query, [userIds]);
+      for (const row of res.rows) {
+        map.set(row.user_id, {
+          orderCount: Number(row.order_count) || 0,
+          totalSpentMinor: Number(row.total_spent_minor) || 0,
+        });
+      }
+      return map;
+    }
+
+    // In-memory fallback
+    const seenOrderIds = new Set<string>();
+    for (const ord of devMemoryStore.values()) {
+      if (ord.id && seenOrderIds.has(ord.id)) continue;
+      if (ord.id) seenOrderIds.add(ord.id);
+
+      if (ord.user_id && map.has(ord.user_id)) {
+        const entry = map.get(ord.user_id)!;
+        entry.orderCount += 1;
+        if (ord.payment_status === 'success') {
+          entry.totalSpentMinor += ord.amount;
+        }
+      }
+    }
+
+    return map;
+  }
+
+  /**
    * Find order by public_reference or payment_reference or id
    */
   static async findOrder(ref: string): Promise<OrderRecord | null> {

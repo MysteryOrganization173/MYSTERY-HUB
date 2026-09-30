@@ -23,6 +23,23 @@ export const adminRouter = Router();
 adminRouter.use(requireAdmin);
 
 /**
+ * Neutralizes spreadsheet formula injection (CSV Injection) and escapes quotes
+ * Defends against cells starting with =, +, -, @, \t, \r
+ */
+export function safeCsvCell(val: unknown): string {
+  if (val === null || val === undefined) return '""';
+  let str = String(val).trim();
+
+  // Formula injection defense: neutralize leading formula trigger characters
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
+
+  const escaped = str.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
+/**
  * 1. GET /api/admin/overview
  * Real server-calculated launch overview metrics
  */
@@ -38,10 +55,10 @@ adminRouter.get('/overview', async (req: Request, res: Response) => {
     let supplierBalanceGhc: number | null = null;
     let supplierBalanceLow = false;
     let supplierStatus: 'connected' | 'unconfigured' | 'error' = 'unconfigured';
+    const provider = new SuccessBizHubProvider();
 
     if (process.env.SUCCESS_BIZ_HUB_API_KEY) {
       try {
-        const provider = new SuccessBizHubProvider();
         const bal = await provider.getBalance();
         supplierBalanceGhc = bal.balanceGhc;
         const threshold = parseFloat(process.env.SUPPLIER_LOW_BALANCE_GHS || '100');
@@ -67,7 +84,7 @@ adminRouter.get('/overview', async (req: Request, res: Response) => {
           status: supplierStatus,
           balanceGhc: supplierBalanceGhc,
           isLowBalance: supplierBalanceLow,
-          fulfilmentEnabled: process.env.ENABLE_SUPPLIER_FULFILMENT !== 'false',
+          fulfilmentEnabled: provider.client.isFulfillmentEnabled(),
         },
         waitlistGrouped: waitlistStats,
       },
@@ -285,16 +302,20 @@ adminRouter.patch('/waitlist/:id', async (req: Request, res: Response) => {
     const id = req.params.id;
     const { status, adminNote } = req.body || {};
 
-    if (!status || !['pending', 'contacted', 'notified', 'unsubscribed'].includes(status)) {
+    if (status !== undefined && !['pending', 'contacted', 'notified', 'unsubscribed'].includes(status)) {
       res.status(400).json({ error: 'Invalid waitlist status.' });
       return;
     }
 
-    const updated = await WaitlistStore.updateWaitlistStatus(
-      id,
+    if (status === undefined && adminNote === undefined) {
+      res.status(400).json({ error: 'At least one field (status or adminNote) must be provided.' });
+      return;
+    }
+
+    const updated = await WaitlistStore.updateWaitlistStatus(id, {
       status,
-      typeof adminNote === 'string' ? adminNote : undefined
-    );
+      adminNote: typeof adminNote === 'string' ? adminNote : adminNote === null ? null : undefined,
+    });
 
     if (!updated) {
       res.status(404).json({ error: 'Waitlist record not found.' });
@@ -309,6 +330,7 @@ adminRouter.patch('/waitlist/:id', async (req: Request, res: Response) => {
       metadata: {
         status: updated.status,
         serviceKey: updated.service_key,
+        hasAdminNote: Boolean(updated.admin_note),
       },
     });
 
@@ -325,7 +347,7 @@ adminRouter.patch('/waitlist/:id', async (req: Request, res: Response) => {
 
 /**
  * 8. GET /api/admin/waitlist/export
- * Safe CSV export of filtered waitlist entries
+ * Safe CSV export of filtered waitlist entries with formula injection protection
  */
 adminRouter.get('/waitlist-export', async (req: Request, res: Response) => {
   try {
@@ -341,22 +363,22 @@ adminRouter.get('/waitlist-export', async (req: Request, res: Response) => {
     });
 
     const rows = [
-      ['ID', 'Service Key', 'Service Title', 'Channel', 'Contact', 'Status', 'Joined Date', 'Contacted Date', 'Admin Note'],
+      ['ID', 'Service Key', 'Service Title', 'Channel', 'Contact', 'Status', 'Joined Date', 'Contacted Date', 'Admin Note'].map(safeCsvCell),
       ...result.entries.map((w) => [
-        w.id,
-        w.service_key,
-        `"${w.service_title.replace(/"/g, '""')}"`,
-        w.channel,
-        w.contact,
-        w.status,
-        w.created_at,
-        w.contacted_at || '',
-        w.admin_note ? `"${w.admin_note.replace(/"/g, '""')}"` : '',
+        safeCsvCell(w.id),
+        safeCsvCell(w.service_key),
+        safeCsvCell(w.service_title),
+        safeCsvCell(w.channel),
+        safeCsvCell(w.contact),
+        safeCsvCell(w.status),
+        safeCsvCell(w.created_at),
+        safeCsvCell(w.contacted_at || ''),
+        safeCsvCell(w.admin_note || ''),
       ]),
     ];
 
     const csvContent = rows.map((r) => r.join(',')).join('\n');
-    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="mystery_hub_waitlist_${new Date().toISOString().slice(0, 10)}.csv"`);
     res.send(csvContent);
   } catch (err) {
@@ -367,7 +389,7 @@ adminRouter.get('/waitlist-export', async (req: Request, res: Response) => {
 
 /**
  * 9. GET /api/admin/users
- * Search and list registered user accounts with aggregate stats
+ * Search and list registered user accounts with batch aggregate stats (zero N+1 queries)
  */
 adminRouter.get('/users', async (req: Request, res: Response) => {
   try {
@@ -381,20 +403,17 @@ adminRouter.get('/users', async (req: Request, res: Response) => {
       limit: limit ? parseInt(limit as string, 10) : 25,
     });
 
-    const safeUsers = await Promise.all(
-      result.users.map(async (u) => {
-        const orders = await OrdersStore.findOrdersByUserId(u.id);
-        const totalPaidPesewas = orders
-          .filter((o) => o.payment_status === 'success')
-          .reduce((sum, o) => sum + o.amount, 0);
+    const userIds = result.users.map((u) => u.id);
+    const aggregates = await OrdersStore.getUserOrderAggregates(userIds);
 
-        return {
-          ...toSafeUserProfile(u),
-          orderCount: orders.length,
-          totalSpentGhc: Number((totalPaidPesewas / 100).toFixed(2)),
-        };
-      })
-    );
+    const safeUsers = result.users.map((u) => {
+      const agg = aggregates.get(u.id) || { orderCount: 0, totalSpentMinor: 0 };
+      return {
+        ...toSafeUserProfile(u),
+        orderCount: agg.orderCount,
+        totalSpentGhc: Number((agg.totalSpentMinor / 100).toFixed(2)),
+      };
+    });
 
     res.json({
       success: true,
@@ -504,20 +523,34 @@ adminRouter.patch('/users/:id/status', async (req: Request, res: Response) => {
 adminRouter.get('/system', async (_req: Request, res: Response) => {
   try {
     // 1. Paystack check
-    const paystackKey = process.env.PAYSTACK_SECRET_KEY || '';
-    const paystackConfigured = Boolean(paystackKey);
+    const paystackKey = (process.env.PAYSTACK_SECRET_KEY || '').trim();
+    let paystackStatus: 'configured' | 'unconfigured' = 'unconfigured';
+    let paystackMode = 'Missing Key';
+
+    if (paystackKey) {
+      paystackStatus = 'configured';
+      if (paystackKey.startsWith('sk_test_')) {
+        paystackMode = 'Test Mode (sk_test_...)';
+      } else if (paystackKey.startsWith('sk_live_')) {
+        paystackMode = 'Live Production (sk_live_...)';
+      } else {
+        paystackMode = 'Unknown Key Format';
+      }
+    }
+
     const isPaystackTestMode = paystackKey.startsWith('sk_test_');
 
     // 2. Success Biz Hub check
-    const sbhKey = process.env.SUCCESS_BIZ_HUB_API_KEY || '';
+    const sbhKey = (process.env.SUCCESS_BIZ_HUB_API_KEY || '').trim();
     const sbhConfigured = Boolean(sbhKey);
     let sbhStatus: 'connected' | 'unconfigured' | 'error' = sbhConfigured ? 'connected' : 'unconfigured';
     let sbhBalanceGhc: number | null = null;
     let sbhLowBalance = false;
 
+    const provider = new SuccessBizHubProvider();
+
     if (sbhConfigured) {
       try {
-        const provider = new SuccessBizHubProvider();
         const bal = await provider.getBalance();
         sbhBalanceGhc = bal.balanceGhc;
         const threshold = parseFloat(process.env.SUPPLIER_LOW_BALANCE_GHS || '100');
@@ -528,13 +561,14 @@ adminRouter.get('/system', async (_req: Request, res: Response) => {
     }
 
     // 3. Gemini AI check
-    const geminiConfigured = Boolean(process.env.GEMINI_API_KEY);
+    const geminiKey = (process.env.GEMINI_API_KEY || '').trim();
+    const geminiConfigured = Boolean(geminiKey);
 
     // 4. Database check
     const dbConnected = isDbConnected();
 
-    // 5. Fulfilment kill switch
-    const fulfilmentEnabled = process.env.ENABLE_SUPPLIER_FULFILMENT !== 'false';
+    // 5. Authoritative fulfilment state from SuccessBizHubClient
+    const fulfilmentEnabled = provider.client.isFulfillmentEnabled();
 
     res.json({
       success: true,
@@ -545,22 +579,22 @@ adminRouter.get('/system', async (_req: Request, res: Response) => {
         components: {
           apiServer: { status: 'healthy', label: 'Online' },
           database: {
-            status: dbConnected ? 'healthy' : 'degraded',
+            status: dbConnected ? 'connected' : 'fallback',
             type: dbConnected ? 'PostgreSQL Connection Pool' : 'In-Memory Development Store',
           },
           paystack: {
-            status: paystackConfigured ? 'healthy' : 'unconfigured',
-            mode: isPaystackTestMode ? 'Test Mode (sk_test_...)' : 'Live Production (sk_live_...)',
+            status: paystackStatus,
+            mode: paystackMode,
             currency: 'GHS',
           },
           successBizHub: {
-            status: sbhStatus === 'connected' ? 'healthy' : sbhStatus === 'error' ? 'error' : 'unconfigured',
+            status: sbhStatus,
             walletBalanceGhc: sbhBalanceGhc,
             isLowBalance: sbhLowBalance,
             lowBalanceThresholdGhc: parseFloat(process.env.SUPPLIER_LOW_BALANCE_GHS || '100'),
           },
           geminiAi: {
-            status: geminiConfigured ? 'healthy' : 'unconfigured',
+            status: geminiConfigured ? 'configured' : 'unconfigured',
             model: 'gemini-3.8-flash / gemini-3.1-flash-lite',
           },
           fulfilmentPipeline: {
