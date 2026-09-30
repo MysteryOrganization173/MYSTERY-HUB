@@ -165,7 +165,11 @@ app.post('/api/mystery-ai/chat', async (req, res) => {
 
     for (const modelName of candidateModels) {
       try {
-        const response = await aiClient.models.generateContent({
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout calling Gemini model ${modelName}`)), 7000)
+        );
+
+        const generatePromise = aiClient.models.generateContent({
           model: modelName,
           contents,
           config: {
@@ -174,6 +178,8 @@ app.post('/api/mystery-ai/chat', async (req, res) => {
             topP: 0.9,
           },
         });
+
+        const response = await Promise.race([generatePromise, timeoutPromise]);
         if (response.text) {
           textResponse = response.text;
           usedModel = modelName;
