@@ -67,7 +67,7 @@ export const AboutPage: React.FC = () => {
               To provide accessible, affordable and reliable digital services for everyone in Ghana.
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-              Ghanaian mobile users and entrepreneurs deserve modern tools designed specifically for local needs — native Mobile Money payments, lightning-fast 4G/5G data dispatch, and websites tailored to Ghanaian customer habits.
+              Ghanaian mobile users and entrepreneurs deserve modern tools designed specifically for local needs — native Mobile Money payments, lightning-fast 4G/5G data delivery, and websites tailored to Ghanaian customer habits.
             </p>
           </div>
 

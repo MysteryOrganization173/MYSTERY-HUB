@@ -21,7 +21,7 @@ export const HomeComingSoonSection: React.FC = () => {
               Coming Soon to Mystery Hub
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 max-w-lg">
-              We are actively developing direct API integrations with Ghanaian utility authorities and services.
+              We are actively developing direct connections with Ghanaian utility providers and services.
             </p>
           </div>
 

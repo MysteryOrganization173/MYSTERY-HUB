@@ -105,7 +105,7 @@ export const WaitlistModal: React.FC = () => {
                   Get notified when {waitlistInfo.serviceTitle} launches
                 </h3>
                 <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                  We are finalizing direct integrations with Ghanaian utility providers. Join the early-access list to be notified the moment this service goes live.
+                  We are finalizing direct connections with Ghanaian utility services. Join the early-access list to be notified the moment this service goes live.
                 </p>
               </div>
 

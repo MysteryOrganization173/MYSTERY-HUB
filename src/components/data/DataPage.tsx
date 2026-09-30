@@ -216,7 +216,7 @@ export const DataPage: React.FC = () => {
             <ul className="space-y-1.5 pl-1">
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-[#00c365] shrink-0 mt-0.5" />
-                <span><strong>Live Order Tracking:</strong> Click "Track Order" in the top bar or footer and enter your phone number or Order Reference ID to see real-time dispatch logs.</span>
+                <span><strong>Live Order Tracking:</strong> Click "Track Order" in the top bar or footer and enter your phone number or Order Reference ID to see real-time delivery status.</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-[#00c365] shrink-0 mt-0.5" />
@@ -343,8 +343,47 @@ export const DataPage: React.FC = () => {
     <div className="min-h-screen py-6 sm:py-10">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 space-y-8 sm:space-y-10">
         {/* Page Hero Section */}
-        <div className="relative rounded-3xl bg-gradient-to-br from-[#0e161c] via-[#091014] to-[#060a0d] border border-slate-800/80 p-3.5 sm:p-6 lg:p-10 overflow-hidden shadow-2xl">
-          {/* Ambient Glow */}
+        <div className="relative rounded-3xl bg-[#091014] border border-slate-800/80 p-3.5 sm:p-6 lg:p-10 overflow-hidden shadow-2xl">
+          {/* Backdrop Artwork Layer */}
+          <div
+            className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0"
+            aria-hidden="true"
+            role="presentation"
+          >
+            {/* Responsive Cloudinary Image */}
+            <picture>
+              <source
+                media="(max-width: 767px)"
+                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_800,c_fill,g_east/v1790789000/ChatGPT_Image_Sep_30_2026_05_22_58_PM_mh5ypm.png 800w"
+                sizes="100vw"
+              />
+              <source
+                media="(max-width: 1023px)"
+                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1200,c_fill,g_east/v1790789000/ChatGPT_Image_Sep_30_2026_05_22_58_PM_mh5ypm.png 1200w"
+                sizes="100vw"
+              />
+              <img
+                src="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1600/v1790789000/ChatGPT_Image_Sep_30_2026_05_22_58_PM_mh5ypm.png"
+                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1280/v1790789000/ChatGPT_Image_Sep_30_2026_05_22_58_PM_mh5ypm.png 1280w,
+                        https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1600/v1790789000/ChatGPT_Image_Sep_30_2026_05_22_58_PM_mh5ypm.png 1600w"
+                sizes="100vw"
+                alt=""
+                fetchPriority="high"
+                loading="eager"
+                decoding="async"
+                className="w-full h-full object-cover object-[90%_top] sm:object-[85%_center] lg:object-[68%_center] opacity-80 sm:opacity-85 lg:opacity-90"
+              />
+            </picture>
+
+            {/* Desktop Overlay Gradient: Solid dark left 38% for text, smooth transition across center */}
+            <div className="hidden lg:block absolute inset-0 bg-gradient-to-r from-[#091014] via-[#091014]/80 to-transparent from-0% via-38% to-80%" />
+
+            {/* Mobile & Tablet Overlay Gradients */}
+            <div className="lg:hidden absolute inset-0 bg-gradient-to-r from-[#091014]/95 via-[#091014]/70 to-[#091014]/25 from-0% via-45% to-100%" />
+            <div className="lg:hidden absolute inset-0 bg-gradient-to-b from-[#091014]/30 via-transparent to-[#091014] from-0% via-60% to-98%" />
+          </div>
+
+          {/* Ambient Emerald Glow */}
           <div className="absolute top-0 right-0 w-80 h-80 bg-[#00c365]/10 rounded-full blur-[90px] pointer-events-none" />
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-6 lg:gap-8 items-center relative z-10">
@@ -374,14 +413,14 @@ export const DataPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-1 sm:gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-[#00c365]" />
-                  <span>Automated Gateway Dispatch</span>
+                  <span>Fast Automated Delivery</span>
                 </div>
               </div>
             </div>
 
             {/* Visual Featured Bundle Card */}
             <div className="lg:col-span-5 flex justify-center lg:justify-end w-full">
-              <div className="w-full lg:max-w-xs rounded-2xl bg-[#121921] border border-slate-700/80 p-3 sm:p-4 shadow-xl">
+              <div className="w-full lg:max-w-[280px] rounded-2xl bg-[#101720]/90 backdrop-blur-md border border-slate-700/80 p-3 sm:p-4 shadow-2xl">
                 {/* Desktop Top Header */}
                 <div className="hidden lg:flex items-center justify-between text-xs text-slate-400 pb-3 border-b border-slate-800">
                   <span className="font-semibold text-white">Popular Bundle</span>

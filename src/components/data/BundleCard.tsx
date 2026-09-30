@@ -68,7 +68,7 @@ export const BundleCard: React.FC<BundleCardProps> = ({ bundle, onBuy, featured 
         <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">
           {bundle.network === 'airteltigo'
             ? 'Instant direct delivery to your AT number.'
-            : (bundle.description || 'Fast direct network dispatch')}
+            : (bundle.description || 'Fast direct SIM delivery')}
         </p>
       </div>
 

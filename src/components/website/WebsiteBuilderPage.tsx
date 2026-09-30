@@ -51,13 +51,52 @@ export const WebsiteBuilderPage: React.FC = () => {
     <div className="min-h-screen py-8 sm:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
         {/* Hero Section */}
-        <div className="relative rounded-3xl bg-gradient-to-br from-[#0c1613] via-[#091011] to-[#060a0c] border border-slate-800/80 p-6 sm:p-12 lg:p-16 overflow-hidden shadow-2xl">
+        <div className="relative rounded-3xl bg-[#08100d] border border-slate-800/80 p-6 sm:p-12 lg:p-16 overflow-hidden shadow-2xl">
+          {/* Backdrop Artwork Layer */}
+          <div
+            className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0"
+            aria-hidden="true"
+            role="presentation"
+          >
+            {/* Responsive Cloudinary Image */}
+            <picture>
+              <source
+                media="(max-width: 767px)"
+                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_800,c_fill,g_east/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png 800w"
+                sizes="100vw"
+              />
+              <source
+                media="(max-width: 1023px)"
+                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1200,c_fill,g_east/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png 1200w"
+                sizes="100vw"
+              />
+              <img
+                src="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1600/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png"
+                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1280/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png 1280w,
+                        https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1600/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png 1600w"
+                sizes="100vw"
+                alt=""
+                fetchPriority="high"
+                loading="eager"
+                decoding="async"
+                className="w-full h-full object-cover object-[92%_top] sm:object-[88%_center] lg:object-right opacity-80 sm:opacity-85 lg:opacity-90"
+              />
+            </picture>
+
+            {/* Desktop Overlay Gradient */}
+            <div className="hidden lg:block absolute inset-0 bg-gradient-to-r from-[#08100d] via-[#08100d]/85 to-transparent from-0% via-42% to-75%" />
+
+            {/* Mobile / Tablet Overlay Gradients */}
+            <div className="lg:hidden absolute inset-0 bg-gradient-to-r from-[#08100d]/95 via-[#08100d]/70 to-[#08100d]/25 from-0% via-48% to-100%" />
+            <div className="lg:hidden absolute inset-0 bg-gradient-to-b from-[#08100d]/30 via-transparent to-[#08100d] from-0% via-60% to-98%" />
+          </div>
+
           {/* Ambient Glow */}
           <div className="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#00c365]/15 rounded-full blur-[100px] pointer-events-none" />
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center relative z-10">
             {/* Left Col */}
-            <div className="lg:col-span-6 space-y-6 text-left">
+            <div className="lg:col-span-7 space-y-6 text-left">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/30 text-xs font-semibold text-[#00c365]">
                 <Globe className="w-3.5 h-3.5" />
                 <span>Mystery Hub Website Studio</span>
@@ -69,7 +108,7 @@ export const WebsiteBuilderPage: React.FC = () => {
               </h1>
 
               <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-lg">
-                Build an exceptional, high-converting website for your chop bar, construction firm, hair studio, tech startup, church, or boutique. No coding required, with built-in Ghana Mobile Money and WhatsApp order routing.
+                Create a professional website for your shop, restaurant, construction business, salon, startup, church, or brand. No coding required, with Ghana Mobile Money and WhatsApp ordering built in.
               </p>
 
               {/* CTAs */}
@@ -84,15 +123,15 @@ export const WebsiteBuilderPage: React.FC = () => {
 
                 <a
                   href="#templates-showcase"
-                  className="px-6 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 transition-colors flex items-center justify-center gap-2"
+                  className="px-6 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 transition-colors flex items-center justify-center gap-2 backdrop-blur-sm"
                 >
                   <Eye className="w-4 h-4 text-slate-400" />
-                  <span>Browse 12+ Templates</span>
+                  <span>Browse 12+ Business Templates</span>
                 </a>
               </div>
 
               {/* Free Option Banner */}
-              <div className="p-3.5 rounded-xl bg-[#0a120e] border border-[#00c365]/20 flex items-center gap-3 text-xs text-slate-300">
+              <div className="p-3.5 rounded-xl bg-[#0a120e]/90 border border-[#00c365]/20 flex items-center gap-3 text-xs text-slate-300 backdrop-blur-sm">
                 <div className="w-6 h-6 rounded-lg bg-[#00c365]/20 text-[#00c365] flex items-center justify-center shrink-0">
                   <Check className="w-3.5 h-3.5" />
                 </div>
@@ -102,74 +141,8 @@ export const WebsiteBuilderPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Right Col: Laptop & Mobile Screen Mockup */}
-            <div className="lg:col-span-6 flex justify-center">
-              <div className="relative w-full max-w-lg">
-                {/* Live Preview Ribbon */}
-                <div className="absolute -top-3 -right-2 z-20 bg-gradient-to-r from-[#00c365] to-emerald-600 text-black text-xs font-extrabold px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>12 Diverse Design Systems</span>
-                </div>
-
-                {/* Laptop Mockup Housing */}
-                <div className="bg-[#121921] rounded-2xl border border-slate-700/80 p-3 shadow-2xl overflow-hidden">
-                  {/* Laptop Window Bar */}
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 px-2 text-[11px] text-slate-400">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-                    </div>
-                    <div className="bg-slate-900 px-3 py-0.5 rounded text-[10px] text-slate-400 font-mono">
-                      https://goldcoastgrill.mysteryhub.site
-                    </div>
-                    <span className="text-[#00c365] font-semibold text-[10px]">Mobile Ready</span>
-                  </div>
-
-                  {/* Rendered Template Preview inside Mockup */}
-                  <div className="rounded-xl overflow-hidden bg-[#7a1c28] text-[#fcf9f5] border border-amber-900/40">
-                    <div className="p-6 sm:p-8 space-y-3 relative overflow-hidden">
-                      <div className="inline-block text-[10px] uppercase font-bold text-[#c99a45] tracking-widest">
-                        Gold Coast Artisan Kitchen & Grill
-                      </div>
-                      <h3 className="text-xl sm:text-2xl font-serif font-normal tracking-tight leading-tight">
-                        Authentic Ghanaian Flavours with Contemporary Craft
-                      </h3>
-                      <p className="text-xs text-pink-100/80 max-w-sm">
-                        Char-grilled tilapia with banku, slow-braised goat light soup, and chilled hibiscus cocktails in Osu.
-                      </p>
-                      <div className="pt-2 flex items-center gap-2">
-                        <span className="px-3 py-1 rounded-full bg-[#c99a45] text-black font-bold text-[11px]">
-                          Reserve Table
-                        </span>
-                        <span className="px-3 py-1 rounded-full bg-white/20 text-white text-[11px]">
-                          Digital Menu
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-[#5c131d] flex items-center justify-between text-xs text-amber-200">
-                      <span>✓ Table Reservation System</span>
-                      <span>✓ MoMo Pre-Orders</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Companion Mobile Preview overlapping */}
-                <div className="absolute -bottom-6 -left-4 sm:-left-6 w-36 sm:w-44 bg-[#0a0f14] border border-slate-700 rounded-2xl p-2 shadow-2xl hidden sm:block">
-                  <div className="h-2 w-10 bg-slate-800 rounded-full mx-auto mb-2" />
-                  <div className="bg-[#0f172a] rounded-xl p-2.5 text-white text-[10px] space-y-1.5 border border-slate-800">
-                    <div className="font-bold text-[11px] text-[#f97316]">Apex Civil Works</div>
-                    <div className="h-10 bg-slate-900 rounded flex items-center justify-center text-[9px] text-slate-400 font-mono">
-                      148+ Projects
-                    </div>
-                    <div className="w-full py-1 bg-[#f97316] text-center font-bold text-black rounded text-[9px]">
-                      Get Estimate
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Right Col: Open spatial canvas allowing artwork devices & interfaces to shine */}
+            <div className="hidden lg:block lg:col-span-5 pointer-events-none min-h-[380px]" aria-hidden="true" />
           </div>
         </div>
 
@@ -179,7 +152,7 @@ export const WebsiteBuilderPage: React.FC = () => {
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-[#00c365]">
               <Smartphone className="w-5 h-5" />
             </div>
-            <h3 className="font-bold text-base text-white">Distinct Design Systems</h3>
+            <h3 className="font-bold text-base text-white">Made for Different Businesses</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
               Every template has its own unique color personality, typography, section rhythm, and purpose-built components for its specific Ghanaian industry.
             </p>

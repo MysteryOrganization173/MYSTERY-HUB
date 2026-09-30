@@ -16,7 +16,9 @@ import {
   Gift,
   Search,
   Bell,
-  ArrowRight
+  ArrowRight,
+  ShieldCheck,
+  CheckCircle2,
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -33,7 +35,6 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Wallet,
   Gift,
 };
-
 export const MoreServicesPage: React.FC = () => {
   const { setActivePage, openWaitlist } = useApp();
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -56,21 +57,101 @@ export const MoreServicesPage: React.FC = () => {
   return (
     <div className="min-h-screen py-8 sm:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-        {/* Header Banner */}
-        <div className="text-center max-w-2xl mx-auto space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#111c16] border border-[#00c365]/30 text-xs font-semibold text-[#00c365]">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Digital Utilities Ecosystem</span>
+        {/* Hero Section */}
+        <div className="relative rounded-3xl bg-[#070b0e] border border-slate-800/80 p-6 sm:p-12 lg:p-16 overflow-hidden shadow-2xl">
+          {/* Backdrop Artwork Layer */}
+          <div
+            className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0"
+            aria-hidden="true"
+            role="presentation"
+          >
+            {/* Responsive Cloudinary Image */}
+            <picture>
+              <source
+                media="(max-width: 767px)"
+                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_800,c_fill,g_east/v1790790255/ChatGPT_Image_Sep_30_2026_05_44_04_PM_jldinc.png 800w"
+                sizes="100vw"
+              />
+              <source
+                media="(max-width: 1023px)"
+                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1200,c_fill,g_east/v1790790255/ChatGPT_Image_Sep_30_2026_05_44_04_PM_jldinc.png 1200w"
+                sizes="100vw"
+              />
+              <img
+                src="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1600/v1790790255/ChatGPT_Image_Sep_30_2026_05_44_04_PM_jldinc.png"
+                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1280/v1790790255/ChatGPT_Image_Sep_30_2026_05_44_04_PM_jldinc.png 1280w,
+                        https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1600/v1790790255/ChatGPT_Image_Sep_30_2026_05_44_04_PM_jldinc.png 1600w"
+                sizes="100vw"
+                alt=""
+                fetchPriority="high"
+                loading="eager"
+                decoding="async"
+                className="w-full h-full object-cover object-[92%_top] sm:object-[88%_center] lg:object-right opacity-80 sm:opacity-85 lg:opacity-90"
+              />
+            </picture>
+
+            {/* Desktop Overlay Gradient */}
+            <div className="hidden lg:block absolute inset-0 bg-gradient-to-r from-[#070b0e] via-[#070b0e]/85 to-transparent from-0% via-42% to-75%" />
+
+            {/* Mobile / Tablet Overlay Gradients */}
+            <div className="lg:hidden absolute inset-0 bg-gradient-to-r from-[#070b0e]/95 via-[#070b0e]/70 to-[#070b0e]/25 from-0% via-48% to-100%" />
+            <div className="lg:hidden absolute inset-0 bg-gradient-to-b from-[#070b0e]/30 via-transparent to-[#070b0e] from-0% via-60% to-98%" />
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-            More Services & <br />
-            <span className="text-[#00c365]">Everyday Utilities</span>
-          </h1>
+          {/* Ambient Glow */}
+          <div className="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#00c365]/15 rounded-full blur-[100px] pointer-events-none" />
 
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-            Mystery Hub is expanding into an all-in-one digital operating hub for everyday life and business in Ghana. Browse current services and preview upcoming integrations.
-          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
+            {/* Left Column */}
+            <div className="lg:col-span-7 space-y-6 text-left">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#111c16]/90 border border-[#00c365]/30 text-xs font-semibold text-[#00c365] backdrop-blur-sm">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Digital Utilities Ecosystem</span>
+              </div>
+
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1]">
+                More Services & <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E575] via-[#00c365] to-[#34d399]">Everyday Utilities</span>
+              </h1>
+
+              <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-xl">
+                Mystery Hub is expanding into an all-in-one digital operating hub for everyday life and business in Ghana. Browse active services, buy data & airtime, and preview upcoming digital features.
+              </p>
+
+              {/* CTAs */}
+              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <button
+                  onClick={() => setActivePage('data')}
+                  className="px-6 py-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.35)] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Wifi className="w-4 h-4" />
+                  <span>Buy Data & Airtime</span>
+                </button>
+                <button
+                  onClick={() => setActivePage('website')}
+                  className="px-6 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 backdrop-blur-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Globe className="w-4 h-4 text-[#00c365]" />
+                  <span>Website Builder</span>
+                </button>
+              </div>
+
+              {/* Trust Signals */}
+              <div className="pt-2 flex flex-wrap items-center gap-y-2 gap-x-5 text-xs text-slate-400">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#00c365]" />
+                  <span>Instant Delivery Active</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-[#00c365]" />
+                  <span>Verified MoMo Checkout</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Open canvas for the artwork */}
+            <div className="hidden lg:block lg:col-span-5 pointer-events-none min-h-[300px] lg:min-h-[380px]" aria-hidden="true" />
+          </div>
         </div>
 
         {/* Filter and Search Bar */}
@@ -175,7 +256,7 @@ export const MoreServicesPage: React.FC = () => {
                       onClick={() => service.targetPage && setActivePage(service.targetPage)}
                       className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider border border-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <span>Explore Templates</span>
+                      <span>{service.id === 'srv-website' ? 'Explore Templates' : 'Preview Feature'}</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   ) : (

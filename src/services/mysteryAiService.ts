@@ -381,7 +381,7 @@ export function getGroundedLocalResponse(
   ) {
     return {
       reply:
-        "To check your order, head to our Orders page or click 'Track Order' in the header. Enter your public Order Reference (e.g. MH-20260930-...) to see real-time network dispatch progress. If you need manual help, our Accra WhatsApp helpdesk link is right on that page!",
+        "To check your order, head to our Orders page or click 'Track Order' in the header. Enter your public Order Reference (e.g. MH-20260930-...) to see real-time delivery status. If you need manual help, our Accra WhatsApp helpdesk link is right on that page!",
       quickAction: { type: 'navigate', targetPage: 'orders', label: '👉 Track Your Order' },
     };
   }

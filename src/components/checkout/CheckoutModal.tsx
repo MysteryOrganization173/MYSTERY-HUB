@@ -276,7 +276,7 @@ export const CheckoutModal: React.FC = () => {
                   )}
                 </div>
                 <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 truncate">
-                  {currentNetwork.name} · {isAirtime ? 'Direct automated airtime recharge' : (checkoutBundle.network === 'airteltigo' ? 'Instant direct delivery to your AT number.' : (checkoutBundle.description || 'Fast automated network dispatch'))}
+                  {currentNetwork.name} · {isAirtime ? 'Direct automated airtime recharge' : (checkoutBundle.network === 'airteltigo' ? 'Instant direct delivery to your AT number.' : (checkoutBundle.description || 'Fast automated delivery'))}
                 </p>
               </div>
             </div>

@@ -59,7 +59,7 @@ export const OrderStatusModal: React.FC = () => {
             statusMessage = 'Delivery could not be completed. Your payment is being reviewed for refund.';
           } else if (serverStatus === 'failed') {
             mappedStatus = 'failed';
-            statusMessage = 'The telecom provider was unable to complete the delivery. Please contact support or retry.';
+            statusMessage = 'The mobile network was unable to complete the delivery. Please contact support or retry.';
           } else if (serverStatus === 'pending_payment') {
             mappedStatus = 'verifying';
           }
@@ -118,14 +118,14 @@ export const OrderStatusModal: React.FC = () => {
     placed: {
       label: 'Order Placed',
       badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-      description: 'Your order has been queued and sent to our telecom gateway.',
+      description: 'Your order has been queued for automated delivery.',
       icon: Clock,
       step: 1,
     },
     processing: {
       label: 'Processing',
       badgeClass: 'bg-sky-500/10 text-sky-400 border-sky-500/30',
-      description: 'Telecom provider is provisioning your bundle. Usually completes in just a few minutes.',
+      description: 'The mobile network is processing your bundle. Usually completes in just a few minutes.',
       icon: RefreshCw,
       step: 2,
     },
@@ -143,7 +143,7 @@ export const OrderStatusModal: React.FC = () => {
         activeOrder.statusMessage ||
         (isRefundIssue
           ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
-          : 'The telecom provider rejected the request. Please check phone number or retry.'),
+          : 'The mobile network was unable to process the request. Please check phone number or retry.'),
       icon: AlertTriangle,
       step: 0,
     },
@@ -219,7 +219,7 @@ export const OrderStatusModal: React.FC = () => {
           <div className="bg-[#090d10] p-4 rounded-xl border border-slate-800 space-y-2">
             <div className="flex justify-between text-xs text-slate-400 font-medium">
               <span>Order Received</span>
-              <span>Network Dispatch</span>
+              <span>Delivery Progress</span>
               <span>Delivered</span>
             </div>
             <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden flex">

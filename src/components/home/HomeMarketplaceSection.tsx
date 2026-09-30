@@ -9,7 +9,7 @@ export const HomeMarketplaceSection: React.FC = () => {
     {
       icon: Laptop,
       title: 'Laptops & Devices',
-      desc: 'Business ultrabooks, coding workstations, and student laptops sourced from verified suppliers.',
+      desc: 'Business ultrabooks, coding workstations, and student laptops sourced from verified distributors.',
       tag: 'Hardware',
       accent: 'text-sky-400 bg-sky-500/10 border-sky-500/20',
     },

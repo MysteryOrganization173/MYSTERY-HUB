@@ -39,7 +39,7 @@ export const BUSINESS_CONFIG = {
       status: 'active',
       isAvailableForPurchase: true,
       label: 'Live',
-      deliveryNotice: 'Automated telecom dispatch directly to your SIM following Mobile Money authorization.',
+      deliveryNotice: 'Fast automated delivery directly to your SIM following Mobile Money authorization.',
     },
     websiteBuilder: {
       status: 'beta',
@@ -53,7 +53,7 @@ export const BUSINESS_CONFIG = {
       isAvailableForPurchase: true,
       label: 'Live Sourcing',
       notice:
-        'Curated tech hardware, creator tools, and productivity software sourced on request with verified Ghana dispatch.',
+        'Curated tech hardware, creator tools, and productivity software sourced on request with verified local Ghana delivery.',
     },
     airtime: {
       status: 'active',
@@ -68,7 +68,7 @@ export const BUSINESS_CONFIG = {
       isAvailableForPurchase: false,
       label: 'Coming Soon',
       notice:
-        'Mystery Hub Wallet is in architectural development with multi-tier ledger security and auto-renewals.',
+        'Mystery Hub Wallet is in development with multi-layer security and auto-renewals.',
     },
     utilities: {
       status: 'coming_soon',

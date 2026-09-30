@@ -39,7 +39,7 @@ export const Hero: React.FC = () => {
             fetchPriority="high"
             loading="eager"
             decoding="async"
-            className="w-full h-full object-cover object-[88%_top] sm:object-[80%_center] lg:object-right opacity-70 sm:opacity-85 lg:opacity-95"
+            className="w-full h-full object-cover object-[88%_top] sm:object-[80%_center] lg:object-right opacity-85 sm:opacity-85 lg:opacity-95"
           />
         </picture>
 
@@ -48,10 +48,11 @@ export const Hero: React.FC = () => {
             smoothly transitioning across center (38–70%) so the illuminated Accra artwork emerges naturally */}
         <div className="hidden lg:block absolute inset-0 bg-gradient-to-r from-[#070b0e] via-[#070b0e]/85 to-transparent from-0% via-40% to-72%" />
 
-        {/* Mobile Gradient Overlay:
-            Rich dark fade from bottom/center so text and CTAs have crystal clear readability
-            while letting the glowing Accra landmarks peek through the top/ambient background */}
-        <div className="lg:hidden absolute inset-0 bg-gradient-to-b from-[#070b0e]/40 via-[#070b0e]/85 to-[#070b0e] from-0% via-45% to-95%" />
+        {/* Mobile & Tablet Gradient Overlay:
+            Left-heavy dark gradient for maximum text contrast on the left,
+            fading to light overlay on the right so phone device & connectivity artwork is clearly visible */}
+        <div className="lg:hidden absolute inset-0 bg-gradient-to-r from-[#070b0e]/95 via-[#070b0e]/65 to-[#070b0e]/20 from-0% via-45% to-100%" />
+        <div className="lg:hidden absolute inset-0 bg-gradient-to-b from-[#070b0e]/40 via-transparent to-[#070b0e] from-0% via-55% to-98%" />
 
         {/* Top Edge Dissolve: Seamless transition from header */}
         <div className="absolute top-0 inset-x-0 h-16 sm:h-24 bg-gradient-to-b from-[#070b0e] to-transparent pointer-events-none" />

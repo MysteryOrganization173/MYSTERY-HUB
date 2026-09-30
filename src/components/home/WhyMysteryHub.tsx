@@ -9,7 +9,7 @@ export const WhyMysteryHub: React.FC = () => {
     {
       icon: Zap,
       title: 'Reliable Automated Delivery',
-      desc: 'Automated telecom dispatch directly to your SIM promptly after Mobile Money payment authorization.',
+      desc: 'Fast automated delivery directly to your SIM promptly after Mobile Money payment authorization.',
       accent: 'text-[#00c365] bg-[#00c365]/10',
     },
     {
