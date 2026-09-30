@@ -186,13 +186,23 @@ export class SuccessBizHubClient {
 
   /**
    * 4. POST /beneficiary-check
-   * Check phone eligibility before order placement
+   * Check phone eligibility before order placement. Requires phones and exactly one offer selector.
    * Never cached
    */
-  async checkBeneficiary(phones: string[]): Promise<SbhBeneficiaryCheckResponse> {
+  async checkBeneficiary(
+    phones: string[],
+    selector?: { offerSlug?: string; offerId?: string }
+  ): Promise<SbhBeneficiaryCheckResponse> {
+    const body: { phones: string[]; offerSlug?: string; offerId?: string } = { phones };
+    if (selector?.offerSlug) {
+      body.offerSlug = selector.offerSlug;
+    } else if (selector?.offerId) {
+      body.offerId = selector.offerId;
+    }
+
     return this.request<SbhBeneficiaryCheckResponse>('/beneficiary-check', {
       method: 'POST',
-      body: { phones },
+      body,
       skipCache: true,
     });
   }

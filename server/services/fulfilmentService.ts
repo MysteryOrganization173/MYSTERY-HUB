@@ -82,8 +82,11 @@ export class FulfilmentService {
 
       const supplierPackage = resolved.resolved;
 
-      // 3. Confirm beneficiary eligibility via /beneficiary-check
-      const beneficiaryCheck = await this.provider.checkBeneficiaryEligibility(recipientPhone);
+      // 3. Confirm beneficiary eligibility via /beneficiary-check with offer selector
+      const beneficiaryCheck = await this.provider.checkBeneficiaryEligibility(recipientPhone, {
+        offerSlug: supplierPackage.offerSlug,
+        offerId: supplierPackage.offerId,
+      });
       if (!beneficiaryCheck.eligible) {
         console.warn(`[Fulfilment Preflight] Beneficiary ineligible: ${beneficiaryCheck.reason}`);
         return {

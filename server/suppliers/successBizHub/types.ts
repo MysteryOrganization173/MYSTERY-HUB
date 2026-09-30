@@ -21,9 +21,9 @@ export interface SbhServicesResponse {
 
 export interface SbhWalletData {
   currency: string;
-  balanceMinor?: number;
-  availableMinor: number;
-  heldMinor?: number;
+  balanceMinor?: string | number;
+  availableMinor: string | number;
+  heldMinor?: string | number;
   [key: string]: unknown;
 }
 
@@ -36,7 +36,7 @@ export interface SbhWalletResponse {
 export interface SbhPackage {
   id?: string;
   sizeLabel: string; // e.g. "1GB", "10GB", "30GB"
-  priceMinor: number; // Wholesale supplier cost in pesewas
+  priceMinor: string | number; // Wholesale supplier cost in pesewas (decimal string or number)
   validity?: string;
   [key: string]: unknown;
 }
@@ -56,6 +56,12 @@ export interface SbhCatalogResponse {
   status: string;
   data: SbhOffer[] | { offers?: SbhOffer[] };
   message?: string;
+}
+
+export interface SbhBeneficiaryCheckRequest {
+  phones: string[];
+  offerSlug?: string;
+  offerId?: string;
 }
 
 export interface SbhBeneficiaryCheckItem {
@@ -118,8 +124,8 @@ export interface SbhWebhookPayload {
     order?: SbhWebhookOrderItem;
     orders?: SbhWebhookOrderItem[];
     items?: SbhWebhookOrderItem[];
-    balanceMinor?: number;
-    availableMinor?: number;
+    balanceMinor?: string | number;
+    availableMinor?: string | number;
   };
   orders?: SbhWebhookOrderItem[];
   items?: SbhWebhookOrderItem[];

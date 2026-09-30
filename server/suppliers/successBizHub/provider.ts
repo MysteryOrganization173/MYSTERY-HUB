@@ -14,6 +14,7 @@ import {
 import { SuccessBizHubClient } from './client.js';
 import { resolveSupplierPackage, ResolvedSupplierPackage } from './catalogResolver.js';
 import { SbhOffer } from './types.js';
+import { parseMinorAmount } from './money.js';
 
 export class SuccessBizHubProvider implements SupplierProvider {
   providerId = 'success_biz_hub';
@@ -49,19 +50,22 @@ export class SuccessBizHubProvider implements SupplierProvider {
 
   /**
    * 1. GET /wallet
-   * Retrieves supplier wallet balance
+   * Retrieves supplier wallet balance. Strictly validates availableMinor.
    */
   async getBalance(): Promise<SupplierBalance> {
     const res = await this.client.getWallet();
     const data = res.data || {};
-    const availableMinor = typeof data.availableMinor === 'number' ? data.availableMinor : 0;
+    const parsedAvailable = parseMinorAmount(data.availableMinor);
+    if (parsedAvailable === null) {
+      throw new Error(`Invalid or unparseable availableMinor in supplier wallet: "${String(data.availableMinor)}"`);
+    }
     const currency = (data.currency || 'GHS').toUpperCase() as 'GHS';
 
     return {
       providerName: this.providerName,
       currency,
-      balancePesewas: availableMinor,
-      balanceGhc: Number((availableMinor / 100).toFixed(2)),
+      balancePesewas: parsedAvailable,
+      balanceGhc: Number((parsedAvailable / 100).toFixed(2)),
     };
   }
 
@@ -83,11 +87,12 @@ export class SuccessBizHubProvider implements SupplierProvider {
       if ((offer.kind || '').toLowerCase() !== 'data') continue;
       const packages = Array.isArray(offer.packages) ? offer.packages : [];
       for (const pkg of packages) {
+        const wholesaleCost = parseMinorAmount(pkg.priceMinor) ?? 0;
         supplierOffers.push({
           supplierCode: offer.slug || offer.id || offer.name,
           network: offer.network,
           dataAmount: pkg.sizeLabel,
-          wholesalePricePesewas: pkg.priceMinor,
+          wholesalePricePesewas: wholesaleCost,
         });
       }
     }
@@ -140,15 +145,18 @@ export class SuccessBizHubProvider implements SupplierProvider {
   }
 
   /**
-   * Check beneficiary eligibility via /beneficiary-check
+   * Check beneficiary eligibility via /beneficiary-check with offer selector
    */
-  async checkBeneficiaryEligibility(phone: string): Promise<{ eligible: boolean; reason?: string }> {
+  async checkBeneficiaryEligibility(
+    phone: string,
+    offerSelector?: { offerSlug?: string; offerId?: string }
+  ): Promise<{ eligible: boolean; reason?: string }> {
     try {
       // Success Biz Hub expects 10-digit local or standard formatted phone
       const cleanPhone = phone.replace(/[^\d]/g, '');
       const formatted = cleanPhone.startsWith('233') ? `0${cleanPhone.slice(3)}` : cleanPhone;
 
-      const res = await this.client.checkBeneficiary([formatted]);
+      const res = await this.client.checkBeneficiary([formatted], offerSelector);
 
       // Parse response format: either { data: [{ phone, eligible, reason }] } or { eligible: true }
       let isEligible = false;

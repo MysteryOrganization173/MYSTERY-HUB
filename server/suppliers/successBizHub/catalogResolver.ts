@@ -5,6 +5,7 @@
  */
 
 import { SbhOffer, SbhPackage } from './types.js';
+import { parseMinorAmount } from './money.js';
 
 export interface ResolvedSupplierPackage {
   offer: SbhOffer;
@@ -146,6 +147,15 @@ export function resolveSupplierPackage(
     };
   }
 
+  // Strict validation of supplier wholesale price
+  const validatedCostMinor = parseMinorAmount(matchedPackage.priceMinor);
+  if (validatedCostMinor === null) {
+    return {
+      resolved: null,
+      error: `Supplier package "${matchedPackage.sizeLabel}" has invalid or unparseable priceMinor: "${String(matchedPackage.priceMinor)}". Failing closed.`,
+    };
+  }
+
   return {
     resolved: {
       offer: selectedOffer,
@@ -153,7 +163,7 @@ export function resolveSupplierPackage(
       offerId: selectedOffer.id || undefined,
       package: matchedPackage,
       sizeLabel: matchedPackage.sizeLabel,
-      supplierCostMinor: matchedPackage.priceMinor,
+      supplierCostMinor: validatedCostMinor,
     },
   };
 }

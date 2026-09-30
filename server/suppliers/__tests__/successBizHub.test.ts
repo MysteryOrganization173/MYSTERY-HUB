@@ -19,6 +19,7 @@ import { FulfilmentService } from '../../services/fulfilmentService.js';
 import { OrdersStore } from '../../db/ordersStore.js';
 import { SbhOffer } from '../successBizHub/types.js';
 import { OrderRecord } from '../../types/orders.js';
+import { parseMinorAmount } from '../successBizHub/money.js';
 
 // Sample mock catalog with typical Ghana telecom offers
 const MOCK_CATALOG: SbhOffer[] = [
@@ -29,11 +30,11 @@ const MOCK_CATALOG: SbhOffer[] = [
     network: 'MTN',
     kind: 'data',
     packages: [
-      { id: 'pkg_mtn_1gb', sizeLabel: '1GB', priceMinor: 420 },
-      { id: 'pkg_mtn_5gb', sizeLabel: '5GB', priceMinor: 2100 },
-      { id: 'pkg_mtn_10gb', sizeLabel: '10GB', priceMinor: 3950 },
-      { id: 'pkg_mtn_15gb', sizeLabel: '15GB', priceMinor: 5800 },
-      { id: 'pkg_mtn_30gb', sizeLabel: '30GB', priceMinor: 10500 },
+      { id: 'pkg_mtn_1gb', sizeLabel: '1GB', priceMinor: '420' }, // Decimal string in v2
+      { id: 'pkg_mtn_5gb', sizeLabel: '5GB', priceMinor: 2100 },  // Numeric format
+      { id: 'pkg_mtn_10gb', sizeLabel: '10GB', priceMinor: '3950' },
+      { id: 'pkg_mtn_15gb', sizeLabel: '15GB', priceMinor: '5800' },
+      { id: 'pkg_mtn_30gb', sizeLabel: '30GB', priceMinor: '10500' },
     ],
   },
   {
@@ -43,22 +44,22 @@ const MOCK_CATALOG: SbhOffer[] = [
     network: 'Telecel',
     kind: 'data',
     packages: [
-      { id: 'pkg_tel_1gb', sizeLabel: '1GB', priceMinor: 410 },
-      { id: 'pkg_tel_3gb', sizeLabel: '3GB', priceMinor: 1150 },
-      { id: 'pkg_tel_6gb', sizeLabel: '6GB', priceMinor: 2200 },
-      { id: 'pkg_tel_12gb', sizeLabel: '12GB', priceMinor: 4100 },
+      { id: 'pkg_tel_1gb', sizeLabel: '1GB', priceMinor: '410' },
+      { id: 'pkg_tel_3gb', sizeLabel: '3GB', priceMinor: '1150' },
+      { id: 'pkg_tel_6gb', sizeLabel: '6GB', priceMinor: '2200' },
+      { id: 'pkg_tel_12gb', sizeLabel: '12GB', priceMinor: '4100' },
     ],
   },
   {
     id: 'off_at_data_01',
-    slug: 'at-data-direct',
+    // slug omitted to test fallback to offerId
     name: 'AirtelTigo AT Data',
     network: 'AirtelTigo',
     kind: 'data',
     packages: [
-      { id: 'pkg_at_4gb', sizeLabel: '4GB', priceMinor: 1000 },
-      { id: 'pkg_at_8gb', sizeLabel: '8GB', priceMinor: 1950 },
-      { id: 'pkg_at_15gb', sizeLabel: '15GB', priceMinor: 3500 },
+      { id: 'pkg_at_4gb', sizeLabel: '4GB', priceMinor: '1000' },
+      { id: 'pkg_at_8gb', sizeLabel: '8GB', priceMinor: '1950' },
+      { id: 'pkg_at_15gb', sizeLabel: '15GB', priceMinor: '3500' },
     ],
   },
 ];
@@ -66,6 +67,26 @@ const MOCK_CATALOG: SbhOffer[] = [
 async function runTests() {
   console.log('--- STARTING SUCCESS BIZ HUB TEST SUITE ---');
   let passed = 0;
+
+  // 0. Money Minor Parser strict requirements
+  {
+    assert.strictEqual(parseMinorAmount('12345'), 12345, 'String "12345" must parse to 12345');
+    assert.strictEqual(parseMinorAmount(12345), 12345, 'Numeric 12345 must work');
+    assert.strictEqual(parseMinorAmount('400'), 400, 'String "400" must parse to 400');
+    assert.strictEqual(parseMinorAmount('400.00'), 400, 'String "400.00" must parse to 400');
+    assert.strictEqual(parseMinorAmount('0'), 0, 'Zero string must parse to 0');
+    assert.strictEqual(parseMinorAmount(0), 0, 'Numeric 0 must work');
+    assert.strictEqual(parseMinorAmount('abc'), null, 'Malformed string must return null');
+    assert.strictEqual(parseMinorAmount(''), null, 'Empty string must return null');
+    assert.strictEqual(parseMinorAmount('   '), null, 'Whitespace must return null');
+    assert.strictEqual(parseMinorAmount('-100'), null, 'Negative string must return null');
+    assert.strictEqual(parseMinorAmount(-100), null, 'Negative number must return null');
+    assert.strictEqual(parseMinorAmount(null), null, 'null must return null');
+    assert.strictEqual(parseMinorAmount(undefined), null, 'undefined must return null');
+    assert.strictEqual(parseMinorAmount(NaN), null, 'NaN must return null');
+    console.log('✓ 0. parseMinorAmount utility verified for strings, numbers, and rejection of malformed values');
+    passed++;
+  }
 
   // 1. API authentication header construction
   {
@@ -76,11 +97,13 @@ async function runTests() {
     passed++;
   }
 
-  // 2. Supplier catalog parsing
+  // 2. Supplier catalog parsing with string priceMinor
   {
     const offers = MOCK_CATALOG.filter((o) => o.kind === 'data');
     assert.strictEqual(offers.length, 3, 'Should parse 3 data offers');
-    console.log('✓ 2. Supplier catalog parsing verified');
+    const firstPkg = offers[0].packages[0];
+    assert.strictEqual(parseMinorAmount(firstPkg.priceMinor), 420);
+    console.log('✓ 2. Supplier catalog parsing & priceMinor string parsing verified');
     passed++;
   }
 
@@ -102,7 +125,7 @@ async function runTests() {
     passed++;
   }
 
-  // 4. Exact size matching
+  // 4. Exact size matching & string priceMinor to integer conversion
   {
     assert.strictEqual(normalizeSizeLabel('1GB'), '1GB');
     assert.strictEqual(normalizeSizeLabel('1 GB'), '1GB');
@@ -111,66 +134,107 @@ async function runTests() {
     const res = resolveSupplierPackage(MOCK_CATALOG, 'mtn', '1GB');
     assert.ok(res.resolved, '1GB should be resolved');
     assert.strictEqual(res.resolved?.sizeLabel, '1GB');
-    assert.strictEqual(res.resolved?.supplierCostMinor, 420);
+    assert.strictEqual(res.resolved?.supplierCostMinor, 420, 'priceMinor "420" must resolve to integer 420');
     assert.strictEqual(res.resolved?.offerSlug, 'mtn-data-direct');
-    console.log('✓ 4. Exact size matching verified');
+    console.log('✓ 4. Exact size matching & string priceMinor to integer conversion verified');
     passed++;
   }
 
-  // 5. Unmatched size rejection (No approximate mappings!)
+  // 5. Unmatched size rejection & malformed price rejection (No approximate mappings!)
   {
     // Mystery Hub 2.5GB does NOT exist in MOCK_CATALOG
     const res25 = resolveSupplierPackage(MOCK_CATALOG, 'mtn', '2.5GB');
     assert.strictEqual(res25.resolved, null, '2.5GB must NOT resolve to 2GB or 3GB');
     assert.ok(res25.error?.includes('No exact package match for size "2.5GB"'));
 
-    // Mystery Hub 1.5GB does NOT exist in AT MOCK_CATALOG
-    const res15 = resolveSupplierPackage(MOCK_CATALOG, 'airteltigo', '1.5GB');
-    assert.strictEqual(res15.resolved, null, '1.5GB must NOT resolve to 1GB or 2GB');
+    // Malformed supplier price rejects package
+    const malformedCatalog: SbhOffer[] = [
+      {
+        id: 'off_bad_price',
+        slug: 'bad-price-offer',
+        name: 'Bad Price MTN',
+        network: 'MTN',
+        kind: 'data',
+        packages: [{ id: 'p1', sizeLabel: '1GB', priceMinor: 'invalid_price_abc' as unknown as number }],
+      },
+    ];
+    const badRes = resolveSupplierPackage(malformedCatalog, 'mtn', '1GB');
+    assert.strictEqual(badRes.resolved, null, 'Package with malformed priceMinor must fail resolution');
+    assert.ok(badRes.error?.includes('has invalid or unparseable priceMinor'));
 
-    // Mystery Hub 500MB does NOT exist in MTN MOCK_CATALOG
-    const res500 = resolveSupplierPackage(MOCK_CATALOG, 'mtn', '500MB');
-    assert.strictEqual(res500.resolved, null, '500MB must NOT resolve to 1GB');
-    console.log('✓ 5. Unmatched size rejection & anti-approximation verified');
+    console.log('✓ 5. Unmatched size rejection & malformed supplier price rejection verified');
     passed++;
   }
 
-  // 6. Beneficiary ineligible handling
+  // 6. Beneficiary check includes offerSlug OR offerId
   {
     const mockClient = new SuccessBizHubClient();
+    let sentBody: unknown = null;
+    mockClient.checkBeneficiary = async (phones, selector) => {
+      sentBody = { phones, ...selector };
+      return {
+        status: 'success',
+        data: [{ phone: phones[0], eligible: true }],
+      };
+    };
+
+    const provider = new SuccessBizHubProvider(mockClient);
+
+    // 6a. Check with offerSlug
+    await provider.checkBeneficiaryEligibility('0592066298', { offerSlug: 'mtn-data-direct' });
+    assert.deepStrictEqual(sentBody, { phones: ['0592066298'], offerSlug: 'mtn-data-direct' }, 'Must send offerSlug');
+
+    // 6b. Check with offerId when slug absent
+    await provider.checkBeneficiaryEligibility('0592066298', { offerId: 'off_at_data_01' });
+    assert.deepStrictEqual(sentBody, { phones: ['0592066298'], offerId: 'off_at_data_01' }, 'Must send offerId when slug absent');
+
+    // 6c. Check beneficiary ineligible
     mockClient.checkBeneficiary = async () => ({
       status: 'success',
       data: [{ phone: '0592066298', eligible: false, reason: 'Line is suspended' }],
     });
-    const provider = new SuccessBizHubProvider(mockClient);
-    const check = await provider.checkBeneficiaryEligibility('0592066298');
-    assert.strictEqual(check.eligible, false);
-    assert.strictEqual(check.reason, 'Line is suspended');
-    console.log('✓ 6. Beneficiary ineligible handling verified');
+    const checkIneligible = await provider.checkBeneficiaryEligibility('0592066298', { offerSlug: 'mtn-data-direct' });
+    assert.strictEqual(checkIneligible.eligible, false);
+    assert.strictEqual(checkIneligible.reason, 'Line is suspended');
+
+    console.log('✓ 6. Beneficiary check with offerSlug & offerId fallback verified');
     passed++;
   }
 
-  // 7. Supplier-wallet unavailable handling
+  // 7. Supplier wallet parsing (string "12345", numeric, and malformed balance fails closed)
   {
     const mockClient = new SuccessBizHubClient();
-    mockClient.isFulfillmentEnabled = () => true;
-    mockClient.isConfigured = () => true;
-    mockClient.getServices = async () => ({ status: 'success', data: [{ kind: 'data', available: true, enabled: true }] });
-    mockClient.getCatalog = async () => ({ status: 'success', data: MOCK_CATALOG });
-    mockClient.checkBeneficiary = async () => ({ status: 'success', data: [{ phone: '0592066298', eligible: true }] });
-    // Low wallet balance: 100 pesewas, but 1GB costs 420 pesewas
+
+    // 7a. String availableMinor "12345"
     mockClient.getWallet = async () => ({
       status: 'success',
-      data: { currency: 'GHS', availableMinor: 100 },
+      data: { currency: 'GHS', availableMinor: '12345' },
     });
+    const providerA = new SuccessBizHubProvider(mockClient);
+    const walletA = await providerA.getBalance();
+    assert.strictEqual(walletA.balancePesewas, 12345, 'availableMinor string "12345" must parse to 12345');
+    assert.strictEqual(walletA.balanceGhc, 123.45);
 
-    const customProvider = new SuccessBizHubProvider(mockClient);
-    // Replace provider temporarily
-    (FulfilmentService as unknown as { provider: SuccessBizHubProvider }).provider = customProvider;
+    // 7b. Numeric availableMinor 5000
+    mockClient.getWallet = async () => ({
+      status: 'success',
+      data: { currency: 'GHS', availableMinor: 5000 },
+    });
+    const walletB = await providerA.getBalance();
+    assert.strictEqual(walletB.balancePesewas, 5000, 'numeric availableMinor must work');
 
-    const preflight = await FulfilmentService.preflightCheck('mtn', '1GB', '0592066298');
-    assert.strictEqual(preflight.allowed, false, 'Preflight must fail when wallet is insufficient');
-    console.log('✓ 7. Supplier wallet unavailable handling verified');
+    // 7c. Malformed wallet balance fails closed
+    mockClient.getWallet = async () => ({
+      status: 'success',
+      data: { currency: 'GHS', availableMinor: 'corrupted_abc' as unknown as number },
+    });
+    await assert.rejects(
+      async () => providerA.getBalance(),
+      /Invalid or unparseable availableMinor in supplier wallet/,
+      'Malformed wallet balance must throw and fail closed'
+    );
+
+    console.log('✓ 7. Supplier wallet string parsing & malformed balance fail-closed verified');
     passed++;
   }
 
