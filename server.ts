@@ -4,7 +4,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import { apiRouter, handlePaystackWebhook, handleSuccessBizHubWebhook } from './server/routes/api.js';
-import { OrdersStore } from './server/db/ordersStore.js';
+import { adminRouter } from './server/routes/adminApi.js';
+import { initDatabase } from './server/db/connection.js';
+import { bootstrapAdminAccount } from './server/services/adminBootstrap.js';
 import { buildMysteryAiSystemInstruction } from './server/services/mysteryAiContext.js';
 
 dotenv.config();
@@ -42,7 +44,7 @@ app.use((req, res, next) => {
     res.setHeader('Vary', 'Origin');
   }
 
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
   res.setHeader(
     'Access-Control-Allow-Headers',
     'Content-Type, Authorization, x-paystack-signature, x-webhook-signature, x-sbh-signature'
@@ -104,6 +106,9 @@ app.use(express.json({ limit: '1mb' }));
 
 // Mount Core Payments & Orders API Router
 app.use('/api', apiRouter);
+
+// Mount Protected Admin V1 API Router
+app.use('/api/admin', adminRouter);
 
 // Initialize Gemini API client if API key is present
 let aiClient: GoogleGenAI | null = null;
@@ -218,7 +223,8 @@ app.post('/api/mystery-ai/chat', async (req, res) => {
 
 // Setup Vite in development or static serving in production
 async function startServer() {
-  await OrdersStore.initDb();
+  await initDatabase();
+  await bootstrapAdminAccount();
   const isProd = process.env.NODE_ENV === 'production';
 
   if (!isProd) {

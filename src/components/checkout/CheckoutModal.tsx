@@ -174,8 +174,8 @@ export const CheckoutModal: React.FC = () => {
     initializeServerPayment({
       productId: checkoutBundle.id,
       recipientPhone: phone.trim(),
-      customerEmail: user?.email,
-      customerName: user?.name,
+      customerEmail: user?.email || undefined,
+      customerName: user?.name || undefined,
       serviceType: isAirtime ? 'airtime' : 'data',
       network: checkoutBundle.network,
       amount: faceValue,

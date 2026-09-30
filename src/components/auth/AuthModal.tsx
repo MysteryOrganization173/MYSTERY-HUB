@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { BrandLogo } from '../common/BrandLogo';
-import { X, Lock, Phone, Mail, User as UserIcon, ArrowRight, ShieldCheck } from 'lucide-react';
+import { X, Lock, Phone, User as UserIcon, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { registerOnServer, loginOnServer } from '../../services/apiClient';
 
 export const AuthModal: React.FC = () => {
   const { isAuthModalOpen, closeAuth, authMode, openAuth, loginUser, showToast } = useApp();
@@ -11,29 +12,60 @@ export const AuthModal: React.FC = () => {
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isAuthModalOpen) return null;
 
   const isSignup = authMode === 'signup';
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!identifier || !password || (isSignup && !name)) {
-      showToast('Please complete all required fields.', 'warning');
+    setErrorMessage(null);
+
+    if (!identifier.trim() || !password || (isSignup && !name.trim())) {
+      setErrorMessage('Please complete all required fields.');
+      return;
+    }
+
+    if (password.length < 8) {
+      setErrorMessage('Password must be at least 8 characters long.');
       return;
     }
 
     setIsLoading(true);
 
-    // Frontend simulation prepared for future backend endpoint (e.g. /api/auth/login)
-    setTimeout(() => {
+    try {
+      if (isSignup) {
+        const res = await registerOnServer({
+          name: name.trim(),
+          identifier: identifier.trim(),
+          password,
+          rememberMe,
+        });
+
+        setName('');
+        setIdentifier('');
+        setPassword('');
+        loginUser(res.user, res.token);
+      } else {
+        const res = await loginOnServer({
+          identifier: identifier.trim(),
+          password,
+          rememberMe,
+        });
+
+        setName('');
+        setIdentifier('');
+        setPassword('');
+        loginUser(res.user, res.token);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Authentication failed. Please try again.';
+      setErrorMessage(msg);
+      showToast(msg, 'warning');
+    } finally {
       setIsLoading(false);
-      loginUser({
-        name: isSignup ? name.trim() : identifier.includes('@') ? identifier.split('@')[0] : 'Account User',
-        email: identifier.includes('@') ? identifier : `${identifier.replace(/\D/g, '')}@user.mysteryhub.site`,
-        phone: identifier.includes('@') ? '' : identifier,
-      });
-    }, 800);
+    }
   };
 
   return (
@@ -63,6 +95,13 @@ export const AuthModal: React.FC = () => {
                 : 'Log in to track orders, save bundles, and manage your websites.'}
             </p>
           </div>
+
+          {errorMessage && (
+            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs animate-in fade-in">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <p className="leading-snug">{errorMessage}</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {isSignup && (
@@ -168,7 +207,10 @@ export const AuthModal: React.FC = () => {
                 Already have an account?{' '}
                 <button
                   type="button"
-                  onClick={() => openAuth('login')}
+                  onClick={() => {
+                    setErrorMessage(null);
+                    openAuth('login');
+                  }}
                   className="text-[#00c365] font-semibold hover:underline"
                 >
                   Log in here
@@ -179,7 +221,10 @@ export const AuthModal: React.FC = () => {
                 Don&apos;t have an account yet?{' '}
                 <button
                   type="button"
-                  onClick={() => openAuth('signup')}
+                  onClick={() => {
+                    setErrorMessage(null);
+                    openAuth('signup');
+                  }}
                   className="text-[#00c365] font-semibold hover:underline"
                 >
                   Create one now

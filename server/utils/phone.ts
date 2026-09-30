@@ -57,6 +57,10 @@ export function validateAndNormalizeGhanaPhone(rawPhone: string): PhoneValidatio
   };
 }
 
+export function isValidGhanaPhoneNumber(rawPhone: string): boolean {
+  return validateAndNormalizeGhanaPhone(rawPhone).isValid;
+}
+
 /**
  * Returns the canonical standardized Ghana phone number (+233...) or null if invalid
  */

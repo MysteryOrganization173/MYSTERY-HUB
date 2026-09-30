@@ -23,9 +23,21 @@ import { WaitlistModal } from './components/common/WaitlistModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { MysteryAiAssistant } from './components/ai/MysteryAiAssistant';
 import { IsolatedTemplatePreview } from './components/website/IsolatedTemplatePreview';
+import { AdminPage } from './components/admin/AdminPage';
 
 const AppContent: React.FC = () => {
   const { activePage } = useApp();
+
+  // Isolated Admin Experience
+  if (activePage === 'admin') {
+    return (
+      <>
+        <SEOHead />
+        <AdminPage />
+        <ToastContainer />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0b0f12] text-slate-100 flex flex-col font-sans selection:bg-[#00c365] selection:text-black">

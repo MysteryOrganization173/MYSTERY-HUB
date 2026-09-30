@@ -1,27 +1,65 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { X, Bell, CheckCircle2, ArrowRight } from 'lucide-react';
+import { X, Bell, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react';
+import { joinWaitlistOnServer } from '../../services/apiClient';
 
 export const WaitlistModal: React.FC = () => {
-  const { waitlistInfo, closeWaitlist, showToast } = useApp();
+  const { waitlistInfo, closeWaitlist, showToast, sessionToken } = useApp();
   const [contact, setContact] = useState('');
   const [channel, setChannel] = useState<'whatsapp' | 'sms' | 'email'>('whatsapp');
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [alreadyJoined, setAlreadyJoined] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!waitlistInfo.isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contact.trim()) return;
 
-    setIsSubmitted(true);
-    showToast(`You're registered for ${waitlistInfo.serviceTitle} launch updates!`, 'success');
+    setErrorMessage(null);
+    setIsSubmitting(true);
 
-    setTimeout(() => {
-      setIsSubmitted(false);
-      setContact('');
-      closeWaitlist();
-    }, 2200);
+    const serviceKey = waitlistInfo.serviceTitle
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+
+    try {
+      const res = await joinWaitlistOnServer(
+        {
+          serviceKey: serviceKey || 'general_waitlist',
+          serviceTitle: waitlistInfo.serviceTitle,
+          channel,
+          contact: contact.trim(),
+          sourcePage: typeof window !== 'undefined' ? window.location.pathname : undefined,
+        },
+        sessionToken
+      );
+
+      setAlreadyJoined(res.alreadyJoined);
+      setIsSubmitted(true);
+      showToast(
+        res.alreadyJoined
+          ? `You're already on the priority list for ${waitlistInfo.serviceTitle}!`
+          : `You're registered for ${waitlistInfo.serviceTitle} launch updates!`,
+        'success'
+      );
+
+      setTimeout(() => {
+        setIsSubmitted(false);
+        setAlreadyJoined(false);
+        setContact('');
+        closeWaitlist();
+      }, 2500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to join waitlist. Please try again.';
+      setErrorMessage(msg);
+      showToast(msg, 'warning');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -47,9 +85,13 @@ export const WaitlistModal: React.FC = () => {
               <div className="w-12 h-12 rounded-full bg-[#00c365]/20 text-[#00c365] flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-7 h-7" />
               </div>
-              <h4 className="font-bold text-lg text-white">You&apos;re On The VIP List!</h4>
+              <h4 className="font-bold text-lg text-white">
+                {alreadyJoined ? 'Already on VIP List!' : "You're On The VIP List!"}
+              </h4>
               <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                We will notify you via {channel} as soon as{' '}
+                {alreadyJoined
+                  ? `Your contact is already confirmed. We will notify you via ${channel} as soon as `
+                  : `We will notify you via ${channel} as soon as `}
                 <span className="text-white font-medium">{waitlistInfo.serviceTitle}</span> goes live in Ghana.
               </p>
             </div>
@@ -66,6 +108,13 @@ export const WaitlistModal: React.FC = () => {
                   We are finalizing direct integrations with Ghanaian utility providers. Join the early-access list to be notified the moment this service goes live.
                 </p>
               </div>
+
+              {errorMessage && (
+                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <p className="leading-snug">{errorMessage}</p>
+                </div>
+              )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
@@ -123,10 +172,20 @@ export const WaitlistModal: React.FC = () => {
 
                 <button
                   type="submit"
-                  className="w-full py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] flex items-center justify-center gap-2 cursor-pointer"
+                  disabled={isSubmitting}
+                  className="w-full py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
                 >
-                  <span>Notify Me at Launch</span>
-                  <ArrowRight className="w-4 h-4" />
+                  {isSubmitting ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                      Registering...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <span>Notify Me at Launch</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </span>
+                  )}
                 </button>
               </form>
             </>

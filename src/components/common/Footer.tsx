@@ -232,6 +232,13 @@ export const Footer: React.FC = () => {
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <span>© 2026 Mystery Hub Ghana. All rights reserved.</span>
+            <span className="text-slate-700">·</span>
+            <button
+              onClick={() => setActivePage('admin')}
+              className="text-slate-600 hover:text-slate-400 text-[11px] transition-colors cursor-pointer"
+            >
+              Staff Portal
+            </button>
           </div>
 
           <div className="flex items-center gap-4 text-slate-400">

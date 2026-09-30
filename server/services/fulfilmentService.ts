@@ -469,8 +469,9 @@ export class FulfilmentService {
   /**
    * 3. BEST-EFFORT STATUS REFRESH WITH 30-SECOND THROTTLE
    * Called during order lookup to refresh state for orders in submitted/processing state.
+   * Can be forced by Admin manual refresh.
    */
-  static async refreshOrderStatusIfDue(order: OrderRecord): Promise<OrderRecord> {
+  static async refreshOrderStatusIfDue(order: OrderRecord, force = false): Promise<OrderRecord> {
     if (!order.supplier_order_id || (order.status !== 'submitted' && order.status !== 'processing')) {
       return order;
     }
@@ -479,11 +480,13 @@ export class FulfilmentService {
       return order;
     }
 
-    // Check throttle: no more than once every 30 seconds
-    const lastChecked = order.supplier_last_checked_at ? new Date(order.supplier_last_checked_at).getTime() : 0;
-    const now = Date.now();
-    if (now - lastChecked < 30_000) {
-      return order; // Throttled
+    // Check throttle: no more than once every 30 seconds unless forced
+    if (!force) {
+      const lastChecked = order.supplier_last_checked_at ? new Date(order.supplier_last_checked_at).getTime() : 0;
+      const now = Date.now();
+      if (now - lastChecked < 30_000) {
+        return order; // Throttled
+      }
     }
 
     try {

@@ -1,0 +1,594 @@
+/**
+ * Production Admin V1 API Routes
+ * Strict RBAC enforcement: Requires active session with role === 'admin'.
+ * Provides real operational monitoring, safe order reviews, waitlist management,
+ * customer account controls, and system health status.
+ */
+
+import { Router, Request, Response } from 'express';
+import { requireAdmin } from '../middleware/authMiddleware.js';
+import { OrdersStore } from '../db/ordersStore.js';
+import { AuthStore } from '../db/authStore.js';
+import { WaitlistStore } from '../db/waitlistStore.js';
+import { AdminAuditStore } from '../db/adminAuditStore.js';
+import { toAdminOrderDetails } from '../types/orders.js';
+import { toSafeUserProfile, UserStatus } from '../types/auth.js';
+import { FulfilmentService } from '../services/fulfilmentService.js';
+import { SuccessBizHubProvider } from '../suppliers/successBizHub/provider.js';
+import { isDbConnected } from '../db/connection.js';
+
+export const adminRouter = Router();
+
+// Apply strict admin authentication and authorization to all admin routes
+adminRouter.use(requireAdmin);
+
+/**
+ * 1. GET /api/admin/overview
+ * Real server-calculated launch overview metrics
+ */
+adminRouter.get('/overview', async (req: Request, res: Response) => {
+  try {
+    const [orderMetrics, customerCount, waitlistStats] = await Promise.all([
+      OrdersStore.getOverviewMetrics(),
+      AuthStore.countCustomers(),
+      WaitlistStore.getWaitlistGroupedStats(),
+    ]);
+
+    // Query supplier balance safely if available
+    let supplierBalanceGhc: number | null = null;
+    let supplierBalanceLow = false;
+    let supplierStatus: 'connected' | 'unconfigured' | 'error' = 'unconfigured';
+
+    if (process.env.SUCCESS_BIZ_HUB_API_KEY) {
+      try {
+        const provider = new SuccessBizHubProvider();
+        const bal = await provider.getBalance();
+        supplierBalanceGhc = bal.balanceGhc;
+        const threshold = parseFloat(process.env.SUPPLIER_LOW_BALANCE_GHS || '100');
+        supplierBalanceLow = supplierBalanceGhc < threshold;
+        supplierStatus = 'connected';
+      } catch {
+        supplierStatus = 'error';
+      }
+    }
+
+    res.json({
+      success: true,
+      metrics: {
+        today: orderMetrics.today,
+        last7Days: orderMetrics.last7Days,
+        allTime: {
+          ...orderMetrics.allTime,
+          totalCustomers: customerCount,
+          totalWaitlist: waitlistStats.totalAll,
+          pendingWaitlist: waitlistStats.totalPending,
+        },
+        supplier: {
+          status: supplierStatus,
+          balanceGhc: supplierBalanceGhc,
+          isLowBalance: supplierBalanceLow,
+          fulfilmentEnabled: process.env.ENABLE_SUPPLIER_FULFILMENT !== 'false',
+        },
+        waitlistGrouped: waitlistStats,
+      },
+    });
+  } catch (err) {
+    console.error('[Admin API] Overview error:', err);
+    res.status(500).json({ error: 'Failed to compute admin overview metrics.' });
+  }
+});
+
+/**
+ * 2. GET /api/admin/orders
+ * Paginated, searchable, and filtered order listing
+ */
+adminRouter.get('/orders', async (req: Request, res: Response) => {
+  try {
+    const {
+      q,
+      serviceType,
+      network,
+      status,
+      paymentStatus,
+      manualReview,
+      dateFrom,
+      dateTo,
+      page,
+      limit,
+    } = req.query;
+
+    const parsedManualReview =
+      manualReview === 'true' ? true : manualReview === 'false' ? false : undefined;
+
+    const result = await OrdersStore.searchOrdersAdmin({
+      q: typeof q === 'string' ? q : undefined,
+      serviceType: typeof serviceType === 'string' ? serviceType : undefined,
+      network: typeof network === 'string' ? network : undefined,
+      status: typeof status === 'string' ? status : undefined,
+      paymentStatus: typeof paymentStatus === 'string' ? paymentStatus : undefined,
+      manualReview: parsedManualReview,
+      dateFrom: typeof dateFrom === 'string' ? dateFrom : undefined,
+      dateTo: typeof dateTo === 'string' ? dateTo : undefined,
+      page: page ? parseInt(page as string, 10) : 1,
+      limit: limit ? parseInt(limit as string, 10) : 25,
+    });
+
+    const safeOrders = result.orders.map(toAdminOrderDetails);
+
+    res.json({
+      success: true,
+      orders: safeOrders,
+      pagination: {
+        total: result.total,
+        totalPages: result.totalPages,
+        page: result.page,
+        limit: result.limit,
+      },
+    });
+  } catch (err) {
+    console.error('[Admin API] Search orders error:', err);
+    res.status(500).json({ error: 'Failed to search and list orders.' });
+  }
+});
+
+/**
+ * 3. GET /api/admin/orders/:reference
+ * Full administrative order details
+ */
+adminRouter.get('/orders/:reference', async (req: Request, res: Response) => {
+  try {
+    const ref = req.params.reference;
+    const order = await OrdersStore.findOrder(ref);
+    if (!order) {
+      res.status(404).json({ error: 'Order reference not found.' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      order: toAdminOrderDetails(order),
+    });
+  } catch (err) {
+    console.error('[Admin API] Get order error:', err);
+    res.status(500).json({ error: 'Failed to retrieve order details.' });
+  }
+});
+
+/**
+ * 4. POST /api/admin/orders/:reference/refresh
+ * Safely refreshes supplier order status using existing fulfilment service logic
+ */
+adminRouter.post('/orders/:reference/refresh', async (req: Request, res: Response) => {
+  try {
+    const ref = req.params.reference;
+    const order = await OrdersStore.findOrder(ref);
+    if (!order) {
+      res.status(404).json({ error: 'Order reference not found.' });
+      return;
+    }
+
+    const refreshed = await FulfilmentService.refreshOrderStatusIfDue(order, true);
+
+    await AdminAuditStore.record({
+      adminUserId: req.user!.id,
+      action: 'order_supplier_status_refreshed',
+      entityType: 'order',
+      entityId: order.public_reference,
+      metadata: {
+        previousStatus: order.status,
+        newStatus: refreshed.status,
+      },
+    });
+
+    res.json({
+      success: true,
+      order: toAdminOrderDetails(refreshed),
+      message: 'Order status refreshed from supplier.',
+    });
+  } catch (err) {
+    console.error('[Admin API] Refresh order error:', err);
+    res.status(500).json({ error: 'Failed to refresh order status.' });
+  }
+});
+
+/**
+ * 5. PATCH /api/admin/orders/:reference/review
+ * Update manual review flag and/or internal admin note
+ */
+adminRouter.patch('/orders/:reference/review', async (req: Request, res: Response) => {
+  try {
+    const ref = req.params.reference;
+    const { manualReview, adminNote } = req.body || {};
+
+    const order = await OrdersStore.findOrder(ref);
+    if (!order) {
+      res.status(404).json({ error: 'Order reference not found.' });
+      return;
+    }
+
+    const updated = await OrdersStore.updateOrderReview(
+      order.id,
+      typeof manualReview === 'boolean' ? manualReview : undefined,
+      typeof adminNote === 'string' ? adminNote : adminNote === null ? null : undefined
+    );
+
+    if (!updated) {
+      res.status(404).json({ error: 'Failed to update order.' });
+      return;
+    }
+
+    await AdminAuditStore.record({
+      adminUserId: req.user!.id,
+      action: 'order_review_updated',
+      entityType: 'order',
+      entityId: order.public_reference,
+      metadata: {
+        manualReview: updated.manual_review,
+        hasAdminNote: Boolean(updated.admin_note),
+      },
+    });
+
+    res.json({
+      success: true,
+      order: toAdminOrderDetails(updated),
+      message: 'Order review details updated.',
+    });
+  } catch (err) {
+    console.error('[Admin API] Update order review error:', err);
+    res.status(500).json({ error: 'Failed to update order review details.' });
+  }
+});
+
+/**
+ * 6. GET /api/admin/waitlist
+ * Paginated waitlist entries with service aggregation stats
+ */
+adminRouter.get('/waitlist', async (req: Request, res: Response) => {
+  try {
+    const { q, serviceKey, channel, status, page, limit } = req.query;
+
+    const [result, stats] = await Promise.all([
+      WaitlistStore.searchWaitlistAdmin({
+        q: typeof q === 'string' ? q : undefined,
+        serviceKey: typeof serviceKey === 'string' ? serviceKey : undefined,
+        channel: typeof channel === 'string' ? (channel as any) : undefined,
+        status: typeof status === 'string' ? status : undefined,
+        page: page ? parseInt(page as string, 10) : 1,
+        limit: limit ? parseInt(limit as string, 10) : 25,
+      }),
+      WaitlistStore.getWaitlistGroupedStats(),
+    ]);
+
+    res.json({
+      success: true,
+      entries: result.entries,
+      stats,
+      pagination: {
+        total: result.total,
+        totalPages: result.totalPages,
+        page: result.page,
+        limit: result.limit,
+      },
+    });
+  } catch (err) {
+    console.error('[Admin API] Waitlist search error:', err);
+    res.status(500).json({ error: 'Failed to retrieve waitlist entries.' });
+  }
+});
+
+/**
+ * 7. PATCH /api/admin/waitlist/:id
+ * Update status (pending, contacted, notified, unsubscribed) or admin note
+ */
+adminRouter.patch('/waitlist/:id', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const { status, adminNote } = req.body || {};
+
+    if (!status || !['pending', 'contacted', 'notified', 'unsubscribed'].includes(status)) {
+      res.status(400).json({ error: 'Invalid waitlist status.' });
+      return;
+    }
+
+    const updated = await WaitlistStore.updateWaitlistStatus(
+      id,
+      status,
+      typeof adminNote === 'string' ? adminNote : undefined
+    );
+
+    if (!updated) {
+      res.status(404).json({ error: 'Waitlist record not found.' });
+      return;
+    }
+
+    await AdminAuditStore.record({
+      adminUserId: req.user!.id,
+      action: 'waitlist_status_changed',
+      entityType: 'waitlist',
+      entityId: id,
+      metadata: {
+        status: updated.status,
+        serviceKey: updated.service_key,
+      },
+    });
+
+    res.json({
+      success: true,
+      entry: updated,
+      message: 'Waitlist entry updated successfully.',
+    });
+  } catch (err) {
+    console.error('[Admin API] Update waitlist error:', err);
+    res.status(500).json({ error: 'Failed to update waitlist entry.' });
+  }
+});
+
+/**
+ * 8. GET /api/admin/waitlist/export
+ * Safe CSV export of filtered waitlist entries
+ */
+adminRouter.get('/waitlist-export', async (req: Request, res: Response) => {
+  try {
+    const { q, serviceKey, channel, status } = req.query;
+
+    const result = await WaitlistStore.searchWaitlistAdmin({
+      q: typeof q === 'string' ? q : undefined,
+      serviceKey: typeof serviceKey === 'string' ? serviceKey : undefined,
+      channel: typeof channel === 'string' ? (channel as any) : undefined,
+      status: typeof status === 'string' ? status : undefined,
+      page: 1,
+      limit: 2000,
+    });
+
+    const rows = [
+      ['ID', 'Service Key', 'Service Title', 'Channel', 'Contact', 'Status', 'Joined Date', 'Contacted Date', 'Admin Note'],
+      ...result.entries.map((w) => [
+        w.id,
+        w.service_key,
+        `"${w.service_title.replace(/"/g, '""')}"`,
+        w.channel,
+        w.contact,
+        w.status,
+        w.created_at,
+        w.contacted_at || '',
+        w.admin_note ? `"${w.admin_note.replace(/"/g, '""')}"` : '',
+      ]),
+    ];
+
+    const csvContent = rows.map((r) => r.join(',')).join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="mystery_hub_waitlist_${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(csvContent);
+  } catch (err) {
+    console.error('[Admin API] CSV Export error:', err);
+    res.status(500).json({ error: 'Failed to export waitlist CSV.' });
+  }
+});
+
+/**
+ * 9. GET /api/admin/users
+ * Search and list registered user accounts with aggregate stats
+ */
+adminRouter.get('/users', async (req: Request, res: Response) => {
+  try {
+    const { q, role, status, page, limit } = req.query;
+
+    const result = await AuthStore.searchUsersAdmin({
+      q: typeof q === 'string' ? q : undefined,
+      role: typeof role === 'string' ? (role as any) : undefined,
+      status: typeof status === 'string' ? (status as any) : undefined,
+      page: page ? parseInt(page as string, 10) : 1,
+      limit: limit ? parseInt(limit as string, 10) : 25,
+    });
+
+    const safeUsers = await Promise.all(
+      result.users.map(async (u) => {
+        const orders = await OrdersStore.findOrdersByUserId(u.id);
+        const totalPaidPesewas = orders
+          .filter((o) => o.payment_status === 'success')
+          .reduce((sum, o) => sum + o.amount, 0);
+
+        return {
+          ...toSafeUserProfile(u),
+          orderCount: orders.length,
+          totalSpentGhc: Number((totalPaidPesewas / 100).toFixed(2)),
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      users: safeUsers,
+      pagination: {
+        total: result.total,
+        totalPages: result.totalPages,
+        page: result.page,
+        limit: result.limit,
+      },
+    });
+  } catch (err) {
+    console.error('[Admin API] Search users error:', err);
+    res.status(500).json({ error: 'Failed to retrieve registered users.' });
+  }
+});
+
+/**
+ * 10. GET /api/admin/users/:id
+ * Detailed customer profile with full order history and waitlist registrations
+ */
+adminRouter.get('/users/:id', async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.id;
+    const user = await AuthStore.findUserById(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User account not found.' });
+      return;
+    }
+
+    const [orders, waitlist] = await Promise.all([
+      OrdersStore.findOrdersByUserId(userId),
+      WaitlistStore.findUserWaitlists(userId),
+    ]);
+
+    res.json({
+      success: true,
+      user: toSafeUserProfile(user),
+      orders: orders.map(toAdminOrderDetails),
+      waitlist,
+    });
+  } catch (err) {
+    console.error('[Admin API] Get user details error:', err);
+    res.status(500).json({ error: 'Failed to retrieve user details.' });
+  }
+});
+
+/**
+ * 11. PATCH /api/admin/users/:id/status
+ * Update user status (active <-> disabled).
+ * Disabling revokes active sessions immediately.
+ */
+adminRouter.patch('/users/:id/status', async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.id;
+    const { status } = req.body || {};
+
+    if (!status || !['active', 'disabled'].includes(status)) {
+      res.status(400).json({ error: 'Status must be "active" or "disabled".' });
+      return;
+    }
+
+    // Safety: prevent admin from disabling their own account
+    if (req.user!.id === userId && status === 'disabled') {
+      res.status(400).json({ error: 'You cannot disable your own administrator account.' });
+      return;
+    }
+
+    const updated = await AuthStore.updateUserStatus(userId, status as UserStatus);
+    if (!updated) {
+      res.status(404).json({ error: 'User account not found.' });
+      return;
+    }
+
+    if (status === 'disabled') {
+      // Invalidate all active sessions for this user immediately
+      await AuthStore.revokeAllUserSessions(userId);
+    }
+
+    await AdminAuditStore.record({
+      adminUserId: req.user!.id,
+      action: status === 'disabled' ? 'customer_disabled' : 'customer_enabled',
+      entityType: 'user',
+      entityId: userId,
+      metadata: {
+        targetUserName: updated.name,
+        targetUserEmail: updated.email,
+        targetUserPhone: updated.phone,
+      },
+    });
+
+    res.json({
+      success: true,
+      user: toSafeUserProfile(updated),
+      message: `User account has been ${status === 'disabled' ? 'disabled' : 'enabled'}.`,
+    });
+  } catch (err) {
+    console.error('[Admin API] Update user status error:', err);
+    res.status(500).json({ error: 'Failed to update user status.' });
+  }
+});
+
+/**
+ * 12. GET /api/admin/system
+ * Safe operations and integration health panel (never exposes secrets)
+ */
+adminRouter.get('/system', async (_req: Request, res: Response) => {
+  try {
+    // 1. Paystack check
+    const paystackKey = process.env.PAYSTACK_SECRET_KEY || '';
+    const paystackConfigured = Boolean(paystackKey);
+    const isPaystackTestMode = paystackKey.startsWith('sk_test_');
+
+    // 2. Success Biz Hub check
+    const sbhKey = process.env.SUCCESS_BIZ_HUB_API_KEY || '';
+    const sbhConfigured = Boolean(sbhKey);
+    let sbhStatus: 'connected' | 'unconfigured' | 'error' = sbhConfigured ? 'connected' : 'unconfigured';
+    let sbhBalanceGhc: number | null = null;
+    let sbhLowBalance = false;
+
+    if (sbhConfigured) {
+      try {
+        const provider = new SuccessBizHubProvider();
+        const bal = await provider.getBalance();
+        sbhBalanceGhc = bal.balanceGhc;
+        const threshold = parseFloat(process.env.SUPPLIER_LOW_BALANCE_GHS || '100');
+        sbhLowBalance = sbhBalanceGhc < threshold;
+      } catch {
+        sbhStatus = 'error';
+      }
+    }
+
+    // 3. Gemini AI check
+    const geminiConfigured = Boolean(process.env.GEMINI_API_KEY);
+
+    // 4. Database check
+    const dbConnected = isDbConnected();
+
+    // 5. Fulfilment kill switch
+    const fulfilmentEnabled = process.env.ENABLE_SUPPLIER_FULFILMENT !== 'false';
+
+    res.json({
+      success: true,
+      system: {
+        environment: process.env.NODE_ENV || 'development',
+        nodeVersion: process.version,
+        uptimeSeconds: Math.floor(process.uptime()),
+        components: {
+          apiServer: { status: 'healthy', label: 'Online' },
+          database: {
+            status: dbConnected ? 'healthy' : 'degraded',
+            type: dbConnected ? 'PostgreSQL Connection Pool' : 'In-Memory Development Store',
+          },
+          paystack: {
+            status: paystackConfigured ? 'healthy' : 'unconfigured',
+            mode: isPaystackTestMode ? 'Test Mode (sk_test_...)' : 'Live Production (sk_live_...)',
+            currency: 'GHS',
+          },
+          successBizHub: {
+            status: sbhStatus === 'connected' ? 'healthy' : sbhStatus === 'error' ? 'error' : 'unconfigured',
+            walletBalanceGhc: sbhBalanceGhc,
+            isLowBalance: sbhLowBalance,
+            lowBalanceThresholdGhc: parseFloat(process.env.SUPPLIER_LOW_BALANCE_GHS || '100'),
+          },
+          geminiAi: {
+            status: geminiConfigured ? 'healthy' : 'unconfigured',
+            model: 'gemini-3.8-flash / gemini-3.1-flash-lite',
+          },
+          fulfilmentPipeline: {
+            status: fulfilmentEnabled ? 'enabled' : 'disabled',
+            autoDispatch: fulfilmentEnabled && !isPaystackTestMode,
+          },
+        },
+      },
+    });
+  } catch (err) {
+    console.error('[Admin API] System status error:', err);
+    res.status(500).json({ error: 'Failed to retrieve system health status.' });
+  }
+});
+
+/**
+ * 13. GET /api/admin/audit-logs
+ * Read recent administrative mutation audit records
+ */
+adminRouter.get('/audit-logs', async (_req: Request, res: Response) => {
+  try {
+    const logs = await AdminAuditStore.findRecent(50);
+    res.json({
+      success: true,
+      logs,
+    });
+  } catch (err) {
+    console.error('[Admin API] Audit logs error:', err);
+    res.status(500).json({ error: 'Failed to retrieve audit logs.' });
+  }
+});

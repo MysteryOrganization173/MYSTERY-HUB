@@ -7,7 +7,14 @@ import { validateAndNormalizeGhanaPhone } from '../utils/phone.js';
 import { getAuthoritativeProduct } from '../data/productCatalog.js';
 import { calculateAirtimeOrder, validateAirtimeAmount, AIRTIME_SERVICE_FEE_PERCENT } from '../data/airtimePricing.js';
 import { OrdersStore } from '../db/ordersStore.js';
+import { AuthStore } from '../db/authStore.js';
+import { WaitlistStore } from '../db/waitlistStore.js';
 import { OrderRecord, toSafePublicOrder } from '../types/orders.js';
+import { toSafeUserProfile, WaitlistChannel } from '../types/auth.js';
+import { hashPassword, verifyPassword, generateSessionToken } from '../utils/crypto.js';
+import { parseIdentifier, validatePassword } from '../utils/authValidation.js';
+import { requireAuth, optionalAuth } from '../middleware/authMiddleware.js';
+import { loginRateLimiter, signupRateLimiter, waitlistRateLimiter } from '../middleware/rateLimiter.js';
 import { PaystackServerService } from '../services/paystackService.js';
 import { FulfilmentService } from '../services/fulfilmentService.js';
 import { SuccessBizHubWebhookHandler } from '../suppliers/successBizHub/webhookHandler.js';
@@ -36,7 +43,7 @@ apiRouter.get('/health', (_req: Request, res: Response) => {
  * Authoritative price is loaded from the catalog — browser input price is ignored.
  * If fulfillment is enabled, performs supplier preflight checks before taking customer payment.
  */
-apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
+apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: Response) => {
   try {
     const { productId, recipientPhone, customerEmail, customerName, serviceType, network: reqNetwork, amount: reqAmount } = req.body || {};
 
@@ -126,8 +133,9 @@ apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
       // 6. Create pending Airtime order
       const newOrder: OrderRecord = {
         id: `ord_${timestamp}_${randomHex}`,
+        user_id: req.user?.id || null,
         public_reference: publicRef,
-        customer_name: typeof customerName === 'string' ? customerName.trim() : null,
+        customer_name: typeof customerName === 'string' ? customerName.trim() : (req.user?.name || null),
         customer_email: validEmail,
         customer_phone: phoneVal.normalized,
         recipient_phone: phoneVal.normalized,
@@ -259,8 +267,9 @@ apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
     // 6. Create pending order in DB atomically with race-condition check
     const newOrder: OrderRecord = {
       id: `ord_${timestamp}_${randomHex}`,
+      user_id: req.user?.id || null,
       public_reference: publicRef,
-      customer_name: typeof customerName === 'string' ? customerName.trim() : null,
+      customer_name: typeof customerName === 'string' ? customerName.trim() : (req.user?.name || null),
       customer_email: validEmail,
       customer_phone: phoneVal.normalized,
       recipient_phone: phoneVal.normalized,
@@ -505,3 +514,282 @@ export async function handlePaystackWebhook(req: Request, res: Response): Promis
 export const handleSuccessBizHubWebhook = SuccessBizHubWebhookHandler.handle.bind(
   SuccessBizHubWebhookHandler
 );
+
+// ==========================================
+// AUTHENTICATION & USER MANAGEMENT ENDPOINTS
+// ==========================================
+
+/**
+ * 6. POST /api/auth/register
+ * Real server-side account registration with scrypt password hashing & session generation
+ */
+apiRouter.post('/auth/register', signupRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { name, identifier, password, rememberMe } = req.body || {};
+
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+      res.status(400).json({ error: 'Please enter a valid full name or business name (at least 2 characters).' });
+      return;
+    }
+
+    if (name.trim().length > 128) {
+      res.status(400).json({ error: 'Name must not exceed 128 characters.' });
+      return;
+    }
+
+    const parsedId = parseIdentifier(identifier);
+    if (!parsedId) {
+      res.status(400).json({
+        error: 'Please enter a valid Ghana phone number (e.g. 0241234567) or email address.',
+      });
+      return;
+    }
+
+    const passValidation = validatePassword(password);
+    if (!passValidation.isValid) {
+      res.status(400).json({ error: passValidation.error || 'Password must be at least 8 characters.' });
+      return;
+    }
+
+    // Check if account with this identifier already exists
+    const existing = await AuthStore.findUserByIdentifier(parsedId.normalized);
+    if (existing) {
+      res.status(409).json({
+        error: 'An account with this email or phone number already exists. Please log in.',
+      });
+      return;
+    }
+
+    // Hash password securely with unique random salt using crypto.scrypt
+    const passwordHash = await hashPassword(password);
+    const userId = `usr_${Date.now()}_${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const user = await AuthStore.createUser({
+      id: userId,
+      name: name.trim(),
+      email: parsedId.type === 'email' ? parsedId.normalized : null,
+      phone: parsedId.type === 'phone' ? parsedId.normalized : null,
+      passwordHash,
+      role: 'customer',
+      status: 'active',
+    });
+
+    // Create session
+    const rawToken = generateSessionToken();
+    const session = await AuthStore.createSession(user.id, rawToken, Boolean(rememberMe));
+
+    res.status(201).json({
+      success: true,
+      user: toSafeUserProfile(user),
+      token: rawToken,
+      expiresAt: session.expires_at,
+    });
+  } catch (err) {
+    console.error('Registration Controller Exception:', err);
+    res.status(500).json({ error: 'An unexpected server error occurred creating your account.' });
+  }
+});
+
+/**
+ * 7. POST /api/auth/login
+ * Real server-side authentication verifying scrypt password hash & returning session token
+ */
+apiRouter.post('/auth/login', loginRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { identifier, password, rememberMe } = req.body || {};
+
+    if (!identifier || typeof identifier !== 'string' || !password || typeof password !== 'string') {
+      res.status(400).json({ error: 'Please provide both your phone/email and password.' });
+      return;
+    }
+
+    const cleanIdentifier = identifier.trim();
+    const user = await AuthStore.findUserByIdentifier(cleanIdentifier);
+
+    if (!user) {
+      res.status(401).json({
+        error: 'Invalid credentials. Please check your phone/email and password.',
+      });
+      return;
+    }
+
+    if (user.status === 'disabled') {
+      res.status(403).json({
+        error: 'Your account has been disabled. Please contact support.',
+      });
+      return;
+    }
+
+    // Constant-time scrypt password verification
+    const isValid = await verifyPassword(password, user.password_hash);
+    if (!isValid) {
+      res.status(401).json({
+        error: 'Invalid credentials. Please check your phone/email and password.',
+      });
+      return;
+    }
+
+    // Update last login timestamp
+    await AuthStore.updateUserLastLogin(user.id);
+
+    // Create fresh session
+    const rawToken = generateSessionToken();
+    const session = await AuthStore.createSession(user.id, rawToken, Boolean(rememberMe));
+
+    res.json({
+      success: true,
+      user: toSafeUserProfile(user),
+      token: rawToken,
+      expiresAt: session.expires_at,
+    });
+  } catch (err) {
+    console.error('Login Controller Exception:', err);
+    res.status(500).json({ error: 'An unexpected server error occurred during login.' });
+  }
+});
+
+/**
+ * 8. GET /api/auth/me
+ * Returns authenticated user profile using Bearer session token
+ */
+apiRouter.get('/auth/me', requireAuth, (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    user: toSafeUserProfile(req.user!),
+  });
+});
+
+/**
+ * 9. POST /api/auth/logout
+ * Securely revokes active session token
+ */
+apiRouter.post('/auth/logout', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const rawToken = authHeader.substring(7).trim();
+      if (rawToken) {
+        await AuthStore.revokeSession(rawToken);
+      }
+    }
+    res.json({ success: true, message: 'Successfully logged out.' });
+  } catch (err) {
+    console.error('Logout Controller Exception:', err);
+    res.status(500).json({ error: 'Failed to process logout.' });
+  }
+});
+
+// ==========================================
+// WAITLIST & EARLY ACCESS ENDPOINTS
+// ==========================================
+
+/**
+ * 10. POST /api/waitlist/join
+ * Persists waitlist submission in PostgreSQL with intelligent deduplication
+ */
+apiRouter.post('/waitlist/join', waitlistRateLimiter, optionalAuth, async (req: Request, res: Response) => {
+  try {
+    const { serviceKey, serviceTitle, channel, contact, sourcePage } = req.body || {};
+
+    if (!serviceKey || typeof serviceKey !== 'string') {
+      res.status(400).json({ error: 'Missing service key.' });
+      return;
+    }
+
+    if (!serviceTitle || typeof serviceTitle !== 'string') {
+      res.status(400).json({ error: 'Missing service title.' });
+      return;
+    }
+
+    if (!channel || !['whatsapp', 'sms', 'email'].includes(channel)) {
+      res.status(400).json({ error: 'Please choose a valid alert channel (WhatsApp, SMS, or Email).' });
+      return;
+    }
+
+    if (!contact || typeof contact !== 'string' || !contact.trim()) {
+      res.status(400).json({ error: 'Please enter your contact information.' });
+      return;
+    }
+
+    const normalized = WaitlistStore.normalizeContact(channel as WaitlistChannel, contact);
+    if (!normalized) {
+      if (channel === 'email') {
+        res.status(400).json({ error: 'Please provide a valid email address.' });
+      } else {
+        res.status(400).json({ error: 'Please provide a valid Ghana phone number.' });
+      }
+      return;
+    }
+
+    const result = await WaitlistStore.addToWaitlist({
+      serviceKey,
+      serviceTitle,
+      channel: channel as WaitlistChannel,
+      contact,
+      sourcePage: typeof sourcePage === 'string' ? sourcePage : null,
+      userId: req.user?.id || null,
+    });
+
+    res.json({
+      success: true,
+      alreadyJoined: result.alreadyJoined,
+      message: result.alreadyJoined
+        ? "You're already on the VIP launch list for this service!"
+        : `Successfully registered for ${serviceTitle} launch updates!`,
+      record: {
+        id: result.record.id,
+        serviceKey: result.record.service_key,
+        serviceTitle: result.record.service_title,
+        channel: result.record.channel,
+        status: result.record.status,
+        createdAt: result.record.created_at,
+      },
+    });
+  } catch (err: unknown) {
+    console.error('Waitlist Controller Exception:', err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to join waitlist. Please try again.',
+    });
+  }
+});
+
+/**
+ * 11. GET /api/waitlist/my-entries
+ * Returns waitlist entries for the authenticated user
+ */
+apiRouter.get('/waitlist/my-entries', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const entries = await WaitlistStore.findUserWaitlists(req.user!.id);
+    res.json({
+      success: true,
+      entries,
+    });
+  } catch (err) {
+    console.error('My Waitlist Controller Exception:', err);
+    res.status(500).json({ error: 'Failed to retrieve waitlist registrations.' });
+  }
+});
+
+// ==========================================
+// CUSTOMER AUTHENTICATED ORDERS ENDPOINT
+// ==========================================
+
+/**
+ * 12. GET /api/orders/my-orders
+ * Returns all orders linked to the logged-in customer (by user_id, phone, or email)
+ */
+apiRouter.get('/orders/my-orders', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const orders = await OrdersStore.findOrdersByUserId(user.id);
+    const safeOrders = orders.map(toSafePublicOrder);
+
+    res.json({
+      success: true,
+      orders: safeOrders,
+    });
+  } catch (err) {
+    console.error('My Orders Controller Exception:', err);
+    res.status(500).json({ error: 'Failed to retrieve orders.' });
+  }
+});

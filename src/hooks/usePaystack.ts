@@ -105,15 +105,19 @@ export function usePaystack() {
 
     try {
       // 1. Call Backend to create pending order & initialize Paystack transaction authoritatively
-      const initRes = await initializePaymentOnServer({
-        productId: options.productId,
-        recipientPhone: options.recipientPhone,
-        customerEmail: options.customerEmail,
-        customerName: options.customerName,
-        serviceType: options.serviceType,
-        network: options.network,
-        amount: options.amount,
-      });
+      const sessionToken = typeof localStorage !== 'undefined' ? localStorage.getItem('mystery_hub_session_token') : null;
+      const initRes = await initializePaymentOnServer(
+        {
+          productId: options.productId,
+          recipientPhone: options.recipientPhone,
+          customerEmail: options.customerEmail,
+          customerName: options.customerName,
+          serviceType: options.serviceType,
+          network: options.network,
+          amount: options.amount,
+        },
+        sessionToken
+      );
 
       if (!initRes.success) {
         throw new Error(initRes.error || 'Failed to initialize payment with server.');

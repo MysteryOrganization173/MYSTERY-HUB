@@ -1,17 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ActivePage, DataBundle, OrderRecord, WebsiteTemplate, MarketplaceProduct } from '../types';
 import { DATA_BUNDLES } from '../data/bundles';
+import { SafeUserProfile } from '../../server/types/auth';
+import { getMeOnServer, logoutOnServer } from '../services/apiClient';
 
 interface ToastMessage {
   id: string;
   message: string;
   type: 'success' | 'info' | 'warning';
-}
-
-interface UserProfile {
-  name: string;
-  phone: string;
-  email: string;
 }
 
 interface AppContextType {
@@ -42,8 +38,9 @@ interface AppContextType {
   authMode: 'login' | 'signup';
   openAuth: (mode?: 'login' | 'signup') => void;
   closeAuth: () => void;
-  user: UserProfile | null;
-  loginUser: (profile: UserProfile) => void;
+  user: SafeUserProfile | null;
+  sessionToken: string | null;
+  loginUser: (profile: SafeUserProfile, token: string) => void;
   logoutUser: () => void;
   selectedTemplatePreview: WebsiteTemplate | null;
   openTemplatePreview: (template: WebsiteTemplate) => void;
@@ -69,6 +66,7 @@ export const ROUTE_PATH_MAP: Record<ActivePage, string> = {
   services: '/services',
   about: '/about',
   orders: '/orders',
+  admin: '/admin',
 };
 
 export const getPageFromPath = (pathname: string): ActivePage => {
@@ -79,6 +77,7 @@ export const getPageFromPath = (pathname: string): ActivePage => {
   if (clean === '/services') return 'services';
   if (clean === '/about') return 'about';
   if (clean === '/orders') return 'orders';
+  if (clean === '/admin') return 'admin';
   return 'home';
 };
 
@@ -110,7 +109,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
-  const [user, setUser] = useState<UserProfile | null>(() => {
+  const [sessionToken, setSessionToken] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('mystery_hub_session_token');
+    } catch {
+      return null;
+    }
+  });
+
+  const [user, setUser] = useState<SafeUserProfile | null>(() => {
     try {
       const saved = localStorage.getItem('mystery_hub_user');
       if (saved) return JSON.parse(saved);
@@ -119,6 +126,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return null;
   });
+
+  // Verify server-side session token on startup
+  useEffect(() => {
+    const token = localStorage.getItem('mystery_hub_session_token');
+    if (!token) return;
+
+    let isMounted = true;
+    getMeOnServer(token)
+      .then((res) => {
+        if (isMounted && res.success && res.user) {
+          setUser(res.user);
+          try {
+            localStorage.setItem('mystery_hub_user', JSON.stringify(res.user));
+          } catch {
+            // ignore
+          }
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setUser(null);
+          setSessionToken(null);
+          try {
+            localStorage.removeItem('mystery_hub_session_token');
+            localStorage.removeItem('mystery_hub_user');
+          } catch {
+            // ignore
+          }
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const [selectedTemplatePreview, setSelectedTemplatePreview] = useState<WebsiteTemplate | null>(null);
   const [marketplaceInquiryProduct, setMarketplaceInquiryProduct] = useState<MarketplaceProduct | null>(null);
@@ -260,10 +302,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthModalOpen(false);
   };
 
-  const loginUser = (profile: UserProfile) => {
+  const loginUser = (profile: SafeUserProfile, token: string) => {
     setUser(profile);
+    setSessionToken(token);
     try {
       localStorage.setItem('mystery_hub_user', JSON.stringify(profile));
+      localStorage.setItem('mystery_hub_session_token', token);
     } catch {
       // ignore
     }
@@ -272,9 +316,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logoutUser = () => {
+    const token = sessionToken || localStorage.getItem('mystery_hub_session_token');
+    logoutOnServer(token);
     setUser(null);
+    setSessionToken(null);
     try {
       localStorage.removeItem('mystery_hub_user');
+      localStorage.removeItem('mystery_hub_session_token');
     } catch {
       // ignore
     }
@@ -326,6 +374,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         openAuth,
         closeAuth,
         user,
+        sessionToken,
         loginUser,
         logoutUser,
         selectedTemplatePreview,
