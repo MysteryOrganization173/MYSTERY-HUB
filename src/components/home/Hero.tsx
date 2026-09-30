@@ -74,7 +74,7 @@ export const Hero: React.FC = () => {
               </div>
               <div className="flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4 text-[#00c365]" />
-                <span>MTN · Telecel · AirtelTigo</span>
+                <span>MTN · AirtelTigo · Telecel</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4 text-[#00c365]" />
@@ -161,7 +161,7 @@ export const Hero: React.FC = () => {
                         <div className="text-xs font-bold text-white group-hover:text-[#00c365] transition-colors">
                           Buy Data
                         </div>
-                        <div className="text-[10px] text-slate-400">MTN · Telecel · AT</div>
+                        <div className="text-[10px] text-slate-400">MTN · AT · Telecel</div>
                       </div>
                     </div>
                     <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#00c365] group-hover:translate-x-0.5 transition-all" />

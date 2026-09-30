@@ -34,7 +34,7 @@ export const HomeFeaturedData: React.FC = () => {
 
           {/* Network Filter Pills */}
           <div className="flex items-center gap-2">
-            {(['mtn', 'telecel', 'airteltigo'] as NetworkId[]).map((netId) => {
+            {(['mtn', 'airteltigo', 'telecel'] as NetworkId[]).map((netId) => {
               const net = GHANA_NETWORKS[netId];
               const isSelected = selectedNetwork === netId;
               return (
@@ -51,7 +51,7 @@ export const HomeFeaturedData: React.FC = () => {
                     className="w-2 h-2 rounded-full"
                     style={{ backgroundColor: net.brandColor }}
                   />
-                  <span>{netId === 'mtn' ? 'MTN' : netId === 'telecel' ? 'Telecel' : 'AirtelTigo'}</span>
+                  <span>{netId === 'mtn' ? 'MTN' : netId === 'airteltigo' ? 'AirtelTigo' : 'Telecel'}</span>
                 </button>
               );
             })}

@@ -11,16 +11,6 @@ export const GHANA_NETWORKS: Record<NetworkId, NetworkInfo> = {
     momoName: 'MTN MoMo',
     prefixes: ['024', '054', '055', '059', '025', '053'],
   },
-  telecel: {
-    id: 'telecel',
-    name: 'Telecel Ghana',
-    tagline: 'Connecting What Matters',
-    brandColor: '#E60000',
-    badgeBg: '#FFF0F0',
-    textColor: '#B30000',
-    momoName: 'Telecel Cash',
-    prefixes: ['020', '050'],
-  },
   airteltigo: {
     id: 'airteltigo',
     name: 'AirtelTigo (AT)',
@@ -30,6 +20,16 @@ export const GHANA_NETWORKS: Record<NetworkId, NetworkInfo> = {
     textColor: '#003366',
     momoName: 'AT Money',
     prefixes: ['027', '057', '026', '056'],
+  },
+  telecel: {
+    id: 'telecel',
+    name: 'Telecel Ghana',
+    tagline: 'Connecting What Matters',
+    brandColor: '#E60000',
+    badgeBg: '#FFF0F0',
+    textColor: '#B30000',
+    momoName: 'Telecel Cash',
+    prefixes: ['020', '050'],
   },
 };
 
@@ -190,7 +190,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     validityCategory: 'Monthly',
     priceGhc: 4.79,
     isPopular: true,
-    description: 'Affordable AT Big Time data bundle',
+    description: 'Instant direct delivery to your AT number.',
   },
   {
     id: 'at-2gb',
@@ -200,7 +200,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
     priceGhc: 8.99,
-    description: 'Convenient AT bundle for messaging & everyday use',
+    description: 'Instant direct delivery to your AT number.',
   },
   {
     id: 'at-3gb',
@@ -211,7 +211,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     validityCategory: 'Monthly',
     priceGhc: 13.49,
     isPopular: true,
-    description: 'Great value bundle for social apps and media',
+    description: 'Instant direct delivery to your AT number.',
   },
   {
     id: 'at-4gb',
@@ -221,7 +221,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
     priceGhc: 17.99,
-    description: 'Reliable AT allocation for downloads & work',
+    description: 'Instant direct delivery to your AT number.',
   },
   {
     id: 'at-5gb',
@@ -233,7 +233,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     priceGhc: 22.49,
     isPopular: true,
     isBestValue: true,
-    description: 'Monthly worry-free browsing with AT simple pricing',
+    description: 'Instant direct delivery to your AT number.',
   },
 
   // ==========================================

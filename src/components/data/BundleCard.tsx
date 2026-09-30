@@ -52,12 +52,23 @@ export const BundleCard: React.FC<BundleCardProps> = ({ bundle, onBuy, featured 
         <h3 className="text-2xl font-extrabold text-white tracking-tight group-hover:text-[#00c365] transition-colors">
           {bundle.dataAmount}
         </h3>
-        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-          <CheckCircle2 className="w-3.5 h-3.5 text-[#00c365]" />
-          <span>In Stock · Direct SIM Credit</span>
-        </div>
+        {bundle.network === 'airteltigo' ? (
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-md">
+              ⚡ Instant Delivery
+            </span>
+            <span className="text-[11px] text-slate-400">· In Stock</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+            <CheckCircle2 className="w-3.5 h-3.5 text-[#00c365]" />
+            <span>In Stock · Direct SIM Credit</span>
+          </div>
+        )}
         <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">
-          {bundle.description || 'Fast direct network dispatch'}
+          {bundle.network === 'airteltigo'
+            ? 'Instant direct delivery to your AT number.'
+            : (bundle.description || 'Fast direct network dispatch')}
         </p>
       </div>
 

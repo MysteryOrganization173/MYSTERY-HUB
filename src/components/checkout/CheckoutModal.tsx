@@ -242,12 +242,18 @@ export const CheckoutModal: React.FC = () => {
                   <h4 className="font-bold text-white text-sm sm:text-base truncate">
                     {checkoutBundle.dataAmount} Data Bundle
                   </h4>
-                  <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded font-medium shrink-0">
-                    Direct SIM Credit
-                  </span>
+                  {checkoutBundle.network === 'airteltigo' ? (
+                    <span className="text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded font-bold shrink-0">
+                      ⚡ Instant Delivery
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded font-medium shrink-0">
+                      Direct SIM Credit
+                    </span>
+                  )}
                 </div>
                 <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 truncate">
-                  {currentNetwork.name} · {checkoutBundle.description || 'Fast automated network dispatch'}
+                  {currentNetwork.name} · {checkoutBundle.network === 'airteltigo' ? 'Instant direct delivery to your AT number.' : (checkoutBundle.description || 'Fast automated network dispatch')}
                 </p>
               </div>
             </div>

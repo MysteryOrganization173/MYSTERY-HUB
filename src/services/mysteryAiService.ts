@@ -27,7 +27,7 @@ export function getSuggestedQuestionsForPage(page: ActivePage): SuggestedQuestio
   switch (page) {
     case 'data':
       return [
-        { id: 'data-buy', text: 'How do I buy data on MTN, Telecel or AT?' },
+        { id: 'data-buy', text: 'How do I buy data on MTN, AirtelTigo or Telecel?' },
         { id: 'data-speed', text: 'How long does delivery take?' },
         { id: 'data-pricing', text: 'What are the current bundle rates?' },
         { id: 'data-momo', text: 'Can I pay with Mobile Money (MoMo)?' },
@@ -231,7 +231,7 @@ export function getGroundedLocalResponse(
   ) {
     return {
       reply:
-        "I am Mystery AI, the official digital assistant for Mystery Hub in Ghana! 🇬🇭\n\nI'm here to help you get the most out of our platform — whether that's purchasing discounted data for MTN, Telecel, and AirtelTigo, creating a professional website for your business without coding, or tracking your order status.",
+        "I am Mystery AI, the official digital assistant for Mystery Hub in Ghana! 🇬🇭\n\nI'm here to help you get the most out of our platform — whether that's purchasing discounted data for MTN, AirtelTigo, and Telecel, creating a professional website for your business without coding, or tracking your order status.",
       quickAction:
         activePage === 'website'
           ? { type: 'navigate', targetPage: 'website', label: '👉 Explore Website Builder' }
@@ -250,7 +250,7 @@ export function getGroundedLocalResponse(
   ) {
     return {
       reply:
-        "Mystery Hub is Ghana's all-in-one digital utility platform. Our live service provides discounted data bundles for MTN, Telecel, and AirtelTigo delivered directly to your SIM via Mobile Money. We also provide an interactive Website Builder for Ghanaian businesses, with utilities like ECG tokens and WAEC checkers coming soon!",
+        "Mystery Hub is Ghana's all-in-one digital utility platform. Our live service provides discounted data bundles for MTN, AirtelTigo, and Telecel delivered directly to your SIM via Mobile Money. We also provide an interactive Website Builder for Ghanaian businesses, with utilities like ECG tokens and WAEC checkers coming soon!",
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Browse Data Offers' },
     };
   }
@@ -258,7 +258,7 @@ export function getGroundedLocalResponse(
   // 3. Navigation Direct Requests
   if (q.includes('take me to data') || q.includes('go to data') || q.includes('open data')) {
     return {
-      reply: "Taking you to our Data page where you can choose bundles for MTN, Telecel, and AirtelTigo.",
+      reply: "Taking you to our Data page where you can choose bundles for MTN, AirtelTigo, and Telecel.",
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Go to Data Page' },
     };
   }
@@ -291,7 +291,7 @@ export function getGroundedLocalResponse(
   ) {
     const mtn1 = DATA_BUNDLES.find((b) => b.id === 'mtn-1gb')?.priceGhc || 4.99;
     return {
-      reply: `Buying data takes just 3 simple steps:\n1. Go to our Data page and select your network (MTN, Telecel, or AirtelTigo).\n2. Pick your bundle (e.g. 1GB for GH₵${mtn1.toFixed(2)}).\n3. Enter your recipient phone number and authorize the Mobile Money prompt on your phone.\n\nYour data is credited directly to your SIM!`,
+      reply: `Buying data takes just 3 simple steps:\n1. Go to our Data page and select your network (MTN, AirtelTigo, or Telecel).\n2. Pick your bundle (e.g. 1GB for GH₵${mtn1.toFixed(2)}).\n3. Enter your recipient phone number and authorize the Mobile Money prompt on your phone.\n\nYour data is credited directly to your SIM!`,
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Buy Data on Data Page' },
     };
   }
@@ -308,7 +308,7 @@ export function getGroundedLocalResponse(
   ) {
     return {
       reply:
-        "We support Ghana's major networks: MTN Ghana (Express Data), Telecel Ghana, and AirtelTigo (AT). We accept payments via MTN MoMo, Telecel Cash, AT Money, and Bank Card via Paystack with transparent pricing and no hidden charges.",
+        "We support Ghana's major networks: MTN Ghana (Express Data), AirtelTigo (AT), and Telecel Ghana. We accept payments via MTN MoMo, AT Money, Telecel Cash, and Bank Card via Paystack with transparent pricing and no hidden charges.",
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Select Your Network' },
     };
   }
@@ -342,7 +342,7 @@ export function getGroundedLocalResponse(
   ) {
     return {
       reply:
-        "Many orders complete within roughly 15–45 minutes under normal telecom conditions. During network congestion, processing may take longer, in exceptional cases up to 48 hours. For MTN, please wait for an existing order to complete before placing another for the same number. All orders remain trackable on our Orders page!",
+        "Delivery depends on your network:\n• ⚡ AirtelTigo (AT iShare): Instant Delivery directly to your AT number.\n• MTN Ghana: Fast direct processing under normal telecom conditions (usually 15–45 minutes). Network congestion can sometimes cause delays, up to 48 hours in exceptional cases. Please note that MTN allows only one active order per recipient number at a time.\n• Telecel Ghana: Standard direct SIM credit delivery as configured.\n\nAll orders remain continuously trackable on our Orders page!",
       quickAction: { type: 'navigate', targetPage: 'orders', label: '👉 Track Order Status' },
     };
   }
@@ -417,7 +417,7 @@ export function getGroundedLocalResponse(
   if (activePage === 'data') {
     return {
       reply:
-        "You are on our Data page! You can choose between MTN, Telecel, and AirtelTigo, browse in Card or Compact view, and click 'Buy Now' to have data credited to your phone quickly via Mobile Money.",
+        "You are on our Data page! You can choose between MTN, AirtelTigo, and Telecel, browse in Card or Compact view, and click 'Buy Now' to have data credited to your phone quickly via Mobile Money.",
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Select a Bundle' },
     };
   }
@@ -441,7 +441,7 @@ export function getGroundedLocalResponse(
   // Default welcoming reply
   return {
     reply:
-      "I'm Mystery AI, your guide to Mystery Hub! I can help you with discounted data for MTN, Telecel, or AirtelTigo, guide you in creating a website for your business, or explain our digital services in Ghana. What would you like to explore?",
+      "I'm Mystery AI, your guide to Mystery Hub! I can help you with discounted data for MTN, AirtelTigo, or Telecel, guide you in creating a website for your business, or explain our digital services in Ghana. What would you like to explore?",
     quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Browse Data Bundles' },
   };
 }

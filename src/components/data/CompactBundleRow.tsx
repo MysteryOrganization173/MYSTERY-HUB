@@ -44,19 +44,26 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
             <span className="font-extrabold text-base sm:text-lg text-white tracking-tight group-hover:text-[#00c365] transition-colors">
               {bundle.dataAmount}
             </span>
+            {bundle.network === 'airteltigo' && (
+              <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.2 rounded-md shrink-0">
+                ⚡ Instant Delivery
+              </span>
+            )}
             {bundle.isBestValue && (
               <span className="text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-1.5 py-0.2 rounded-full uppercase tracking-wider shrink-0">
                 Best Value
               </span>
             )}
-            {!bundle.isBestValue && bundle.isPopular && (
+            {!bundle.isBestValue && bundle.isPopular && bundle.network !== 'airteltigo' && (
               <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.2 rounded-full uppercase tracking-wider shrink-0">
                 Popular
               </span>
             )}
           </div>
           <p className="text-[11px] text-slate-400 truncate">
-            {bundle.description || 'Direct SIM credit'}
+            {bundle.network === 'airteltigo'
+              ? 'Instant direct delivery to your AT number.'
+              : (bundle.description || 'Direct SIM credit')}
           </p>
         </div>
       </div>

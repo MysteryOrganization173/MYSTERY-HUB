@@ -88,14 +88,20 @@ async function runMysteryAiTests() {
       false,
       'Must NOT promise guaranteed instant delivery'
     );
-    assert.ok(instruction.includes('15–45 minutes'), 'Must mention typical 15-45 minutes');
+    assert.ok(instruction.includes('AirtelTigo (AT iShare): INSTANT DELIVERY'), 'Must state AirtelTigo is INSTANT DELIVERY');
+    assert.ok(instruction.includes('MTN Orders: Fast under normal conditions, but NOT instant'), 'Must state MTN is NOT instant');
+    assert.ok(instruction.includes('15–45 minutes'), 'Must mention typical 15-45 minutes for MTN');
     assert.ok(instruction.includes('48 hours'), 'Must mention exceptional delay up to 48 hours');
     assert.ok(
       instruction.includes('wait for their current active MTN order to complete'),
       'Must instruct waiting for active MTN order to complete'
     );
     assert.ok(instruction.includes('trackable'), 'Must state orders remain trackable');
-    console.log('✓ 4. Realistic delivery expectations and duplicate MTN protection grounded in AI prompt');
+    assert.ok(
+      instruction.indexOf('AirtelTigo') < instruction.indexOf('Telecel'),
+      'Customer-facing network order must be MTN -> AirtelTigo -> Telecel'
+    );
+    console.log('✓ 4. Realistic delivery expectations, AT instant delivery, and MTN protection grounded in AI prompt');
     passed++;
   }
 
@@ -110,11 +116,16 @@ async function runMysteryAiTests() {
     );
 
     const speedResponse = getGroundedLocalResponse('How fast is delivery?', 'data');
-    assert.ok(speedResponse.reply.includes('15–45 minutes'));
-    assert.ok(speedResponse.reply.includes('48 hours'));
+    assert.ok(speedResponse.reply.includes('Instant Delivery'), 'Fallback must describe AirtelTigo as Instant Delivery');
+    assert.ok(speedResponse.reply.includes('15–45 minutes'), 'Fallback must state MTN typical 15-45 minutes');
+    assert.ok(speedResponse.reply.includes('48 hours'), 'Fallback must state MTN exceptional 48 hours');
 
     const identityResponse = getGroundedLocalResponse('Who are you?', 'home');
     assert.ok(identityResponse.reply.includes('Mystery AI'));
+    assert.ok(
+      identityResponse.reply.indexOf('AirtelTigo') < identityResponse.reply.indexOf('Telecel'),
+      'Identity reply must list networks in order MTN -> AirtelTigo -> Telecel'
+    );
 
     console.log('✓ 5. Emergency local fallback returns grounded facts without stale data');
     passed++;

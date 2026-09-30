@@ -5,7 +5,7 @@ export const DIGITAL_SERVICES: DigitalService[] = [
     id: 'srv-data',
     title: 'High-Speed Data Bundles',
     category: 'Connectivity',
-    description: 'Reliable, affordable data bundles for MTN, Telecel, and AirtelTigo. Direct automated delivery to your SIM.',
+    description: 'Reliable, affordable data bundles for MTN, AirtelTigo, and Telecel. Direct automated delivery to your SIM.',
     status: 'active',
     iconName: 'Wifi',
     accentColor: '#00C365',

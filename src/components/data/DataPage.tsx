@@ -130,6 +130,7 @@ export const DataPage: React.FC = () => {
   };
 
   const mtnNotice = serviceNotices.mtn;
+  const atNotice = serviceNotices.airteltigo;
 
   return (
     <div className="min-h-screen py-6 sm:py-10">
@@ -290,6 +291,32 @@ export const DataPage: React.FC = () => {
               </div>
             </button>
 
+            {/* AirtelTigo */}
+            <button
+              type="button"
+              onClick={() => handleSelectNetwork('airteltigo')}
+              className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
+                !isAirtimeMode && activeNetwork === 'airteltigo'
+                  ? 'border-[#004B93] bg-[#004B93]/20 shadow-[0_0_20px_rgba(0,75,147,0.25)] ring-1 ring-[#004B93]/60'
+                  : 'border-slate-800 bg-[#0f151b] hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl bg-[#004B93] text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                  AT
+                </div>
+                {!isAirtimeMode && activeNetwork === 'airteltigo' && (
+                  <div className="w-2.5 h-2.5 rounded-full bg-sky-400" />
+                )}
+              </div>
+              <div className="mt-3">
+                <div className="font-bold text-sm text-white">AirtelTigo (AT)</div>
+                <div className="text-[11px] text-amber-400 font-semibold flex items-center gap-1">
+                  <span>⚡ Instant Delivery</span>
+                </div>
+              </div>
+            </button>
+
             {/* Telecel */}
             <button
               type="button"
@@ -311,30 +338,6 @@ export const DataPage: React.FC = () => {
               <div className="mt-3">
                 <div className="font-bold text-sm text-white">Telecel Ghana</div>
                 <div className="text-[11px] text-slate-400">Telecel Cash</div>
-              </div>
-            </button>
-
-            {/* AirtelTigo */}
-            <button
-              type="button"
-              onClick={() => handleSelectNetwork('airteltigo')}
-              className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
-                !isAirtimeMode && activeNetwork === 'airteltigo'
-                  ? 'border-[#004B93] bg-[#004B93]/20 shadow-[0_0_20px_rgba(0,75,147,0.25)] ring-1 ring-[#004B93]/60'
-                  : 'border-slate-800 bg-[#0f151b] hover:border-slate-700'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-[#004B93] text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                  AT
-                </div>
-                {!isAirtimeMode && activeNetwork === 'airteltigo' && (
-                  <div className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-                )}
-              </div>
-              <div className="mt-3">
-                <div className="font-bold text-sm text-white">AirtelTigo (AT)</div>
-                <div className="text-[11px] text-slate-400">AT iShare</div>
               </div>
             </button>
 
@@ -404,17 +407,6 @@ export const DataPage: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setAirtimeNet('telecel')}
-                    className={`p-2.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
-                      airtimeNet === 'telecel'
-                        ? 'border-[#E60000] bg-[#E60000]/10 text-red-400'
-                        : 'border-slate-800 bg-slate-900 text-slate-400'
-                    }`}
-                  >
-                    Telecel
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setAirtimeNet('airteltigo')}
                     className={`p-2.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
                       airtimeNet === 'airteltigo'
@@ -423,6 +415,17 @@ export const DataPage: React.FC = () => {
                     }`}
                   >
                     AirtelTigo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAirtimeNet('telecel')}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
+                      airtimeNet === 'telecel'
+                        ? 'border-[#E60000] bg-[#E60000]/10 text-red-400'
+                        : 'border-slate-800 bg-slate-900 text-slate-400'
+                    }`}
+                  >
+                    Telecel
                   </button>
                 </div>
               </div>
@@ -475,6 +478,30 @@ export const DataPage: React.FC = () => {
                       <span>• {mtnNotice.duplicatePolicyNote}</span>
                       <span>• {mtnNotice.trackingNote}</span>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* AirtelTigo Instant Delivery Highlight Notice */}
+            {atNotice.enabled && activeNetwork === 'airteltigo' && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#004B93]/20 border border-[#004B93]/40 text-slate-200 space-y-2 animate-in fade-in duration-200">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-amber-400/20 text-amber-400 shrink-0 mt-0.5">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-1 text-left min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-semibold text-sm text-white">
+                        {atNotice.title}
+                      </h4>
+                      <span className="text-[11px] font-bold text-amber-400 bg-amber-400/15 border border-amber-400/30 px-2 py-0.5 rounded-full">
+                        {atNotice.summary}
+                      </span>
+                    </div>
+                    <p className="text-xs text-sky-100/90 leading-relaxed">
+                      {atNotice.message}
+                    </p>
                   </div>
                 </div>
               </div>
