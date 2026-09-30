@@ -40,65 +40,7 @@ export class OrdersStore {
    * Initializes database table if PostgreSQL is configured
    */
   static async initDb(): Promise<void> {
-    const pool = getPool();
-    if (!pool) return;
-    const client = await pool.connect();
-    try {
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS orders (
-          id VARCHAR(64) PRIMARY KEY,
-          public_reference VARCHAR(64) UNIQUE NOT NULL,
-          customer_name VARCHAR(128),
-          customer_email VARCHAR(128) NOT NULL,
-          customer_phone VARCHAR(32) NOT NULL,
-          recipient_phone VARCHAR(32) NOT NULL,
-          network VARCHAR(32) NOT NULL,
-          product_id VARCHAR(64) NOT NULL,
-          product_name_snapshot VARCHAR(128) NOT NULL,
-          bundle_size_snapshot VARCHAR(64) NOT NULL,
-          amount INTEGER NOT NULL,
-          currency VARCHAR(8) NOT NULL DEFAULT 'GHS',
-          status VARCHAR(32) NOT NULL DEFAULT 'pending_payment',
-          payment_provider VARCHAR(32) NOT NULL DEFAULT 'paystack',
-          payment_reference VARCHAR(128) UNIQUE NOT NULL,
-          payment_status VARCHAR(32) NOT NULL DEFAULT 'pending',
-          supplier_provider VARCHAR(64),
-          supplier_order_id VARCHAR(128),
-          supplier_response TEXT,
-          supplier_cost_minor INTEGER,
-          supplier_offer_ref VARCHAR(128),
-          supplier_last_checked_at VARCHAR(64),
-          failure_reason TEXT,
-          created_at VARCHAR(64) NOT NULL,
-          updated_at VARCHAR(64) NOT NULL,
-          paid_at VARCHAR(64),
-          submitted_at VARCHAR(64),
-          delivered_at VARCHAR(64)
-        );
-
-        -- Safe non-destructive column additions
-        ALTER TABLE orders ADD COLUMN IF NOT EXISTS supplier_cost_minor INTEGER;
-        ALTER TABLE orders ADD COLUMN IF NOT EXISTS supplier_offer_ref VARCHAR(128);
-        ALTER TABLE orders ADD COLUMN IF NOT EXISTS supplier_last_checked_at VARCHAR(64);
-
-        -- Supplier webhook idempotency table
-        CREATE TABLE IF NOT EXISTS supplier_webhook_events (
-          event_id VARCHAR(128) PRIMARY KEY,
-          event_type VARCHAR(64) NOT NULL,
-          payload TEXT,
-          processed_at VARCHAR(64) NOT NULL
-        );
-
-        -- Active MTN recipient lock index (enforces at most one active MTN order per recipient at DB level)
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_active_mtn_recipient 
-        ON orders (recipient_phone) 
-        WHERE network = 'mtn' AND status IN ('paid', 'queued', 'submitted', 'processing', 'refund_pending');
-      `);
-    } catch (err) {
-      console.warn('Error running initDb table check:', err);
-    } finally {
-      client.release();
-    }
+    await initDatabase();
   }
 
   /**
