@@ -1,25 +1,78 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { DATA_BUNDLES } from '../../data/bundles';
-import { Wifi, Globe, ArrowRight, Sparkles, Smartphone, CheckCircle, ShieldCheck } from 'lucide-react';
+import { Wifi, ArrowRight, CheckCircle } from 'lucide-react';
 
 export const Hero: React.FC = () => {
-  const { setActivePage, openCheckout } = useApp();
-
-  const sampleBundle = DATA_BUNDLES[0]; // MTN 1GB for GH₵4.99
+  const { setActivePage } = useApp();
 
   return (
-    <section className="relative overflow-hidden pt-8 pb-16 lg:pt-16 lg:pb-24">
-      {/* Background Ambient Glows */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gradient-to-tr from-[#00c365]/15 via-[#00a855]/10 to-transparent blur-[120px] pointer-events-none rounded-full" />
-      <div className="absolute top-10 right-10 w-96 h-96 bg-emerald-500/5 blur-[100px] pointer-events-none rounded-full" />
+    <section className="relative overflow-hidden pt-6 pb-12 sm:pt-10 sm:pb-16 lg:pt-16 lg:pb-24 bg-[#070b0e]">
+      {/* Composed Backdrop Artwork Layer */}
+      <div
+        className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0"
+        aria-hidden="true"
+        role="presentation"
+      >
+        {/* Responsive Cloudinary Image */}
+        <picture>
+          {/* Mobile (< 768px): Cropped to east (illuminated Accra connectivity artwork), responsive sizing */}
+          <source
+            media="(max-width: 767px)"
+            srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_640,c_fill,g_east/v1790778037/ChatGPT_Image_Sep_30_2026_02_14_20_PM_baowst.png 640w,
+                    https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_768,c_fill,g_east/v1790778037/ChatGPT_Image_Sep_30_2026_02_14_20_PM_baowst.png 768w"
+            sizes="100vw"
+          />
+          {/* Tablet (768px - 1023px) */}
+          <source
+            media="(max-width: 1023px)"
+            srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1024/v1790778037/ChatGPT_Image_Sep_30_2026_02_14_20_PM_baowst.png 1024w"
+            sizes="100vw"
+          />
+          {/* Desktop (1024px+) */}
+          <img
+            src="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1600/v1790778037/ChatGPT_Image_Sep_30_2026_02_14_20_PM_baowst.png"
+            srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1280/v1790778037/ChatGPT_Image_Sep_30_2026_02_14_20_PM_baowst.png 1280w,
+                    https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1600/v1790778037/ChatGPT_Image_Sep_30_2026_02_14_20_PM_baowst.png 1600w,
+                    https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1920/v1790778037/ChatGPT_Image_Sep_30_2026_02_14_20_PM_baowst.png 1920w"
+            sizes="100vw"
+            alt=""
+            fetchPriority="high"
+            loading="eager"
+            decoding="async"
+            className="w-full h-full object-cover object-[88%_top] sm:object-[80%_center] lg:object-right opacity-70 sm:opacity-85 lg:opacity-95"
+          />
+        </picture>
 
+        {/* Desktop Horizontal Gradient Overlay:
+            Solid dark on the left (0–38%) for maximum text contrast,
+            smoothly transitioning across center (38–70%) so the illuminated Accra artwork emerges naturally */}
+        <div className="hidden lg:block absolute inset-0 bg-gradient-to-r from-[#070b0e] via-[#070b0e]/85 to-transparent from-0% via-40% to-72%" />
+
+        {/* Mobile Gradient Overlay:
+            Rich dark fade from bottom/center so text and CTAs have crystal clear readability
+            while letting the glowing Accra landmarks peek through the top/ambient background */}
+        <div className="lg:hidden absolute inset-0 bg-gradient-to-b from-[#070b0e]/40 via-[#070b0e]/85 to-[#070b0e] from-0% via-45% to-95%" />
+
+        {/* Top Edge Dissolve: Seamless transition from header */}
+        <div className="absolute top-0 inset-x-0 h-16 sm:h-24 bg-gradient-to-b from-[#070b0e] to-transparent pointer-events-none" />
+
+        {/* Bottom Edge Dissolve: Seamless transition into Popular Bundles section */}
+        <div className="absolute bottom-0 inset-x-0 h-16 sm:h-28 bg-gradient-to-t from-[#070b0e] to-transparent pointer-events-none" />
+
+        {/* Right Edge Soft Feather: Eliminates any hard frame boundaries */}
+        <div className="hidden sm:block absolute top-0 bottom-0 right-0 w-24 sm:w-36 bg-gradient-to-l from-[#070b0e]/50 to-transparent pointer-events-none" />
+
+        {/* Mystery Hub Signature Emerald Glow Ambient Bleed */}
+        <div className="absolute top-1/4 right-1/4 w-[450px] h-[350px] bg-[#00c365]/10 rounded-full blur-[100px] pointer-events-none mix-blend-screen" />
+      </div>
+
+      {/* Hero Foreground Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8 items-center min-h-[380px] lg:min-h-[480px]">
           {/* Left Column: Value Proposition & CTAs */}
-          <div className="lg:col-span-7 space-y-6 text-left">
+          <div className="lg:col-span-7 space-y-4 sm:space-y-6 text-left max-w-2xl">
             {/* Pill Header Badge */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#11181e] border border-slate-700/60 shadow-inner">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#11181e]/90 border border-slate-700/60 backdrop-blur-sm shadow-inner">
               <span className="w-2 h-2 rounded-full bg-[#00c365] animate-pulse" />
               <span className="text-xs font-medium text-slate-300 tracking-wide">
                 Ghana&apos;s Digital Utility Platform
@@ -27,7 +80,7 @@ export const Hero: React.FC = () => {
             </div>
 
             {/* Main Headline */}
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.15] sm:leading-[1.1] max-w-2xl">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.15] sm:leading-[1.1]">
               Your All-in-One <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E575] via-[#00c365] to-[#34d399]">
                 Digital Solution
@@ -59,7 +112,7 @@ export const Hero: React.FC = () => {
                   e.preventDefault();
                   setActivePage('data');
                 }}
-                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#141b22] hover:bg-[#1a232c] text-white font-semibold text-sm border border-slate-700/80 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
+                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#141b22]/90 hover:bg-[#1a232c] text-white font-semibold text-sm border border-slate-700/80 backdrop-blur-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
               >
                 <Wifi className="w-4 h-4 text-[#00c365]" />
                 <span>Buy Data Bundles</span>
@@ -67,7 +120,7 @@ export const Hero: React.FC = () => {
             </div>
 
             {/* Trust and Key Signals */}
-            <div className="pt-3 flex flex-wrap items-center gap-y-2 gap-x-5 text-xs text-slate-400">
+            <div className="pt-2 sm:pt-3 flex flex-wrap items-center gap-y-2 gap-x-5 text-xs text-slate-400">
               <div className="flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4 text-[#00c365]" />
                 <span>Secure MoMo Checkout</span>
@@ -83,123 +136,8 @@ export const Hero: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column: Visual Device & Floating Product Mockup */}
-          <div className="lg:col-span-5 relative flex justify-center lg:justify-end">
-            <div className="relative w-full max-w-md">
-              {/* Outer decorative halo */}
-              <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-[#00c365]/30 to-emerald-700/20 blur-xl opacity-70" />
-
-              {/* Main Visual Showcase Card */}
-              <div className="relative rounded-2xl bg-[#0e141a] border border-slate-700/80 p-5 shadow-2xl overflow-hidden">
-                {/* Visual Top Bar */}
-                <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-[#00c365]/20 flex items-center justify-center text-[#00c365]">
-                      <Sparkles className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-white">Mystery Hub Live</div>
-                      <div className="text-[10px] text-slate-400">Accra Gateway · Active</div>
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                    Ghana 🇬🇭
-                  </span>
-                </div>
-
-                {/* Simulated Interactive Mobile Interface in Phone Mockup */}
-                <div className="my-5 p-4 rounded-xl bg-[#090d11] border border-slate-800/90 shadow-inner relative">
-                  <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
-                    <span className="font-semibold text-white">Popular Bundle</span>
-                    <span className="text-[#00c365] text-[11px] font-medium">Reliable Delivery</span>
-                  </div>
-
-                  {/* Interactive Mini Card */}
-                  <div className="p-4 rounded-xl bg-[#141b22] border border-slate-700/80 flex items-center justify-between gap-3 shadow-sm hover:border-[#00c365]/50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-[#FFCC00] text-black font-extrabold text-xs flex items-center justify-center shrink-0 shadow-sm">
-                        MTN
-                      </div>
-                      <div>
-                        <div className="font-bold text-white text-base">1GB Data</div>
-                        <div className="text-xs text-slate-400">Direct SIM Dispatch</div>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <div className="text-base font-extrabold text-[#00c365] tabular-nums">
-                        GH₵4.99
-                      </div>
-                      <button
-                        onClick={() => openCheckout(sampleBundle)}
-                        className="mt-1 px-3 py-1 rounded-md bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs transition-transform active:scale-95 shadow-sm"
-                      >
-                        Buy Now
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Quick features snippet */}
-                  <div className="mt-3 pt-3 border-t border-slate-800/80 flex justify-between text-[11px] text-slate-400">
-                    <span>MTN MoMo Accepted</span>
-                    <span>Automated SIM Delivery</span>
-                  </div>
-                </div>
-
-                {/* Floating Interactive Badges as seen in reference */}
-                <div className="space-y-2.5">
-                  {/* Floating Action Pill 1: Buy Data */}
-                  <button
-                    onClick={() => setActivePage('data')}
-                    className="w-full p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-slate-700/70 flex items-center justify-between transition-colors group cursor-pointer text-left"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                        <Smartphone className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-white group-hover:text-[#00c365] transition-colors">
-                          Buy Data
-                        </div>
-                        <div className="text-[10px] text-slate-400">MTN · AT · Telecel</div>
-                      </div>
-                    </div>
-                    <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#00c365] group-hover:translate-x-0.5 transition-all" />
-                  </button>
-
-                  {/* Floating Action Pill 2: Create Website */}
-                  <button
-                    onClick={() => setActivePage('website')}
-                    className="w-full p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-slate-700/70 flex items-center justify-between transition-colors group cursor-pointer text-left"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
-                        <Globe className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-white group-hover:text-[#00c365] transition-colors">
-                          Create Your Website
-                        </div>
-                        <div className="text-[10px] text-slate-400">In Minutes · No Coding</div>
-                      </div>
-                    </div>
-                    <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#00c365] group-hover:translate-x-0.5 transition-all" />
-                  </button>
-                </div>
-
-                {/* Subtle Made in Ghana badge in script style */}
-                <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-[#00c365]" />
-                    <span className="text-[11px]">Transparent Pricing</span>
-                  </div>
-                  <span className="font-serif italic text-slate-300 text-xs">
-                    Made in Ghana for Ghana 🇬🇭
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Right Column: Open spatial canvas allowing the illuminated Accra artwork to breathe */}
+          <div className="hidden lg:block lg:col-span-5 pointer-events-none min-h-[420px]" aria-hidden="true" />
         </div>
       </div>
     </section>
