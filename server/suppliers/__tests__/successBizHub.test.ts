@@ -166,7 +166,7 @@ async function runTests() {
     passed++;
   }
 
-  // 6. Beneficiary check includes offerSlug OR offerId
+  // 6. Beneficiary check includes offerSlug OR offerId & response parser shapes
   {
     const mockClient = new SuccessBizHubClient();
     let sentBody: unknown = null;
@@ -188,16 +188,77 @@ async function runTests() {
     await provider.checkBeneficiaryEligibility('0592066298', { offerId: 'off_at_data_01' });
     assert.deepStrictEqual(sentBody, { phones: ['0592066298'], offerId: 'off_at_data_01' }, 'Must send offerId when slug absent');
 
-    // 6c. Check beneficiary ineligible
+    // 6c. Shape A: data.results eligible true
     mockClient.checkBeneficiary = async () => ({
       status: 'success',
-      data: [{ phone: '0592066298', eligible: false, reason: 'Line is suspended' }],
+      data: {
+        results: [{ phone: '0592066298', eligible: true }],
+      },
     });
-    const checkIneligible = await provider.checkBeneficiaryEligibility('0592066298', { offerSlug: 'mtn-data-direct' });
-    assert.strictEqual(checkIneligible.eligible, false);
-    assert.strictEqual(checkIneligible.reason, 'Line is suspended');
+    const checkA = await provider.checkBeneficiaryEligibility('0592066298', { offerSlug: 'mtn-data-direct' });
+    assert.strictEqual(checkA.eligible, true, 'data.results eligible true must parse to true');
 
-    console.log('✓ 6. Beneficiary check with offerSlug & offerId fallback verified');
+    // 6d. Shape A: data.results eligible false with reason
+    mockClient.checkBeneficiary = async () => ({
+      status: 'success',
+      data: {
+        results: [{ phone: '0592066298', eligible: false, reason: 'Line is suspended' }],
+      },
+    });
+    const checkAFalse = await provider.checkBeneficiaryEligibility('0592066298', { offerSlug: 'mtn-data-direct' });
+    assert.strictEqual(checkAFalse.eligible, false, 'data.results eligible false must parse to false');
+    assert.strictEqual(checkAFalse.reason, 'Line is suspended');
+
+    // 6e. Local phone vs 233-format matching (e.g. requested '0592066298' vs supplier '+233592066298')
+    mockClient.checkBeneficiary = async () => ({
+      status: 'success',
+      data: {
+        results: [{ phone: '+233592066298', eligible: true }],
+      },
+    });
+    const checkCrossFormat = await provider.checkBeneficiaryEligibility('0592066298');
+    assert.strictEqual(checkCrossFormat.eligible, true, 'Local 059... must match supplier +23359...');
+
+    // 6f. Shape B: direct array response
+    mockClient.checkBeneficiary = async () => ({
+      status: 'success',
+      data: [{ phone: '233592066298', eligible: true }],
+    });
+    const checkArray = await provider.checkBeneficiaryEligibility('0592066298');
+    assert.strictEqual(checkArray.eligible, true, 'Array data response must parse to true');
+
+    // 6g. Shape C: direct data.eligible response
+    mockClient.checkBeneficiary = async () => ({
+      status: 'success',
+      data: { eligible: true, reason: 'Active subscriber' },
+    });
+    const checkDirect = await provider.checkBeneficiaryEligibility('0592066298');
+    assert.strictEqual(checkDirect.eligible, true, 'Direct data.eligible must parse to true');
+    assert.strictEqual(checkDirect.reason, 'Active subscriber');
+
+    // 6h. Missing eligible boolean fails closed (never infers from status: "success")
+    mockClient.checkBeneficiary = async () => ({
+      status: 'success',
+      data: { results: [{ phone: '0592066298' }] }, // no eligible property
+    });
+    const checkMissing = await provider.checkBeneficiaryEligibility('0592066298');
+    assert.strictEqual(checkMissing.eligible, false, 'Missing eligible boolean must fail closed');
+    assert.strictEqual(checkMissing.reason, 'Beneficiary response did not contain an explicit eligibility result.');
+
+    // 6i. Multiple results select the correct requested phone
+    mockClient.checkBeneficiary = async () => ({
+      status: 'success',
+      data: {
+        results: [
+          { phone: '0241111111', eligible: false, reason: 'Other line inactive' },
+          { phone: '0592066298', eligible: true },
+        ],
+      },
+    });
+    const checkMulti = await provider.checkBeneficiaryEligibility('0592066298');
+    assert.strictEqual(checkMulti.eligible, true, 'Must select the requested phone among multiple results');
+
+    console.log('✓ 6. Beneficiary check (data.results, array, direct, phone matching, fail closed) verified');
     passed++;
   }
 

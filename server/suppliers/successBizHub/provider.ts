@@ -16,6 +16,19 @@ import { resolveSupplierPackage, ResolvedSupplierPackage } from './catalogResolv
 import { SbhOffer } from './types.js';
 import { parseMinorAmount } from './money.js';
 
+/**
+ * Normalizes Ghana phone number to 10-digit standard local format for matching
+ * e.g. "0592066298", "233592066298", "+233592066298" all normalize to "0592066298"
+ */
+export function normalizeGhanaPhoneForComparison(phoneStr: string): string {
+  if (!phoneStr || typeof phoneStr !== 'string') return '';
+  const digits = phoneStr.replace(/\D/g, '');
+  if (digits.startsWith('233') && digits.length === 12) {
+    return '0' + digits.slice(3);
+  }
+  return digits;
+}
+
 export class SuccessBizHubProvider implements SupplierProvider {
   providerId = 'success_biz_hub';
   providerName = 'Success Biz Hub API v2';
@@ -146,39 +159,117 @@ export class SuccessBizHubProvider implements SupplierProvider {
 
   /**
    * Check beneficiary eligibility via /beneficiary-check with offer selector
+   * Supports:
+   * A) data.results: [{ phone, eligible, reason }]
+   * B) data: [{ phone, eligible, reason }]
+   * C) data: { eligible, reason }
+   * Strictly requires explicit eligible === true. Never infers from status/success.
    */
   async checkBeneficiaryEligibility(
     phone: string,
     offerSelector?: { offerSlug?: string; offerId?: string }
   ): Promise<{ eligible: boolean; reason?: string }> {
-    try {
-      // Success Biz Hub expects 10-digit local or standard formatted phone
-      const cleanPhone = phone.replace(/[^\d]/g, '');
-      const formatted = cleanPhone.startsWith('233') ? `0${cleanPhone.slice(3)}` : cleanPhone;
+    const cleanPhone = phone.replace(/[^\d]/g, '');
+    const formatted = cleanPhone.startsWith('233') ? `0${cleanPhone.slice(3)}` : cleanPhone;
+    const targetNorm = normalizeGhanaPhoneForComparison(formatted);
+    const maskedPhone = targetNorm.length >= 4 ? `***${targetNorm.slice(-4)}` : '***';
 
+    try {
       const res = await this.client.checkBeneficiary([formatted], offerSelector);
 
-      // Parse response format: either { data: [{ phone, eligible, reason }] } or { eligible: true }
-      let isEligible = false;
+      let isEligible: boolean | null = null;
       let reason: string | undefined;
+      let hasDataResults = false;
+      let resultCount = 0;
+      let matchedPhone: string | undefined;
 
-      if (Array.isArray(res.data) && res.data.length > 0) {
-        const item = res.data[0];
-        isEligible = item.eligible === true;
-        reason = item.reason;
-      } else if (res.data && typeof (res.data as { eligible?: boolean }).eligible === 'boolean') {
-        isEligible = (res.data as { eligible: boolean }).eligible;
-        reason = (res.data as { reason?: string }).reason;
-      } else if (typeof res.eligible === 'boolean') {
-        isEligible = res.eligible;
+      const rawData = res.data as
+        | { results?: Array<{ phone?: string; eligible?: unknown; reason?: string }>; eligible?: unknown; reason?: string }
+        | Array<{ phone?: string; eligible?: unknown; reason?: string }>
+        | undefined;
+
+      // Shape A: data.results array
+      if (rawData && typeof rawData === 'object' && !Array.isArray(rawData) && Array.isArray(rawData.results)) {
+        hasDataResults = true;
+        resultCount = rawData.results.length;
+
+        // Find entry matching requested phone
+        let matched = rawData.results.find(
+          (item) => item.phone && normalizeGhanaPhoneForComparison(item.phone) === targetNorm
+        );
+
+        // If only 1 result exists for the single phone submitted, allow use
+        if (!matched && resultCount === 1) {
+          const single = rawData.results[0];
+          if (!single.phone || normalizeGhanaPhoneForComparison(single.phone) === targetNorm) {
+            matched = single;
+          }
+        }
+
+        if (matched) {
+          matchedPhone = matched.phone;
+          if (typeof matched.eligible === 'boolean') {
+            isEligible = matched.eligible === true;
+            reason = matched.reason;
+          }
+        }
+      }
+      // Shape B: data is an array
+      else if (Array.isArray(rawData)) {
+        resultCount = rawData.length;
+
+        let matched = rawData.find(
+          (item) => item.phone && normalizeGhanaPhoneForComparison(item.phone) === targetNorm
+        );
+
+        if (!matched && resultCount === 1) {
+          const single = rawData[0];
+          if (!single.phone || normalizeGhanaPhoneForComparison(single.phone) === targetNorm) {
+            matched = single;
+          }
+        }
+
+        if (matched) {
+          matchedPhone = matched.phone;
+          if (typeof matched.eligible === 'boolean') {
+            isEligible = matched.eligible === true;
+            reason = matched.reason;
+          }
+        }
+      }
+      // Shape C: data.eligible is direct boolean
+      else if (rawData && typeof rawData === 'object' && typeof rawData.eligible === 'boolean') {
+        isEligible = rawData.eligible === true;
+        reason = rawData.reason;
+      }
+      // Direct root eligible boolean fallback
+      else if (typeof res.eligible === 'boolean') {
+        isEligible = res.eligible === true;
         reason = res.message;
-      } else {
-        // Fallback: if status === "success" without explicit false, consider eligible
-        isEligible = res.status === 'success';
+      }
+
+      // Safe server diagnostic logging (never logs API keys, secrets, or full credentials)
+      console.info(
+        `[SBH Beneficiary Check] Phone: ${maskedPhone}, hasDataResults: ${hasDataResults}, resultCount: ${resultCount}, matched: ${matchedPhone ? '***' + matchedPhone.slice(-4) : 'none'}, eligible: ${isEligible ?? 'undefined'}, reason: ${reason || 'none'}`
+      );
+
+      // Explicit eligible boolean requirement (Never infer from status === 'success')
+      if (isEligible === null) {
+        console.warn(
+          `[SBH Beneficiary Check] Beneficiary response did not contain an explicit eligibility result for phone ${maskedPhone}.`
+        );
+        return {
+          eligible: false,
+          reason: 'Beneficiary response did not contain an explicit eligibility result.',
+        };
       }
 
       return { eligible: isEligible, reason };
     } catch (err) {
+      console.error(
+        `[SBH Beneficiary Check] Error checking beneficiary eligibility for phone ${maskedPhone}:`,
+        err instanceof Error ? err.message : err
+      );
       return {
         eligible: false,
         reason: err instanceof Error ? err.message : 'Beneficiary eligibility check failed.',

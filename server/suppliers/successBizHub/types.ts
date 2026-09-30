@@ -65,17 +65,23 @@ export interface SbhBeneficiaryCheckRequest {
 }
 
 export interface SbhBeneficiaryCheckItem {
-  phone: string;
-  eligible: boolean;
+  phone?: string;
+  eligible?: boolean;
   reason?: string;
   [key: string]: unknown;
 }
 
 export interface SbhBeneficiaryCheckResponse {
-  status: string;
-  data?: SbhBeneficiaryCheckItem[] | { results?: SbhBeneficiaryCheckItem[] } | SbhBeneficiaryCheckItem;
+  status?: string;
+  success?: boolean;
+  data?:
+    | SbhBeneficiaryCheckItem[]
+    | { results?: SbhBeneficiaryCheckItem[]; eligible?: boolean; reason?: string }
+    | { eligible?: boolean; reason?: string }
+    | SbhBeneficiaryCheckItem;
   eligible?: boolean;
   message?: string;
+  [key: string]: unknown;
 }
 
 export interface SbhCreateOrderRequest {
