@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { TEMPLATE_CATEGORIES, WEBSITE_TEMPLATES } from '../../data/templates';
 import { TemplateCategory, WebsiteTemplate } from '../../types';
+import { TemplateCardPreview } from './TemplateCardPreview';
 import {
   Globe,
   Sparkles,
@@ -292,7 +293,7 @@ export const WebsiteBuilderPage: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredTemplates.map((t) => (
-                <TemplateCard
+                <TemplateCardPreview
                   key={t.id}
                   template={t}
                   onPreview={() => openTemplatePreview(t)}
@@ -326,123 +327,6 @@ export const WebsiteBuilderPage: React.FC = () => {
             </button>
           </div>
         </div>
-      </div>
-    </div>
-  );
-};
-
-interface TemplateCardProps {
-  template: WebsiteTemplate;
-  onPreview: () => void;
-}
-
-const TemplateCard: React.FC<TemplateCardProps> = ({ template: t, onPreview }) => {
-  const palette = t.colorScheme || {
-    primary: '#0f172a',
-    secondary: t.accentColor || '#00c365',
-    background: '#ffffff',
-    surface: '#f8fafc',
-    text: '#0f172a',
-    mutedText: '#64748b',
-    accent: t.accentColor || '#00c365',
-    border: '#e2e8f0',
-  };
-
-  return (
-    <div className="rounded-2xl bg-[#0e141a] border border-slate-800 hover:border-slate-700 overflow-hidden transition-all duration-300 flex flex-col justify-between group shadow-sm hover:shadow-2xl hover:-translate-y-1">
-      <div>
-        {/* Mock Miniature Live Window Header with real template branding */}
-        <div
-          className="h-44 p-4 flex flex-col justify-between relative overflow-hidden"
-          style={{
-            background: `linear-gradient(135deg, ${palette.primary} 0%, #000000 100%)`,
-          }}
-        >
-          {/* Subtle Image Backdrop if available */}
-          {t.heroImage && (
-            <div
-              className="absolute inset-0 opacity-20 bg-cover bg-center mix-blend-overlay group-hover:scale-105 transition-transform duration-500"
-              style={{ backgroundImage: `url(${t.heroImage})` }}
-            />
-          )}
-
-          {/* Browser Window Controls & Badges */}
-          <div className="flex items-center justify-between z-10">
-            <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full border border-white/10">
-              <span className="w-2 h-2 rounded-full bg-rose-400" />
-              <span className="w-2 h-2 rounded-full bg-amber-400" />
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="text-[10px] text-slate-300 font-mono ml-1">
-                {t.categoryLabel.split('&')[0]}
-              </span>
-            </div>
-
-            {t.badgeText ? (
-              <span className="text-[10px] font-bold text-amber-300 bg-black/70 backdrop-blur-sm border border-amber-500/30 px-2 py-0.5 rounded-full">
-                {t.badgeText}
-              </span>
-            ) : t.isFreeTier ? (
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full">
-                Free Starter
-              </span>
-            ) : (
-              <span className="text-[10px] font-bold text-purple-400 bg-purple-500/20 px-2 py-0.5 rounded-full">
-                Pro
-              </span>
-            )}
-          </div>
-
-          {/* Miniature Brand Identity Tagline */}
-          <div className="z-10 space-y-0.5">
-            <div className="font-extrabold text-sm text-white drop-shadow-md tracking-tight leading-tight">
-              {t.demoBusinessName}
-            </div>
-            <div className="text-[10px] text-slate-300 line-clamp-1 opacity-90">
-              {t.demoHeroTagline}
-            </div>
-          </div>
-
-          {/* Distinct Color Indicator Bar */}
-          <div
-            className="absolute bottom-0 left-0 right-0 h-1.5"
-            style={{ backgroundColor: palette.secondary }}
-          />
-        </div>
-
-        {/* Content Details */}
-        <div className="p-4 space-y-3 text-left">
-          <div>
-            <h4 className="font-bold text-sm text-white group-hover:text-[#00c365] transition-colors leading-snug">
-              {t.title}
-            </h4>
-            <p className="text-[11px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">
-              {t.description}
-            </p>
-          </div>
-
-          {/* Features pills */}
-          <div className="flex flex-wrap gap-1 pt-1">
-            {t.features.slice(0, 2).map((feat, i) => (
-              <span
-                key={i}
-                className="text-[10px] text-slate-300 bg-[#121921] border border-slate-800 px-2 py-0.5 rounded-md"
-              >
-                {feat}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Action Button */}
-      <div className="p-4 pt-0">
-        <button
-          onClick={onPreview}
-          className="w-full py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-[#00c365] hover:text-black text-white text-xs font-bold border border-slate-800 hover:border-[#00c365] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-        >
-          <Eye className="w-3.5 h-3.5" />
-          <span>Interactive Preview</span>
-        </button>
       </div>
     </div>
   );

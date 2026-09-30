@@ -1,7 +1,8 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { WEBSITE_TEMPLATES } from '../../data/templates';
-import { Globe, ArrowRight, Eye, Smartphone, Zap, Sparkles } from 'lucide-react';
+import { TemplateCardPreview } from '../website/TemplateCardPreview';
+import { Globe, ArrowRight, Smartphone, Zap, Sparkles } from 'lucide-react';
 
 export const HomeWebsiteSection: React.FC = () => {
   const { setActivePage, openTemplatePreview } = useApp();
@@ -10,8 +11,8 @@ export const HomeWebsiteSection: React.FC = () => {
   const previewTemplates = WEBSITE_TEMPLATES.slice(0, 3);
 
   return (
-    <section className="py-12 sm:py-16 bg-[#090d10] border-y border-slate-800/80">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+    <section className="py-8 sm:py-12 lg:py-16 bg-[#090d10] border-y border-slate-800/80">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 lg:space-y-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-3">
             <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#00c365]">
@@ -41,55 +42,11 @@ export const HomeWebsiteSection: React.FC = () => {
         {/* 3 Template Previews Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {previewTemplates.map((t) => (
-            <div
+            <TemplateCardPreview
               key={t.id}
-              className="rounded-2xl bg-[#0e141a] border border-slate-800 overflow-hidden hover:border-[#00c365]/50 transition-all duration-200 flex flex-col justify-between group shadow-sm"
-            >
-              <div>
-                {/* Visual Header */}
-                <div
-                  className="h-32 p-4 flex flex-col justify-between relative"
-                  style={{
-                    background: `linear-gradient(135deg, #0a1014 0%, #17242e 100%)`,
-                  }}
-                >
-                  <span className="text-[10px] font-bold text-white bg-black/60 px-2 py-0.5 rounded w-fit">
-                    {t.categoryLabel}
-                  </span>
-                  <div>
-                    <div className="font-extrabold text-sm text-white">
-                      {t.demoBusinessName}
-                    </div>
-                    <div className="text-[10px] text-slate-300 truncate">
-                      {t.demoHeroTagline}
-                    </div>
-                  </div>
-                  <div
-                    className="absolute bottom-0 left-0 right-0 h-1"
-                    style={{ backgroundColor: t.accentColor }}
-                  />
-                </div>
-
-                <div className="p-4 space-y-2">
-                  <h4 className="font-bold text-sm text-white group-hover:text-[#00c365] transition-colors">
-                    {t.title}
-                  </h4>
-                  <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
-                    {t.description}
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-4 pt-0">
-                <button
-                  onClick={() => openTemplatePreview(t)}
-                  className="w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-[#00c365] hover:text-black text-white text-xs font-semibold border border-slate-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Preview Demo Site</span>
-                </button>
-              </div>
-            </div>
+              template={t}
+              onPreview={() => openTemplatePreview(t)}
+            />
           ))}
         </div>
 

@@ -37,8 +37,8 @@ export const HomeMarketplaceSection: React.FC = () => {
   ];
 
   return (
-    <section className="py-12 sm:py-16 bg-[#070b0e] border-t border-slate-800/80">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-10">
+    <section className="py-8 sm:py-12 lg:py-16 bg-[#070b0e] border-t border-slate-800/80">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 lg:space-y-10">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div className="space-y-2 text-left">

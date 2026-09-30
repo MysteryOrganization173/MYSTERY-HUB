@@ -9,8 +9,8 @@ export const HomeComingSoonSection: React.FC = () => {
   const futureServices = DIGITAL_SERVICES.filter((s) => s.status === 'coming_soon').slice(0, 4);
 
   return (
-    <section className="py-12 sm:py-16 bg-[#070b0e] border-t border-slate-800/80">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+    <section className="py-8 sm:py-12 lg:py-16 bg-[#070b0e] border-t border-slate-800/80">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 lg:space-y-10">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#00c365]">

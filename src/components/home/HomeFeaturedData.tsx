@@ -15,8 +15,8 @@ export const HomeFeaturedData: React.FC = () => {
   ).slice(0, 4);
 
   return (
-    <section className="py-12 sm:py-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    <section className="pt-2 pb-8 sm:pt-4 sm:pb-12 lg:pt-6 lg:pb-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="space-y-2">

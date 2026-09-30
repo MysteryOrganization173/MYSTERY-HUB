@@ -6,7 +6,7 @@ export const Hero: React.FC = () => {
   const { setActivePage } = useApp();
 
   return (
-    <section className="relative overflow-hidden pt-6 pb-12 sm:pt-10 sm:pb-16 lg:pt-16 lg:pb-24 bg-[#070b0e]">
+    <section className="relative overflow-hidden pt-5 pb-8 sm:pt-8 sm:pb-12 lg:pt-14 lg:pb-18 bg-[#070b0e]">
       {/* Composed Backdrop Artwork Layer */}
       <div
         className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0"

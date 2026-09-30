@@ -22,6 +22,7 @@ import { TemplatePreviewModal } from './components/website/TemplatePreviewModal'
 import { WaitlistModal } from './components/common/WaitlistModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { MysteryAiAssistant } from './components/ai/MysteryAiAssistant';
+import { IsolatedTemplatePreview } from './components/website/IsolatedTemplatePreview';
 
 const AppContent: React.FC = () => {
   const { activePage } = useApp();
@@ -61,6 +62,16 @@ const AppContent: React.FC = () => {
 };
 
 export default function App() {
+  // Check if running inside an isolated preview iframe
+  const searchParams = new URLSearchParams(window.location.search);
+  const isolatedTemplateId =
+    searchParams.get('isolated_template_preview') ||
+    searchParams.get('preview_template_id');
+
+  if (isolatedTemplateId) {
+    return <IsolatedTemplatePreview templateId={isolatedTemplateId} />;
+  }
+
   return (
     <AppProvider>
       <AppContent />
