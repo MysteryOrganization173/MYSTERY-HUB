@@ -16,10 +16,10 @@ export const CheckoutModal: React.FC = () => {
 
   useEffect(() => {
     if (checkoutBundle) {
-      setPhone((prev) => prev || '024 ');
+      setPhone((prev) => prev || user?.phone || '');
       setPhoneError('');
     }
-  }, [checkoutBundle]);
+  }, [checkoutBundle, user?.phone]);
 
   useEffect(() => {
     const net = detectGhanaNetwork(phone);
