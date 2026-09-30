@@ -13,6 +13,17 @@ import { getActiveSupplierProvider } from '../suppliers/supplierInterface.js';
 export const apiRouter = Router();
 
 /**
+ * 0. GET /api/health
+ * Lightweight health check endpoint for monitoring & Render deployment checks
+ */
+apiRouter.get('/health', (_req: Request, res: Response) => {
+  res.json({
+    status: 'ok',
+    service: 'mysteryhub-api',
+  });
+});
+
+/**
  * 1. POST /api/payments/initialize
  * Creates pending order and initializes Paystack from the SERVER.
  * Authoritative price is loaded from the catalog — browser input price is ignored.
@@ -154,7 +165,17 @@ apiRouter.get('/payments/verify/:reference', async (req: Request, res: Response)
     const verifyResult = await PaystackServerService.verifyTransaction(order.payment_reference);
 
     if (verifyResult.isVerified) {
-      // Validate amount match
+      // 1. Validate currency requirement: must be GHS
+      if (!verifyResult.currency || verifyResult.currency.toUpperCase() !== 'GHS') {
+        console.warn(
+          `Payment currency mismatch! Expected GHS, received ${verifyResult.currency || 'UNKNOWN'} for order ${order.public_reference}`
+        );
+        await OrdersStore.updateOrderStatus(order.id, 'failed', 'Payment currency mismatch detected');
+        res.status(400).json({ error: 'Payment verification failed due to currency mismatch.' });
+        return;
+      }
+
+      // 2. Validate amount match
       if (verifyResult.amountPesewas > 0 && verifyResult.amountPesewas !== order.amount) {
         console.warn(
           `Payment amount mismatch! Expected ${order.amount} pesewas, received ${verifyResult.amountPesewas}`
