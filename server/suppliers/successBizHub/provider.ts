@@ -10,6 +10,8 @@ import {
   SupplierOffer,
   SupplierOrderRequest,
   SupplierOrderResponse,
+  SupplierAirtimeRequest,
+  SupplierAirtimeResponse,
 } from '../supplierInterface.js';
 import { SuccessBizHubClient } from './client.js';
 import { resolveSupplierPackage, ResolvedSupplierPackage } from './catalogResolver.js';
@@ -50,7 +52,7 @@ export class SuccessBizHubProvider implements SupplierProvider {
    */
   mapSupplierStatus(rawStatus: string): 'queued' | 'submitted' | 'processing' | 'delivered' | 'failed' {
     const s = (rawStatus || '').toLowerCase().trim();
-    if (s === 'processed' || s === 'completed' || s === 'success') {
+    if (s === 'processed' || s === 'completed' || s === 'success' || s === 'delivered') {
       return 'delivered';
     }
     if (s === 'processing' || s === 'in_progress') {
@@ -357,6 +359,42 @@ export class SuccessBizHubProvider implements SupplierProvider {
   }
 
   /**
+   * Check if Airtime service is available via GET /services
+   */
+  async checkAirtimeAvailable(): Promise<{ available: boolean; reason?: string }> {
+    try {
+      const res = await this.client.getServices();
+      let services: Array<{ kind?: string; slug?: string; name?: string; enabled?: boolean; available?: boolean }> = [];
+      if (Array.isArray(res.data)) {
+        services = res.data;
+      } else if (res.data && Array.isArray((res.data as { services?: any[] }).services)) {
+        services = (res.data as { services?: any[] }).services!;
+      }
+
+      if (services.length > 0) {
+        const airtimeService = services.find(
+          (s) =>
+            (s.slug && s.slug.toLowerCase().includes('airtime')) ||
+            (s.kind && s.kind.toLowerCase() === 'airtime') ||
+            (s.name && s.name.toLowerCase().includes('airtime'))
+        );
+
+        if (airtimeService) {
+          const isEnabled = airtimeService.enabled !== false && airtimeService.available !== false;
+          if (!isEnabled) {
+            return { available: false, reason: 'Airtime service is currently disabled on supplier.' };
+          }
+        }
+      }
+
+      return { available: true };
+    } catch (err) {
+      console.warn('[SBH Provider] Unable to query services endpoint for airtime availability:', err);
+      return { available: true }; // Soft fallback if services endpoint is transiently slow
+    }
+  }
+
+  /**
    * 4. GET /orders/:identifier
    * Retrieves supplier order status
    */
@@ -379,6 +417,90 @@ export class SuccessBizHubProvider implements SupplierProvider {
         status: 'processing', // Keep non-terminal on lookup error
         supplierOrderId,
         errorMessage: err instanceof Error ? err.message : 'Failed to query supplier order status.',
+      };
+    }
+  }
+
+  /**
+   * 5. POST /airtime
+   * Places an airtime top-up order.
+   * Body: { network, phone, amountMajor }
+   * Never sends packageId. Face value is passed in amountMajor.
+   */
+  async placeAirtime(request: SupplierAirtimeRequest): Promise<SupplierAirtimeResponse> {
+    const netRaw = (request.network || '').toLowerCase().trim();
+    const network = netRaw === 'at' ? 'airteltigo' : netRaw;
+
+    const cleanPhone = request.recipientPhone.replace(/[^\d]/g, '');
+    const phone = cleanPhone.startsWith('233') ? `0${cleanPhone.slice(3)}` : cleanPhone;
+
+    try {
+      const res = await this.client.createAirtime({
+        network,
+        phone,
+        amountMajor: request.amountMajor,
+      });
+
+      const data = res.data || {};
+      const supplierOrderId = data.publicId || data.id;
+      const status = this.mapSupplierStatus(data.status);
+
+      const parsedAmountMinor = parseMinorAmount(data.amountMinor) ?? undefined;
+      const parsedChargeMinor = parseMinorAmount(data.chargeMinor) ?? undefined;
+
+      return {
+        success: true,
+        supplierOrderId,
+        status,
+        amountMinor: parsedAmountMinor,
+        chargeMinor: parsedChargeMinor,
+        rawResponse: data,
+        errorMessage: data.failureReason,
+      };
+    } catch (err: unknown) {
+      const isTimeout = Boolean((err as { isTimeout?: boolean })?.isTimeout);
+      const errorMessage = err instanceof Error ? err.message : 'Supplier airtime placement failed.';
+
+      return {
+        success: false,
+        status: 'failed',
+        errorMessage,
+        rawResponse: {
+          isTimeout,
+          error: errorMessage,
+        },
+      };
+    }
+  }
+
+  /**
+   * 6. GET /airtime/:identifier
+   * Retrieves airtime order status.
+   */
+  async getAirtimeStatus(supplierOrderId: string): Promise<SupplierAirtimeResponse> {
+    try {
+      const res = await this.client.getAirtime(supplierOrderId);
+      const data = res.data || {};
+      const status = this.mapSupplierStatus(data.status);
+
+      const parsedAmountMinor = parseMinorAmount(data.amountMinor) ?? undefined;
+      const parsedChargeMinor = parseMinorAmount(data.chargeMinor) ?? undefined;
+
+      return {
+        success: true,
+        supplierOrderId: data.publicId || data.id || supplierOrderId,
+        status,
+        amountMinor: parsedAmountMinor,
+        chargeMinor: parsedChargeMinor,
+        rawResponse: data,
+        errorMessage: data.failureReason,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        status: 'processing', // Keep non-terminal on lookup error
+        supplierOrderId,
+        errorMessage: err instanceof Error ? err.message : 'Failed to query supplier airtime status.',
       };
     }
   }

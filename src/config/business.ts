@@ -56,11 +56,12 @@ export const BUSINESS_CONFIG = {
         'Curated tech hardware, creator tools, and productivity software sourced on request with verified Ghana dispatch.',
     },
     airtime: {
-      status: 'beta',
-      isAvailableForPurchase: false,
-      label: 'In Testing',
+      status: 'active',
+      isAvailableForPurchase: true,
+      label: 'Live',
+      serviceFeePercent: 2,
       notice:
-        'Airtime top-up is undergoing direct telecom gateway testing. Live checkout is paused until full fulfillment is enabled.',
+        'Instant automated airtime recharge directly to your SIM across MTN, AirtelTigo, and Telecel following Mobile Money authorization.',
     },
     wallet: {
       status: 'coming_soon',

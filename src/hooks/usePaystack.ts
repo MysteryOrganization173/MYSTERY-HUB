@@ -40,6 +40,9 @@ export interface ServerPaystackOptions {
   recipientPhone: string;
   customerEmail?: string;
   customerName?: string;
+  serviceType?: 'data' | 'airtime';
+  network?: string;
+  amount?: number;
   onPaymentReceived: (orderRef: string, reference: string) => void;
   onCancel?: () => void;
   onError?: (error: Error & { code?: string; existingOrderReference?: string; existingOrderStatus?: string }) => void;
@@ -107,6 +110,9 @@ export function usePaystack() {
         recipientPhone: options.recipientPhone,
         customerEmail: options.customerEmail,
         customerName: options.customerName,
+        serviceType: options.serviceType,
+        network: options.network,
+        amount: options.amount,
       });
 
       if (!initRes.success) {

@@ -109,6 +109,32 @@ export interface SbhOrderResponse {
   message?: string;
 }
 
+export interface SbhCreateAirtimeRequest {
+  network: 'mtn' | 'airteltigo' | 'at' | 'telecel' | string;
+  phone: string;
+  amountMajor: string; // e.g. "10"
+}
+
+export interface SbhAirtimeData {
+  id?: string;
+  publicId?: string;
+  status: 'pending' | 'processing' | 'processed' | 'failed' | string;
+  network?: string;
+  phone?: string;
+  amountMinor?: string | number; // Pesewas e.g. 1000
+  chargeMinor?: string | number; // Pesewas e.g. 985
+  createdAt?: string;
+  updatedAt?: string;
+  failureReason?: string;
+  [key: string]: unknown;
+}
+
+export interface SbhAirtimeResponse {
+  status: string;
+  data: SbhAirtimeData;
+  message?: string;
+}
+
 export interface SbhWebhookOrderItem {
   orderId?: string;
   publicId?: string;

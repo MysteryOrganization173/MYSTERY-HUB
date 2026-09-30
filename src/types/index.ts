@@ -16,14 +16,17 @@ export type BundleValidity = 'Daily' | 'Weekly' | 'Monthly' | 'Non-Expiry';
 export interface DataBundle {
   id: string;
   network: NetworkId;
-  dataAmount: string; // e.g., '1GB', '2.5GB', '10GB'
-  dataBytesValue: number; // in MB for sorting
-  validity: string; // e.g., '7 Days', '30 Days', 'No Expiry'
+  dataAmount: string; // e.g., '1GB', '2.5GB', 'GH₵10 Airtime'
+  dataBytesValue: number; // in MB for sorting, 0 for airtime
+  validity: string; // e.g., '7 Days', '30 Days', 'No Expiry', 'Direct Credit'
   validityCategory: BundleValidity;
-  priceGhc: number; // editable price in Ghanaian Cedis
+  priceGhc: number; // editable price or total in Ghanaian Cedis
   isPopular?: boolean;
   isBestValue?: boolean;
   description?: string;
+  serviceType?: 'data' | 'airtime';
+  faceValueGhc?: number;
+  serviceFeeGhc?: number;
 }
 
 export type OrderStatus = 'placed' | 'verifying' | 'processing' | 'delivered' | 'failed';
@@ -32,11 +35,14 @@ export interface OrderRecord {
   id: string; // Local client ID e.g. MH1234567
   publicReference?: string; // Real authoritative backend reference e.g. MH-20260930-592025
   serverReference?: string; // Alias for backward compatibility
+  serviceType?: 'data' | 'airtime';
   bundle: DataBundle;
   recipientPhone: string;
   network: NetworkId;
   paymentMethod: 'momo' | 'card' | 'bank';
   amountGhc: number;
+  faceValueGhc?: number;
+  serviceFeeGhc?: number;
   status: OrderStatus;
   serverStatus?: string; // Raw backend status e.g. 'refund_pending', 'delivered'
   statusMessage?: string; // Customer-friendly status message (e.g. for refund pending)

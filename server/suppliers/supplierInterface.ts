@@ -28,6 +28,26 @@ export interface SupplierOrderResponse {
   errorMessage?: string;
 }
 
+export interface SupplierAirtimeRequest {
+  internalOrderId: string;
+  publicReference: string;
+  recipientPhone: string;
+  network: string;
+  amountMajor: string; // e.g. "10"
+  faceValuePesewas: number;
+  customerTotalPesewas: number;
+}
+
+export interface SupplierAirtimeResponse {
+  success: boolean;
+  supplierOrderId?: string;
+  status: 'queued' | 'submitted' | 'processing' | 'delivered' | 'failed';
+  amountMinor?: number;
+  chargeMinor?: number;
+  rawResponse?: unknown;
+  errorMessage?: string;
+}
+
 export interface SupplierBalance {
   providerName: string;
   currency: 'GHS';
@@ -43,6 +63,8 @@ export interface SupplierProvider {
   getOffers(): Promise<SupplierOffer[]>;
   placeOrder(request: SupplierOrderRequest): Promise<SupplierOrderResponse>;
   getOrderStatus(supplierOrderId: string): Promise<SupplierOrderResponse>;
+  placeAirtime?(request: SupplierAirtimeRequest): Promise<SupplierAirtimeResponse>;
+  getAirtimeStatus?(supplierOrderId: string): Promise<SupplierAirtimeResponse>;
 }
 
 /**
@@ -71,6 +93,18 @@ export class UnconfiguredSupplierProvider implements SupplierProvider {
   }
 
   async getOrderStatus(_supplierOrderId: string): Promise<SupplierOrderResponse> {
+    throw new Error('Supplier integration not configured.');
+  }
+
+  async placeAirtime(_request: SupplierAirtimeRequest): Promise<SupplierAirtimeResponse> {
+    return {
+      success: false,
+      status: 'queued',
+      errorMessage: 'Supplier integration not configured.',
+    };
+  }
+
+  async getAirtimeStatus(_supplierOrderId: string): Promise<SupplierAirtimeResponse> {
     throw new Error('Supplier integration not configured.');
   }
 }

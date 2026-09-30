@@ -80,6 +80,10 @@ export const CheckoutModal: React.FC = () => {
   if (!isCheckoutOpen || !checkoutBundle) return null;
 
   const currentNetwork = GHANA_NETWORKS[checkoutBundle.network];
+  const isAirtime = checkoutBundle.serviceType === 'airtime' || checkoutBundle.id.startsWith('airtime-');
+  const faceValue = checkoutBundle.faceValueGhc ?? checkoutBundle.priceGhc;
+  const serviceFee = checkoutBundle.serviceFeeGhc ?? (isAirtime ? Number((faceValue * 0.02).toFixed(2)) : 0);
+  const totalAmount = isAirtime ? Number((faceValue + serviceFee).toFixed(2)) : checkoutBundle.priceGhc;
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -100,6 +104,7 @@ export const CheckoutModal: React.FC = () => {
           publicReference: res.order.public_reference,
           serverReference: res.order.public_reference,
           serverStatus: res.order.status,
+          serviceType: res.order.service_type,
           statusMessage:
             res.order.status === 'refund_pending' || res.order.status === 'refunded'
               ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
@@ -171,8 +176,18 @@ export const CheckoutModal: React.FC = () => {
       recipientPhone: phone.trim(),
       customerEmail: user?.email,
       customerName: user?.name,
+      serviceType: isAirtime ? 'airtime' : 'data',
+      network: checkoutBundle.network,
+      amount: faceValue,
       onPaymentReceived: (orderRef, reference) => {
-        const newOrder = createOrder(checkoutBundle, phone.trim(), paymentMethod, reference, orderRef);
+        const orderToCreate = {
+          ...checkoutBundle,
+          priceGhc: totalAmount,
+          faceValueGhc: faceValue,
+          serviceFeeGhc: serviceFee,
+          serviceType: isAirtime ? ('airtime' as const) : ('data' as const),
+        };
+        const newOrder = createOrder(orderToCreate, phone.trim(), paymentMethod, reference, orderRef);
         closeCheckout();
         showToast(`Payment received! Order #${orderRef}. Verifying payment...`, 'success');
         openOrderStatus(newOrder);
@@ -204,8 +219,12 @@ export const CheckoutModal: React.FC = () => {
               <Smartphone className="w-4 h-4" />
             </div>
             <div className="min-w-0 truncate">
-              <h3 className="font-semibold text-sm sm:text-base text-white truncate">Data Bundle Checkout</h3>
-              <p className="text-[11px] sm:text-xs text-slate-400 truncate">Direct SIM delivery via Ghana Mobile Money</p>
+              <h3 className="font-semibold text-sm sm:text-base text-white truncate">
+                {isAirtime ? `${currentNetwork.name} Airtime Top-Up` : 'Data Bundle Checkout'}
+              </h3>
+              <p className="text-[11px] sm:text-xs text-slate-400 truncate">
+                {isAirtime ? 'Direct SIM recharge via Ghana Mobile Money' : 'Direct SIM delivery via Ghana Mobile Money'}
+              </p>
             </div>
           </div>
           <button
@@ -220,7 +239,7 @@ export const CheckoutModal: React.FC = () => {
 
         {/* Scrollable Body */}
         <form onSubmit={handleSubmit} className="overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5 flex-1 overscroll-contain">
-          {/* Bundle Summary Card */}
+          {/* Bundle / Airtime Summary Card */}
           <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div
@@ -240,9 +259,13 @@ export const CheckoutModal: React.FC = () => {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="font-bold text-white text-sm sm:text-base truncate">
-                    {checkoutBundle.dataAmount} Data Bundle
+                    {isAirtime ? `GH₵${faceValue.toFixed(2)} Airtime Top-Up` : `${checkoutBundle.dataAmount} Data Bundle`}
                   </h4>
-                  {checkoutBundle.network === 'airteltigo' ? (
+                  {isAirtime ? (
+                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded font-bold shrink-0">
+                      ⚡ Instant Recharge
+                    </span>
+                  ) : checkoutBundle.network === 'airteltigo' ? (
                     <span className="text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded font-bold shrink-0">
                       ⚡ Instant Delivery
                     </span>
@@ -253,15 +276,15 @@ export const CheckoutModal: React.FC = () => {
                   )}
                 </div>
                 <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 truncate">
-                  {currentNetwork.name} · {checkoutBundle.network === 'airteltigo' ? 'Instant direct delivery to your AT number.' : (checkoutBundle.description || 'Fast automated network dispatch')}
+                  {currentNetwork.name} · {isAirtime ? 'Direct automated airtime recharge' : (checkoutBundle.network === 'airteltigo' ? 'Instant direct delivery to your AT number.' : (checkoutBundle.description || 'Fast automated network dispatch'))}
                 </p>
               </div>
             </div>
 
             <div className="text-right shrink-0">
-              <div className="text-[11px] text-slate-400 font-medium">Price</div>
+              <div className="text-[11px] text-slate-400 font-medium">{isAirtime ? 'Total' : 'Price'}</div>
               <div className="text-base sm:text-lg font-bold text-[#00c365] tabular-nums">
-                GH₵{checkoutBundle.priceGhc.toFixed(2)}
+                GH₵{totalAmount.toFixed(2)}
               </div>
             </div>
           </div>
@@ -381,97 +404,122 @@ export const CheckoutModal: React.FC = () => {
             </div>
           )}
 
-          {/* Payment Method Selector */}
+          {/* Payment Method Selector (Compact 3-column Tiles) */}
           <div className="space-y-2">
             <label className="text-xs font-semibold text-slate-200 block">
               Choose Payment Method
             </label>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {/* MoMo Option */}
+            <div className="grid grid-cols-3 gap-2">
+              {/* MoMo Tile */}
               <button
                 type="button"
                 onClick={() => setPaymentMethod('momo')}
-                className={`p-3 rounded-xl border text-left flex sm:flex-col items-center sm:items-start justify-between sm:justify-between transition-all cursor-pointer ${
+                className={`p-2.5 sm:p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-1.5 transition-all cursor-pointer ${
                   paymentMethod === 'momo'
-                    ? 'border-[#00c365] bg-[#00c365]/10 text-white shadow-sm'
-                    : 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700'
+                    ? 'border-[#00c365] bg-[#00c365]/10 text-white shadow-sm ring-1 ring-[#00c365]/40'
+                    : 'border-slate-800 bg-[#090d10] text-slate-300 hover:border-slate-700'
                 }`}
               >
-                <div className="flex items-center justify-between w-full">
+                <div className="flex items-center justify-center gap-1">
                   <Smartphone className="w-4 h-4 text-[#00c365]" />
                   {paymentMethod === 'momo' && (
-                    <div className="w-2 h-2 rounded-full bg-[#00c365]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00c365]" />
                   )}
                 </div>
-                <div className="sm:mt-2 text-right sm:text-left">
-                  <div className="text-xs font-bold">Mobile Money</div>
-                  <div className="text-[10px] text-slate-400">MTN, Telecel, AT</div>
-                </div>
+                <span className="text-xs font-bold leading-none">Mobile Money</span>
               </button>
 
-              {/* Card Option */}
+              {/* Card Tile */}
               <button
                 type="button"
                 onClick={() => setPaymentMethod('card')}
-                className={`p-3 rounded-xl border text-left flex sm:flex-col items-center sm:items-start justify-between sm:justify-between transition-all cursor-pointer ${
+                className={`p-2.5 sm:p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-1.5 transition-all cursor-pointer ${
                   paymentMethod === 'card'
-                    ? 'border-[#00c365] bg-[#00c365]/10 text-white shadow-sm'
-                    : 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700'
+                    ? 'border-[#00c365] bg-[#00c365]/10 text-white shadow-sm ring-1 ring-[#00c365]/40'
+                    : 'border-slate-800 bg-[#090d10] text-slate-300 hover:border-slate-700'
                 }`}
               >
-                <div className="flex items-center justify-between w-full">
+                <div className="flex items-center justify-center gap-1">
                   <CreditCard className="w-4 h-4 text-sky-400" />
                   {paymentMethod === 'card' && (
-                    <div className="w-2 h-2 rounded-full bg-[#00c365]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00c365]" />
                   )}
                 </div>
-                <div className="sm:mt-2 text-right sm:text-left">
-                  <div className="text-xs font-bold">Card Payment</div>
-                  <div className="text-[10px] text-slate-400">Visa / Mastercard</div>
-                </div>
+                <span className="text-xs font-bold leading-none">Card</span>
               </button>
 
-              {/* Bank Transfer Option */}
+              {/* Bank / QR Tile */}
               <button
                 type="button"
                 onClick={() => setPaymentMethod('bank')}
-                className={`p-3 rounded-xl border text-left flex sm:flex-col items-center sm:items-start justify-between sm:justify-between transition-all cursor-pointer ${
+                className={`p-2.5 sm:p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-1.5 transition-all cursor-pointer ${
                   paymentMethod === 'bank'
-                    ? 'border-[#00c365] bg-[#00c365]/10 text-white shadow-sm'
-                    : 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700'
+                    ? 'border-[#00c365] bg-[#00c365]/10 text-white shadow-sm ring-1 ring-[#00c365]/40'
+                    : 'border-slate-800 bg-[#090d10] text-slate-300 hover:border-slate-700'
                 }`}
               >
-                <div className="flex items-center justify-between w-full">
+                <div className="flex items-center justify-center gap-1">
                   <Building2 className="w-4 h-4 text-amber-400" />
                   {paymentMethod === 'bank' && (
-                    <div className="w-2 h-2 rounded-full bg-[#00c365]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00c365]" />
                   )}
                 </div>
-                <div className="sm:mt-2 text-right sm:text-left">
-                  <div className="text-xs font-bold">Bank / GhanaQR</div>
-                  <div className="text-[10px] text-slate-400">Direct Account</div>
-                </div>
+                <span className="text-xs font-bold leading-none">Bank / QR</span>
               </button>
+            </div>
+
+            {/* Contextual description below tiles */}
+            <div className="text-[11px] text-slate-400 px-1 pt-0.5">
+              {paymentMethod === 'momo' && (
+                <span>Official USSD prompt sent to your MTN MoMo, Telecel Cash, or AT Money wallet.</span>
+              )}
+              {paymentMethod === 'card' && (
+                <span>Pay securely with Visa, Mastercard, or Verve via Paystack 256-bit encryption.</span>
+              )}
+              {paymentMethod === 'bank' && (
+                <span>Scan GhanaQR or pay directly from your Ghana bank app.</span>
+              )}
             </div>
           </div>
 
           {/* Pricing Breakdown */}
           <div className="p-3.5 rounded-xl bg-[#090d10] border border-slate-800/80 space-y-2 text-xs">
-            <div className="flex items-center justify-between text-slate-400">
-              <span>Data Subtotal</span>
-              <span className="text-white tabular-nums font-medium">GH₵{checkoutBundle.priceGhc.toFixed(2)}</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-400">
-              <span>Service & Delivery Fee</span>
-              <span className="text-emerald-400 font-medium">FREE</span>
-            </div>
-            <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-sm font-bold text-white">
-              <span>Total Amount</span>
-              <span className="text-[#00c365] text-base tabular-nums">
-                GH₵{checkoutBundle.priceGhc.toFixed(2)}
-              </span>
-            </div>
+            {isAirtime ? (
+              <>
+                <div className="flex items-center justify-between text-slate-400">
+                  <span>Airtime Value (Face Value)</span>
+                  <span className="text-white tabular-nums font-medium">GH₵{faceValue.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-400">
+                  <span>Service Fee (2%)</span>
+                  <span className="text-slate-300 tabular-nums font-medium">GH₵{serviceFee.toFixed(2)}</span>
+                </div>
+                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-sm font-bold text-white">
+                  <span>Total Amount</span>
+                  <span className="text-[#00c365] text-base tabular-nums font-black">
+                    GH₵{totalAmount.toFixed(2)}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between text-slate-400">
+                  <span>Data Subtotal</span>
+                  <span className="text-white tabular-nums font-medium">GH₵{checkoutBundle.priceGhc.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-400">
+                  <span>Service & Delivery Fee</span>
+                  <span className="text-emerald-400 font-medium">FREE</span>
+                </div>
+                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-sm font-bold text-white">
+                  <span>Total Amount</span>
+                  <span className="text-[#00c365] text-base tabular-nums font-black">
+                    GH₵{checkoutBundle.priceGhc.toFixed(2)}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Security Note & Paystack Status */}
@@ -499,7 +547,7 @@ export const CheckoutModal: React.FC = () => {
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                Pay GH₵{checkoutBundle.priceGhc.toFixed(2)} with Paystack
+                Pay GH₵{totalAmount.toFixed(2)} with Paystack
                 <ArrowRight className="w-4 h-4" />
               </span>
             )}
@@ -508,7 +556,7 @@ export const CheckoutModal: React.FC = () => {
           {/* WhatsApp Inquiries */}
           <div className="text-center pt-0.5">
             <a
-              href={BUSINESS_CONFIG.getCheckoutSupportWhatsAppUrl(checkoutBundle.dataAmount, currentNetwork.name)}
+              href={BUSINESS_CONFIG.getCheckoutSupportWhatsAppUrl(isAirtime ? `GH₵${faceValue.toFixed(2)} Airtime` : checkoutBundle.dataAmount, currentNetwork.name)}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"

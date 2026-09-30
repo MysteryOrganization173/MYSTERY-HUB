@@ -17,6 +17,9 @@ export interface InitializePaymentRequest {
   recipientPhone: string;
   customerEmail?: string;
   customerName?: string;
+  serviceType?: 'data' | 'airtime';
+  network?: string;
+  amount?: number;
 }
 
 export interface InitializePaymentResponse {
@@ -26,6 +29,8 @@ export interface InitializePaymentResponse {
   accessCode?: string;
   authorizationUrl?: string;
   amountGhc: number;
+  faceValueGhc?: number;
+  serviceFeeGhc?: number;
   amountPesewas: number;
   currency: 'GHS';
   isSimulated?: boolean;

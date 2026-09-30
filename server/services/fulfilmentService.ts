@@ -133,6 +133,77 @@ export class FulfilmentService {
   }
 
   /**
+   * 1b. AIRTIME SUPPLIER PREFLIGHT CHECK
+   * Executed before initializing a Paystack transaction for Airtime.
+   * If Airtime service is unavailable on supplier, BLOCKS before Paystack.
+   */
+  static async preflightCheckAirtime(
+    network: string,
+    faceValuePesewas: number,
+    recipientPhone: string
+  ): Promise<PreflightResult> {
+    const isEnabled = this.provider.client.isFulfillmentEnabled();
+
+    // When fulfillment is disabled, preserve test payment flow without calling supplier
+    if (!isEnabled) {
+      return { allowed: true };
+    }
+
+    if (!this.provider.client.isConfigured()) {
+      console.error('[Airtime Preflight] Fulfilment is enabled but SUCCESS_BIZ_HUB_API_KEY is not configured.');
+      return {
+        allowed: false,
+        customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
+        internalReason: 'SUCCESS_BIZ_HUB_API_KEY is missing.',
+      };
+    }
+
+    try {
+      // 1. Check if Airtime service is available on supplier
+      const serviceCheck = await this.provider.checkAirtimeAvailable();
+      if (!serviceCheck.available) {
+        console.warn(`[Airtime Preflight] Airtime service unavailable: ${serviceCheck.reason}`);
+        return {
+          allowed: false,
+          customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
+          internalReason: serviceCheck.reason || 'Airtime service unavailable on supplier.',
+        };
+      }
+
+      // 2. Check supplier wallet balance against airtime face value
+      try {
+        const wallet = await this.provider.getBalance();
+        if (wallet.balancePesewas < faceValuePesewas) {
+          console.error(
+            `[Airtime Preflight] Insufficient supplier wallet balance for airtime! Available: GH₵${wallet.balanceGhc}, required: GH₵${(faceValuePesewas / 100).toFixed(2)}`
+          );
+          return {
+            allowed: false,
+            customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
+            internalReason: 'Insufficient supplier wallet balance for airtime.',
+          };
+        }
+      } catch (walletErr) {
+        console.warn('[Airtime Preflight] Wallet check failed, failing closed:', walletErr);
+        return {
+          allowed: false,
+          customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
+          internalReason: 'Supplier wallet check failed.',
+        };
+      }
+
+      return { allowed: true };
+    } catch (err) {
+      console.error('[Airtime Preflight] Unexpected preflight exception:', err);
+      return {
+        allowed: false,
+        customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
+        internalReason: err instanceof Error ? err.message : 'Unknown preflight error',
+      };
+    }
+  }
+
+  /**
    * 2. CENTRALIZED PAYMENT -> DISPATCH ORCHESTRATION
    * Used identically by both Paystack webhook and GET /api/payments/verify/:reference.
    */
@@ -204,6 +275,101 @@ export class FulfilmentService {
     }
 
     // Step 4: Live dispatch to Success Biz Hub
+    const isAirtime = claimedOrder.service_type === 'airtime' || claimedOrder.product_id.startsWith('airtime-');
+
+    if (isAirtime) {
+      // 4-Airtime: Dispatch airtime top-up
+      try {
+        const cleanPhone = claimedOrder.recipient_phone.replace(/[^\d]/g, '');
+        const msisdn = cleanPhone.startsWith('233') ? `0${cleanPhone.slice(3)}` : cleanPhone;
+
+        // Calculate amountMajor face value string e.g. "10"
+        let amountMajor = '10';
+        if (claimedOrder.face_value_minor && claimedOrder.face_value_minor > 0) {
+          const faceValGhc = claimedOrder.face_value_minor / 100;
+          amountMajor = Number.isInteger(faceValGhc) ? String(faceValGhc) : faceValGhc.toFixed(2);
+        } else if (claimedOrder.bundle_size_snapshot) {
+          const numericMatch = claimedOrder.bundle_size_snapshot.replace(/[^\d.]/g, '');
+          if (numericMatch) amountMajor = numericMatch;
+        }
+
+        console.info(
+          `[Fulfilment Dispatch] Submitting Airtime order ${claimedOrder.public_reference} to Success Biz Hub for ${msisdn} (${claimedOrder.network.toUpperCase()} GH₵${amountMajor})...`
+        );
+
+        const airtimeRes = await this.provider.placeAirtime({
+          internalOrderId: claimedOrder.id,
+          publicReference: claimedOrder.public_reference,
+          recipientPhone: msisdn,
+          network: claimedOrder.network,
+          amountMajor,
+          faceValuePesewas: claimedOrder.face_value_minor || claimedOrder.amount,
+          customerTotalPesewas: claimedOrder.amount,
+        });
+
+        if (!airtimeRes.success && !airtimeRes.supplierOrderId) {
+          throw new Error(airtimeRes.errorMessage || 'Success Biz Hub Airtime placement failed.');
+        }
+
+        const supplierOrderId = airtimeRes.supplierOrderId;
+        if (!supplierOrderId) {
+          throw new Error('Success Biz Hub did not return an airtime order identifier.');
+        }
+
+        const mappedOrderStatus: OrderStatus =
+          airtimeRes.status === 'delivered'
+            ? 'delivered'
+            : airtimeRes.status === 'processing'
+            ? 'processing'
+            : airtimeRes.status === 'failed'
+            ? 'refund_pending'
+            : 'submitted';
+
+        const supplierCostMinor = airtimeRes.chargeMinor ?? airtimeRes.amountMinor ?? null;
+
+        const submittedOrder = await OrdersStore.saveSupplierSubmission(
+          claimedOrder.id,
+          supplierOrderId,
+          supplierCostMinor,
+          'sbh_airtime',
+          mappedOrderStatus,
+          airtimeRes.rawResponse || {}
+        );
+
+        return { order: submittedOrder || claimedOrder, alreadyHandled: false };
+      } catch (err: unknown) {
+        const isTimeout = Boolean((err as { isTimeout?: boolean })?.isTimeout);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown airtime supplier error';
+
+        if (isTimeout) {
+          // CRITICAL: Ambiguous timeout! Do NOT automatically resubmit.
+          console.error(
+            `[Fulfilment Dispatch] Ambiguous timeout communicating with Success Biz Hub Airtime API for order ${claimedOrder.public_reference}. Preserving order in safe queued state.`
+          );
+          const uncertainOrder = await OrdersStore.saveSupplierUncertainSubmission(
+            claimedOrder.id,
+            'Network timeout awaiting response from Success Biz Hub Airtime API',
+            { isTimeout: true, message: errorMessage }
+          );
+          return { order: uncertainOrder || claimedOrder, alreadyHandled: false };
+        }
+
+        // Definitive supplier error before placement
+        console.error(
+          `[Fulfilment Dispatch] Definitive supplier error for airtime order ${claimedOrder.public_reference}: ${errorMessage}`
+        );
+        const refundOrder = await OrdersStore.updateOrderStatus(
+          claimedOrder.id,
+          'refund_pending',
+          `Supplier airtime placement failed: ${errorMessage}`,
+          undefined,
+          JSON.stringify({ error: errorMessage })
+        );
+        return { order: refundOrder || claimedOrder, alreadyHandled: false };
+      }
+    }
+
+    // 4-Data: Live dispatch to Success Biz Hub Data catalog
     try {
       // 4a. Resolve live supplier package
       const resolution = await this.provider.resolvePackage(
@@ -321,7 +487,11 @@ export class FulfilmentService {
     }
 
     try {
-      const statusRes = await this.provider.getOrderStatus(order.supplier_order_id);
+      const isAirtime = order.service_type === 'airtime' || order.product_id.startsWith('airtime-');
+      const statusRes = isAirtime && this.provider.getAirtimeStatus
+        ? await this.provider.getAirtimeStatus(order.supplier_order_id)
+        : await this.provider.getOrderStatus(order.supplier_order_id);
+
       if (statusRes.success && statusRes.status) {
         const mappedStatus: OrderStatus =
           statusRes.status === 'delivered'

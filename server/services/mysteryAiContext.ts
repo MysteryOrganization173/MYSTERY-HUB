@@ -47,8 +47,11 @@ CURRENT MYSTERY HUB SERVICES & STATUS:
      * Telecel Ghana: Standard direct SIM credit delivery as configured and verified. Do not invent an unverified speed promise.
      * All orders remain continuously trackable until delivered or resolved.
 
-2. AIRTIME TOP-UP:
-   - Status: Beta Preview. Direct telecom gateway routing is in testing. Checkout is paused until fully active. Customers can join the free notification waitlist on the Data page.
+2. AIRTIME TOP-UP (LIVE & OPERATIONAL):
+   - Status: Fully Live and operational across MTN, AirtelTigo, and Telecel.
+   - Amounts: Quick amounts (GH₵5, GH₵10, GH₵20, GH₵50, GH₵100) or any custom amount from GH₵1.00 to GH₵1,000.00.
+   - Pricing & Service Fee: Transparent 2% service fee (e.g., GH₵10 airtime = GH₵10.00 SIM credit + GH₵0.20 fee = GH₵10.20 total payable).
+   - Delivery: Direct automated recharge credited to the recipient's SIM immediately upon Paystack payment authorization.
 
 3. WEBSITE BUILDER:
    - Status: Interactive Preview.

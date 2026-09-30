@@ -476,7 +476,7 @@ export class OrdersStore {
   static async saveSupplierSubmission(
     orderId: string,
     supplierOrderId: string,
-    supplierCostMinor: number,
+    supplierCostMinor: number | null,
     supplierOfferRef: string,
     submittedStatus: OrderStatus,
     rawSupplierResponse?: unknown

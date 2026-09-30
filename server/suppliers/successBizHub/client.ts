@@ -12,6 +12,8 @@ import {
   SbhBeneficiaryCheckResponse,
   SbhCreateOrderRequest,
   SbhOrderResponse,
+  SbhCreateAirtimeRequest,
+  SbhAirtimeResponse,
   SbhOffer,
 } from './types.js';
 
@@ -227,6 +229,32 @@ export class SuccessBizHubClient {
    */
   async getOrder(identifier: string): Promise<SbhOrderResponse> {
     return this.request<SbhOrderResponse>(`/orders/${encodeURIComponent(identifier)}`, {
+      method: 'GET',
+      skipCache: true,
+    });
+  }
+
+  /**
+   * 7. POST /airtime
+   * Place an airtime top-up order.
+   * Body: { network, phone, amountMajor }
+   * Never cached.
+   */
+  async createAirtime(req: SbhCreateAirtimeRequest): Promise<SbhAirtimeResponse> {
+    return this.request<SbhAirtimeResponse>('/airtime', {
+      method: 'POST',
+      body: req,
+      skipCache: true,
+    });
+  }
+
+  /**
+   * 8. GET /airtime/:identifier
+   * Retrieve supplier airtime status.
+   * Never cached.
+   */
+  async getAirtime(identifier: string): Promise<SbhAirtimeResponse> {
+    return this.request<SbhAirtimeResponse>(`/airtime/${encodeURIComponent(identifier)}`, {
       method: 'GET',
       skipCache: true,
     });

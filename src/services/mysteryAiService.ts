@@ -144,6 +144,15 @@ function inferQuickAction(
 
   // Navigation commands
   if (
+    q.includes('airtime') ||
+    q.includes('recharge') ||
+    q.includes('credit') ||
+    q.includes('top up') ||
+    q.includes('top-up')
+  ) {
+    return { type: 'navigate', targetPage: 'data', label: '👉 Top Up Airtime' };
+  }
+  if (
     q.includes('go to data') ||
     q.includes('take me to data') ||
     q.includes('buy data') ||
@@ -282,6 +291,21 @@ export function getGroundedLocalResponse(
   }
 
   // 4. Buying Data & How it Works
+  if (
+    q.includes('airtime') ||
+    q.includes('buy airtime') ||
+    q.includes('recharge airtime') ||
+    q.includes('top up airtime') ||
+    q.includes('top-up airtime') ||
+    q.includes('phone credit')
+  ) {
+    return {
+      reply:
+        "Airtime Top-Up is live on Mystery Hub! ⚡\n1. Go to our Data & Airtime page and select 'Airtime Top-Up'.\n2. Choose your network (MTN, AirtelTigo, or Telecel).\n3. Enter your phone number and amount (GH₵1.00 – GH₵1,000.00).\n4. Pay via Mobile Money or Card. A transparent 2% service fee applies, and your airtime is credited directly to your SIM immediately!",
+      quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Top Up Airtime Now' },
+    };
+  }
+
   if (
     q.includes('how do i buy data') ||
     q.includes('how does buying data work') ||

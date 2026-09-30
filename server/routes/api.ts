@@ -5,6 +5,7 @@
 import { Router, Request, Response } from 'express';
 import { validateAndNormalizeGhanaPhone } from '../utils/phone.js';
 import { getAuthoritativeProduct } from '../data/productCatalog.js';
+import { calculateAirtimeOrder, validateAirtimeAmount, AIRTIME_SERVICE_FEE_PERCENT } from '../data/airtimePricing.js';
 import { OrdersStore } from '../db/ordersStore.js';
 import { OrderRecord, toSafePublicOrder } from '../types/orders.js';
 import { PaystackServerService } from '../services/paystackService.js';
@@ -37,7 +38,7 @@ apiRouter.get('/health', (_req: Request, res: Response) => {
  */
 apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
   try {
-    const { productId, recipientPhone, customerEmail, customerName } = req.body || {};
+    const { productId, recipientPhone, customerEmail, customerName, serviceType, network: reqNetwork, amount: reqAmount } = req.body || {};
 
     if (!productId || typeof productId !== 'string') {
       res.status(400).json({ error: 'Missing or invalid productId parameter.' });
@@ -58,6 +59,156 @@ apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
         ? emailStr
         : `${phoneVal.formattedLocal}@customer.mysteryhub.site`;
 
+    const isAirtime =
+      serviceType === 'airtime' ||
+      productId.startsWith('airtime-') ||
+      productId === 'airtime';
+
+    // ==========================================
+    // A. AIRTIME TOP-UP FLOW
+    // ==========================================
+    if (isAirtime) {
+      // 1. Determine network
+      let airtimeNet = typeof reqNetwork === 'string' ? reqNetwork.toLowerCase().trim() : '';
+      if (!airtimeNet && productId.startsWith('airtime-')) {
+        const parts = productId.split('-');
+        if (parts[1]) airtimeNet = parts[1].toLowerCase().trim();
+      }
+      if (airtimeNet === 'at') airtimeNet = 'airteltigo';
+
+      if (!['mtn', 'airteltigo', 'telecel'].includes(airtimeNet)) {
+        res.status(400).json({ error: 'Please select a valid network (MTN, AirtelTigo, or Telecel).' });
+        return;
+      }
+
+      // 2. Determine requested face value amount in GHS
+      let airtimeFaceValue = 0;
+      if (typeof reqAmount === 'number' && !isNaN(reqAmount)) {
+        airtimeFaceValue = reqAmount;
+      } else if (typeof reqAmount === 'string') {
+        airtimeFaceValue = parseFloat(reqAmount);
+      } else if (productId.startsWith('airtime-')) {
+        const parts = productId.split('-');
+        if (parts[2]) airtimeFaceValue = parseFloat(parts[2]);
+      }
+
+      const amountValidation = validateAirtimeAmount(airtimeFaceValue);
+      if (!amountValidation.isValid) {
+        res.status(400).json({ error: amountValidation.error || 'Invalid airtime amount.' });
+        return;
+      }
+
+      // 3. Server-authoritative fee and total calculation (2% service fee)
+      const calculation = calculateAirtimeOrder(airtimeFaceValue);
+
+      // 4. Supplier Preflight Check for Airtime
+      const preflight = await FulfilmentService.preflightCheckAirtime(
+        airtimeNet,
+        calculation.faceValuePesewas,
+        phoneVal.normalized
+      );
+      if (!preflight.allowed) {
+        res.status(400).json({
+          error:
+            preflight.customerMessage ||
+            'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
+        });
+        return;
+      }
+
+      // 5. Generate safe unique references
+      const timestamp = Date.now();
+      const randomHex = Math.floor(100000 + Math.random() * 900000);
+      const publicRef = `MH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${randomHex}`;
+      const paymentRef = `MH_PAY_AIRTIME_${airtimeNet.toUpperCase()}_${timestamp}_${randomHex}`;
+      const nowIso = new Date().toISOString();
+
+      // 6. Create pending Airtime order
+      const newOrder: OrderRecord = {
+        id: `ord_${timestamp}_${randomHex}`,
+        public_reference: publicRef,
+        customer_name: typeof customerName === 'string' ? customerName.trim() : null,
+        customer_email: validEmail,
+        customer_phone: phoneVal.normalized,
+        recipient_phone: phoneVal.normalized,
+        network: airtimeNet as 'mtn' | 'airteltigo' | 'telecel',
+        service_type: 'airtime',
+        product_id: `airtime-${airtimeNet}-${calculation.faceValueGhc}`,
+        product_name_snapshot: `${airtimeNet.toUpperCase()} Airtime Top-Up`,
+        bundle_size_snapshot: `GH₵${calculation.faceValueGhc.toFixed(2)} Airtime`,
+        amount: calculation.totalPesewas, // Customer total with service fee
+        face_value_minor: calculation.faceValuePesewas,
+        service_fee_minor: calculation.serviceFeePesewas,
+        currency: 'GHS',
+        status: 'pending_payment',
+        payment_provider: 'paystack',
+        payment_reference: paymentRef,
+        payment_status: 'pending',
+        supplier_provider: 'success_biz_hub',
+        supplier_order_id: null,
+        supplier_response: null,
+        supplier_cost_minor: null,
+        supplier_offer_ref: 'sbh_airtime',
+        supplier_last_checked_at: null,
+        failure_reason: null,
+        created_at: nowIso,
+        updated_at: nowIso,
+        paid_at: null,
+        submitted_at: null,
+        delivered_at: null,
+      };
+
+      const createResult = await OrdersStore.createOrderWithMtnDuplicateCheck(newOrder);
+      if (!createResult.success) {
+        res.status(409).json({
+          code: ACTIVE_MTN_ORDER_CODE,
+          message: ACTIVE_MTN_ORDER_MESSAGE,
+          existingOrderReference: createResult.existingOrder.public_reference,
+          existingOrderStatus: mapToSafeCustomerStatus(createResult.existingOrder.status),
+        });
+        return;
+      }
+
+      // 7. Initialize Paystack transaction with authoritative total
+      const paystackRes = await PaystackServerService.initializeTransaction({
+        email: validEmail,
+        amountPesewas: calculation.totalPesewas,
+        reference: paymentRef,
+        metadata: {
+          public_reference: publicRef,
+          recipient_phone: phoneVal.normalized,
+          network: airtimeNet,
+          service_type: 'airtime',
+          face_value_ghc: calculation.faceValueGhc,
+          service_fee_ghc: calculation.serviceFeeGhc,
+          product_name: `${airtimeNet.toUpperCase()} GH₵${calculation.faceValueGhc} Airtime`,
+        },
+      });
+
+      if (!paystackRes.success) {
+        res.status(500).json({ error: paystackRes.error || 'Failed to initialize payment with Paystack.' });
+        return;
+      }
+
+      res.json({
+        success: true,
+        orderRef: publicRef,
+        reference: paymentRef,
+        accessCode: paystackRes.accessCode,
+        authorizationUrl: paystackRes.authorizationUrl,
+        amountGhc: calculation.totalGhc,
+        faceValueGhc: calculation.faceValueGhc,
+        serviceFeeGhc: calculation.serviceFeeGhc,
+        amountPesewas: calculation.totalPesewas,
+        currency: 'GHS',
+        isSimulated: paystackRes.isSimulated || false,
+      });
+      return;
+    }
+
+    // ==========================================
+    // B. DATA BUNDLE FLOW
+    // ==========================================
     // 3. Load authoritative product from server catalog
     const product = getAuthoritativeProduct(productId);
     if (!product) {
@@ -114,6 +265,7 @@ apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
       customer_phone: phoneVal.normalized,
       recipient_phone: phoneVal.normalized,
       network: product.network,
+      service_type: 'data',
       product_id: product.id,
       product_name_snapshot: `${product.network.toUpperCase()} ${product.dataAmount}`,
       bundle_size_snapshot: product.dataAmount,
@@ -157,6 +309,7 @@ apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
         public_reference: publicRef,
         recipient_phone: phoneVal.normalized,
         network: product.network,
+        service_type: 'data',
         product_id: product.id,
         product_name: product.dataAmount,
       },
