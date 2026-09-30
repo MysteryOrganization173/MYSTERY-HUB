@@ -270,12 +270,12 @@ function getGroundedLocalResponse(
     q.includes('how much') ||
     q.includes('cheap')
   ) {
-    const mtn1 = DATA_BUNDLES.find((b) => b.id === 'mtn-1gb-7d')?.priceGhc || 4.99;
-    const mtn5 = DATA_BUNDLES.find((b) => b.id === 'mtn-5gb-30d')?.priceGhc || 24.99;
-    const mtn10 = DATA_BUNDLES.find((b) => b.id === 'mtn-10gb-30d')?.priceGhc || 44.99;
+    const mtn1 = DATA_BUNDLES.find((b) => b.id === 'mtn-1gb')?.priceGhc || 4.99;
+    const mtn5 = DATA_BUNDLES.find((b) => b.id === 'mtn-5gb')?.priceGhc || 23.99;
+    const mtn10 = DATA_BUNDLES.find((b) => b.id === 'mtn-10gb')?.priceGhc || 46.99;
 
     return {
-      reply: `Our data bundles offer competitive value for Ghanaian Cedis:\n• 1GB (7 Days) is GH₵${mtn1.toFixed(2)}\n• 5GB (30 Days) is GH₵${mtn5.toFixed(2)}\n• 10GB (30 Days) is GH₵${mtn10.toFixed(2)}\n\nWe also offer non-expiring Jumbo bundles up to 30GB. Check out all live options on our Data page!`,
+      reply: `Our data bundles offer competitive value for Ghanaian Cedis:\n• 1GB is GH₵${mtn1.toFixed(2)}\n• 5GB is GH₵${mtn5.toFixed(2)}\n• 10GB is GH₵${mtn10.toFixed(2)}\n\nWe offer bundles from 1GB up to 40GB with direct SIM delivery. Check out all live options on our Data page!`,
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 View All Bundle Prices' },
     };
   }
@@ -350,7 +350,7 @@ function getGroundedLocalResponse(
   if (activePage === 'data') {
     return {
       reply:
-        "You are on our Data & Airtime page. You can choose between MTN, Telecel, and AirtelTigo, filter by validity (7 Days, 30 Days, or No Expiry), and click 'Buy Now' to have data credited to your phone in under a minute.",
+        "You are on our Data & Airtime page. You can choose between MTN, Telecel, and AirtelTigo, browse in Card or Compact view, and click 'Buy Now' to have data credited to your phone quickly and securely via Mobile Money.",
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Select a Bundle Now' },
     };
   }

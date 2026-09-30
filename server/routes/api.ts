@@ -115,7 +115,7 @@ apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
       recipient_phone: phoneVal.normalized,
       network: product.network,
       product_id: product.id,
-      product_name_snapshot: `${product.dataAmount} (${product.validity})`,
+      product_name_snapshot: `${product.network.toUpperCase()} ${product.dataAmount}`,
       bundle_size_snapshot: product.dataAmount,
       amount: product.amountPesewas, // Stored safely in pesewas
       currency: 'GHS',

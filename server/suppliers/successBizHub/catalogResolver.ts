@@ -116,6 +116,31 @@ export function resolveSupplierPackage(
 
     if (offersWithMatchingPackage.length === 1) {
       selectedOffer = offersWithMatchingPackage[0];
+    } else if (targetNetwork === 'mtn') {
+      // Mystery Hub sells MTN Express, not Budget. Prefer Express offers.
+      const expressOffers = offersWithMatchingPackage.filter(
+        (o) =>
+          (o.name || '').toLowerCase().includes('express') ||
+          (o.slug || '').toLowerCase().includes('express') ||
+          !(
+            (o.name || '').toLowerCase().includes('budget') ||
+            (o.slug || '').toLowerCase().includes('budget')
+          )
+      );
+      if (expressOffers.length === 1) {
+        selectedOffer = expressOffers[0];
+      } else {
+        const offerSummaries = matchingDataOffers.map((o) => ({
+          id: o.id,
+          slug: o.slug,
+          name: o.name,
+          network: o.network,
+        }));
+        return {
+          resolved: null,
+          error: `Multiple ambiguous supplier data offers found for network "${targetNetwork.toUpperCase()}". Failing closed to prevent incorrect routing. Available offers: ${JSON.stringify(offerSummaries)}`,
+        };
+      }
     } else {
       // Multiple ambiguous offers: Fail closed
       const offerSummaries = matchingDataOffers.map((o) => ({

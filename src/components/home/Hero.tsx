@@ -122,7 +122,7 @@ export const Hero: React.FC = () => {
                       </div>
                       <div>
                         <div className="font-bold text-white text-base">1GB Data</div>
-                        <div className="text-xs text-slate-400">7 Days Validity</div>
+                        <div className="text-xs text-slate-400">Direct SIM Dispatch</div>
                       </div>
                     </div>
 

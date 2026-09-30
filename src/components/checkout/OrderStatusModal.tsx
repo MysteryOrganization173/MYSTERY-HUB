@@ -258,7 +258,7 @@ export const OrderStatusModal: React.FC = () => {
             <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
               <div className="text-[11px] text-slate-400">Product</div>
               <div className="font-semibold text-sm text-white truncate mt-0.5">
-                {currentNetwork?.name || activeOrder.network.toUpperCase()} {activeOrder.bundle.dataAmount} ({activeOrder.bundle.validity})
+                {currentNetwork?.name || activeOrder.network.toUpperCase()} {activeOrder.bundle.dataAmount} Data
               </div>
             </div>
 

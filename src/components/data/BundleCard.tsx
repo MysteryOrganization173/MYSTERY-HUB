@@ -1,7 +1,7 @@
 import React from 'react';
 import { DataBundle } from '../../types';
 import { GHANA_NETWORKS } from '../../data/bundles';
-import { Zap, Check, ArrowRight } from 'lucide-react';
+import { Zap, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 interface BundleCardProps {
   bundle: DataBundle;
@@ -33,25 +33,31 @@ export const BundleCard: React.FC<BundleCardProps> = ({ bundle, onBuy, featured 
           </span>
         </div>
 
-        {bundle.isBestValue && (
-          <span className="text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
-            Best Value
-          </span>
-        )}
-        {!bundle.isBestValue && bundle.isPopular && (
-          <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
-            Popular
-          </span>
-        )}
+        <div className="flex items-center gap-1">
+          {bundle.isBestValue && (
+            <span className="text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
+              Best Value
+            </span>
+          )}
+          {!bundle.isBestValue && bundle.isPopular && (
+            <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
+              Popular
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Main Bundle Details */}
-      <div className="space-y-1">
+      {/* Main Bundle Details: Focused on Network, Bundle Size, and Availability */}
+      <div className="space-y-1.5">
         <h3 className="text-2xl font-extrabold text-white tracking-tight group-hover:text-[#00c365] transition-colors">
           {bundle.dataAmount}
         </h3>
-        <p className="text-xs text-slate-400 font-medium">
-          {bundle.validity}
+        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+          <CheckCircle2 className="w-3.5 h-3.5 text-[#00c365]" />
+          <span>In Stock · Direct SIM Credit</span>
+        </div>
+        <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">
+          {bundle.description || 'Fast direct network dispatch'}
         </p>
       </div>
 
@@ -65,6 +71,7 @@ export const BundleCard: React.FC<BundleCardProps> = ({ bundle, onBuy, featured 
         </div>
 
         <button
+          type="button"
           onClick={() => onBuy(bundle)}
           className="w-full py-2.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer"
         >
@@ -74,7 +81,7 @@ export const BundleCard: React.FC<BundleCardProps> = ({ bundle, onBuy, featured 
 
         <div className="flex items-center justify-center gap-1 text-[11px] text-slate-400">
           <Zap className="w-3 h-3 text-[#00c365]" />
-          <span>Secure MoMo Checkout</span>
+          <span>Secure Ghana MoMo</span>
         </div>
       </div>
     </div>
