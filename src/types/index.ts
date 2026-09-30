@@ -29,13 +29,17 @@ export interface DataBundle {
 export type OrderStatus = 'placed' | 'verifying' | 'processing' | 'delivered' | 'failed';
 
 export interface OrderRecord {
-  id: string; // e.g. MH1234567
+  id: string; // Local client ID e.g. MH1234567
+  publicReference?: string; // Real authoritative backend reference e.g. MH-20260930-592025
+  serverReference?: string; // Alias for backward compatibility
   bundle: DataBundle;
   recipientPhone: string;
   network: NetworkId;
   paymentMethod: 'momo' | 'card' | 'bank';
   amountGhc: number;
   status: OrderStatus;
+  serverStatus?: string; // Raw backend status e.g. 'refund_pending', 'delivered'
+  statusMessage?: string; // Customer-friendly status message (e.g. for refund pending)
   paymentReference?: string;
   createdAt: string;
   updatedAt: string;

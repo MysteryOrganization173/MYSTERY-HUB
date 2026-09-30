@@ -26,8 +26,18 @@ interface AppContextType {
   openOrderStatus: (order: OrderRecord) => void;
   closeOrderStatus: () => void;
   isStatusModalOpen: boolean;
-  createOrder: (bundle: DataBundle, phone: string, method: 'momo' | 'card' | 'bank', paymentReference?: string) => OrderRecord;
-  updateOrderStatus: (orderId: string, status: OrderRecord['status']) => void;
+  createOrder: (
+    bundle: DataBundle,
+    phone: string,
+    method: 'momo' | 'card' | 'bank',
+    paymentReference?: string,
+    publicReference?: string
+  ) => OrderRecord;
+  updateOrderStatus: (
+    orderId: string,
+    status: OrderRecord['status'],
+    extra?: { serverStatus?: string; statusMessage?: string }
+  ) => void;
   isAuthModalOpen: boolean;
   authMode: 'login' | 'signup';
   openAuth: (mode?: 'login' | 'signup') => void;
@@ -184,11 +194,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     bundle: DataBundle,
     phone: string,
     method: 'momo' | 'card' | 'bank',
-    paymentReference?: string
+    paymentReference?: string,
+    publicReference?: string
   ): OrderRecord => {
     const randomId = 'MH' + Math.floor(100000 + Math.random() * 900000);
+    // Real backend public order reference (e.g. MH-20260930-592025)
+    const realPublicRef =
+      publicReference ||
+      (paymentReference && paymentReference.startsWith('MH-') ? paymentReference : undefined);
+
     const newOrder: OrderRecord = {
       id: randomId,
+      publicReference: realPublicRef,
+      serverReference: realPublicRef,
       bundle,
       recipientPhone: phone,
       network: bundle.network,
@@ -205,17 +223,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsCheckoutOpen(false);
     setIsStatusModalOpen(true);
 
-    // TRUTHFUL STATE: No fake JavaScript timers auto-delivering the SIM.
-    // Real orders stay at 'verifying' until real backend webhook updates.
     return newOrder;
   };
 
-  const updateOrderStatus = (orderId: string, status: OrderRecord['status']) => {
+  const updateOrderStatus = (
+    orderId: string,
+    status: OrderRecord['status'],
+    extra?: { serverStatus?: string; statusMessage?: string }
+  ) => {
     setOrders((prev) =>
       prev.map((order) => {
-        if (order.id === orderId) {
-          const updated = { ...order, status, updatedAt: new Date().toISOString() };
-          if (activeOrder?.id === orderId) {
+        if (order.id === orderId || (order.publicReference && order.publicReference === orderId)) {
+          const updated: OrderRecord = {
+            ...order,
+            status,
+            serverStatus: extra?.serverStatus || order.serverStatus,
+            statusMessage: extra?.statusMessage !== undefined ? extra.statusMessage : order.statusMessage,
+            updatedAt: new Date().toISOString(),
+          };
+          if (activeOrder?.id === order.id || (activeOrder?.publicReference && activeOrder.publicReference === orderId)) {
             setActiveOrder(updated);
           }
           return updated;

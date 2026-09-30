@@ -19,8 +19,23 @@ export const OrdersPage: React.FC = () => {
       const res = await lookupOrderOnServer(query);
       if (res.success && res.order) {
         const orderData = res.order;
+        const isDelivered = orderData.status === 'delivered';
+        const isProcessing = orderData.status === 'processing' || orderData.status === 'submitted';
+        const isPlaced = orderData.status === 'paid' || orderData.status === 'queued';
+        const isFailed =
+          orderData.status === 'failed' ||
+          orderData.status === 'refund_pending' ||
+          orderData.status === 'refunded';
+
         openOrderStatus({
           id: orderData.public_reference,
+          publicReference: orderData.public_reference,
+          serverReference: orderData.public_reference,
+          serverStatus: orderData.status,
+          statusMessage:
+            orderData.status === 'refund_pending' || orderData.status === 'refunded'
+              ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
+              : undefined,
           bundle: {
             id: 'lookup-bundle',
             network: orderData.network,
@@ -35,16 +50,15 @@ export const OrdersPage: React.FC = () => {
           network: orderData.network,
           paymentMethod: 'momo',
           amountGhc: orderData.amount_ghc,
-          status:
-            orderData.status === 'paid' || orderData.status === 'queued'
-              ? 'placed'
-              : orderData.status === 'processing'
-              ? 'processing'
-              : orderData.status === 'delivered'
-              ? 'delivered'
-              : orderData.status === 'failed'
-              ? 'failed'
-              : 'verifying',
+          status: isDelivered
+            ? 'delivered'
+            : isProcessing
+            ? 'processing'
+            : isPlaced
+            ? 'placed'
+            : isFailed
+            ? 'failed'
+            : 'verifying',
           paymentReference: orderData.public_reference,
           createdAt: orderData.created_at,
           updatedAt: orderData.created_at,
@@ -62,7 +76,9 @@ export const OrdersPage: React.FC = () => {
   const filteredOrders = orders.filter((o) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
+    const pubRef = o.publicReference ? o.publicReference.toLowerCase() : '';
     return (
+      pubRef.includes(q) ||
       o.id.toLowerCase().includes(q) ||
       o.recipientPhone.includes(q) ||
       o.bundle.dataAmount.toLowerCase().includes(q) ||
@@ -181,8 +197,8 @@ export const OrdersPage: React.FC = () => {
                         <span className="font-bold text-white text-base group-hover:text-[#00c365] transition-colors">
                           {order.bundle.dataAmount} Data Bundle
                         </span>
-                        <span className="font-mono text-xs text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded">
-                          #{order.id}
+                        <span className="font-mono text-xs text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded truncate max-w-[150px] sm:max-w-none">
+                          #{order.publicReference || order.id}
                         </span>
                       </div>
                       <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">

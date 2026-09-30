@@ -53,8 +53,10 @@ export const CheckoutModal: React.FC = () => {
       recipientPhone: phone.trim(),
       customerEmail: user?.email,
       customerName: user?.name,
-      onPaymentReceived: (orderRef) => {
-        const newOrder = createOrder(checkoutBundle, phone.trim(), paymentMethod, orderRef);
+      onPaymentReceived: (orderRef, reference) => {
+        // orderRef: real backend public order reference (e.g. MH-20260930-592025)
+        // reference: Paystack payment reference (e.g. MH_PAY_MTN_...)
+        const newOrder = createOrder(checkoutBundle, phone.trim(), paymentMethod, reference, orderRef);
         closeCheckout();
         showToast(`Payment received! Order #${orderRef}. Verifying payment...`, 'success');
         openOrderStatus(newOrder);

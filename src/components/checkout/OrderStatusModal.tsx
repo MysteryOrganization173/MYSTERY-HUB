@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS } from '../../data/bundles';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { lookupOrderOnServer } from '../../services/apiClient';
+import { OrderRecord } from '../../types';
 import { CheckCircle2, Clock, AlertTriangle, ArrowRight, MessageSquare, Copy, Check, RefreshCw, X } from 'lucide-react';
 
 export const OrderStatusModal: React.FC = () => {
@@ -15,49 +16,94 @@ export const OrderStatusModal: React.FC = () => {
     showToast,
   } = useApp();
 
-  const [copied, setCopied] = React.useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Authoritative reference: Real backend public order reference takes precedence
+  const lookupReference = activeOrder?.publicReference || activeOrder?.id;
 
   // Poll server for status updates if order is pending or in-progress
   useEffect(() => {
-    if (!isStatusModalOpen || !activeOrder?.id) return;
+    if (!isStatusModalOpen || !lookupReference) return;
+
+    // Stop aggressive polling when terminal status is reached
+    const isTerminal = activeOrder?.status === 'delivered' || activeOrder?.status === 'failed';
+    if (isTerminal) return;
 
     const fetchServerStatus = async () => {
       try {
-        const res = await lookupOrderOnServer(activeOrder.id);
+        const res = await lookupOrderOnServer(lookupReference);
         if (res.success && res.order) {
-          const mappedStatus =
-            res.order.status === 'paid' || res.order.status === 'queued'
-              ? 'placed'
-              : res.order.status === 'processing'
-              ? 'processing'
-              : res.order.status === 'delivered'
-              ? 'delivered'
-              : res.order.status === 'failed'
-              ? 'failed'
-              : 'verifying';
+          const serverStatus = res.order.status;
 
-          if (mappedStatus !== activeOrder.status) {
-            updateOrderStatus(activeOrder.id, mappedStatus as typeof activeOrder.status);
+          // Status mapping:
+          // pending_payment -> verifying
+          // paid -> placed
+          // queued -> placed
+          // submitted -> processing
+          // processing -> processing
+          // delivered -> delivered
+          // failed -> failed
+          // refund_pending -> failed
+          // refunded -> failed
+          let mappedStatus: OrderRecord['status'] = 'verifying';
+          let statusMessage: string | undefined;
+
+          if (serverStatus === 'delivered') {
+            mappedStatus = 'delivered';
+          } else if (serverStatus === 'processing' || serverStatus === 'submitted') {
+            mappedStatus = 'processing';
+          } else if (serverStatus === 'paid' || serverStatus === 'queued') {
+            mappedStatus = 'placed';
+          } else if (serverStatus === 'refund_pending' || serverStatus === 'refunded') {
+            mappedStatus = 'failed';
+            statusMessage = 'Delivery could not be completed. Your payment is being reviewed for refund.';
+          } else if (serverStatus === 'failed') {
+            mappedStatus = 'failed';
+            statusMessage = 'The telecom provider was unable to complete the delivery. Please contact support or retry.';
+          } else if (serverStatus === 'pending_payment') {
+            mappedStatus = 'verifying';
+          }
+
+          if (
+            mappedStatus !== activeOrder?.status ||
+            serverStatus !== activeOrder?.serverStatus ||
+            statusMessage !== activeOrder?.statusMessage
+          ) {
+            updateOrderStatus(activeOrder!.id, mappedStatus, {
+              serverStatus,
+              statusMessage,
+            });
           }
         }
-      } catch {
-        // ignore polling network errors
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          console.warn('[OrderStatusModal] Polling error for reference:', lookupReference, err);
+        }
       }
     };
 
     fetchServerStatus();
     const interval = setInterval(fetchServerStatus, 3000);
     return () => clearInterval(interval);
-  }, [isStatusModalOpen, activeOrder?.id, activeOrder?.status, updateOrderStatus]);
+  }, [
+    isStatusModalOpen,
+    lookupReference,
+    activeOrder?.status,
+    activeOrder?.serverStatus,
+    activeOrder?.statusMessage,
+    updateOrderStatus,
+  ]);
 
   if (!isStatusModalOpen || !activeOrder) return null;
 
   const currentNetwork = GHANA_NETWORKS[activeOrder.network];
+  const displayRef = activeOrder.publicReference || activeOrder.id;
+  const isRefundIssue = activeOrder.serverStatus === 'refund_pending' || activeOrder.serverStatus === 'refunded';
 
   const handleCopyOrderId = () => {
-    navigator.clipboard.writeText(activeOrder.id);
+    navigator.clipboard.writeText(displayRef);
     setCopied(true);
-    showToast('Order ID copied to clipboard');
+    showToast('Order reference copied to clipboard');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -91,15 +137,34 @@ export const OrderStatusModal: React.FC = () => {
       step: 3,
     },
     failed: {
-      label: 'Failed',
+      label: isRefundIssue ? 'Refund Pending' : 'Failed',
       badgeClass: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
-      description: 'The telecom provider rejected the request. Please check phone number or retry.',
+      description:
+        activeOrder.statusMessage ||
+        (isRefundIssue
+          ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
+          : 'The telecom provider rejected the request. Please check phone number or retry.'),
       icon: AlertTriangle,
       step: 0,
     },
   }[activeOrder.status];
 
-  const Icon = statusConfig.icon;
+  const headingText =
+    activeOrder.status === 'delivered'
+      ? 'Order Placed Successfully!'
+      : activeOrder.status === 'processing'
+      ? 'Processing Your Data Bundle'
+      : isRefundIssue
+      ? 'Refund in Progress'
+      : activeOrder.status === 'failed'
+      ? 'Delivery Issue'
+      : 'Order Received';
+
+  const descriptionText =
+    activeOrder.statusMessage ||
+    (isRefundIssue
+      ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
+      : statusConfig.description);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -111,7 +176,7 @@ export const OrderStatusModal: React.FC = () => {
           </span>
           <button
             onClick={closeOrderStatus}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
             aria-label="Close status"
           >
             <X className="w-5 h-5" />
@@ -143,16 +208,10 @@ export const OrderStatusModal: React.FC = () => {
           {/* Heading */}
           <div>
             <h3 className="text-2xl font-bold text-white tracking-tight">
-              {activeOrder.status === 'delivered'
-                ? 'Order Placed Successfully!'
-                : activeOrder.status === 'processing'
-                ? 'Processing Your Data Bundle'
-                : activeOrder.status === 'failed'
-                ? 'Delivery Issue'
-                : 'Order Received'}
+              {headingText}
             </h3>
             <p className="text-xs text-slate-400 mt-2 max-w-sm mx-auto leading-relaxed">
-              {statusConfig.description}
+              {descriptionText}
             </p>
           </div>
 
@@ -181,15 +240,15 @@ export const OrderStatusModal: React.FC = () => {
           {/* Key Information Grid */}
           <div className="grid grid-cols-2 gap-3 text-left">
             <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
-              <div className="text-[11px] text-slate-400">Order ID</div>
+              <div className="text-[11px] text-slate-400">Order Reference</div>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="font-mono text-sm font-semibold text-white">
-                  #{activeOrder.id}
+                <span className="font-mono text-sm font-semibold text-white truncate max-w-[140px] sm:max-w-none">
+                  #{displayRef}
                 </span>
                 <button
                   onClick={handleCopyOrderId}
-                  className="text-slate-400 hover:text-white"
-                  title="Copy ID"
+                  className="text-slate-400 hover:text-white shrink-0 cursor-pointer"
+                  title="Copy Reference"
                 >
                   {copied ? <Check className="w-3.5 h-3.5 text-[#00c365]" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
@@ -199,7 +258,7 @@ export const OrderStatusModal: React.FC = () => {
             <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
               <div className="text-[11px] text-slate-400">Product</div>
               <div className="font-semibold text-sm text-white truncate mt-0.5">
-                {activeOrder.bundle.network.toUpperCase()} {activeOrder.bundle.dataAmount} ({activeOrder.bundle.validity})
+                {currentNetwork?.name || activeOrder.network.toUpperCase()} {activeOrder.bundle.dataAmount} ({activeOrder.bundle.validity})
               </div>
             </div>
 
@@ -225,7 +284,7 @@ export const OrderStatusModal: React.FC = () => {
                     {activeOrder.paymentReference}
                   </div>
                 </div>
-                <span className="text-[10px] text-[#00c365] bg-[#00c365]/10 px-2 py-0.5 rounded font-semibold">
+                <span className="text-[10px] text-[#00c365] bg-[#00c365]/10 px-2 py-0.5 rounded font-semibold shrink-0">
                   Verified Payment
                 </span>
               </div>
@@ -234,11 +293,19 @@ export const OrderStatusModal: React.FC = () => {
 
           {/* Development Status Simulator (only visible in dev mode) */}
           {import.meta.env.DEV && (
-            <div className="flex items-center justify-center gap-2 pt-1">
+            <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
               <span className="text-[10px] text-slate-500 uppercase tracking-wider">Dev preview:</span>
               <button
+                onClick={() => updateOrderStatus(activeOrder.id, 'placed')}
+                className={`text-[10px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                  activeOrder.status === 'placed' ? 'border-amber-400 text-amber-400 bg-amber-400/10' : 'border-slate-800 text-slate-400'
+                }`}
+              >
+                Placed
+              </button>
+              <button
                 onClick={() => updateOrderStatus(activeOrder.id, 'processing')}
-                className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                className={`text-[10px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
                   activeOrder.status === 'processing' ? 'border-sky-400 text-sky-400 bg-sky-400/10' : 'border-slate-800 text-slate-400'
                 }`}
               >
@@ -246,19 +313,24 @@ export const OrderStatusModal: React.FC = () => {
               </button>
               <button
                 onClick={() => updateOrderStatus(activeOrder.id, 'delivered')}
-                className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                className={`text-[10px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
                   activeOrder.status === 'delivered' ? 'border-[#00c365] text-[#00c365] bg-[#00c365]/10' : 'border-slate-800 text-slate-400'
                 }`}
               >
                 Delivered
               </button>
               <button
-                onClick={() => updateOrderStatus(activeOrder.id, 'failed')}
-                className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
-                  activeOrder.status === 'failed' ? 'border-rose-400 text-rose-400 bg-rose-400/10' : 'border-slate-800 text-slate-400'
+                onClick={() =>
+                  updateOrderStatus(activeOrder.id, 'failed', {
+                    serverStatus: 'refund_pending',
+                    statusMessage: 'Delivery could not be completed. Your payment is being reviewed for refund.',
+                  })
+                }
+                className={`text-[10px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                  activeOrder.serverStatus === 'refund_pending' ? 'border-rose-400 text-rose-400 bg-rose-400/10' : 'border-slate-800 text-slate-400'
                 }`}
               >
-                Failed
+                Refund Pending
               </button>
             </div>
           )}
@@ -270,7 +342,7 @@ export const OrderStatusModal: React.FC = () => {
                 closeOrderStatus();
                 setActivePage('orders');
               }}
-              className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-colors"
+              className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-colors cursor-pointer"
             >
               View All Orders
             </button>
@@ -279,7 +351,7 @@ export const OrderStatusModal: React.FC = () => {
                 closeOrderStatus();
                 setActivePage('home');
               }}
-              className="py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] flex items-center justify-center gap-1.5"
+              className="py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span>Back to Home</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -289,7 +361,7 @@ export const OrderStatusModal: React.FC = () => {
           {/* WhatsApp Support Assistance */}
           <div className="pt-2">
             <a
-              href={BUSINESS_CONFIG.getOrderSupportWhatsAppUrl(activeOrder.id, activeOrder.recipientPhone)}
+              href={BUSINESS_CONFIG.getOrderSupportWhatsAppUrl(displayRef, activeOrder.recipientPhone)}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors"
