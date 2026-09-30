@@ -135,50 +135,83 @@ export const DataPage: React.FC = () => {
     <div className="min-h-screen py-6 sm:py-10">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 space-y-8 sm:space-y-10">
         {/* Page Hero Section */}
-        <div className="relative rounded-3xl bg-gradient-to-br from-[#0e161c] via-[#091014] to-[#060a0d] border border-slate-800/80 p-5 sm:p-10 overflow-hidden shadow-2xl">
+        <div className="relative rounded-3xl bg-gradient-to-br from-[#0e161c] via-[#091014] to-[#060a0d] border border-slate-800/80 p-3.5 sm:p-6 lg:p-10 overflow-hidden shadow-2xl">
           {/* Ambient Glow */}
           <div className="absolute top-0 right-0 w-80 h-80 bg-[#00c365]/10 rounded-full blur-[90px] pointer-events-none" />
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center relative z-10">
-            <div className="lg:col-span-7 space-y-4 text-left">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#141d24] border border-slate-700/80 text-xs font-semibold text-[#00c365]">
-                <Wifi className="w-3.5 h-3.5" />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-6 lg:gap-8 items-center relative z-10">
+            <div className="lg:col-span-7 space-y-2.5 sm:space-y-4 text-left">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-[#141d24] border border-slate-700/80 text-[11px] sm:text-xs font-semibold text-[#00c365]">
+                <Wifi className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 <span>Data & Airtime</span>
               </div>
 
-              <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
-                Stay Connected <br />
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-snug sm:leading-tight">
+                Stay Connected <br className="hidden sm:inline" />
                 <span className="text-[#00c365]">Always</span>
               </h1>
 
-              <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-lg">
+              <p className="text-slate-300 text-xs sm:text-sm lg:text-base leading-snug sm:leading-relaxed max-w-lg">
                 Get the best data bundles and airtime for all networks in Ghana. Fast, secure, and affordable with direct delivery to your SIM.
               </p>
 
-              <div className="pt-1 flex flex-wrap gap-4 text-xs text-slate-400">
-                <div className="flex items-center gap-1.5">
-                  <Zap className="w-4 h-4 text-[#00c365]" />
+              <div className="pt-0.5 sm:pt-1 flex flex-wrap gap-2.5 sm:gap-4 text-[11px] sm:text-xs text-slate-400">
+                <div className="flex items-center gap-1 sm:gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-[#00c365]" />
                   <span>Direct SIM Credit</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-[#00c365]" />
+                <div className="flex items-center gap-1 sm:gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#00c365]" />
                   <span>MoMo Protected</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-[#00c365]" />
+                <div className="flex items-center gap-1 sm:gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-[#00c365]" />
                   <span>Automated Gateway Dispatch</span>
                 </div>
               </div>
             </div>
 
-            {/* Visual Phone Mockup Card */}
-            <div className="lg:col-span-5 flex justify-center lg:justify-end">
-              <div className="w-full max-w-xs rounded-2xl bg-[#121921] border border-slate-700/80 p-4 shadow-xl">
-                <div className="flex items-center justify-between text-xs text-slate-400 pb-3 border-b border-slate-800">
+            {/* Visual Featured Bundle Card */}
+            <div className="lg:col-span-5 flex justify-center lg:justify-end w-full">
+              <div className="w-full lg:max-w-xs rounded-2xl bg-[#121921] border border-slate-700/80 p-3 sm:p-4 shadow-xl">
+                {/* Desktop Top Header */}
+                <div className="hidden lg:flex items-center justify-between text-xs text-slate-400 pb-3 border-b border-slate-800">
                   <span className="font-semibold text-white">Popular Bundle</span>
                   <span className="text-[#00c365] font-medium">In Stock</span>
                 </div>
-                <div className="py-4 text-center space-y-2">
+
+                {/* Mobile Compact Horizontal Layout (< lg) */}
+                <div className="flex lg:hidden items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-lg bg-[#FFCC00] text-black font-extrabold text-xs flex items-center justify-center shrink-0 shadow-sm">
+                      MTN
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-base font-extrabold text-white">1GB</span>
+                        <span className="text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 px-1.5 py-0.2 rounded border border-[#00c365]/30">In Stock</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 block truncate">MTN Express Data</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <div className="text-right">
+                      <div className="text-[10px] text-slate-400 font-medium">Price</div>
+                      <div className="text-sm sm:text-base font-extrabold text-[#00c365] tabular-nums">GH₵4.99</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openCheckout(DATA_BUNDLES[0])}
+                      className="py-1.5 px-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
+                    >
+                      Buy Now
+                    </button>
+                  </div>
+                </div>
+
+                {/* Desktop Vertical Layout (lg+) */}
+                <div className="hidden lg:block py-4 text-center space-y-2">
                   <div className="w-12 h-12 rounded-xl bg-[#FFCC00] text-black font-extrabold text-sm flex items-center justify-center mx-auto shadow-md">
                     MTN
                   </div>
@@ -186,6 +219,7 @@ export const DataPage: React.FC = () => {
                   <div className="text-xs text-slate-400">MTN Express · Direct SIM Credit</div>
                   <div className="text-xl font-extrabold text-[#00c365]">GH₵4.99</div>
                   <button
+                    type="button"
                     onClick={() => openCheckout(DATA_BUNDLES[0])}
                     className="w-full py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
                   >

@@ -6,7 +6,10 @@
 
 import { SafePublicOrderDetails } from '../../server/types/orders';
 
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+const rawBaseUrl =
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE_URL) ||
+  (typeof process !== 'undefined' && process.env && process.env.VITE_API_BASE_URL) ||
+  '';
 export const API_BASE_URL = typeof rawBaseUrl === 'string' ? rawBaseUrl.replace(/\/$/, '') : '';
 
 export interface InitializePaymentRequest {
