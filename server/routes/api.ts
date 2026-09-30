@@ -8,7 +8,8 @@ import { getAuthoritativeProduct } from '../data/productCatalog.js';
 import { OrdersStore } from '../db/ordersStore.js';
 import { OrderRecord, toSafePublicOrder } from '../types/orders.js';
 import { PaystackServerService } from '../services/paystackService.js';
-import { getActiveSupplierProvider } from '../suppliers/supplierInterface.js';
+import { FulfilmentService } from '../services/fulfilmentService.js';
+import { SuccessBizHubWebhookHandler } from '../suppliers/successBizHub/webhookHandler.js';
 
 export const apiRouter = Router();
 
@@ -27,6 +28,7 @@ apiRouter.get('/health', (_req: Request, res: Response) => {
  * 1. POST /api/payments/initialize
  * Creates pending order and initializes Paystack from the SERVER.
  * Authoritative price is loaded from the catalog — browser input price is ignored.
+ * If fulfillment is enabled, performs supplier preflight checks before taking customer payment.
  */
 apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
   try {
@@ -58,7 +60,23 @@ apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
       return;
     }
 
-    // 4. Generate safe unique references
+    // 4. Supplier Preflight Check (when fulfillment enabled)
+    // Never take customer money for an order we already know cannot be submitted
+    const preflight = await FulfilmentService.preflightCheck(
+      product.network,
+      product.dataAmount,
+      phoneVal.normalized
+    );
+    if (!preflight.allowed) {
+      res.status(400).json({
+        error:
+          preflight.customerMessage ||
+          'This bundle is temporarily unavailable. Please try another package or try again shortly.',
+      });
+      return;
+    }
+
+    // 5. Generate safe unique references
     const timestamp = Date.now();
     const randomHex = Math.floor(100000 + Math.random() * 900000);
     const publicRef = `MH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${randomHex}`;
@@ -66,7 +84,7 @@ apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
 
     const nowIso = new Date().toISOString();
 
-    // 5. Create pending order in DB
+    // 6. Create pending order in DB
     const newOrder: OrderRecord = {
       id: `ord_${timestamp}_${randomHex}`,
       public_reference: publicRef,
@@ -84,9 +102,12 @@ apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
       payment_provider: 'paystack',
       payment_reference: paymentRef,
       payment_status: 'pending',
-      supplier_provider: 'unconfigured',
+      supplier_provider: 'success_biz_hub',
       supplier_order_id: null,
       supplier_response: null,
+      supplier_cost_minor: preflight.supplierCostMinor ?? null,
+      supplier_offer_ref: null,
+      supplier_last_checked_at: null,
       failure_reason: null,
       created_at: nowIso,
       updated_at: nowIso,
@@ -97,7 +118,7 @@ apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
 
     await OrdersStore.createOrder(newOrder);
 
-    // 6. Initialize Paystack transaction on the server
+    // 7. Initialize Paystack transaction on the server
     const paystackRes = await PaystackServerService.initializeTransaction({
       email: validEmail,
       amountPesewas: product.amountPesewas,
@@ -136,6 +157,7 @@ apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
 /**
  * 2. GET /api/payments/verify/:reference
  * Server-side payment verification endpoint.
+ * Dispatches to centralized fulfillment orchestration upon verified payment.
  */
 apiRouter.get('/payments/verify/:reference', async (req: Request, res: Response) => {
   try {
@@ -151,7 +173,7 @@ apiRouter.get('/payments/verify/:reference', async (req: Request, res: Response)
       return;
     }
 
-    // If already marked paid, return safe details immediately
+    // If already marked paid or beyond, return safe details immediately
     if (order.status !== 'pending_payment' && order.payment_status === 'success') {
       res.json({
         verified: true,
@@ -185,16 +207,16 @@ apiRouter.get('/payments/verify/:reference', async (req: Request, res: Response)
         return;
       }
 
-      const supplierNotice = 'Order paid and queued for automated dispatch.';
-      const { order: updatedOrder } = await OrdersStore.markOrderPaid(
+      // 3. Centralized payment -> fulfillment dispatch
+      const { order: dispatchedOrder } = await FulfilmentService.processPaidOrder(
         order.payment_reference,
         verifyResult.paidAt || new Date().toISOString(),
-        supplierNotice
+        'Paystack verify API'
       );
 
       res.json({
         verified: true,
-        order: updatedOrder ? toSafePublicOrder(updatedOrder) : toSafePublicOrder(order),
+        order: dispatchedOrder ? toSafePublicOrder(dispatchedOrder) : toSafePublicOrder(order),
         message: 'Payment verified successfully.',
       });
     } else {
@@ -213,6 +235,7 @@ apiRouter.get('/payments/verify/:reference', async (req: Request, res: Response)
 /**
  * 3. GET /api/orders/lookup/:reference
  * Returns safe public details of an order. No secrets or supplier credentials exposed.
+ * If order is submitted or processing, best-effort throttled status refresh is performed.
  */
 apiRouter.get('/orders/lookup/:reference', async (req: Request, res: Response) => {
   try {
@@ -228,9 +251,12 @@ apiRouter.get('/orders/lookup/:reference', async (req: Request, res: Response) =
       return;
     }
 
+    // Refresh status from supplier if due (30-second throttle)
+    const activeOrder = await FulfilmentService.refreshOrderStatusIfDue(order);
+
     res.json({
       success: true,
-      order: toSafePublicOrder(order),
+      order: toSafePublicOrder(activeOrder),
     });
   } catch (err) {
     console.error('Order Lookup Exception:', err);
@@ -267,14 +293,12 @@ export async function handlePaystackWebhook(req: Request, res: Response): Promis
       if (paymentRef) {
         const order = await OrdersStore.findOrder(paymentRef);
         if (order) {
-          // Idempotent update
+          // Idempotent update & centralized fulfillment
           if (currency === 'GHS' && amountPesewas === order.amount) {
-            const supplier = getActiveSupplierProvider();
-            const queueNotice = `Paid via Paystack Webhook. Supplier status: ${supplier.providerName}`;
-            await OrdersStore.markOrderPaid(
+            await FulfilmentService.processPaidOrder(
               paymentRef,
               data.paid_at || new Date().toISOString(),
-              queueNotice
+              'Paystack charge.success webhook'
             );
           } else {
             console.warn(`Webhook amount/currency mismatch for order ${order.public_reference}`);
@@ -286,7 +310,15 @@ export async function handlePaystackWebhook(req: Request, res: Response): Promis
     // Webhooks must return 200 OK promptly
     res.status(200).json({ status: 'success' });
   } catch (err) {
-    console.error('Webhook Handler Exception:', err);
+    console.error('Paystack Webhook Handler Exception:', err);
     res.status(200).json({ status: 'error_logged' });
   }
 }
+
+/**
+ * 5. POST /api/webhooks/success-biz-hub
+ * Success Biz Hub Webhook Handler
+ */
+export const handleSuccessBizHubWebhook = SuccessBizHubWebhookHandler.handle.bind(
+  SuccessBizHubWebhookHandler
+);

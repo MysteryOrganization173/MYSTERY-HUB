@@ -33,6 +33,9 @@ export interface OrderRecord {
   supplier_provider: string | null;
   supplier_order_id: string | null;
   supplier_response: string | null;
+  supplier_cost_minor: number | null;
+  supplier_offer_ref: string | null;
+  supplier_last_checked_at: string | null;
   failure_reason: string | null;
   created_at: string; // ISO 8601
   updated_at: string; // ISO 8601

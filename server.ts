@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
-import { apiRouter, handlePaystackWebhook } from './server/routes/api.js';
+import { apiRouter, handlePaystackWebhook, handleSuccessBizHubWebhook } from './server/routes/api.js';
 import { OrdersStore } from './server/db/ordersStore.js';
 
 dotenv.config();
@@ -44,7 +44,7 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, x-paystack-signature'
+    'Content-Type, Authorization, x-paystack-signature, x-webhook-signature, x-sbh-signature'
   );
 
   if (req.method === 'OPTIONS') {
@@ -79,6 +79,24 @@ app.post(
     next();
   },
   handlePaystackWebhook
+);
+
+// Success Biz Hub Webhook endpoint requires raw body for HMAC SHA256 signature verification
+app.post(
+  '/api/webhooks/success-biz-hub',
+  express.raw({ type: 'application/json' }),
+  (req, res, next) => {
+    try {
+      if (Buffer.isBuffer(req.body)) {
+        (req as unknown as { rawBody: Buffer }).rawBody = req.body;
+        req.body = JSON.parse(req.body.toString('utf8'));
+      }
+    } catch {
+      // ignore JSON parse error for raw body capture
+    }
+    next();
+  },
+  handleSuccessBizHubWebhook
 );
 
 app.use(express.json({ limit: '1mb' }));
@@ -134,6 +152,7 @@ RULES:
 - When answering, mention the relevant section on the website so the user can be redirected there.
 - Informational only: You cannot independently deduct money or purchase bundles; direct them to the Data page to choose their bundle.
 - Never invent prices or internal provider names.
+- Never reveal internal supplier names (such as Success Biz Hub), wholesale costs, backend architecture, API keys, or operational secrets. All customer transactions are presented strictly under the Mystery Hub brand.
 `;
 
 // API endpoint for Mystery AI chat

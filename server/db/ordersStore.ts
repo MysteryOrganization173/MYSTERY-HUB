@@ -26,6 +26,7 @@ if (process.env.DATABASE_URL) {
 
 // In-memory fallback repository for development when DATABASE_URL is omitted
 const devMemoryStore = new Map<string, OrderRecord>();
+const devWebhookEventsStore = new Set<string>();
 
 export class OrdersStore {
   /**
@@ -56,12 +57,28 @@ export class OrdersStore {
           supplier_provider VARCHAR(64),
           supplier_order_id VARCHAR(128),
           supplier_response TEXT,
+          supplier_cost_minor INTEGER,
+          supplier_offer_ref VARCHAR(128),
+          supplier_last_checked_at VARCHAR(64),
           failure_reason TEXT,
           created_at VARCHAR(64) NOT NULL,
           updated_at VARCHAR(64) NOT NULL,
           paid_at VARCHAR(64),
           submitted_at VARCHAR(64),
           delivered_at VARCHAR(64)
+        );
+
+        -- Safe non-destructive column additions
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS supplier_cost_minor INTEGER;
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS supplier_offer_ref VARCHAR(128);
+        ALTER TABLE orders ADD COLUMN IF NOT EXISTS supplier_last_checked_at VARCHAR(64);
+
+        -- Supplier webhook idempotency table
+        CREATE TABLE IF NOT EXISTS supplier_webhook_events (
+          event_id VARCHAR(128) PRIMARY KEY,
+          event_type VARCHAR(64) NOT NULL,
+          payload TEXT,
+          processed_at VARCHAR(64) NOT NULL
         );
       `);
     } catch (err) {
@@ -82,11 +99,12 @@ export class OrdersStore {
           recipient_phone, network, product_id, product_name_snapshot,
           bundle_size_snapshot, amount, currency, status, payment_provider,
           payment_reference, payment_status, supplier_provider, supplier_order_id,
-          supplier_response, failure_reason, created_at, updated_at,
+          supplier_response, supplier_cost_minor, supplier_offer_ref,
+          supplier_last_checked_at, failure_reason, created_at, updated_at,
           paid_at, submitted_at, delivered_at
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-          $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+          $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
         ) RETURNING *;
       `;
       const values = [
@@ -109,6 +127,9 @@ export class OrdersStore {
         order.supplier_provider,
         order.supplier_order_id,
         order.supplier_response,
+        order.supplier_cost_minor ?? null,
+        order.supplier_offer_ref ?? null,
+        order.supplier_last_checked_at ?? null,
         order.failure_reason,
         order.created_at,
         order.updated_at,
@@ -147,6 +168,33 @@ export class OrdersStore {
       if (devMemoryStore.has(ref)) return devMemoryStore.get(ref)!;
       if (devMemoryStore.has(`payref:${ref}`)) return devMemoryStore.get(`payref:${ref}`)!;
       if (devMemoryStore.has(`pubref:${ref}`)) return devMemoryStore.get(`pubref:${ref}`)!;
+      return null;
+    }
+  }
+
+  /**
+   * Find order by supplier_order_id
+   */
+  static async findOrderBySupplierOrderId(supplierOrderId: string): Promise<OrderRecord | null> {
+    if (!supplierOrderId) return null;
+
+    if (pool) {
+      const query = `
+        SELECT * FROM orders
+        WHERE supplier_order_id = $1
+        LIMIT 1;
+      `;
+      const result = await pool.query(query, [supplierOrderId]);
+      if (result.rows.length > 0) {
+        return result.rows[0] as OrderRecord;
+      }
+      return null;
+    } else {
+      for (const order of devMemoryStore.values()) {
+        if (order.supplier_order_id === supplierOrderId) {
+          return order;
+        }
+      }
       return null;
     }
   }
@@ -203,36 +251,226 @@ export class OrdersStore {
   }
 
   /**
+   * Atomically claim order for supplier dispatch
+   * Transitions 'paid' -> 'queued' ONLY.
+   * If already claimed or not in 'paid' status, returns null.
+   * Protects against concurrent Paystack webhook and verify requests.
+   */
+  static async claimOrderForSupplierDispatch(orderId: string): Promise<OrderRecord | null> {
+    const nowIso = new Date().toISOString();
+
+    if (pool) {
+      const query = `
+        UPDATE orders
+        SET status = 'queued', updated_at = $1
+        WHERE id = $2 AND status = 'paid'
+        RETURNING *;
+      `;
+      const result = await pool.query(query, [nowIso, orderId]);
+      if (result.rows.length > 0) {
+        return result.rows[0] as OrderRecord;
+      }
+      return null;
+    } else {
+      const existing = await this.findOrder(orderId);
+      if (!existing || existing.status !== 'paid') {
+        return null;
+      }
+      const updated: OrderRecord = {
+        ...existing,
+        status: 'queued',
+        updated_at: nowIso,
+      };
+      devMemoryStore.set(existing.id, updated);
+      devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
+      devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
+      return updated;
+    }
+  }
+
+  /**
+   * Save successful supplier submission
+   */
+  static async saveSupplierSubmission(
+    orderId: string,
+    supplierOrderId: string,
+    supplierCostMinor: number,
+    supplierOfferRef: string,
+    submittedStatus: OrderStatus,
+    rawSupplierResponse?: unknown
+  ): Promise<OrderRecord | null> {
+    const existing = await this.findOrder(orderId);
+    if (!existing) return null;
+
+    const nowIso = new Date().toISOString();
+    const updated: OrderRecord = {
+      ...existing,
+      status: submittedStatus,
+      supplier_provider: 'success_biz_hub',
+      supplier_order_id: supplierOrderId,
+      supplier_cost_minor: supplierCostMinor,
+      supplier_offer_ref: supplierOfferRef,
+      supplier_response: rawSupplierResponse ? JSON.stringify(rawSupplierResponse) : existing.supplier_response,
+      submitted_at: nowIso,
+      updated_at: nowIso,
+      supplier_last_checked_at: nowIso,
+      failure_reason: null,
+    };
+
+    if (pool) {
+      const query = `
+        UPDATE orders
+        SET status = $1, supplier_provider = $2, supplier_order_id = $3,
+            supplier_cost_minor = $4, supplier_offer_ref = $5, supplier_response = $6,
+            submitted_at = $7, updated_at = $8, supplier_last_checked_at = $9, failure_reason = NULL
+        WHERE id = $10;
+      `;
+      await pool.query(query, [
+        updated.status,
+        updated.supplier_provider,
+        updated.supplier_order_id,
+        updated.supplier_cost_minor,
+        updated.supplier_offer_ref,
+        updated.supplier_response,
+        updated.submitted_at,
+        updated.updated_at,
+        updated.supplier_last_checked_at,
+        existing.id,
+      ]);
+    } else {
+      devMemoryStore.set(existing.id, updated);
+      devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
+      devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
+    }
+
+    return updated;
+  }
+
+  /**
+   * Save uncertain supplier submission (e.g. network timeout where order may have reached supplier)
+   * Does NOT mark failed or delivered. Retains queued/submitted for reconciliation.
+   */
+  static async saveSupplierUncertainSubmission(
+    orderId: string,
+    uncertaintyReason: string,
+    rawErrorDetails?: unknown
+  ): Promise<OrderRecord | null> {
+    const existing = await this.findOrder(orderId);
+    if (!existing) return null;
+
+    const nowIso = new Date().toISOString();
+    const updated: OrderRecord = {
+      ...existing,
+      supplier_provider: 'success_biz_hub',
+      failure_reason: 'supplier_submission_uncertain',
+      supplier_response: JSON.stringify({
+        reason: uncertaintyReason,
+        error: rawErrorDetails,
+        timestamp: nowIso,
+      }),
+      updated_at: nowIso,
+    };
+
+    if (pool) {
+      const query = `
+        UPDATE orders
+        SET supplier_provider = $1, failure_reason = $2, supplier_response = $3, updated_at = $4
+        WHERE id = $5;
+      `;
+      await pool.query(query, [
+        updated.supplier_provider,
+        updated.failure_reason,
+        updated.supplier_response,
+        updated.updated_at,
+        existing.id,
+      ]);
+    } else {
+      devMemoryStore.set(existing.id, updated);
+      devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
+      devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
+    }
+
+    return updated;
+  }
+
+  /**
+   * Record and deduplicate supplier webhook event
+   * Returns true if event is recorded for the first time, false if duplicate.
+   */
+  static async recordSupplierWebhookEvent(
+    eventId: string,
+    eventType: string,
+    payload?: unknown
+  ): Promise<boolean> {
+    if (!eventId) return true; // Can't deduplicate without ID
+
+    const nowIso = new Date().toISOString();
+
+    if (pool) {
+      try {
+        const query = `
+          INSERT INTO supplier_webhook_events (event_id, event_type, payload, processed_at)
+          VALUES ($1, $2, $3, $4)
+          ON CONFLICT (event_id) DO NOTHING
+          RETURNING event_id;
+        `;
+        const payloadStr = payload ? JSON.stringify(payload) : null;
+        const result = await pool.query(query, [eventId, eventType, payloadStr, nowIso]);
+        return result.rows.length > 0;
+      } catch (err) {
+        console.warn('Error recording supplier webhook event:', err);
+        return false;
+      }
+    } else {
+      if (devWebhookEventsStore.has(eventId)) {
+        return false; // Duplicate
+      }
+      devWebhookEventsStore.add(eventId);
+      return true;
+    }
+  }
+
+  /**
    * Update arbitrary order status or failure reason safely
    */
   static async updateOrderStatus(
     orderId: string,
     status: OrderStatus,
     failureReason?: string,
-    supplierOrderId?: string
+    supplierOrderId?: string,
+    supplierResponse?: string
   ): Promise<OrderRecord | null> {
     const existing = await this.findOrder(orderId);
     if (!existing) return null;
 
+    const nowIso = new Date().toISOString();
     const updated: OrderRecord = {
       ...existing,
       status,
-      failure_reason: failureReason || existing.failure_reason,
+      failure_reason: failureReason !== undefined ? failureReason : existing.failure_reason,
       supplier_order_id: supplierOrderId || existing.supplier_order_id,
-      updated_at: new Date().toISOString(),
+      supplier_response: supplierResponse !== undefined ? supplierResponse : existing.supplier_response,
+      delivered_at: status === 'delivered' ? (existing.delivered_at || nowIso) : existing.delivered_at,
+      updated_at: nowIso,
+      supplier_last_checked_at: nowIso,
     };
 
     if (pool) {
       const query = `
         UPDATE orders
-        SET status = $1, failure_reason = $2, supplier_order_id = $3, updated_at = $4
-        WHERE id = $5;
+        SET status = $1, failure_reason = $2, supplier_order_id = $3,
+            supplier_response = $4, delivered_at = $5, updated_at = $6,
+            supplier_last_checked_at = $7
+        WHERE id = $8;
       `;
       await pool.query(query, [
         updated.status,
         updated.failure_reason,
         updated.supplier_order_id,
+        updated.supplier_response,
+        updated.delivered_at,
         updated.updated_at,
+        updated.supplier_last_checked_at,
         existing.id,
       ]);
     } else {

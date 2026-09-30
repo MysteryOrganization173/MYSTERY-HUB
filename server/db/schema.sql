@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS orders (
   supplier_provider VARCHAR(64),
   supplier_order_id VARCHAR(128),
   supplier_response TEXT,
+  supplier_cost_minor INTEGER,
+  supplier_offer_ref VARCHAR(128),
+  supplier_last_checked_at VARCHAR(64),
   failure_reason TEXT,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -32,4 +35,20 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE INDEX IF NOT EXISTS idx_orders_public_ref ON orders (public_reference);
 CREATE INDEX IF NOT EXISTS idx_orders_payment_ref ON orders (payment_reference);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders (status);
+CREATE INDEX IF NOT EXISTS idx_orders_supplier_order_id ON orders (supplier_order_id);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders (created_at DESC);
+
+-- Non-destructive migrations for existing installations
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS supplier_cost_minor INTEGER;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS supplier_offer_ref VARCHAR(128);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS supplier_last_checked_at VARCHAR(64);
+
+-- Supplier Webhook Idempotency Table
+CREATE TABLE IF NOT EXISTS supplier_webhook_events (
+  event_id VARCHAR(128) PRIMARY KEY,
+  event_type VARCHAR(64) NOT NULL,
+  payload TEXT,
+  processed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_supplier_webhook_events_time ON supplier_webhook_events (processed_at DESC);
