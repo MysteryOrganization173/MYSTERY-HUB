@@ -1,29 +1,36 @@
 /**
  * Paystack Hook (Server-First Bridge)
- * Uses server-created access codes and transaction references.
- * Never calculates or trusts payment amounts on the client.
+ * Uses official Paystack Inline JS V2 with server-created access codes.
+ * Transactions are initialized on the server and resumed in the browser.
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { initializePaymentOnServer, verifyPaymentOnServer } from '../services/apiClient';
 
+export interface PaystackTransactionResponse {
+  reference: string;
+  status?: string;
+  trans?: string;
+  transaction?: string;
+  message?: string;
+  [key: string]: unknown;
+}
+
+export interface PaystackResumeOptions {
+  onSuccess?: (response: PaystackTransactionResponse) => void;
+  onCancel?: () => void;
+  onClose?: () => void;
+  onError?: (error: unknown) => void;
+}
+
+export interface PaystackPopInstance {
+  resumeTransaction: (accessCode: string, options?: PaystackResumeOptions) => void;
+}
+
 declare global {
   interface Window {
     PaystackPop?: {
-      setup: (options: {
-        key?: string;
-        access_code?: string;
-        email?: string;
-        amount?: number;
-        currency?: string;
-        ref?: string;
-        channels?: string[];
-        metadata?: Record<string, unknown>;
-        callback: (response: { reference: string; status?: string; trans?: string; [key: string]: unknown }) => void;
-        onClose: () => void;
-      }) => {
-        openIframe: () => void;
-      };
+      new (): PaystackPopInstance;
     };
   }
 }
@@ -38,7 +45,8 @@ export interface ServerPaystackOptions {
   onError?: (error: Error) => void;
 }
 
-const PAYSTACK_INLINE_SCRIPT = 'https://js.paystack.co/v1/inline.js';
+// Paystack Inline JS V2
+const PAYSTACK_INLINE_SCRIPT = 'https://js.paystack.co/v2/inline.js';
 
 export function usePaystack() {
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
@@ -66,16 +74,34 @@ export function usePaystack() {
     script.async = true;
     script.onload = () => setIsScriptLoaded(true);
     script.onerror = () => {
-      console.warn('Paystack inline.js failed to load.');
+      console.warn('Paystack InlineJS V2 failed to load.');
     };
     document.body.appendChild(script);
   }, []);
+
+  const waitForPaystackPop = async (maxWaitMs = 1500): Promise<boolean> => {
+    if (typeof window === 'undefined') return false;
+    if (window.PaystackPop) return true;
+
+    const startTime = Date.now();
+    return new Promise((resolve) => {
+      const interval = setInterval(() => {
+        if (window.PaystackPop) {
+          clearInterval(interval);
+          resolve(true);
+        } else if (Date.now() - startTime >= maxWaitMs) {
+          clearInterval(interval);
+          resolve(false);
+        }
+      }, 100);
+    });
+  };
 
   const initializeServerPayment = useCallback(async (options: ServerPaystackOptions) => {
     setIsInitializing(true);
 
     try {
-      // 1. Call Backend to create order & initialize Paystack transaction authoritatively
+      // 1. Call Backend to create pending order & initialize Paystack transaction authoritatively
       const initRes = await initializePaymentOnServer({
         productId: options.productId,
         recipientPhone: options.recipientPhone,
@@ -84,58 +110,91 @@ export function usePaystack() {
       });
 
       if (!initRes.success) {
-        throw new Error(initRes.error || 'Failed to initialize payment.');
+        throw new Error(initRes.error || 'Failed to initialize payment with server.');
       }
 
       const { orderRef, reference, accessCode, isSimulated } = initRes;
 
-      // 2. Open Paystack Pop popup if Paystack script is loaded & accessCode/publicKey present
-      if (window.PaystackPop && (accessCode || publicKey)) {
+      if (!accessCode) {
+        throw new Error('Server did not return a valid Paystack payment access code.');
+      }
+
+      // 2. Ensure Paystack InlineJS V2 script is ready
+      const popAvailable = window.PaystackPop ? true : await waitForPaystackPop();
+
+      // 3. Official Paystack InlineJS V2 Server-Initialized Flow
+      if (popAvailable && window.PaystackPop) {
         try {
-          const handler = window.PaystackPop.setup({
-            key: publicKey || undefined,
-            access_code: accessCode || undefined,
-            ref: reference,
-            callback: async (_response) => {
+          const popup = new window.PaystackPop();
+
+          popup.resumeTransaction(accessCode, {
+            onSuccess: async () => {
               setIsInitializing(false);
-              // Frontend callback triggers verification on backend — DOES NOT claim delivery
+              // Trigger backend verification, then poll for authoritative status
               try {
                 await verifyPaymentOnServer(reference);
               } catch {
-                // Ignore verification retry error; backend polling/webhook will handle status
+                // Backend webhook or polling will reconcile status
               }
               options.onPaymentReceived(orderRef, reference);
+            },
+            onCancel: () => {
+              setIsInitializing(false);
+              options.onCancel?.();
             },
             onClose: () => {
               setIsInitializing(false);
               options.onCancel?.();
             },
+            onError: (popErr: unknown) => {
+              setIsInitializing(false);
+              const errMsg =
+                popErr instanceof Error
+                  ? popErr.message
+                  : 'An error occurred during payment processing with Paystack.';
+              options.onError?.(new Error(errMsg));
+            },
           });
-
-          handler.openIframe();
           return;
         } catch (popErr) {
-          console.warn('PaystackPop setup error, falling back:', popErr);
+          setIsInitializing(false);
+          const err =
+            popErr instanceof Error
+              ? popErr
+              : new Error('Failed to open Paystack payment popup.');
+          options.onError?.(err);
+          return;
         }
       }
 
-      // 3. Sandbox / Dev fallback if Paystack popup iframe is omitted
-      if (isSimulated || !window.PaystackPop) {
+      // 4. DEVELOPMENT ONLY: Simulated fallback when explicitly in dev mode with simulated server response
+      if (import.meta.env.DEV && isSimulated) {
+        console.info('[DEV ONLY] Simulating payment processing in local test mode...');
         setTimeout(async () => {
           setIsInitializing(false);
           try {
             await verifyPaymentOnServer(reference);
           } catch {
-            // ignore
+            // ignore dev simulation verification error
           }
           options.onPaymentReceived(orderRef, reference);
         }, 1200);
+        return;
       }
+
+      // 5. PRODUCTION FAILURE: Missing popup in production must NEVER claim payment success
+      setIsInitializing(false);
+      const scriptError = new Error(
+        'Unable to load Paystack payment module. Please check your internet connection, disable ad-blockers, and try again.'
+      );
+      options.onError?.(scriptError);
     } catch (err) {
       setIsInitializing(false);
-      options.onError?.(err instanceof Error ? err : new Error('Payment initialization failed.'));
+      options.onError?.(
+        err instanceof Error ? err : new Error('Payment initialization failed.')
+      );
     }
-  }, [publicKey]);
+  }, []);
 
   return {
     initializeServerPayment,
