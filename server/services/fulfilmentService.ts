@@ -180,6 +180,29 @@ export class FulfilmentService {
       return { order: safeOrder || claimedOrder, alreadyHandled: false };
     }
 
+    // Step 3b: Concurrent active MTN fulfillment safeguard
+    // Prevents submitting a second MTN order to supplier if another order is already active for this recipient
+    if (claimedOrder.network.toLowerCase() === 'mtn') {
+      const activeOrder = await OrdersStore.findActiveMtnOrder(claimedOrder.recipient_phone);
+      if (
+        activeOrder &&
+        activeOrder.id !== claimedOrder.id &&
+        ['submitted', 'processing'].includes(activeOrder.status)
+      ) {
+        console.warn(
+          `[Fulfilment Dispatch] Concurrent active MTN order ${activeOrder.public_reference} already in progress for ${claimedOrder.recipient_phone}. Holding ${claimedOrder.public_reference} in queued status.`
+        );
+        const queuedOrder = await OrdersStore.updateOrderStatus(
+          claimedOrder.id,
+          'queued',
+          'An active MTN order is currently in progress for this recipient. Kept in queue for sequential processing.',
+          undefined,
+          `Active MTN order in progress: ${activeOrder.public_reference}`
+        );
+        return { order: queuedOrder || claimedOrder, alreadyHandled: false };
+      }
+    }
+
     // Step 4: Live dispatch to Success Biz Hub
     try {
       // 4a. Resolve live supplier package

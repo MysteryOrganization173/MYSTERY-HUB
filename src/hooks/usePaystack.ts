@@ -42,7 +42,7 @@ export interface ServerPaystackOptions {
   customerName?: string;
   onPaymentReceived: (orderRef: string, reference: string) => void;
   onCancel?: () => void;
-  onError?: (error: Error) => void;
+  onError?: (error: Error & { code?: string; existingOrderReference?: string; existingOrderStatus?: string }) => void;
 }
 
 // Paystack Inline JS V2

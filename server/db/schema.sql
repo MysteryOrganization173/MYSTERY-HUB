@@ -52,3 +52,8 @@ CREATE TABLE IF NOT EXISTS supplier_webhook_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_supplier_webhook_events_time ON supplier_webhook_events (processed_at DESC);
+
+-- Active MTN recipient lock index (enforces at most one active MTN order per recipient)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_active_mtn_recipient 
+ON orders (recipient_phone) 
+WHERE network = 'mtn' AND status IN ('paid', 'queued', 'submitted', 'processing', 'refund_pending');

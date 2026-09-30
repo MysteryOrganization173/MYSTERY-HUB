@@ -15,12 +15,17 @@ import { SuccessBizHubClient } from './client.js';
 import { resolveSupplierPackage, ResolvedSupplierPackage } from './catalogResolver.js';
 import { SbhOffer } from './types.js';
 import { parseMinorAmount } from './money.js';
+import { validateAndNormalizeGhanaPhone } from '../../utils/phone.js';
 
 /**
  * Normalizes Ghana phone number to 10-digit standard local format for matching
  * e.g. "0592066298", "233592066298", "+233592066298" all normalize to "0592066298"
  */
 export function normalizeGhanaPhoneForComparison(phoneStr: string): string {
+  const res = validateAndNormalizeGhanaPhone(phoneStr);
+  if (res.isValid && res.formattedLocal) {
+    return res.formattedLocal;
+  }
   if (!phoneStr || typeof phoneStr !== 'string') return '';
   const digits = phoneStr.replace(/\D/g, '');
   if (digits.startsWith('233') && digits.length === 12) {

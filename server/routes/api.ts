@@ -10,6 +10,11 @@ import { OrderRecord, toSafePublicOrder } from '../types/orders.js';
 import { PaystackServerService } from '../services/paystackService.js';
 import { FulfilmentService } from '../services/fulfilmentService.js';
 import { SuccessBizHubWebhookHandler } from '../suppliers/successBizHub/webhookHandler.js';
+import {
+  ACTIVE_MTN_ORDER_CODE,
+  ACTIVE_MTN_ORDER_MESSAGE,
+  mapToSafeCustomerStatus,
+} from '../services/duplicateOrderProtection.js';
 
 export const apiRouter = Router();
 
@@ -60,6 +65,22 @@ apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
       return;
     }
 
+    // 3a. MTN Duplicate Active Order Protection
+    // MTN network does not allow another bundle order for the same recipient while a previous one is processing.
+    // Rejects before preflight and before Paystack payment initialization.
+    if (product.network.toLowerCase() === 'mtn') {
+      const activeMtnOrder = await OrdersStore.findActiveMtnOrder(phoneVal.normalized);
+      if (activeMtnOrder) {
+        res.status(409).json({
+          code: ACTIVE_MTN_ORDER_CODE,
+          message: ACTIVE_MTN_ORDER_MESSAGE,
+          existingOrderReference: activeMtnOrder.public_reference,
+          existingOrderStatus: mapToSafeCustomerStatus(activeMtnOrder.status),
+        });
+        return;
+      }
+    }
+
     // 4. Supplier Preflight Check (when fulfillment enabled)
     // Never take customer money for an order we already know cannot be submitted
     const preflight = await FulfilmentService.preflightCheck(
@@ -84,7 +105,7 @@ apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
 
     const nowIso = new Date().toISOString();
 
-    // 6. Create pending order in DB
+    // 6. Create pending order in DB atomically with race-condition check
     const newOrder: OrderRecord = {
       id: `ord_${timestamp}_${randomHex}`,
       public_reference: publicRef,
@@ -116,7 +137,16 @@ apiRouter.post('/payments/initialize', async (req: Request, res: Response) => {
       delivered_at: null,
     };
 
-    await OrdersStore.createOrder(newOrder);
+    const createResult = await OrdersStore.createOrderWithMtnDuplicateCheck(newOrder);
+    if (!createResult.success) {
+      res.status(409).json({
+        code: ACTIVE_MTN_ORDER_CODE,
+        message: ACTIVE_MTN_ORDER_MESSAGE,
+        existingOrderReference: createResult.existingOrder.public_reference,
+        existingOrderStatus: mapToSafeCustomerStatus(createResult.existingOrder.status),
+      });
+      return;
+    }
 
     // 7. Initialize Paystack transaction on the server
     const paystackRes = await PaystackServerService.initializeTransaction({

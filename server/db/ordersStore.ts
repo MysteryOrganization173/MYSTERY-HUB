@@ -6,6 +6,11 @@
 
 import pg from 'pg';
 import { OrderRecord, OrderStatus } from '../types/orders.js';
+import {
+  getGhanaPhoneLookupVariants,
+  canonicalGhanaPhone,
+  areGhanaPhonesEqual,
+} from '../utils/phone.js';
 
 const { Pool } = pg;
 
@@ -27,6 +32,25 @@ if (process.env.DATABASE_URL) {
 // In-memory fallback repository for development when DATABASE_URL is omitted
 const devMemoryStore = new Map<string, OrderRecord>();
 const devWebhookEventsStore = new Set<string>();
+
+// In-memory mutex mechanism for serializing concurrent order creations per recipient
+const inMemoryLocks = new Map<string, Promise<void>>();
+
+async function acquireLock(key: string): Promise<() => void> {
+  while (inMemoryLocks.has(key)) {
+    await inMemoryLocks.get(key);
+  }
+  let resolveCurrent: () => void = () => {};
+  const currentPromise = new Promise<void>((resolve) => {
+    resolveCurrent = resolve;
+  });
+  inMemoryLocks.set(key, currentPromise);
+
+  return () => {
+    inMemoryLocks.delete(key);
+    resolveCurrent();
+  };
+}
 
 export class OrdersStore {
   /**
@@ -80,12 +104,170 @@ export class OrdersStore {
           payload TEXT,
           processed_at VARCHAR(64) NOT NULL
         );
+
+        -- Active MTN recipient lock index (enforces at most one active MTN order per recipient at DB level)
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_active_mtn_recipient 
+        ON orders (recipient_phone) 
+        WHERE network = 'mtn' AND status IN ('paid', 'queued', 'submitted', 'processing', 'refund_pending');
       `);
     } catch (err) {
       console.warn('Error running initDb table check:', err);
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Find any existing active/blocking order for an MTN recipient
+   * Blocking statuses: paid, queued, submitted, processing, refund_pending
+   */
+  static async findActiveMtnOrder(recipientPhone: string): Promise<OrderRecord | null> {
+    const variants = getGhanaPhoneLookupVariants(recipientPhone);
+    if (variants.length === 0) return null;
+
+    if (pool) {
+      const query = `
+        SELECT * FROM orders
+        WHERE network = 'mtn'
+          AND recipient_phone = ANY($1)
+          AND status IN ('paid', 'queued', 'submitted', 'processing', 'refund_pending')
+        ORDER BY created_at DESC
+        LIMIT 1;
+      `;
+      const result = await pool.query(query, [variants]);
+      if (result.rows.length > 0) {
+        return result.rows[0] as OrderRecord;
+      }
+      return null;
+    } else {
+      const blockingStatuses = ['paid', 'queued', 'submitted', 'processing', 'refund_pending'];
+      for (const order of devMemoryStore.values()) {
+        if (
+          order.network.toLowerCase() === 'mtn' &&
+          blockingStatuses.includes(order.status) &&
+          variants.some((v) => areGhanaPhonesEqual(order.recipient_phone, v))
+        ) {
+          return order;
+        }
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Atomically checks for an existing active MTN order and inserts the new order
+   * within a database transaction with advisory lock (or serialized in-memory lock)
+   */
+  static async createOrderWithMtnDuplicateCheck(
+    order: OrderRecord
+  ): Promise<{ success: true; order: OrderRecord } | { success: false; existingOrder: OrderRecord }> {
+    if (order.network.toLowerCase() !== 'mtn') {
+      const created = await this.createOrder(order);
+      return { success: true, order: created };
+    }
+
+    const normPhone = canonicalGhanaPhone(order.recipient_phone) || order.recipient_phone;
+    const variants = getGhanaPhoneLookupVariants(order.recipient_phone);
+
+    if (pool) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        // Advisory transaction-level lock on hash of normalized phone
+        // Automatically released at COMMIT or ROLLBACK
+        await client.query(`SELECT pg_advisory_xact_lock(hashtext('mtn_' || $1))`, [normPhone]);
+
+        // Check for active blocking MTN order
+        const checkQuery = `
+          SELECT * FROM orders
+          WHERE network = 'mtn'
+            AND recipient_phone = ANY($1)
+            AND status IN ('paid', 'queued', 'submitted', 'processing', 'refund_pending')
+          ORDER BY created_at DESC
+          LIMIT 1;
+        `;
+        const checkRes = await client.query(checkQuery, [variants]);
+        if (checkRes.rows.length > 0) {
+          await client.query('ROLLBACK');
+          return { success: false, existingOrder: checkRes.rows[0] as OrderRecord };
+        }
+
+        // Insert new order
+        const insertQuery = `
+          INSERT INTO orders (
+            id, public_reference, customer_name, customer_email, customer_phone,
+            recipient_phone, network, product_id, product_name_snapshot,
+            bundle_size_snapshot, amount, currency, status, payment_provider,
+            payment_reference, payment_status, supplier_provider, supplier_order_id,
+            supplier_response, supplier_cost_minor, supplier_offer_ref,
+            supplier_last_checked_at, failure_reason, created_at, updated_at,
+            paid_at, submitted_at, delivered_at
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+            $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
+          ) RETURNING *;
+        `;
+        const values = [
+          order.id,
+          order.public_reference,
+          order.customer_name,
+          order.customer_email,
+          order.customer_phone,
+          order.recipient_phone,
+          order.network,
+          order.product_id,
+          order.product_name_snapshot,
+          order.bundle_size_snapshot,
+          order.amount,
+          order.currency,
+          order.status,
+          order.payment_provider,
+          order.payment_reference,
+          order.payment_status,
+          order.supplier_provider,
+          order.supplier_order_id,
+          order.supplier_response,
+          order.supplier_cost_minor ?? null,
+          order.supplier_offer_ref ?? null,
+          order.supplier_last_checked_at ?? null,
+          order.failure_reason,
+          order.created_at,
+          order.updated_at,
+          order.paid_at,
+          order.submitted_at,
+          order.delivered_at,
+        ];
+        await client.query(insertQuery, values);
+        await client.query('COMMIT');
+        return { success: true, order };
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+    } else {
+      const release = await acquireLock(`mtn:${normPhone}`);
+      try {
+        const existing = await this.findActiveMtnOrder(order.recipient_phone);
+        if (existing) {
+          return { success: false, existingOrder: existing };
+        }
+        await this.createOrder(order);
+        return { success: true, order };
+      } finally {
+        release();
+      }
+    }
+  }
+
+  /**
+   * Resets dev memory store (used for test isolation)
+   */
+  static clearDevStore(): void {
+    devMemoryStore.clear();
+    devWebhookEventsStore.clear();
   }
 
   /**

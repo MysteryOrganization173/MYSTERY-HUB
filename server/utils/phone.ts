@@ -56,3 +56,39 @@ export function validateAndNormalizeGhanaPhone(rawPhone: string): PhoneValidatio
     raw: rawPhone,
   };
 }
+
+/**
+ * Returns the canonical standardized Ghana phone number (+233...) or null if invalid
+ */
+export function canonicalGhanaPhone(rawPhone: string): string | null {
+  const result = validateAndNormalizeGhanaPhone(rawPhone);
+  return result.isValid ? result.normalized : null;
+}
+
+/**
+ * Compares two Ghana phone numbers across formats (059..., 233..., +233...)
+ */
+export function areGhanaPhonesEqual(phoneA: string, phoneB: string): boolean {
+  const normA = canonicalGhanaPhone(phoneA);
+  const normB = canonicalGhanaPhone(phoneB);
+  return Boolean(normA && normB && normA === normB);
+}
+
+/**
+ * Generates all valid lookup representations of a Ghana phone number
+ * e.g. for "0592066298": ["+233592066298", "233592066298", "0592066298"]
+ */
+export function getGhanaPhoneLookupVariants(rawPhone: string): string[] {
+  const result = validateAndNormalizeGhanaPhone(rawPhone);
+  if (!result.isValid || !result.normalized || !result.formattedLocal) {
+    const digits = (rawPhone || '').replace(/\D/g, '');
+    return digits ? [digits] : [];
+  }
+  const local = result.formattedLocal; // e.g. 0592066298
+  const nineDigits = local.slice(1);   // e.g. 592066298
+  return [
+    result.normalized,                 // +233592066298
+    `233${nineDigits}`,                // 233592066298
+    local,                             // 0592066298
+  ];
+}

@@ -3,7 +3,8 @@ import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS, detectGhanaNetwork } from '../../data/bundles';
 import { usePaystack } from '../../hooks/usePaystack';
 import { BUSINESS_CONFIG } from '../../config/business';
-import { X, ShieldCheck, Smartphone, CreditCard, Building2, Check, ArrowRight, MessageSquare, AlertCircle, Lock } from 'lucide-react';
+import { lookupOrderOnServer } from '../../services/apiClient';
+import { X, ShieldCheck, Smartphone, CreditCard, Building2, Check, ArrowRight, MessageSquare, AlertCircle, Lock, AlertTriangle } from 'lucide-react';
 
 export const CheckoutModal: React.FC = () => {
   const { isCheckoutOpen, closeCheckout, checkoutBundle, createOrder, showToast, user, openOrderStatus } = useApp();
@@ -13,11 +14,16 @@ export const CheckoutModal: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'momo' | 'card' | 'bank'>('momo');
   const [detectedNet, setDetectedNet] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState('');
+  const [activeMtnConflict, setActiveMtnConflict] = useState<{
+    orderRef?: string;
+    status?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (checkoutBundle) {
       setPhone((prev) => prev || user?.phone || '');
       setPhoneError('');
+      setActiveMtnConflict(null);
     }
   }, [checkoutBundle, user?.phone]);
 
@@ -37,6 +43,68 @@ export const CheckoutModal: React.FC = () => {
     const val = e.target.value;
     const clean = val.replace(/[^\d\s]/g, '');
     setPhone(clean);
+    if (activeMtnConflict) setActiveMtnConflict(null);
+    if (phoneError) setPhoneError('');
+  };
+
+  const handleTrackCurrentOrder = async (orderRef: string) => {
+    closeCheckout();
+    try {
+      const res = await lookupOrderOnServer(orderRef);
+      if (res.success && res.order) {
+        openOrderStatus({
+          id: res.order.public_reference,
+          publicReference: res.order.public_reference,
+          serverReference: res.order.public_reference,
+          serverStatus: res.order.status,
+          statusMessage:
+            res.order.status === 'refund_pending' || res.order.status === 'refunded'
+              ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
+              : undefined,
+          bundle: {
+            id: 'mtn-active',
+            network: res.order.network,
+            dataAmount: res.order.bundle_size_snapshot,
+            dataBytesValue: 1024,
+            validity: 'Standard',
+            validityCategory: 'Monthly',
+            priceGhc: res.order.amount_ghc,
+          },
+          recipientPhone: res.order.recipient_phone,
+          network: res.order.network,
+          paymentMethod: 'momo',
+          amountGhc: res.order.amount_ghc,
+          status: res.order.status === 'delivered' ? 'delivered' : 'processing',
+          createdAt: res.order.created_at,
+          updatedAt: res.order.created_at,
+        });
+        return;
+      }
+    } catch {
+      // fallback
+    }
+
+    openOrderStatus({
+      id: orderRef,
+      publicReference: orderRef,
+      serverReference: orderRef,
+      bundle: {
+        id: 'mtn-active',
+        network: 'mtn',
+        dataAmount: 'MTN Data',
+        dataBytesValue: 1024,
+        validity: 'Standard',
+        validityCategory: 'Monthly',
+        priceGhc: 0,
+      },
+      recipientPhone: phone.trim(),
+      network: 'mtn',
+      paymentMethod: 'momo',
+      amountGhc: 0,
+      status: 'processing',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -47,6 +115,8 @@ export const CheckoutModal: React.FC = () => {
       setPhoneError('Please enter a valid 10-digit Ghana phone number (e.g. 024 123 4567)');
       return;
     }
+
+    setActiveMtnConflict(null);
 
     initializeServerPayment({
       productId: checkoutBundle.id,
@@ -65,6 +135,13 @@ export const CheckoutModal: React.FC = () => {
         showToast('Payment window closed.', 'info');
       },
       onError: (err) => {
+        if (err.code === 'ACTIVE_MTN_ORDER_EXISTS') {
+          setActiveMtnConflict({
+            orderRef: err.existingOrderReference,
+            status: err.existingOrderStatus,
+          });
+          return;
+        }
         showToast(err.message || 'Payment initiation failed', 'warning');
       },
     });
@@ -129,6 +206,45 @@ export const CheckoutModal: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Active MTN Duplicate Order Conflict Banner */}
+          {activeMtnConflict && (
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-left space-y-3 animate-in fade-in">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-sm text-amber-200">
+                    An MTN bundle is already being processed for this number.
+                  </h4>
+                  <p className="text-xs text-amber-300/80 mt-1 leading-relaxed">
+                    Please wait for your current order to be completed before buying another MTN bundle for this number.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                {activeMtnConflict.orderRef && (
+                  <button
+                    type="button"
+                    onClick={() => handleTrackCurrentOrder(activeMtnConflict.orderRef!)}
+                    className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Track current order</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveMtnConflict(null)}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Recipient Phone Input */}
           <div className="space-y-2">

@@ -36,6 +36,12 @@ export interface VerifyPaymentResponse {
   error?: string;
 }
 
+export interface ApiError extends Error {
+  code?: string;
+  existingOrderReference?: string;
+  existingOrderStatus?: string;
+}
+
 export interface LookupOrderResponse {
   success: boolean;
   order: SafePublicOrderDetails;
@@ -54,7 +60,11 @@ export async function initializePaymentOnServer(
 
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.error || 'Failed to initialize payment transaction.');
+    const error: ApiError = new Error(data.message || data.error || 'Failed to initialize payment transaction.');
+    error.code = data.code;
+    error.existingOrderReference = data.existingOrderReference;
+    error.existingOrderStatus = data.existingOrderStatus;
+    throw error;
   }
 
   return data;
