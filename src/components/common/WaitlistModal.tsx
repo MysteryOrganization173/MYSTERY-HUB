@@ -63,7 +63,7 @@ export const WaitlistModal: React.FC = () => {
                   Get notified when {waitlistInfo.serviceTitle} launches
                 </h3>
                 <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                  We are finalizing the direct integrations with Ghanaian providers. Be the first to try it with early-bird discounts and zero transaction fees.
+                  We are finalizing direct integrations with Ghanaian utility providers. Join the early-access list to be notified the moment this service goes live.
                 </p>
               </div>
 
@@ -115,7 +115,7 @@ export const WaitlistModal: React.FC = () => {
                     type={channel === 'email' ? 'email' : 'tel'}
                     value={contact}
                     onChange={(e) => setContact(e.target.value)}
-                    placeholder={channel === 'email' ? 'you@domain.com' : '024 123 4567'}
+                    placeholder={channel === 'email' ? 'you@domain.com' : 'e.g. 024 XXX XXXX'}
                     required
                     className="w-full bg-[#0a0e12] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />

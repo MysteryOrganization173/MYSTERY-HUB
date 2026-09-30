@@ -1,5 +1,5 @@
 import React from 'react';
-import { useApp } from '../../context/AppContext';
+import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { ActivePage } from '../../types';
 import { Home, Wifi, Globe, Grid, Clock } from 'lucide-react';
 
@@ -24,10 +24,14 @@ export const MobileNav: React.FC = () => {
           const Icon = item.icon;
           const isActive = activePage === item.id;
           return (
-            <button
+            <a
               key={item.id}
-              onClick={() => setActivePage(item.id)}
-              className="flex flex-col items-center justify-center min-h-[44px] min-w-[44px] py-1 transition-colors relative"
+              href={ROUTE_PATH_MAP[item.id]}
+              onClick={(e) => {
+                e.preventDefault();
+                setActivePage(item.id);
+              }}
+              className="flex flex-col items-center justify-center min-h-[44px] min-w-[44px] py-1 transition-colors relative cursor-pointer"
             >
               <div
                 className={`p-1 rounded-xl transition-all duration-200 ${
@@ -46,7 +50,7 @@ export const MobileNav: React.FC = () => {
               {item.id === 'orders' && orders.length > 0 && !isActive && (
                 <span className="absolute top-1 right-3 w-1.5 h-1.5 bg-[#00c365] rounded-full" />
               )}
-            </button>
+            </a>
           );
         })}
       </div>

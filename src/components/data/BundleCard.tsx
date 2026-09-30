@@ -74,7 +74,7 @@ export const BundleCard: React.FC<BundleCardProps> = ({ bundle, onBuy, featured 
 
         <div className="flex items-center justify-center gap-1 text-[11px] text-slate-400">
           <Zap className="w-3 h-3 text-[#00c365]" />
-          <span>Instant MoMo Delivery</span>
+          <span>Secure MoMo Checkout</span>
         </div>
       </div>
     </div>

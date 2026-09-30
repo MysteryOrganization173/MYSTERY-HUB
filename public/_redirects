@@ -1,0 +1,3 @@
+# Netlify Single-Page Application (SPA) redirect rule
+# Ensures direct visits to /data, /website-builder, /about, etc. resolve to index.html with 200 status
+/*    /index.html   200

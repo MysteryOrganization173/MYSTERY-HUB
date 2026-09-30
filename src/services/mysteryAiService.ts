@@ -199,7 +199,7 @@ function getGroundedLocalResponse(
   ) {
     return {
       reply:
-        "Mystery Hub is Ghana's all-in-one digital utility platform. Right now, our active service lets you buy discounted data bundles for MTN, Telecel, and AirtelTigo delivered in 30–60 seconds via Mobile Money. We also provide a Website Builder so Ghanaian businesses can launch online in minutes, with utilities like ECG tokens and WAEC checkers coming soon!",
+        "Mystery Hub is Ghana's all-in-one digital utility platform. Right now, our active service lets you buy discounted data bundles for MTN, Telecel, and AirtelTigo delivered promptly via Mobile Money. We also provide a Website Builder so Ghanaian businesses can launch online in minutes, with utilities like ECG tokens and WAEC checkers coming soon!",
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Browse Data Offers' },
     };
   }
@@ -240,7 +240,7 @@ function getGroundedLocalResponse(
   ) {
     return {
       reply:
-        "Buying data takes just 3 simple steps:\n1. Head to our Data page and select your network (MTN, Telecel, or AirtelTigo).\n2. Choose your bundle (e.g. 1GB for GH₵4.99 or 5GB for GH₵24.99).\n3. Enter your Ghana phone number and approve the prompt on your phone with your MoMo PIN.\n\nYour data is credited automatically within 30 to 60 seconds!",
+        "Buying data takes just 3 simple steps:\n1. Head to our Data page and select your network (MTN, Telecel, or AirtelTigo).\n2. Choose your bundle (e.g. 1GB for GH₵4.99 or 5GB for GH₵24.99).\n3. Enter your Ghana phone number and approve the prompt on your phone with your MoMo PIN.\n\nYour data is credited automatically upon payment authorization!",
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Buy Data on Data Page' },
     };
   }
@@ -257,7 +257,7 @@ function getGroundedLocalResponse(
   ) {
     return {
       reply:
-        "We support all 3 major telecommunications networks in Ghana: MTN Ghana, Telecel Ghana, and AirtelTigo (AT). We accept payment through MTN MoMo, Telecel Cash, and AT Money with zero extra deductions or hidden fees.",
+        "We support all 3 major telecommunications networks in Ghana: MTN Ghana, Telecel Ghana, and AirtelTigo (AT). We accept payment through MTN MoMo, Telecel Cash, and AT Money with transparent pricing and no surprise fees.",
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Select Your Network' },
     };
   }
@@ -275,7 +275,7 @@ function getGroundedLocalResponse(
     const mtn10 = DATA_BUNDLES.find((b) => b.id === 'mtn-10gb-30d')?.priceGhc || 44.99;
 
     return {
-      reply: `Our data bundles offer genuine wholesale value for Ghanaian Cedis:\n• 1GB (7 Days) is GH₵${mtn1.toFixed(2)}\n• 5GB (30 Days) is GH₵${mtn5.toFixed(2)}\n• 10GB (30 Days) is GH₵${mtn10.toFixed(2)}\n\nWe also offer non-expiring Jumbo bundles up to 30GB. Check out all live options on our Data page!`,
+      reply: `Our data bundles offer competitive value for Ghanaian Cedis:\n• 1GB (7 Days) is GH₵${mtn1.toFixed(2)}\n• 5GB (30 Days) is GH₵${mtn5.toFixed(2)}\n• 10GB (30 Days) is GH₵${mtn10.toFixed(2)}\n\nWe also offer non-expiring Jumbo bundles up to 30GB. Check out all live options on our Data page!`,
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 View All Bundle Prices' },
     };
   }
@@ -326,7 +326,7 @@ function getGroundedLocalResponse(
   ) {
     return {
       reply:
-        "Data bundles are delivered automatically within 30 to 60 seconds after Mobile Money authorization. You can track your purchase live on our Orders page using your Order ID (e.g. #MH849201). If you ever need personal assistance, our 24/7 Accra WhatsApp helpdesk is ready to help!",
+        "Data bundles are delivered automatically after Mobile Money authorization. You can track your purchase live on our Orders page using your Order ID. If you ever need personal assistance, our Accra WhatsApp helpdesk is ready to help!",
       quickAction: { type: 'navigate', targetPage: 'orders', label: '👉 Track Your Order' },
     };
   }

@@ -26,7 +26,7 @@ export interface DataBundle {
   description?: string;
 }
 
-export type OrderStatus = 'placed' | 'processing' | 'delivered' | 'failed';
+export type OrderStatus = 'placed' | 'verifying' | 'processing' | 'delivered' | 'failed';
 
 export interface OrderRecord {
   id: string; // e.g. MH1234567
@@ -36,6 +36,7 @@ export interface OrderRecord {
   paymentMethod: 'momo' | 'card' | 'bank';
   amountGhc: number;
   status: OrderStatus;
+  paymentReference?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -49,7 +50,48 @@ export type TemplateCategory =
   | 'church'
   | 'services'
   | 'portfolio'
-  | 'retail';
+  | 'retail'
+  | 'realestate'
+  | 'hotel'
+  | 'education'
+  | 'agency';
+
+export type TemplateLayoutType =
+  | 'construction'
+  | 'restaurant'
+  | 'salon'
+  | 'realestate'
+  | 'portfolio'
+  | 'agency'
+  | 'hotel'
+  | 'education'
+  | 'ecommerce'
+  | 'church'
+  | 'fashion'
+  | 'services';
+
+export interface TemplateColorScheme {
+  primary: string;
+  secondary: string;
+  background: string;
+  surface: string;
+  text: string;
+  mutedText: string;
+  accent: string;
+  border: string;
+}
+
+export interface TemplateItem {
+  id?: string;
+  name: string;
+  price?: string;
+  category?: string;
+  desc?: string;
+  image?: string;
+  tag?: string;
+  specs?: string[];
+  rating?: number;
+}
 
 export interface WebsiteTemplate {
   id: string;
@@ -65,6 +107,16 @@ export interface WebsiteTemplate {
   demoSubtext: string;
   previewImageUrl?: string;
   isFreeTier: boolean;
+  layoutType?: TemplateLayoutType;
+  colorScheme?: TemplateColorScheme;
+  heroImage?: string;
+  galleryImages?: string[];
+  items?: TemplateItem[];
+  stats?: Array<{ label: string; value: string }>;
+  testimonials?: Array<{ quote: string; author: string; role?: string }>;
+  badgeText?: string;
+  location?: string;
+  hoursOrContact?: string;
 }
 
 export type ServiceStatus = 'active' | 'coming_soon' | 'beta';
@@ -77,7 +129,41 @@ export interface DigitalService {
   status: ServiceStatus;
   iconName: string;
   accentColor: string;
-  targetPage?: 'data' | 'website' | 'services' | 'about';
+  targetPage?: 'data' | 'website' | 'marketplace' | 'services' | 'about';
 }
 
-export type ActivePage = 'home' | 'data' | 'website' | 'services' | 'about' | 'orders';
+export type ActivePage = 'home' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'orders';
+
+export type MarketplaceAvailability = 'available' | 'check_availability' | 'limited' | 'coming_soon';
+
+export type MarketplaceCategory =
+  | 'all'
+  | 'laptops_computers'
+  | 'phones_accessories'
+  | 'ai_productivity'
+  | 'creator_tools'
+  | 'business_software'
+  | 'digital_products'
+  | 'business_essentials';
+
+export interface MarketplaceProduct {
+  id: string;
+  slug: string;
+  name: string;
+  category: MarketplaceCategory;
+  categoryLabel: string;
+  tagline: string;
+  description: string;
+  priceDisplay: string; // e.g. "From GH₵ 4,200", "Request Price", "Check Availability"
+  priceType: 'fixed' | 'starting_at' | 'quote';
+  availability: MarketplaceAvailability;
+  availabilityLabel: string;
+  featured?: boolean;
+  type: 'hardware' | 'software' | 'digital_tool' | 'essential';
+  badge?: string;
+  highlights: string[];
+  specs?: Array<{ label: string; value: string }>;
+  iconName?: string;
+  accentColor?: string;
+}
+

@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS } from '../../data/bundles';
+import { BUSINESS_CONFIG } from '../../config/business';
+import { lookupOrderOnServer } from '../../services/apiClient';
 import { CheckCircle2, Clock, AlertTriangle, ArrowRight, MessageSquare, Copy, Check, RefreshCw, X } from 'lucide-react';
 
 export const OrderStatusModal: React.FC = () => {
@@ -15,6 +17,39 @@ export const OrderStatusModal: React.FC = () => {
 
   const [copied, setCopied] = React.useState(false);
 
+  // Poll server for status updates if order is pending or in-progress
+  useEffect(() => {
+    if (!isStatusModalOpen || !activeOrder?.id) return;
+
+    const fetchServerStatus = async () => {
+      try {
+        const res = await lookupOrderOnServer(activeOrder.id);
+        if (res.success && res.order) {
+          const mappedStatus =
+            res.order.status === 'paid' || res.order.status === 'queued'
+              ? 'placed'
+              : res.order.status === 'processing'
+              ? 'processing'
+              : res.order.status === 'delivered'
+              ? 'delivered'
+              : res.order.status === 'failed'
+              ? 'failed'
+              : 'verifying';
+
+          if (mappedStatus !== activeOrder.status) {
+            updateOrderStatus(activeOrder.id, mappedStatus as typeof activeOrder.status);
+          }
+        }
+      } catch {
+        // ignore polling network errors
+      }
+    };
+
+    fetchServerStatus();
+    const interval = setInterval(fetchServerStatus, 3000);
+    return () => clearInterval(interval);
+  }, [isStatusModalOpen, activeOrder?.id, activeOrder?.status, updateOrderStatus]);
+
   if (!isStatusModalOpen || !activeOrder) return null;
 
   const currentNetwork = GHANA_NETWORKS[activeOrder.network];
@@ -27,6 +62,13 @@ export const OrderStatusModal: React.FC = () => {
   };
 
   const statusConfig = {
+    verifying: {
+      label: 'Verifying Payment',
+      badgeClass: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
+      description: 'Confirming your payment reference with Paystack...',
+      icon: RefreshCw,
+      step: 1,
+    },
     placed: {
       label: 'Order Placed',
       badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
@@ -37,7 +79,7 @@ export const OrderStatusModal: React.FC = () => {
     processing: {
       label: 'Processing',
       badgeClass: 'bg-sky-500/10 text-sky-400 border-sky-500/30',
-      description: 'Telecom provider is provisioning your bundle. Usually takes 30–60 seconds.',
+      description: 'Telecom provider is provisioning your bundle. Usually completes in just a few minutes.',
       icon: RefreshCw,
       step: 2,
     },
@@ -174,36 +216,52 @@ export const OrderStatusModal: React.FC = () => {
                 GH₵{activeOrder.amountGhc.toFixed(2)}
               </div>
             </div>
+
+            {activeOrder.paymentReference && (
+              <div className="col-span-2 bg-[#0a0e12] p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                <div>
+                  <div className="text-[11px] text-slate-400">Paystack Reference</div>
+                  <div className="font-mono text-xs text-slate-300 mt-0.5 truncate max-w-xs">
+                    {activeOrder.paymentReference}
+                  </div>
+                </div>
+                <span className="text-[10px] text-[#00c365] bg-[#00c365]/10 px-2 py-0.5 rounded font-semibold">
+                  Verified Payment
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Test Status Simulator (allows user to preview delivered / failed states) */}
-          <div className="flex items-center justify-center gap-2 pt-1">
-            <span className="text-[10px] text-slate-500 uppercase tracking-wider">Preview status:</span>
-            <button
-              onClick={() => updateOrderStatus(activeOrder.id, 'processing')}
-              className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
-                activeOrder.status === 'processing' ? 'border-sky-400 text-sky-400 bg-sky-400/10' : 'border-slate-800 text-slate-400'
-              }`}
-            >
-              Processing
-            </button>
-            <button
-              onClick={() => updateOrderStatus(activeOrder.id, 'delivered')}
-              className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
-                activeOrder.status === 'delivered' ? 'border-[#00c365] text-[#00c365] bg-[#00c365]/10' : 'border-slate-800 text-slate-400'
-              }`}
-            >
-              Delivered
-            </button>
-            <button
-              onClick={() => updateOrderStatus(activeOrder.id, 'failed')}
-              className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
-                activeOrder.status === 'failed' ? 'border-rose-400 text-rose-400 bg-rose-400/10' : 'border-slate-800 text-slate-400'
-              }`}
-            >
-              Failed
-            </button>
-          </div>
+          {/* Development Status Simulator (only visible in dev mode) */}
+          {import.meta.env.DEV && (
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider">Dev preview:</span>
+              <button
+                onClick={() => updateOrderStatus(activeOrder.id, 'processing')}
+                className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                  activeOrder.status === 'processing' ? 'border-sky-400 text-sky-400 bg-sky-400/10' : 'border-slate-800 text-slate-400'
+                }`}
+              >
+                Processing
+              </button>
+              <button
+                onClick={() => updateOrderStatus(activeOrder.id, 'delivered')}
+                className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                  activeOrder.status === 'delivered' ? 'border-[#00c365] text-[#00c365] bg-[#00c365]/10' : 'border-slate-800 text-slate-400'
+                }`}
+              >
+                Delivered
+              </button>
+              <button
+                onClick={() => updateOrderStatus(activeOrder.id, 'failed')}
+                className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                  activeOrder.status === 'failed' ? 'border-rose-400 text-rose-400 bg-rose-400/10' : 'border-slate-800 text-slate-400'
+                }`}
+              >
+                Failed
+              </button>
+            </div>
+          )}
 
           {/* Buttons */}
           <div className="grid grid-cols-2 gap-3 pt-2">
@@ -231,7 +289,7 @@ export const OrderStatusModal: React.FC = () => {
           {/* WhatsApp Support Assistance */}
           <div className="pt-2">
             <a
-              href={`https://wa.me/233550000000?text=Hi%20Mystery%20Hub,%20inquiring%20about%20Order%20%23${activeOrder.id}%20for%20${activeOrder.recipientPhone}`}
+              href={BUSINESS_CONFIG.getOrderSupportWhatsAppUrl(activeOrder.id, activeOrder.recipientPhone)}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors"

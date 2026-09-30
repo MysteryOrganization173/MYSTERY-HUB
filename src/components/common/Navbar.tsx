@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { BrandLogo } from './BrandLogo';
 import { ActivePage } from '../../types';
 import { Search, ShoppingBag, User, LogOut, Menu, X } from 'lucide-react';
@@ -14,6 +14,7 @@ export const Navbar: React.FC = () => {
     { id: 'home', label: 'Home' },
     { id: 'data', label: 'Data' },
     { id: 'website', label: 'Website Builder' },
+    { id: 'marketplace', label: 'Marketplace' },
     { id: 'services', label: 'More Services' },
     { id: 'about', label: 'About' },
   ];
@@ -31,6 +32,8 @@ export const Navbar: React.FC = () => {
       setActivePage('data');
     } else if (q.includes('web') || q.includes('site') || q.includes('build') || q.includes('template')) {
       setActivePage('website');
+    } else if (q.includes('market') || q.includes('laptop') || q.includes('tech') || q.includes('tool') || q.includes('mic') || q.includes('phone') || q.includes('charger')) {
+      setActivePage('marketplace');
     } else {
       setActivePage('services');
     }
@@ -44,23 +47,31 @@ export const Navbar: React.FC = () => {
     <header className="sticky top-0 z-40 bg-[#0a0e11]/90 backdrop-blur-md border-b border-slate-800/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Zone 1: Brand Wordmark */}
-        <button
-          onClick={() => handleNavClick('home')}
-          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] rounded-lg transition-transform active:scale-95"
+        <a
+          href="/"
+          onClick={(e) => {
+            e.preventDefault();
+            handleNavClick('home');
+          }}
+          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] rounded-lg transition-transform active:scale-95 inline-block"
           aria-label="Mystery Hub Homepage"
         >
           <BrandLogo size="md" />
-        </button>
+        </a>
 
         {/* Zone 2: Navigation Links (Desktop) */}
         <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-slate-300">
           {navLinks.map((link) => {
             const isActive = activePage === link.id;
             return (
-              <button
+              <a
                 key={link.id}
-                onClick={() => handleNavClick(link.id)}
-                className={`transition-colors py-1 relative whitespace-nowrap ${
+                href={ROUTE_PATH_MAP[link.id]}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavClick(link.id);
+                }}
+                className={`transition-colors py-1 relative whitespace-nowrap cursor-pointer ${
                   isActive
                     ? 'text-white font-semibold'
                     : 'text-slate-300 hover:text-white'
@@ -70,7 +81,7 @@ export const Navbar: React.FC = () => {
                 {isActive && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#00c365] rounded-full shadow-[0_0_8px_rgba(0,195,101,0.6)]" />
                 )}
-              </button>
+              </a>
             );
           })}
         </nav>
@@ -171,17 +182,21 @@ export const Navbar: React.FC = () => {
       {mobileMenuOpen && (
         <div className="md:hidden bg-[#0c1116] border-b border-slate-800 px-4 pt-3 pb-5 space-y-2">
           {navLinks.map((link) => (
-            <button
+            <a
               key={link.id}
-              onClick={() => handleNavClick(link.id)}
-              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              href={ROUTE_PATH_MAP[link.id]}
+              onClick={(e) => {
+                e.preventDefault();
+                handleNavClick(link.id);
+              }}
+              className={`block w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
                 activePage === link.id
                   ? 'bg-[#00c365]/10 text-[#00c365] font-semibold'
                   : 'text-slate-300 hover:bg-slate-900 hover:text-white'
               }`}
             >
               {link.label}
-            </button>
+            </a>
           ))}
 
           {!user && (

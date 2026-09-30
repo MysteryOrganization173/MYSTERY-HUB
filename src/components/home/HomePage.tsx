@@ -3,6 +3,7 @@ import { Hero } from './Hero';
 import { QuickServicesBar } from './QuickServicesBar';
 import { HomeFeaturedData } from './HomeFeaturedData';
 import { HomeWebsiteSection } from './HomeWebsiteSection';
+import { HomeMarketplaceSection } from './HomeMarketplaceSection';
 import { WhyMysteryHub } from './WhyMysteryHub';
 import { HomeComingSoonSection } from './HomeComingSoonSection';
 
@@ -13,6 +14,7 @@ export const HomePage: React.FC = () => {
       <QuickServicesBar />
       <HomeFeaturedData />
       <HomeWebsiteSection />
+      <HomeMarketplaceSection />
       <WhyMysteryHub />
       <HomeComingSoonSection />
     </div>

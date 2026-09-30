@@ -9,6 +9,7 @@ import { Navbar } from './components/common/Navbar';
 import { MobileNav } from './components/common/MobileNav';
 import { Footer } from './components/common/Footer';
 import { ToastContainer } from './components/common/Toast';
+import { SEOHead } from './components/common/SEOHead';
 import { HomePage } from './components/home/HomePage';
 import { DataPage } from './components/data/DataPage';
 import { WebsiteBuilderPage } from './components/website/WebsiteBuilderPage';
@@ -27,6 +28,7 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0b0f12] text-slate-100 flex flex-col font-sans selection:bg-[#00c365] selection:text-black">
+      <SEOHead />
       {/* 3-zone Header Contract */}
       <Navbar />
 

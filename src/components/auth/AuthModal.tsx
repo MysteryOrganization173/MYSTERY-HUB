@@ -29,9 +29,9 @@ export const AuthModal: React.FC = () => {
     setTimeout(() => {
       setIsLoading(false);
       loginUser({
-        name: isSignup ? name : identifier.includes('@') ? identifier.split('@')[0] : 'Kofi Mensah',
-        email: identifier.includes('@') ? identifier : `${identifier.replace(/\D/g, '')}@mysteryhub.gh`,
-        phone: identifier.includes('@') ? '024 123 4567' : identifier,
+        name: isSignup ? name.trim() : identifier.includes('@') ? identifier.split('@')[0] : 'Account User',
+        email: identifier.includes('@') ? identifier : `${identifier.replace(/\D/g, '')}@user.mysteryhub.site`,
+        phone: identifier.includes('@') ? '' : identifier,
       });
     }, 800);
   };
@@ -74,7 +74,7 @@ export const AuthModal: React.FC = () => {
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Kofi Mensah or Akwaaba Kitchen"
+                    placeholder="e.g. Kwame Asante or Akwaaba Ventures"
                     required
                     className="w-full bg-[#0a0e12] border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />

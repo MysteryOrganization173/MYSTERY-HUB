@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { ActivePage, DataBundle, OrderRecord, WebsiteTemplate } from '../types';
+import { ActivePage, DataBundle, OrderRecord, WebsiteTemplate, MarketplaceProduct } from '../types';
 import { DATA_BUNDLES } from '../data/bundles';
 
 interface ToastMessage {
@@ -26,7 +26,7 @@ interface AppContextType {
   openOrderStatus: (order: OrderRecord) => void;
   closeOrderStatus: () => void;
   isStatusModalOpen: boolean;
-  createOrder: (bundle: DataBundle, phone: string, method: 'momo' | 'card' | 'bank') => OrderRecord;
+  createOrder: (bundle: DataBundle, phone: string, method: 'momo' | 'card' | 'bank', paymentReference?: string) => OrderRecord;
   updateOrderStatus: (orderId: string, status: OrderRecord['status']) => void;
   isAuthModalOpen: boolean;
   authMode: 'login' | 'signup';
@@ -38,6 +38,9 @@ interface AppContextType {
   selectedTemplatePreview: WebsiteTemplate | null;
   openTemplatePreview: (template: WebsiteTemplate) => void;
   closeTemplatePreview: () => void;
+  marketplaceInquiryProduct: MarketplaceProduct | null;
+  openMarketplaceInquiry: (product: MarketplaceProduct) => void;
+  closeMarketplaceInquiry: () => void;
   waitlistInfo: { isOpen: boolean; serviceTitle: string };
   openWaitlist: (title: string) => void;
   closeWaitlist: () => void;
@@ -48,36 +51,40 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Initial realistic demo order history for Ghana
-const INITIAL_DEMO_ORDERS: OrderRecord[] = [
-  {
-    id: 'MH849201',
-    bundle: DATA_BUNDLES[0], // MTN 1GB
-    recipientPhone: '024 456 7890',
-    network: 'mtn',
-    paymentMethod: 'momo',
-    amountGhc: 4.99,
-    status: 'delivered',
-    createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 2 + 15000).toISOString(),
-  },
-  {
-    id: 'MH849182',
-    bundle: DATA_BUNDLES[2], // MTN 5GB
-    recipientPhone: '055 123 9988',
-    network: 'mtn',
-    paymentMethod: 'momo',
-    amountGhc: 24.99,
-    status: 'delivered',
-    createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 24 + 20000).toISOString(),
-  },
-];
+export const ROUTE_PATH_MAP: Record<ActivePage, string> = {
+  home: '/',
+  data: '/data',
+  website: '/website-builder',
+  marketplace: '/marketplace',
+  services: '/services',
+  about: '/about',
+  orders: '/orders',
+};
+
+export const getPageFromPath = (pathname: string): ActivePage => {
+  const clean = pathname.toLowerCase().replace(/\/$/, '') || '/';
+  if (clean === '/data') return 'data';
+  if (clean === '/website-builder' || clean === '/website') return 'website';
+  if (clean === '/marketplace') return 'marketplace';
+  if (clean === '/services') return 'services';
+  if (clean === '/about') return 'about';
+  if (clean === '/orders') return 'orders';
+  return 'home';
+};
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [activePage, setActivePageState] = useState<ActivePage>('home');
+  // Initialize route from current browser URL
+  const [activePage, setActivePageState] = useState<ActivePage>(() => {
+    if (typeof window !== 'undefined') {
+      return getPageFromPath(window.location.pathname);
+    }
+    return 'home';
+  });
+
   const [checkoutBundle, setCheckoutBundle] = useState<DataBundle | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+
+  // Production customer orders (starts empty - no fake demo orders)
   const [orders, setOrders] = useState<OrderRecord[]>(() => {
     try {
       const saved = localStorage.getItem('mystery_hub_orders');
@@ -85,7 +92,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {
       // fallback
     }
-    return INITIAL_DEMO_ORDERS;
+    return [];
   });
 
   const [activeOrder, setActiveOrder] = useState<OrderRecord | null>(null);
@@ -104,12 +111,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [selectedTemplatePreview, setSelectedTemplatePreview] = useState<WebsiteTemplate | null>(null);
+  const [marketplaceInquiryProduct, setMarketplaceInquiryProduct] = useState<MarketplaceProduct | null>(null);
   const [waitlistInfo, setWaitlistInfo] = useState<{ isOpen: boolean; serviceTitle: string }>({
     isOpen: false,
     serviceTitle: '',
   });
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // Browser History and Popstate synchronization for back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const page = getPageFromPath(window.location.pathname);
+      setActivePageState(page);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     try {
@@ -119,9 +138,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [orders]);
 
-  const setActivePage = (page: ActivePage) => {
+  const setActivePage = (page: ActivePage, pushHistory = true) => {
     setActivePageState(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (pushHistory && typeof window !== 'undefined') {
+      const targetPath = ROUTE_PATH_MAP[page] || '/';
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ page }, '', targetPath);
+      }
+    }
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   };
 
   const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'success') => {
@@ -154,7 +180,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsStatusModalOpen(false);
   };
 
-  const createOrder = (bundle: DataBundle, phone: string, method: 'momo' | 'card' | 'bank'): OrderRecord => {
+  const createOrder = (
+    bundle: DataBundle,
+    phone: string,
+    method: 'momo' | 'card' | 'bank',
+    paymentReference?: string
+  ): OrderRecord => {
     const randomId = 'MH' + Math.floor(100000 + Math.random() * 900000);
     const newOrder: OrderRecord = {
       id: randomId,
@@ -163,7 +194,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       network: bundle.network,
       paymentMethod: method,
       amountGhc: bundle.priceGhc,
-      status: 'placed',
+      status: paymentReference ? 'verifying' : 'placed',
+      paymentReference,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -173,17 +205,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsCheckoutOpen(false);
     setIsStatusModalOpen(true);
 
-    // Simulate realistic asynchronous transaction progress:
-    // Placed -> Processing (after 1.5s) -> Delivered (after 4s)
-    setTimeout(() => {
-      updateOrderStatus(newOrder.id, 'processing');
-    }, 1800);
-
-    setTimeout(() => {
-      updateOrderStatus(newOrder.id, 'delivered');
-      showToast(`Data bundle delivered successfully to ${phone}!`, 'success');
-    }, 5500);
-
+    // TRUTHFUL STATE: No fake JavaScript timers auto-delivering the SIM.
+    // Real orders stay at 'verifying' until real backend webhook updates.
     return newOrder;
   };
 
@@ -240,6 +263,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSelectedTemplatePreview(null);
   };
 
+  const openMarketplaceInquiry = (product: MarketplaceProduct) => {
+    setMarketplaceInquiryProduct(product);
+  };
+
+  const closeMarketplaceInquiry = () => {
+    setMarketplaceInquiryProduct(null);
+  };
+
   const openWaitlist = (title: string) => {
     setWaitlistInfo({ isOpen: true, serviceTitle: title });
   };
@@ -274,6 +305,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         selectedTemplatePreview,
         openTemplatePreview,
         closeTemplatePreview,
+        marketplaceInquiryProduct,
+        openMarketplaceInquiry,
+        closeMarketplaceInquiry,
         waitlistInfo,
         openWaitlist,
         closeWaitlist,

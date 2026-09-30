@@ -3,6 +3,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
+import { apiRouter, handlePaystackWebhook } from './server/routes/api.js';
+import { OrdersStore } from './server/db/ordersStore.js';
 
 dotenv.config();
 
@@ -12,7 +14,28 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+// Paystack Webhook endpoint requires raw body for HMAC signature verification
+app.post(
+  '/api/webhooks/paystack',
+  express.raw({ type: 'application/json' }),
+  (req, res, next) => {
+    try {
+      if (Buffer.isBuffer(req.body)) {
+        (req as unknown as { rawBody: Buffer }).rawBody = req.body;
+        req.body = JSON.parse(req.body.toString('utf8'));
+      }
+    } catch {
+      // ignore JSON parse error for raw body capture
+    }
+    next();
+  },
+  handlePaystackWebhook
+);
+
+app.use(express.json({ limit: '1mb' }));
+
+// Mount Core Payments & Orders API Router
+app.use('/api', apiRouter);
 
 // Initialize Gemini API client if API key is present
 let aiClient: GoogleGenAI | null = null;
@@ -47,9 +70,9 @@ ABOUT MYSTERY HUB:
 CURRENT V1 SERVICES:
 1. DATA & AIRTIME (ACTIVE & LIVE):
    - Networks: MTN Ghana, Telecel Ghana, and AirtelTigo (AT).
-   - Payment: Ghana Mobile Money (MTN MoMo, Telecel Cash, AT Money), Card, and Bank/GhanaQR. Zero extra transaction fees.
+   - Payment: Ghana Mobile Money (MTN MoMo, Telecel Cash, AT Money), Card, and Bank/GhanaQR. Transparent pricing with no hidden charges.
    - Pricing highlights: 1GB (7 Days) at GH₵4.99, 2.5GB (7 Days) at GH₵12.99, 5GB (30 Days) at GH₵24.99, 10GB (30 Days) at GH₵44.99, plus non-expiring Jumbo bundles up to 30GB.
-   - Delivery: Automated direct SIM dispatch within 30 to 60 seconds after MoMo approval.
+   - Delivery: Automated direct SIM dispatch promptly following MoMo authorization.
 2. WEBSITE BUILDER (PREVIEW / COMING SOON):
    - Concept: "Create Your Own Website in Minutes" with zero coding required.
    - Templates for Ghanaian industries: Construction, Restaurants & Chop Bars, Fashion & Kente ateliers, Salons & Barber shops, Churches & Ministries, Consultancies, Portfolios, and Retail shops.
@@ -98,8 +121,8 @@ app.post('/api/mystery-ai/chat', async (req, res) => {
       },
     ];
 
-    // Try reliable models in sequence
-    const candidateModels = ['gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+    // Try reliable standard Gemini models in sequence
+    const candidateModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
     let textResponse: string | null = null;
 
     for (const modelName of candidateModels) {
@@ -135,6 +158,7 @@ app.post('/api/mystery-ai/chat', async (req, res) => {
 
 // Setup Vite in development or static serving in production
 async function startServer() {
+  await OrdersStore.initDb();
   const isProd = process.env.NODE_ENV === 'production';
 
   if (!isProd) {

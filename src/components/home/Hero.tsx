@@ -27,7 +27,7 @@ export const Hero: React.FC = () => {
             </div>
 
             {/* Main Headline */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1] max-w-2xl">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.15] sm:leading-[1.1] max-w-2xl">
               Your All-in-One <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E575] via-[#00c365] to-[#34d399]">
                 Digital Solution
@@ -35,34 +35,42 @@ export const Hero: React.FC = () => {
             </h1>
 
             {/* Subtitle */}
-            <p className="text-base sm:text-lg text-slate-300 max-w-xl leading-relaxed">
+            <p className="text-sm sm:text-lg text-slate-300 max-w-xl leading-relaxed">
               Buy data, create your own website, and access essential digital services — all in one place. Simple. Fast. Reliable.
             </p>
 
             {/* Primary & Secondary Action CTAs */}
-            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5">
-              <button
-                onClick={() => setActivePage('website')}
-                className="px-6 py-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-sm tracking-wide transition-all shadow-[0_0_25px_rgba(0,195,101,0.35)] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <a
+                href="/website-builder"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setActivePage('website');
+                }}
+                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-sm tracking-wide transition-all shadow-[0_0_25px_rgba(0,195,101,0.35)] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
               >
                 <span>Create Your Website</span>
                 <ArrowRight className="w-4 h-4" />
-              </button>
+              </a>
 
-              <button
-                onClick={() => setActivePage('data')}
-                className="px-6 py-3.5 rounded-xl bg-[#141b22] hover:bg-[#1a232c] text-white font-semibold text-sm border border-slate-700/80 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+              <a
+                href="/data"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setActivePage('data');
+                }}
+                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#141b22] hover:bg-[#1a232c] text-white font-semibold text-sm border border-slate-700/80 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
               >
                 <Wifi className="w-4 h-4 text-[#00c365]" />
                 <span>Buy Data Bundles</span>
-              </button>
+              </a>
             </div>
 
             {/* Trust and Key Signals */}
-            <div className="pt-4 flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-slate-400">
+            <div className="pt-3 flex flex-wrap items-center gap-y-2 gap-x-5 text-xs text-slate-400">
               <div className="flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4 text-[#00c365]" />
-                <span>Instant MoMo Delivery</span>
+                <span>Secure MoMo Checkout</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4 text-[#00c365]" />
@@ -70,7 +78,7 @@ export const Hero: React.FC = () => {
               </div>
               <div className="flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4 text-[#00c365]" />
-                <span>Free Website Starter</span>
+                <span>Website Builder Beta</span>
               </div>
             </div>
           </div>
@@ -91,7 +99,7 @@ export const Hero: React.FC = () => {
                     </div>
                     <div>
                       <div className="text-xs font-bold text-white">Mystery Hub Live</div>
-                      <div className="text-[10px] text-slate-400">Accra Server · 24/7 Active</div>
+                      <div className="text-[10px] text-slate-400">Accra Gateway · Active</div>
                     </div>
                   </div>
                   <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
@@ -103,7 +111,7 @@ export const Hero: React.FC = () => {
                 <div className="my-5 p-4 rounded-xl bg-[#090d11] border border-slate-800/90 shadow-inner relative">
                   <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
                     <span className="font-semibold text-white">Popular Bundle</span>
-                    <span className="text-[#00c365] text-[11px] font-medium">99.8% Success Rate</span>
+                    <span className="text-[#00c365] text-[11px] font-medium">Reliable Delivery</span>
                   </div>
 
                   {/* Interactive Mini Card */}
@@ -134,7 +142,7 @@ export const Hero: React.FC = () => {
                   {/* Quick features snippet */}
                   <div className="mt-3 pt-3 border-t border-slate-800/80 flex justify-between text-[11px] text-slate-400">
                     <span>MTN MoMo Accepted</span>
-                    <span>Delivered in ~30s</span>
+                    <span>Automated SIM Delivery</span>
                   </div>
                 </div>
 
@@ -183,7 +191,7 @@ export const Hero: React.FC = () => {
                 <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
                   <div className="flex items-center gap-1.5">
                     <ShieldCheck className="w-3.5 h-3.5 text-[#00c365]" />
-                    <span className="text-[11px]">Zero Transaction Fees</span>
+                    <span className="text-[11px]">Transparent Pricing</span>
                   </div>
                   <span className="font-serif italic text-slate-300 text-xs">
                     Made in Ghana for Ghana 🇬🇭

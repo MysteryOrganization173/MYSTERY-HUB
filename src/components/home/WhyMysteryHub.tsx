@@ -8,14 +8,14 @@ export const WhyMysteryHub: React.FC = () => {
   const reasons = [
     {
       icon: Zap,
-      title: 'Automated 60-Second Delivery',
-      desc: 'Our direct integration with Ghanaian telecom providers dispatches your data bundles within seconds of payment.',
+      title: 'Reliable Automated Delivery',
+      desc: 'Automated telecom dispatch directly to your SIM promptly after Mobile Money payment authorization.',
       accent: 'text-[#00c365] bg-[#00c365]/10',
     },
     {
       icon: DollarSign,
-      title: 'Real Wholesale Savings',
-      desc: 'Save significantly compared to standard telco scratch-card retail pricing. More megabytes for your Cedis.',
+      title: 'Competitive Bundle Pricing',
+      desc: 'Affordable, transparent pricing designed to give you more megabytes for your Cedis across all networks.',
       accent: 'text-amber-400 bg-amber-400/10',
     },
     {
@@ -26,8 +26,8 @@ export const WhyMysteryHub: React.FC = () => {
     },
     {
       icon: Clock,
-      title: '24/7 Platform Uptime',
-      desc: 'Top up in the middle of the night or on public holidays. Our servers are active around the clock.',
+      title: 'Always-On Availability',
+      desc: 'Top up whenever you need data. Order directly from any browser on phone, tablet, or laptop.',
       accent: 'text-purple-400 bg-purple-400/10',
     },
   ];
@@ -77,13 +77,17 @@ export const WhyMysteryHub: React.FC = () => {
                 No app installation required. Works directly in your browser.
               </p>
             </div>
-            <button
-              onClick={() => setActivePage('data')}
+            <a
+              href="/data"
+              onClick={(e) => {
+                e.preventDefault();
+                setActivePage('data');
+              }}
               className="px-5 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-sm flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
             >
               <span>Try It Now</span>
               <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            </a>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -107,7 +111,7 @@ export const WhyMysteryHub: React.FC = () => {
               <div className="text-2xl font-extrabold text-[#00c365]">03.</div>
               <h4 className="font-bold text-sm text-white">Approve Mobile Money</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Confirm the prompt on your phone with your MoMo PIN. Your data arrives within 60 seconds.
+                Confirm the prompt on your phone with your MoMo PIN. Your data is queued and credited directly to your SIM.
               </p>
             </div>
           </div>

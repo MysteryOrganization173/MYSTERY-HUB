@@ -6,7 +6,7 @@ import { BundleCard } from './BundleCard';
 import { Wifi, Smartphone, Search, Zap, ShieldCheck, Clock, HelpCircle, Check, ArrowRight } from 'lucide-react';
 
 export const DataPage: React.FC = () => {
-  const { openCheckout, showToast } = useApp();
+  const { openCheckout, showToast, openWaitlist } = useApp();
 
   const [activeNetwork, setActiveNetwork] = useState<NetworkId | 'all'>('mtn');
   const [activeValidity, setActiveValidity] = useState<BundleValidity | 'all'>('all');
@@ -54,7 +54,7 @@ export const DataPage: React.FC = () => {
       network: airtimeNet,
       dataAmount: `GH₵${amt.toFixed(2)} Airtime`,
       dataBytesValue: 0,
-      validity: 'Instant Top-Up',
+      validity: 'Top-Up',
       validityCategory: 'Daily',
       priceGhc: amt,
       description: `Direct airtime recharge on ${GHANA_NETWORKS[airtimeNet].name}`,
@@ -84,13 +84,13 @@ export const DataPage: React.FC = () => {
               </h1>
 
               <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-lg">
-                Get the best data bundles and airtime for all networks in Ghana. Fast, secure and affordable. Delivered directly to your SIM within seconds.
+                Get the best data bundles and airtime for all networks in Ghana. Fast, secure and affordable. Direct delivery to your SIM.
               </p>
 
               <div className="pt-2 flex flex-wrap gap-4 text-xs text-slate-400">
                 <div className="flex items-center gap-1.5">
                   <Zap className="w-4 h-4 text-[#00c365]" />
-                  <span>Instant Network Dispatch</span>
+                  <span>Direct Network Dispatch</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-[#00c365]" />
@@ -98,7 +98,7 @@ export const DataPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Clock className="w-4 h-4 text-[#00c365]" />
-                  <span>24/7 Automated</span>
+                  <span>Reliable Automated Delivery</span>
                 </div>
               </div>
             </div>
@@ -150,7 +150,7 @@ export const DataPage: React.FC = () => {
                   isAirtimeMode ? 'bg-[#00c365] text-black' : 'bg-slate-800 text-slate-300 hover:text-white'
                 }`}
               >
-                Instant Airtime
+                Airtime Top-Up
               </button>
             </div>
           </div>
@@ -252,7 +252,7 @@ export const DataPage: React.FC = () => {
               </div>
               <div className="mt-3">
                 <div className="font-bold text-sm text-white">Airtime Top-Up</div>
-                <div className="text-[11px] text-slate-400">Any Amount Instantly</div>
+                <div className="text-[11px] text-slate-400">Custom Top-Up Amount</div>
               </div>
             </button>
           </div>
@@ -263,13 +263,23 @@ export const DataPage: React.FC = () => {
           /* Airtime Direct Top-Up Widget */
           <div className="max-w-xl mx-auto rounded-2xl bg-[#0f151b] border border-slate-700/80 p-6 sm:p-8 space-y-6">
             <div className="text-center space-y-1">
-              <h3 className="text-xl font-bold text-white">Instant Airtime Top-Up</h3>
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold mb-1">
+                <span>Beta Preview · In Testing</span>
+              </div>
+              <h3 className="text-xl font-bold text-white">Airtime Top-Up</h3>
               <p className="text-xs text-slate-400">
-                Recharge any MTN, Telecel, or AirtelTigo number in Ghana with zero extra charge.
+                Direct telecom gateway routing for airtime top-up is currently in final testing. Live checkout is paused until full fulfillment is enabled.
               </p>
             </div>
 
-            <form onSubmit={handleAirtimeSubmit} className="space-y-4">
+            <div className="p-4 rounded-xl bg-[#0a0e12] border border-amber-500/20 text-xs text-slate-300 space-y-1">
+              <span className="font-semibold text-amber-400">Notice for Customers:</span>
+              <p>
+                To protect customer funds, we only accept payments when automated fulfillment is 100% active. Join the waitlist to receive a WhatsApp notification when Airtime is live.
+              </p>
+            </div>
+
+            <div className="space-y-4">
               {/* Select Network */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-300">Select Network</label>
@@ -318,55 +328,19 @@ export const DataPage: React.FC = () => {
                   value={airtimePhone}
                   onChange={(e) => setAirtimePhone(e.target.value)}
                   placeholder="e.g. 024 123 4567"
-                  required
                   className="w-full bg-[#0a0e12] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#00c365]"
                 />
               </div>
 
-              {/* Airtime Amount */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">Amount (GH₵)</label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                    GH₵
-                  </span>
-                  <input
-                    type="number"
-                    min="1"
-                    step="0.5"
-                    value={airtimeAmount}
-                    onChange={(e) => setAirtimeAmount(e.target.value)}
-                    required
-                    className="w-full bg-[#0a0e12] border border-slate-700 rounded-xl pl-12 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#00c365]"
-                  />
-                </div>
-                {/* Quick amount chips */}
-                <div className="flex gap-2 pt-1">
-                  {['5', '10', '20', '50', '100'].map((chip) => (
-                    <button
-                      key={chip}
-                      type="button"
-                      onClick={() => setAirtimeAmount(chip)}
-                      className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
-                        airtimeAmount === chip
-                          ? 'border-[#00c365] bg-[#00c365]/10 text-white font-semibold'
-                          : 'border-slate-800 bg-slate-900/60 text-slate-400'
-                      }`}
-                    >
-                      GH₵{chip}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               <button
-                type="submit"
-                className="w-full py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-sm tracking-wide transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] flex items-center justify-center gap-2 cursor-pointer"
+                type="button"
+                onClick={() => openWaitlist(`Airtime Top-Up (${airtimeNet.toUpperCase()})`)}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-[#00c365] hover:from-emerald-400 hover:to-[#00e575] text-black font-bold text-sm tracking-wide transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>Continue to Checkout (GH₵{parseFloat(airtimeAmount || '0').toFixed(2)})</span>
+                <span>Notify Me When Airtime is Live (Free)</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
-            </form>
+            </div>
           </div>
         ) : (
           /* Data Bundles View */
@@ -471,7 +445,7 @@ export const DataPage: React.FC = () => {
             </div>
             <h4 className="font-bold text-sm text-white">How fast is delivery?</h4>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Data is credited automatically within 30 to 60 seconds of Mobile Money approval. You receive an SMS confirmation directly from your telecom provider.
+              Data is credited automatically upon Mobile Money authorization. You receive an SMS confirmation directly from your telecom provider.
             </p>
           </div>
 
@@ -491,7 +465,7 @@ export const DataPage: React.FC = () => {
             </div>
             <h4 className="font-bold text-sm text-white">What if I enter the wrong number?</h4>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Our system validates Ghanaian network prefixes before submission. If an issue occurs, reach out directly to our 24/7 WhatsApp helpdesk with your Order ID.
+              Our system validates Ghanaian network prefixes before submission. If an issue occurs, reach out directly to our WhatsApp helpdesk with your Order ID.
             </p>
           </div>
         </div>

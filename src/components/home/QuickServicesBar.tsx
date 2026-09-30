@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Wifi, Smartphone, Globe, Grid2X2, ArrowRight } from 'lucide-react';
+import { Wifi, Globe, ShoppingBag, Grid2X2, ArrowRight } from 'lucide-react';
 
 export const QuickServicesBar: React.FC = () => {
   const { setActivePage } = useApp();
@@ -13,34 +13,34 @@ export const QuickServicesBar: React.FC = () => {
       icon: Wifi,
       accent: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
       action: () => setActivePage('data'),
-      tag: 'Instant',
-    },
-    {
-      id: 'airtime',
-      title: 'Airtime',
-      desc: 'Top up anytime',
-      icon: Smartphone,
-      accent: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
-      action: () => setActivePage('data'),
-      tag: '24/7',
+      tag: 'Live',
     },
     {
       id: 'website',
       title: 'Website Builder',
-      desc: 'For your business',
+      desc: 'For Ghanaian business',
       icon: Globe,
       accent: 'text-sky-400 bg-sky-400/10 border-sky-400/20',
       action: () => setActivePage('website'),
-      tag: 'Popular',
+      tag: 'Beta',
+    },
+    {
+      id: 'marketplace',
+      title: 'Tech Marketplace',
+      desc: 'Laptops, tools & software',
+      icon: ShoppingBag,
+      accent: 'text-[#00c365] bg-[#00c365]/10 border-[#00c365]/20',
+      action: () => setActivePage('marketplace'),
+      tag: 'New',
     },
     {
       id: 'services',
-      title: 'More Services',
-      desc: 'Coming soon',
+      title: 'More Utilities',
+      desc: 'Bills & future ecosystem',
       icon: Grid2X2,
       accent: 'text-purple-400 bg-purple-400/10 border-purple-400/20',
       action: () => setActivePage('services'),
-      tag: 'New',
+      tag: 'Coming Soon',
     },
   ];
 

@@ -1,0 +1,13 @@
+# Mystery Hub Robots Configuration (Ghana)
+User-agent: *
+Allow: /
+Allow: /data
+Allow: /website-builder
+Allow: /services
+Allow: /about
+
+# Private or internal transaction endpoints
+Disallow: /orders
+Disallow: /api/
+
+Sitemap: https://mysteryhub.site/sitemap.xml

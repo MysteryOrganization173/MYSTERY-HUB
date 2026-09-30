@@ -22,13 +22,13 @@ export const HomeFeaturedData: React.FC = () => {
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#00c365]">
               <Wifi className="w-3.5 h-3.5" />
-              <span>Instant Data Bundles</span>
+              <span>Data Bundles</span>
             </div>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
               Popular Data Bundles
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 max-w-lg">
-              Discounted 4G/5G data packages with instant Mobile Money delivery to your phone.
+              Reliable 4G/5G data packages with fast Mobile Money delivery to your phone.
             </p>
           </div>
 

@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS, detectGhanaNetwork } from '../../data/bundles';
-import { X, ShieldCheck, Smartphone, CreditCard, Building2, Check, ArrowRight, MessageSquare, AlertCircle } from 'lucide-react';
+import { usePaystack } from '../../hooks/usePaystack';
+import { BUSINESS_CONFIG } from '../../config/business';
+import { X, ShieldCheck, Smartphone, CreditCard, Building2, Check, ArrowRight, MessageSquare, AlertCircle, Lock } from 'lucide-react';
 
 export const CheckoutModal: React.FC = () => {
-  const { isCheckoutOpen, closeCheckout, checkoutBundle, createOrder, showToast } = useApp();
+  const { isCheckoutOpen, closeCheckout, checkoutBundle, createOrder, showToast, user, openOrderStatus } = useApp();
+  const { initializeServerPayment, isInitializing, isConfigured } = usePaystack();
 
   const [phone, setPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'momo' | 'card' | 'bank'>('momo');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [detectedNet, setDetectedNet] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState('');
 
   useEffect(() => {
     if (checkoutBundle) {
-      // Default initial recipient phone if available
       setPhone((prev) => prev || '024 ');
       setPhoneError('');
     }
@@ -34,7 +35,6 @@ export const CheckoutModal: React.FC = () => {
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    // Allow numbers, spaces
     const clean = val.replace(/[^\d\s]/g, '');
     setPhone(clean);
   };
@@ -48,13 +48,24 @@ export const CheckoutModal: React.FC = () => {
       return;
     }
 
-    setIsSubmitting(true);
-
-    setTimeout(() => {
-      setIsSubmitting(false);
-      createOrder(checkoutBundle, phone.trim(), paymentMethod);
-      showToast('Order received! Processing your bundle delivery...', 'info');
-    }, 900);
+    initializeServerPayment({
+      productId: checkoutBundle.id,
+      recipientPhone: phone.trim(),
+      customerEmail: user?.email,
+      customerName: user?.name,
+      onPaymentReceived: (orderRef) => {
+        const newOrder = createOrder(checkoutBundle, phone.trim(), paymentMethod, orderRef);
+        closeCheckout();
+        showToast(`Payment received! Order #${orderRef}. Verifying payment...`, 'success');
+        openOrderStatus(newOrder);
+      },
+      onCancel: () => {
+        showToast('Payment window closed.', 'info');
+      },
+      onError: (err) => {
+        showToast(err.message || 'Payment initiation failed', 'warning');
+      },
+    });
   };
 
   return (
@@ -104,7 +115,7 @@ export const CheckoutModal: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {currentNetwork.name} · {checkoutBundle.description || 'Instant automated top-up'}
+                  {currentNetwork.name} · {checkoutBundle.description || 'Fast automated top-up'}
                 </p>
               </div>
             </div>
@@ -137,7 +148,7 @@ export const CheckoutModal: React.FC = () => {
                 type="tel"
                 value={phone}
                 onChange={handlePhoneChange}
-                placeholder="e.g. 024 123 4567"
+                placeholder="e.g. 024 XXX XXXX"
                 required
                 className="w-full bg-[#0a0e12] border border-slate-700 rounded-xl px-4 py-3 text-white text-base tracking-wide focus:outline-none focus:border-[#00c365] focus:ring-1 focus:ring-[#00c365]"
               />
@@ -153,7 +164,7 @@ export const CheckoutModal: React.FC = () => {
               </p>
             ) : (
               <p className="text-[11px] text-slate-400">
-                Double-check the number. Data is delivered automatically within 60 seconds of confirmation.
+                Double-check the recipient number carefully. Data is credited automatically following Mobile Money authorization.
               </p>
             )}
           </div>
@@ -251,26 +262,32 @@ export const CheckoutModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Security Note */}
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>256-bit encrypted checkout. No hidden charges or extra deductions.</span>
+          {/* Security Note & Paystack Status */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400">
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>256-bit encrypted checkout. Zero hidden fees.</span>
+            </div>
+            <div className="flex items-center gap-1 text-[11px] text-slate-400">
+              <Lock className="w-3 h-3 text-[#00c365]" />
+              <span>{isConfigured ? 'Secured by Paystack' : 'Paystack Ready (Test Sandbox)'}</span>
+            </div>
           </div>
 
           {/* Submit Action */}
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="w-full py-3.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-sm tracking-wide transition-all shadow-[0_0_20px_rgba(0,195,101,0.3)] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+            disabled={isInitializing}
+            className="w-full py-3.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-sm tracking-wide transition-all shadow-[0_0_20px_rgba(0,195,101,0.3)] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
           >
-            {isSubmitting ? (
+            {isInitializing ? (
               <span className="flex items-center gap-2">
                 <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                Connecting to Gateway...
+                Connecting to Paystack...
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                Pay GH₵{checkoutBundle.priceGhc.toFixed(2)} Now
+                Pay GH₵{checkoutBundle.priceGhc.toFixed(2)} with Paystack
                 <ArrowRight className="w-4 h-4" />
               </span>
             )}
@@ -279,7 +296,7 @@ export const CheckoutModal: React.FC = () => {
           {/* WhatsApp Inquiries */}
           <div className="text-center pt-1">
             <a
-              href={`https://wa.me/233550000000?text=Hi%20Mystery%20Hub,%20I'm%20purchasing%20${encodeURIComponent(checkoutBundle.dataAmount)}%20${encodeURIComponent(currentNetwork.name)}`}
+              href={BUSINESS_CONFIG.getCheckoutSupportWhatsAppUrl(checkoutBundle.dataAmount, currentNetwork.name)}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"

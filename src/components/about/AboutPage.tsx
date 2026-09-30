@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { BUSINESS_CONFIG } from '../../config/business';
 import {
   ShieldCheck,
   Zap,
@@ -92,7 +93,7 @@ export const AboutPage: React.FC = () => {
               <div className="space-y-1">
                 <h3 className="font-bold text-base text-white">Trust & Reliability</h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Secure transactions powered by direct telecom integrations and Paystack. Instant receipts, transparent pricing with zero surprise deductions, and direct WhatsApp customer support.
+                  Secure transactions powered by Paystack and direct mobile money processing. Verifiable digital receipts, transparent pricing with no hidden charges, and direct WhatsApp customer support.
                 </p>
               </div>
             </div>
@@ -168,7 +169,7 @@ export const AboutPage: React.FC = () => {
             Our team is based in Accra, Ghana. We&apos;d love to hear your feedback or discuss institutional and campus partnerships.
           </p>
           <a
-            href="https://wa.me/233550000000?text=Hi%20Mystery%20Hub%20Team%2C%20I'd%20like%20to%20learn%20more"
+            href={BUSINESS_CONFIG.getGeneralWhatsAppUrl("Hi Mystery Hub Team, I'd like to learn more about your services.")}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md"
