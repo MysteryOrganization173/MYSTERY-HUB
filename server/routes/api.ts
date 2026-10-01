@@ -6,6 +6,13 @@ import { Router, Request, Response } from 'express';
 import { validateAndNormalizeGhanaPhone } from '../utils/phone.js';
 import { getAuthoritativeProduct } from '../data/productCatalog.js';
 import { calculateAirtimeOrder, validateAirtimeAmount, AIRTIME_SERVICE_FEE_PERCENT } from '../data/airtimePricing.js';
+import {
+  calculateFixedInstantBundlePrice,
+  calculateFlexiInstantBundlePrice,
+  toPublicInstantBundle,
+  PublicInstantBundle,
+} from '../data/instantBundlePricing.js';
+import { SbhInstantBundlePackage } from '../suppliers/successBizHub/types.js';
 import { OrdersStore } from '../db/ordersStore.js';
 import { AuthStore } from '../db/authStore.js';
 import { WaitlistStore } from '../db/waitlistStore.js';
@@ -35,6 +42,62 @@ apiRouter.get('/health', (_req: Request, res: Response) => {
     status: 'ok',
     service: 'mysteryhub-api',
   });
+});
+
+/**
+ * 0b. GET /api/instant-bundles
+ * Returns live Instant Bundle offers with server-calculated Mystery Hub retail pricing.
+ * Wholesale supplier costs, API keys, and accounting internals are NEVER returned.
+ */
+apiRouter.get('/instant-bundles', async (_req: Request, res: Response) => {
+  try {
+    const provider = FulfilmentService.getProvider();
+    const serviceCheck = await provider.client.checkInstantBundlesService();
+
+    if (!serviceCheck.permitted || !serviceCheck.available) {
+      res.json({
+        success: true,
+        available: false,
+        reason: serviceCheck.reason || 'Instant Bundles service is currently unavailable.',
+        products: [],
+      });
+      return;
+    }
+
+    const catalogRes = await provider.client.getInstantBundles();
+    let rawList: SbhInstantBundlePackage[] = [];
+    if (Array.isArray(catalogRes.data)) {
+      rawList = catalogRes.data;
+    } else if (catalogRes.data && Array.isArray((catalogRes.data as { packages?: SbhInstantBundlePackage[] }).packages)) {
+      rawList = (catalogRes.data as { packages?: SbhInstantBundlePackage[] }).packages!;
+    } else if (catalogRes.data && Array.isArray((catalogRes.data as { products?: SbhInstantBundlePackage[] }).products)) {
+      rawList = (catalogRes.data as { products?: SbhInstantBundlePackage[] }).products!;
+    }
+
+    const publicProducts: PublicInstantBundle[] = [];
+    for (const pkg of rawList) {
+      if (pkg.enabled === false) continue;
+      const mapped = toPublicInstantBundle(pkg);
+      if (mapped) {
+        publicProducts.push(mapped);
+      }
+    }
+
+    res.json({
+      success: true,
+      available: publicProducts.length > 0,
+      reason: publicProducts.length === 0 ? 'No sellable instant bundle packages are currently available.' : undefined,
+      products: publicProducts,
+    });
+  } catch (err) {
+    console.error('Error in GET /api/instant-bundles:', err);
+    res.json({
+      success: true,
+      available: false,
+      reason: 'Instant Bundles are temporarily unavailable.',
+      products: [],
+    });
+  }
 });
 
 /**
@@ -71,6 +134,194 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
       serviceType === 'airtime' ||
       productId.startsWith('airtime-') ||
       productId === 'airtime';
+
+    const isInstantBundle =
+      serviceType === 'instant_bundle' ||
+      productId.startsWith('instant-');
+
+    // ==========================================
+    // A. INSTANT BUNDLE FLOW
+    // ==========================================
+    if (isInstantBundle) {
+      const provider = FulfilmentService.getProvider();
+
+      // 1. Check service availability
+      const serviceCheck = await provider.client.checkInstantBundlesService();
+      if (!serviceCheck.permitted || !serviceCheck.available) {
+        res.status(400).json({
+          error: serviceCheck.reason || 'Instant Bundles are temporarily unavailable. Please select a standard Data Bundle.',
+        });
+        return;
+      }
+
+      // 2. Resolve package from live catalogue
+      const catalogRes = await provider.client.getInstantBundles();
+      let rawList: SbhInstantBundlePackage[] = [];
+      if (Array.isArray(catalogRes.data)) {
+        rawList = catalogRes.data;
+      } else if (catalogRes.data && Array.isArray((catalogRes.data as { packages?: SbhInstantBundlePackage[] }).packages)) {
+        rawList = (catalogRes.data as { packages?: SbhInstantBundlePackage[] }).packages!;
+      } else if (catalogRes.data && Array.isArray((catalogRes.data as { products?: SbhInstantBundlePackage[] }).products)) {
+        rawList = (catalogRes.data as { products?: SbhInstantBundlePackage[] }).products!;
+      }
+
+      const targetPkgId = productId.startsWith('instant-') ? productId.replace('instant-', '') : productId;
+      const pkg = rawList.find((p) => p.id === targetPkgId || p.id === productId || `instant-${p.id}` === productId);
+
+      if (!pkg || pkg.enabled === false) {
+        res.status(404).json({ error: 'Selected Instant Bundle package is no longer available.' });
+        return;
+      }
+
+      const isFlexi = Boolean(pkg.isFlexi || pkg.mode === 'flexi');
+      let pricing;
+      let requestedMajorVal: number | string | undefined;
+
+      if (isFlexi) {
+        const reqVal = typeof reqAmount === 'number' ? reqAmount : parseFloat(String(reqAmount || '0'));
+        const minVal = typeof pkg.minAmountMajor === 'number' ? pkg.minAmountMajor : parseFloat(String(pkg.minAmountMajor || '1')) || 1;
+        const maxVal = typeof pkg.maxAmountMajor === 'number' ? pkg.maxAmountMajor : parseFloat(String(pkg.maxAmountMajor || '500')) || 500;
+        const ratio = typeof pkg.payableRatio === 'number' ? pkg.payableRatio : 1.0;
+
+        try {
+          pricing = calculateFlexiInstantBundlePrice(pkg.id, reqVal, ratio, minVal, maxVal);
+          requestedMajorVal = reqVal;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Invalid flexi package amount.';
+          res.status(400).json({ error: msg });
+          return;
+        }
+      } else {
+        try {
+          pricing = calculateFixedInstantBundlePrice(pkg.id, pkg.priceMinor);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Unable to calculate retail price for this package.';
+          res.status(400).json({ error: msg });
+          return;
+        }
+      }
+
+      const rawNet = (pkg.network || reqNetwork || 'mtn').toLowerCase().trim();
+      let network: 'mtn' | 'telecel' | 'airteltigo' = 'mtn';
+      if (rawNet.includes('telecel') || rawNet === 't') network = 'telecel';
+      else if (rawNet.includes('airtel') || rawNet.includes('tigo') || rawNet === 'at') network = 'airteltigo';
+
+      // 3. Fast MTN duplicate check
+      if (network === 'mtn') {
+        const activeMtnOrder = await OrdersStore.findActiveMtnOrder(phoneVal.normalized);
+        if (activeMtnOrder) {
+          res.status(409).json({
+            code: ACTIVE_MTN_ORDER_CODE,
+            message: ACTIVE_MTN_ORDER_MESSAGE,
+            existingOrderReference: activeMtnOrder.public_reference,
+            existingOrderStatus: mapToSafeCustomerStatus(activeMtnOrder.status),
+          });
+          return;
+        }
+      }
+
+      // 4. Wallet check feasibility (if fulfillment enabled)
+      if (provider.client.isFulfillmentEnabled() && provider.client.isConfigured()) {
+        try {
+          const wallet = await provider.getBalance();
+          if (wallet.balancePesewas < pricing.supplierCostPesewas) {
+            console.error(`[Instant Bundle Preflight] Insufficient wallet: Available ${wallet.balancePesewas}p < required ${pricing.supplierCostPesewas}p`);
+            res.status(400).json({
+              error: 'Instant Bundles are temporarily unavailable due to supplier limits. Please try standard Data Bundles.',
+            });
+            return;
+          }
+        } catch (walletErr) {
+          console.warn('[Instant Bundle Preflight] Wallet check failed:', walletErr);
+        }
+      }
+
+      // 5. Generate references
+      const timestamp = Date.now();
+      const randomHex = Math.floor(100000 + Math.random() * 900000);
+      const publicRef = `MH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${randomHex}`;
+      const paymentRef = `MH_PAY_INSTANT_${network.toUpperCase()}_${timestamp}_${randomHex}`;
+      const nowIso = new Date().toISOString();
+
+      // 6. Create pending order in DB
+      const newOrder: OrderRecord = {
+        id: `ord_${timestamp}_${randomHex}`,
+        user_id: req.user?.id || null,
+        public_reference: publicRef,
+        customer_name: typeof customerName === 'string' ? customerName.trim() : (req.user?.name || null),
+        customer_email: validEmail,
+        customer_phone: phoneVal.normalized,
+        recipient_phone: phoneVal.normalized,
+        network,
+        service_type: 'instant_bundle',
+        product_id: `instant-${pkg.id}`,
+        product_name_snapshot: pkg.name || `${pkg.dataAmount || 'Instant'} Data`,
+        bundle_size_snapshot: isFlexi ? `GH₵${requestedMajorVal} Flexi` : (pkg.dataAmount || pkg.name || 'Instant Data'),
+        amount: pricing.retailPricePesewas,
+        currency: 'GHS',
+        status: 'pending_payment',
+        payment_provider: 'paystack',
+        payment_reference: paymentRef,
+        payment_status: 'pending',
+        supplier_provider: 'success_biz_hub',
+        supplier_order_id: null,
+        supplier_response: null,
+        supplier_cost_minor: pricing.supplierCostPesewas,
+        supplier_offer_ref: pkg.id,
+        supplier_last_checked_at: null,
+        failure_reason: null,
+        created_at: nowIso,
+        updated_at: nowIso,
+        paid_at: null,
+        submitted_at: null,
+        delivered_at: null,
+      };
+
+      const createResult = await OrdersStore.createOrderWithMtnDuplicateCheck(newOrder);
+      if (!createResult.success) {
+        res.status(409).json({
+          code: ACTIVE_MTN_ORDER_CODE,
+          message: ACTIVE_MTN_ORDER_MESSAGE,
+          existingOrderReference: createResult.existingOrder.public_reference,
+          existingOrderStatus: mapToSafeCustomerStatus(createResult.existingOrder.status),
+        });
+        return;
+      }
+
+      // 7. Initialize Paystack
+      const paystackRes = await PaystackServerService.initializeTransaction({
+        email: validEmail,
+        amountPesewas: pricing.retailPricePesewas,
+        reference: paymentRef,
+        metadata: {
+          public_reference: publicRef,
+          recipient_phone: phoneVal.normalized,
+          network,
+          service_type: 'instant_bundle',
+          package_id: pkg.id,
+          product_name: newOrder.product_name_snapshot,
+          amount_major: requestedMajorVal,
+        },
+      });
+
+      if (!paystackRes.success) {
+        res.status(500).json({ error: paystackRes.error || 'Failed to initialize payment with Paystack.' });
+        return;
+      }
+
+      res.json({
+        success: true,
+        orderRef: publicRef,
+        reference: paymentRef,
+        accessCode: paystackRes.accessCode,
+        authorizationUrl: paystackRes.authorizationUrl,
+        amountGhc: pricing.retailPriceGhc,
+        amountPesewas: pricing.retailPricePesewas,
+        currency: 'GHS',
+        isSimulated: paystackRes.isSimulated || false,
+      });
+      return;
+    }
 
     // ==========================================
     // A. AIRTIME TOP-UP FLOW

@@ -504,4 +504,105 @@ export class SuccessBizHubProvider implements SupplierProvider {
       };
     }
   }
+
+  /**
+   * 7. POST /instant-bundles
+   * Places an instant bundle order. Never send retail prices to supplier.
+   */
+  async placeInstantBundle(request: {
+    internalOrderId: string;
+    publicReference: string;
+    packageId: string;
+    phone: string;
+    amountMajor?: number | string;
+  }): Promise<{
+    success: boolean;
+    supplierOrderId?: string;
+    status: 'queued' | 'submitted' | 'processing' | 'delivered' | 'failed';
+    amountMinor?: number;
+    chargeMinor?: number;
+    rawResponse?: unknown;
+    errorMessage?: string;
+  }> {
+    try {
+      const res = await this.client.createInstantBundle({
+        packageId: request.packageId,
+        phone: request.phone,
+        amountMajor: request.amountMajor,
+      });
+
+      const data = res.data || {};
+      const supplierOrderId = data.publicId || data.orderId || data.id;
+      const status = this.mapSupplierStatus(data.status);
+
+      const parsedAmountMinor = parseMinorAmount(data.amountMinor) ?? undefined;
+      const parsedChargeMinor = parseMinorAmount(data.chargeMinor) ?? undefined;
+
+      return {
+        success: true,
+        supplierOrderId,
+        status,
+        amountMinor: parsedAmountMinor,
+        chargeMinor: parsedChargeMinor,
+        rawResponse: data,
+        errorMessage: data.failureReason,
+      };
+    } catch (err: unknown) {
+      const isTimeout = Boolean((err as { isTimeout?: boolean })?.isTimeout);
+      const errorMessage = err instanceof Error ? err.message : 'Supplier instant bundle placement failed.';
+      const errorObj = err as unknown as { isTimeout?: boolean; statusCode?: number; responseBody?: unknown };
+
+      return {
+        success: false,
+        status: 'failed',
+        errorMessage,
+        rawResponse: {
+          isTimeout,
+          statusCode: errorObj.statusCode,
+          responseBody: errorObj.responseBody,
+          error: errorMessage,
+        },
+      };
+    }
+  }
+
+  /**
+   * 8. GET /instant-bundles/:identifier
+   * Retrieves instant bundle order status.
+   */
+  async getInstantBundleStatus(supplierOrderId: string): Promise<{
+    success: boolean;
+    supplierOrderId?: string;
+    status: 'queued' | 'submitted' | 'processing' | 'delivered' | 'failed';
+    amountMinor?: number;
+    chargeMinor?: number;
+    rawResponse?: unknown;
+    errorMessage?: string;
+  }> {
+    try {
+      const res = await this.client.getInstantBundle(supplierOrderId);
+      const data = res.data || {};
+      const status = this.mapSupplierStatus(data.status);
+
+      const parsedAmountMinor = parseMinorAmount(data.amountMinor) ?? undefined;
+      const parsedChargeMinor = parseMinorAmount(data.chargeMinor) ?? undefined;
+
+      return {
+        success: true,
+        supplierOrderId: data.publicId || data.orderId || data.id || supplierOrderId,
+        status,
+        amountMinor: parsedAmountMinor,
+        chargeMinor: parsedChargeMinor,
+        rawResponse: data,
+        errorMessage: data.failureReason,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        status: 'processing', // Keep non-terminal on lookup error
+        supplierOrderId,
+        errorMessage: err instanceof Error ? err.message : 'Failed to query supplier instant bundle status.',
+      };
+    }
+  }
 }

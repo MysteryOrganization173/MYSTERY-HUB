@@ -14,6 +14,9 @@ import {
   SbhOrderResponse,
   SbhCreateAirtimeRequest,
   SbhAirtimeResponse,
+  SbhInstantBundlesResponse,
+  SbhCreateInstantBundleRequest,
+  SbhInstantBundleResponse,
   SbhOffer,
 } from './types.js';
 
@@ -32,7 +35,7 @@ export class SuccessBizHubClient {
   }
 
   private getApiKey(): string {
-    const raw = process.env.SUCCESS_BIZ_HUB_API_KEY || '';
+    const raw = process.env.SUCCESS_BIZ_HUB_API_KEY || process.env.SUCCESSBASE_API_KEY || '';
     return raw.trim();
   }
 
@@ -256,6 +259,108 @@ export class SuccessBizHubClient {
    */
   async getAirtime(identifier: string): Promise<SbhAirtimeResponse> {
     return this.request<SbhAirtimeResponse>(`/airtime/${encodeURIComponent(identifier)}`, {
+      method: 'GET',
+      skipCache: true,
+    });
+  }
+
+  /**
+   * 9. Inspect GET /services for instant_bundles permission & availability
+   * Instant Bundles must only be shown as LIVE when the current account/key
+   * reports the instant_bundles service as:
+   * - keyGranted / permitted
+   * - available
+   * - and there are sellable products
+   */
+  async checkInstantBundlesService(skipCache = false): Promise<{
+    permitted: boolean;
+    available: boolean;
+    productCount: number;
+    reason?: string;
+  }> {
+    try {
+      const res = await this.getServices(skipCache);
+      const data = res.data as {
+        keyPermissions?: Record<string, boolean>;
+        services?: Array<{ id: string; keyGranted?: boolean; available?: boolean; productCount?: number }>;
+      } | undefined;
+
+      const keyPermitted = data?.keyPermissions?.instant_bundles;
+      const serviceItem = Array.isArray(data?.services)
+        ? data?.services.find((s) => s.id === 'instant_bundles')
+        : undefined;
+
+      const isGranted = Boolean(keyPermitted || serviceItem?.keyGranted);
+      const isAvailable = Boolean(serviceItem?.available);
+      const productCount = typeof serviceItem?.productCount === 'number' ? serviceItem.productCount : 0;
+
+      if (!isGranted) {
+        return {
+          permitted: false,
+          available: false,
+          productCount: 0,
+          reason: 'API key does not have permission for instant_bundles.',
+        };
+      }
+
+      if (!isAvailable) {
+        return {
+          permitted: true,
+          available: false,
+          productCount,
+          reason: 'Instant Bundles service is currently unavailable from supplier.',
+        };
+      }
+
+      return {
+        permitted: true,
+        available: true,
+        productCount,
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to query supplier services.';
+      return {
+        permitted: false,
+        available: false,
+        productCount: 0,
+        reason: msg,
+      };
+    }
+  }
+
+  /**
+   * 10. GET /instant-bundles
+   * Retrieve assigned instant bundles catalog
+   * Cached for 5 minutes (300,000 ms) unless skipCache is true
+   */
+  async getInstantBundles(skipCache = false): Promise<SbhInstantBundlesResponse> {
+    return this.request<SbhInstantBundlesResponse>('/instant-bundles', {
+      method: 'GET',
+      skipCache,
+      cacheTtlMs: 300_000,
+    });
+  }
+
+  /**
+   * 11. POST /instant-bundles
+   * Place an instant bundle order. Never send retail prices to supplier.
+   * Never cached.
+   */
+  async createInstantBundle(req: SbhCreateInstantBundleRequest): Promise<SbhInstantBundleResponse> {
+    return this.request<SbhInstantBundleResponse>('/instant-bundles', {
+      method: 'POST',
+      body: req,
+      skipCache: true,
+    });
+  }
+
+  /**
+   * 12. GET /instant-bundles/:identifier
+   * Retrieve supplier instant bundle order status.
+   * Never cached.
+   */
+  async getInstantBundle(identifier: string): Promise<SbhInstantBundleResponse> {
+    return this.request<SbhInstantBundleResponse>(`/instant-bundles/${encodeURIComponent(identifier)}`, {
       method: 'GET',
       skipCache: true,
     });

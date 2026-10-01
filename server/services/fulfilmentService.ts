@@ -348,6 +348,94 @@ export class FulfilmentService {
 
     // Step 4: Live dispatch to Success Biz Hub
     const isAirtime = claimedOrder.service_type === 'airtime' || claimedOrder.product_id.startsWith('airtime-');
+    const isInstantBundle =
+      claimedOrder.service_type === 'instant_bundle' || claimedOrder.product_id.startsWith('instant-');
+
+    if (isInstantBundle) {
+      // 4-InstantBundle: Dispatch instant bundle order
+      try {
+        const cleanPhone = claimedOrder.recipient_phone.replace(/[^\d]/g, '');
+        const msisdn = cleanPhone.startsWith('233') ? `0${cleanPhone.slice(3)}` : cleanPhone;
+        const packageId =
+          claimedOrder.supplier_offer_ref || claimedOrder.product_id.replace(/^instant-/, '');
+
+        let amountMajor: number | string | undefined = undefined;
+        if (claimedOrder.bundle_size_snapshot && claimedOrder.bundle_size_snapshot.includes('Flexi')) {
+          const match = claimedOrder.bundle_size_snapshot.replace(/[^\d.]/g, '');
+          if (match) amountMajor = match;
+        }
+
+        console.info(
+          `[Fulfilment Dispatch] Submitting Instant Bundle order ${claimedOrder.public_reference} to Success Biz Hub (pkg: ${packageId}) for ${msisdn}...`
+        );
+
+        const instantRes = await this.provider.placeInstantBundle({
+          internalOrderId: claimedOrder.id,
+          publicReference: claimedOrder.public_reference,
+          packageId,
+          phone: msisdn,
+          amountMajor,
+        });
+
+        if (!instantRes.success && !instantRes.supplierOrderId) {
+          throw new Error(instantRes.errorMessage || 'Success Biz Hub Instant Bundle placement failed.');
+        }
+
+        const supplierOrderId = instantRes.supplierOrderId;
+        if (!supplierOrderId) {
+          throw new Error('Success Biz Hub did not return an instant bundle order identifier.');
+        }
+
+        const mappedOrderStatus: OrderStatus =
+          instantRes.status === 'delivered'
+            ? 'delivered'
+            : instantRes.status === 'processing'
+            ? 'processing'
+            : instantRes.status === 'failed'
+            ? 'refund_pending'
+            : 'submitted';
+
+        const supplierCostMinor = instantRes.chargeMinor ?? instantRes.amountMinor ?? claimedOrder.supplier_cost_minor ?? null;
+
+        const submittedOrder = await OrdersStore.saveSupplierSubmission(
+          claimedOrder.id,
+          supplierOrderId,
+          supplierCostMinor,
+          packageId,
+          mappedOrderStatus,
+          instantRes.rawResponse || {}
+        );
+
+        return { order: submittedOrder || claimedOrder, alreadyHandled: false };
+      } catch (err: unknown) {
+        const isTimeout = Boolean((err as { isTimeout?: boolean })?.isTimeout);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown instant bundle supplier error';
+
+        if (isTimeout) {
+          console.error(
+            `[Fulfilment Dispatch] Ambiguous timeout communicating with Success Biz Hub Instant Bundle API for order ${claimedOrder.public_reference}. Preserving order in safe queued state.`
+          );
+          const uncertainOrder = await OrdersStore.saveSupplierUncertainSubmission(
+            claimedOrder.id,
+            'Network timeout awaiting response from Success Biz Hub Instant Bundle API',
+            { isTimeout: true, message: errorMessage }
+          );
+          return { order: uncertainOrder || claimedOrder, alreadyHandled: false };
+        }
+
+        console.error(
+          `[Fulfilment Dispatch] Definitive supplier error for instant bundle order ${claimedOrder.public_reference}: ${errorMessage}`
+        );
+        const refundOrder = await OrdersStore.updateOrderStatus(
+          claimedOrder.id,
+          'refund_pending',
+          `Supplier instant bundle placement failed: ${errorMessage}`,
+          undefined,
+          JSON.stringify({ error: errorMessage })
+        );
+        return { order: refundOrder || claimedOrder, alreadyHandled: false };
+      }
+    }
 
     if (isAirtime) {
       // 4-Airtime: Dispatch airtime top-up
@@ -563,9 +651,17 @@ export class FulfilmentService {
 
     try {
       const isAirtime = order.service_type === 'airtime' || order.product_id.startsWith('airtime-');
-      const statusRes = isAirtime && this.provider.getAirtimeStatus
-        ? await this.provider.getAirtimeStatus(order.supplier_order_id)
-        : await this.provider.getOrderStatus(order.supplier_order_id);
+      const isInstantBundle =
+        order.service_type === 'instant_bundle' || order.product_id.startsWith('instant-');
+
+      let statusRes;
+      if (isInstantBundle && this.provider.getInstantBundleStatus) {
+        statusRes = await this.provider.getInstantBundleStatus(order.supplier_order_id);
+      } else if (isAirtime && this.provider.getAirtimeStatus) {
+        statusRes = await this.provider.getAirtimeStatus(order.supplier_order_id);
+      } else {
+        statusRes = await this.provider.getOrderStatus(order.supplier_order_id);
+      }
 
       if (statusRes.success && statusRes.status) {
         const mappedStatus: OrderStatus =

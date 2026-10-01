@@ -22,7 +22,7 @@ export interface OrderRecord {
   customer_phone: string;
   recipient_phone: string;
   network: 'mtn' | 'telecel' | 'airteltigo';
-  service_type?: 'data' | 'airtime';
+  service_type?: 'data' | 'airtime' | 'instant_bundle';
   product_id: string;
   product_name_snapshot: string;
   bundle_size_snapshot: string;

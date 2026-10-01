@@ -163,3 +163,64 @@ export interface SbhWebhookPayload {
   items?: SbhWebhookOrderItem[];
   [key: string]: unknown;
 }
+
+// ==========================================
+// Instant Bundles (Success Biz Hub API v2)
+// ==========================================
+
+export interface SbhInstantBundlePackage {
+  id: string;
+  name: string;
+  network: string; // e.g. "MTN", "Telecel", "AirtelTigo", "AT"
+  isFlexi?: boolean;
+  mode?: 'fixed' | 'flexi' | string;
+  priceMinor?: string | number; // Wholesale supplier cost in pesewas (for fixed packages)
+  payableRatio?: number; // Wholesale payable ratio (for flexi packages e.g. 0.95)
+  minAmountMajor?: number | string;
+  maxAmountMajor?: number | string;
+  dataAmount?: string;
+  validity?: string;
+  category?: string;
+  enabled?: boolean;
+  available?: boolean;
+  [key: string]: unknown;
+}
+
+export interface SbhInstantBundlesResponse {
+  success?: boolean;
+  status?: string;
+  data:
+    | SbhInstantBundlePackage[]
+    | { packages?: SbhInstantBundlePackage[]; products?: SbhInstantBundlePackage[]; items?: SbhInstantBundlePackage[] };
+  message?: string;
+}
+
+export interface SbhCreateInstantBundleRequest {
+  packageId: string;
+  phone: string;
+  amountMajor?: number | string;
+}
+
+export interface SbhInstantBundleOrderData {
+  id?: string;
+  orderId?: string;
+  publicId?: string;
+  status: 'pending' | 'processing' | 'processed' | 'delivered' | 'failed' | string;
+  packageId?: string;
+  phone?: string;
+  msisdn?: string;
+  amountMajor?: string | number;
+  amountMinor?: string | number;
+  chargeMinor?: string | number;
+  createdAt?: string;
+  updatedAt?: string;
+  failureReason?: string;
+  [key: string]: unknown;
+}
+
+export interface SbhInstantBundleResponse {
+  success?: boolean;
+  status?: string;
+  data: SbhInstantBundleOrderData;
+  message?: string;
+}
