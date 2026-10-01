@@ -3,8 +3,9 @@ import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS } from '../../data/bundles';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { lookupOrderOnServer } from '../../services/apiClient';
+import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
 import { OrderRecord } from '../../types';
-import { CheckCircle2, Clock, AlertTriangle, ArrowRight, MessageSquare, Copy, Check, RefreshCw, X } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, ArrowRight, MessageSquare, Copy, Check, RefreshCw, X, ShieldAlert, Phone as PhoneIcon } from 'lucide-react';
 
 export const OrderStatusModal: React.FC = () => {
   const {
@@ -262,13 +263,27 @@ export const OrderStatusModal: React.FC = () => {
             <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
               <div className="text-[11px] text-slate-400">Product</div>
               <div className="font-semibold text-sm text-white truncate mt-0.5">
-                {activeOrder.serviceType === 'instant_bundle' ||
-                (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('instant-'))
-                  ? `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount} Instant ⚡`
-                  : activeOrder.serviceType === 'airtime' ||
+                {(() => {
+                  const isInst =
+                    activeOrder.serviceType === 'instant_bundle' ||
+                    (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('instant-'));
+                  if (isInst) {
+                    const info = getInstantBundlePresentation({
+                      category: activeOrder.bundle.category,
+                      name: activeOrder.bundle.description || activeOrder.bundle.dataAmount,
+                      dataAmount: activeOrder.bundle.dataAmount,
+                      isFlexi: activeOrder.bundle.isFlexi,
+                    });
+                    return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${info.formattedAmount} ${info.categoryLabel} ⚡`;
+                  }
+                  if (
+                    activeOrder.serviceType === 'airtime' ||
                     (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('airtime-'))
-                  ? `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount}`
-                  : `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount} Data`}
+                  ) {
+                    return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount}`;
+                  }
+                  return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount} Data`;
+                })()}
               </div>
             </div>
 

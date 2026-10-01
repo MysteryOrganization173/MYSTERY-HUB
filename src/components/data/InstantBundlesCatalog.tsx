@@ -5,15 +5,15 @@ import { InstantBundleCard } from './InstantBundleCard';
 import { NetworkId, DataBundle } from '../../types';
 import { GHANA_NETWORKS } from '../../data/bundles';
 import {
+  getInstantBundlePresentation,
+  InstantBundleCategoryType,
+} from '../../utils/instantBundleUtils';
+import {
   Zap,
   Search,
   RefreshCw,
   AlertCircle,
   Clock,
-  ShieldCheck,
-  CheckCircle2,
-  ArrowRight,
-  Wifi,
   PackageX,
 } from 'lucide-react';
 
@@ -37,10 +37,11 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const [selectedNetwork, setSelectedNetwork] = useState<NetworkId | 'all'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<InstantBundleCategoryType | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // In-session memory cache to avoid unnecessary repeated fetching when switching tabs
-  const fetchCatalog = async (force = false) => {
+  // Fetch live catalogue
+  const fetchCatalog = async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -68,23 +69,45 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
     fetchCatalog();
   }, []);
 
+  // Compute actual categories present in the loaded catalogue
+  const presentCategories = useMemo(() => {
+    const categoryOrder: InstantBundleCategoryType[] = ['data', 'video', 'social', 'midnight', 'idd'];
+    const foundSet = new Set<InstantBundleCategoryType>();
+    
+    products.forEach((p) => {
+      const info = getInstantBundlePresentation(p);
+      foundSet.add(info.categoryKey);
+    });
+
+    return categoryOrder.filter((cat) => foundSet.has(cat));
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      // Network filter
+      // 1. Network filter
       if (selectedNetwork !== 'all' && p.network !== selectedNetwork) {
         return false;
       }
-      // Search filter
+      
+      const info = getInstantBundlePresentation(p);
+
+      // 2. Category filter
+      if (selectedCategory !== 'all' && info.categoryKey !== selectedCategory) {
+        return false;
+      }
+
+      // 3. Search filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchName = p.name.toLowerCase().includes(q);
         const matchData = (p.dataAmount || '').toLowerCase().includes(q);
         const matchNet = p.network.toLowerCase().includes(q);
-        return matchName || matchData || matchNet;
+        const matchCat = info.categoryLabel.toLowerCase().includes(q);
+        return matchName || matchData || matchNet || matchCat;
       }
       return true;
     });
-  }, [products, selectedNetwork, searchQuery]);
+  }, [products, selectedNetwork, selectedCategory, searchQuery]);
 
   const handleBuy = (
     product: PublicInstantBundle,
@@ -93,16 +116,21 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
     const finalPrice =
       product.isFlexi && options?.flexiAmount ? options.flexiAmount : product.retailPriceGhc;
 
+    const info = getInstantBundlePresentation(product);
+
     const convertedBundle: DataBundle = {
       id: product.productKey,
       network: product.network,
-      dataAmount: product.dataAmount || product.name,
+      dataAmount: info.formattedAmount,
       dataBytesValue: 0,
       validity: product.validity || 'Instant Direct',
       validityCategory: 'Daily',
       priceGhc: finalPrice,
       serviceType: 'instant_bundle',
+      category: info.categoryLabel,
+      restrictionNote: info.restrictionNote,
       description:
+        info.restrictionNote ||
         product.description ||
         `Instant ${product.network.toUpperCase()} bundle with direct automated delivery.`,
       packageId: product.packageId,
@@ -114,8 +142,25 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
     openCheckout(convertedBundle, { recipientPhone: options?.recipientPhone });
   };
 
+  const getCategoryFilterLabel = (cat: InstantBundleCategoryType) => {
+    switch (cat) {
+      case 'data':
+        return 'Standard Data';
+      case 'video':
+        return 'Video';
+      case 'social':
+        return 'Social Media';
+      case 'midnight':
+        return '🌙 Midnight';
+      case 'idd':
+        return '📞 International Calls';
+      default:
+        return cat;
+    }
+  };
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
+    <div className="space-y-5 animate-in fade-in duration-200">
       {/* Instant Bundles Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-800">
         <div>
@@ -169,17 +214,58 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
         </div>
       </div>
 
-      {/* Search Input */}
+      {/* Category Filter Pills & Search Bar (Only render if categories exist) */}
       {isAvailable && products.length > 0 && (
-        <div className="relative max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search instant packages (e.g. 5GB, 10GB)..."
-            className="w-full bg-[#0e141a] border border-slate-800 focus:border-amber-500/80 rounded-xl pl-10 pr-4 py-2 text-xs sm:text-sm text-white focus:outline-none transition-colors"
-          />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-[#0e141a] border border-slate-800">
+          {/* Second-Level Category Filter Pills */}
+          {presentCategories.length > 1 ? (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                  selectedCategory === 'all'
+                    ? 'bg-[#00c365] text-black shadow-sm font-bold'
+                    : 'text-slate-400 hover:text-white bg-slate-900/60 border border-slate-800'
+                }`}
+              >
+                All
+              </button>
+              {presentCategories.map((catKey) => {
+                const isSelected = selectedCategory === catKey;
+                return (
+                  <button
+                    key={catKey}
+                    type="button"
+                    onClick={() => setSelectedCategory(catKey)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                      isSelected
+                        ? catKey === 'midnight'
+                          ? 'bg-amber-400 text-black font-bold shadow-sm'
+                          : 'bg-[#00c365] text-black font-bold shadow-sm'
+                        : 'text-slate-400 hover:text-white bg-slate-900/60 border border-slate-800'
+                    }`}
+                  >
+                    {getCategoryFilterLabel(catKey)}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div />
+          )}
+
+          {/* Search Input */}
+          <div className="relative w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search category, size..."
+              className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+            />
+          </div>
         </div>
       )}
 
@@ -225,7 +311,7 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
           <div className="flex justify-center gap-2 pt-2">
             <button
               type="button"
-              onClick={() => fetchCatalog(true)}
+              onClick={() => fetchCatalog()}
               className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -281,6 +367,7 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
             type="button"
             onClick={() => {
               setSelectedNetwork('all');
+              setSelectedCategory('all');
               setSearchQuery('');
             }}
             className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs cursor-pointer"

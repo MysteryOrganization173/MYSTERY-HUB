@@ -25,6 +25,8 @@ export interface DataBundle {
   isBestValue?: boolean;
   description?: string;
   serviceType?: 'data' | 'airtime' | 'instant_bundle';
+  category?: string;
+  restrictionNote?: string;
   faceValueGhc?: number;
   serviceFeeGhc?: number;
   packageId?: string;

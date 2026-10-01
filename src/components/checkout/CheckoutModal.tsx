@@ -5,9 +5,11 @@ import { usePaystack } from '../../hooks/usePaystack';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { lookupOrderOnServer } from '../../services/apiClient';
 import { smoothScrollToElement } from '../../utils/scroll';
+import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
 import {
   X,
   ShieldCheck,
+  ShieldAlert,
   Smartphone,
   Check,
   ArrowRight,
@@ -15,6 +17,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Info,
+  Phone as PhoneIcon,
 } from 'lucide-react';
 
 export const CheckoutModal: React.FC = () => {
@@ -93,6 +96,14 @@ export const CheckoutModal: React.FC = () => {
   const isAirtime = checkoutBundle.serviceType === 'airtime' || checkoutBundle.id.startsWith('airtime-');
   const isInstantBundle =
     checkoutBundle.serviceType === 'instant_bundle' || checkoutBundle.id.startsWith('instant-');
+  const instantInfo = isInstantBundle
+    ? getInstantBundlePresentation({
+        category: checkoutBundle.category,
+        name: checkoutBundle.description || checkoutBundle.dataAmount,
+        dataAmount: checkoutBundle.dataAmount,
+        isFlexi: checkoutBundle.isFlexi,
+      })
+    : null;
   const faceValue = checkoutBundle.faceValueGhc ?? checkoutBundle.priceGhc;
   const serviceFee = checkoutBundle.serviceFeeGhc ?? (isAirtime ? Number((faceValue * 0.02).toFixed(2)) : 0);
   const totalAmount = isAirtime ? Number((faceValue + serviceFee).toFixed(2)) : checkoutBundle.priceGhc;
@@ -236,8 +247,8 @@ export const CheckoutModal: React.FC = () => {
             </div>
             <div className="min-w-0 truncate">
               <h3 className="font-semibold text-sm sm:text-base text-white truncate">
-                {isInstantBundle
-                  ? `${currentNetwork.name} Instant Bundle ⚡`
+                {isInstantBundle && instantInfo
+                  ? `${currentNetwork.name} ${instantInfo.categoryLabel} ⚡`
                   : isAirtime
                   ? `${currentNetwork.name} Airtime Top-Up`
                   : 'Data Bundle Checkout'}
@@ -281,8 +292,8 @@ export const CheckoutModal: React.FC = () => {
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <h4 className="font-bold text-white text-sm sm:text-base truncate">
-                    {isInstantBundle
-                      ? `${checkoutBundle.dataAmount} Instant Bundle`
+                    {isInstantBundle && instantInfo
+                      ? `${instantInfo.formattedAmount} ${instantInfo.categoryLabel}`
                       : isAirtime
                       ? `GH₵${faceValue.toFixed(2)} Airtime Top-Up`
                       : `${checkoutBundle.dataAmount} Data Bundle`}
@@ -307,8 +318,8 @@ export const CheckoutModal: React.FC = () => {
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5 truncate">
                   {currentNetwork.name} ·{' '}
-                  {isInstantBundle
-                    ? 'Instant automated direct delivery to your line'
+                  {isInstantBundle && instantInfo
+                    ? instantInfo.restrictionNote || 'Instant automated direct delivery to your line'
                     : isAirtime
                     ? 'Direct automated airtime recharge'
                     : checkoutBundle.network === 'airteltigo'
@@ -325,6 +336,44 @@ export const CheckoutModal: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Instant Bundle Safety & Restriction Notice */}
+          {isInstantBundle && instantInfo && instantInfo.restrictionNote && (
+            <div
+              className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 animate-in fade-in ${
+                instantInfo.isMidnight
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-200'
+                  : instantInfo.isVideo
+                  ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-200'
+                  : instantInfo.isIdd
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200'
+                  : 'bg-slate-800/80 border-slate-700 text-slate-300'
+              }`}
+            >
+              {instantInfo.isMidnight ? (
+                <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              ) : instantInfo.isIdd ? (
+                <PhoneIcon className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              ) : (
+                <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+              )}
+              <div className="space-y-0.5 text-left">
+                <div className="font-bold flex items-center gap-1">
+                  {instantInfo.badgeEmoji && <span>{instantInfo.badgeEmoji}</span>}
+                  <span>{instantInfo.categoryLabel} Notice</span>
+                </div>
+                <p className="text-[11px] leading-relaxed opacity-90">
+                  {instantInfo.isMidnight
+                    ? 'Midnight-only data. This bundle is valid exclusively during network midnight hours and is not intended for regular daytime browsing.'
+                    : instantInfo.isVideo
+                    ? 'Video bundle. Intended for supported video and media streaming usage.'
+                    : instantInfo.isIdd
+                    ? 'International calls package. Direct voice call minutes to supported overseas destinations.'
+                    : instantInfo.restrictionNote}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Active MTN Duplicate Order Conflict Banner */}
           {activeMtnConflict && (

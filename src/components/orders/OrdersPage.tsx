@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS } from '../../data/bundles';
 import { lookupOrderOnServer } from '../../services/apiClient';
+import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
 import { Clock, Search, ArrowRight, CheckCircle2, RefreshCw, AlertTriangle, Smartphone } from 'lucide-react';
 
 export const OrdersPage: React.FC = () => {
@@ -182,6 +183,14 @@ export const OrdersPage: React.FC = () => {
               const isAirtime =
                 order.serviceType === 'airtime' ||
                 (order.bundle.id && order.bundle.id.startsWith('airtime-'));
+              const instantInfo = isInstantBundle
+                ? getInstantBundlePresentation({
+                    category: order.bundle.category,
+                    name: order.bundle.description || order.bundle.dataAmount,
+                    dataAmount: order.bundle.dataAmount,
+                    isFlexi: order.bundle.isFlexi,
+                  })
+                : null;
 
               return (
                 <div
@@ -201,10 +210,10 @@ export const OrdersPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-white text-base group-hover:text-[#00c365] transition-colors">
-                          {isInstantBundle
-                            ? `${order.bundle.dataAmount} Instant Bundle ⚡`
+                          {isInstantBundle && instantInfo
+                            ? `${instantInfo.formattedAmount} ${instantInfo.categoryLabel} ⚡`
                             : isAirtime
                             ? order.bundle.dataAmount
                             : `${order.bundle.dataAmount} Data Bundle`}
@@ -216,7 +225,32 @@ export const OrdersPage: React.FC = () => {
                       <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span>Recipient: {order.recipientPhone}</span>
                         <span>·</span>
-                        <span>{new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>
+                          {new Date(order.createdAt).toLocaleDateString()}{' '}
+                          {new Date(order.createdAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                        {instantInfo?.restrictionNote && (
+                          <>
+                            <span>·</span>
+                            <span
+                              className={`text-[11px] font-semibold ${
+                                instantInfo.isMidnight
+                                  ? 'text-amber-400'
+                                  : instantInfo.isVideo
+                                  ? 'text-indigo-400'
+                                  : instantInfo.isIdd
+                                  ? 'text-emerald-400'
+                                  : 'text-slate-300'
+                              }`}
+                            >
+                              {instantInfo.badgeEmoji ? `${instantInfo.badgeEmoji} ` : ''}
+                              {instantInfo.restrictionNote}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
