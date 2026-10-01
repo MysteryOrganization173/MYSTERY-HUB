@@ -134,6 +134,36 @@ CREATE TABLE IF NOT EXISTS admin_audit_log (
 CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_admin_audit_entity ON admin_audit_log (entity_type, entity_id);
 
+-- 7. MARKETPLACE PRODUCTS TABLE (V1 Sourcing Marketplace)
+CREATE TABLE IF NOT EXISTS marketplace_products (
+  id VARCHAR(64) PRIMARY KEY,
+  slug VARCHAR(128) UNIQUE NOT NULL,
+  name VARCHAR(256) NOT NULL,
+  category VARCHAR(64) NOT NULL,
+  tagline VARCHAR(256),
+  description TEXT,
+  price_type VARCHAR(32) NOT NULL DEFAULT 'quote', -- 'fixed' | 'starting_at' | 'quote'
+  price_minor INTEGER, -- integer pesewas (100 pesewas = 1 GHS)
+  availability VARCHAR(32) NOT NULL DEFAULT 'available', -- 'available' | 'check_availability' | 'limited' | 'coming_soon'
+  availability_label VARCHAR(64),
+  badge VARCHAR(64),
+  image_url TEXT,
+  image_alt VARCHAR(256),
+  gallery_urls TEXT,
+  highlights TEXT,
+  specs TEXT,
+  featured BOOLEAN NOT NULL DEFAULT FALSE,
+  published BOOLEAN NOT NULL DEFAULT FALSE,
+  archived BOOLEAN NOT NULL DEFAULT FALSE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_marketplace_slug ON marketplace_products (slug);
+CREATE INDEX IF NOT EXISTS idx_marketplace_category ON marketplace_products (category);
+CREATE INDEX IF NOT EXISTS idx_marketplace_published ON marketplace_products (published, archived, sort_order, created_at DESC);
+
 -- Active MTN recipient lock index (enforces at most one active MTN order per recipient)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_active_mtn_recipient 
 ON orders (recipient_phone) 

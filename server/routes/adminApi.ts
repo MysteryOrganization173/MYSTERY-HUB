@@ -10,7 +10,13 @@ import { requireAdmin } from '../middleware/authMiddleware.js';
 import { OrdersStore } from '../db/ordersStore.js';
 import { AuthStore } from '../db/authStore.js';
 import { WaitlistStore } from '../db/waitlistStore.js';
+import { MarketplaceStore } from '../db/marketplaceStore.js';
 import { AdminAuditStore } from '../db/adminAuditStore.js';
+import {
+  MarketplaceProductPriceType,
+  MarketplaceProductAvailability,
+  CATEGORY_LABELS,
+} from '../types/marketplace.js';
 import { toAdminOrderDetails } from '../types/orders.js';
 import { toSafeUserProfile, UserStatus } from '../types/auth.js';
 import { FulfilmentService } from '../services/fulfilmentService.js';
@@ -722,3 +728,395 @@ adminRouter.get('/audit-logs', async (_req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to retrieve audit logs.' });
   }
 });
+
+// ==========================================
+// 14. ADMIN MARKETPLACE PRODUCT MANAGEMENT
+// ==========================================
+
+const VALID_CATEGORIES = new Set(Object.keys(CATEGORY_LABELS).filter((k) => k !== 'all'));
+const VALID_PRICE_TYPES = new Set<MarketplaceProductPriceType>(['fixed', 'starting_at', 'quote']);
+const VALID_AVAILABILITIES = new Set<MarketplaceProductAvailability>([
+  'available',
+  'check_availability',
+  'limited',
+  'coming_soon',
+]);
+
+function sanitizeString(val: unknown, maxLen = 256): string | undefined {
+  if (val === null || val === undefined) return undefined;
+  if (typeof val !== 'string') return undefined;
+  // Remove raw script tags and control characters
+  const clean = val.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '').trim();
+  return clean.slice(0, maxLen);
+}
+
+function isValidHttpUrl(string: string): boolean {
+  try {
+    const url = new URL(string);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 14a. GET /api/admin/marketplace/metrics
+ */
+adminRouter.get('/marketplace/metrics', async (_req: Request, res: Response) => {
+  try {
+    const metrics = await MarketplaceStore.getAdminMetrics();
+    res.json({
+      success: true,
+      metrics,
+    });
+  } catch (err) {
+    console.error('[Admin API] Marketplace metrics error:', err);
+    res.status(500).json({ error: 'Failed to retrieve marketplace metrics.' });
+  }
+});
+
+/**
+ * 14b. GET /api/admin/marketplace/products
+ */
+adminRouter.get('/marketplace/products', async (req: Request, res: Response) => {
+  try {
+    const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+    const status =
+      req.query.status === 'published' ||
+      req.query.status === 'draft' ||
+      req.query.status === 'archived'
+        ? (req.query.status as 'published' | 'draft' | 'archived')
+        : 'all';
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+
+    const products = await MarketplaceStore.getAdminProducts({ category, status, search });
+    const metrics = await MarketplaceStore.getAdminMetrics();
+
+    res.json({
+      success: true,
+      products,
+      metrics,
+    });
+  } catch (err) {
+    console.error('[Admin API] Marketplace products error:', err);
+    res.status(500).json({ error: 'Failed to retrieve marketplace products.' });
+  }
+});
+
+/**
+ * 14c. POST /api/admin/marketplace/products
+ * Create new marketplace product
+ */
+adminRouter.post('/marketplace/products', async (req: Request, res: Response) => {
+  try {
+    const adminUser = req.user!;
+    const body = req.body || {};
+
+    const name = sanitizeString(body.name, 256);
+    if (!name || name.length < 2) {
+      res.status(400).json({ error: 'Product name must be at least 2 characters.' });
+      return;
+    }
+
+    const category = typeof body.category === 'string' ? body.category.trim() : '';
+    if (!VALID_CATEGORIES.has(category)) {
+      res.status(400).json({ error: `Invalid category. Supported categories: ${Array.from(VALID_CATEGORIES).join(', ')}` });
+      return;
+    }
+
+    const priceType = body.priceType as MarketplaceProductPriceType;
+    if (!VALID_PRICE_TYPES.has(priceType)) {
+      res.status(400).json({ error: 'Invalid priceType. Supported: fixed, starting_at, quote' });
+      return;
+    }
+
+    let priceMinor: number | null = null;
+    if (priceType === 'fixed' || priceType === 'starting_at') {
+      if (typeof body.priceMinor === 'number') {
+        priceMinor = Math.floor(body.priceMinor);
+      } else if (typeof body.priceGhc === 'number' || typeof body.priceGhc === 'string') {
+        const parsedGhc = parseFloat(String(body.priceGhc));
+        if (!isNaN(parsedGhc) && parsedGhc > 0) {
+          priceMinor = Math.round(parsedGhc * 100);
+        }
+      }
+
+      if (priceMinor === null || priceMinor <= 0) {
+        res.status(400).json({ error: `Price is required for "${priceType}" price type and must be greater than 0.` });
+        return;
+      }
+    }
+
+    const availability = (body.availability as MarketplaceProductAvailability) || 'available';
+    if (!VALID_AVAILABILITIES.has(availability)) {
+      res.status(400).json({ error: 'Invalid availability status.' });
+      return;
+    }
+
+    let imageUrl: string | null = null;
+    if (body.imageUrl && typeof body.imageUrl === 'string' && body.imageUrl.trim().length > 0) {
+      const cleanUrl = body.imageUrl.trim();
+      if (!isValidHttpUrl(cleanUrl)) {
+        res.status(400).json({ error: 'Image URL must be a valid HTTP or HTTPS URL.' });
+        return;
+      }
+      imageUrl = cleanUrl;
+    }
+
+    const product = await MarketplaceStore.createProduct(
+      {
+        slug: body.slug ? sanitizeString(body.slug, 128) : undefined,
+        name,
+        category,
+        tagline: sanitizeString(body.tagline, 256) || null,
+        description: sanitizeString(body.description, 5000) || null,
+        priceType,
+        priceMinor,
+        availability,
+        availabilityLabel: sanitizeString(body.availabilityLabel, 64) || null,
+        badge: sanitizeString(body.badge, 64) || null,
+        imageUrl,
+        imageAlt: sanitizeString(body.imageAlt, 256) || name,
+        highlights: Array.isArray(body.highlights)
+          ? body.highlights.map((h: unknown) => sanitizeString(h, 200)).filter(Boolean)
+          : null,
+        specs: Array.isArray(body.specs)
+          ? body.specs
+              .filter((s: unknown) => typeof s === 'object' && s !== null && (s as { label?: string }).label)
+              .map((s: { label: string; value: string }) => ({
+                label: sanitizeString(s.label, 100) || '',
+                value: sanitizeString(s.value, 200) || '',
+              }))
+          : null,
+        featured: Boolean(body.featured),
+        published: Boolean(body.published),
+        sortOrder: typeof body.sortOrder === 'number' ? Math.floor(body.sortOrder) : 0,
+      },
+      adminUser.id
+    );
+
+    res.status(201).json({
+      success: true,
+      product,
+      message: `Product "${product.name}" created successfully.`,
+    });
+  } catch (err) {
+    console.error('[Admin API] Create marketplace product error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to create marketplace product.' });
+  }
+});
+
+/**
+ * 14d. PATCH /api/admin/marketplace/products/:id
+ * Update product
+ */
+adminRouter.patch('/marketplace/products/:id', async (req: Request, res: Response) => {
+  try {
+    const adminUser = req.user!;
+    const id = req.params.id;
+    const body = req.body || {};
+
+    const existing = await MarketplaceStore.getProductById(id);
+    if (!existing) {
+      res.status(404).json({ error: `Marketplace product "${id}" not found.` });
+      return;
+    }
+
+    let name: string | undefined;
+    if (body.name !== undefined) {
+      name = sanitizeString(body.name, 256);
+      if (!name || name.length < 2) {
+        res.status(400).json({ error: 'Product name must be at least 2 characters.' });
+        return;
+      }
+    }
+
+    let category: string | undefined;
+    if (body.category !== undefined) {
+      const catTrimmed = typeof body.category === 'string' ? body.category.trim() : '';
+      if (!VALID_CATEGORIES.has(catTrimmed)) {
+        res.status(400).json({ error: 'Invalid category.' });
+        return;
+      }
+      category = catTrimmed;
+    }
+
+    let priceType = existing.price_type;
+    if (body.priceType !== undefined) {
+      if (!VALID_PRICE_TYPES.has(body.priceType)) {
+        res.status(400).json({ error: 'Invalid priceType.' });
+        return;
+      }
+      priceType = body.priceType;
+    }
+
+    let priceMinor: number | null | undefined;
+    if (priceType === 'quote') {
+      priceMinor = null;
+    } else if (body.priceMinor !== undefined) {
+      priceMinor = typeof body.priceMinor === 'number' ? Math.floor(body.priceMinor) : null;
+    } else if (body.priceGhc !== undefined) {
+      const parsedGhc = parseFloat(String(body.priceGhc));
+      if (!isNaN(parsedGhc) && parsedGhc > 0) {
+        priceMinor = Math.round(parsedGhc * 100);
+      }
+    }
+
+    let imageUrl: string | null | undefined;
+    if (body.imageUrl !== undefined) {
+      if (body.imageUrl && typeof body.imageUrl === 'string' && body.imageUrl.trim().length > 0) {
+        const cleanUrl = body.imageUrl.trim();
+        if (!isValidHttpUrl(cleanUrl)) {
+          res.status(400).json({ error: 'Image URL must be a valid HTTP or HTTPS URL.' });
+          return;
+        }
+        imageUrl = cleanUrl;
+      } else {
+        imageUrl = null;
+      }
+    }
+
+    let availability = existing.availability;
+    if (body.availability !== undefined) {
+      if (!VALID_AVAILABILITIES.has(body.availability)) {
+        res.status(400).json({ error: 'Invalid availability status.' });
+        return;
+      }
+      availability = body.availability;
+    }
+
+    const updated = await MarketplaceStore.updateProduct(
+      id,
+      {
+        slug: body.slug ? sanitizeString(body.slug, 128) : undefined,
+        name,
+        category,
+        tagline: body.tagline !== undefined ? sanitizeString(body.tagline, 256) || null : undefined,
+        description: body.description !== undefined ? sanitizeString(body.description, 5000) || null : undefined,
+        priceType,
+        priceMinor,
+        availability,
+        availabilityLabel: body.availabilityLabel !== undefined ? sanitizeString(body.availabilityLabel, 64) || null : undefined,
+        badge: body.badge !== undefined ? sanitizeString(body.badge, 64) || null : undefined,
+        imageUrl,
+        imageAlt: body.imageAlt !== undefined ? sanitizeString(body.imageAlt, 256) || null : undefined,
+        highlights: Array.isArray(body.highlights)
+          ? body.highlights.map((h: unknown) => sanitizeString(h, 200)).filter(Boolean)
+          : undefined,
+        specs: Array.isArray(body.specs)
+          ? body.specs
+              .filter((s: unknown) => typeof s === 'object' && s !== null && (s as { label?: string }).label)
+              .map((s: { label: string; value: string }) => ({
+                label: sanitizeString(s.label, 100) || '',
+                value: sanitizeString(s.value, 200) || '',
+              }))
+          : undefined,
+        featured: body.featured !== undefined ? Boolean(body.featured) : undefined,
+        published: body.published !== undefined ? Boolean(body.published) : undefined,
+        archived: body.archived !== undefined ? Boolean(body.archived) : undefined,
+        sortOrder: typeof body.sortOrder === 'number' ? Math.floor(body.sortOrder) : undefined,
+      },
+      adminUser.id
+    );
+
+    res.json({
+      success: true,
+      product: updated,
+      message: `Product "${updated.name}" updated successfully.`,
+    });
+  } catch (err) {
+    console.error('[Admin API] Update marketplace product error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to update marketplace product.' });
+  }
+});
+
+/**
+ * 14e. POST /api/admin/marketplace/products/:id/publish
+ */
+adminRouter.post('/marketplace/products/:id/publish', async (req: Request, res: Response) => {
+  try {
+    const adminUser = req.user!;
+    const product = await MarketplaceStore.setPublished(req.params.id, true, adminUser.id);
+    res.json({
+      success: true,
+      product,
+      message: `Product "${product.name}" published live to storefront.`,
+    });
+  } catch (err) {
+    console.error('[Admin API] Publish product error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to publish product.' });
+  }
+});
+
+/**
+ * 14f. POST /api/admin/marketplace/products/:id/unpublish
+ */
+adminRouter.post('/marketplace/products/:id/unpublish', async (req: Request, res: Response) => {
+  try {
+    const adminUser = req.user!;
+    const product = await MarketplaceStore.setPublished(req.params.id, false, adminUser.id);
+    res.json({
+      success: true,
+      product,
+      message: `Product "${product.name}" unpublished to draft status.`,
+    });
+  } catch (err) {
+    console.error('[Admin API] Unpublish product error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to unpublish product.' });
+  }
+});
+
+/**
+ * 14g. POST /api/admin/marketplace/products/:id/feature
+ */
+adminRouter.post('/marketplace/products/:id/feature', async (req: Request, res: Response) => {
+  try {
+    const adminUser = req.user!;
+    const product = await MarketplaceStore.setFeatured(req.params.id, true, adminUser.id);
+    res.json({
+      success: true,
+      product,
+      message: `Product "${product.name}" marked as featured.`,
+    });
+  } catch (err) {
+    console.error('[Admin API] Feature product error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to feature product.' });
+  }
+});
+
+/**
+ * 14h. POST /api/admin/marketplace/products/:id/unfeature
+ */
+adminRouter.post('/marketplace/products/:id/unfeature', async (req: Request, res: Response) => {
+  try {
+    const adminUser = req.user!;
+    const product = await MarketplaceStore.setFeatured(req.params.id, false, adminUser.id);
+    res.json({
+      success: true,
+      product,
+      message: `Product "${product.name}" removed from featured.`,
+    });
+  } catch (err) {
+    console.error('[Admin API] Unfeature product error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to unfeature product.' });
+  }
+});
+
+/**
+ * 14i. POST /api/admin/marketplace/products/:id/archive
+ */
+adminRouter.post('/marketplace/products/:id/archive', async (req: Request, res: Response) => {
+  try {
+    const adminUser = req.user!;
+    const product = await MarketplaceStore.archiveProduct(req.params.id, adminUser.id);
+    res.json({
+      success: true,
+      product,
+      message: `Product "${product.name}" archived successfully.`,
+    });
+  } catch (err) {
+    console.error('[Admin API] Archive product error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to archive product.' });
+  }
+});
+

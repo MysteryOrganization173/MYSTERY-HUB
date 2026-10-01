@@ -175,16 +175,26 @@ export interface MarketplaceProduct {
   categoryLabel: string;
   tagline: string;
   description: string;
-  priceDisplay: string; // e.g. "From GH₵ 4,200", "Request Price", "Check Availability"
+  priceDisplay: string; // e.g. "GH₵ 3,900", "From GH₵ 6,800", "Request Quote"
   priceType: 'fixed' | 'starting_at' | 'quote';
+  priceMinor?: number | null;
+  priceGhc?: number | null;
   availability: MarketplaceAvailability;
   availabilityLabel: string;
   featured?: boolean;
-  type: 'hardware' | 'software' | 'digital_tool' | 'essential';
+  type?: 'hardware' | 'software' | 'digital_tool' | 'essential';
   badge?: string;
+  imageUrl?: string;
+  imageAlt?: string;
+  galleryUrls?: string[];
   highlights: string[];
   specs?: Array<{ label: string; value: string }>;
   iconName?: string;
   accentColor?: string;
+  published?: boolean;
+  archived?: boolean;
+  sortOrder?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 

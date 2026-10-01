@@ -20,7 +20,7 @@ import {
 
 interface AdminOverviewSectionProps {
   sessionToken: string;
-  onNavigateTab: (tab: 'orders' | 'waitlist' | 'customers' | 'system') => void;
+  onNavigateTab: (tab: 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system') => void;
 }
 
 export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({

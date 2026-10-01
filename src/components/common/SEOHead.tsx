@@ -27,7 +27,7 @@ const SEO_MAP: Record<string, PageMetadata> = {
   marketplace: {
     title: 'Digital Marketplace & Tech Hardware — Mystery Hub Ghana',
     description:
-      'Explore laptops, phones, accessories, AI software, and creator tools in Ghana with verified pricing and direct WhatsApp inquiries.',
+      'Explore laptops, phones, accessories, AI software, and creator tools in Ghana with transparent pricing and direct WhatsApp inquiries.',
   },
   services: {
     title: 'Digital Services & Utility Bill Payments in Ghana — Mystery Hub',

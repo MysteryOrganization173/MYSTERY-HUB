@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { AdminLoginCard } from './AdminLoginCard';
 import { AdminOverviewSection } from './sections/AdminOverviewSection';
 import { AdminOrdersSection } from './sections/AdminOrdersSection';
+import { AdminMarketplaceSection } from './sections/AdminMarketplaceSection';
 import { AdminWaitlistSection } from './sections/AdminWaitlistSection';
 import { AdminCustomersSection } from './sections/AdminCustomersSection';
 import { AdminSystemSection } from './sections/AdminSystemSection';
@@ -10,6 +11,7 @@ import { BrandLogo } from '../common/BrandLogo';
 import {
   LayoutDashboard,
   ShoppingBag,
+  Store,
   ClipboardList,
   Users,
   Server,
@@ -20,7 +22,7 @@ import {
   Radio,
 } from 'lucide-react';
 
-export type AdminTab = 'overview' | 'orders' | 'waitlist' | 'customers' | 'system';
+export type AdminTab = 'overview' | 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system';
 
 export const AdminPage: React.FC = () => {
   const { user, sessionToken, logoutUser, setActivePage } = useApp();
@@ -140,6 +142,18 @@ export const AdminPage: React.FC = () => {
               </button>
 
               <button
+                onClick={() => setActiveTab('marketplace')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === 'marketplace'
+                    ? 'bg-[#00c365] text-black shadow-lg shadow-[#00c365]/20 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                <Store className="w-4 h-4 shrink-0" />
+                <span>Marketplace</span>
+              </button>
+
+              <button
                 onClick={() => setActiveTab('waitlist')}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'waitlist'
@@ -215,6 +229,18 @@ export const AdminPage: React.FC = () => {
             </button>
 
             <button
+              onClick={() => setActiveTab('marketplace')}
+              className={`px-3 py-2 rounded-xl shrink-0 flex items-center gap-1.5 font-semibold transition-colors ${
+                activeTab === 'marketplace'
+                  ? 'bg-[#00c365] text-black font-bold'
+                  : 'bg-slate-900 border border-slate-800 text-slate-400'
+              }`}
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>Marketplace</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('waitlist')}
               className={`px-3 py-2 rounded-xl shrink-0 flex items-center gap-1.5 font-semibold transition-colors ${
                 activeTab === 'waitlist'
@@ -261,6 +287,9 @@ export const AdminPage: React.FC = () => {
             )}
             {activeTab === 'orders' && (
               <AdminOrdersSection sessionToken={sessionToken} />
+            )}
+            {activeTab === 'marketplace' && (
+              <AdminMarketplaceSection sessionToken={sessionToken} />
             )}
             {activeTab === 'waitlist' && (
               <AdminWaitlistSection sessionToken={sessionToken} />

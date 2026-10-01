@@ -16,6 +16,7 @@ import { SbhInstantBundlePackage } from '../suppliers/successBizHub/types.js';
 import { OrdersStore } from '../db/ordersStore.js';
 import { AuthStore } from '../db/authStore.js';
 import { WaitlistStore } from '../db/waitlistStore.js';
+import { MarketplaceStore } from '../db/marketplaceStore.js';
 import { OrderRecord, toSafePublicOrder } from '../types/orders.js';
 import { toSafeUserProfile, WaitlistChannel } from '../types/auth.js';
 import { hashPassword, verifyPassword, generateSessionToken } from '../utils/crypto.js';
@@ -1111,3 +1112,68 @@ apiRouter.get('/orders/my-orders', requireAuth, async (req: Request, res: Respon
     res.status(500).json({ error: 'Failed to retrieve orders.' });
   }
 });
+
+// ==========================================
+// PUBLIC MARKETPLACE SOURCING CATALOG ROUTES
+// ==========================================
+
+/**
+ * 13. GET /api/marketplace/products
+ * Returns live published marketplace products (only published = true, archived = false)
+ * Wholesale costs, internal audit IDs, and admin fields are NEVER exposed.
+ */
+apiRouter.get('/marketplace/products', async (req: Request, res: Response) => {
+  try {
+    const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    const featured =
+      req.query.featured === 'true'
+        ? true
+        : req.query.featured === 'false'
+        ? false
+        : undefined;
+
+    const products = await MarketplaceStore.getPublicProducts({ category, search, featured });
+
+    res.json({
+      success: true,
+      products,
+    });
+  } catch (err) {
+    console.error('Public Marketplace Products API error:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve marketplace products.',
+      products: [],
+    });
+  }
+});
+
+/**
+ * 14. GET /api/marketplace/products/:slug
+ * Returns single published marketplace product by unique slug
+ */
+apiRouter.get('/marketplace/products/:slug', async (req: Request, res: Response) => {
+  try {
+    const slug = req.params.slug;
+    if (!slug) {
+      res.status(400).json({ error: 'Product slug is required.' });
+      return;
+    }
+
+    const product = await MarketplaceStore.getPublicProductBySlug(slug);
+    if (!product) {
+      res.status(404).json({ error: 'Marketplace product not found or not published.' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      product,
+    });
+  } catch (err) {
+    console.error('Public Marketplace Product Slug API error:', err);
+    res.status(500).json({ error: 'Failed to retrieve marketplace product.' });
+  }
+});
+

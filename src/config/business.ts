@@ -16,6 +16,8 @@ export const BUSINESS_CONFIG = {
   // Official Brand Assets
   brandMarkUrl:
     'https://res.cloudinary.com/da6oeat7m/image/upload/v1790859552/30338777-d9dc-4709-8603-b18a4dc8d0ca_tvptuc.png',
+  marketplaceHeroImageUrl:
+    'https://res.cloudinary.com/da6oeat7m/image/upload/v1790865356/Futuristic_Ghana_Tech_Marketplace_Banner_uvziku.png',
 
   // Official Public Contact Information
   contact: {
@@ -57,7 +59,7 @@ export const BUSINESS_CONFIG = {
       isAvailableForPurchase: true,
       label: 'Live Sourcing',
       notice:
-        'Curated tech hardware, creator tools, and productivity software sourced on request with verified local Ghana delivery.',
+        'Curated tech hardware, creator tools, and productivity software sourced on request for customers in Ghana.',
     },
     airtime: {
       status: 'active',
