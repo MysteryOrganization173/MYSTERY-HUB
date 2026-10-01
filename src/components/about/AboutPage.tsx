@@ -32,7 +32,7 @@ export const AboutPage: React.FC = () => {
     'https://res.cloudinary.com/da6oeat7m/image/upload/v1790866217/Neon_Ghana__Connected_Futures_qdf0ek.png';
 
   return (
-    <div className="min-h-screen pt-4 sm:pt-6 pb-8 sm:pb-12">
+    <div className="min-h-screen pt-6 sm:pt-8 lg:pt-10 pb-8 sm:pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 sm:space-y-14">
         
         {/* 1. About Hero Panel with Cloudinary Image 2 Artwork */}
@@ -72,7 +72,7 @@ export const AboutPage: React.FC = () => {
               <span>About Mystery Hub</span>
             </div>
 
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight scroll-mt-20">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight scroll-mt-24 sm:scroll-mt-28">
               Your Digital World. <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E575] via-[#00c365] to-[#38bdf8]">
                 One Unified Hub.
@@ -106,7 +106,7 @@ export const AboutPage: React.FC = () => {
             <span className="text-xs font-bold text-[#00c365] uppercase tracking-wider">
               Our Core Mission
             </span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-snug scroll-mt-20">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-snug scroll-mt-24 sm:scroll-mt-28">
               To provide accessible, affordable and reliable digital services for everyone in Ghana.
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
@@ -158,7 +158,7 @@ export const AboutPage: React.FC = () => {
 
         {/* 3. Built for Ghana — Section with Official Cloudinary Image 1 */}
         <div className="space-y-6 sm:space-y-7">
-          <div className="text-center max-w-xl mx-auto space-y-2 scroll-mt-20">
+          <div className="text-center max-w-xl mx-auto space-y-2 scroll-mt-24 sm:scroll-mt-28">
             <span className="text-xs font-bold text-[#00c365] uppercase tracking-wider">
               Built for Ghana
             </span>
@@ -177,7 +177,7 @@ export const AboutPage: React.FC = () => {
               alt="Connected Futures — Designed For The People Who Move Ghana Forward"
               objectFit="cover"
               objectPosition="center"
-              containerClassName="w-full h-[220px] sm:h-[300px] lg:h-[340px]"
+              containerClassName="w-full h-[210px] sm:h-[295px] lg:h-[330px]"
               className="hover:scale-[1.01] transition-transform duration-500"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#070b0e]/50 via-transparent to-transparent pointer-events-none" />

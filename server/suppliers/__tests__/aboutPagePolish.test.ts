@@ -83,4 +83,20 @@ describe('About Page Polish & Artwork Integration', () => {
       'Unsubstantiated "no hidden charges" claim must be removed'
     );
   });
+
+  test('6. Connected Futures image container maintains calibrated height and navbar clearance', () => {
+    const pageCode = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/about/AboutPage.tsx'),
+      'utf-8'
+    );
+
+    assert.ok(
+      pageCode.includes('lg:h-[330px]'),
+      'Desktop visual height must be approximately 320-350px (e.g. lg:h-[330px])'
+    );
+    assert.ok(
+      pageCode.includes('scroll-mt-24 sm:scroll-mt-28'),
+      'Headings must have proper scroll margins to clear the sticky navbar'
+    );
+  });
 });
