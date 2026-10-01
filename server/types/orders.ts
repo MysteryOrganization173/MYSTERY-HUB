@@ -11,7 +11,9 @@ export type OrderStatus =
   | 'delivered'
   | 'failed'
   | 'refund_pending'
-  | 'refunded';
+  | 'refunded'
+  | 'cancelled'
+  | 'expired';
 
 export interface OrderRecord {
   id: string;
@@ -33,7 +35,7 @@ export interface OrderRecord {
   status: OrderStatus;
   payment_provider: 'paystack';
   payment_reference: string;
-  payment_status: 'pending' | 'success' | 'failed';
+  payment_status: 'pending' | 'success' | 'failed' | 'cancelled' | 'expired';
   supplier_provider: string | null;
   supplier_order_id: string | null;
   supplier_response: string | null;
@@ -48,6 +50,7 @@ export interface OrderRecord {
   paid_at: string | null;
   submitted_at: string | null;
   delivered_at: string | null;
+  payment_closed_at?: string | null;
 }
 
 export type SafePublicOrderDetails = Pick<
@@ -91,6 +94,7 @@ export interface AdminOrderDetails extends SafePublicOrderDetails {
   admin_note: string | null;
   updated_at: string;
   submitted_at: string | null;
+  payment_closed_at?: string | null;
 }
 
 export function toAdminOrderDetails(order: OrderRecord): AdminOrderDetails {
@@ -117,6 +121,7 @@ export function toAdminOrderDetails(order: OrderRecord): AdminOrderDetails {
     admin_note: order.admin_note || null,
     updated_at: order.updated_at,
     submitted_at: order.submitted_at || null,
+    payment_closed_at: order.payment_closed_at || null,
   };
 }
 

@@ -11,6 +11,8 @@ import {
   canonicalGhanaPhone,
   areGhanaPhonesEqual,
 } from '../utils/phone.js';
+import { PaystackServerService } from '../services/paystackService.js';
+import { FulfilmentService } from '../services/fulfilmentService.js';
 
 // In-memory fallback repository for development when DATABASE_URL is omitted
 const devMemoryStore = new Map<string, OrderRecord>();
@@ -338,6 +340,7 @@ export class OrdersStore {
 
   /**
    * Find orders belonging to a specific authenticated user
+   * Excludes cancelled/expired unpaid payment attempts so customer history stays clean
    */
   static async findOrdersByUserId(userId: string, limit?: number): Promise<OrderRecord[]> {
     if (!userId) return [];
@@ -346,7 +349,7 @@ export class OrdersStore {
     if (pool) {
       const query = `
         SELECT * FROM orders 
-        WHERE user_id = $1 
+        WHERE user_id = $1 AND status NOT IN ('cancelled', 'expired')
         ORDER BY created_at DESC
         ${hasLimit ? 'LIMIT $2' : ''};
       `;
@@ -357,7 +360,12 @@ export class OrdersStore {
 
     const results: OrderRecord[] = [];
     for (const ord of devMemoryStore.values()) {
-      if (ord.user_id === userId && !results.some((r) => r.id === ord.id)) {
+      if (
+        ord.user_id === userId &&
+        ord.status !== 'cancelled' &&
+        ord.status !== 'expired' &&
+        !results.some((r) => r.id === ord.id)
+      ) {
         results.push(ord);
       }
     }
@@ -366,6 +374,249 @@ export class OrdersStore {
       return sorted.slice(0, limit);
     }
     return sorted;
+  }
+
+  /**
+   * Safe, authoritative cancellation of an order payment attempt
+   * Cannot cancel orders that are already paid, delivered, or processing
+   */
+  static async cancelOrder(
+    ref: string,
+    failureReason: string = 'customer_closed_checkout'
+  ): Promise<{ order: OrderRecord | null; cancelled: boolean; alreadyPaid: boolean }> {
+    const existing = await this.findOrder(ref);
+    if (!existing) {
+      return { order: null, cancelled: false, alreadyPaid: false };
+    }
+
+    if (
+      existing.payment_status === 'success' ||
+      ['paid', 'queued', 'submitted', 'processing', 'delivered', 'refund_pending', 'refunded'].includes(existing.status)
+    ) {
+      return { order: existing, cancelled: false, alreadyPaid: true };
+    }
+
+    const nowIso = new Date().toISOString();
+    const updated: OrderRecord = {
+      ...existing,
+      status: 'cancelled',
+      payment_status: 'cancelled',
+      failure_reason: failureReason,
+      payment_closed_at: nowIso,
+      updated_at: nowIso,
+    };
+
+    const pool = getPool();
+    if (pool) {
+      const query = `
+        UPDATE orders
+        SET status = $1, payment_status = $2, failure_reason = $3, payment_closed_at = $4, updated_at = $5
+        WHERE id = $6;
+      `;
+      await pool.query(query, [
+        updated.status,
+        updated.payment_status,
+        updated.failure_reason,
+        updated.payment_closed_at,
+        updated.updated_at,
+        existing.id,
+      ]);
+    } else {
+      devMemoryStore.set(existing.id, updated);
+      devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
+      devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
+    }
+
+    return { order: updated, cancelled: true, alreadyPaid: false };
+  }
+
+  /**
+   * Safe expiration of an unresolved order payment attempt
+   */
+  static async expireOrder(
+    ref: string,
+    failureReason: string = 'payment_expired'
+  ): Promise<{ order: OrderRecord | null; expired: boolean; alreadyPaid: boolean }> {
+    const existing = await this.findOrder(ref);
+    if (!existing) {
+      return { order: null, expired: false, alreadyPaid: false };
+    }
+
+    if (
+      existing.payment_status === 'success' ||
+      ['paid', 'queued', 'submitted', 'processing', 'delivered', 'refund_pending', 'refunded'].includes(existing.status)
+    ) {
+      return { order: existing, expired: false, alreadyPaid: true };
+    }
+
+    const nowIso = new Date().toISOString();
+    const updated: OrderRecord = {
+      ...existing,
+      status: 'expired',
+      payment_status: 'expired',
+      failure_reason: failureReason,
+      payment_closed_at: nowIso,
+      updated_at: nowIso,
+    };
+
+    const pool = getPool();
+    if (pool) {
+      const query = `
+        UPDATE orders
+        SET status = $1, payment_status = $2, failure_reason = $3, payment_closed_at = $4, updated_at = $5
+        WHERE id = $6;
+      `;
+      await pool.query(query, [
+        updated.status,
+        updated.payment_status,
+        updated.failure_reason,
+        updated.payment_closed_at,
+        updated.updated_at,
+        existing.id,
+      ]);
+    } else {
+      devMemoryStore.set(existing.id, updated);
+      devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
+      devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
+    }
+
+    return { order: updated, expired: true, alreadyPaid: false };
+  }
+
+  private static isReconcilingStalePending = false;
+
+  /**
+   * Server-side reconciliation of stale pending_payment orders
+   * Checks Paystack status before marking cancelled or expired.
+   * Never mutates destructively if Paystack status is unknown/network error.
+   */
+  static async reconcileStalePendingPayments(
+    expiryMinutes: number = parseInt(process.env.PAYMENT_PENDING_EXPIRY_MINUTES || '30', 10),
+    limit: number = 20
+  ): Promise<{
+    scanned: number;
+    verifiedPaidCount: number;
+    cancelledCount: number;
+    expiredCount: number;
+    unresolvedCount: number;
+  }> {
+    if (this.isReconcilingStalePending) {
+      return { scanned: 0, verifiedPaidCount: 0, cancelledCount: 0, expiredCount: 0, unresolvedCount: 0 };
+    }
+
+    this.isReconcilingStalePending = true;
+    let scanned = 0;
+    let verifiedPaidCount = 0;
+    let cancelledCount = 0;
+    let expiredCount = 0;
+    let unresolvedCount = 0;
+
+    try {
+      const now = new Date();
+      const cutoffIso = new Date(now.getTime() - expiryMinutes * 60 * 1000).toISOString();
+      const pool = getPool();
+      let candidates: OrderRecord[] = [];
+
+      if (pool) {
+        const query = `
+          SELECT * FROM orders
+          WHERE status = 'pending_payment'
+            AND payment_status = 'pending'
+            AND paid_at IS NULL
+            AND supplier_order_id IS NULL
+            AND created_at <= $1
+          ORDER BY created_at ASC
+          LIMIT $2;
+        `;
+        const res = await pool.query(query, [cutoffIso, limit]);
+        candidates = res.rows as OrderRecord[];
+      } else {
+        const cutoffTime = new Date(cutoffIso).getTime();
+        const all = Array.from(devMemoryStore.values()).filter(
+          (o, idx, arr) => arr.findIndex((x) => x.id === o.id) === idx
+        );
+        candidates = all
+          .filter(
+            (o) =>
+              o.status === 'pending_payment' &&
+              o.payment_status === 'pending' &&
+              !o.paid_at &&
+              !o.supplier_order_id &&
+              new Date(o.created_at).getTime() <= cutoffTime
+          )
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+          .slice(0, limit);
+      }
+
+      scanned = candidates.length;
+
+      for (const order of candidates) {
+        try {
+          const txRes = await PaystackServerService.verifyTransaction(order.payment_reference);
+
+          if (txRes.status === 'success') {
+            const markRes = await this.markOrderPaid(order.payment_reference, txRes.paidAt || new Date().toISOString());
+            if (markRes.order && !markRes.alreadyPaid) {
+              await FulfilmentService.dispatchOrderFulfilment(markRes.order.id);
+            }
+            verifiedPaidCount++;
+          } else if (txRes.status === 'abandoned' || txRes.status === 'failed') {
+            await this.cancelOrder(order.id, 'paystack_abandoned_reconciled');
+            cancelledCount++;
+          } else if (txRes.status === 'pending') {
+            await this.expireOrder(order.id, 'stale_pending_payment_expired');
+            expiredCount++;
+          } else {
+            unresolvedCount++;
+          }
+        } catch (err) {
+          console.warn(`[Stale Reconciler] Error reconciling order ${order.public_reference}:`, err);
+          unresolvedCount++;
+        }
+      }
+    } finally {
+      this.isReconcilingStalePending = false;
+    }
+
+    return { scanned, verifiedPaidCount, cancelledCount, expiredCount, unresolvedCount };
+  }
+
+  /**
+   * Admin: Safely purge unpaid test/abandoned payment attempts
+   * Only deletes records where payment_status != 'success', paid_at IS NULL,
+   * supplier_order_id IS NULL, submitted_at IS NULL, delivered_at IS NULL.
+   */
+  static async purgeUnpaidTestAttempts(): Promise<number> {
+    const pool = getPool();
+    if (pool) {
+      const query = `
+        DELETE FROM orders
+        WHERE payment_status != 'success'
+          AND paid_at IS NULL
+          AND supplier_order_id IS NULL
+          AND submitted_at IS NULL
+          AND delivered_at IS NULL;
+      `;
+      const res = await pool.query(query);
+      return res.rowCount || 0;
+    } else {
+      let count = 0;
+      for (const [id, ord] of Array.from(devMemoryStore.entries())) {
+        if (
+          ord.payment_status !== 'success' &&
+          !ord.paid_at &&
+          !ord.supplier_order_id &&
+          !ord.submitted_at &&
+          !ord.delivered_at
+        ) {
+          devMemoryStore.delete(id);
+          devMemoryStore.delete(`payref:${ord.payment_reference}`);
+          devMemoryStore.delete(`pubref:${ord.public_reference}`);
+          count++;
+        }
+      }
+      return count;
+    }
   }
 
   /**
@@ -898,10 +1149,19 @@ export class OrdersStore {
         valIdx++;
       }
 
-      if (params.status) {
+      if (params.status === 'needs_attention') {
+        conditions.push(`(manual_review = TRUE OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR failure_reason NOT LIKE 'prelaunch_%')`);
+      } else if (params.status === 'abandoned') {
+        conditions.push(`status IN ('cancelled', 'expired')`);
+      } else if (params.status === 'all') {
+        // No status filter
+      } else if (params.status && params.status !== 'operational') {
         conditions.push(`status = $${valIdx}`);
         values.push(params.status);
         valIdx++;
+      } else {
+        // Default 'operational' view: exclude cancelled, expired, and initialization failures
+        conditions.push(`status NOT IN ('cancelled', 'expired') AND (failure_reason IS NULL OR failure_reason NOT LIKE 'paystack_initialization_%')`);
       }
 
       if (params.paymentStatus) {
@@ -973,8 +1233,28 @@ export class OrdersStore {
       all = all.filter((o) => o.network.toLowerCase() === params.network!.toLowerCase());
     }
 
-    if (params.status) {
+    if (params.status === 'needs_attention') {
+      all = all.filter(
+        (o) =>
+          (Boolean(o.manual_review) ||
+            o.status === 'refund_pending' ||
+            (o.payment_status === 'success' && o.status === 'failed')) &&
+          (!o.failure_reason || !o.failure_reason.startsWith('prelaunch_'))
+      );
+    } else if (params.status === 'abandoned') {
+      all = all.filter((o) => o.status === 'cancelled' || o.status === 'expired');
+    } else if (params.status === 'all') {
+      // Keep all
+    } else if (params.status && params.status !== 'operational') {
       all = all.filter((o) => o.status === params.status);
+    } else {
+      // Default 'operational' view: exclude cancelled, expired, and initialization failures
+      all = all.filter(
+        (o) =>
+          o.status !== 'cancelled' &&
+          o.status !== 'expired' &&
+          (!o.failure_reason || !o.failure_reason.startsWith('paystack_initialization_'))
+      );
     }
 
     if (params.paymentStatus) {
@@ -1039,23 +1319,23 @@ export class OrdersStore {
     if (pool) {
       const res = await pool.query(`
         SELECT 
-          COUNT(*) as total_orders,
+          COUNT(CASE WHEN payment_status = 'success' THEN 1 END) as total_orders,
           COALESCE(SUM(CASE WHEN payment_status = 'success' THEN amount ELSE 0 END), 0) as total_revenue,
-          COALESCE(SUM(CASE WHEN supplier_cost_minor IS NOT NULL THEN supplier_cost_minor ELSE 0 END), 0) as total_cost,
-          COUNT(CASE WHEN manual_review = TRUE THEN 1 END) as manual_reviews,
+          COALESCE(SUM(CASE WHEN payment_status = 'success' AND (supplier_order_id IS NOT NULL OR submitted_at IS NOT NULL OR status IN ('submitted', 'processing', 'delivered', 'refund_pending', 'refunded')) THEN supplier_cost_minor ELSE 0 END), 0) as total_cost,
+          COUNT(CASE WHEN (manual_review = TRUE OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR failure_reason NOT LIKE 'prelaunch_%') THEN 1 END) as manual_reviews,
           
           -- Today
-          COUNT(CASE WHEN created_at >= $1 THEN 1 END) as today_orders,
+          COUNT(CASE WHEN created_at >= $1 AND payment_status = 'success' THEN 1 END) as today_orders,
           COALESCE(SUM(CASE WHEN created_at >= $1 AND payment_status = 'success' THEN amount ELSE 0 END), 0) as today_revenue,
           COUNT(CASE WHEN created_at >= $1 AND status = 'delivered' THEN 1 END) as today_delivered,
           COUNT(CASE WHEN created_at >= $1 AND status IN ('processing', 'submitted', 'queued') THEN 1 END) as today_processing,
-          COUNT(CASE WHEN created_at >= $1 AND status IN ('failed', 'refund_pending', 'refunded') THEN 1 END) as today_attention,
+          COUNT(CASE WHEN created_at >= $1 AND (manual_review = TRUE OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR failure_reason NOT LIKE 'prelaunch_%') THEN 1 END) as today_attention,
 
           -- Last 7 Days
-          COUNT(CASE WHEN created_at >= $2 THEN 1 END) as last7_orders,
+          COUNT(CASE WHEN created_at >= $2 AND payment_status = 'success' THEN 1 END) as last7_orders,
           COALESCE(SUM(CASE WHEN created_at >= $2 AND payment_status = 'success' THEN amount ELSE 0 END), 0) as last7_revenue,
-          COUNT(CASE WHEN created_at >= $2 AND (service_type = 'data' OR service_type IS NULL) THEN 1 END) as last7_data,
-          COUNT(CASE WHEN created_at >= $2 AND service_type = 'airtime' THEN 1 END) as last7_airtime
+          COUNT(CASE WHEN created_at >= $2 AND payment_status = 'success' AND (service_type = 'data' OR service_type IS NULL) THEN 1 END) as last7_data,
+          COUNT(CASE WHEN created_at >= $2 AND payment_status = 'success' AND service_type = 'airtime' THEN 1 END) as last7_airtime
         FROM orders;
       `, [startOfToday, sevenDaysAgo]);
 
@@ -1065,7 +1345,7 @@ export class OrdersStore {
       const todayRev = parseInt(row.today_revenue || '0', 10);
       const last7Rev = parseInt(row.last7_revenue || '0', 10);
 
-      const marginGhc = totalCost > 0 ? Number(((totalRev - totalCost) / 100).toFixed(2)) : null;
+      const marginGhc = totalRev > 0 ? Number(((totalRev - totalCost) / 100).toFixed(2)) : null;
 
       return {
         today: {
@@ -1097,39 +1377,48 @@ export class OrdersStore {
 
     // In-memory fallback calculation
     const all = Array.from(devMemoryStore.values()).filter((ord, idx, arr) => arr.findIndex((x) => x.id === ord.id) === idx);
+    const paidAll = all.filter((o) => o.payment_status === 'success');
 
-    const todayOrders = all.filter((o) => new Date(o.created_at) >= new Date(startOfToday));
-    const last7Orders = all.filter((o) => new Date(o.created_at) >= new Date(sevenDaysAgo));
+    const todayPaid = paidAll.filter((o) => new Date(o.created_at) >= new Date(startOfToday));
+    const last7Paid = paidAll.filter((o) => new Date(o.created_at) >= new Date(sevenDaysAgo));
 
-    const todayRevMinor = todayOrders.filter((o) => o.payment_status === 'success').reduce((sum, o) => sum + o.amount, 0);
-    const last7RevMinor = last7Orders.filter((o) => o.payment_status === 'success').reduce((sum, o) => sum + o.amount, 0);
-    const totalRevMinor = all.filter((o) => o.payment_status === 'success').reduce((sum, o) => sum + o.amount, 0);
-    const totalCostMinor = all.reduce((sum, o) => sum + (o.supplier_cost_minor || 0), 0);
+    const todayRevMinor = todayPaid.reduce((sum, o) => sum + o.amount, 0);
+    const last7RevMinor = last7Paid.reduce((sum, o) => sum + o.amount, 0);
+    const totalRevMinor = paidAll.reduce((sum, o) => sum + o.amount, 0);
+    const totalCostMinor = paidAll
+      .filter((o) => o.supplier_order_id || o.submitted_at || ['submitted', 'processing', 'delivered', 'refund_pending', 'refunded'].includes(o.status))
+      .reduce((sum, o) => sum + (o.supplier_cost_minor || 0), 0);
+
+    const isActionableAttention = (o: OrderRecord) =>
+      (Boolean(o.manual_review) ||
+        o.status === 'refund_pending' ||
+        (o.payment_status === 'success' && o.status === 'failed')) &&
+      (!o.failure_reason || !o.failure_reason.startsWith('prelaunch_'));
 
     return {
       today: {
-        ordersCount: todayOrders.length,
+        ordersCount: todayPaid.length,
         revenueMinor: todayRevMinor,
         revenueGhc: Number((todayRevMinor / 100).toFixed(2)),
-        deliveredCount: todayOrders.filter((o) => o.status === 'delivered').length,
-        processingCount: todayOrders.filter((o) => ['processing', 'submitted', 'queued'].includes(o.status)).length,
-        attentionCount: todayOrders.filter((o) => ['failed', 'refund_pending', 'refunded'].includes(o.status)).length,
+        deliveredCount: all.filter((o) => new Date(o.created_at) >= new Date(startOfToday) && o.status === 'delivered').length,
+        processingCount: all.filter((o) => new Date(o.created_at) >= new Date(startOfToday) && ['processing', 'submitted', 'queued'].includes(o.status)).length,
+        attentionCount: all.filter((o) => new Date(o.created_at) >= new Date(startOfToday) && isActionableAttention(o)).length,
       },
       last7Days: {
-        ordersCount: last7Orders.length,
+        ordersCount: last7Paid.length,
         revenueMinor: last7RevMinor,
         revenueGhc: Number((last7RevMinor / 100).toFixed(2)),
-        dataOrdersCount: last7Orders.filter((o) => (o.service_type || 'data') === 'data').length,
-        airtimeOrdersCount: last7Orders.filter((o) => o.service_type === 'airtime').length,
+        dataOrdersCount: last7Paid.filter((o) => (o.service_type || 'data') === 'data').length,
+        airtimeOrdersCount: last7Paid.filter((o) => o.service_type === 'airtime').length,
       },
       allTime: {
-        ordersCount: all.length,
+        ordersCount: paidAll.length,
         revenueMinor: totalRevMinor,
         revenueGhc: Number((totalRevMinor / 100).toFixed(2)),
         supplierCostMinor: totalCostMinor,
         supplierCostGhc: Number((totalCostMinor / 100).toFixed(2)),
-        estimatedGrossMarginGhc: totalCostMinor > 0 ? Number(((totalRevMinor - totalCostMinor) / 100).toFixed(2)) : null,
-        manualReviewPendingCount: all.filter((o) => Boolean(o.manual_review)).length,
+        estimatedGrossMarginGhc: totalRevMinor > 0 ? Number(((totalRevMinor - totalCostMinor) / 100).toFixed(2)) : null,
+        manualReviewPendingCount: all.filter(isActionableAttention).length,
       },
     };
   }

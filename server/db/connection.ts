@@ -244,6 +244,10 @@ export async function initDatabase(): Promise<void> {
         name: 'orders.admin_note',
         sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS admin_note TEXT;`,
       },
+      {
+        name: 'orders.payment_closed_at',
+        sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_closed_at TIMESTAMP WITH TIME ZONE;`,
+      },
     ];
 
     for (const mig of orderMigrations) {
