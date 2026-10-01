@@ -48,7 +48,7 @@ export const OrdersPage: React.FC = () => {
           },
           recipientPhone: orderData.recipient_phone,
           network: orderData.network,
-          paymentMethod: 'momo',
+          paymentMethod: 'paystack',
           amountGhc: orderData.amount_ghc,
           status: isDelivered
             ? 'delivered'

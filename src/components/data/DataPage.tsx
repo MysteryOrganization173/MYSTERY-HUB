@@ -35,7 +35,7 @@ export const DataPage: React.FC = () => {
   const [sizeFilter, setSizeFilter] = useState<'all' | 'small' | 'medium' | 'large'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isAirtimeMode, setIsAirtimeMode] = useState(false);
-  const [selectedBundleId, setSelectedBundleId] = useState<string | null>(null);
+  const [quickBuyPhone, setQuickBuyPhone] = useState('');
 
   // View mode: 'cards' or 'compact'
   // Mobile defaults to compact view, desktop defaults to card view. Stored in localStorage.
@@ -424,7 +424,7 @@ export const DataPage: React.FC = () => {
                 {/* Desktop Top Header */}
                 <div className="hidden lg:flex items-center justify-between text-xs text-slate-400 pb-3 border-b border-slate-800">
                   <span className="font-semibold text-white">Popular Bundle</span>
-                  <span className="text-[#00c365] font-medium">In Stock</span>
+                  <span className="text-[10px] font-semibold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/25 px-2 py-0.5 rounded-full">In Stock</span>
                 </div>
 
                 {/* Mobile Compact Horizontal Layout (< lg) */}
@@ -436,7 +436,9 @@ export const DataPage: React.FC = () => {
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="text-base font-extrabold text-white">1GB</span>
-                        <span className="text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 px-1.5 py-0.2 rounded border border-[#00c365]/30">In Stock</span>
+                        <span className="text-[9px] sm:text-[10px] font-semibold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/25 px-2 py-0.5 rounded-full shrink-0">
+                          In Stock
+                        </span>
                       </div>
                       <span className="text-[11px] text-slate-400 block truncate">MTN Express Data</span>
                     </div>
@@ -813,8 +815,9 @@ export const DataPage: React.FC = () => {
                 type="submit"
                 className="w-full py-3.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-sm tracking-wide transition-all shadow-[0_0_20px_rgba(0,195,101,0.3)] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>Buy GH₵{airtimeCalculation.faceValue.toFixed(2)} Airtime · Pay GH₵{airtimeCalculation.total.toFixed(2)}</span>
-                <ArrowRight className="w-4 h-4" />
+                <span className="hidden xs:inline">Buy GH₵{airtimeCalculation.faceValue.toFixed(2)} Airtime · Pay GH₵{airtimeCalculation.total.toFixed(2)}</span>
+                <span className="xs:hidden">Pay GH₵{airtimeCalculation.total.toFixed(2)} for Airtime</span>
+                <ArrowRight className="w-4 h-4 shrink-0" />
               </button>
 
               <div className="flex items-center justify-center gap-2 text-[11px] text-slate-500 text-center">
@@ -976,26 +979,26 @@ export const DataPage: React.FC = () => {
             {/* Bundles Content: Compact View vs Card View */}
             {filteredBundles.length > 0 ? (
               viewMode === 'compact' ? (
-                /* Compact View */
+                /* Compact View - Whole row is actionable, no separate selection */
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                   {filteredBundles.map((bundle) => (
                     <CompactBundleRow
                       key={bundle.id}
                       bundle={bundle}
-                      isSelected={selectedBundleId === bundle.id}
-                      onSelect={(b) => setSelectedBundleId(b.id)}
                       onBuy={(b) => openCheckout(b)}
                     />
                   ))}
                 </div>
               ) : (
-                /* Card View */
+                /* Card View - Quick buy with shared recipient number input */
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {filteredBundles.map((bundle) => (
                     <BundleCard
                       key={bundle.id}
                       bundle={bundle}
-                      onBuy={(b) => openCheckout(b)}
+                      recipientPhone={quickBuyPhone}
+                      onPhoneChange={setQuickBuyPhone}
+                      onBuy={(b, opts) => openCheckout(b, opts)}
                     />
                   ))}
                 </div>

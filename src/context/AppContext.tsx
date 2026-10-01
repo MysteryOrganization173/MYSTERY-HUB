@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { ActivePage, DataBundle, OrderRecord, WebsiteTemplate, MarketplaceProduct } from '../types';
+import { ActivePage, DataBundle, OrderRecord, PaymentMethod, WebsiteTemplate, MarketplaceProduct } from '../types';
 import { DATA_BUNDLES } from '../data/bundles';
 import { SafeUserProfile } from '../../server/types/auth';
 import { getMeOnServer, logoutOnServer } from '../services/apiClient';
@@ -21,7 +21,8 @@ interface AppContextType {
   activePage: ActivePage;
   setActivePage: (page: ActivePage) => void;
   checkoutBundle: DataBundle | null;
-  openCheckout: (bundle: DataBundle) => void;
+  checkoutInitialPhone?: string;
+  openCheckout: (bundle: DataBundle, options?: { recipientPhone?: string }) => void;
   closeCheckout: () => void;
   isCheckoutOpen: boolean;
   orders: OrderRecord[];
@@ -32,7 +33,7 @@ interface AppContextType {
   createOrder: (
     bundle: DataBundle,
     phone: string,
-    method: 'momo' | 'card' | 'bank',
+    method?: PaymentMethod,
     paymentReference?: string,
     publicReference?: string
   ) => OrderRecord;
@@ -75,6 +76,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [checkoutBundle, setCheckoutBundle] = useState<DataBundle | null>(null);
+  const [checkoutInitialPhone, setCheckoutInitialPhone] = useState<string | undefined>(undefined);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   // Production customer orders (starts empty - no fake demo orders)
@@ -163,6 +165,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Browser History and Popstate synchronization for back/forward buttons
   useEffect(() => {
+    // If the browser visibly landed on /index.html (e.g. from an old server redirect or direct link),
+    // normalize the address bar to '/' cleanly without a full page reload
+    if (typeof window !== 'undefined' && normalizePathname(window.location.pathname) === '/index.html') {
+      window.history.replaceState({ page: 'home' }, '', '/');
+    }
+
     const handlePopState = () => {
       const page = getPageFromPath(window.location.pathname);
       setActivePageState(page);
@@ -204,13 +212,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const openCheckout = (bundle: DataBundle) => {
+  const openCheckout = (bundle: DataBundle, options?: { recipientPhone?: string }) => {
     setCheckoutBundle(bundle);
+    setCheckoutInitialPhone(options?.recipientPhone);
     setIsCheckoutOpen(true);
   };
 
   const closeCheckout = () => {
     setIsCheckoutOpen(false);
+    setCheckoutInitialPhone(undefined);
   };
 
   const openOrderStatus = (order: OrderRecord) => {
@@ -225,7 +235,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const createOrder = (
     bundle: DataBundle,
     phone: string,
-    method: 'momo' | 'card' | 'bank',
+    method: PaymentMethod = 'paystack',
     paymentReference?: string,
     publicReference?: string
   ): OrderRecord => {
@@ -360,6 +370,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activePage,
         setActivePage,
         checkoutBundle,
+        checkoutInitialPhone,
         openCheckout,
         closeCheckout,
         isCheckoutOpen,

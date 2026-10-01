@@ -8,6 +8,7 @@ import { ArrowRight, Wifi } from 'lucide-react';
 export const HomeFeaturedData: React.FC = () => {
   const { setActivePage, openCheckout } = useApp();
   const [selectedNetwork, setSelectedNetwork] = useState<NetworkId>('mtn');
+  const [homeQuickBuyPhone, setHomeQuickBuyPhone] = useState('');
 
   // Popular 4 bundles for the selected network
   const popularBundles = DATA_BUNDLES.filter(
@@ -72,7 +73,9 @@ export const HomeFeaturedData: React.FC = () => {
             <BundleCard
               key={bundle.id}
               bundle={bundle}
-              onBuy={(b) => openCheckout(b)}
+              recipientPhone={homeQuickBuyPhone}
+              onPhoneChange={setHomeQuickBuyPhone}
+              onBuy={(b, opts) => openCheckout(b, opts)}
             />
           ))}
         </div>

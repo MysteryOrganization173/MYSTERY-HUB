@@ -9,13 +9,10 @@ import {
   X,
   ShieldCheck,
   Smartphone,
-  CreditCard,
-  Building2,
   Check,
   ArrowRight,
   MessageSquare,
   AlertCircle,
-  Lock,
   AlertTriangle,
   Info,
 } from 'lucide-react';
@@ -25,6 +22,7 @@ export const CheckoutModal: React.FC = () => {
     isCheckoutOpen,
     closeCheckout,
     checkoutBundle,
+    checkoutInitialPhone,
     createOrder,
     showToast,
     user,
@@ -33,7 +31,6 @@ export const CheckoutModal: React.FC = () => {
   const { initializeServerPayment, isInitializing, loadingPhase, isConfigured } = usePaystack();
 
   const [phone, setPhone] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'momo' | 'card' | 'bank'>('momo');
   const [detectedNet, setDetectedNet] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState('');
   const [serverError, setServerError] = useState('');
@@ -60,12 +57,13 @@ export const CheckoutModal: React.FC = () => {
 
   useEffect(() => {
     if (checkoutBundle) {
-      setPhone((prev) => prev || user?.phone || '');
+      const initial = checkoutInitialPhone !== undefined ? checkoutInitialPhone : (user?.phone || '');
+      setPhone(initial);
       setPhoneError('');
       setServerError('');
       setActiveMtnConflict(null);
     }
-  }, [checkoutBundle, user?.phone]);
+  }, [checkoutBundle, checkoutInitialPhone, user?.phone]);
 
   useEffect(() => {
     const net = detectGhanaNetwork(phone);
@@ -132,7 +130,7 @@ export const CheckoutModal: React.FC = () => {
           },
           recipientPhone: res.order.recipient_phone,
           network: res.order.network,
-          paymentMethod: 'momo',
+          paymentMethod: 'paystack',
           amountGhc: res.order.amount_ghc,
           status: res.order.status === 'delivered' ? 'delivered' : 'processing',
           createdAt: res.order.created_at,
@@ -159,7 +157,7 @@ export const CheckoutModal: React.FC = () => {
       },
       recipientPhone: phone.trim(),
       network: 'mtn',
-      paymentMethod: 'momo',
+      paymentMethod: 'paystack',
       amountGhc: 0,
       status: 'processing',
       createdAt: new Date().toISOString(),
@@ -199,7 +197,7 @@ export const CheckoutModal: React.FC = () => {
           serviceFeeGhc: serviceFee,
           serviceType: isAirtime ? ('airtime' as const) : ('data' as const),
         };
-        const newOrder = createOrder(orderToCreate, phone.trim(), paymentMethod, reference, orderRef);
+        const newOrder = createOrder(orderToCreate, phone.trim(), 'paystack', reference, orderRef);
         closeCheckout();
         showToast(`Payment received! Order #${orderRef}. Verifying payment...`, 'success');
         openOrderStatus(newOrder);
@@ -223,9 +221,9 @@ export const CheckoutModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl bg-[#0f151b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 max-h-[94dvh] flex flex-col">
+      <div className="relative w-full max-w-lg bg-[#0f151b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 max-h-[94dvh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 bg-[#0c1116] shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-3.5 border-b border-slate-800 bg-[#0c1116] shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-[#00c365]/10 border border-[#00c365]/30 flex items-center justify-center text-[#00c365] shrink-0">
               <Smartphone className="w-4 h-4" />
@@ -235,7 +233,7 @@ export const CheckoutModal: React.FC = () => {
                 {isAirtime ? `${currentNetwork.name} Airtime Top-Up` : 'Data Bundle Checkout'}
               </h3>
               <p className="text-[11px] sm:text-xs text-slate-400 truncate">
-                {isAirtime ? 'Direct SIM recharge via Ghana Mobile Money' : 'Direct SIM delivery via Ghana Mobile Money'}
+                Direct SIM delivery via Paystack
               </p>
             </div>
           </div>
@@ -250,12 +248,12 @@ export const CheckoutModal: React.FC = () => {
         </div>
 
         {/* Scrollable Body */}
-        <form onSubmit={handleSubmit} className="overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5 flex-1 overscroll-contain">
-          {/* Bundle / Airtime Summary Card */}
-          <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3">
+        <form onSubmit={handleSubmit} className="overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4 flex-1 overscroll-contain">
+          {/* 1. Bundle / Airtime Summary Card */}
+          <div className="p-3 sm:p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div
-                className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-sm"
+                className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-sm"
                 style={{
                   backgroundColor:
                     checkoutBundle.network === 'mtn'
@@ -269,73 +267,73 @@ export const CheckoutModal: React.FC = () => {
                 {checkoutBundle.network === 'mtn' ? 'MTN' : checkoutBundle.network === 'telecel' ? 'Telecel' : 'AT'}
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <h4 className="font-bold text-white text-sm sm:text-base truncate">
                     {isAirtime ? `GH₵${faceValue.toFixed(2)} Airtime Top-Up` : `${checkoutBundle.dataAmount} Data Bundle`}
                   </h4>
                   {isAirtime ? (
-                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded font-bold shrink-0">
-                      ⚡ Instant Recharge
+                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-bold shrink-0">
+                      ⚡ Instant
                     </span>
                   ) : checkoutBundle.network === 'airteltigo' ? (
-                    <span className="text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded font-bold shrink-0">
-                      ⚡ Instant Delivery
+                    <span className="text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded font-bold shrink-0">
+                      ⚡ Instant
                     </span>
                   ) : (
-                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded font-medium shrink-0">
-                      Direct SIM Credit
+                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-medium shrink-0">
+                      Direct SIM
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 truncate">
-                  {currentNetwork.name} · {isAirtime ? 'Direct automated airtime recharge' : (checkoutBundle.network === 'airteltigo' ? 'Instant direct delivery to your AT number.' : (checkoutBundle.description || 'Fast automated delivery'))}
+                <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                  {currentNetwork.name} · {isAirtime ? 'Direct automated airtime recharge' : (checkoutBundle.network === 'airteltigo' ? 'Instant direct delivery to your AT number' : (checkoutBundle.description || 'Fast automated delivery'))}
                 </p>
               </div>
             </div>
 
             <div className="text-right shrink-0">
-              <div className="text-[11px] text-slate-400 font-medium">{isAirtime ? 'Total' : 'Price'}</div>
+              <div className="text-[10px] text-slate-400 font-medium">{isAirtime ? 'Total' : 'Price'}</div>
               <div className="text-base sm:text-lg font-bold text-[#00c365] tabular-nums">
                 GH₵{totalAmount.toFixed(2)}
               </div>
             </div>
           </div>
 
-          {/* Active MTN Duplicate Order Conflict Banner (Smooth-scrolled into view) */}
+          {/* Active MTN Duplicate Order Conflict Banner */}
           {activeMtnConflict && (
             <div
               ref={conflictRef}
-              className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/35 text-left space-y-3 animate-in fade-in"
+              className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/35 text-left space-y-2.5 animate-in fade-in"
             >
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
-                  <AlertTriangle className="w-5 h-5" />
+              <div className="flex items-start gap-2.5">
+                <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                  <AlertTriangle className="w-4 h-4" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-sm text-amber-200">
+                  <h4 className="font-semibold text-xs sm:text-sm text-amber-200">
                     An MTN bundle is already being processed for this number.
                   </h4>
-                  <p className="text-xs text-amber-300/90 mt-1 leading-relaxed">
+                  <p className="text-[11px] sm:text-xs text-amber-300/90 mt-0.5 leading-relaxed">
                     Please wait for your current order to be completed before buying another MTN bundle for this number.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-2 pt-0.5">
                 {activeMtnConflict.orderRef && (
                   <button
                     type="button"
                     onClick={() => handleTrackCurrentOrder(activeMtnConflict.orderRef!)}
-                    className="px-3 py-1.5 rounded-lg bg-amber-500/25 hover:bg-amber-500/35 text-amber-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg bg-amber-500/25 hover:bg-amber-500/35 text-amber-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <span>Track current order</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <ArrowRight className="w-3 h-3" />
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => setActiveMtnConflict(null)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
                 >
                   Dismiss
                 </button>
@@ -343,11 +341,11 @@ export const CheckoutModal: React.FC = () => {
             </div>
           )}
 
-          {/* Server Error Callout (Smooth-scrolled into view) */}
+          {/* Server Error Callout */}
           {serverError && (
             <div
               ref={serverErrorRef}
-              className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5 animate-in fade-in"
+              className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5 animate-in fade-in"
             >
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               <div className="flex-1">
@@ -364,7 +362,7 @@ export const CheckoutModal: React.FC = () => {
             </div>
           )}
 
-          {/* Recipient Phone Input */}
+          {/* 2. Recipient Phone Input */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label htmlFor="checkout-phone" className="text-xs font-semibold text-slate-200">
@@ -387,7 +385,7 @@ export const CheckoutModal: React.FC = () => {
                 onChange={handlePhoneChange}
                 placeholder="e.g. 024 XXX XXXX"
                 required
-                className="w-full bg-[#0a0e12] border border-slate-700 rounded-xl px-4 py-3 text-white text-base tracking-wide focus:outline-none focus:border-[#00c365] focus:ring-1 focus:ring-[#00c365]"
+                className="w-full bg-[#0a0e12] border border-slate-700 rounded-xl px-4 py-2.5 sm:py-3 text-white text-sm sm:text-base tracking-wide focus:outline-none focus:border-[#00c365] focus:ring-1 focus:ring-[#00c365] transition-colors"
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 bg-slate-800 px-2 py-1 rounded">
                 +233
@@ -401,14 +399,14 @@ export const CheckoutModal: React.FC = () => {
               </p>
             ) : (
               <p className="text-[11px] text-slate-400">
-                Double-check the recipient number carefully. Data is credited directly following Mobile Money authorization.
+                Please double-check the recipient number. Data is credited directly after payment authorization.
               </p>
             )}
           </div>
 
-          {/* MTN Reassurance Notice in Checkout */}
+          {/* 3. Network Notice (if required) */}
           {checkoutBundle.network === 'mtn' && !activeMtnConflict && (
-            <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300 flex items-start gap-2">
+            <div className="p-2.5 sm:p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300 flex items-start gap-2">
               <Info className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
               <span>
                 MTN orders are queued and processed automatically. Please allow processing to complete before placing another order for this number.
@@ -416,87 +414,8 @@ export const CheckoutModal: React.FC = () => {
             </div>
           )}
 
-          {/* Payment Method Selector (Compact 3-column Tiles) */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-200 block">
-              Choose Payment Method
-            </label>
-
-            <div className="grid grid-cols-3 gap-2">
-              {/* MoMo Tile */}
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('momo')}
-                className={`p-2.5 sm:p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-1.5 transition-all cursor-pointer ${
-                  paymentMethod === 'momo'
-                    ? 'border-[#00c365] bg-[#00c365]/10 text-white shadow-sm ring-1 ring-[#00c365]/40'
-                    : 'border-slate-800 bg-[#090d10] text-slate-300 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-center gap-1">
-                  <Smartphone className="w-4 h-4 text-[#00c365]" />
-                  {paymentMethod === 'momo' && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#00c365]" />
-                  )}
-                </div>
-                <span className="text-xs font-bold leading-none">Mobile Money</span>
-              </button>
-
-              {/* Card Tile */}
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('card')}
-                className={`p-2.5 sm:p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-1.5 transition-all cursor-pointer ${
-                  paymentMethod === 'card'
-                    ? 'border-[#00c365] bg-[#00c365]/10 text-white shadow-sm ring-1 ring-[#00c365]/40'
-                    : 'border-slate-800 bg-[#090d10] text-slate-300 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-center gap-1">
-                  <CreditCard className="w-4 h-4 text-sky-400" />
-                  {paymentMethod === 'card' && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#00c365]" />
-                  )}
-                </div>
-                <span className="text-xs font-bold leading-none">Card</span>
-              </button>
-
-              {/* Bank / QR Tile */}
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('bank')}
-                className={`p-2.5 sm:p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-1.5 transition-all cursor-pointer ${
-                  paymentMethod === 'bank'
-                    ? 'border-[#00c365] bg-[#00c365]/10 text-white shadow-sm ring-1 ring-[#00c365]/40'
-                    : 'border-slate-800 bg-[#090d10] text-slate-300 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-center gap-1">
-                  <Building2 className="w-4 h-4 text-amber-400" />
-                  {paymentMethod === 'bank' && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#00c365]" />
-                  )}
-                </div>
-                <span className="text-xs font-bold leading-none">Bank / QR</span>
-              </button>
-            </div>
-
-            {/* Contextual description below tiles */}
-            <div className="text-[11px] text-slate-400 px-1 pt-0.5">
-              {paymentMethod === 'momo' && (
-                <span>Official USSD prompt sent to your MTN MoMo, Telecel Cash, or AT Money wallet.</span>
-              )}
-              {paymentMethod === 'card' && (
-                <span>Pay securely with Visa, Mastercard, or Verve via Paystack 256-bit encryption.</span>
-              )}
-              {paymentMethod === 'bank' && (
-                <span>Scan GhanaQR or pay directly from your Ghana bank app.</span>
-              )}
-            </div>
-          </div>
-
-          {/* Pricing Breakdown */}
-          <div className="p-3.5 rounded-xl bg-[#090d10] border border-slate-800/80 space-y-2 text-xs">
+          {/* 4. Price / Total Summary Breakdown */}
+          <div className="p-3 sm:p-3.5 rounded-xl bg-[#090d10] border border-slate-800/80 space-y-1.5 text-xs">
             {isAirtime ? (
               <>
                 <div className="flex items-center justify-between text-slate-400">
@@ -534,19 +453,13 @@ export const CheckoutModal: React.FC = () => {
             )}
           </div>
 
-          {/* Security Note & Paystack Status */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs text-slate-400">
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>256-bit encrypted checkout. Zero hidden fees.</span>
-            </div>
-            <div className="flex items-center gap-1 text-[11px] text-slate-400">
-              <Lock className="w-3 h-3 text-[#00c365]" />
-              <span>{isConfigured ? 'Secured by Paystack' : 'Paystack Ready (Test Sandbox)'}</span>
-            </div>
+          {/* 5. Simple Security Line */}
+          <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400 text-center">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span>Secure checkout powered by Paystack.</span>
           </div>
 
-          {/* Submit Action */}
+          {/* 6. Proceed to Secure Payment CTA */}
           <button
             type="submit"
             disabled={isInitializing}
@@ -563,13 +476,13 @@ export const CheckoutModal: React.FC = () => {
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                Pay GH₵{totalAmount.toFixed(2)} with Paystack
+                Proceed to Secure Payment
                 <ArrowRight className="w-4 h-4" />
               </span>
             )}
           </button>
 
-          {/* WhatsApp Inquiries */}
+          {/* 7. WhatsApp Help */}
           <div className="text-center pt-0.5">
             <a
               href={BUSINESS_CONFIG.getCheckoutSupportWhatsAppUrl(isAirtime ? `GH₵${faceValue.toFixed(2)} Airtime` : checkoutBundle.dataAmount, currentNetwork.name)}

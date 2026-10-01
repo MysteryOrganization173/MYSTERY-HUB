@@ -31,6 +31,8 @@ export interface DataBundle {
 
 export type OrderStatus = 'placed' | 'verifying' | 'processing' | 'delivered' | 'failed';
 
+export type PaymentMethod = 'paystack' | 'momo' | 'card' | 'bank';
+
 export interface OrderRecord {
   id: string; // Local client ID e.g. MH1234567
   publicReference?: string; // Real authoritative backend reference e.g. MH-20260930-592025
@@ -39,7 +41,7 @@ export interface OrderRecord {
   bundle: DataBundle;
   recipientPhone: string;
   network: NetworkId;
-  paymentMethod: 'momo' | 'card' | 'bank';
+  paymentMethod: PaymentMethod;
   amountGhc: number;
   faceValueGhc?: number;
   serviceFeeGhc?: number;
