@@ -27,6 +27,10 @@ export interface DataBundle {
   serviceType?: 'data' | 'airtime' | 'instant_bundle';
   faceValueGhc?: number;
   serviceFeeGhc?: number;
+  packageId?: string;
+  isFlexi?: boolean;
+  minAmountGhc?: number;
+  maxAmountGhc?: number;
 }
 
 export type OrderStatus = 'placed' | 'verifying' | 'processing' | 'delivered' | 'failed';

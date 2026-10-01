@@ -4,6 +4,7 @@ import { DATA_BUNDLES, GHANA_NETWORKS, detectGhanaNetwork } from '../../data/bun
 import { NetworkId, DataBundle } from '../../types';
 import { BundleCard } from './BundleCard';
 import { CompactBundleRow } from './CompactBundleRow';
+import { InstantBundlesCatalog } from './InstantBundlesCatalog';
 import { smoothScrollToElement } from '../../utils/scroll';
 import { serviceNotices } from '../../config/serviceNotices';
 import {
@@ -29,12 +30,11 @@ import {
 } from 'lucide-react';
 
 export const DataPage: React.FC = () => {
-  const { openCheckout, showToast, openWaitlist } = useApp();
+  const { openCheckout, showToast, openWaitlist, dataProductMode, setDataProductMode } = useApp();
 
   const [activeNetwork, setActiveNetwork] = useState<NetworkId | 'all'>('mtn');
   const [sizeFilter, setSizeFilter] = useState<'all' | 'small' | 'medium' | 'large'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isAirtimeMode, setIsAirtimeMode] = useState(false);
   const [quickBuyPhone, setQuickBuyPhone] = useState('');
 
   // View mode: 'cards' or 'compact'
@@ -251,7 +251,9 @@ export const DataPage: React.FC = () => {
 
   // Network selection with smooth scroll to results
   const handleSelectNetwork = (net: NetworkId) => {
-    setIsAirtimeMode(false);
+    if (dataProductMode === 'airtime') {
+      setDataProductMode('data');
+    }
     setActiveNetwork(net);
     // Smooth scroll to bundle results section
     setTimeout(() => {
@@ -261,7 +263,7 @@ export const DataPage: React.FC = () => {
 
   // Airtime selection with smooth scroll to airtime widget
   const handleSelectAirtime = () => {
-    setIsAirtimeMode(true);
+    setDataProductMode('airtime');
     setTimeout(() => {
       smoothScrollToElement(airtimeSectionRef.current, { block: 'start' });
     }, 50);
@@ -482,30 +484,52 @@ export const DataPage: React.FC = () => {
 
         {/* Network Selection Banner */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-              Choose a Network
+              Choose a Product & Network
             </h2>
-            <div className="flex items-center gap-2">
+            {/* 3 Product Mode Navigation Tabs */}
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               <button
                 type="button"
                 onClick={() => {
-                  setIsAirtimeMode(false);
+                  setDataProductMode('data');
                   setTimeout(() => {
                     smoothScrollToElement(bundlesSectionRef.current, { block: 'start' });
                   }, 50);
                 }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                  !isAirtimeMode ? 'bg-[#00c365] text-black' : 'bg-slate-800 text-slate-300 hover:text-white'
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  dataProductMode === 'data'
+                    ? 'bg-[#00c365] text-black shadow-md'
+                    : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'
                 }`}
               >
                 Data Bundles
               </button>
               <button
                 type="button"
+                onClick={() => {
+                  setDataProductMode('instant');
+                  setTimeout(() => {
+                    smoothScrollToElement(bundlesSectionRef.current, { block: 'start' });
+                  }, 50);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  dataProductMode === 'instant'
+                    ? 'bg-amber-400 text-black shadow-md'
+                    : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 fill-current" />
+                <span>Instant Bundles</span>
+              </button>
+              <button
+                type="button"
                 onClick={handleSelectAirtime}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                  isAirtimeMode ? 'bg-[#00c365] text-black' : 'bg-slate-800 text-slate-300 hover:text-white'
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  dataProductMode === 'airtime'
+                    ? 'bg-[#00c365] text-black shadow-md'
+                    : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'
                 }`}
               >
                 Airtime Top-Up
@@ -513,14 +537,14 @@ export const DataPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Network Cards Grid */}
+          {/* Network Cards Grid (4 Selector Cards Kept Intact) */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             {/* MTN */}
             <button
               type="button"
               onClick={() => handleSelectNetwork('mtn')}
               className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
-                !isAirtimeMode && activeNetwork === 'mtn'
+                dataProductMode !== 'airtime' && activeNetwork === 'mtn'
                   ? 'border-[#FFCC00] bg-[#FFCC00]/10 shadow-[0_0_20px_rgba(255,204,0,0.15)] ring-1 ring-[#FFCC00]/40'
                   : 'border-slate-800 bg-[#0f151b] hover:border-slate-700'
               }`}
@@ -529,7 +553,7 @@ export const DataPage: React.FC = () => {
                 <div className="w-10 h-10 rounded-xl bg-[#FFCC00] text-black font-extrabold text-xs flex items-center justify-center shadow-sm">
                   MTN
                 </div>
-                {!isAirtimeMode && activeNetwork === 'mtn' && (
+                {dataProductMode !== 'airtime' && activeNetwork === 'mtn' && (
                   <div className="w-2.5 h-2.5 rounded-full bg-[#FFCC00]" />
                 )}
               </div>
@@ -544,7 +568,7 @@ export const DataPage: React.FC = () => {
               type="button"
               onClick={() => handleSelectNetwork('airteltigo')}
               className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
-                !isAirtimeMode && activeNetwork === 'airteltigo'
+                dataProductMode !== 'airtime' && activeNetwork === 'airteltigo'
                   ? 'border-[#004B93] bg-[#004B93]/20 shadow-[0_0_20px_rgba(0,75,147,0.25)] ring-1 ring-[#004B93]/60'
                   : 'border-slate-800 bg-[#0f151b] hover:border-slate-700'
               }`}
@@ -553,7 +577,7 @@ export const DataPage: React.FC = () => {
                 <div className="w-10 h-10 rounded-xl bg-[#004B93] text-white font-bold text-xs flex items-center justify-center shadow-sm">
                   AT
                 </div>
-                {!isAirtimeMode && activeNetwork === 'airteltigo' && (
+                {dataProductMode !== 'airtime' && activeNetwork === 'airteltigo' && (
                   <div className="w-2.5 h-2.5 rounded-full bg-sky-400" />
                 )}
               </div>
@@ -570,7 +594,7 @@ export const DataPage: React.FC = () => {
               type="button"
               onClick={() => handleSelectNetwork('telecel')}
               className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
-                !isAirtimeMode && activeNetwork === 'telecel'
+                dataProductMode !== 'airtime' && activeNetwork === 'telecel'
                   ? 'border-[#E60000] bg-[#E60000]/10 shadow-[0_0_20px_rgba(230,0,0,0.15)] ring-1 ring-[#E60000]/40'
                   : 'border-slate-800 bg-[#0f151b] hover:border-slate-700'
               }`}
@@ -579,7 +603,7 @@ export const DataPage: React.FC = () => {
                 <div className="w-10 h-10 rounded-xl bg-[#E60000] text-white font-bold text-sm flex items-center justify-center shadow-sm">
                   t
                 </div>
-                {!isAirtimeMode && activeNetwork === 'telecel' && (
+                {dataProductMode !== 'airtime' && activeNetwork === 'telecel' && (
                   <div className="w-2.5 h-2.5 rounded-full bg-[#E60000]" />
                 )}
               </div>
@@ -594,7 +618,7 @@ export const DataPage: React.FC = () => {
               type="button"
               onClick={handleSelectAirtime}
               className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
-                isAirtimeMode
+                dataProductMode === 'airtime'
                   ? 'border-[#00c365] bg-[#00c365]/10 shadow-[0_0_20px_rgba(0,195,101,0.15)] ring-1 ring-[#00c365]/40'
                   : 'border-slate-800 bg-[#0f151b] hover:border-slate-700'
               }`}
@@ -603,7 +627,7 @@ export const DataPage: React.FC = () => {
                 <div className="w-10 h-10 rounded-xl bg-[#00c365]/20 text-[#00c365] flex items-center justify-center shadow-sm">
                   <Smartphone className="w-5 h-5" />
                 </div>
-                {isAirtimeMode && <div className="w-2.5 h-2.5 rounded-full bg-[#00c365]" />}
+                {dataProductMode === 'airtime' && <div className="w-2.5 h-2.5 rounded-full bg-[#00c365]" />}
               </div>
               <div className="mt-3">
                 <div className="font-bold text-sm text-white">Airtime Top-Up</div>
@@ -611,10 +635,56 @@ export const DataPage: React.FC = () => {
               </div>
             </button>
           </div>
+
+          {/* Instant Discovery Banner */}
+          {dataProductMode !== 'instant' && (
+            <div className="rounded-2xl bg-gradient-to-r from-[#0d141b] via-[#141d27] to-[#0d141b] border border-amber-500/30 p-3.5 sm:p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 shadow-lg relative overflow-hidden animate-in fade-in">
+              <div className="absolute right-0 top-0 w-48 h-full bg-amber-500/5 blur-xl pointer-events-none" />
+              <div className="flex items-center gap-3 relative z-10">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 shadow-sm">
+                  <Zap className="w-4 h-4 sm:w-5 sm:h-5 fill-amber-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-xs sm:text-sm text-white">
+                      ⚡ Need data now? Go Instant
+                    </h3>
+                    <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-1.5 py-0.2 rounded">
+                      Fast Delivery
+                    </span>
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 leading-snug">
+                    Browse available Instant Bundles for fast delivery.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDataProductMode('instant');
+                  setTimeout(() => {
+                    smoothScrollToElement(bundlesSectionRef.current, { block: 'start' });
+                  }, 50);
+                }}
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-bold text-xs tracking-wide transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer relative z-10"
+              >
+                <span>Explore Instant Bundles</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Dynamic Mode: Airtime vs Data Bundles */}
-        {isAirtimeMode ? (
+        {/* Dynamic Mode: Instant Bundles vs Airtime vs Standard Data */}
+        {dataProductMode === 'instant' ? (
+          <div ref={bundlesSectionRef} className="scroll-mt-6">
+            <InstantBundlesCatalog
+              quickBuyPhone={quickBuyPhone}
+              onQuickBuyPhoneChange={setQuickBuyPhone}
+              onSwitchToData={() => setDataProductMode('data')}
+            />
+          </div>
+        ) : dataProductMode === 'airtime' ? (
           /* Airtime Direct Top-Up Widget */
           <form
             ref={airtimeSectionRef}

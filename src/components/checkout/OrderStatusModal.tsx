@@ -262,7 +262,13 @@ export const OrderStatusModal: React.FC = () => {
             <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
               <div className="text-[11px] text-slate-400">Product</div>
               <div className="font-semibold text-sm text-white truncate mt-0.5">
-                {currentNetwork?.name || activeOrder.network.toUpperCase()} {activeOrder.bundle.dataAmount} Data
+                {activeOrder.serviceType === 'instant_bundle' ||
+                (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('instant-'))
+                  ? `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount} Instant ⚡`
+                  : activeOrder.serviceType === 'airtime' ||
+                    (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('airtime-'))
+                  ? `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount}`
+                  : `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount} Data`}
               </div>
             </div>
 

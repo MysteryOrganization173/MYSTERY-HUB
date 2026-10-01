@@ -41,7 +41,7 @@ export interface ServerPaystackOptions {
   recipientPhone: string;
   customerEmail?: string;
   customerName?: string;
-  serviceType?: 'data' | 'airtime';
+  serviceType?: 'data' | 'airtime' | 'instant_bundle';
   network?: string;
   amount?: number;
   onPaymentReceived: (orderRef: string, reference: string) => void;

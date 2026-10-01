@@ -175,6 +175,14 @@ export const OrdersPage: React.FC = () => {
                 ),
               }[order.status];
 
+              const isInstantBundle =
+                order.serviceType === 'instant_bundle' ||
+                (order.bundle.id && order.bundle.id.startsWith('instant-')) ||
+                (order.bundle.packageId && order.bundle.packageId.length > 0);
+              const isAirtime =
+                order.serviceType === 'airtime' ||
+                (order.bundle.id && order.bundle.id.startsWith('airtime-'));
+
               return (
                 <div
                   key={order.id}
@@ -195,7 +203,11 @@ export const OrdersPage: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-white text-base group-hover:text-[#00c365] transition-colors">
-                          {order.bundle.dataAmount} Data Bundle
+                          {isInstantBundle
+                            ? `${order.bundle.dataAmount} Instant Bundle ⚡`
+                            : isAirtime
+                            ? order.bundle.dataAmount
+                            : `${order.bundle.dataAmount} Data Bundle`}
                         </span>
                         <span className="font-mono text-xs text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded truncate max-w-[150px] sm:max-w-none">
                           #{order.publicReference || order.id}

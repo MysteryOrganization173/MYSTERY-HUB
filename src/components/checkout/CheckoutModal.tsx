@@ -91,6 +91,8 @@ export const CheckoutModal: React.FC = () => {
 
   const currentNetwork = GHANA_NETWORKS[checkoutBundle.network];
   const isAirtime = checkoutBundle.serviceType === 'airtime' || checkoutBundle.id.startsWith('airtime-');
+  const isInstantBundle =
+    checkoutBundle.serviceType === 'instant_bundle' || checkoutBundle.id.startsWith('instant-');
   const faceValue = checkoutBundle.faceValueGhc ?? checkoutBundle.priceGhc;
   const serviceFee = checkoutBundle.serviceFeeGhc ?? (isAirtime ? Number((faceValue * 0.02).toFixed(2)) : 0);
   const totalAmount = isAirtime ? Number((faceValue + serviceFee).toFixed(2)) : checkoutBundle.priceGhc;
@@ -186,7 +188,7 @@ export const CheckoutModal: React.FC = () => {
       recipientPhone: phone.trim(),
       customerEmail: user?.email || undefined,
       customerName: user?.name || undefined,
-      serviceType: isAirtime ? 'airtime' : 'data',
+      serviceType: isInstantBundle ? 'instant_bundle' : isAirtime ? 'airtime' : 'data',
       network: checkoutBundle.network,
       amount: faceValue,
       onPaymentReceived: (orderRef, reference) => {
@@ -195,7 +197,11 @@ export const CheckoutModal: React.FC = () => {
           priceGhc: totalAmount,
           faceValueGhc: faceValue,
           serviceFeeGhc: serviceFee,
-          serviceType: isAirtime ? ('airtime' as const) : ('data' as const),
+          serviceType: isInstantBundle
+            ? ('instant_bundle' as const)
+            : isAirtime
+            ? ('airtime' as const)
+            : ('data' as const),
         };
         const newOrder = createOrder(orderToCreate, phone.trim(), 'paystack', reference, orderRef);
         closeCheckout();
@@ -230,10 +236,16 @@ export const CheckoutModal: React.FC = () => {
             </div>
             <div className="min-w-0 truncate">
               <h3 className="font-semibold text-sm sm:text-base text-white truncate">
-                {isAirtime ? `${currentNetwork.name} Airtime Top-Up` : 'Data Bundle Checkout'}
+                {isInstantBundle
+                  ? `${currentNetwork.name} Instant Bundle ⚡`
+                  : isAirtime
+                  ? `${currentNetwork.name} Airtime Top-Up`
+                  : 'Data Bundle Checkout'}
               </h3>
               <p className="text-[11px] sm:text-xs text-slate-400 truncate">
-                Direct SIM delivery via Paystack
+                {isInstantBundle
+                  ? 'Direct automated instant delivery via Paystack'
+                  : 'Direct SIM delivery via Paystack'}
               </p>
             </div>
           </div>
@@ -269,9 +281,17 @@ export const CheckoutModal: React.FC = () => {
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <h4 className="font-bold text-white text-sm sm:text-base truncate">
-                    {isAirtime ? `GH₵${faceValue.toFixed(2)} Airtime Top-Up` : `${checkoutBundle.dataAmount} Data Bundle`}
+                    {isInstantBundle
+                      ? `${checkoutBundle.dataAmount} Instant Bundle`
+                      : isAirtime
+                      ? `GH₵${faceValue.toFixed(2)} Airtime Top-Up`
+                      : `${checkoutBundle.dataAmount} Data Bundle`}
                   </h4>
-                  {isAirtime ? (
+                  {isInstantBundle ? (
+                    <span className="text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded font-bold shrink-0">
+                      ⚡ Instant
+                    </span>
+                  ) : isAirtime ? (
                     <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-bold shrink-0">
                       ⚡ Instant
                     </span>
@@ -286,7 +306,14 @@ export const CheckoutModal: React.FC = () => {
                   )}
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-                  {currentNetwork.name} · {isAirtime ? 'Direct automated airtime recharge' : (checkoutBundle.network === 'airteltigo' ? 'Instant direct delivery to your AT number' : (checkoutBundle.description || 'Fast automated delivery'))}
+                  {currentNetwork.name} ·{' '}
+                  {isInstantBundle
+                    ? 'Instant automated direct delivery to your line'
+                    : isAirtime
+                    ? 'Direct automated airtime recharge'
+                    : checkoutBundle.network === 'airteltigo'
+                    ? 'Instant direct delivery to your AT number'
+                    : checkoutBundle.description || 'Fast automated delivery'}
                 </p>
               </div>
             </div>

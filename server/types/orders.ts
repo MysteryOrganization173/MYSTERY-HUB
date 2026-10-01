@@ -65,7 +65,7 @@ export type SafePublicOrderDetails = Pick<
   | 'delivered_at'
 > & {
   amount_ghc: number;
-  service_type?: 'data' | 'airtime';
+  service_type?: 'data' | 'airtime' | 'instant_bundle';
   face_value_ghc?: number;
   service_fee_ghc?: number;
 };

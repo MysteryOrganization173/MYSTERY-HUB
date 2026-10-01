@@ -20,6 +20,9 @@ interface ToastMessage {
 interface AppContextType {
   activePage: ActivePage;
   setActivePage: (page: ActivePage) => void;
+  dataProductMode: 'data' | 'instant' | 'airtime';
+  setDataProductMode: (mode: 'data' | 'instant' | 'airtime') => void;
+  openDataPage: (mode?: 'data' | 'instant' | 'airtime') => void;
   checkoutBundle: DataBundle | null;
   checkoutInitialPhone?: string;
   openCheckout: (bundle: DataBundle, options?: { recipientPhone?: string }) => void;
@@ -74,6 +77,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return 'home';
   });
+
+  const [dataProductMode, setDataProductMode] = useState<'data' | 'instant' | 'airtime'>('data');
+
+  const openDataPage = (mode: 'data' | 'instant' | 'airtime' = 'data') => {
+    setDataProductMode(mode);
+    setActivePage('data');
+  };
 
   const [checkoutBundle, setCheckoutBundle] = useState<DataBundle | null>(null);
   const [checkoutInitialPhone, setCheckoutInitialPhone] = useState<string | undefined>(undefined);
@@ -249,11 +259,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: randomId,
       publicReference: realPublicRef,
       serverReference: realPublicRef,
+      serviceType:
+        bundle.serviceType ||
+        (bundle.id.startsWith('instant-') ? 'instant_bundle' : bundle.id.startsWith('airtime-') ? 'airtime' : 'data'),
       bundle,
       recipientPhone: phone,
       network: bundle.network,
       paymentMethod: method,
       amountGhc: bundle.priceGhc,
+      faceValueGhc: bundle.faceValueGhc,
+      serviceFeeGhc: bundle.serviceFeeGhc,
       status: paymentReference ? 'verifying' : 'placed',
       paymentReference,
       createdAt: new Date().toISOString(),
@@ -369,6 +384,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         activePage,
         setActivePage,
+        dataProductMode,
+        setDataProductMode,
+        openDataPage,
         checkoutBundle,
         checkoutInitialPhone,
         openCheckout,

@@ -387,6 +387,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
             >
               <option value="">All Services</option>
               <option value="data">Data Bundles</option>
+              <option value="instant_bundle">Instant Bundles</option>
               <option value="airtime">Airtime Top-up</option>
             </select>
           </div>
@@ -576,8 +577,13 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                       </td>
 
                       <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-200">
-                          {isAirtime ? 'Airtime Top-Up' : order.product_name_snapshot}
+                        <div className="font-semibold text-slate-200 flex items-center gap-1.5">
+                          <span>{isAirtime ? 'Airtime Top-Up' : order.product_name_snapshot}</span>
+                          {order.service_type === 'instant_bundle' && (
+                            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-1 rounded">
+                              Instant
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-slate-400 uppercase font-mono">{order.network}</div>
                       </td>

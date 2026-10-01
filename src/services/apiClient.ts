@@ -18,9 +18,33 @@ export interface InitializePaymentRequest {
   recipientPhone: string;
   customerEmail?: string;
   customerName?: string;
-  serviceType?: 'data' | 'airtime';
+  serviceType?: 'data' | 'airtime' | 'instant_bundle';
   network?: string;
   amount?: number;
+}
+
+export interface PublicInstantBundle {
+  productKey: string;
+  packageId: string;
+  name: string;
+  network: 'mtn' | 'telecel' | 'airteltigo';
+  dataAmount: string;
+  validity: string;
+  isFlexi: boolean;
+  minAmountGhc?: number;
+  maxAmountGhc?: number;
+  retailPriceGhc: number;
+  retailPricePesewas: number;
+  availability: 'in_stock' | 'out_of_stock';
+  category?: string;
+  description?: string;
+}
+
+export interface InstantBundlesCatalogResponse {
+  success: boolean;
+  available: boolean;
+  reason?: string;
+  products: PublicInstantBundle[];
 }
 
 export interface InitializePaymentResponse {
@@ -579,5 +603,38 @@ export async function getAdminSystemOnServer(token: string): Promise<{ success: 
   if (!res.ok) throw new Error(data.error || 'Failed to check system status.');
   return data;
 }
+
+/**
+ * Public Instant Bundles Catalogue Discovery
+ * Fetches live sellable Instant Bundles with server-calculated retail prices.
+ */
+export async function getInstantBundlesOnServer(timeoutMs = 15000): Promise<InstantBundlesCatalogResponse> {
+  const url = `${API_BASE_URL}/api/instant-bundles`;
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutHandle);
+    const data = await res.json();
+    return data;
+  } catch (err: unknown) {
+    clearTimeout(timeoutHandle);
+    return {
+      success: false,
+      available: false,
+      reason:
+        err instanceof Error && err.name === 'AbortError'
+          ? 'Instant bundle catalogue request timed out. Please try again.'
+          : 'Unable to connect to Instant Bundles service.',
+      products: [],
+    };
+  }
+}
+
 
 

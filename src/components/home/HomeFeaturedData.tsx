@@ -1,14 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DATA_BUNDLES, GHANA_NETWORKS } from '../../data/bundles';
 import { NetworkId } from '../../types';
 import { BundleCard } from '../data/BundleCard';
-import { ArrowRight, Wifi } from 'lucide-react';
+import { getInstantBundlesOnServer } from '../../services/apiClient';
+import { ArrowRight, Wifi, Zap } from 'lucide-react';
 
 export const HomeFeaturedData: React.FC = () => {
-  const { setActivePage, openCheckout } = useApp();
+  const { setActivePage, openCheckout, openDataPage } = useApp();
   const [selectedNetwork, setSelectedNetwork] = useState<NetworkId>('mtn');
   const [homeQuickBuyPhone, setHomeQuickBuyPhone] = useState('');
+  const [instantAvailable, setInstantAvailable] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    getInstantBundlesOnServer()
+      .then((res) => {
+        if (mounted && res.success && res.available && res.products.length > 0) {
+          setInstantAvailable(true);
+        }
+      })
+      .catch(() => {
+        // fail silently
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Popular 4 bundles for the selected network
   const popularBundles = DATA_BUNDLES.filter(
@@ -57,9 +75,20 @@ export const HomeFeaturedData: React.FC = () => {
               );
             })}
 
+            {instantAvailable && (
+              <button
+                type="button"
+                onClick={() => openDataPage('instant')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all cursor-pointer shadow-sm ml-1"
+              >
+                <Zap className="w-3.5 h-3.5 fill-amber-400" />
+                <span>Instant Bundles</span>
+              </button>
+            )}
+
             <button
               onClick={() => setActivePage('data')}
-              className="text-xs font-semibold text-[#00c365] hover:text-[#00e575] flex items-center gap-1 ml-2 transition-colors whitespace-nowrap"
+              className="text-xs font-semibold text-[#00c365] hover:text-[#00e575] flex items-center gap-1 ml-2 transition-colors whitespace-nowrap cursor-pointer"
             >
               <span>View All</span>
               <ArrowRight className="w-3.5 h-3.5" />
