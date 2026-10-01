@@ -584,7 +584,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                       <img
                         src={p.imageUrl}
                         alt={p.imageAlt || p.name}
-                        className="w-full h-full object-contain p-1"
+                        className="w-full h-full object-cover"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -1075,13 +1075,13 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                   </div>
 
                   {/* Image Live Preview */}
-                  <div className="sm:col-span-4 flex flex-col items-center justify-center p-2 rounded-xl bg-[#11171d] border border-slate-700 min-h-[100px] text-center">
+                  <div className="sm:col-span-4 flex flex-col items-center justify-center p-2 rounded-xl bg-[#11171d] border border-slate-700 min-h-[100px] text-center overflow-hidden">
                     {formImageUrl && !imagePreviewError ? (
-                      <div className="relative w-full h-24 flex items-center justify-center">
+                      <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-[#090d10] border border-slate-800">
                         <img
                           src={formImageUrl}
                           alt="Live preview"
-                          className="max-h-full max-w-full object-contain"
+                          className="w-full h-full object-cover"
                           onError={() => setImagePreviewError(true)}
                         />
                       </div>

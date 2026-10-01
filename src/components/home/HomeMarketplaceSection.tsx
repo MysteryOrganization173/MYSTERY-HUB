@@ -113,14 +113,14 @@ export const HomeMarketplaceSection: React.FC = () => {
               >
                 <div>
                   {/* Thumbnail / Image */}
-                  <div className="relative w-full aspect-[16/10] bg-[#090d10] rounded-xl border border-slate-800 overflow-hidden mb-3">
+                  <div className="relative w-full aspect-[4/3] bg-[#090d10] rounded-xl border border-slate-800 overflow-hidden mb-3">
                     <OptimizedImage
                       src={p.imageUrl}
                       alt={p.imageAlt || p.name}
-                      aspectRatio="16/10"
-                      objectFit="contain"
+                      aspectRatio="4/3"
+                      objectFit="cover"
+                      objectPosition="center center"
                       fallbackIcon={<ImageIcon className="w-6 h-6 text-slate-600" />}
-                      containerClassName="p-2"
                     />
                     {p.featured && (
                       <span className="absolute top-2 right-2 text-[9px] font-bold text-amber-400 bg-black/70 backdrop-blur-md border border-amber-400/30 px-1.5 py-0.2 rounded z-10">

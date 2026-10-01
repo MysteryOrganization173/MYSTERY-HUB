@@ -36,11 +36,12 @@ export const AboutPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 sm:space-y-14">
         
         {/* 1. About Hero Panel with Cloudinary Image 2 Artwork */}
-        <div className="relative rounded-3xl bg-[#070b0e] border border-slate-800/80 overflow-hidden shadow-2xl min-h-[300px] sm:min-h-[350px] lg:min-h-[390px] flex items-center">
+        {/* DESKTOP & TABLET HERO (sm and above): Unchanged Premium Composition */}
+        <div className="hidden sm:flex relative rounded-3xl bg-[#070b0e] border border-slate-800/80 overflow-hidden shadow-2xl min-h-[350px] lg:min-h-[390px] items-center">
           {/* Ambient Glows */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#00c365]/10 rounded-full blur-[120px] pointer-events-none z-0" />
 
-          {/* Official Visual Artwork Layer (Above-the-Fold Critical Fetch with Eager Loading) */}
+          {/* Official Visual Artwork Layer */}
           {!heroImageFailed && (
             <div className="absolute inset-0 z-0 select-none overflow-hidden bg-[#070b0e]">
               <img
@@ -60,13 +61,12 @@ export const AboutPage: React.FC = () => {
             </div>
           )}
 
-          {/* Readability Gradient Overlays: Dark solid negative space on the left for crisp text contrast */}
+          {/* Readability Gradient Overlays */}
           <div className="hidden lg:block absolute inset-0 z-10 bg-gradient-to-r from-[#070b0e] via-[#070b0e]/90 via-45% to-transparent pointer-events-none" />
           <div className="lg:hidden absolute inset-0 z-10 bg-gradient-to-r from-[#070b0e]/95 via-[#070b0e]/80 to-[#070b0e]/40 pointer-events-none" />
-          <div className="lg:hidden absolute inset-0 z-10 bg-gradient-to-b from-[#070b0e]/30 via-transparent to-[#070b0e] pointer-events-none" />
 
           {/* Hero Foreground Content */}
-          <div className="relative z-20 w-full max-w-xl lg:max-w-2xl p-6 sm:p-10 lg:p-12 space-y-4 text-left">
+          <div className="relative z-20 w-full max-w-xl lg:max-w-2xl p-10 lg:p-12 space-y-4 text-left">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#112019]/90 border border-[#00c365]/30 text-xs font-semibold text-[#00c365] backdrop-blur-sm">
               <Sparkles className="w-3.5 h-3.5" />
               <span>About Mystery Hub</span>
@@ -97,6 +97,68 @@ export const AboutPage: React.FC = () => {
                 Explore Live Data Offers
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* MOBILE HERO (< sm): Dedicated Stacked Composition for Clear Text + Clear Accra Network Artwork */}
+        <div className="block sm:hidden rounded-3xl bg-[#070b0e] border border-slate-800/80 overflow-hidden shadow-xl p-4 space-y-3.5 text-left">
+          {/* Top Crisp Text Region */}
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#112019] border border-[#00c365]/30 text-[11px] font-semibold text-[#00c365]">
+              <Sparkles className="w-3 h-3" />
+              <span>About Mystery Hub</span>
+            </div>
+
+            <h1 className="text-2xl font-extrabold text-white tracking-tight leading-snug scroll-mt-24">
+              Your Digital World. <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E575] via-[#00c365] to-[#38bdf8]">
+                One Unified Hub.
+              </span>
+            </h1>
+
+            <p className="text-slate-300 text-xs leading-relaxed">
+              A Ghana-focused digital services platform built to make everyday connectivity, digital tools and online business services easier to access from one trusted place.
+            </p>
+          </div>
+
+          {/* Clearly Visible Accra Digital Network Artwork Region (~200px height) */}
+          <div className="relative w-full h-[200px] rounded-2xl overflow-hidden border border-slate-800/90 bg-[#070b0e] shadow-inner">
+            {!heroImageFailed && (
+              <img
+                src={heroSrc}
+                srcSet={heroSrcSet}
+                sizes="100vw"
+                alt="Mystery Hub Accra Digital Network"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                onLoad={() => setHeroImageLoaded(true)}
+                onError={() => setHeroImageFailed(true)}
+                className={`w-full h-full object-cover object-[75%_center] transition-opacity duration-300 ease-out ${
+                  heroImageLoaded ? 'opacity-95' : 'opacity-0'
+                }`}
+              />
+            )}
+            {/* Subtle Gradient Overlays for Cinematic Integration */}
+            <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-[#070b0e] to-transparent pointer-events-none" />
+            <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#070b0e] to-transparent pointer-events-none" />
+            <div className="absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-[#070b0e]/80 to-transparent pointer-events-none" />
+          </div>
+
+          {/* Action CTAs */}
+          <div className="flex flex-col gap-2 pt-0.5">
+            <button
+              onClick={() => openWaitlist('Mystery Hub VIP Updates')}
+              className="w-full py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
+            >
+              Join Our Journey
+            </button>
+            <button
+              onClick={() => setActivePage('data')}
+              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-800 transition-colors cursor-pointer"
+            >
+              Explore Live Data Offers
+            </button>
           </div>
         </div>
 

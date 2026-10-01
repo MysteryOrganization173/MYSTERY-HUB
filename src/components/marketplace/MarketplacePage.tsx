@@ -102,12 +102,13 @@ export const MarketplacePage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5 sm:space-y-8">
         
         {/* 1. Official Marketplace Hero Header with Cloudinary Artwork Background */}
-        <div className="relative rounded-3xl bg-[#070b0e] border border-slate-800/80 overflow-hidden shadow-2xl min-h-[220px] sm:min-h-[280px] lg:min-h-[320px] flex items-center">
+        {/* DESKTOP & TABLET HERO (sm and above): Unchanged Premium Composition */}
+        <div className="hidden sm:flex relative rounded-3xl bg-[#070b0e] border border-slate-800/80 overflow-hidden shadow-2xl min-h-[280px] lg:min-h-[320px] items-center">
           {/* Ambient Glows */}
           <div className="absolute top-0 right-0 w-80 h-80 bg-[#00c365]/10 rounded-full blur-[100px] pointer-events-none z-0" />
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-sky-500/5 rounded-full blur-[80px] pointer-events-none z-0" />
 
-          {/* Official Visual Artwork Layer (Above-the-Fold Critical Fetch with Eager Loading) */}
+          {/* Official Visual Artwork Layer */}
           {heroBannerUrl && !heroImageFailed && (
             <div className="absolute inset-0 z-0 select-none overflow-hidden bg-[#070b0e]">
               <img
@@ -127,20 +128,19 @@ export const MarketplacePage: React.FC = () => {
             </div>
           )}
 
-          {/* Readability Gradient Overlays: Dark solid negative space on the left for crisp text contrast */}
+          {/* Readability Gradient Overlays */}
           <div className="hidden lg:block absolute inset-0 z-10 bg-gradient-to-r from-[#070b0e] via-[#070b0e]/90 via-45% to-transparent pointer-events-none" />
           <div className="lg:hidden absolute inset-0 z-10 bg-gradient-to-r from-[#070b0e]/95 via-[#070b0e]/80 to-[#070b0e]/45 pointer-events-none" />
-          <div className="lg:hidden absolute inset-0 z-10 bg-gradient-to-b from-[#070b0e]/30 via-transparent to-[#070b0e] pointer-events-none" />
 
           {/* Hero Foreground Content */}
-          <div className="relative z-20 w-full max-w-xl lg:max-w-2xl p-5 sm:p-8 lg:p-10 space-y-3 sm:space-y-4 text-left">
+          <div className="relative z-20 w-full max-w-xl lg:max-w-2xl p-8 lg:p-10 space-y-4 text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#111e18]/90 border border-[#00c365]/30 text-xs font-semibold text-[#00c365] backdrop-blur-sm">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Tech & Digital Marketplace</span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight">
-              Quality Technology, Creator Gear & <br className="hidden sm:inline" />
+            <h1 className="text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight">
+              Quality Technology, Creator Gear & <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E575] via-[#00c365] to-[#38bdf8]">
                 Business Essentials Sourced on Request
               </span>
@@ -164,6 +164,64 @@ export const MarketplacePage: React.FC = () => {
                 <CheckCircle className="w-3.5 h-3.5 text-[#00c365]" />
                 <span>Direct WhatsApp Support</span>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* MOBILE HERO (< sm): Dedicated Stacked Composition for Clear Text + Clear Tech Artwork */}
+        <div className="block sm:hidden rounded-3xl bg-[#070b0e] border border-slate-800/80 overflow-hidden shadow-xl p-4 space-y-3.5 text-left">
+          {/* Top Crisp Text Region */}
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#111e18] border border-[#00c365]/30 text-[11px] font-semibold text-[#00c365]">
+              <Sparkles className="w-3 h-3" />
+              <span>Tech & Digital Marketplace</span>
+            </div>
+
+            <h1 className="text-xl font-extrabold text-white tracking-tight leading-snug">
+              Quality Tech, Creator Gear & <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E575] via-[#00c365] to-[#38bdf8]">
+                Business Essentials
+              </span>
+            </h1>
+
+            <p className="text-slate-300 text-xs leading-relaxed">
+              Browse laptops, smartphones, creator microphones and productivity gear sourced on request for customers in Ghana.
+            </p>
+          </div>
+
+          {/* Clearly Visible Tech Artwork Region (~195px height) */}
+          <div className="relative w-full h-[195px] rounded-2xl overflow-hidden border border-slate-800/90 bg-[#070b0e] shadow-inner group">
+            {heroBannerUrl && !heroImageFailed && (
+              <img
+                src={heroSrc}
+                srcSet={heroSrcSet}
+                sizes="100vw"
+                alt="Mystery Hub Technology Sourcing"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                onLoad={() => setHeroImageLoaded(true)}
+                onError={() => setHeroImageFailed(true)}
+                className={`w-full h-full object-cover object-[75%_center] transition-opacity duration-300 ease-out ${
+                  heroImageLoaded ? 'opacity-95' : 'opacity-0'
+                }`}
+              />
+            )}
+            {/* Subtle Gradient Overlays for Cinematic Integration */}
+            <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-[#070b0e] to-transparent pointer-events-none" />
+            <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#070b0e] to-transparent pointer-events-none" />
+            <div className="absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-[#070b0e]/80 to-transparent pointer-events-none" />
+          </div>
+
+          {/* Bottom Compact Trust Row */}
+          <div className="pt-0.5 flex flex-wrap items-center justify-between text-[11px] text-slate-300 font-medium gap-y-1">
+            <div className="flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#00c365]" />
+              <span>Sourced on Request</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <CheckCircle className="w-3.5 h-3.5 text-[#00c365]" />
+              <span>Direct WhatsApp</span>
             </div>
           </div>
         </div>
@@ -403,15 +461,15 @@ export const MarketplacePage: React.FC = () => {
                   className="rounded-2xl bg-[#0f151b] border border-slate-800 hover:border-slate-700/80 transition-all duration-200 flex flex-col justify-between overflow-hidden group shadow-md hover:shadow-xl"
                 >
                   <div>
-                    {/* Product Image Container (4:3 Aspect Ratio, object-contain) */}
+                    {/* Product Image Container (4:3 Aspect Ratio, object-cover) */}
                     <div className="relative w-full aspect-[4/3] bg-gradient-to-b from-[#090e13] to-[#0f151b] border-b border-slate-800/80 overflow-hidden">
                       <OptimizedImage
                         src={p.imageUrl}
                         alt={p.imageAlt || p.name}
                         aspectRatio="4/3"
-                        objectFit="contain"
+                        objectFit="cover"
+                        objectPosition="center center"
                         fallbackIcon={getCategoryFallbackIcon(p.category)}
-                        containerClassName="p-3"
                         className="transition-transform duration-300 group-hover:scale-105"
                       />
 

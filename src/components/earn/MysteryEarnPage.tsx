@@ -33,11 +33,18 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = ({
   const { user, openAuth, setActivePage, openWaitlist } = useApp();
   const [heroImageLoaded, setHeroImageLoaded] = useState(false);
 
-  // Official Hero Artwork
-  const heroArtworkUrl =
-    'https://res.cloudinary.com/da6oeat7m/image/upload/v1790873549/Mystery_Hub_Referral_Rewards_pjlb3q.png';
-  const heroSrc = getCloudinaryUrl(heroArtworkUrl, { format: 'auto', quality: 'auto' });
-  const heroSrcSet = getCloudinarySrcSet(heroArtworkUrl, [640, 960, 1280, 1600]);
+  // Official Hero Artwork Assets
+  // Desktop/Tablet Hero Artwork (min-width: 640px)
+  const desktopArtworkUrl =
+    'https://res.cloudinary.com/da6oeat7m/image/upload/v1790877120/a4e9ca0a-8a11-43a4-930f-7252e97d01c8_i9bmqs.png';
+  const desktopHeroSrc = getCloudinaryUrl(desktopArtworkUrl, { format: 'auto', quality: 'auto' });
+  const desktopHeroSrcSet = getCloudinarySrcSet(desktopArtworkUrl, [768, 1024, 1280, 1600]);
+
+  // Mobile Hero Artwork (max-width: 639px)
+  const mobileArtworkUrl =
+    'https://res.cloudinary.com/da6oeat7m/image/upload/v1790877287/72fcc9b0-5ea3-4d4f-92fe-bfd1e3b8ac52_xe8gdu.png';
+  const mobileHeroSrc = getCloudinaryUrl(mobileArtworkUrl, { format: 'auto', quality: 'auto' });
+  const mobileHeroSrcSet = getCloudinarySrcSet(mobileArtworkUrl, [360, 430, 640]);
 
   // Format max reward if configured dynamically
   const maxRewardGhc =
@@ -49,35 +56,40 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = ({
     <div className="min-h-screen py-6 sm:py-10">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
         {/* 1. Official Hero Banner Panel */}
-        <div className="relative rounded-3xl bg-[#070b0e] border border-slate-800/90 overflow-hidden shadow-2xl min-h-[320px] sm:min-h-[370px] lg:min-h-[410px] flex items-center">
+        {/* DESKTOP & TABLET HERO (sm and above): Unchanged Premium Composition */}
+        <div className="hidden sm:flex relative rounded-3xl bg-[#070b0e] border border-slate-800/90 overflow-hidden shadow-2xl min-h-[370px] lg:min-h-[410px] items-center">
           {/* Ambient Glows */}
           <div className="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#00c365]/15 rounded-full blur-[120px] pointer-events-none z-0" />
           <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-amber-500/10 rounded-full blur-[100px] pointer-events-none z-0" />
 
           {/* Official Visual Artwork Layer */}
           <div className="absolute inset-0 z-0 select-none overflow-hidden bg-[#070b0e]">
-            <img
-              src={heroSrc}
-              srcSet={heroSrcSet}
-              sizes="(max-width: 1024px) 100vw, 1280px"
-              alt="Mystery Hub Referral Rewards"
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-              onLoad={() => setHeroImageLoaded(true)}
-              className={`w-full h-full object-cover object-right lg:object-[82%_center] transition-opacity duration-300 ease-out ${
-                heroImageLoaded ? 'opacity-85 sm:opacity-90 lg:opacity-95' : 'opacity-0'
-              }`}
-            />
+            <picture className="w-full h-full block">
+              <source
+                media="(min-width: 640px)"
+                srcSet={desktopHeroSrcSet}
+                sizes="(max-width: 1024px) 100vw, 1280px"
+              />
+              <img
+                src={desktopHeroSrc}
+                alt="Mystery Hub Referral Rewards"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                onLoad={() => setHeroImageLoaded(true)}
+                className={`w-full h-full object-cover object-right lg:object-[82%_center] transition-opacity duration-300 ease-out ${
+                  heroImageLoaded ? 'opacity-85 sm:opacity-90 lg:opacity-95' : 'opacity-0'
+                }`}
+              />
+            </picture>
           </div>
 
           {/* Readability Gradient Overlays */}
           <div className="hidden lg:block absolute inset-0 z-10 bg-gradient-to-r from-[#070b0e] via-[#070b0e]/95 via-48% to-transparent pointer-events-none" />
           <div className="lg:hidden absolute inset-0 z-10 bg-gradient-to-r from-[#070b0e]/95 via-[#070b0e]/85 to-[#070b0e]/35 pointer-events-none" />
-          <div className="lg:hidden absolute inset-0 z-10 bg-gradient-to-b from-[#070b0e]/30 via-transparent to-[#070b0e] pointer-events-none" />
 
           {/* Hero Foreground Content */}
-          <div className="relative z-20 w-full max-w-xl lg:max-w-2xl p-6 sm:p-10 lg:p-12 space-y-4 text-left">
+          <div className="relative z-20 w-full max-w-xl lg:max-w-2xl p-10 lg:p-12 space-y-4 text-left">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#112019]/90 border border-[#00c365]/40 text-xs font-bold text-[#00c365] backdrop-blur-sm shadow-sm" data-badge="Mystery Earn · Coming Soon">
               <Sparkles className="w-3.5 h-3.5" />
               <span>MYSTERY EARN · COMING SOON</span>
@@ -133,6 +145,95 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = ({
                   className="px-5 py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 backdrop-blur-sm transition-colors flex items-center gap-2 cursor-pointer"
                 >
                   <ShoppingBag className="w-4 h-4 text-amber-400" />
+                  <span>Explore Marketplace</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* MOBILE HERO (< sm): Dedicated Stacked Composition with 100% Full Uncropped Artwork */}
+        <div className="block sm:hidden rounded-3xl bg-[#070b0e] border border-slate-800/90 overflow-hidden shadow-xl p-4.5 space-y-4 text-left">
+          {/* Top Crisp Text Region */}
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/40 text-[11px] font-bold text-[#00c365]" data-badge="Mystery Earn · Coming Soon">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>MYSTERY EARN · COMING SOON</span>
+            </div>
+
+            <h1 className="text-2xl font-extrabold text-white tracking-tight leading-snug" data-title="Share Mystery Hub. Get Rewarded.">
+              Share Mystery Hub. <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E575] via-[#00c365] to-[#f59e0b]">
+                Get Rewarded.
+              </span>
+            </h1>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Create your account free, share eligible Mystery Hub services and products, and earn rewards when qualifying referrals convert.
+            </p>
+          </div>
+
+          {/* Full Official Mobile Artwork (100% Visible, No Cropping, Natural Aspect Ratio, Slightly Shrunk Max-Height) */}
+          <div className="w-full flex justify-center rounded-2xl overflow-hidden border border-slate-800/80 bg-[#070b0e] shadow-lg">
+            <picture className="w-full block text-center">
+              <source
+                media="(max-width: 639px)"
+                srcSet={mobileHeroSrcSet}
+                sizes="100vw"
+              />
+              <img
+                src={mobileHeroSrc}
+                alt="Mystery Hub Referral Rewards"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                onLoad={() => setHeroImageLoaded(true)}
+                className={`w-full max-h-[270px] min-[412px]:max-h-[300px] h-auto mx-auto block object-contain rounded-2xl transition-opacity duration-300 ease-out ${
+                  heroImageLoaded ? 'opacity-100' : 'opacity-0'
+                }`}
+              />
+            </picture>
+          </div>
+
+          {/* Benefit Chips & Mobile CTAs */}
+          <div className="pt-0.5 space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-300 font-medium gap-y-1.5 gap-x-2">
+              <div className="flex items-center gap-1.5 bg-slate-900/60 border border-slate-800/80 px-2.5 py-1 rounded-lg">
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
+                <span>No inventory</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-slate-900/60 border border-slate-800/80 px-2.5 py-1 rounded-lg">
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
+                <span>No complex setup</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-slate-900/60 border border-slate-800/80 px-2.5 py-1 rounded-lg">
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
+                <span>Just share & track</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2.5 pt-0.5">
+              <button
+                onClick={() => openWaitlist('Mystery Earn')}
+                className="w-full py-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Bell className="w-3.5 h-3.5" />
+                <span>Notify Me at Launch</span>
+              </button>
+
+              {!user ? (
+                <button
+                  onClick={() => openAuth('signup')}
+                  className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 transition-colors cursor-pointer text-center"
+                >
+                  Create Free Account
+                </button>
+              ) : (
+                <button
+                  onClick={() => setActivePage('marketplace')}
+                  className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />
                   <span>Explore Marketplace</span>
                 </button>
               )}
