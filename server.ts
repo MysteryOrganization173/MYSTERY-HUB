@@ -22,6 +22,7 @@ const ALLOWED_ORIGINS = [
   'https://mysteryhub.netlify.app',
   'https://mysterybundlehub.com',
   'https://www.mysterybundlehub.com',
+  'https://mystery-hub.onrender.com',
 ];
 
 const isAllowedOrigin = (origin: string | undefined): boolean => {
