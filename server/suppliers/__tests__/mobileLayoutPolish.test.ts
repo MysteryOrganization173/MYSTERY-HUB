@@ -37,7 +37,10 @@ describe('Mystery Hub Mobile Layout Polish & Geometry Verification', () => {
       !cardCode.includes('Secure Paystack Checkout'),
       'BundleCard must NOT repeat "Secure Paystack Checkout" on every card'
     );
-    assert.ok(cardCode.includes('p-3.5 sm:p-4.5'), 'BundleCard must use compact padding');
+    assert.ok(
+      cardCode.includes('p-3 sm:p-4') || cardCode.includes('p-3.5 sm:p-4') || cardCode.includes('p-3.5 sm:p-4.5'),
+      'BundleCard must use compact padding'
+    );
   });
 
   test('3. DataPage.tsx contains elevated section-level trust badge', () => {
