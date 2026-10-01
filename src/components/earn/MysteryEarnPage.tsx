@@ -173,9 +173,9 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = ({
             </p>
           </div>
 
-          {/* Full Official Mobile Artwork (100% Visible, No Cropping, Natural Aspect Ratio, Slightly Shrunk Max-Height) */}
-          <div className="w-full flex justify-center rounded-2xl overflow-hidden border border-slate-800/80 bg-[#070b0e] shadow-lg">
-            <picture className="w-full block text-center">
+          {/* Mobile Artwork Container: Full-Width Cinematic Container (~215-235px height) */}
+          <div className="relative w-full h-[215px] min-[412px]:h-[235px] rounded-2xl overflow-hidden border border-slate-800/80 bg-[#070b0e] shadow-lg">
+            <picture className="w-full h-full block">
               <source
                 media="(max-width: 639px)"
                 srcSet={mobileHeroSrcSet}
@@ -188,11 +188,14 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = ({
                 fetchPriority="high"
                 decoding="async"
                 onLoad={() => setHeroImageLoaded(true)}
-                className={`w-full max-h-[270px] min-[412px]:max-h-[300px] h-auto mx-auto block object-contain rounded-2xl transition-opacity duration-300 ease-out ${
+                className={`w-full h-full object-cover object-[50%_40%] transition-opacity duration-300 ease-out ${
                   heroImageLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
               />
             </picture>
+            {/* Subtle Ambient Edge Fades */}
+            <div className="absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-[#070b0e]/60 to-transparent pointer-events-none" />
+            <div className="absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-[#070b0e]/60 to-transparent pointer-events-none" />
           </div>
 
           {/* Benefit Chips & Mobile CTAs */}
@@ -402,83 +405,179 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = ({
         </div>
 
         {/* 4. DASHBOARD PREVIEW & CAPABILITIES */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-[#0e141a] border border-slate-800 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
+        <div className="p-6 sm:p-8 rounded-3xl bg-[#0e141a] border border-slate-800/90 space-y-6 relative overflow-hidden shadow-xl">
+          {/* Subtle Ambient Emerald Glow & Background Graph Lines */}
+          <div className="absolute -right-16 -top-16 w-64 h-64 bg-[#00c365]/10 rounded-full blur-[90px] pointer-events-none" />
+          <div className="absolute -left-16 -bottom-16 w-56 h-56 bg-sky-500/5 rounded-full blur-[80px] pointer-events-none" />
+          <svg className="absolute inset-0 w-full h-full opacity-[0.03] pointer-events-none stroke-[#00c365]" xmlns="http://www.w3.org/2000/svg">
+            <line x1="0" y1="30%" x2="100%" y2="30%" strokeWidth="1" strokeDasharray="4 4" />
+            <line x1="0" y1="70%" x2="100%" y2="70%" strokeWidth="1" strokeDasharray="4 4" />
+            <path d="M 0 120 Q 100 80, 200 110 T 400 60 T 600 90 T 800 40 T 1000 70" fill="none" strokeWidth="1.5" />
+          </svg>
+
+          {/* Header & Subtitle */}
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-start justify-between gap-3 text-left">
+            <div className="space-y-1 max-w-xl">
               <span className="text-xs font-bold text-[#00c365] uppercase tracking-wider">Interface Teaser</span>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight mt-0.5">
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
                 Your Mystery Earn Dashboard
               </h2>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed pt-0.5">
+                Share eligible Mystery Hub services and products, track referrals, and earn rewards when qualifying conversions happen.
+              </p>
             </div>
-            <span className="self-start sm:self-auto px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-semibold">
+            <span className="self-start sm:self-auto shrink-0 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-bold tracking-wide">
               Preview · Coming Soon
             </span>
           </div>
 
-          {/* 5 KPI Skeletons */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div className="p-3.5 rounded-2xl bg-[#090d11] border border-slate-800/90 text-left space-y-1">
-              <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                <MousePointerClick className="w-3 h-3 text-sky-400" /> Clicks
-              </span>
-              <p className="text-lg font-bold text-slate-500">—</p>
+          {/* Opportunity Metrics Grid (5 KPI Cards with Teaser Example Values) */}
+          <div className="relative z-10 space-y-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {/* Card 1: Clicks */}
+              <div className="p-3.5 rounded-2xl bg-[#090d11]/90 border border-slate-800/90 text-left space-y-1.5 shadow-sm hover:border-slate-700/80 transition-colors">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <MousePointerClick className="w-3.5 h-3.5 text-sky-400" /> Clicks
+                  </span>
+                  <span className="text-[9px] text-slate-500 font-normal">Est.</span>
+                </span>
+                <p className="text-xl sm:text-2xl font-black text-white tracking-tight tabular-nums">120+</p>
+                <p className="text-[10px] text-slate-400">Total link visits</p>
+              </div>
+
+              {/* Card 2: Referrals */}
+              <div className="p-3.5 rounded-2xl bg-[#090d11]/90 border border-slate-800/90 text-left space-y-1.5 shadow-sm hover:border-slate-700/80 transition-colors">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5 text-[#00c365]" /> Referrals
+                  </span>
+                  <span className="text-[9px] text-slate-500 font-normal">Est.</span>
+                </span>
+                <p className="text-xl sm:text-2xl font-black text-[#00c365] tracking-tight tabular-nums">8</p>
+                <p className="text-[10px] text-slate-400">Conversions</p>
+              </div>
+
+              {/* Card 3: Pending Rewards */}
+              <div className="p-3.5 rounded-2xl bg-[#090d11]/90 border border-slate-800/90 text-left space-y-1.5 shadow-sm hover:border-slate-700/80 transition-colors">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-amber-400" /> Pending
+                  </span>
+                  <span className="text-[9px] text-slate-500 font-normal">Est.</span>
+                </span>
+                <p className="text-xl sm:text-2xl font-black text-amber-400 tracking-tight tabular-nums">GH₵400</p>
+                <p className="text-[10px] text-slate-400">Under verification</p>
+              </div>
+
+              {/* Card 4: Approved Rewards */}
+              <div className="p-3.5 rounded-2xl bg-[#090d11]/90 border border-slate-800/90 text-left space-y-1.5 shadow-sm hover:border-slate-700/80 transition-colors">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-purple-400" /> Approved
+                  </span>
+                  <span className="text-[9px] text-slate-500 font-normal">Est.</span>
+                </span>
+                <p className="text-xl sm:text-2xl font-black text-purple-300 tracking-tight tabular-nums">GH₵700</p>
+                <p className="text-[10px] text-slate-400">Ready for payout</p>
+              </div>
+
+              {/* Card 5: Potential Monthly Earnings */}
+              <div className="p-3.5 rounded-2xl bg-[#090d11]/90 border border-[#00c365]/30 text-left space-y-1.5 col-span-2 sm:col-span-1 shadow-sm hover:border-[#00c365]/50 transition-colors">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Coins className="w-3.5 h-3.5 text-[#00c365]" /> Monthly Target
+                  </span>
+                  <span className="text-[9px] text-[#00c365] font-semibold">Goal</span>
+                </span>
+                <p className="text-lg sm:text-xl font-black text-white tracking-tight tabular-nums">GH₵300 – GH₵900+</p>
+                <p className="text-[10px] text-slate-400">Based on active sharing</p>
+              </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-[#090d11] border border-slate-800/90 text-left space-y-1">
-              <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                <Users className="w-3 h-3 text-[#00c365]" /> Referrals
-              </span>
-              <p className="text-lg font-bold text-slate-500">—</p>
-            </div>
+            {/* Illustrative Preview Note */}
+            <p className="text-[11px] text-slate-400 text-left pt-1">
+              * Illustrative preview based on successful qualifying referrals.
+            </p>
+          </div>
 
-            <div className="p-3.5 rounded-2xl bg-[#090d11] border border-slate-800/90 text-left space-y-1">
-              <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                <Clock className="w-3 h-3 text-amber-400" /> Pending
-              </span>
-              <p className="text-lg font-bold text-slate-500">—</p>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-[#090d11] border border-slate-800/90 text-left space-y-1">
-              <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-purple-400" /> Approved
-              </span>
-              <p className="text-lg font-bold text-slate-500">—</p>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-[#090d11] border border-slate-800/90 text-left space-y-1 col-span-2 sm:col-span-1">
-              <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                <Coins className="w-3 h-3 text-[#00c365]" /> Total Earned
-              </span>
-              <p className="text-lg font-bold text-slate-500">—</p>
+          {/* Benefit Grid / Value Props (8 Core Items) */}
+          <div className="relative z-10 pt-4 border-t border-slate-800/80 space-y-3 text-left">
+            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+              Core Dashboard Capabilities
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs text-slate-300">
+              <div className="flex items-center gap-2 bg-[#090d11]/60 p-2.5 rounded-xl border border-slate-800/80">
+                <CheckCircle2 className="w-4 h-4 text-[#00c365] shrink-0" />
+                <span>Personal referral link</span>
+              </div>
+              <div className="flex items-center gap-2 bg-[#090d11]/60 p-2.5 rounded-xl border border-slate-800/80">
+                <CheckCircle2 className="w-4 h-4 text-[#00c365] shrink-0" />
+                <span>Product-specific share links</span>
+              </div>
+              <div className="flex items-center gap-2 bg-[#090d11]/60 p-2.5 rounded-xl border border-slate-800/80">
+                <CheckCircle2 className="w-4 h-4 text-[#00c365] shrink-0" />
+                <span>Service referral opportunities</span>
+              </div>
+              <div className="flex items-center gap-2 bg-[#090d11]/60 p-2.5 rounded-xl border border-slate-800/80">
+                <CheckCircle2 className="w-4 h-4 text-[#00c365] shrink-0" />
+                <span>Click & conversion analytics</span>
+              </div>
+              <div className="flex items-center gap-2 bg-[#090d11]/60 p-2.5 rounded-xl border border-slate-800/80">
+                <CheckCircle2 className="w-4 h-4 text-[#00c365] shrink-0" />
+                <span>Pending & approved rewards</span>
+              </div>
+              <div className="flex items-center gap-2 bg-[#090d11]/60 p-2.5 rounded-xl border border-slate-800/80">
+                <CheckCircle2 className="w-4 h-4 text-[#00c365] shrink-0" />
+                <span>Reward history</span>
+              </div>
+              <div className="flex items-center gap-2 bg-[#090d11]/60 p-2.5 rounded-xl border border-slate-800/80">
+                <CheckCircle2 className="w-4 h-4 text-[#00c365] shrink-0" />
+                <span>Free to join</span>
+              </div>
+              <div className="flex items-center gap-2 bg-[#090d11]/60 p-2.5 rounded-xl border border-slate-800/80">
+                <CheckCircle2 className="w-4 h-4 text-[#00c365] shrink-0" />
+                <span>No inventory needed</span>
+              </div>
             </div>
           </div>
 
-          {/* Capabilities Grid */}
-          <div className="pt-2 border-t border-slate-800/80 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs text-slate-300 text-left">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-[#00c365] shrink-0" />
-              <span>Personal referral link</span>
+          {/* Section CTAs & Truthful Disclaimer */}
+          <div className="relative z-10 pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => openWaitlist('Mystery Earn')}
+                  className="px-5 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center gap-2 cursor-pointer"
+                >
+                  <Bell className="w-3.5 h-3.5" />
+                  <span>Notify Me at Launch</span>
+                </button>
+                {!user ? (
+                  <button
+                    onClick={() => openAuth('signup')}
+                    className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 transition-colors cursor-pointer"
+                  >
+                    Create Free Account
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setActivePage('marketplace')}
+                    className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 transition-colors flex items-center gap-2 cursor-pointer"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Explore Marketplace</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400 font-medium pt-1">
+                Be ready when Mystery Earn goes live.
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-[#00c365] shrink-0" />
-              <span>Product-specific share links</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-[#00c365] shrink-0" />
-              <span>Service referral opportunities</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-[#00c365] shrink-0" />
-              <span>Click & conversion analytics</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-[#00c365] shrink-0" />
-              <span>Pending & approved rewards</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-[#00c365] shrink-0" />
-              <span>Paid reward history</span>
-            </div>
+
+            <p className="text-[10px] text-slate-400 max-w-xs leading-relaxed">
+              Example preview only. Final reward structure may vary by service or product.
+            </p>
           </div>
         </div>
 
