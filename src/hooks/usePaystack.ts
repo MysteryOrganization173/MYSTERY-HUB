@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { initializePaymentOnServer, verifyPaymentOnServer } from '../services/apiClient';
+import { getActiveSessionToken } from '../utils/authStorage';
 
 export interface PaystackTransactionResponse {
   reference: string;
@@ -54,6 +55,7 @@ const PAYSTACK_INLINE_SCRIPT = 'https://js.paystack.co/v2/inline.js';
 export function usePaystack() {
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState<'idle' | 'preparing' | 'opening'>('idle');
 
   const rawKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '';
   const publicKey = typeof rawKey === 'string' ? rawKey.trim() : '';
@@ -102,10 +104,11 @@ export function usePaystack() {
 
   const initializeServerPayment = useCallback(async (options: ServerPaystackOptions) => {
     setIsInitializing(true);
+    setLoadingPhase('preparing');
 
     try {
       // 1. Call Backend to create pending order & initialize Paystack transaction authoritatively
-      const sessionToken = typeof localStorage !== 'undefined' ? localStorage.getItem('mystery_hub_session_token') : null;
+      const sessionToken = getActiveSessionToken();
       const initRes = await initializePaymentOnServer(
         {
           productId: options.productId,
@@ -129,6 +132,8 @@ export function usePaystack() {
         throw new Error('Server did not return a valid Paystack payment access code.');
       }
 
+      setLoadingPhase('opening');
+
       // 2. Ensure Paystack InlineJS V2 script is ready
       const popAvailable = window.PaystackPop ? true : await waitForPaystackPop();
 
@@ -140,6 +145,7 @@ export function usePaystack() {
           popup.resumeTransaction(accessCode, {
             onSuccess: async () => {
               setIsInitializing(false);
+              setLoadingPhase('idle');
               // Trigger backend verification, then poll for authoritative status
               try {
                 await verifyPaymentOnServer(reference);
@@ -150,14 +156,17 @@ export function usePaystack() {
             },
             onCancel: () => {
               setIsInitializing(false);
+              setLoadingPhase('idle');
               options.onCancel?.();
             },
             onClose: () => {
               setIsInitializing(false);
+              setLoadingPhase('idle');
               options.onCancel?.();
             },
             onError: (popErr: unknown) => {
               setIsInitializing(false);
+              setLoadingPhase('idle');
               const errMsg =
                 popErr instanceof Error
                   ? popErr.message
@@ -168,6 +177,7 @@ export function usePaystack() {
           return;
         } catch (popErr) {
           setIsInitializing(false);
+          setLoadingPhase('idle');
           const err =
             popErr instanceof Error
               ? popErr
@@ -182,6 +192,7 @@ export function usePaystack() {
         console.info('[DEV ONLY] Simulating payment processing in local test mode...');
         setTimeout(async () => {
           setIsInitializing(false);
+          setLoadingPhase('idle');
           try {
             await verifyPaymentOnServer(reference);
           } catch {
@@ -194,12 +205,14 @@ export function usePaystack() {
 
       // 5. PRODUCTION FAILURE: Missing popup in production must NEVER claim payment success
       setIsInitializing(false);
+      setLoadingPhase('idle');
       const scriptError = new Error(
         'Unable to load Paystack payment module. Please check your internet connection, disable ad-blockers, and try again.'
       );
       options.onError?.(scriptError);
     } catch (err) {
       setIsInitializing(false);
+      setLoadingPhase('idle');
       options.onError?.(
         err instanceof Error ? err : new Error('Payment initialization failed.')
       );
@@ -210,6 +223,7 @@ export function usePaystack() {
     initializeServerPayment,
     isScriptLoaded,
     isInitializing,
+    loadingPhase,
     isConfigured: Boolean(publicKey),
   };
 }

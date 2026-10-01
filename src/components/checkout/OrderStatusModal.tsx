@@ -151,14 +151,18 @@ export const OrderStatusModal: React.FC = () => {
 
   const headingText =
     activeOrder.status === 'delivered'
-      ? 'Order Placed Successfully!'
+      ? 'Order delivered successfully'
+      : activeOrder.status === 'verifying'
+      ? 'Confirming your payment'
       : activeOrder.status === 'processing'
-      ? 'Processing Your Data Bundle'
+      ? 'Your order is being processed'
+      : activeOrder.status === 'placed'
+      ? 'Order placed successfully'
       : isRefundIssue
-      ? 'Refund in Progress'
+      ? 'Refund in progress'
       : activeOrder.status === 'failed'
-      ? 'Delivery Issue'
-      : 'Order Received';
+      ? 'Delivery issue'
+      : 'Order placed successfully';
 
   const descriptionText =
     activeOrder.statusMessage ||

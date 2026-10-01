@@ -23,7 +23,8 @@ interface CacheEntry<T> {
 }
 
 export class SuccessBizHubClient {
-  private cache = new Map<string, CacheEntry<unknown>>();
+  private static sharedCache = new Map<string, CacheEntry<unknown>>();
+  private cache = SuccessBizHubClient.sharedCache;
 
   private getBaseUrl(): string {
     const raw = process.env.SUCCESS_BIZ_HUB_BASE_URL || 'https://api.successbizhub.com/v2';
@@ -264,6 +265,6 @@ export class SuccessBizHubClient {
    * Invalidate discovery caches
    */
   clearCache(): void {
-    this.cache.clear();
+    SuccessBizHubClient.sharedCache.clear();
   }
 }

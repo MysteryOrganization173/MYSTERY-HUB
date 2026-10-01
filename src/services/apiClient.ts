@@ -95,7 +95,8 @@ export interface JoinWaitlistResponse {
 
 export async function initializePaymentOnServer(
   req: InitializePaymentRequest,
-  sessionToken?: string | null
+  sessionToken?: string | null,
+  timeoutMs = 35000
 ): Promise<InitializePaymentResponse> {
   const url = `${API_BASE_URL}/api/payments/initialize`;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -103,22 +104,37 @@ export async function initializePaymentOnServer(
     headers['Authorization'] = `Bearer ${sessionToken}`;
   }
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(req),
-  });
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
-  const data = await res.json();
-  if (!res.ok) {
-    const error: ApiError = new Error(data.message || data.error || 'Failed to initialize payment transaction.');
-    error.code = data.code;
-    error.existingOrderReference = data.existingOrderReference;
-    error.existingOrderStatus = data.existingOrderStatus;
-    throw error;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(req),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutHandle);
+
+    const data = await res.json();
+    if (!res.ok) {
+      const error: ApiError = new Error(data.message || data.error || 'Failed to initialize payment transaction.');
+      error.code = data.code;
+      error.existingOrderReference = data.existingOrderReference;
+      error.existingOrderStatus = data.existingOrderStatus;
+      throw error;
+    }
+
+    return data;
+  } catch (err: unknown) {
+    clearTimeout(timeoutHandle);
+    if (err instanceof Error && err.name === 'AbortError') {
+      const timeoutError: ApiError = new Error('Checkout is taking longer than expected. Please try again.');
+      timeoutError.code = 'CHECKOUT_TIMEOUT';
+      throw timeoutError;
+    }
+    throw err;
   }
-
-  return data;
 }
 
 export async function verifyPaymentOnServer(reference: string): Promise<VerifyPaymentResponse> {

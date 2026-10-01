@@ -14,6 +14,13 @@ export interface PreflightResult {
   customerMessage?: string;
   internalReason?: string;
   supplierCostMinor?: number;
+  timings?: {
+    servicesMs: number;
+    catalogMs: number;
+    beneficiaryMs: number;
+    walletMs: number;
+    totalMs: number;
+  };
 }
 
 export class FulfilmentService {
@@ -57,70 +64,109 @@ export class FulfilmentService {
       };
     }
 
+    const startPreflight = performance.now();
     try {
-      // 1. Confirm supplier orders/services are available
-      const servicesCheck = await this.provider.checkServicesAvailable();
-      if (!servicesCheck.available) {
-        console.warn(`[Fulfilment Preflight] Services check failed: ${servicesCheck.reason}`);
+      // Step A: Run checkServicesAvailable and resolvePackage concurrently
+      // Genuinely independent discovery queries
+      const [servicesCheckResult, resolvedResult] = await Promise.all([
+        (async () => {
+          const s0 = performance.now();
+          const res = await this.provider.checkServicesAvailable();
+          return { res, ms: Math.round(performance.now() - s0) };
+        })(),
+        (async () => {
+          const c0 = performance.now();
+          const res = await this.provider.resolvePackage(network, bundleSize);
+          return { res, ms: Math.round(performance.now() - c0) };
+        })(),
+      ]);
+
+      const servicesMs = servicesCheckResult.ms;
+      const catalogMs = resolvedResult.ms;
+
+      if (!servicesCheckResult.res.available) {
+        console.warn(`[Fulfilment Preflight] Services check failed: ${servicesCheckResult.res.reason}`);
         return {
           allowed: false,
           customerMessage: 'This bundle is temporarily unavailable. Please try another package or try again shortly.',
-          internalReason: servicesCheck.reason,
+          internalReason: servicesCheckResult.res.reason,
+          timings: { servicesMs, catalogMs, beneficiaryMs: 0, walletMs: 0, totalMs: Math.round(performance.now() - startPreflight) },
         };
       }
 
-      // 2. Confirm exact product mapping exists in GET /catalog
-      const resolved = await this.provider.resolvePackage(network, bundleSize);
-      if (!resolved.resolved) {
-        console.warn(`[Fulfilment Preflight] Package resolution failed: ${resolved.error}`);
+      if (!resolvedResult.res.resolved) {
+        console.warn(`[Fulfilment Preflight] Package resolution failed: ${resolvedResult.res.error}`);
         return {
           allowed: false,
           customerMessage: 'This bundle is temporarily unavailable. Please try another package or try again shortly.',
-          internalReason: resolved.error,
+          internalReason: resolvedResult.res.error,
+          timings: { servicesMs, catalogMs, beneficiaryMs: 0, walletMs: 0, totalMs: Math.round(performance.now() - startPreflight) },
         };
       }
 
-      const supplierPackage = resolved.resolved;
+      const supplierPackage = resolvedResult.res.resolved;
 
-      // 3. Confirm beneficiary eligibility via /beneficiary-check with offer selector
-      const beneficiaryCheck = await this.provider.checkBeneficiaryEligibility(recipientPhone, {
-        offerSlug: supplierPackage.offerSlug,
-        offerId: supplierPackage.offerId,
-      });
-      if (!beneficiaryCheck.eligible) {
-        console.warn(`[Fulfilment Preflight] Beneficiary ineligible: ${beneficiaryCheck.reason}`);
+      // Step B: Now that authoritative package is resolved, checkBeneficiaryEligibility and getBalance
+      // are genuinely independent. Run them concurrently.
+      const [beneficiaryResult, walletResult] = await Promise.all([
+        (async () => {
+          const b0 = performance.now();
+          const res = await this.provider.checkBeneficiaryEligibility(recipientPhone, {
+            offerSlug: supplierPackage.offerSlug,
+            offerId: supplierPackage.offerId,
+          });
+          return { res, ms: Math.round(performance.now() - b0) };
+        })(),
+        (async () => {
+          const w0 = performance.now();
+          try {
+            const res = await this.provider.getBalance();
+            return { res, ms: Math.round(performance.now() - w0), error: null };
+          } catch (walletErr) {
+            return { res: null, ms: Math.round(performance.now() - w0), error: walletErr };
+          }
+        })(),
+      ]);
+
+      const beneficiaryMs = beneficiaryResult.ms;
+      const walletMs = walletResult.ms;
+
+      if (!beneficiaryResult.res.eligible) {
+        console.warn(`[Fulfilment Preflight] Beneficiary ineligible: ${beneficiaryResult.res.reason}`);
         return {
           allowed: false,
           customerMessage: 'The recipient phone number is not eligible for this telecom bundle. Please check the number and network.',
-          internalReason: beneficiaryCheck.reason || 'Beneficiary ineligible',
+          internalReason: beneficiaryResult.res.reason || 'Beneficiary ineligible',
+          timings: { servicesMs, catalogMs, beneficiaryMs, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
         };
       }
 
-      // 4. Check supplier available wallet balance against package cost
-      try {
-        const wallet = await this.provider.getBalance();
-        if (wallet.balancePesewas < supplierPackage.supplierCostMinor) {
-          console.error(
-            `[Fulfilment Preflight] Insufficient supplier wallet balance! Available: GH₵${wallet.balanceGhc}, required: GH₵${(supplierPackage.supplierCostMinor / 100).toFixed(2)}`
-          );
-          return {
-            allowed: false,
-            customerMessage: 'This bundle is temporarily unavailable. Please try another package or try again shortly.',
-            internalReason: 'Insufficient supplier wallet balance.',
-          };
-        }
-      } catch (walletErr) {
-        console.warn('[Fulfilment Preflight] Wallet check failed, failing closed:', walletErr);
+      if (walletResult.error || !walletResult.res) {
+        console.warn('[Fulfilment Preflight] Wallet check failed, failing closed:', walletResult.error);
         return {
           allowed: false,
           customerMessage: 'This bundle is temporarily unavailable. Please try another package or try again shortly.',
           internalReason: 'Supplier wallet check failed.',
+          timings: { servicesMs, catalogMs, beneficiaryMs, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
+        };
+      }
+
+      if (walletResult.res.balancePesewas < supplierPackage.supplierCostMinor) {
+        console.error(
+          `[Fulfilment Preflight] Insufficient supplier wallet balance! Available: GH₵${walletResult.res.balanceGhc}, required: GH₵${(supplierPackage.supplierCostMinor / 100).toFixed(2)}`
+        );
+        return {
+          allowed: false,
+          customerMessage: 'This bundle is temporarily unavailable. Please try another package or try again shortly.',
+          internalReason: 'Insufficient supplier wallet balance.',
+          timings: { servicesMs, catalogMs, beneficiaryMs, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
         };
       }
 
       return {
         allowed: true,
         supplierCostMinor: supplierPackage.supplierCostMinor,
+        timings: { servicesMs, catalogMs, beneficiaryMs, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
       };
     } catch (err) {
       console.error('[Fulfilment Preflight] Unexpected preflight exception:', err);
@@ -128,6 +174,7 @@ export class FulfilmentService {
         allowed: false,
         customerMessage: 'This bundle is temporarily unavailable. Please try another package or try again shortly.',
         internalReason: err instanceof Error ? err.message : 'Unknown preflight error',
+        timings: { servicesMs: 0, catalogMs: 0, beneficiaryMs: 0, walletMs: 0, totalMs: Math.round(performance.now() - startPreflight) },
       };
     }
   }
@@ -158,47 +205,72 @@ export class FulfilmentService {
       };
     }
 
+    const startPreflight = performance.now();
     try {
-      // 1. Check if Airtime service is available on supplier
-      const serviceCheck = await this.provider.checkAirtimeAvailable();
-      if (!serviceCheck.available) {
-        console.warn(`[Airtime Preflight] Airtime service unavailable: ${serviceCheck.reason}`);
+      // Run service availability and wallet check concurrently
+      const [serviceResult, walletResult] = await Promise.all([
+        (async () => {
+          const s0 = performance.now();
+          const res = await this.provider.checkAirtimeAvailable();
+          return { res, ms: Math.round(performance.now() - s0) };
+        })(),
+        (async () => {
+          const w0 = performance.now();
+          try {
+            const res = await this.provider.getBalance();
+            return { res, ms: Math.round(performance.now() - w0), error: null };
+          } catch (walletErr) {
+            return { res: null, ms: Math.round(performance.now() - w0), error: walletErr };
+          }
+        })(),
+      ]);
+
+      const servicesMs = serviceResult.ms;
+      const walletMs = walletResult.ms;
+
+      if (!serviceResult.res.available) {
+        console.warn(`[Airtime Preflight] Airtime service unavailable: ${serviceResult.res.reason}`);
         return {
           allowed: false,
           customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
-          internalReason: serviceCheck.reason || 'Airtime service unavailable on supplier.',
+          internalReason: serviceResult.res.reason || 'Airtime service unavailable on supplier.',
+          timings: { servicesMs, catalogMs: 0, beneficiaryMs: 0, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
         };
       }
 
-      // 2. Check supplier wallet balance against airtime face value
-      try {
-        const wallet = await this.provider.getBalance();
-        if (wallet.balancePesewas < faceValuePesewas) {
-          console.error(
-            `[Airtime Preflight] Insufficient supplier wallet balance for airtime! Available: GH₵${wallet.balanceGhc}, required: GH₵${(faceValuePesewas / 100).toFixed(2)}`
-          );
-          return {
-            allowed: false,
-            customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
-            internalReason: 'Insufficient supplier wallet balance for airtime.',
-          };
-        }
-      } catch (walletErr) {
-        console.warn('[Airtime Preflight] Wallet check failed, failing closed:', walletErr);
+      if (walletResult.error || !walletResult.res) {
+        console.warn('[Airtime Preflight] Wallet check failed, failing closed:', walletResult.error);
         return {
           allowed: false,
           customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
           internalReason: 'Supplier wallet check failed.',
+          timings: { servicesMs, catalogMs: 0, beneficiaryMs: 0, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
         };
       }
 
-      return { allowed: true };
+      if (walletResult.res.balancePesewas < faceValuePesewas) {
+        console.error(
+          `[Airtime Preflight] Insufficient supplier wallet balance for airtime! Available: GH₵${walletResult.res.balanceGhc}, required: GH₵${(faceValuePesewas / 100).toFixed(2)}`
+        );
+        return {
+          allowed: false,
+          customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
+          internalReason: 'Insufficient supplier wallet balance for airtime.',
+          timings: { servicesMs, catalogMs: 0, beneficiaryMs: 0, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
+        };
+      }
+
+      return {
+        allowed: true,
+        timings: { servicesMs, catalogMs: 0, beneficiaryMs: 0, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
+      };
     } catch (err) {
       console.error('[Airtime Preflight] Unexpected preflight exception:', err);
       return {
         allowed: false,
         customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
         internalReason: err instanceof Error ? err.message : 'Unknown preflight error',
+        timings: { servicesMs: 0, catalogMs: 0, beneficiaryMs: 0, walletMs: 0, totalMs: Math.round(performance.now() - startPreflight) },
       };
     }
   }

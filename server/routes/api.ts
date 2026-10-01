@@ -44,6 +44,7 @@ apiRouter.get('/health', (_req: Request, res: Response) => {
  * If fulfillment is enabled, performs supplier preflight checks before taking customer payment.
  */
 apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: Response) => {
+  const reqStart = performance.now();
   try {
     const { productId, recipientPhone, customerEmail, customerName, serviceType, network: reqNetwork, amount: reqAmount } = req.body || {};
 
@@ -105,6 +106,25 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
         return;
       }
 
+      // 2b. Fast MTN duplicate check before preflight
+      if (airtimeNet.toLowerCase() === 'mtn') {
+        const dupStart = performance.now();
+        const activeMtnOrder = await OrdersStore.findActiveMtnOrder(phoneVal.normalized);
+        const dupMs = Math.round(performance.now() - dupStart);
+        console.info(`[Checkout Timing] duplicateCheck=${dupMs}ms`);
+
+        if (activeMtnOrder) {
+          console.info(`[Checkout Timing] total=${Math.round(performance.now() - reqStart)}ms`);
+          res.status(409).json({
+            code: ACTIVE_MTN_ORDER_CODE,
+            message: ACTIVE_MTN_ORDER_MESSAGE,
+            existingOrderReference: activeMtnOrder.public_reference,
+            existingOrderStatus: mapToSafeCustomerStatus(activeMtnOrder.status),
+          });
+          return;
+        }
+      }
+
       // 3. Server-authoritative fee and total calculation (2% service fee)
       const calculation = calculateAirtimeOrder(airtimeFaceValue);
 
@@ -114,7 +134,12 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
         calculation.faceValuePesewas,
         phoneVal.normalized
       );
+      if (preflight.timings) {
+        console.info(`[Checkout Timing] preflight.services=${preflight.timings.servicesMs}ms`);
+        console.info(`[Checkout Timing] preflight.wallet=${preflight.timings.walletMs}ms`);
+      }
       if (!preflight.allowed) {
+        console.info(`[Checkout Timing] total=${Math.round(performance.now() - reqStart)}ms`);
         res.status(400).json({
           error:
             preflight.customerMessage ||
@@ -166,8 +191,13 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
         delivered_at: null,
       };
 
+      const dbStart = performance.now();
       const createResult = await OrdersStore.createOrderWithMtnDuplicateCheck(newOrder);
+      const dbMs = Math.round(performance.now() - dbStart);
+      console.info(`[Checkout Timing] databaseInsert=${dbMs}ms`);
+
       if (!createResult.success) {
+        console.info(`[Checkout Timing] total=${Math.round(performance.now() - reqStart)}ms`);
         res.status(409).json({
           code: ACTIVE_MTN_ORDER_CODE,
           message: ACTIVE_MTN_ORDER_MESSAGE,
@@ -178,6 +208,7 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
       }
 
       // 7. Initialize Paystack transaction with authoritative total
+      const paystackStart = performance.now();
       const paystackRes = await PaystackServerService.initializeTransaction({
         email: validEmail,
         amountPesewas: calculation.totalPesewas,
@@ -192,6 +223,11 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
           product_name: `${airtimeNet.toUpperCase()} GH₵${calculation.faceValueGhc} Airtime`,
         },
       });
+      const paystackMs = Math.round(performance.now() - paystackStart);
+      console.info(`[Checkout Timing] paystackInit=${paystackMs}ms`);
+
+      const totalMs = Math.round(performance.now() - reqStart);
+      console.info(`[Checkout Timing] total=${totalMs}ms`);
 
       if (!paystackRes.success) {
         res.status(500).json({ error: paystackRes.error || 'Failed to initialize payment with Paystack.' });
@@ -228,8 +264,13 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
     // MTN network does not allow another bundle order for the same recipient while a previous one is processing.
     // Rejects before preflight and before Paystack payment initialization.
     if (product.network.toLowerCase() === 'mtn') {
+      const dupStart = performance.now();
       const activeMtnOrder = await OrdersStore.findActiveMtnOrder(phoneVal.normalized);
+      const dupMs = Math.round(performance.now() - dupStart);
+      console.info(`[Checkout Timing] duplicateCheck=${dupMs}ms`);
+
       if (activeMtnOrder) {
+        console.info(`[Checkout Timing] total=${Math.round(performance.now() - reqStart)}ms`);
         res.status(409).json({
           code: ACTIVE_MTN_ORDER_CODE,
           message: ACTIVE_MTN_ORDER_MESSAGE,
@@ -247,7 +288,16 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
       product.dataAmount,
       phoneVal.normalized
     );
+
+    if (preflight.timings) {
+      console.info(`[Checkout Timing] preflight.services=${preflight.timings.servicesMs}ms`);
+      console.info(`[Checkout Timing] preflight.catalog=${preflight.timings.catalogMs}ms`);
+      console.info(`[Checkout Timing] preflight.beneficiary=${preflight.timings.beneficiaryMs}ms`);
+      console.info(`[Checkout Timing] preflight.wallet=${preflight.timings.walletMs}ms`);
+    }
+
     if (!preflight.allowed) {
+      console.info(`[Checkout Timing] total=${Math.round(performance.now() - reqStart)}ms`);
       res.status(400).json({
         error:
           preflight.customerMessage ||
@@ -298,8 +348,13 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
       delivered_at: null,
     };
 
+    const dbStart = performance.now();
     const createResult = await OrdersStore.createOrderWithMtnDuplicateCheck(newOrder);
+    const dbMs = Math.round(performance.now() - dbStart);
+    console.info(`[Checkout Timing] databaseInsert=${dbMs}ms`);
+
     if (!createResult.success) {
+      console.info(`[Checkout Timing] total=${Math.round(performance.now() - reqStart)}ms`);
       res.status(409).json({
         code: ACTIVE_MTN_ORDER_CODE,
         message: ACTIVE_MTN_ORDER_MESSAGE,
@@ -310,6 +365,7 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
     }
 
     // 7. Initialize Paystack transaction on the server
+    const paystackStart = performance.now();
     const paystackRes = await PaystackServerService.initializeTransaction({
       email: validEmail,
       amountPesewas: product.amountPesewas,
@@ -323,6 +379,11 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
         product_name: product.dataAmount,
       },
     });
+    const paystackMs = Math.round(performance.now() - paystackStart);
+    console.info(`[Checkout Timing] paystackInit=${paystackMs}ms`);
+
+    const totalMs = Math.round(performance.now() - reqStart);
+    console.info(`[Checkout Timing] total=${totalMs}ms`);
 
     if (!paystackRes.success) {
       res.status(500).json({ error: paystackRes.error || 'Failed to initialize payment with Paystack.' });

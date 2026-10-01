@@ -30,13 +30,14 @@ export const CheckoutModal: React.FC = () => {
     user,
     openOrderStatus,
   } = useApp();
-  const { initializeServerPayment, isInitializing, isConfigured } = usePaystack();
+  const { initializeServerPayment, isInitializing, loadingPhase, isConfigured } = usePaystack();
 
   const [phone, setPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'momo' | 'card' | 'bank'>('momo');
   const [detectedNet, setDetectedNet] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState('');
   const [serverError, setServerError] = useState('');
+  const [isSlowPreparation, setIsSlowPreparation] = useState(false);
   const [activeMtnConflict, setActiveMtnConflict] = useState<{
     orderRef?: string;
     status?: string;
@@ -45,6 +46,17 @@ export const CheckoutModal: React.FC = () => {
   const conflictRef = useRef<HTMLDivElement>(null);
   const serverErrorRef = useRef<HTMLDivElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isInitializing) {
+      setIsSlowPreparation(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setIsSlowPreparation(true);
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, [isInitializing]);
 
   useEffect(() => {
     if (checkoutBundle) {
@@ -543,7 +555,11 @@ export const CheckoutModal: React.FC = () => {
             {isInitializing ? (
               <span className="flex items-center gap-2">
                 <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                Connecting to Paystack...
+                {loadingPhase === 'opening'
+                  ? 'Opening Paystack...'
+                  : isSlowPreparation
+                  ? 'Still preparing your checkout...'
+                  : 'Preparing secure checkout...'}
               </span>
             ) : (
               <span className="flex items-center gap-2">
