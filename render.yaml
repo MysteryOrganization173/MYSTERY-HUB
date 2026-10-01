@@ -1,0 +1,14 @@
+# Render Blueprint Specification for Mystery Hub
+# Configures the Render Static Site with proper SPA rewrite routing:
+# All frontend routes (/*) are internally rewritten to /index.html with HTTP 200.
+# No HTTP 301/302 redirects to /index.html.
+services:
+  - type: web
+    name: mystery-hub
+    runtime: static
+    buildCommand: npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

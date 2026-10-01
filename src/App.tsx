@@ -14,6 +14,7 @@ import { HomePage } from './components/home/HomePage';
 import { DataPage } from './components/data/DataPage';
 import { WebsiteBuilderPage } from './components/website/WebsiteBuilderPage';
 import { MoreServicesPage } from './components/services/MoreServicesPage';
+import { MarketplacePage } from './components/marketplace/MarketplacePage';
 import { AboutPage } from './components/about/AboutPage';
 import { OrdersPage } from './components/orders/OrdersPage';
 import { CheckoutModal } from './components/checkout/CheckoutModal';
@@ -50,6 +51,7 @@ const AppContent: React.FC = () => {
         {activePage === 'home' && <HomePage />}
         {activePage === 'data' && <DataPage />}
         {activePage === 'website' && <WebsiteBuilderPage />}
+        {activePage === 'marketplace' && <MarketplacePage />}
         {activePage === 'services' && <MoreServicesPage />}
         {activePage === 'about' && <AboutPage />}
         {activePage === 'orders' && <OrdersPage />}

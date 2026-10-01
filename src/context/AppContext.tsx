@@ -3,6 +3,13 @@ import { ActivePage, DataBundle, OrderRecord, WebsiteTemplate, MarketplaceProduc
 import { DATA_BUNDLES } from '../data/bundles';
 import { SafeUserProfile } from '../../server/types/auth';
 import { getMeOnServer, logoutOnServer } from '../services/apiClient';
+import {
+  ROUTE_PATH_MAP,
+  getPageFromPath,
+  normalizePathname,
+} from '../utils/routing';
+
+export { ROUTE_PATH_MAP, getPageFromPath, normalizePathname };
 
 interface ToastMessage {
   id: string;
@@ -57,29 +64,6 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
-
-export const ROUTE_PATH_MAP: Record<ActivePage, string> = {
-  home: '/',
-  data: '/data',
-  website: '/website-builder',
-  marketplace: '/marketplace',
-  services: '/services',
-  about: '/about',
-  orders: '/orders',
-  admin: '/admin',
-};
-
-export const getPageFromPath = (pathname: string): ActivePage => {
-  const clean = pathname.toLowerCase().replace(/\/$/, '') || '/';
-  if (clean === '/data') return 'data';
-  if (clean === '/website-builder' || clean === '/website') return 'website';
-  if (clean === '/marketplace') return 'marketplace';
-  if (clean === '/services') return 'services';
-  if (clean === '/about') return 'about';
-  if (clean === '/orders') return 'orders';
-  if (clean === '/admin') return 'admin';
-  return 'home';
-};
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Initialize route from current browser URL
@@ -179,6 +163,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Browser History and Popstate synchronization for back/forward buttons
   useEffect(() => {
+    // If the browser visibly landed on /index.html (e.g. from an old server redirect or direct link),
+    // normalize the address bar to '/' cleanly without a full page reload
+    if (typeof window !== 'undefined' && normalizePathname(window.location.pathname) === '/index.html') {
+      window.history.replaceState({ page: 'home' }, '', '/');
+    }
+
     const handlePopState = () => {
       const page = getPageFromPath(window.location.pathname);
       setActivePageState(page);

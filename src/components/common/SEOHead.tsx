@@ -24,6 +24,11 @@ const SEO_MAP: Record<string, PageMetadata> = {
     description:
       'Explore mobile-responsive website templates handcrafted for chop bars, salons, construction firms, boutiques, and churches in Ghana. With native WhatsApp & MoMo support.',
   },
+  marketplace: {
+    title: 'Digital Marketplace & Tech Hardware — Mystery Hub Ghana',
+    description:
+      'Explore laptops, phones, accessories, AI software, and creator tools in Ghana with verified pricing and direct WhatsApp inquiries.',
+  },
   services: {
     title: 'Digital Services & Utility Bill Payments in Ghana — Mystery Hub',
     description:
@@ -38,6 +43,11 @@ const SEO_MAP: Record<string, PageMetadata> = {
     title: 'Track Your Order & Receipts — Mystery Hub Ghana',
     description:
       'Check live status and transaction receipts for your Mystery Hub data bundle orders across MTN, Telecel, and AirtelTigo.',
+  },
+  admin: {
+    title: 'Staff & Operations Portal — Mystery Hub Ghana',
+    description:
+      'Authorized administrator and staff operations portal for Mystery Hub Ghana order processing, customers, and fulfillment.',
   },
 };
 
