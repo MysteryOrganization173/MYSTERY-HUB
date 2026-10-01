@@ -222,9 +222,7 @@ export const MysteryAiAssistant: React.FC = () => {
           {/* Header */}
           <div className="px-4 py-3 bg-[#090e13] border-b border-slate-800 flex items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-[#00c365]/15 border border-[#00c365]/30 flex items-center justify-center overflow-hidden shrink-0">
-                <MysteryAiIcon size="sm" active={isTyping} />
-              </div>
+              <MysteryAiIcon size="md" active={isTyping} className="shrink-0" />
               <div className="leading-tight">
                 <div className="flex items-center gap-1.5">
                   <h3 className="font-bold text-sm text-white">Mystery AI</h3>
@@ -354,10 +352,8 @@ export const MysteryAiAssistant: React.FC = () => {
 
             {/* Typing Indicator */}
             {isTyping && (
-              <div className="flex items-center gap-1.5 text-slate-400 text-xs py-1">
-                <div className="w-6 h-6 rounded-lg bg-[#141b22] border border-slate-800 flex items-center justify-center overflow-hidden shrink-0">
-                  <MysteryAiIcon size="xs" active />
-                </div>
+              <div className="flex items-center gap-2 text-slate-400 text-xs py-1">
+                <MysteryAiIcon size="sm" active className="shrink-0" />
                 <div className="flex items-center gap-1 bg-[#141b22] border border-slate-800 rounded-xl px-3 py-2">
                   <span className="w-1.5 h-1.5 bg-[#00c365] rounded-full animate-bounce [animation-delay:-0.3s]" />
                   <span className="w-1.5 h-1.5 bg-[#00c365] rounded-full animate-bounce [animation-delay:-0.15s]" />
@@ -460,12 +456,12 @@ export const MysteryAiAssistant: React.FC = () => {
           {isOpen ? (
             <X className="w-5 h-5 text-slate-300 group-hover:text-white" />
           ) : (
-            <MysteryAiIcon size="md" active={isExpandedPrompt} />
+            <MysteryAiIcon size="lg" active={isExpandedPrompt} />
           )}
 
           {/* Micro status beacon dot */}
           {!isOpen && (
-            <span className="absolute top-0 right-0 w-3 h-3 bg-[#00c365] rounded-full ring-2 ring-[#0b0f12]" />
+            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[#00c365] rounded-full ring-2 ring-[#0b0f12] pointer-events-none z-10" />
           )}
         </button>
       </div>
