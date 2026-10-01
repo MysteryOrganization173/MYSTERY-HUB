@@ -772,7 +772,8 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
               )}
 
               {/* Status Alert if Needs Attention */}
-              {(selectedOrder.status === 'refund_pending' || selectedOrder.status === 'failed') && (
+              {(selectedOrder.status === 'refund_pending' || selectedOrder.status === 'failed') &&
+               !(selectedOrder.failure_reason?.toLowerCase().startsWith('prelaunch') || selectedOrder.failure_reason?.toLowerCase().startsWith('pre-launch')) && (
                 <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1 text-amber-300">
                   <div className="flex items-center gap-2 font-bold text-xs">
                     <AlertTriangle className="w-4 h-4 text-amber-400" />

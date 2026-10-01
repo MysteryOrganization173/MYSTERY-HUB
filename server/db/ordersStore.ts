@@ -555,10 +555,11 @@ export class OrdersStore {
           const txRes = await PaystackServerService.verifyTransaction(order.payment_reference);
 
           if (txRes.status === 'success') {
-            const markRes = await this.markOrderPaid(order.payment_reference, txRes.paidAt || new Date().toISOString());
-            if (markRes.order && !markRes.alreadyPaid) {
-              await FulfilmentService.dispatchOrderFulfilment(markRes.order.id);
-            }
+            await FulfilmentService.processPaidOrder(
+              order.payment_reference,
+              txRes.paidAt || new Date().toISOString(),
+              'Auto reconciler paid verification'
+            );
             verifiedPaidCount++;
           } else if (txRes.status === 'abandoned' || txRes.status === 'failed') {
             await this.cancelOrder(order.id, 'paystack_abandoned_reconciled');
@@ -1150,7 +1151,7 @@ export class OrdersStore {
       }
 
       if (params.status === 'needs_attention') {
-        conditions.push(`(manual_review = TRUE OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR failure_reason NOT LIKE 'prelaunch_%')`);
+        conditions.push(`(manual_review = TRUE OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%'))`);
       } else if (params.status === 'abandoned') {
         conditions.push(`status IN ('cancelled', 'expired')`);
       } else if (params.status === 'all') {
@@ -1239,7 +1240,7 @@ export class OrdersStore {
           (Boolean(o.manual_review) ||
             o.status === 'refund_pending' ||
             (o.payment_status === 'success' && o.status === 'failed')) &&
-          (!o.failure_reason || !o.failure_reason.startsWith('prelaunch_'))
+          (!o.failure_reason || (!o.failure_reason.toLowerCase().startsWith('prelaunch') && !o.failure_reason.toLowerCase().startsWith('pre-launch')))
       );
     } else if (params.status === 'abandoned') {
       all = all.filter((o) => o.status === 'cancelled' || o.status === 'expired');
@@ -1322,14 +1323,14 @@ export class OrdersStore {
           COUNT(CASE WHEN payment_status = 'success' THEN 1 END) as total_orders,
           COALESCE(SUM(CASE WHEN payment_status = 'success' THEN amount ELSE 0 END), 0) as total_revenue,
           COALESCE(SUM(CASE WHEN payment_status = 'success' AND (supplier_order_id IS NOT NULL OR submitted_at IS NOT NULL OR status IN ('submitted', 'processing', 'delivered', 'refund_pending', 'refunded')) THEN supplier_cost_minor ELSE 0 END), 0) as total_cost,
-          COUNT(CASE WHEN (manual_review = TRUE OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR failure_reason NOT LIKE 'prelaunch_%') THEN 1 END) as manual_reviews,
+          COUNT(CASE WHEN (manual_review = TRUE OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%')) THEN 1 END) as manual_reviews,
           
           -- Today
           COUNT(CASE WHEN created_at >= $1 AND payment_status = 'success' THEN 1 END) as today_orders,
           COALESCE(SUM(CASE WHEN created_at >= $1 AND payment_status = 'success' THEN amount ELSE 0 END), 0) as today_revenue,
           COUNT(CASE WHEN created_at >= $1 AND status = 'delivered' THEN 1 END) as today_delivered,
           COUNT(CASE WHEN created_at >= $1 AND status IN ('processing', 'submitted', 'queued') THEN 1 END) as today_processing,
-          COUNT(CASE WHEN created_at >= $1 AND (manual_review = TRUE OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR failure_reason NOT LIKE 'prelaunch_%') THEN 1 END) as today_attention,
+          COUNT(CASE WHEN created_at >= $1 AND (manual_review = TRUE OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%')) THEN 1 END) as today_attention,
 
           -- Last 7 Days
           COUNT(CASE WHEN created_at >= $2 AND payment_status = 'success' THEN 1 END) as last7_orders,
@@ -1393,7 +1394,7 @@ export class OrdersStore {
       (Boolean(o.manual_review) ||
         o.status === 'refund_pending' ||
         (o.payment_status === 'success' && o.status === 'failed')) &&
-      (!o.failure_reason || !o.failure_reason.startsWith('prelaunch_'));
+      (!o.failure_reason || (!o.failure_reason.toLowerCase().startsWith('prelaunch') && !o.failure_reason.toLowerCase().startsWith('pre-launch')));
 
     return {
       today: {

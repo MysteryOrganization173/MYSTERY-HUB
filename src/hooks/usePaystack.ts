@@ -45,7 +45,7 @@ export interface ServerPaystackOptions {
   network?: string;
   amount?: number;
   onPaymentReceived: (orderRef: string, reference: string) => void;
-  onCancel?: () => void;
+  onCancel?: (orderRef?: string, reference?: string) => void;
   onError?: (error: Error & { code?: string; existingOrderReference?: string; existingOrderStatus?: string }) => void;
 }
 
@@ -157,12 +157,12 @@ export function usePaystack() {
             onCancel: () => {
               setIsInitializing(false);
               setLoadingPhase('idle');
-              options.onCancel?.();
+              options.onCancel?.(orderRef, reference);
             },
             onClose: () => {
               setIsInitializing(false);
               setLoadingPhase('idle');
-              options.onCancel?.();
+              options.onCancel?.(orderRef, reference);
             },
             onError: (popErr: unknown) => {
               setIsInitializing(false);

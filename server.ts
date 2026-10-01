@@ -8,6 +8,7 @@ import { adminRouter } from './server/routes/adminApi.js';
 import { initDatabase } from './server/db/connection.js';
 import { bootstrapAdminAccount } from './server/services/adminBootstrap.js';
 import { buildMysteryAiSystemInstruction } from './server/services/mysteryAiContext.js';
+import { OrdersStore } from './server/db/ordersStore.js';
 
 dotenv.config();
 
@@ -234,6 +235,29 @@ async function startServer() {
   app.listen(PORT, () => {
     console.log(`Mystery Hub server running on http://localhost:${PORT}`);
   });
+
+  // Schedule auto-reconciliation of stale pending payment attempts (runs on startup and every 10 mins)
+  setTimeout(async () => {
+    try {
+      const stats = await OrdersStore.reconcileStalePendingPayments();
+      if (stats.scanned > 0) {
+        console.info(`[Auto Reconciler] Initial startup run scanned ${stats.scanned} orders: paid=${stats.verifiedPaidCount}, cancelled=${stats.cancelledCount}, expired=${stats.expiredCount}`);
+      }
+    } catch (err) {
+      console.error('[Auto Reconciler] Initial reconciliation run failed:', err);
+    }
+  }, 10000); // 10 seconds post-startup
+
+  setInterval(async () => {
+    try {
+      const stats = await OrdersStore.reconcileStalePendingPayments();
+      if (stats.scanned > 0) {
+        console.info(`[Auto Reconciler] Scheduled run scanned ${stats.scanned} orders: paid=${stats.verifiedPaidCount}, cancelled=${stats.cancelledCount}, expired=${stats.expiredCount}`);
+      }
+    } catch (err) {
+      console.error('[Auto Reconciler] Scheduled reconciliation failed:', err);
+    }
+  }, 10 * 60 * 1000); // Every 10 minutes
 }
 
 startServer();

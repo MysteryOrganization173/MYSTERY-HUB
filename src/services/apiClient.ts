@@ -188,6 +188,30 @@ export async function verifyPaymentOnServer(reference: string): Promise<VerifyPa
   return data;
 }
 
+export interface CancelPaymentResponse {
+  success: boolean;
+  cancelled: boolean;
+  alreadyPaid: boolean;
+  order?: SafePublicOrderDetails;
+  error?: string;
+}
+
+export async function cancelPaymentOnServer(orderRef: string): Promise<CancelPaymentResponse> {
+  const url = `${API_BASE_URL}/api/payments/cancel`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orderRef }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to cancel payment.');
+  }
+
+  return data;
+}
+
 export async function lookupOrderOnServer(reference: string): Promise<LookupOrderResponse> {
   const url = `${API_BASE_URL}/api/orders/lookup/${encodeURIComponent(reference)}`;
   const res = await fetch(url, { method: 'GET' });

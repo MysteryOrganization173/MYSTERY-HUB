@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS, detectGhanaNetwork } from '../../data/bundles';
 import { usePaystack } from '../../hooks/usePaystack';
 import { BUSINESS_CONFIG } from '../../config/business';
-import { lookupOrderOnServer } from '../../services/apiClient';
+import { lookupOrderOnServer, cancelPaymentOnServer } from '../../services/apiClient';
 import { smoothScrollToElement } from '../../utils/scroll';
 import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
 import {
@@ -228,8 +228,13 @@ export const CheckoutModal: React.FC = () => {
         showToast(`Payment received! Order #${orderRef}. Verifying payment...`, 'success');
         openOrderStatus(newOrder);
       },
-      onCancel: () => {
+      onCancel: (orderRef) => {
         showToast('Payment window closed.', 'info');
+        if (orderRef) {
+          cancelPaymentOnServer(orderRef).catch((err) => {
+            console.warn('Failed to cancel order on server:', err);
+          });
+        }
       },
       onError: (err) => {
         if (err.code === 'ACTIVE_MTN_ORDER_EXISTS') {

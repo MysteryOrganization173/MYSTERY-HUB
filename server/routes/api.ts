@@ -744,6 +744,37 @@ apiRouter.get('/payments/verify/:reference', async (req: Request, res: Response)
 });
 
 /**
+ * 2b. POST /api/payments/cancel
+ * Handles customer-initiated transaction cancellations (e.g., closing checkout popup).
+ * Transitions pending order to 'cancelled' status cleanly and records reason.
+ */
+apiRouter.post('/payments/cancel', async (req: Request, res: Response) => {
+  try {
+    const { orderRef } = req.body || {};
+    if (!orderRef) {
+      res.status(400).json({ error: 'Order reference is required.' });
+      return;
+    }
+
+    const result = await OrdersStore.cancelOrder(orderRef, 'customer_closed_checkout');
+    if (!result.order) {
+      res.status(404).json({ error: 'Order reference not found.' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      cancelled: result.cancelled,
+      alreadyPaid: result.alreadyPaid,
+      order: toSafePublicOrder(result.order),
+    });
+  } catch (err) {
+    console.error('Payment Cancel Exception:', err);
+    res.status(500).json({ error: 'Failed to cancel payment.' });
+  }
+});
+
+/**
  * 3. GET /api/orders/lookup/:reference
  * Returns safe public details of an order. No secrets or supplier credentials exposed.
  * If order is submitted or processing, best-effort throttled status refresh is performed.
