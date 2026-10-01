@@ -829,6 +829,44 @@ export async function archiveAdminMarketplaceProduct(
   return data;
 }
 
+export async function importMarketplaceProductWithAi(
+  token: string,
+  advertText: string
+): Promise<{
+  success: boolean;
+  extraction: {
+    name: string;
+    category: string;
+    tagline: string;
+    description: string;
+    priceType: 'fixed' | 'starting_at' | 'quote';
+    priceGhc: number | null;
+    availability: 'in_stock' | 'sourcing_on_demand' | 'preorder' | 'out_of_stock';
+    availabilityLabel: string | null;
+    badge: string | null;
+    imageAlt: string;
+    highlights: string[];
+    specs: { label: string; value: string }[];
+    detectedPriceOptions: { label: string; priceGhc: number }[];
+    warnings: string[];
+    sourceNotes: string[];
+  };
+  message?: string;
+}> {
+  const url = `${API_BASE_URL}/api/admin/marketplace/ai-import`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ advertText }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to parse supplier advert with AI.');
+  return data;
+}
+
 
 
 

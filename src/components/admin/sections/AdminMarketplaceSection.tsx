@@ -9,6 +9,7 @@ import {
   featureAdminMarketplaceProduct,
   unfeatureAdminMarketplaceProduct,
   archiveAdminMarketplaceProduct,
+  importMarketplaceProductWithAi,
   AdminMarketplaceMetrics,
 } from '../../../services/apiClient';
 import { MARKETPLACE_CATEGORIES } from '../../../data/marketplace';
@@ -31,6 +32,7 @@ import {
   ExternalLink,
   Layers,
   Sparkles,
+  AlertTriangle,
   X,
   Check,
   ChevronDown,
@@ -95,6 +97,29 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
   // Image Preview Error Handling
   const [imagePreviewError, setImagePreviewError] = useState(false);
 
+  // AI Importer States
+  const [aiAdvertInput, setAiAdvertInput] = useState('');
+  const [isParsingAi, setIsParsingAi] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiExtraction, setAiExtraction] = useState<{
+    name: string;
+    category: string;
+    tagline: string;
+    description: string;
+    priceType: 'fixed' | 'starting_at' | 'quote';
+    priceGhc: number | null;
+    availability: 'in_stock' | 'sourcing_on_demand' | 'preorder' | 'out_of_stock';
+    availabilityLabel: string | null;
+    badge: string | null;
+    imageAlt: string;
+    highlights: string[];
+    specs: { label: string; value: string }[];
+    detectedPriceOptions: { label: string; priceGhc: number }[];
+    warnings: string[];
+    sourceNotes: string[];
+  } | null>(null);
+  const [showAiOverwriteConfirm, setShowAiOverwriteConfirm] = useState(false);
+
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -140,6 +165,11 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
     setFormHighlights(['']);
     setFormSpecs([{ label: '', value: '' }]);
     setImagePreviewError(false);
+    setAiAdvertInput('');
+    setIsParsingAi(false);
+    setAiError(null);
+    setAiExtraction(null);
+    setShowAiOverwriteConfirm(false);
     setIsModalOpen(true);
   };
 
@@ -173,7 +203,114 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
         : [{ label: '', value: '' }]
     );
     setImagePreviewError(false);
+    setAiAdvertInput('');
+    setIsParsingAi(false);
+    setAiError(null);
+    setAiExtraction(null);
+    setShowAiOverwriteConfirm(false);
     setIsModalOpen(true);
+  };
+
+  const handleParseWithAi = async () => {
+    if (!aiAdvertInput || !aiAdvertInput.trim()) {
+      setAiError('Please paste a supplier WhatsApp advert to parse.');
+      return;
+    }
+
+    if (aiAdvertInput.trim().length > 20000) {
+      setAiError('This advert is too long. Paste only the product information you want to import.');
+      return;
+    }
+
+    setIsParsingAi(true);
+    setAiError(null);
+    setAiExtraction(null);
+
+    try {
+      const res = await importMarketplaceProductWithAi(sessionToken, aiAdvertInput.trim());
+      if (res.success && res.extraction) {
+        setAiExtraction(res.extraction);
+      } else {
+        setAiError(res.message || 'Failed to extract product details.');
+      }
+    } catch (err) {
+      setAiError(
+        err instanceof Error
+          ? err.message
+          : 'Mystery AI couldn\'t parse this advert right now. Your pasted text is still here, so you can retry or fill the form manually.'
+      );
+    } finally {
+      setIsParsingAi(false);
+    }
+  };
+
+  const handleApplyAiExtraction = (overrideConfirmation = false) => {
+    if (!aiExtraction) return;
+
+    // Safety check: if editing an existing product and form already contains field values
+    const hasExistingData = Boolean(
+      editingProduct &&
+        (formName.trim() ||
+          formTagline.trim() ||
+          formDescription.trim() ||
+          (formSpecs.length > 0 && formSpecs[0].label.trim()))
+    );
+
+    if (hasExistingData && !overrideConfirmation) {
+      setShowAiOverwriteConfirm(true);
+      return;
+    }
+
+    // Apply extracted values to form state
+    setFormName(aiExtraction.name);
+    setFormCategory(aiExtraction.category || 'laptops_computers');
+    setFormTagline(aiExtraction.tagline || '');
+    setFormDescription(aiExtraction.description || '');
+    setFormPriceType(aiExtraction.priceType || 'fixed');
+    setFormPriceGhc(aiExtraction.priceGhc !== null ? String(aiExtraction.priceGhc) : '');
+
+    if (aiExtraction.availability) {
+      const availMap: Record<string, 'available' | 'check_availability' | 'limited' | 'coming_soon'> = {
+        in_stock: 'available',
+        sourcing_on_demand: 'check_availability',
+        preorder: 'check_availability',
+        out_of_stock: 'check_availability',
+      };
+      setFormAvailability(availMap[aiExtraction.availability] || 'available');
+    }
+
+    setFormAvailabilityLabel(aiExtraction.availabilityLabel || '');
+    if (aiExtraction.badge) setFormBadge(aiExtraction.badge);
+    if (aiExtraction.imageAlt) setFormImageAlt(aiExtraction.imageAlt);
+
+    if (aiExtraction.highlights && aiExtraction.highlights.length > 0) {
+      setFormHighlights(aiExtraction.highlights);
+    }
+
+    // Build specs array with extracted specs and price option breakdown
+    const newSpecs: Array<{ label: string; value: string }> = [];
+    if (aiExtraction.specs && aiExtraction.specs.length > 0) {
+      newSpecs.push(...aiExtraction.specs);
+    }
+
+    if (aiExtraction.detectedPriceOptions && aiExtraction.detectedPriceOptions.length > 1) {
+      aiExtraction.detectedPriceOptions.forEach((opt) => {
+        newSpecs.push({
+          label: `Config: ${opt.label}`,
+          value: `GH₵${opt.priceGhc.toLocaleString()}`,
+        });
+      });
+    }
+
+    if (newSpecs.length > 0) {
+      setFormSpecs(newSpecs);
+    }
+
+    // NOTE: CRITICAL SAFETY RULE
+    // DO NOT wipe or overwrite an existing manually entered formImageUrl!
+
+    setShowAiOverwriteConfirm(false);
+    showToast(`AI extraction applied for "${aiExtraction.name}". Image URL preserved.`, 'success');
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
@@ -594,6 +731,170 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
 
             {/* Modal Form */}
             <form onSubmit={handleSaveProduct} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+              {/* ✨ Mystery AI Supplier Advert Importer Panel */}
+              <div className="p-4 rounded-xl bg-gradient-to-br from-[#0a1713] via-[#0b1418] to-[#0d1217] border border-[#00c365]/35 space-y-3 shadow-md">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-[#00c365]/20 border border-[#00c365]/40 flex items-center justify-center text-[#00c365]">
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-xs text-white">Import Product with AI</h4>
+                      <p className="text-[11px] text-slate-300">
+                        Paste a supplier advert and Mystery AI will extract product details for you. Nothing is published until you review and save.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="hidden sm:inline-block text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/20 px-2 py-0.5 rounded-full">
+                    Draft Only · Safe Review
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <textarea
+                    rows={4}
+                    value={aiAdvertInput}
+                    onChange={(e) => setAiAdvertInput(e.target.value)}
+                    placeholder="Paste the full WhatsApp supplier advert here (e.g. 💻 HP EliteBook 745 G6... Processor, RAM, Storage, Prices...)"
+                    className="w-full bg-[#070b0e] border border-slate-700/80 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#00c365] font-mono leading-relaxed"
+                  />
+
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] text-slate-400">
+                      {aiAdvertInput.length > 0 ? `${aiAdvertInput.length.toLocaleString()} characters` : 'AI populates draft fields for review'}
+                    </span>
+
+                    <button
+                      type="button"
+                      disabled={isParsingAi || !aiAdvertInput.trim()}
+                      onClick={handleParseWithAi}
+                      className="px-4 py-2 rounded-xl bg-[#00c365] hover:bg-[#00e575] disabled:opacity-50 text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      {isParsingAi ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Reading Advert...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Parse & Fill Form</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Error Callout */}
+                {aiError && (
+                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-400 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      <span>Parsing Error</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed">{aiError}</p>
+                  </div>
+                )}
+
+                {/* AI Extraction Preview Panel */}
+                {aiExtraction && (
+                  <div className="p-3.5 rounded-xl bg-[#080d11] border border-[#00c365]/40 space-y-2.5 mt-2 shadow-inner text-xs">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span className="font-bold text-white text-xs flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-[#00c365]" />
+                        <span>Extracted Draft Preview</span>
+                      </span>
+                      <span className="text-[10px] font-semibold text-[#00c365] bg-[#00c365]/10 px-2 py-0.5 rounded">
+                        Category: {aiExtraction.category}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 text-slate-300">
+                      <div className="flex justify-between font-bold text-white text-sm">
+                        <span>{aiExtraction.name}</span>
+                        <span className="text-[#00c365]">
+                          {aiExtraction.priceGhc ? `GH₵${aiExtraction.priceGhc.toLocaleString()} (${aiExtraction.priceType})` : 'Quote'}
+                        </span>
+                      </div>
+                      {aiExtraction.tagline && <p className="text-[11px] text-slate-300 italic">{aiExtraction.tagline}</p>}
+
+                      {/* Detected Price Options */}
+                      {aiExtraction.detectedPriceOptions && aiExtraction.detectedPriceOptions.length > 0 && (
+                        <div className="p-2.5 rounded-lg bg-[#0e141a] border border-slate-800 space-y-1 text-[11px]">
+                          <span className="font-bold text-white block">Detected Price / Config Options ({aiExtraction.detectedPriceOptions.length}):</span>
+                          {aiExtraction.detectedPriceOptions.map((opt, i) => (
+                            <div key={i} className="flex justify-between text-slate-300">
+                              <span>• {opt.label}</span>
+                              <span className="font-mono text-white font-bold">GH₵{opt.priceGhc.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Warnings */}
+                      {aiExtraction.warnings && aiExtraction.warnings.length > 0 && (
+                        <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-300 space-y-1">
+                          <span className="font-bold block flex items-center gap-1">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Review Before Publishing:</span>
+                          </span>
+                          {aiExtraction.warnings.map((w, i) => (
+                            <p key={i}>• {w}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setAiExtraction(null)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors cursor-pointer"
+                      >
+                        Discard
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyAiExtraction(false)}
+                        className="px-4 py-1.5 rounded-lg bg-[#00c365] hover:bg-[#00e575] text-black text-xs font-bold transition-all shadow-sm cursor-pointer"
+                      >
+                        Apply to Form
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Overwrite Confirmation Overlay / Callout */}
+              {showAiOverwriteConfirm && (
+                <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-xs text-amber-200 space-y-2">
+                  <div className="flex items-center gap-2 font-bold text-amber-300">
+                    <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    <span>Confirm Applying AI Extraction</span>
+                  </div>
+                  <p className="text-[11px] text-slate-200 leading-relaxed">
+                    Existing product form fields will be updated with extracted values. Your manually entered product image URL will be preserved.
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleApplyAiExtraction(true)}
+                      className="px-3.5 py-1.5 rounded-lg bg-amber-400 text-black font-bold text-xs cursor-pointer"
+                    >
+                      Overwrite & Apply
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAiOverwriteConfirm(false)}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-semibold text-xs cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Product Name & Slug */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="space-y-1.5">

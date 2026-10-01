@@ -22,6 +22,10 @@ import { toSafeUserProfile, UserStatus } from '../types/auth.js';
 import { FulfilmentService } from '../services/fulfilmentService.js';
 import { SuccessBizHubProvider } from '../suppliers/successBizHub/provider.js';
 import { isDbConnected } from '../db/connection.js';
+import { parseSupplierAdvertWithAi } from '../services/marketplaceAiImporter.js';
+
+// Simple sliding window rate limit map for Admin AI Importer
+const adminAiRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
 export const adminRouter = Router();
 
@@ -1117,6 +1121,77 @@ adminRouter.post('/marketplace/products/:id/archive', async (req: Request, res: 
   } catch (err) {
     console.error('[Admin API] Archive product error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to archive product.' });
+  }
+});
+
+/**
+ * 14j. POST /api/admin/marketplace/ai-import
+ * Admin-only AI Importer endpoint to parse WhatsApp supplier adverts with Gemini.
+ */
+adminRouter.post('/marketplace/ai-import', async (req: Request, res: Response) => {
+  try {
+    const adminUser = req.user!;
+    const { advertText } = req.body || {};
+
+    if (!advertText || typeof advertText !== 'string' || !advertText.trim()) {
+      res.status(400).json({ error: 'Please paste a supplier advert to parse.' });
+      return;
+    }
+
+    const trimmed = advertText.trim();
+    if (trimmed.length > 20000) {
+      res.status(400).json({
+        error: 'This advert is too long. Paste only the product information you want to import.',
+      });
+      return;
+    }
+
+    // Lightweight rate-limiting (e.g. 15 requests per minute per admin)
+    const now = Date.now();
+    const rateKey = adminUser.id;
+    const currentLimit = adminAiRateLimitMap.get(rateKey) || { count: 0, resetAt: now + 60000 };
+
+    if (now > currentLimit.resetAt) {
+      currentLimit.count = 0;
+      currentLimit.resetAt = now + 60000;
+    }
+
+    if (currentLimit.count >= 15) {
+      res.status(429).json({
+        error: 'AI import rate limit reached (15 per minute). Please wait a moment before trying again.',
+      });
+      return;
+    }
+
+    currentLimit.count += 1;
+    adminAiRateLimitMap.set(rateKey, currentLimit);
+
+    const extraction = await parseSupplierAdvertWithAi(trimmed);
+
+    // Record admin audit log
+    await AdminAuditStore.record({
+      adminUserId: adminUser.id,
+      action: 'marketplace_ai_import',
+      entityType: 'marketplace_importer',
+      entityId: 'ai_import',
+      metadata: {
+        productName: extraction.name,
+        category: extraction.category,
+        detectedPriceOptions: extraction.detectedPriceOptions.length,
+        warningsCount: extraction.warnings.length,
+      },
+    });
+
+    res.json({
+      success: true,
+      extraction,
+      message: `Successfully extracted draft specifications for "${extraction.name}". Review and apply to form.`,
+    });
+  } catch (err) {
+    console.error('[Admin API] AI Marketplace Importer error:', err);
+    res.status(500).json({
+      error: 'Mystery AI couldn\'t parse this advert right now. Your pasted text is still here, so you can retry or fill the form manually.',
+    });
   }
 });
 

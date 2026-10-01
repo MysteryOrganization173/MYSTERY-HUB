@@ -2,7 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI } from '@google/genai';
+import { getGeminiClient } from './server/services/geminiClient.js';
 import { apiRouter, handlePaystackWebhook, handleSuccessBizHubWebhook } from './server/routes/api.js';
 import { adminRouter } from './server/routes/adminApi.js';
 import { initDatabase } from './server/db/connection.js';
@@ -111,19 +111,6 @@ app.use('/api', apiRouter);
 // Mount Protected Admin V1 API Router
 app.use('/api/admin', adminRouter);
 
-// Initialize Gemini API client if API key is present
-let aiClient: GoogleGenAI | null = null;
-if (process.env.GEMINI_API_KEY) {
-  aiClient = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
-  });
-}
-
 // API endpoint for Mystery AI chat
 app.post('/api/mystery-ai/chat', async (req, res) => {
   try {
@@ -133,6 +120,8 @@ app.post('/api/mystery-ai/chat', async (req, res) => {
       res.status(400).json({ error: 'Message is required' });
       return;
     }
+
+    const aiClient = getGeminiClient();
 
     if (!aiClient) {
       res.json({
