@@ -1,14 +1,83 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS } from '../../data/bundles';
-import { lookupOrderOnServer } from '../../services/apiClient';
+import { lookupOrderOnServer, getAccountOrdersOnServer } from '../../services/apiClient';
 import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
-import { Clock, Search, ArrowRight, CheckCircle2, RefreshCw, AlertTriangle, Smartphone } from 'lucide-react';
+import { OrderRecord } from '../../types';
+import { Clock, Search, ArrowRight, CheckCircle2, RefreshCw, AlertTriangle, Smartphone, ShieldCheck } from 'lucide-react';
 
 export const OrdersPage: React.FC = () => {
-  const { orders, openOrderStatus, setActivePage, showToast } = useApp();
+  const { orders: localOrders, openOrderStatus, setActivePage, showToast, user, sessionToken } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchingServer, setIsSearchingServer] = useState(false);
+  const [serverOrders, setServerOrders] = useState<OrderRecord[]>([]);
+
+  // Fetch account-linked orders when authenticated
+  useEffect(() => {
+    if (!user || !sessionToken) {
+      setServerOrders([]);
+      return;
+    }
+
+    let isMounted = true;
+    getAccountOrdersOnServer(sessionToken, 50)
+      .then((res) => {
+        if (isMounted && res.success && Array.isArray(res.orders)) {
+          const mapped: OrderRecord[] = res.orders.map((o) => {
+            const isDelivered = o.status === 'delivered';
+            const isProcessing = o.status === 'processing' || o.status === 'submitted';
+            const isPlaced = o.status === 'paid' || o.status === 'queued';
+            const isFailed = o.status === 'failed' || o.status === 'refund_pending' || o.status === 'refunded';
+
+            return {
+              id: o.public_reference,
+              publicReference: o.public_reference,
+              serverReference: o.public_reference,
+              serverStatus: o.status,
+              serviceType: o.service_type || (o.product_name_snapshot?.toLowerCase().includes('airtime') ? 'airtime' : 'data'),
+              bundle: {
+                id: 'server-bundle-' + o.public_reference,
+                network: o.network,
+                dataAmount: o.bundle_size_snapshot || o.product_name_snapshot || 'Data Order',
+                dataBytesValue: 0,
+                validity: 'Standard',
+                validityCategory: 'Daily',
+                priceGhc: o.amount_ghc,
+                description: o.product_name_snapshot,
+              },
+              recipientPhone: o.recipient_phone,
+              network: o.network,
+              paymentMethod: 'paystack',
+              amountGhc: o.amount_ghc,
+              status: isDelivered ? 'delivered' : isProcessing ? 'processing' : isPlaced ? 'placed' : isFailed ? 'failed' : 'verifying',
+              paymentReference: o.public_reference,
+              createdAt: o.created_at,
+              updatedAt: o.created_at,
+            };
+          });
+          setServerOrders(mapped);
+        }
+      })
+      .catch(() => {
+        // Fallback silently to local orders if request fails
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, sessionToken]);
+
+  // Combine server orders with local orders without duplicates
+  const allOrders = React.useMemo(() => {
+    const combined = [...serverOrders];
+    for (const localOrd of localOrders) {
+      const ref = localOrd.publicReference || localOrd.id;
+      if (!combined.some((s) => s.publicReference === ref || s.id === ref || s.id === localOrd.id)) {
+        combined.push(localOrd);
+      }
+    }
+    return combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [serverOrders, localOrders]);
 
   const handleServerLookup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +143,7 @@ export const OrdersPage: React.FC = () => {
     }
   };
 
-  const filteredOrders = orders.filter((o) => {
+  const filteredOrders = allOrders.filter((o) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     const pubRef = o.publicReference ? o.publicReference.toLowerCase() : '';
@@ -93,14 +162,16 @@ export const OrdersPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/30 text-xs font-semibold text-[#00c365] mb-2">
-              <Clock className="w-3.5 h-3.5" />
-              <span>Order Tracking</span>
+              {user ? <ShieldCheck className="w-3.5 h-3.5 text-[#00c365]" /> : <Clock className="w-3.5 h-3.5" />}
+              <span>{user ? 'Account Orders' : 'Order Tracking'}</span>
             </div>
             <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-              Order History & Tracking
+              {user ? 'Your Orders' : 'Order History & Tracking'}
             </h1>
             <p className="text-xs text-slate-400 mt-1">
-              Track real-time bundle delivery and view transaction receipts.
+              {user
+                ? 'Your purchases linked to this Mystery Hub account.'
+                : 'Track real-time bundle delivery and view transaction receipts.'}
             </p>
           </div>
 
@@ -141,7 +212,7 @@ export const OrdersPage: React.FC = () => {
         {filteredOrders.length > 0 ? (
           <div className="space-y-3">
             {filteredOrders.map((order) => {
-              const net = GHANA_NETWORKS[order.network];
+              const net = GHANA_NETWORKS[order.network] || GHANA_NETWORKS['mtn'];
 
               const statusBadge = {
                 verifying: (
@@ -277,7 +348,7 @@ export const OrdersPage: React.FC = () => {
             </p>
             <button
               onClick={() => setActivePage('data')}
-              className="px-5 py-2.5 rounded-xl bg-[#00c365] text-black font-bold text-xs uppercase tracking-wider"
+              className="px-5 py-2.5 rounded-xl bg-[#00c365] text-black font-bold text-xs uppercase tracking-wider cursor-pointer"
             >
               Browse Data Bundles
             </button>

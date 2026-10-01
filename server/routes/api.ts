@@ -1100,7 +1100,15 @@ apiRouter.get('/waitlist/my-entries', requireAuth, async (req: Request, res: Res
 apiRouter.get('/orders/my-orders', requireAuth, async (req: Request, res: Response) => {
   try {
     const user = req.user!;
-    const orders = await OrdersStore.findOrdersByUserId(user.id);
+    const rawLimit = req.query.limit;
+    let limit = 20;
+    if (typeof rawLimit === 'string') {
+      const parsed = parseInt(rawLimit, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        limit = Math.min(parsed, 50);
+      }
+    }
+    const orders = await OrdersStore.findOrdersByUserId(user.id, limit);
     const safeOrders = orders.map(toSafePublicOrder);
 
     res.json({
@@ -1110,6 +1118,36 @@ apiRouter.get('/orders/my-orders', requireAuth, async (req: Request, res: Respon
   } catch (err) {
     console.error('My Orders Controller Exception:', err);
     res.status(500).json({ error: 'Failed to retrieve orders.' });
+  }
+});
+
+/**
+ * 12b. GET /api/account/orders
+ * Dedicated customer account orders endpoint.
+ * Protected with requireAuth middleware. Supports ?limit= parameter (default 20, max 50).
+ */
+apiRouter.get('/account/orders', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const rawLimit = req.query.limit;
+    let limit = 20;
+    if (typeof rawLimit === 'string') {
+      const parsed = parseInt(rawLimit, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        limit = Math.min(parsed, 50);
+      }
+    }
+
+    const orders = await OrdersStore.findOrdersByUserId(userId, limit);
+    const safeOrders = orders.map(toSafePublicOrder);
+
+    res.json({
+      success: true,
+      orders: safeOrders,
+    });
+  } catch (err) {
+    console.error('Account Orders API Exception:', err);
+    res.status(500).json({ error: 'Failed to retrieve account orders.' });
   }
 });
 

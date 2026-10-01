@@ -339,16 +339,19 @@ export class OrdersStore {
   /**
    * Find orders belonging to a specific authenticated user
    */
-  static async findOrdersByUserId(userId: string): Promise<OrderRecord[]> {
+  static async findOrdersByUserId(userId: string, limit?: number): Promise<OrderRecord[]> {
     if (!userId) return [];
     const pool = getPool();
+    const hasLimit = typeof limit === 'number' && limit > 0;
     if (pool) {
       const query = `
         SELECT * FROM orders 
         WHERE user_id = $1 
-        ORDER BY created_at DESC;
+        ORDER BY created_at DESC
+        ${hasLimit ? 'LIMIT $2' : ''};
       `;
-      const res = await pool.query(query, [userId]);
+      const params = hasLimit ? [userId, limit] : [userId];
+      const res = await pool.query(query, params);
       return res.rows as OrderRecord[];
     }
 
@@ -358,7 +361,11 @@ export class OrdersStore {
         results.push(ord);
       }
     }
-    return results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const sorted = results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    if (hasLimit) {
+      return sorted.slice(0, limit);
+    }
+    return sorted;
   }
 
   /**

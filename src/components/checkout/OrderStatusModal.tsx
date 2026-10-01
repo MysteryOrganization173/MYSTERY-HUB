@@ -15,6 +15,8 @@ export const OrderStatusModal: React.FC = () => {
     setActivePage,
     updateOrderStatus,
     showToast,
+    user,
+    openAuth,
   } = useApp();
 
   const [copied, setCopied] = useState(false);
@@ -356,6 +358,25 @@ export const OrderStatusModal: React.FC = () => {
                 }`}
               >
                 Refund Pending
+              </button>
+            </div>
+          )}
+
+          {/* Guest Account Conversion Banner */}
+          {!user && (
+            <div className="p-3.5 rounded-xl bg-[#121c24] border border-[#00c365]/30 flex items-center justify-between gap-3 text-xs">
+              <div className="space-y-0.5">
+                <p className="font-semibold text-white">Want your orders available across devices?</p>
+                <p className="text-slate-400 text-[11px]">Create a free Mystery Hub account to link and track all purchases.</p>
+              </div>
+              <button
+                onClick={() => {
+                  closeOrderStatus();
+                  openAuth('signup');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-[#00c365] hover:bg-[#00e575] text-black font-bold shrink-0 transition-colors cursor-pointer"
+              >
+                Create Account
               </button>
             </div>
           )}

@@ -253,6 +253,28 @@ export async function getMeOnServer(token: string): Promise<{ success: boolean; 
   return data;
 }
 
+export async function getAccountOrdersOnServer(
+  token: string,
+  limit?: number
+): Promise<{ success: boolean; orders: SafePublicOrderDetails[] }> {
+  const query = limit ? `?limit=${limit}` : '';
+  const url = `${API_BASE_URL}/api/account/orders${query}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to fetch account orders.');
+  }
+
+  return data;
+}
+
 export async function logoutOnServer(token?: string | null): Promise<void> {
   if (!token) return;
   try {

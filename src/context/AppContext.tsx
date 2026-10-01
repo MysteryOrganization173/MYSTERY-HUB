@@ -51,6 +51,7 @@ interface AppContextType {
   closeAuth: () => void;
   user: SafeUserProfile | null;
   sessionToken: string | null;
+  isAuthChecking: boolean;
   loginUser: (profile: SafeUserProfile, token: string, rememberMe?: boolean) => void;
   logoutUser: () => void;
   selectedTemplatePreview: WebsiteTemplate | null;
@@ -123,10 +124,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return null;
   });
 
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => {
+    try {
+      return Boolean(localStorage.getItem('mystery_hub_session_token') || sessionStorage.getItem('mystery_hub_session_token'));
+    } catch {
+      return false;
+    }
+  });
+
   // Verify server-side session token on startup
   useEffect(() => {
     const token = localStorage.getItem('mystery_hub_session_token') || sessionStorage.getItem('mystery_hub_session_token');
-    if (!token) return;
+    if (!token) {
+      setIsAuthChecking(false);
+      return;
+    }
 
     let isMounted = true;
     getMeOnServer(token)
@@ -156,6 +168,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           } catch {
             // ignore
           }
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsAuthChecking(false);
         }
       });
 
@@ -405,6 +422,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         closeAuth,
         user,
         sessionToken,
+        isAuthChecking,
         loginUser,
         logoutUser,
         selectedTemplatePreview,

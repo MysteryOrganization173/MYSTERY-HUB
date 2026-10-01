@@ -1,14 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { BrandLogo } from './BrandLogo';
 import { ActivePage } from '../../types';
-import { Search, ShoppingBag, User, LogOut, Menu, X } from 'lucide-react';
+import {
+  Search,
+  ShoppingBag,
+  User as UserIcon,
+  LogOut,
+  Menu,
+  X,
+  ChevronDown,
+  Home,
+  Globe,
+  Sparkles,
+  Clock,
+  ExternalLink,
+} from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { activePage, setActivePage, openAuth, user, logoutUser, orders, openOrderStatus } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const navLinks: { id: ActivePage; label: string }[] = [
     { id: 'home', label: 'Home' },
@@ -19,9 +35,34 @@ export const Navbar: React.FC = () => {
     { id: 'about', label: 'About' },
   ];
 
+  // Close dropdown on outside click or Escape key
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setAccountDropdownOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setAccountDropdownOpen(false);
+        setMobileMenuOpen(false);
+        setSearchOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   const handleNavClick = (pageId: ActivePage) => {
     setActivePage(pageId);
     setMobileMenuOpen(false);
+    setAccountDropdownOpen(false);
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -42,6 +83,9 @@ export const Navbar: React.FC = () => {
   };
 
   const recentOrder = orders[0];
+  const userFirstName = user?.name ? user.name.split(' ')[0] : 'Member';
+  const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'M';
+  const userSubtext = user?.email || user?.phone || '';
 
   return (
     <header className="sticky top-0 z-40 bg-[#0a0e11]/90 backdrop-blur-md border-b border-slate-800/80">
@@ -72,9 +116,7 @@ export const Navbar: React.FC = () => {
                   handleNavClick(link.id);
                 }}
                 className={`transition-colors py-1 relative whitespace-nowrap cursor-pointer ${
-                  isActive
-                    ? 'text-white font-semibold'
-                    : 'text-slate-300 hover:text-white'
+                  isActive ? 'text-white font-semibold' : 'text-slate-300 hover:text-white'
                 }`}
               >
                 {link.label}
@@ -112,7 +154,7 @@ export const Navbar: React.FC = () => {
             ) : (
               <button
                 onClick={() => setSearchOpen(true)}
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors"
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
                 title="Search Mystery Hub"
                 aria-label="Search"
               >
@@ -125,7 +167,7 @@ export const Navbar: React.FC = () => {
           {orders.length > 0 && (
             <button
               onClick={() => recentOrder && openOrderStatus(recentOrder)}
-              className="relative p-2 text-slate-400 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors"
+              className="relative p-2 text-slate-400 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
               title="Recent Orders"
               aria-label="Recent Orders"
             >
@@ -136,32 +178,101 @@ export const Navbar: React.FC = () => {
 
           {/* Auth Controls */}
           {user ? (
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/90 border border-slate-800 rounded-lg text-xs text-slate-200">
-                <div className="w-5 h-5 rounded-full bg-[#00c365]/20 text-[#00c365] flex items-center justify-center font-bold text-[10px]">
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
-                <span className="hidden sm:inline font-medium truncate max-w-[100px]">{user.name.split(' ')[0]}</span>
-              </div>
+            <div className="relative" ref={dropdownRef}>
               <button
-                onClick={logoutUser}
-                className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800/60 rounded-lg transition-colors"
-                title="Log out"
+                onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 rounded-xl text-xs text-slate-200 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#00c365]"
+                aria-haspopup="true"
+                aria-expanded={accountDropdownOpen}
               >
-                <LogOut className="w-4 h-4" />
+                <div className="w-5 h-5 rounded-full bg-[#00c365]/20 text-[#00c365] flex items-center justify-center font-bold text-[10px]">
+                  {userInitial}
+                </div>
+                <span className="hidden sm:inline font-medium truncate max-w-[110px]">{userFirstName}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${accountDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
+
+              {/* Account Dropdown Menu */}
+              {accountDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-[#0f151b] border border-slate-700/80 shadow-2xl py-2 z-50 text-xs text-slate-200 animate-in fade-in zoom-in-95 duration-150">
+                  {/* User Profile Header */}
+                  <div className="px-3.5 py-2.5 border-b border-slate-800 space-y-0.5">
+                    <p className="font-bold text-white text-xs truncate">{user.name}</p>
+                    {userSubtext && <p className="text-[11px] text-slate-400 truncate">{userSubtext}</p>}
+                  </div>
+
+                  {/* Navigation Shortcuts */}
+                  <div className="py-1">
+                    <button
+                      onClick={() => handleNavClick('home')}
+                      className="w-full text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <Home className="w-3.5 h-3.5 text-[#00c365]" />
+                      <span>My Home</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleNavClick('orders')}
+                      className="w-full text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <Clock className="w-3.5 h-3.5 text-sky-400" />
+                      <span>My Orders</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleNavClick('website')}
+                      className="w-full text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <Globe className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Website Builder</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleNavClick('marketplace')}
+                      className="w-full text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Marketplace</span>
+                    </button>
+
+                    <div className="px-3.5 py-2 flex items-center justify-between text-slate-400 cursor-not-allowed">
+                      <div className="flex items-center gap-2.5">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Mystery Earn</span>
+                      </div>
+                      <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 bg-[#00c365]/10 text-[#00c365] rounded border border-[#00c365]/20">
+                        Soon
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Sign Out */}
+                  <div className="pt-1 border-t border-slate-800">
+                    <button
+                      onClick={() => {
+                        setAccountDropdownOpen(false);
+                        logoutUser();
+                      }}
+                      className="w-full text-left px-3.5 py-2 hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => openAuth('login')}
-                className="hidden sm:inline-flex px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white transition-colors"
+                className="hidden sm:inline-flex px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white transition-colors cursor-pointer"
               >
                 Login
               </button>
               <button
                 onClick={() => openAuth('signup')}
-                className="px-4 py-2 text-xs font-semibold text-black bg-[#00c365] hover:bg-[#00e575] rounded-lg transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] active:scale-95 whitespace-nowrap"
+                className="px-4 py-2 text-xs font-semibold text-black bg-[#00c365] hover:bg-[#00e575] rounded-xl transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] active:scale-95 whitespace-nowrap cursor-pointer"
               >
                 Sign Up
               </button>
@@ -171,7 +282,7 @@ export const Navbar: React.FC = () => {
           {/* Mobile Menu Hamburger */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-slate-400 hover:text-white rounded-lg focus:outline-none"
+            className="md:hidden p-2 text-slate-400 hover:text-white rounded-lg focus:outline-none cursor-pointer"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -181,24 +292,49 @@ export const Navbar: React.FC = () => {
 
       {/* Mobile Dropdown Menu Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#0c1116] border-b border-slate-800 px-4 pt-3 pb-5 space-y-2">
-          {navLinks.map((link) => (
-            <a
-              key={link.id}
-              href={ROUTE_PATH_MAP[link.id]}
-              onClick={(e) => {
-                e.preventDefault();
-                handleNavClick(link.id);
-              }}
-              className={`block w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                activePage === link.id
-                  ? 'bg-[#00c365]/10 text-[#00c365] font-semibold'
-                  : 'text-slate-300 hover:bg-slate-900 hover:text-white'
-              }`}
-            >
-              {link.label}
-            </a>
-          ))}
+        <div className="md:hidden bg-[#0c1116] border-b border-slate-800 px-4 pt-3 pb-5 space-y-3">
+          {user && (
+            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-[#00c365]/20 text-[#00c365] flex items-center justify-center font-bold text-xs shrink-0">
+                  {userInitial}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-xs text-white truncate">{user.name}</p>
+                  {userSubtext && <p className="text-[11px] text-slate-400 truncate">{userSubtext}</p>}
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  logoutUser();
+                }}
+                className="px-2.5 py-1 text-[11px] text-rose-400 border border-rose-500/30 bg-rose-500/10 rounded-lg shrink-0 cursor-pointer"
+              >
+                Sign Out
+              </button>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            {navLinks.map((link) => (
+              <a
+                key={link.id}
+                href={ROUTE_PATH_MAP[link.id]}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavClick(link.id);
+                }}
+                className={`block w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                  activePage === link.id
+                    ? 'bg-[#00c365]/10 text-[#00c365] font-semibold'
+                    : 'text-slate-300 hover:bg-slate-900 hover:text-white'
+                }`}
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
 
           {!user && (
             <div className="pt-2 border-t border-slate-800 flex gap-2">
@@ -207,7 +343,7 @@ export const Navbar: React.FC = () => {
                   setMobileMenuOpen(false);
                   openAuth('login');
                 }}
-                className="flex-1 py-2 text-center text-xs font-medium text-slate-300 bg-slate-900 rounded-lg"
+                className="flex-1 py-2 text-center text-xs font-medium text-slate-300 bg-slate-900 rounded-xl cursor-pointer"
               >
                 Login
               </button>
@@ -216,7 +352,7 @@ export const Navbar: React.FC = () => {
                   setMobileMenuOpen(false);
                   openAuth('signup');
                 }}
-                className="flex-1 py-2 text-center text-xs font-semibold text-black bg-[#00c365] rounded-lg"
+                className="flex-1 py-2 text-center text-xs font-semibold text-black bg-[#00c365] rounded-xl cursor-pointer"
               >
                 Sign Up
               </button>

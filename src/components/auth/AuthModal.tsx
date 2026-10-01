@@ -94,6 +94,20 @@ export const AuthModal: React.FC = () => {
                 ? 'Join thousands of Ghanaians accessing cheap data and launching business websites.'
                 : 'Log in to track orders, save bundles, and manage your websites.'}
             </p>
+
+            {isSignup && (
+              <div className="flex flex-wrap gap-1.5 pt-2.5">
+                <span className="px-2 py-0.5 rounded-md bg-[#00c365]/10 border border-[#00c365]/20 text-[#00c365] text-[11px] font-medium">
+                  ✓ Track orders across devices
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-[#00c365]/10 border border-[#00c365]/20 text-[#00c365] text-[11px] font-medium">
+                  ✓ Website Builder identity
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-[#00c365]/10 border border-[#00c365]/20 text-[#00c365] text-[11px] font-medium">
+                  ✓ Mystery Earn coming soon
+                </span>
+              </div>
+            )}
           </div>
 
           {errorMessage && (
