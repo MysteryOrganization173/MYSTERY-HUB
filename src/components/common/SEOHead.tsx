@@ -94,6 +94,14 @@ export const SEOHead: React.FC = () => {
     updateOrCreateMeta('og:title', meta.title);
     updateOrCreateMeta('og:description', meta.description);
     updateOrCreateMeta('og:url', canonicalUrl);
+    updateOrCreateMeta(
+      'og:image',
+      'https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1200/v1790859552/30338777-d9dc-4709-8603-b18a4dc8d0ca_tvptuc.png'
+    );
+    updateOrCreateMeta(
+      'twitter:image',
+      'https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1200/v1790859552/30338777-d9dc-4709-8603-b18a4dc8d0ca_tvptuc.png'
+    );
   }, [activePage]);
 
   return null;

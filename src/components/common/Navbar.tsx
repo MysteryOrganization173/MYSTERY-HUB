@@ -53,10 +53,10 @@ export const Navbar: React.FC = () => {
             e.preventDefault();
             handleNavClick('home');
           }}
-          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] rounded-lg transition-transform active:scale-95 inline-block"
+          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] rounded-lg transition-transform active:scale-95 inline-flex items-center"
           aria-label="Mystery Hub Homepage"
         >
-          <BrandLogo size="md" />
+          <BrandLogo size="md" priority="high" />
         </a>
 
         {/* Zone 2: Navigation Links (Desktop) */}

@@ -13,6 +13,10 @@ export const BUSINESS_CONFIG = {
   currency: 'GHS',
   currencySymbol: 'GH₵',
 
+  // Official Brand Assets
+  brandMarkUrl:
+    'https://res.cloudinary.com/da6oeat7m/image/upload/v1790859552/30338777-d9dc-4709-8603-b18a4dc8d0ca_tvptuc.png',
+
   // Official Public Contact Information
   contact: {
     supportEmail: 'aryeeteyemmanuel852@gmail.com',
