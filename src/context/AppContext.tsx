@@ -163,12 +163,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Browser History and Popstate synchronization for back/forward buttons
   useEffect(() => {
-    // If the browser visibly landed on /index.html (e.g. from an old server redirect or direct link),
-    // normalize the address bar to '/' cleanly without a full page reload
-    if (typeof window !== 'undefined' && normalizePathname(window.location.pathname) === '/index.html') {
-      window.history.replaceState({ page: 'home' }, '', '/');
-    }
-
     const handlePopState = () => {
       const page = getPageFromPath(window.location.pathname);
       setActivePageState(page);

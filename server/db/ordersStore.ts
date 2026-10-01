@@ -757,6 +757,48 @@ export class OrdersStore {
   }
 
   /**
+   * Admin: Terminalize a pre-launch/test order safely
+   * Sets status to 'failed', records the administrative failure reason,
+   * updates updated_at, and preserves all accounting and transaction data.
+   */
+  static async closeAsTestOrder(
+    orderId: string,
+    failureReason: string
+  ): Promise<OrderRecord | null> {
+    const existing = await this.findOrder(orderId);
+    if (!existing) return null;
+
+    const nowIso = new Date().toISOString();
+    const updated: OrderRecord = {
+      ...existing,
+      status: 'failed',
+      failure_reason: failureReason,
+      updated_at: nowIso,
+    };
+
+    const pool = getPool();
+    if (pool) {
+      const query = `
+        UPDATE orders
+        SET status = $1, failure_reason = $2, updated_at = $3
+        WHERE id = $4;
+      `;
+      await pool.query(query, [
+        updated.status,
+        updated.failure_reason,
+        updated.updated_at,
+        existing.id,
+      ]);
+    } else {
+      devMemoryStore.set(existing.id, updated);
+      devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
+      devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
+    }
+
+    return updated;
+  }
+
+  /**
    * Admin: Update manual review flag and internal admin note
    */
   static async updateOrderReview(

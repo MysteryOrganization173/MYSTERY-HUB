@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   AdminOrdersResponse,
   getAdminOrdersOnServer,
   refreshAdminOrderOnServer,
   updateAdminOrderReviewOnServer,
+  closeAdminTestOrderOnServer,
 } from '../../../services/apiClient';
 import { AdminOrderDetails } from '../../../../server/types/orders';
 import {
@@ -46,8 +47,9 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Selected Order for Drawer
+  // Selected Order for Drawer & Stable Ref to prevent race conditions on close
   const [selectedOrder, setSelectedOrder] = useState<AdminOrderDetails | null>(null);
+  const selectedOrderRef = useRef<AdminOrderDetails | null>(null);
   const [isRefreshingSupplier, setIsRefreshingSupplier] = useState(false);
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
   const [adminNoteInput, setAdminNoteInput] = useState('');
@@ -55,6 +57,42 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+  // Administrative Resolution State
+  const [showCloseTestConfirm, setShowCloseTestConfirm] = useState(false);
+  const [confirmPaidCheckbox, setConfirmPaidCheckbox] = useState(false);
+  const [closeTestReason, setCloseTestReason] = useState('');
+  const [isClosingTest, setIsClosingTest] = useState(false);
+  const [closeTestError, setCloseTestError] = useState<string | null>(null);
+
+  // Dedicated Drawer Close Handler
+  const closeOrderDrawer = useCallback(() => {
+    selectedOrderRef.current = null;
+    setSelectedOrder(null);
+    setActionSuccessMessage(null);
+    setShowTechnicalDetails(false);
+    setCopiedKey(null);
+    setShowCloseTestConfirm(false);
+    setConfirmPaidCheckbox(false);
+    setCloseTestReason('');
+    setIsClosingTest(false);
+    setCloseTestError(null);
+  }, []);
+
+  // Dedicated Drawer Open Handler
+  const openOrderDrawer = useCallback((order: AdminOrderDetails) => {
+    selectedOrderRef.current = order;
+    setSelectedOrder(order);
+    setActionSuccessMessage(null);
+    setShowTechnicalDetails(false);
+    setCopiedKey(null);
+    setAdminNoteInput(order.admin_note || '');
+    setShowCloseTestConfirm(false);
+    setConfirmPaidCheckbox(false);
+    setCloseTestReason('');
+    setIsClosingTest(false);
+    setCloseTestError(null);
+  }, []);
 
   const fetchOrders = useCallback(async () => {
     setIsSearching(true);
@@ -74,10 +112,14 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
 
       if (res.success) {
         setOrdersData(res);
-        // If an order was selected, update its reference in state if in current list
-        if (selectedOrder) {
-          const updated = res.orders.find((o) => o.public_reference === selectedOrder.public_reference);
-          if (updated) setSelectedOrder(updated);
+        // Only update selectedOrder if drawer is currently open and reference matches
+        if (selectedOrderRef.current) {
+          const currentRef = selectedOrderRef.current.public_reference;
+          const updated = res.orders.find((o) => o.public_reference === currentRef);
+          if (updated && selectedOrderRef.current) {
+            selectedOrderRef.current = updated;
+            setSelectedOrder(updated);
+          }
         }
       }
     } catch (err: unknown) {
@@ -95,12 +137,24 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
     paymentStatusFilter,
     manualReviewFilter,
     currentPage,
-    selectedOrder,
   ]);
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  // Escape key listener to close order details drawer
+  useEffect(() => {
+    if (!selectedOrder) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        closeOrderDrawer();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedOrder, closeOrderDrawer]);
 
   // Handle Copy to Clipboard
   const handleCopy = (text: string, key: string) => {
@@ -166,12 +220,34 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
     }
   };
 
-  // Open Details Modal/Drawer
-  const openOrderDrawer = (order: AdminOrderDetails) => {
-    setSelectedOrder(order);
-    setAdminNoteInput(order.admin_note || '');
+  // Handle Controlled Close As Pre-launch Test Order
+  const handleCloseTestOrder = async () => {
+    if (!selectedOrder) return;
+    setIsClosingTest(true);
+    setCloseTestError(null);
     setActionSuccessMessage(null);
-    setShowTechnicalDetails(false);
+
+    try {
+      const res = await closeAdminTestOrderOnServer(sessionToken, selectedOrder.public_reference, {
+        confirmPaidTestOrder: confirmPaidCheckbox,
+        reason: closeTestReason.trim() || undefined,
+      });
+
+      if (res.success && res.order) {
+        selectedOrderRef.current = res.order;
+        setSelectedOrder(res.order);
+        setActionSuccessMessage(res.message || 'Test order closed. It will no longer block new MTN orders.');
+        setShowCloseTestConfirm(false);
+        setConfirmPaidCheckbox(false);
+        setCloseTestReason('');
+        // Refresh full table
+        fetchOrders();
+      }
+    } catch (err: unknown) {
+      setCloseTestError(err instanceof Error ? err.message : 'Failed to close test order.');
+    } finally {
+      setIsClosingTest(false);
+    }
   };
 
   // Helper for Status Badge
@@ -635,8 +711,19 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
 
       {/* Order Details Drawer / Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-2xl max-h-[92vh] flex flex-col bg-[#0f171d] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            closeOrderDrawer();
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+        >
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+            className="w-full max-w-2xl max-h-[92vh] flex flex-col bg-[#0f171d] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+          >
             {/* Drawer Header */}
             <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
               <div className="space-y-0.5">
@@ -656,8 +743,13 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
               </div>
 
               <button
-                onClick={() => setSelectedOrder(null)}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeOrderDrawer();
+                }}
                 className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                title="Close drawer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -861,6 +953,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
               {selectedOrder.supplier_response && (
                 <div className="border border-slate-800 rounded-xl overflow-hidden">
                   <button
+                    type="button"
                     onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
                     className="w-full p-3 bg-slate-900/90 text-left text-xs text-slate-400 hover:text-white flex items-center justify-between font-mono cursor-pointer"
                   >
@@ -874,11 +967,168 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                   )}
                 </div>
               )}
+
+              {/* Administrative Resolution Section */}
+              <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Administrative Resolution</span>
+                  </h4>
+                  <span className="text-[10px] text-slate-500 font-mono">Restricted Controls</span>
+                </div>
+
+                {/* Case C: Delivered -> No destructive action */}
+                {(selectedOrder.status === 'delivered' || selectedOrder.delivered_at) && (
+                  <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/25 flex items-center gap-2 text-[11px] text-emerald-300">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>This order has been verified as delivered to the customer. No administrative intervention permitted.</span>
+                  </div>
+                )}
+
+                {/* Case D: Already terminal failed/refunded -> Informational */}
+                {(selectedOrder.status === 'failed' || selectedOrder.status === 'refunded') && (
+                  <div className="p-3 rounded-lg bg-slate-800/80 border border-slate-700/60 flex items-center gap-2 text-[11px] text-slate-400">
+                    <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                    <span>Order is in terminal status ({selectedOrder.status}). It does not block MTN duplicate protection.</span>
+                  </div>
+                )}
+
+                {/* Case A: supplier_order_id exists -> Show Refresh Supplier Status */}
+                {selectedOrder.supplier_order_id && selectedOrder.status !== 'delivered' && selectedOrder.status !== 'failed' && selectedOrder.status !== 'refunded' && (
+                  <div className="p-3.5 rounded-lg bg-sky-500/10 border border-sky-500/25 space-y-2">
+                    <p className="text-[11px] text-sky-200 leading-relaxed">
+                      This order was dispatched to Success Biz Hub (ID: <span className="font-mono font-bold text-white">{selectedOrder.supplier_order_id}</span>). Use supplier refresh to synchronize the live delivery state.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleRefreshSupplierStatus(selectedOrder.public_reference)}
+                      disabled={isRefreshingSupplier}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingSupplier ? 'animate-spin' : ''}`} />
+                      <span>{isRefreshingSupplier ? 'Checking Supplier...' : 'Refresh Supplier Status'}</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Case B: No supplier_order_id AND non-terminal -> Can close as Pre-launch Test */}
+                {!selectedOrder.supplier_order_id && selectedOrder.status !== 'delivered' && selectedOrder.status !== 'failed' && selectedOrder.status !== 'refunded' && (
+                  <div className="space-y-3">
+                    {!showCloseTestConfirm ? (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                        <div>
+                          <div className="font-bold text-amber-300 text-xs">Stale Test Order Resolution</div>
+                          <p className="text-[11px] text-slate-400">
+                            Terminalize this pre-launch test order so it no longer blocks MTN duplicate protection.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCloseTestConfirm(true);
+                            setCloseTestError(null);
+                            setConfirmPaidCheckbox(false);
+                            setCloseTestReason('');
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-colors cursor-pointer shrink-0"
+                        >
+                          Close as Pre-launch Test
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-3.5 rounded-xl bg-[#141b22] border border-amber-500/40 space-y-3 animate-fadeIn">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 font-bold text-amber-400 text-xs">
+                            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                            <span>Confirm Pre-Launch Test Resolution</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCloseTestConfirm(false);
+                              setCloseTestError(null);
+                            }}
+                            className="text-slate-400 hover:text-white text-xs cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+
+                        {/* Paid Warning & Mandatory Checkbox */}
+                        {(selectedOrder.payment_status === 'success' || Boolean(selectedOrder.paid_at)) && (
+                          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 space-y-2">
+                            <p className="text-[11px] text-red-300 leading-relaxed font-medium">
+                              This order has a successful payment record but no supplier order ID. Only close it if you have confirmed it was a test/pre-launch transaction. This does not refund the payment.
+                            </p>
+                            <label className="flex items-start gap-2 text-[11px] text-slate-200 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={confirmPaidCheckbox}
+                                onChange={(e) => setConfirmPaidCheckbox(e.target.checked)}
+                                className="mt-0.5 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-400 cursor-pointer"
+                              />
+                              <span className="leading-snug">
+                                I confirm this is a pre-launch/test order and no customer refund is being performed by this action.
+                              </span>
+                            </label>
+                          </div>
+                        )}
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[11px] text-slate-400">
+                            Reason for closure (recorded in audit log):
+                          </label>
+                          <input
+                            type="text"
+                            value={closeTestReason}
+                            onChange={(e) => setCloseTestReason(e.target.value)}
+                            placeholder="e.g. Pre-launch developer test order"
+                            className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400 font-mono"
+                          />
+                        </div>
+
+                        {closeTestError && (
+                          <div className="text-[11px] text-red-400 font-medium p-2 rounded-lg bg-red-500/10 border border-red-500/20">
+                            {closeTestError}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCloseTestConfirm(false);
+                              setCloseTestError(null);
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCloseTestOrder}
+                            disabled={
+                              isClosingTest ||
+                              ((selectedOrder.payment_status === 'success' || Boolean(selectedOrder.paid_at)) &&
+                                !confirmPaidCheckbox)
+                            }
+                            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            {isClosingTest ? 'Terminalizing...' : 'Confirm & Terminalize Order'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Drawer Footer */}
             <div className="p-4 bg-slate-900/90 border-t border-slate-800 flex items-center justify-between">
               <button
+                type="button"
                 onClick={() => handleCopy(selectedOrder.public_reference, 'pub_ref_btn')}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
               >
@@ -887,7 +1137,11 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
               </button>
 
               <button
-                onClick={() => setSelectedOrder(null)}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeOrderDrawer();
+                }}
                 className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition-colors cursor-pointer"
               >
                 Close Drawer

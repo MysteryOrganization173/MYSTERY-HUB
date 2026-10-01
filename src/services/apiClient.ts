@@ -450,6 +450,25 @@ export async function updateAdminOrderReviewOnServer(
   return data;
 }
 
+export async function closeAdminTestOrderOnServer(
+  token: string,
+  reference: string,
+  options: { confirmPaidTestOrder?: boolean; reason?: string } = {}
+): Promise<{ success: boolean; order: AdminOrderDetails; message: string }> {
+  const url = `${API_BASE_URL}/api/admin/orders/${encodeURIComponent(reference)}/close-test-order`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(options),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to close test order.');
+  return data;
+}
+
 export async function getAdminWaitlistOnServer(
   token: string,
   params: Record<string, string | number | undefined> = {}

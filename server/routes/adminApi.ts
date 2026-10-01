@@ -257,6 +257,102 @@ adminRouter.patch('/orders/:reference/review', async (req: Request, res: Respons
 });
 
 /**
+ * 6. POST /api/admin/orders/:reference/close-test-order
+ * Controlled closure of pre-launch/test orders so they no longer block MTN duplicate protection.
+ * Strict safety rules:
+ * - Refuses delivered orders.
+ * - Refuses orders already dispatched with a supplier_order_id.
+ * - Refuses already terminal orders (failed, refunded).
+ * - Requires explicit second-level confirmation (confirmPaidTestOrder: true) if payment_status is success or paid_at exists.
+ * - Sets status = 'failed' with descriptive administrative failure reason.
+ * - Preserves all payment references, financial amounts, and customer history for audit integrity.
+ * - Writes an audit record to admin_audit_log.
+ */
+adminRouter.post('/orders/:reference/close-test-order', async (req: Request, res: Response) => {
+  try {
+    const ref = req.params.reference;
+    const { confirmPaidTestOrder, reason: customReason } = req.body || {};
+
+    const order = await OrdersStore.findOrder(ref);
+    if (!order) {
+      res.status(404).json({ error: 'Order reference not found.' });
+      return;
+    }
+
+    // Safety Rule 1: Never close delivered orders
+    if (order.status === 'delivered' || order.delivered_at) {
+      res.status(400).json({
+        error: 'Delivered orders cannot be closed as test orders. The service was already fulfilled.',
+      });
+      return;
+    }
+
+    // Safety Rule 2: If dispatched to supplier, require supplier refresh instead
+    if (order.supplier_order_id) {
+      res.status(400).json({
+        error: `Order was already dispatched to supplier (ID: ${order.supplier_order_id}). Use "Refresh Supplier Status" to synchronize the live supplier state.`,
+      });
+      return;
+    }
+
+    // Safety Rule 3: Refuse already terminal orders
+    if (order.status === 'failed' || order.status === 'refunded') {
+      res.status(400).json({
+        error: `Order is already in a terminal state (${order.status}). No closure action needed.`,
+      });
+      return;
+    }
+
+    // Safety Rule 4: If order was paid, require explicit second-level confirmation
+    const isPaid = order.payment_status === 'success' || Boolean(order.paid_at);
+    if (isPaid && confirmPaidTestOrder !== true) {
+      res.status(400).json({
+        error:
+          'This order has a successful payment record but no supplier order ID. Explicit confirmation (confirmPaidTestOrder: true) is required to close as a pre-launch test order.',
+        requiresConfirmation: true,
+      });
+      return;
+    }
+
+    const finalReason =
+      typeof customReason === 'string' && customReason.trim().length > 0
+        ? customReason.trim()
+        : 'Pre-launch test order closed by administrator.';
+
+    const updated = await OrdersStore.closeAsTestOrder(order.id, finalReason);
+    if (!updated) {
+      res.status(500).json({ error: 'Failed to terminalize test order.' });
+      return;
+    }
+
+    // Record audit record
+    await AdminAuditStore.record({
+      adminUserId: req.user!.id,
+      action: 'prelaunch_test_order_closed',
+      entityType: 'order',
+      entityId: order.public_reference,
+      metadata: {
+        previousStatus: order.status,
+        paymentStatus: order.payment_status,
+        hadPaidAt: Boolean(order.paid_at),
+        hadSupplierOrderId: Boolean(order.supplier_order_id),
+        reason: finalReason,
+        confirmedPaidTestOrder: Boolean(confirmPaidTestOrder),
+      },
+    });
+
+    res.json({
+      success: true,
+      order: toAdminOrderDetails(updated),
+      message: 'Test order closed. It will no longer block new MTN orders.',
+    });
+  } catch (err) {
+    console.error('[Admin API] Close test order error:', err);
+    res.status(500).json({ error: 'Failed to close test order.' });
+  }
+});
+
+/**
  * 6. GET /api/admin/waitlist
  * Paginated waitlist entries with service aggregation stats
  */
