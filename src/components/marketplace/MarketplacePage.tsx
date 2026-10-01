@@ -148,7 +148,7 @@ export const MarketplacePage: React.FC = () => {
           </div>
 
           {/* Category Tabs: Scrollable on mobile with smooth touch handling */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-800 -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="w-full flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
             {MARKETPLACE_CATEGORIES.map((cat) => {
               const isSelected = selectedCategory === cat.id;
               return (

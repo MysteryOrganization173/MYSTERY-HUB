@@ -96,14 +96,15 @@ export const Navbar: React.FC = () => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search data, websites, services..."
+                  placeholder="Search..."
                   autoFocus
-                  className="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 w-48 sm:w-64 focus:outline-none focus:border-[#00c365]"
+                  className="bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-2.5 py-1.5 w-32 xs:w-44 sm:w-64 max-w-[calc(100vw-110px)] focus:outline-none focus:border-[#00c365]"
                 />
                 <button
                   type="button"
                   onClick={() => setSearchOpen(false)}
-                  className="ml-1 text-slate-400 hover:text-white p-1"
+                  className="ml-1 text-slate-400 hover:text-white p-1 cursor-pointer"
+                  aria-label="Close search"
                 >
                   <X className="w-4 h-4" />
                 </button>

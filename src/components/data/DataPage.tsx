@@ -1048,31 +1048,41 @@ export const DataPage: React.FC = () => {
 
             {/* Bundles Content: Compact View vs Card View */}
             {filteredBundles.length > 0 ? (
-              viewMode === 'compact' ? (
-                /* Compact View - Whole row is actionable, no separate selection */
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                  {filteredBundles.map((bundle) => (
-                    <CompactBundleRow
-                      key={bundle.id}
-                      bundle={bundle}
-                      onBuy={(b) => openCheckout(b)}
-                    />
-                  ))}
+              <>
+                {viewMode === 'compact' ? (
+                  /* Compact View - Whole row is actionable, no separate selection */
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {filteredBundles.map((bundle) => (
+                      <CompactBundleRow
+                        key={bundle.id}
+                        bundle={bundle}
+                        onBuy={(b) => openCheckout(b)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  /* Card View - Quick buy with shared recipient number input */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                    {filteredBundles.map((bundle) => (
+                      <BundleCard
+                        key={bundle.id}
+                        bundle={bundle}
+                        recipientPhone={quickBuyPhone}
+                        onPhoneChange={setQuickBuyPhone}
+                        onBuy={(b, opts) => openCheckout(b, opts)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Elevated Section-Level Trust Signal (replaces repeated copy inside every card) */}
+                <div className="flex items-center justify-center gap-2 pt-3 pb-1 text-xs text-slate-400 text-center">
+                  <ShieldCheck className="w-4 h-4 text-[#00c365] shrink-0" />
+                  <span>
+                    Direct automated SIM delivery · Secured by Paystack with Mobile Money & Card
+                  </span>
                 </div>
-              ) : (
-                /* Card View - Quick buy with shared recipient number input */
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {filteredBundles.map((bundle) => (
-                    <BundleCard
-                      key={bundle.id}
-                      bundle={bundle}
-                      recipientPhone={quickBuyPhone}
-                      onPhoneChange={setQuickBuyPhone}
-                      onBuy={(b, opts) => openCheckout(b, opts)}
-                    />
-                  ))}
-                </div>
-              )
+              </>
             ) : (
               <div className="text-center py-16 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-3">
                 <HelpCircle className="w-10 h-10 text-slate-500 mx-auto" />

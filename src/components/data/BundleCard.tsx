@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { DataBundle } from '../../types';
 import { GHANA_NETWORKS } from '../../data/bundles';
-import { ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
 
 interface BundleCardProps {
   bundle: DataBundle;
@@ -33,14 +33,14 @@ export const BundleCard: React.FC<BundleCardProps> = ({
   return (
     <div
       onClick={handleCardClick}
-      className={`relative rounded-2xl bg-[#0f151b] border transition-all duration-200 p-4 sm:p-5 flex flex-col justify-between group hover:-translate-y-0.5 hover:shadow-xl cursor-pointer ${
+      className={`relative rounded-2xl bg-[#0f151b] border transition-all duration-200 p-3.5 sm:p-4.5 flex flex-col justify-between group hover:-translate-y-0.5 hover:shadow-xl cursor-pointer ${
         featured || bundle.isBestValue
           ? 'border-[#00c365]/60 shadow-[0_0_20px_rgba(0,195,101,0.12)]'
           : 'border-slate-800 hover:border-slate-700'
       }`}
     >
       {/* Top badges */}
-      <div className="flex items-center justify-between gap-2 mb-3">
+      <div className="flex items-center justify-between gap-2 mb-2">
         {/* Network indicator */}
         <div className="flex items-center gap-1.5">
           <span
@@ -68,37 +68,37 @@ export const BundleCard: React.FC<BundleCardProps> = ({
       </div>
 
       {/* Main Bundle Details */}
-      <div className="space-y-2">
-        <h3 className="text-2xl font-extrabold text-white tracking-tight group-hover:text-[#00c365] transition-colors">
+      <div className="space-y-1.5">
+        <h3 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight group-hover:text-[#00c365] transition-colors leading-tight">
           {bundle.dataAmount}
         </h3>
 
         {bundle.network === 'airteltigo' ? (
           <div className="flex items-center gap-1.5 text-xs">
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-md">
+            <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded-md">
               ⚡ Instant Delivery
             </span>
             <span className="text-[11px] text-slate-400">· In Stock</span>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
             <CheckCircle2 className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
             <span className="truncate">In Stock · Direct SIM Credit</span>
           </div>
         )}
 
-        <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">
+        <p className="text-[11px] text-slate-400 leading-snug line-clamp-1">
           {bundle.network === 'airteltigo'
             ? 'Instant direct delivery to your AT number.'
             : (bundle.description || 'Fast direct SIM delivery')}
         </p>
 
         {/* Quick Buy: Compact Ghana Recipient-Number Field */}
-        <div className="pt-2">
+        <div className="pt-1.5">
           <label
             htmlFor={`card-phone-${bundle.id}`}
             onClick={(e) => e.stopPropagation()}
-            className="text-[11px] font-semibold text-slate-300 block mb-1"
+            className="text-[10px] sm:text-[11px] font-semibold text-slate-300 block mb-0.5"
           >
             Recipient number
           </label>
@@ -113,17 +113,17 @@ export const BundleCard: React.FC<BundleCardProps> = ({
                 onPhoneChange?.(val);
               }}
               placeholder="024 XXX XXXX"
-              className="w-full bg-[#0a0e12] border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365] focus:ring-1 focus:ring-[#00c365] transition-colors"
+              className="w-full bg-[#0a0e12] border border-slate-700/80 rounded-xl px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365] focus:ring-1 focus:ring-[#00c365] transition-colors"
             />
           </div>
         </div>
       </div>
 
       {/* Pricing and Review Order Action */}
-      <div className="mt-4 pt-3.5 border-t border-slate-800/80 flex flex-col gap-2.5">
+      <div className="mt-2.5 pt-2.5 border-t border-slate-800/80 flex flex-col gap-2">
         <div className="flex items-baseline justify-between">
           <span className="text-xs text-slate-400 font-medium">Price</span>
-          <span className="text-xl font-extrabold text-white tabular-nums tracking-tight">
+          <span className="text-lg sm:text-xl font-extrabold text-white tabular-nums tracking-tight">
             GH₵{bundle.priceGhc.toFixed(2)}
           </span>
         </div>
@@ -131,16 +131,11 @@ export const BundleCard: React.FC<BundleCardProps> = ({
         <button
           type="button"
           onClick={handleReviewOrder}
-          className="w-full py-2.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] hover:shadow-[0_0_20px_rgba(0,195,101,0.35)] active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer"
+          className="w-full py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] hover:shadow-[0_0_20px_rgba(0,195,101,0.35)] active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer"
         >
           <span>Review Order</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
-
-        <div className="flex items-center justify-center gap-1 text-[11px] text-slate-400">
-          <ShieldCheck className="w-3.5 h-3.5 text-[#00c365]" />
-          <span>Secure Paystack Checkout</span>
-        </div>
       </div>
     </div>
   );

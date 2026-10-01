@@ -210,14 +210,14 @@ export const MysteryAiAssistant: React.FC = () => {
   const suggestedQuestions: SuggestedQuestion[] = getSuggestedQuestionsForPage(activePage);
 
   return (
-    <div className="fixed z-50 bottom-20 right-4 sm:bottom-6 sm:right-6 pointer-events-none">
+    <div className="fixed z-50 bottom-20 right-3 sm:bottom-6 sm:right-6 pointer-events-none max-w-[calc(100vw-1.5rem)]">
       {/* Floating Chat Panel */}
       {isOpen && (
         <div
           role="dialog"
           aria-label="Mystery AI Assistant"
           aria-modal="true"
-          className="pointer-events-auto mb-3 w-[calc(100vw-2rem)] sm:w-96 md:w-[430px] h-[540px] max-h-[80vh] bg-[#0c1217] border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-200"
+          className="pointer-events-auto mb-3 w-[calc(100vw-1.5rem)] sm:w-96 md:w-[420px] max-w-[calc(100vw-1.5rem)] h-[520px] max-h-[78vh] bg-[#0c1217] border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-200"
         >
           {/* Header */}
           <div className="px-4 py-3 bg-[#090e13] border-b border-slate-800 flex items-center justify-between gap-3 shrink-0">

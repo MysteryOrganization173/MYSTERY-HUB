@@ -26,6 +26,7 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({
 
   const isOutOfStock = product.availability === 'out_of_stock';
   const info = getInstantBundlePresentation(product);
+  const cardKey = product.productKey || product.packageId;
 
   const handleCardClick = (e: React.MouseEvent) => {
     // If clicking on non-interactive elements, focus the recipient phone input
@@ -74,7 +75,7 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({
   return (
     <div
       onClick={handleCardClick}
-      className={`group relative rounded-2xl border transition-all duration-200 p-4 sm:p-5 flex flex-col justify-between text-left cursor-pointer shadow-sm hover:shadow-md ${cardBorderClass} ${
+      className={`group relative rounded-2xl border transition-all duration-200 p-3.5 sm:p-4.5 flex flex-col justify-between text-left cursor-pointer shadow-sm hover:shadow-md ${cardBorderClass} ${
         isOutOfStock ? 'opacity-60 pointer-events-none' : ''
       }`}
     >
@@ -82,7 +83,7 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-sm"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-sm"
             style={{
               backgroundColor: network.brandColor,
               color: product.network === 'mtn' ? '#000' : '#fff',
@@ -116,7 +117,7 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded-full shadow-sm">
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-1.5 sm:px-2 py-0.5 rounded-full shadow-sm">
             <Zap className="w-3 h-3 fill-amber-400" />
             <span>Instant</span>
           </span>
@@ -124,9 +125,9 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({
       </div>
 
       {/* 2. Main Product Amount / Minutes & Restriction Badge */}
-      <div className="my-3 space-y-1.5">
+      <div className="my-2.5 space-y-1">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none group-hover:text-amber-400 transition-colors">
+          <span className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none group-hover:text-amber-400 transition-colors">
             {info.formattedAmount}
           </span>
           {product.isFlexi && (
@@ -139,109 +140,129 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({
         {/* Safety restriction / category info badge */}
         {info.restrictionNote && (
           <div
-            className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-lg border ${
+            className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium px-2 py-0.5 rounded-md border leading-tight ${
               info.isMidnight
-                ? 'bg-amber-500/15 border-amber-500/35 text-amber-300'
+                ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
                 : info.isVideo
-                ? 'bg-indigo-500/15 border-indigo-500/35 text-indigo-300'
+                ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300'
+                : info.isSocial
+                ? 'bg-sky-500/15 border-sky-500/30 text-sky-300'
                 : info.isIdd
-                ? 'bg-emerald-500/15 border-emerald-500/35 text-emerald-300'
+                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
                 : 'bg-slate-800 border-slate-700 text-slate-300'
             }`}
           >
-            {info.isMidnight && <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+            {info.isMidnight ? (
+              <ShieldAlert className="w-3 h-3 shrink-0 text-amber-400" />
+            ) : null}
             <span>{info.restrictionNote}</span>
           </div>
         )}
+
+        {/* Validity */}
+        <div className="text-[11px] text-slate-400 font-medium">
+          {product.validity ? `Validity: ${product.validity}` : 'Immediate Automated SIM Credit'}
+        </div>
       </div>
 
-      {/* 3. Flexi Amount Input (If applicable) */}
-      {product.isFlexi && (
-        <div className="mb-3 space-y-1">
-          <div className="flex items-center justify-between text-[11px] text-slate-400">
-            <span>Select Amount (GH₵)</span>
-            <span className="text-[10px] text-slate-500">
-              Min {product.minAmountGhc || 1} · Max {product.maxAmountGhc || 500}
+      {/* 3. Flexi Custom Amount Input or Fixed Details */}
+      {product.isFlexi ? (
+        <div className="space-y-1 pt-1.5 border-t border-slate-800/60" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between text-[11px]">
+            <label htmlFor={`flexi-amt-${cardKey}`} className="font-semibold text-slate-300">
+              Custom Amount (GH₵)
+            </label>
+            <span className="text-slate-400 text-[10px]">
+              Min: {product.minAmountGhc || 1} - Max: {product.maxAmountGhc || 500}
             </span>
           </div>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
               GH₵
             </span>
             <input
+              id={`flexi-amt-${cardKey}`}
               type="number"
+              min={product.minAmountGhc || 1}
+              max={product.maxAmountGhc || 500}
               value={flexiAmount}
               onChange={(e) => {
                 setFlexiAmount(e.target.value);
-                if (flexiError) setFlexiError('');
+                setFlexiError('');
               }}
-              min={product.minAmountGhc || 1}
-              max={product.maxAmountGhc || 500}
-              step="1"
               placeholder="10"
-              className="w-full bg-[#080d11] border border-slate-700/80 focus:border-amber-500/80 rounded-xl pl-10 pr-3 py-1.5 text-sm font-semibold text-white focus:outline-none transition-colors"
+              className="w-full bg-[#0a0e12] border border-slate-700/80 rounded-xl pl-10 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
             />
           </div>
           {flexiError && (
-            <p className="text-[10px] text-rose-400 flex items-center gap-1 mt-0.5">
-              <AlertCircle className="w-3 h-3" />
+            <p className="text-[10px] text-rose-400 flex items-center gap-1 font-medium">
+              <AlertCircle className="w-3 h-3 shrink-0" />
               <span>{flexiError}</span>
             </p>
           )}
         </div>
-      )}
+      ) : null}
 
-      {/* 4. Recipient Phone Input */}
-      <div className="space-y-1 mb-3.5">
-        <label className="text-[11px] font-medium text-slate-400 flex items-center justify-between">
-          <span>Recipient number</span>
-          <span className="text-[10px] text-slate-500">Ghana SIM</span>
+      {/* 4. Quick Recipient Number */}
+      <div className="pt-1.5 border-t border-slate-800/60" onClick={(e) => e.stopPropagation()}>
+        <label
+          htmlFor={`instant-phone-${cardKey}`}
+          className="text-[10px] sm:text-[11px] font-semibold text-slate-300 block mb-0.5"
+        >
+          Recipient number
         </label>
         <div className="relative">
           <input
             ref={inputRef}
+            id={`instant-phone-${cardKey}`}
             type="tel"
-            inputMode="numeric"
             value={recipientPhone}
             onChange={(e) => {
-              const clean = e.target.value.replace(/[^\d\s]/g, '');
-              onPhoneChange(clean);
+              const val = e.target.value.replace(/[^\d\s]/g, '');
+              onPhoneChange(val);
             }}
             placeholder="024 XXX XXXX"
-            className="w-full bg-[#080d11] border border-slate-700/80 focus:border-amber-500/80 rounded-xl px-3 py-2 text-xs sm:text-sm font-mono text-white placeholder-slate-600 focus:outline-none transition-colors"
+            className="w-full bg-[#0a0e12] border border-slate-700/80 rounded-xl px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-colors"
           />
         </div>
       </div>
 
-      {/* 5. Footer: Price & Review Order Button */}
-      <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-3">
-        <div>
-          <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider flex items-center gap-1.5">
-            <span>{product.isFlexi ? 'Estimated Bundle' : 'Bundle Price'}</span>
-            {product.networkReferencePriceGhc && product.savingsOnProductGhc && product.savingsOnProductGhc > 0 ? (
-              <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1 rounded">
-                Save GH₵{product.savingsOnProductGhc.toFixed(2)}
+      {/* 5. Pricing & Action CTA */}
+      <div className="mt-2.5 pt-2.5 border-t border-slate-800/80 flex flex-col gap-2">
+        <div className="flex items-baseline justify-between">
+          <div className="flex flex-col text-left">
+            <span className="text-[10px] sm:text-xs text-slate-400 font-medium">
+              {product.isFlexi ? 'Selected Value' : 'Bundle Price'}
+            </span>
+            {Boolean(product.savingsOnProductGhc && product.savingsOnProductGhc > 0) && product.networkReferencePriceGhc && (
+              <span className="text-[10px] text-slate-500 line-through">
+                MTN: GH₵{product.networkReferencePriceGhc.toFixed(2)}
               </span>
-            ) : null}
+            )}
           </div>
-          <div className="text-base sm:text-lg font-black text-[#00c365] tabular-nums leading-none mt-0.5">
-            GH₵{product.retailPriceGhc.toFixed(2)}
+          <div className="text-right">
+            <span className="text-lg sm:text-xl font-extrabold text-white tabular-nums tracking-tight">
+              {product.isFlexi
+                ? `GH₵${(parseFloat(flexiAmount) || 0).toFixed(2)}`
+                : `GH₵${product.retailPriceGhc.toFixed(2)}`}
+            </span>
           </div>
-          {product.networkReferencePriceGhc && product.networkReferencePriceGhc > product.retailPriceGhc ? (
-            <div className="text-[10px] text-slate-500 line-through tabular-nums mt-0.5">
-              Network: GH₵{product.networkReferencePriceGhc.toFixed(2)}
-            </div>
-          ) : null}
         </div>
 
         <button
           type="button"
           onClick={handleBuyClick}
           disabled={isOutOfStock}
-          className="py-2 px-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] active:bg-[#00b05b] text-black font-bold text-xs tracking-wide transition-all shadow-[0_0_15px_rgba(0,195,101,0.2)] active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0"
+          className={`w-full py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] ${
+            isOutOfStock
+              ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+              : info.isMidnight
+              ? 'bg-amber-400 hover:bg-amber-300 text-black shadow-[0_0_15px_rgba(251,191,36,0.25)] hover:shadow-[0_0_20px_rgba(251,191,36,0.35)]'
+              : 'bg-[#00c365] hover:bg-[#00e575] text-black shadow-[0_0_15px_rgba(0,195,101,0.25)] hover:shadow-[0_0_20px_rgba(0,195,101,0.35)]'
+          }`}
         >
-          <span>Review Order</span>
-          <ArrowRight className="w-3.5 h-3.5" />
+          <span>{isOutOfStock ? 'Out of Stock' : 'Review Order'}</span>
+          {!isOutOfStock && <ArrowRight className="w-3.5 h-3.5" />}
         </button>
       </div>
     </div>
