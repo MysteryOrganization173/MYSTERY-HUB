@@ -285,19 +285,25 @@ export const MemberHome: React.FC = () => {
             </span>
           </div>
 
-          <div className="p-4 sm:p-5 rounded-2xl bg-[#0f151b] border border-slate-800 space-y-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+          <div
+            onClick={() => setActivePage('earn')}
+            className="p-4 sm:p-5 rounded-2xl bg-[#0f151b] border border-slate-800 hover:border-[#00c365]/50 transition-all space-y-3 cursor-pointer group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform">
               <Sparkles className="w-5 h-5" />
             </div>
             <div className="space-y-1">
-              <h3 className="font-bold text-sm text-white">Refer & Earn Program</h3>
+              <h3 className="font-bold text-sm text-white group-hover:text-[#00c365] transition-colors flex items-center justify-between">
+                <span>Refer & Earn Program</span>
+                <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-[#00c365] group-hover:translate-x-1 transition-all" />
+              </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
                 Your personal referral link, product sharing rewards and referral history are coming to your Mystery Hub account.
               </p>
             </div>
             <div className="pt-1">
-              <span className="inline-block text-[11px] text-slate-400 italic">
-                Stay tuned for updates.
+              <span className="inline-block text-[11px] text-[#00c365] font-semibold">
+                Learn more about Mystery Earn &rarr;
               </span>
             </div>
           </div>

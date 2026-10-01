@@ -17,6 +17,7 @@ import { MoreServicesPage } from './components/services/MoreServicesPage';
 import { MarketplacePage } from './components/marketplace/MarketplacePage';
 import { AboutPage } from './components/about/AboutPage';
 import { OrdersPage } from './components/orders/OrdersPage';
+import { MysteryEarnPage } from './components/earn/MysteryEarnPage';
 import { CheckoutModal } from './components/checkout/CheckoutModal';
 import { OrderStatusModal } from './components/checkout/OrderStatusModal';
 import { TemplatePreviewModal } from './components/website/TemplatePreviewModal';
@@ -55,6 +56,7 @@ const AppContent: React.FC = () => {
         {activePage === 'services' && <MoreServicesPage />}
         {activePage === 'about' && <AboutPage />}
         {activePage === 'orders' && <OrdersPage />}
+        {activePage === 'earn' && <MysteryEarnPage />}
       </main>
 
       {/* Footer */}

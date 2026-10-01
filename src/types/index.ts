@@ -153,7 +153,7 @@ export interface DigitalService {
   targetPage?: 'data' | 'website' | 'marketplace' | 'services' | 'about';
 }
 
-export type ActivePage = 'home' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'orders' | 'admin';
+export type ActivePage = 'home' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'orders' | 'admin' | 'earn';
 
 export type MarketplaceAvailability = 'available' | 'check_availability' | 'limited' | 'coming_soon';
 

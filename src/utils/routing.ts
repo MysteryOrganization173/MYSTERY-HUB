@@ -12,6 +12,7 @@ export const ROUTE_PATH_MAP: Record<ActivePage, string> = {
   about: '/about',
   orders: '/orders',
   admin: '/admin',
+  earn: '/earn',
 };
 
 /**
@@ -119,6 +120,15 @@ export function getPageFromPath(rawPath: string | null | undefined): ActivePage 
 
   if (normalized === '/admin' || normalized === '/admin/index.html') {
     return 'admin';
+  }
+
+  if (
+    normalized === '/earn' ||
+    normalized === '/earn/index.html' ||
+    normalized === '/referral' ||
+    normalized === '/rewards'
+  ) {
+    return 'earn';
   }
 
   // Intentional fallback for unknown routes

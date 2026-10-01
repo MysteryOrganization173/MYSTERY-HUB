@@ -15,10 +15,11 @@ import {
   Sparkles,
   Clock,
   ExternalLink,
+  Gift,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { activePage, setActivePage, openAuth, user, logoutUser, orders, openOrderStatus } = useApp();
+  const { activePage, setActivePage, openAuth, user, logoutUser } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -69,7 +70,9 @@ export const Navbar: React.FC = () => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     const q = searchQuery.toLowerCase();
-    if (q.includes('data') || q.includes('mtn') || q.includes('telecel') || q.includes('bundle') || q.includes('airteltigo')) {
+    if (q.includes('earn') || q.includes('referral') || q.includes('reward') || q.includes('affiliate') || q.includes('share')) {
+      setActivePage('earn');
+    } else if (q.includes('data') || q.includes('mtn') || q.includes('telecel') || q.includes('bundle') || q.includes('airteltigo')) {
       setActivePage('data');
     } else if (q.includes('web') || q.includes('site') || q.includes('build') || q.includes('template')) {
       setActivePage('website');
@@ -82,7 +85,6 @@ export const Navbar: React.FC = () => {
     setSearchQuery('');
   };
 
-  const recentOrder = orders[0];
   const userFirstName = user?.name ? user.name.split(' ')[0] : 'Member';
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'M';
   const userSubtext = user?.email || user?.phone || '';
@@ -163,18 +165,15 @@ export const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Quick Orders Check */}
-          {orders.length > 0 && (
-            <button
-              onClick={() => recentOrder && openOrderStatus(recentOrder)}
-              className="relative p-2 text-slate-400 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
-              title="Recent Orders"
-              aria-label="Recent Orders"
-            >
-              <ShoppingBag className="w-4 h-4" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-[#00c365] rounded-full ring-2 ring-[#0a0e11]" />
-            </button>
-          )}
+          {/* Mystery Earn Shortcut */}
+          <button
+            onClick={() => handleNavClick('earn')}
+            className="p-2 text-slate-400 hover:text-[#00c365] hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
+            title="Mystery Earn"
+            aria-label="Mystery Earn"
+          >
+            <Gift className="w-4 h-4 text-[#00c365]" />
+          </button>
 
           {/* Auth Controls */}
           {user ? (
@@ -235,15 +234,18 @@ export const Navbar: React.FC = () => {
                       <span>Marketplace</span>
                     </button>
 
-                    <div className="px-3.5 py-2 flex items-center justify-between text-slate-400 cursor-not-allowed">
+                    <button
+                      onClick={() => handleNavClick('earn')}
+                      className="w-full text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
+                    >
                       <div className="flex items-center gap-2.5">
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                        <Gift className="w-3.5 h-3.5 text-[#00c365]" />
                         <span>Mystery Earn</span>
                       </div>
                       <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 bg-[#00c365]/10 text-[#00c365] rounded border border-[#00c365]/20">
                         Soon
                       </span>
-                    </div>
+                    </button>
                   </div>
 
                   {/* Sign Out */}
@@ -334,6 +336,24 @@ export const Navbar: React.FC = () => {
                 {link.label}
               </a>
             ))}
+
+            <a
+              href={ROUTE_PATH_MAP['earn']}
+              onClick={(e) => {
+                e.preventDefault();
+                handleNavClick('earn');
+              }}
+              className={`flex items-center justify-between w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                activePage === 'earn'
+                  ? 'bg-[#00c365]/10 text-[#00c365] font-semibold'
+                  : 'text-slate-300 hover:bg-slate-900 hover:text-white'
+              }`}
+            >
+              <span>Mystery Earn</span>
+              <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 bg-[#00c365]/10 text-[#00c365] rounded border border-[#00c365]/20">
+                Soon
+              </span>
+            </a>
           </div>
 
           {!user && (

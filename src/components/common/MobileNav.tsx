@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { ActivePage } from '../../types';
-import { Home, Wifi, Globe, Grid, Clock } from 'lucide-react';
+import { Home, Wifi, Globe, ShoppingBag, Clock } from 'lucide-react';
 
 export const MobileNav: React.FC = () => {
   const { activePage, setActivePage, orders } = useApp();
@@ -10,7 +10,7 @@ export const MobileNav: React.FC = () => {
     { id: 'home', label: 'Home', icon: Home },
     { id: 'data', label: 'Data', icon: Wifi },
     { id: 'website', label: 'Website', icon: Globe },
-    { id: 'services', label: 'Services', icon: Grid },
+    { id: 'marketplace', label: 'Marketplace', icon: ShoppingBag },
     { id: 'orders', label: 'Orders', icon: Clock },
   ];
 
