@@ -35,6 +35,12 @@ export interface PublicInstantBundle {
   maxAmountGhc?: number;
   retailPriceGhc: number;
   retailPricePesewas: number;
+  paymentProcessingFeeGhc?: number;
+  paymentProcessingFeePesewas?: number;
+  estimatedTotalGhc?: number;
+  estimatedTotalPesewas?: number;
+  networkReferencePriceGhc?: number;
+  savingsOnProductGhc?: number;
   availability: 'in_stock' | 'out_of_stock';
   category?: string;
   description?: string;

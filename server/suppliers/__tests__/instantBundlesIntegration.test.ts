@@ -46,10 +46,10 @@ async function runInstantBundlesTests() {
     assert.strictEqual(stringPriceResult.supplierCostPesewas, 2000);
     assert(stringPriceResult.grossMarginPesewas >= 200);
 
-    // Test case: Low wholesale cost where minMargin dominates
+    // Test case: Low wholesale cost where minProductMargin dominates
     const lowCostResult = calculateFixedInstantBundlePrice('pkg_mini_500mb', 100); // GH₵1.00
     assert.strictEqual(lowCostResult.supplierCostPesewas, 100);
-    assert(lowCostResult.grossMarginPesewas >= 50, 'Minimum margin of 50 pesewas must be preserved');
+    assert(lowCostResult.grossMarginPesewas >= INSTANT_BUNDLE_CONFIG.minProductMarginPesewas, 'Minimum product margin must be preserved');
 
     // Test case: Invalid price rejects
     assert.throws(() => calculateFixedInstantBundlePrice('pkg_bad', 0), /Invalid or missing supplier priceMinor/);

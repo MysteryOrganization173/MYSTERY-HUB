@@ -29,6 +29,9 @@ export interface DataBundle {
   restrictionNote?: string;
   faceValueGhc?: number;
   serviceFeeGhc?: number;
+  estimatedTotalGhc?: number;
+  networkReferencePriceGhc?: number;
+  savingsOnProductGhc?: number;
   packageId?: string;
   isFlexi?: boolean;
   minAmountGhc?: number;

@@ -216,12 +216,22 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({
       {/* 5. Footer: Price & Review Order Button */}
       <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-3">
         <div>
-          <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-            {product.isFlexi ? 'Estimated Price' : 'Price'}
+          <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider flex items-center gap-1.5">
+            <span>{product.isFlexi ? 'Estimated Bundle' : 'Bundle Price'}</span>
+            {product.networkReferencePriceGhc && product.savingsOnProductGhc && product.savingsOnProductGhc > 0 ? (
+              <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1 rounded">
+                Save GH₵{product.savingsOnProductGhc.toFixed(2)}
+              </span>
+            ) : null}
           </div>
           <div className="text-base sm:text-lg font-black text-[#00c365] tabular-nums leading-none mt-0.5">
             GH₵{product.retailPriceGhc.toFixed(2)}
           </div>
+          {product.networkReferencePriceGhc && product.networkReferencePriceGhc > product.retailPriceGhc ? (
+            <div className="text-[10px] text-slate-500 line-through tabular-nums mt-0.5">
+              Network: GH₵{product.networkReferencePriceGhc.toFixed(2)}
+            </div>
+          ) : null}
         </div>
 
         <button

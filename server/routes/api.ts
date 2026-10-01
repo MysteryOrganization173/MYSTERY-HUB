@@ -257,7 +257,9 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
         product_id: `instant-${pkg.id}`,
         product_name_snapshot: pkg.name || `${pkg.dataAmount || 'Instant'} Data`,
         bundle_size_snapshot: isFlexi ? `GH₵${requestedMajorVal} Flexi` : (pkg.dataAmount || pkg.name || 'Instant Data'),
-        amount: pricing.retailPricePesewas,
+        amount: pricing.customerTotalPesewas,
+        face_value_minor: pricing.productRetailPricePesewas,
+        service_fee_minor: pricing.paymentProcessingFeePesewas,
         currency: 'GHS',
         status: 'pending_payment',
         payment_provider: 'paystack',
@@ -291,7 +293,7 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
       // 7. Initialize Paystack
       const paystackRes = await PaystackServerService.initializeTransaction({
         email: validEmail,
-        amountPesewas: pricing.retailPricePesewas,
+        amountPesewas: pricing.customerTotalPesewas,
         reference: paymentRef,
         metadata: {
           public_reference: publicRef,
@@ -301,6 +303,8 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
           package_id: pkg.id,
           product_name: newOrder.product_name_snapshot,
           amount_major: requestedMajorVal,
+          product_retail_minor: pricing.productRetailPricePesewas,
+          processing_fee_minor: pricing.paymentProcessingFeePesewas,
         },
       });
 
@@ -315,8 +319,10 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
         reference: paymentRef,
         accessCode: paystackRes.accessCode,
         authorizationUrl: paystackRes.authorizationUrl,
-        amountGhc: pricing.retailPriceGhc,
-        amountPesewas: pricing.retailPricePesewas,
+        amountGhc: pricing.customerTotalGhc,
+        faceValueGhc: pricing.productRetailPriceGhc,
+        serviceFeeGhc: pricing.paymentProcessingFeeGhc,
+        amountPesewas: pricing.customerTotalPesewas,
         currency: 'GHS',
         isSimulated: paystackRes.isSimulated || false,
       });

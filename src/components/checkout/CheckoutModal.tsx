@@ -105,8 +105,17 @@ export const CheckoutModal: React.FC = () => {
       })
     : null;
   const faceValue = checkoutBundle.faceValueGhc ?? checkoutBundle.priceGhc;
-  const serviceFee = checkoutBundle.serviceFeeGhc ?? (isAirtime ? Number((faceValue * 0.02).toFixed(2)) : 0);
-  const totalAmount = isAirtime ? Number((faceValue + serviceFee).toFixed(2)) : checkoutBundle.priceGhc;
+  const serviceFee =
+    checkoutBundle.serviceFeeGhc ??
+    (isAirtime
+      ? Number((faceValue * 0.02).toFixed(2))
+      : isInstantBundle
+      ? Number((Math.ceil((Math.round(faceValue * 100) + 10) / 0.98) / 100 - faceValue).toFixed(2))
+      : 0);
+  const totalAmount =
+    isAirtime || isInstantBundle
+      ? Number((faceValue + serviceFee).toFixed(2))
+      : checkoutBundle.priceGhc;
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -492,7 +501,27 @@ export const CheckoutModal: React.FC = () => {
 
           {/* 4. Price / Total Summary Breakdown */}
           <div className="p-3 sm:p-3.5 rounded-xl bg-[#090d10] border border-slate-800/80 space-y-1.5 text-xs">
-            {isAirtime ? (
+            {isInstantBundle ? (
+              <>
+                <div className="flex items-center justify-between text-slate-400">
+                  <span>Bundle Price</span>
+                  <span className="text-white tabular-nums font-medium">GH₵{faceValue.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-400">
+                  <div className="flex items-center gap-1">
+                    <span>Payment processing</span>
+                    <span className="text-[10px] text-slate-500">(gateway + dispatch)</span>
+                  </div>
+                  <span className="text-slate-300 tabular-nums font-medium">GH₵{serviceFee.toFixed(2)}</span>
+                </div>
+                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-sm font-bold text-white">
+                  <span>Total Amount</span>
+                  <span className="text-[#00c365] text-base tabular-nums font-black">
+                    GH₵{totalAmount.toFixed(2)}
+                  </span>
+                </div>
+              </>
+            ) : isAirtime ? (
               <>
                 <div className="flex items-center justify-between text-slate-400">
                   <span>Airtime Value (Face Value)</span>
