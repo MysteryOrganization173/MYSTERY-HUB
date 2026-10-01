@@ -205,6 +205,72 @@ export class OrdersStore {
   }
 
   /**
+   * Delete order by id (internal / administrative cleanup use only)
+   */
+  static async deleteOrder(orderId: string): Promise<boolean> {
+    const existing = await this.findOrder(orderId);
+    if (!existing) return false;
+
+    const pool = getPool();
+    if (pool) {
+      await pool.query('DELETE FROM orders WHERE id = $1', [existing.id]);
+    } else {
+      devMemoryStore.delete(existing.id);
+      devMemoryStore.delete(`payref:${existing.payment_reference}`);
+      devMemoryStore.delete(`pubref:${existing.public_reference}`);
+    }
+    return true;
+  }
+
+  /**
+   * Find orders by an array of public references or IDs
+   */
+  static async findOrdersByReferences(references: string[]): Promise<OrderRecord[]> {
+    if (!references || references.length === 0) return [];
+    const pool = getPool();
+    if (pool) {
+      const query = `
+        SELECT * FROM orders
+        WHERE public_reference = ANY($1) OR id = ANY($1)
+        ORDER BY created_at ASC;
+      `;
+      const result = await pool.query(query, [references]);
+      return result.rows as OrderRecord[];
+    } else {
+      const matched: OrderRecord[] = [];
+      for (const ref of references) {
+        const ord = await this.findOrder(ref);
+        if (ord && !matched.some((m) => m.id === ord.id)) {
+          matched.push(ord);
+        }
+      }
+      return matched;
+    }
+  }
+
+  /**
+   * Find candidate blocking orders for administrative cleanup discovery
+   */
+  static async findCandidateBlockingOrders(): Promise<OrderRecord[]> {
+    const pool = getPool();
+    if (pool) {
+      const query = `
+        SELECT * FROM orders
+        WHERE status IN ('paid', 'queued', 'submitted', 'processing', 'refund_pending')
+        ORDER BY created_at ASC;
+      `;
+      const result = await pool.query(query);
+      return result.rows as OrderRecord[];
+    } else {
+      const blocking = ['paid', 'queued', 'submitted', 'processing', 'refund_pending'];
+      const unique = Array.from(devMemoryStore.values()).filter(
+        (o, idx, arr) => arr.findIndex((x) => x.id === o.id) === idx
+      );
+      return unique.filter((o) => blocking.includes(o.status));
+    }
+  }
+
+  /**
    * Create a new pending order atomically
    */
   static async createOrder(order: OrderRecord): Promise<OrderRecord> {
