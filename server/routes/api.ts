@@ -398,10 +398,14 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
       }
       if (!preflight.allowed) {
         console.info(`[Checkout Timing] total=${Math.round(performance.now() - reqStart)}ms`);
+        const safeCode = preflight.code || 'SERVICE_TEMPORARILY_UNAVAILABLE';
+        const safeMessage =
+          preflight.customerMessage ||
+          'Airtime Top-Up is temporarily unavailable. Please try again shortly.';
         res.status(400).json({
-          error:
-            preflight.customerMessage ||
-            'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
+          code: safeCode,
+          message: safeMessage,
+          error: safeMessage,
         });
         return;
       }
@@ -556,10 +560,14 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
 
     if (!preflight.allowed) {
       console.info(`[Checkout Timing] total=${Math.round(performance.now() - reqStart)}ms`);
+      const safeCode = preflight.code || 'SERVICE_TEMPORARILY_UNAVAILABLE';
+      const safeMessage =
+        preflight.customerMessage ||
+        'This bundle is temporarily unavailable. Please try another package or try again shortly.';
       res.status(400).json({
-        error:
-          preflight.customerMessage ||
-          'This bundle is temporarily unavailable. Please try another package or try again shortly.',
+        code: safeCode,
+        message: safeMessage,
+        error: safeMessage,
       });
       return;
     }

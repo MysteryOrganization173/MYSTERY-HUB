@@ -349,7 +349,7 @@ export class OrdersStore {
     if (pool) {
       const query = `
         SELECT * FROM orders 
-        WHERE user_id = $1 AND status NOT IN ('cancelled', 'expired')
+        WHERE user_id = $1 AND status NOT IN ('cancelled', 'expired', 'pending_payment')
         ORDER BY created_at DESC
         ${hasLimit ? 'LIMIT $2' : ''};
       `;
@@ -364,6 +364,7 @@ export class OrdersStore {
         ord.user_id === userId &&
         ord.status !== 'cancelled' &&
         ord.status !== 'expired' &&
+        ord.status !== 'pending_payment' &&
         !results.some((r) => r.id === ord.id)
       ) {
         results.push(ord);

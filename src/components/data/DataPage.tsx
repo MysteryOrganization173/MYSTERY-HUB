@@ -250,7 +250,7 @@ export const DataPage: React.FC = () => {
   }, [selectedFaqCategory, faqs]);
 
   // Network selection with smooth scroll to results
-  const handleSelectNetwork = (net: NetworkId) => {
+  const handleSelectNetwork = (net: NetworkId | 'all') => {
     if (dataProductMode === 'airtime') {
       setDataProductMode('data');
     }
@@ -542,7 +542,7 @@ export const DataPage: React.FC = () => {
             {/* MTN */}
             <button
               type="button"
-              onClick={() => handleSelectNetwork('mtn')}
+              onClick={() => handleSelectNetwork(activeNetwork === 'mtn' ? 'all' : 'mtn')}
               className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
                 dataProductMode !== 'airtime' && activeNetwork === 'mtn'
                   ? 'border-[#FFCC00] bg-[#FFCC00]/10 shadow-[0_0_20px_rgba(255,204,0,0.15)] ring-1 ring-[#FFCC00]/40'
@@ -566,7 +566,7 @@ export const DataPage: React.FC = () => {
             {/* AirtelTigo */}
             <button
               type="button"
-              onClick={() => handleSelectNetwork('airteltigo')}
+              onClick={() => handleSelectNetwork(activeNetwork === 'airteltigo' ? 'all' : 'airteltigo')}
               className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
                 dataProductMode !== 'airtime' && activeNetwork === 'airteltigo'
                   ? 'border-[#004B93] bg-[#004B93]/20 shadow-[0_0_20px_rgba(0,75,147,0.25)] ring-1 ring-[#004B93]/60'
@@ -592,7 +592,7 @@ export const DataPage: React.FC = () => {
             {/* Telecel */}
             <button
               type="button"
-              onClick={() => handleSelectNetwork('telecel')}
+              onClick={() => handleSelectNetwork(activeNetwork === 'telecel' ? 'all' : 'telecel')}
               className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
                 dataProductMode !== 'airtime' && activeNetwork === 'telecel'
                   ? 'border-[#E60000] bg-[#E60000]/10 shadow-[0_0_20px_rgba(230,0,0,0.15)] ring-1 ring-[#E60000]/40'
@@ -682,6 +682,8 @@ export const DataPage: React.FC = () => {
               quickBuyPhone={quickBuyPhone}
               onQuickBuyPhoneChange={setQuickBuyPhone}
               onSwitchToData={() => setDataProductMode('data')}
+              activeNetwork={activeNetwork}
+              onSelectNetwork={(net) => setActiveNetwork(net)}
             />
           </div>
         ) : dataProductMode === 'airtime' ? (
@@ -952,53 +954,106 @@ export const DataPage: React.FC = () => {
             )}
 
             {/* Filter Bar & View Mode Toggle */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-[#0e141a] border border-slate-800">
-              {/* Size Tier Filter Buttons */}
-              <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-                <button
-                  type="button"
-                  onClick={() => setSizeFilter('all')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                    sizeFilter === 'all'
-                      ? 'bg-[#00c365] text-black shadow-sm'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  All Packages
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSizeFilter('small')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                    sizeFilter === 'small'
-                      ? 'bg-[#00c365] text-black shadow-sm'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  1GB – 5GB
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSizeFilter('medium')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                    sizeFilter === 'medium'
-                      ? 'bg-[#00c365] text-black shadow-sm'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  6GB – 20GB
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSizeFilter('large')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                    sizeFilter === 'large'
-                      ? 'bg-[#00c365] text-black shadow-sm'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  25GB+
-                </button>
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3 rounded-2xl bg-[#0e141a] border border-slate-800">
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                {/* Network Selection Pills */}
+                <div className="flex items-center gap-1 pr-2 border-b sm:border-b-0 sm:border-r border-slate-800 shrink-0 pb-1 sm:pb-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveNetwork('all')}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      activeNetwork === 'all'
+                        ? 'bg-amber-400 text-black shadow-sm font-black'
+                        : 'text-slate-400 hover:text-white bg-slate-900/60 border border-slate-800'
+                    }`}
+                  >
+                    All Networks
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveNetwork('mtn')}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                      activeNetwork === 'mtn'
+                        ? 'bg-[#FFCC00] text-black shadow-sm font-black'
+                        : 'text-slate-400 hover:text-white bg-slate-900/60 border border-slate-800'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#FFCC00]" />
+                    <span>MTN</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveNetwork('airteltigo')}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                      activeNetwork === 'airteltigo'
+                        ? 'bg-[#004B93] text-white shadow-sm font-black'
+                        : 'text-slate-400 hover:text-white bg-slate-900/60 border border-slate-800'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                    <span>AT</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveNetwork('telecel')}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                      activeNetwork === 'telecel'
+                        ? 'bg-[#E60000] text-white shadow-sm font-black'
+                        : 'text-slate-400 hover:text-white bg-slate-900/60 border border-slate-800'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#E60000]" />
+                    <span>Telecel</span>
+                  </button>
+                </div>
+
+                {/* Size Tier Filter Buttons */}
+                <div className="flex items-center gap-1 overflow-x-auto scrollbar-none shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSizeFilter('all')}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                      sizeFilter === 'all'
+                        ? 'bg-[#00c365] text-black shadow-sm font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    All Sizes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSizeFilter('small')}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                      sizeFilter === 'small'
+                        ? 'bg-[#00c365] text-black shadow-sm font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    1GB – 5GB
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSizeFilter('medium')}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                      sizeFilter === 'medium'
+                        ? 'bg-[#00c365] text-black shadow-sm font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    6GB – 20GB
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSizeFilter('large')}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                      sizeFilter === 'large'
+                        ? 'bg-[#00c365] text-black shadow-sm font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    25GB+
+                  </button>
+                </div>
               </div>
 
               {/* Search Bar & View Mode Switcher */}

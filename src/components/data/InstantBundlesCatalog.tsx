@@ -21,12 +21,16 @@ interface InstantBundlesCatalogProps {
   quickBuyPhone: string;
   onQuickBuyPhoneChange: (phone: string) => void;
   onSwitchToData: () => void;
+  activeNetwork?: NetworkId | 'all';
+  onSelectNetwork?: (net: NetworkId | 'all') => void;
 }
 
 export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
   quickBuyPhone,
   onQuickBuyPhoneChange,
   onSwitchToData,
+  activeNetwork: controlledNetwork,
+  onSelectNetwork: controlledOnSelectNetwork,
 }) => {
   const { openCheckout } = useApp();
 
@@ -36,7 +40,13 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedNetwork, setSelectedNetwork] = useState<NetworkId | 'all'>('all');
+  const [internalSelectedNetwork, setInternalSelectedNetwork] = useState<NetworkId | 'all'>('all');
+  const selectedNetwork = controlledNetwork !== undefined ? controlledNetwork : internalSelectedNetwork;
+  const setSelectedNetwork = (net: NetworkId | 'all') => {
+    setInternalSelectedNetwork(net);
+    controlledOnSelectNetwork?.(net);
+  };
+
   const [selectedCategory, setSelectedCategory] = useState<InstantBundleCategoryType | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 

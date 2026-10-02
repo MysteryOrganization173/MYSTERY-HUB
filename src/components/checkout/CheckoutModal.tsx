@@ -42,8 +42,16 @@ export const CheckoutModal: React.FC = () => {
     orderRef?: string;
     status?: string;
   } | null>(null);
+  const [preflightIssue, setPreflightIssue] = useState<{
+    code: string;
+    title: string;
+    message: string;
+    supportingNote?: string;
+    networkName?: string;
+  } | null>(null);
 
   const conflictRef = useRef<HTMLDivElement>(null);
+  const preflightRef = useRef<HTMLDivElement>(null);
   const serverErrorRef = useRef<HTMLDivElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
 
@@ -65,6 +73,7 @@ export const CheckoutModal: React.FC = () => {
       setPhoneError('');
       setServerError('');
       setActiveMtnConflict(null);
+      setPreflightIssue(null);
     }
   }, [checkoutBundle, checkoutInitialPhone, user?.phone]);
 
@@ -82,6 +91,13 @@ export const CheckoutModal: React.FC = () => {
       smoothScrollToElement(conflictRef.current, { block: 'center' });
     }
   }, [activeMtnConflict]);
+
+  // Smoothly scroll preflight issue into view
+  useEffect(() => {
+    if (preflightIssue && preflightRef.current) {
+      smoothScrollToElement(preflightRef.current, { block: 'center' });
+    }
+  }, [preflightIssue]);
 
   // Smoothly scroll server error message into view
   useEffect(() => {
@@ -122,6 +138,7 @@ export const CheckoutModal: React.FC = () => {
     const clean = val.replace(/[^\d\s]/g, '');
     setPhone(clean);
     if (activeMtnConflict) setActiveMtnConflict(null);
+    if (preflightIssue) setPreflightIssue(null);
     if (phoneError) setPhoneError('');
     if (serverError) setServerError('');
   };
@@ -237,13 +254,41 @@ export const CheckoutModal: React.FC = () => {
         }
       },
       onError: (err) => {
-        if (err.code === 'ACTIVE_MTN_ORDER_EXISTS') {
+        if (err.code === 'ACTIVE_MTN_ORDER_EXISTS' || err.code === 'ACTIVE_MTN_ORDER') {
           setActiveMtnConflict({
             orderRef: err.existingOrderReference,
             status: err.existingOrderStatus,
           });
           return;
         }
+
+        const networkName = currentNetwork.name;
+        if (err.code === 'BENEFICIARY_NOT_ELIGIBLE') {
+          setPreflightIssue({
+            code: 'BENEFICIARY_NOT_ELIGIBLE',
+            title: `This ${checkoutBundle.network === 'mtn' ? 'MTN' : networkName} number isn't ready yet`,
+            message: `This number is not currently eligible for ${checkoutBundle.network === 'mtn' ? 'MTN Express' : networkName} bundles.\nNo payment has been taken.\n\nTry another ${checkoutBundle.network === 'mtn' ? 'MTN' : networkName} number or try this number again later after it has been verified.`,
+            supportingNote: 'Mystery Hub checks eligibility before payment so you are not charged for an order that cannot be processed.',
+            networkName,
+          });
+          return;
+        }
+
+        if (
+          err.code === 'SUPPLIER_WALLET_LOW' ||
+          err.code === 'SERVICE_TEMPORARILY_UNAVAILABLE' ||
+          err.code === 'PACKAGE_UNAVAILABLE'
+        ) {
+          setPreflightIssue({
+            code: err.code,
+            title: err.code === 'PACKAGE_UNAVAILABLE' ? 'Package Temporarily Unavailable' : 'Telecom Service Notice',
+            message: err.message || 'This telecom package is momentarily undergoing scheduled maintenance. No payment has been taken.',
+            supportingNote: 'Mystery Hub checks eligibility and network channels before payment so your funds are never charged for unfulfillable requests.',
+            networkName,
+          });
+          return;
+        }
+
         setServerError(err.message || 'Payment initiation failed. Please try again.');
         showToast(err.message || 'Payment initiation failed', 'warning');
       },
@@ -431,6 +476,72 @@ export const CheckoutModal: React.FC = () => {
             </div>
           )}
 
+          {/* Calm Preflight Issue Callout (Informational, No Payment Taken) */}
+          {preflightIssue && (
+            <div
+              ref={preflightRef}
+              className="p-3.5 sm:p-4 rounded-xl bg-slate-900/95 border border-slate-700/80 text-left space-y-3 animate-in fade-in"
+            >
+              <div className="flex items-start gap-2.5">
+                <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400 shrink-0 mt-0.5">
+                  <Info className="w-4 h-4" />
+                </div>
+                <div className="space-y-1 min-w-0 flex-1">
+                  <h4 className="font-semibold text-xs sm:text-sm text-white">
+                    {preflightIssue.title}
+                  </h4>
+                  <div className="text-[11px] sm:text-xs text-slate-300 leading-relaxed whitespace-pre-line">
+                    {preflightIssue.message}
+                  </div>
+                  {preflightIssue.supportingNote && (
+                    <p className="text-[10px] sm:text-[11px] text-slate-400 pt-1.5 leading-relaxed border-t border-slate-800/80">
+                      {preflightIssue.supportingNote}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreflightIssue(null);
+                    if (phoneInputRef.current) {
+                      smoothScrollToElement(phoneInputRef.current, { block: 'center' });
+                      phoneInputRef.current.focus();
+                      phoneInputRef.current.select();
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-[#00c365] hover:bg-[#00e575] text-black text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                >
+                  <span>Try Another Number</span>
+                </button>
+                <a
+                  href={`${BUSINESS_CONFIG.contact.supportWhatsAppUrl}?text=${encodeURIComponent(
+                    `Hello Mystery Hub Support, I am ordering ${checkoutBundle.network.toUpperCase()} bundle (${
+                      checkoutBundle.dataAmount || 'Airtime'
+                    }) for ${phone.trim()}, but preflight verification indicates this number is not currently eligible (Code: ${
+                      preflightIssue.code
+                    }). Please assist me.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Report Issue</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreflightIssue(null)}
+                  className="px-2.5 py-1.5 rounded-lg text-slate-400 hover:text-white text-xs transition-colors cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Server Error Callout */}
           {serverError && (
             <div
@@ -449,6 +560,16 @@ export const CheckoutModal: React.FC = () => {
               >
                 ✕
               </button>
+            </div>
+          )}
+
+          {/* Network Mismatch Warning Banner */}
+          {detectedNet && checkoutBundle.network && detectedNet !== checkoutBundle.network && (
+            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-300 flex items-start gap-2 animate-in fade-in">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+              <span className="text-[11px] leading-relaxed">
+                Number prefix indicates <strong>{GHANA_NETWORKS[detectedNet as keyof typeof GHANA_NETWORKS]?.name || detectedNet.toUpperCase()}</strong>, while this checkout is for <strong>{currentNetwork.name}</strong>. If this number was ported via MNP, you can proceed safely.
+              </span>
             </div>
           )}
 

@@ -9,8 +9,16 @@ import { OrderRecord, OrderStatus } from '../types/orders.js';
 import { SuccessBizHubProvider } from '../suppliers/successBizHub/provider.js';
 import { SuccessBizHubClient } from '../suppliers/successBizHub/client.js';
 
+export type PreflightErrorCode =
+  | 'BENEFICIARY_NOT_ELIGIBLE'
+  | 'SUPPLIER_WALLET_LOW'
+  | 'SERVICE_TEMPORARILY_UNAVAILABLE'
+  | 'PACKAGE_UNAVAILABLE'
+  | 'ACTIVE_MTN_ORDER';
+
 export interface PreflightResult {
   allowed: boolean;
+  code?: PreflightErrorCode;
   customerMessage?: string;
   internalReason?: string;
   supplierCostMinor?: number;
@@ -59,6 +67,7 @@ export class FulfilmentService {
       console.error('[Fulfilment Preflight] Fulfilment is enabled but SUCCESS_BIZ_HUB_API_KEY is not configured.');
       return {
         allowed: false,
+        code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
         customerMessage: 'This bundle is temporarily unavailable. Please try another package or try again shortly.',
         internalReason: 'SUCCESS_BIZ_HUB_API_KEY is missing.',
       };
@@ -88,6 +97,7 @@ export class FulfilmentService {
         console.warn(`[Fulfilment Preflight] Services check failed: ${servicesCheckResult.res.reason}`);
         return {
           allowed: false,
+          code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
           customerMessage: 'This bundle is temporarily unavailable. Please try another package or try again shortly.',
           internalReason: servicesCheckResult.res.reason,
           timings: { servicesMs, catalogMs, beneficiaryMs: 0, walletMs: 0, totalMs: Math.round(performance.now() - startPreflight) },
@@ -98,6 +108,7 @@ export class FulfilmentService {
         console.warn(`[Fulfilment Preflight] Package resolution failed: ${resolvedResult.res.error}`);
         return {
           allowed: false,
+          code: 'PACKAGE_UNAVAILABLE',
           customerMessage: 'This bundle is temporarily unavailable. Please try another package or try again shortly.',
           internalReason: resolvedResult.res.error,
           timings: { servicesMs, catalogMs, beneficiaryMs: 0, walletMs: 0, totalMs: Math.round(performance.now() - startPreflight) },
@@ -135,6 +146,7 @@ export class FulfilmentService {
         console.warn(`[Fulfilment Preflight] Beneficiary ineligible: ${beneficiaryResult.res.reason}`);
         return {
           allowed: false,
+          code: 'BENEFICIARY_NOT_ELIGIBLE',
           customerMessage: 'The recipient phone number is not eligible for this telecom bundle. Please check the number and network.',
           internalReason: beneficiaryResult.res.reason || 'Beneficiary ineligible',
           timings: { servicesMs, catalogMs, beneficiaryMs, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
@@ -145,6 +157,7 @@ export class FulfilmentService {
         console.warn('[Fulfilment Preflight] Wallet check failed, failing closed:', walletResult.error);
         return {
           allowed: false,
+          code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
           customerMessage: 'This bundle is temporarily unavailable. Please try another package or try again shortly.',
           internalReason: 'Supplier wallet check failed.',
           timings: { servicesMs, catalogMs, beneficiaryMs, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
@@ -157,6 +170,7 @@ export class FulfilmentService {
         );
         return {
           allowed: false,
+          code: 'SUPPLIER_WALLET_LOW',
           customerMessage: 'This bundle is temporarily unavailable. Please try another package or try again shortly.',
           internalReason: 'Insufficient supplier wallet balance.',
           timings: { servicesMs, catalogMs, beneficiaryMs, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
@@ -172,6 +186,7 @@ export class FulfilmentService {
       console.error('[Fulfilment Preflight] Unexpected preflight exception:', err);
       return {
         allowed: false,
+        code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
         customerMessage: 'This bundle is temporarily unavailable. Please try another package or try again shortly.',
         internalReason: err instanceof Error ? err.message : 'Unknown preflight error',
         timings: { servicesMs: 0, catalogMs: 0, beneficiaryMs: 0, walletMs: 0, totalMs: Math.round(performance.now() - startPreflight) },
@@ -200,6 +215,7 @@ export class FulfilmentService {
       console.error('[Airtime Preflight] Fulfilment is enabled but SUCCESS_BIZ_HUB_API_KEY is not configured.');
       return {
         allowed: false,
+        code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
         customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
         internalReason: 'SUCCESS_BIZ_HUB_API_KEY is missing.',
       };
@@ -232,6 +248,7 @@ export class FulfilmentService {
         console.warn(`[Airtime Preflight] Airtime service unavailable: ${serviceResult.res.reason}`);
         return {
           allowed: false,
+          code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
           customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
           internalReason: serviceResult.res.reason || 'Airtime service unavailable on supplier.',
           timings: { servicesMs, catalogMs: 0, beneficiaryMs: 0, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
@@ -242,6 +259,7 @@ export class FulfilmentService {
         console.warn('[Airtime Preflight] Wallet check failed, failing closed:', walletResult.error);
         return {
           allowed: false,
+          code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
           customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
           internalReason: 'Supplier wallet check failed.',
           timings: { servicesMs, catalogMs: 0, beneficiaryMs: 0, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
@@ -254,6 +272,7 @@ export class FulfilmentService {
         );
         return {
           allowed: false,
+          code: 'SUPPLIER_WALLET_LOW',
           customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
           internalReason: 'Insufficient supplier wallet balance for airtime.',
           timings: { servicesMs, catalogMs: 0, beneficiaryMs: 0, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
@@ -268,6 +287,7 @@ export class FulfilmentService {
       console.error('[Airtime Preflight] Unexpected preflight exception:', err);
       return {
         allowed: false,
+        code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
         customerMessage: 'Airtime Top-Up is temporarily unavailable. Please try again shortly.',
         internalReason: err instanceof Error ? err.message : 'Unknown preflight error',
         timings: { servicesMs: 0, catalogMs: 0, beneficiaryMs: 0, walletMs: 0, totalMs: Math.round(performance.now() - startPreflight) },
