@@ -34,6 +34,9 @@ export interface ReferralAttributionRecord {
   first_seen_at: string;
   bound_at: string | null;
   status: 'active' | 'locked' | 'inactive';
+  level1_referrer_user_id?: string | null;
+  level2_referrer_user_id?: string | null;
+  level3_referrer_user_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -55,8 +58,12 @@ export interface ReferralRewardRuleRecord {
   product_key: string | null;
   network: string | null;
   reward_type: RewardCalculationType;
-  reward_minor: number | null; // stored in pesewas
+  reward_minor: number | null; // stored in pesewas (Level 1 / direct)
   reward_percent_bps: number | null; // basis points (100 = 1%)
+  level2_reward_minor?: number | null; // Level 2 fixed pesewas
+  level2_percent_bps?: number | null; // Level 2 basis points
+  level3_reward_minor?: number | null; // Level 3 fixed pesewas
+  level3_percent_bps?: number | null; // Level 3 basis points
   enabled: boolean;
   starts_at: string | null;
   ends_at: string | null;
@@ -73,6 +80,7 @@ export interface RewardLedgerRecord {
   marketplace_product_id: string | null;
   service_type: RewardServiceType;
   reward_rule_id: string | null;
+  network_level?: number; // 1, 2, or 3
   amount_minor: number; // integer pesewas
   currency: 'GHS';
   status: RewardLedgerStatus;
@@ -89,6 +97,8 @@ export interface RewardLedgerRecord {
 export interface SafeRewardLedgerItem {
   id: string;
   service_type: RewardServiceType;
+  network_level?: number; // 1 = Direct Referral, 2 = Level 2, 3 = Level 3
+  level_label?: string;
   amount_minor: number;
   amount_ghc: number;
   currency: 'GHS';
@@ -104,7 +114,11 @@ export interface ReferralSummary {
   shareUrl: string;
   isEnabled: boolean;
   clicksCount: number;
-  referredCustomersCount: number;
+  referredCustomersCount: number; // Level 1 direct
+  networkLevel1Count: number;
+  networkLevel2Count: number;
+  networkLevel3Count: number;
+  networkTotalCount: number;
   pendingRewardsMinor: number;
   pendingRewardsGhc: number;
   approvedRewardsMinor: number;

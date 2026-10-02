@@ -373,6 +373,38 @@ export async function initDatabase(): Promise<void> {
         name: 'marketplace_products.referral_reward_minor',
         sql: `ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS referral_reward_minor INTEGER;`,
       },
+      {
+        name: 'referral_attributions.level1_referrer_user_id',
+        sql: `ALTER TABLE referral_attributions ADD COLUMN IF NOT EXISTS level1_referrer_user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL;`,
+      },
+      {
+        name: 'referral_attributions.level2_referrer_user_id',
+        sql: `ALTER TABLE referral_attributions ADD COLUMN IF NOT EXISTS level2_referrer_user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL;`,
+      },
+      {
+        name: 'referral_attributions.level3_referrer_user_id',
+        sql: `ALTER TABLE referral_attributions ADD COLUMN IF NOT EXISTS level3_referrer_user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL;`,
+      },
+      {
+        name: 'referral_reward_rules.level2_reward_minor',
+        sql: `ALTER TABLE referral_reward_rules ADD COLUMN IF NOT EXISTS level2_reward_minor INTEGER;`,
+      },
+      {
+        name: 'referral_reward_rules.level2_percent_bps',
+        sql: `ALTER TABLE referral_reward_rules ADD COLUMN IF NOT EXISTS level2_percent_bps INTEGER;`,
+      },
+      {
+        name: 'referral_reward_rules.level3_reward_minor',
+        sql: `ALTER TABLE referral_reward_rules ADD COLUMN IF NOT EXISTS level3_reward_minor INTEGER;`,
+      },
+      {
+        name: 'referral_reward_rules.level3_percent_bps',
+        sql: `ALTER TABLE referral_reward_rules ADD COLUMN IF NOT EXISTS level3_percent_bps INTEGER;`,
+      },
+      {
+        name: 'reward_ledger.network_level',
+        sql: `ALTER TABLE reward_ledger ADD COLUMN IF NOT EXISTS network_level INTEGER NOT NULL DEFAULT 1;`,
+      },
     ];
 
     for (const mig of orderMigrations) {
@@ -416,6 +448,8 @@ export async function initDatabase(): Promise<void> {
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_profiles_user_id ON referral_profiles (user_id);`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_profiles_code ON referral_profiles (UPPER(referral_code));`,
       `CREATE INDEX IF NOT EXISTS idx_referral_attributions_referrer ON referral_attributions (referrer_user_id);`,
+      `CREATE INDEX IF NOT EXISTS idx_referral_attributions_level2 ON referral_attributions (level2_referrer_user_id);`,
+      `CREATE INDEX IF NOT EXISTS idx_referral_attributions_level3 ON referral_attributions (level3_referrer_user_id);`,
       `CREATE INDEX IF NOT EXISTS idx_referral_attributions_visitor ON referral_attributions (visitor_key);`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_attributions_referred_unique ON referral_attributions (referred_user_id) WHERE referred_user_id IS NOT NULL;`,
       `CREATE INDEX IF NOT EXISTS idx_referral_clicks_referrer ON referral_clicks (referrer_user_id);`,
@@ -423,6 +457,7 @@ export async function initDatabase(): Promise<void> {
       `CREATE INDEX IF NOT EXISTS idx_reward_rules_service ON referral_reward_rules (service_type, enabled);`,
       `CREATE INDEX IF NOT EXISTS idx_reward_ledger_referrer ON reward_ledger (referrer_user_id, status);`,
       `CREATE INDEX IF NOT EXISTS idx_reward_ledger_order ON reward_ledger (order_id);`,
+      `CREATE INDEX IF NOT EXISTS idx_reward_ledger_network_level ON reward_ledger (network_level);`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_reward_ledger_idempotency ON reward_ledger (idempotency_key);`,
       `CREATE INDEX IF NOT EXISTS idx_reward_ledger_created ON reward_ledger (created_at DESC);`,
     ];

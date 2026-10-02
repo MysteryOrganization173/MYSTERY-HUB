@@ -212,11 +212,16 @@ CREATE TABLE IF NOT EXISTS referral_attributions (
   first_seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   bound_at TIMESTAMP WITH TIME ZONE,
   status VARCHAR(32) NOT NULL DEFAULT 'active',
+  level1_referrer_user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
+  level2_referrer_user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
+  level3_referrer_user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_referral_attributions_referrer ON referral_attributions (referrer_user_id);
+CREATE INDEX IF NOT EXISTS idx_referral_attributions_level2 ON referral_attributions (level2_referrer_user_id);
+CREATE INDEX IF NOT EXISTS idx_referral_attributions_level3 ON referral_attributions (level3_referrer_user_id);
 CREATE INDEX IF NOT EXISTS idx_referral_attributions_visitor ON referral_attributions (visitor_key);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_attributions_referred_unique ON referral_attributions (referred_user_id) WHERE referred_user_id IS NOT NULL;
 
@@ -244,6 +249,10 @@ CREATE TABLE IF NOT EXISTS referral_reward_rules (
   reward_type VARCHAR(32) NOT NULL DEFAULT 'fixed_minor',
   reward_minor INTEGER,
   reward_percent_bps INTEGER,
+  level2_reward_minor INTEGER,
+  level2_percent_bps INTEGER,
+  level3_reward_minor INTEGER,
+  level3_percent_bps INTEGER,
   enabled BOOLEAN NOT NULL DEFAULT FALSE,
   starts_at TIMESTAMP WITH TIME ZONE,
   ends_at TIMESTAMP WITH TIME ZONE,
@@ -263,6 +272,7 @@ CREATE TABLE IF NOT EXISTS reward_ledger (
   marketplace_product_id VARCHAR(64) REFERENCES marketplace_products(id) ON DELETE SET NULL,
   service_type VARCHAR(32) NOT NULL,
   reward_rule_id VARCHAR(64) REFERENCES referral_reward_rules(id) ON DELETE SET NULL,
+  network_level INTEGER NOT NULL DEFAULT 1,
   amount_minor INTEGER NOT NULL,
   currency VARCHAR(8) NOT NULL DEFAULT 'GHS',
   status VARCHAR(32) NOT NULL DEFAULT 'pending',
@@ -278,6 +288,7 @@ CREATE TABLE IF NOT EXISTS reward_ledger (
 
 CREATE INDEX IF NOT EXISTS idx_reward_ledger_referrer ON reward_ledger (referrer_user_id, status);
 CREATE INDEX IF NOT EXISTS idx_reward_ledger_order ON reward_ledger (order_id);
+CREATE INDEX IF NOT EXISTS idx_reward_ledger_network_level ON reward_ledger (network_level);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_reward_ledger_idempotency ON reward_ledger (idempotency_key);
 CREATE INDEX IF NOT EXISTS idx_reward_ledger_created ON reward_ledger (created_at DESC);
 

@@ -112,7 +112,7 @@ export const AuthModal: React.FC = () => {
                   ✓ Website Builder identity
                 </span>
                 <span className="px-2 py-0.5 rounded-md bg-[#00c365]/10 border border-[#00c365]/20 text-[#00c365] text-[11px] font-medium">
-                  ✓ Mystery Earn coming soon
+                  ✓ Mystery Earn active rewards
                 </span>
               </div>
             )}

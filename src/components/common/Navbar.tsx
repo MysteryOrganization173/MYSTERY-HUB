@@ -168,11 +168,15 @@ export const Navbar: React.FC = () => {
           {/* Mystery Earn Shortcut */}
           <button
             onClick={() => handleNavClick('earn')}
-            className="p-2 text-slate-400 hover:text-[#00c365] hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
+            className="relative p-2 text-slate-400 hover:text-[#00c365] hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
             title="Mystery Earn"
             aria-label="Mystery Earn"
           >
             <Gift className="w-4 h-4 text-[#00c365]" />
+            <span className="absolute top-1.5 right-1.5 flex h-2 w-2" aria-hidden="true">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 motion-reduce:hidden" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00c365]" />
+            </span>
           </button>
 
           {/* Auth Controls */}
@@ -243,7 +247,7 @@ export const Navbar: React.FC = () => {
                         <span>Mystery Earn</span>
                       </div>
                       <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 bg-[#00c365]/10 text-[#00c365] rounded border border-[#00c365]/20">
-                        Soon
+                        LIVE
                       </span>
                     </button>
                   </div>
@@ -351,7 +355,7 @@ export const Navbar: React.FC = () => {
             >
               <span>Mystery Earn</span>
               <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 bg-[#00c365]/10 text-[#00c365] rounded border border-[#00c365]/20">
-                Soon
+                LIVE
               </span>
             </a>
           </div>

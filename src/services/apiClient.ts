@@ -1143,6 +1143,10 @@ export interface ReferralSummaryResponse {
     isEnabled: boolean;
     clicksCount: number;
     referredCustomersCount: number;
+    networkLevel1Count?: number;
+    networkLevel2Count?: number;
+    networkLevel3Count?: number;
+    networkTotalCount?: number;
     pendingRewardsMinor: number;
     pendingRewardsGhc: number;
     approvedRewardsMinor: number;
@@ -1156,6 +1160,8 @@ export interface ReferralSummaryResponse {
 export interface RewardLedgerItem {
   id: string;
   service_type: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'website_builder' | 'manual_adjustment';
+  network_level?: number;
+  level_label?: string;
   amount_minor: number;
   amount_ghc: number;
   currency: 'GHS';

@@ -149,6 +149,40 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
   };
 
+  const getDestinationUrl = (path: string) => {
+    return summary?.code ? buildReferralUrl(path, summary.code) : shareUrl;
+  };
+
+  const [copiedDestPath, setCopiedDestPath] = useState<string | null>(null);
+
+  const handleCopyDestination = async (path: string, label: string) => {
+    const url = getDestinationUrl(path);
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = url;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopiedDestPath(path);
+      showToast(`${label} referral link copied!`, 'success');
+      setTimeout(() => setCopiedDestPath(null), 2500);
+    } catch {
+      showToast('Please copy the link directly.', 'info');
+    }
+  };
+
+  const handleWhatsAppDestination = (path: string, label: string, desc: string) => {
+    const url = getDestinationUrl(path);
+    const text = `Check out ${label} on Mystery Hub 💚\n${desc}\n${url}`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const handleNativeShare = async () => {
     if (navigator?.share) {
       try {
@@ -363,6 +397,171 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
               <Copy className="w-3.5 h-3.5" />
               <span>Copy Link</span>
             </button>
+          </div>
+
+          {/* 3B. 3-Level Network Lineage (Real Figures) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-[#00c365]" />
+                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">3-Level Referral Network</h2>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium">Auto-Attributed Network</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              {/* Level 1: Direct */}
+              <div className="p-4 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-1 text-left">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-xs font-semibold text-slate-300">Level 1 (Direct)</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#00c365]/10 text-[#00c365] border border-[#00c365]/30">Direct</span>
+                </div>
+                <div className="text-xl sm:text-2xl font-extrabold text-white">
+                  {summary?.networkLevel1Count ?? summary?.referredCustomersCount ?? 0}
+                </div>
+                <p className="text-[11px] text-slate-400">Personally referred members</p>
+              </div>
+
+              {/* Level 2: Secondary */}
+              <div className="p-4 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-1 text-left">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-xs font-semibold text-slate-300">Level 2 (Tier 2)</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/30">Tier 2</span>
+                </div>
+                <div className="text-xl sm:text-2xl font-extrabold text-white">
+                  {summary?.networkLevel2Count ?? 0}
+                </div>
+                <p className="text-[11px] text-slate-400">Referred by your Level 1 partners</p>
+              </div>
+
+              {/* Level 3: Tertiary */}
+              <div className="p-4 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-1 text-left">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-xs font-semibold text-slate-300">Level 3 (Tier 3)</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30">Tier 3</span>
+                </div>
+                <div className="text-xl sm:text-2xl font-extrabold text-white">
+                  {summary?.networkLevel3Count ?? 0}
+                </div>
+                <p className="text-[11px] text-slate-400">Referred by your Level 2 partners</p>
+              </div>
+            </div>
+          </div>
+
+          {/* 3C. Share Hub (Target Page Referral Links) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Share2 className="w-4 h-4 text-[#00c365]" />
+                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Share Hub · Targeted Referral Links</h2>
+              </div>
+              <span className="text-[11px] text-[#00c365] font-medium">Lifetime Attribution</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {[
+                {
+                  id: 'data',
+                  title: 'Data Bundles',
+                  path: '/data',
+                  desc: 'MTN, Telecel, and AT data packages at affordable rates.',
+                  badge: 'High Conversion',
+                  icon: Smartphone,
+                  color: 'text-[#00c365]',
+                  bg: 'bg-[#00c365]/10',
+                  border: 'border-[#00c365]/20',
+                },
+                {
+                  id: 'marketplace',
+                  title: 'Marketplace Sourcing',
+                  path: '/marketplace',
+                  desc: 'Verified phones, electronics, and hardware with direct cash rewards.',
+                  badge: 'Cash Rewards',
+                  icon: ShoppingBag,
+                  color: 'text-amber-400',
+                  bg: 'bg-amber-500/10',
+                  border: 'border-amber-500/20',
+                },
+                {
+                  id: 'website',
+                  title: 'Website Builder',
+                  path: '/website',
+                  desc: 'Professional instant business website creation for Ghanaian businesses.',
+                  badge: 'Business',
+                  icon: Globe,
+                  color: 'text-purple-400',
+                  bg: 'bg-purple-500/10',
+                  border: 'border-purple-500/20',
+                },
+                {
+                  id: 'earn',
+                  title: 'Mystery Earn Program',
+                  path: '/earn',
+                  desc: 'Invite friends and partners to join Mystery Earn and build a team.',
+                  badge: 'Partner Invite',
+                  icon: Gift,
+                  color: 'text-emerald-400',
+                  bg: 'bg-emerald-500/10',
+                  border: 'border-emerald-500/20',
+                },
+                {
+                  id: 'home',
+                  title: 'Mystery Hub Main Portal',
+                  path: '/',
+                  desc: 'Universal landing page featuring all digital products and services.',
+                  badge: 'All Services',
+                  icon: Sparkles,
+                  color: 'text-sky-400',
+                  bg: 'bg-sky-500/10',
+                  border: 'border-sky-500/20',
+                },
+              ].map((target) => {
+                const isCopied = copiedDestPath === target.path;
+                const TargetIcon = target.icon;
+
+                return (
+                  <div
+                    key={target.id}
+                    className="p-4 rounded-2xl bg-[#0b1015] border border-slate-800/90 flex flex-col justify-between gap-3 text-left hover:border-slate-700/80 transition-all shadow-sm"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-7 h-7 rounded-lg ${target.bg} flex items-center justify-center ${target.color}`}>
+                            <TargetIcon className="w-4 h-4" />
+                          </div>
+                          <h4 className="font-bold text-xs sm:text-sm text-white">{target.title}</h4>
+                        </div>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${target.bg} ${target.color} border ${target.border}`}>
+                          {target.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">{target.desc}</p>
+                    </div>
+
+                    <div className="pt-1 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyDestination(target.path, target.title)}
+                        className="flex-1 py-1.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                      >
+                        {isCopied ? <Check className="w-3.5 h-3.5 text-[#00c365]" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                        <span className={isCopied ? 'text-[#00c365]' : ''}>{isCopied ? 'Copied' : 'Copy Link'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleWhatsAppDestination(target.path, target.title, target.desc)}
+                        aria-label={`Share ${target.title} on WhatsApp`}
+                        className="py-1.5 px-2.5 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/30 text-[#25D366] text-xs font-semibold transition-all flex items-center justify-center cursor-pointer active:scale-95"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* 4. Recent Reward Activity Ledger */}

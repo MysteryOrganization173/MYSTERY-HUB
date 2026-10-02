@@ -335,10 +335,41 @@ export class ReferralStore {
   }
 
   /**
+   * Checks if candidateReferrerUserId has targetReferredUserId anywhere in its ancestral upline.
+   * Prevents circular attribution loops (e.g. A -> B -> A or A -> B -> C -> A).
+   */
+  static async isDescendantOrCycle(
+    candidateReferrerUserId: string,
+    targetReferredUserId: string
+  ): Promise<boolean> {
+    let currentId: string | null = candidateReferrerUserId;
+    const visited = new Set<string>();
+    let hops = 0;
+
+    while (currentId && hops < 10) {
+      if (currentId === targetReferredUserId) {
+        return true;
+      }
+      if (visited.has(currentId)) {
+        // Cycle detected
+        return true;
+      }
+      visited.add(currentId);
+
+      const uplineAttr = await this.findAttributionByReferredUserId(currentId);
+      currentId = uplineAttr?.referrer_user_id || uplineAttr?.level1_referrer_user_id || null;
+      hops++;
+    }
+
+    return false;
+  }
+
+  /**
    * Permanently binds an authenticated user to a referrer.
    * FIRST VALID REFERRER WINS:
    * If user already has a bound referrer, the existing binding is returned and CANNOT be hijacked.
    * Self-referrals (referredUserId === referrerUserId) are rejected.
+   * Circular referrals (e.g. A -> B -> A) are rejected.
    */
   static async bindAttributionToUser(params: {
     referredUserId: string;
@@ -352,7 +383,13 @@ export class ReferralStore {
       return { attribution: null, isNew: false, error: 'Self-referral is not allowed.' };
     }
 
-    // 2. Check if user already has an established lifetime attribution
+    // 2. Enforce No Circular Referral Loops
+    const isCycle = await this.isDescendantOrCycle(params.referrerUserId, params.referredUserId);
+    if (isCycle) {
+      return { attribution: null, isNew: false, error: 'Circular referral chain is not allowed.' };
+    }
+
+    // 3. Check if user already has an established lifetime attribution
     const existingForUser = await this.findAttributionByReferredUserId(params.referredUserId);
     if (existingForUser) {
       return { attribution: existingForUser, isNew: false };
@@ -360,11 +397,34 @@ export class ReferralStore {
 
     const nowIso = new Date().toISOString();
 
-    // 3. If visitorKey was provided, check if a guest record exists to upgrade
+    // 4. Derive Maximum 3-Level Network Lineage
+    const level1UserId = params.referrerUserId;
+    let level2UserId: string | null = null;
+    let level3UserId: string | null = null;
+
+    try {
+      const level1Attr = await this.findAttributionByReferredUserId(level1UserId);
+      if (level1Attr && level1Attr.referrer_user_id && level1Attr.referrer_user_id !== params.referredUserId) {
+        level2UserId = level1Attr.referrer_user_id;
+        const level2Attr = await this.findAttributionByReferredUserId(level2UserId);
+        if (
+          level2Attr &&
+          level2Attr.referrer_user_id &&
+          level2Attr.referrer_user_id !== params.referredUserId &&
+          level2Attr.referrer_user_id !== level1UserId
+        ) {
+          level3UserId = level2Attr.referrer_user_id;
+        }
+      }
+    } catch (err) {
+      console.warn('[ReferralStore] Error resolving 3-level lineage:', err);
+    }
+
+    // 5. If visitorKey was provided, check if a guest record exists to upgrade
     if (params.visitorKey) {
       const guestAttribution = await this.findAttributionByVisitorKey(params.visitorKey);
       if (guestAttribution && !guestAttribution.referred_user_id) {
-        // Enforce no self-referral on upgrade
+        // Enforce no self-referral or circular referral on upgrade
         if (guestAttribution.referrer_user_id === params.referredUserId) {
           return { attribution: null, isNew: false, error: 'Self-referral is not allowed.' };
         }
@@ -374,11 +434,13 @@ export class ReferralStore {
           const res = await pool.query<ReferralAttributionRecord>(
             `
             UPDATE referral_attributions
-            SET referred_user_id = $1, bound_at = $2, status = 'locked', updated_at = $2
-            WHERE id = $3 AND referred_user_id IS NULL
+            SET referred_user_id = $1, bound_at = $2, status = 'locked',
+                level1_referrer_user_id = $3, level2_referrer_user_id = $4, level3_referrer_user_id = $5,
+                updated_at = $2
+            WHERE id = $6 AND referred_user_id IS NULL
             RETURNING *;
             `,
-            [params.referredUserId, nowIso, guestAttribution.id]
+            [params.referredUserId, nowIso, level1UserId, level2UserId, level3UserId, guestAttribution.id]
           );
           if (res.rows.length > 0) {
             return { attribution: res.rows[0], isNew: true };
@@ -389,6 +451,9 @@ export class ReferralStore {
             referred_user_id: params.referredUserId,
             bound_at: nowIso,
             status: 'locked',
+            level1_referrer_user_id: level1UserId,
+            level2_referrer_user_id: level2UserId,
+            level3_referrer_user_id: level3UserId,
             updated_at: nowIso,
           };
           devReferralAttributions.set(updated.id, updated);
@@ -397,11 +462,11 @@ export class ReferralStore {
       }
     }
 
-    // 4. Create fresh permanent locked attribution
+    // 6. Create fresh permanent locked attribution with 3-level lineage
     const id = `refatt_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     const newRecord: ReferralAttributionRecord = {
       id,
-      referrer_user_id: params.referrerUserId,
+      referrer_user_id: level1UserId,
       referred_user_id: params.referredUserId,
       visitor_key: params.visitorKey || null,
       source_code: params.sourceCode.toUpperCase(),
@@ -409,6 +474,9 @@ export class ReferralStore {
       first_seen_at: nowIso,
       bound_at: nowIso,
       status: 'locked',
+      level1_referrer_user_id: level1UserId,
+      level2_referrer_user_id: level2UserId,
+      level3_referrer_user_id: level3UserId,
       created_at: nowIso,
       updated_at: nowIso,
     };
@@ -418,8 +486,12 @@ export class ReferralStore {
       try {
         const res = await pool.query<ReferralAttributionRecord>(
           `
-          INSERT INTO referral_attributions (id, referrer_user_id, referred_user_id, visitor_key, source_code, first_landing_path, first_seen_at, bound_at, status, created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          INSERT INTO referral_attributions (
+            id, referrer_user_id, referred_user_id, visitor_key, source_code,
+            first_landing_path, first_seen_at, bound_at, status,
+            level1_referrer_user_id, level2_referrer_user_id, level3_referrer_user_id,
+            created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
           ON CONFLICT (referred_user_id) DO UPDATE SET updated_at = NOW()
           RETURNING *;
           `,
@@ -433,6 +505,9 @@ export class ReferralStore {
             newRecord.first_seen_at,
             newRecord.bound_at,
             newRecord.status,
+            newRecord.level1_referrer_user_id,
+            newRecord.level2_referrer_user_id,
+            newRecord.level3_referrer_user_id,
             newRecord.created_at,
             newRecord.updated_at,
           ]
@@ -447,6 +522,60 @@ export class ReferralStore {
 
     devReferralAttributions.set(newRecord.id, newRecord);
     return { attribution: { ...newRecord }, isNew: true };
+  }
+
+  /**
+   * Computes accurate network member counts across 3 levels (real numbers only).
+   */
+  static async countNetworkMembers(
+    referrerUserId: string
+  ): Promise<{ level1: number; level2: number; level3: number; total: number }> {
+    const pool = getPool();
+    if (pool) {
+      const res = await pool.query<{
+        level1_count: string;
+        level2_count: string;
+        level3_count: string;
+      }>(
+        `
+        SELECT
+          (SELECT COUNT(DISTINCT referred_user_id) FROM referral_attributions WHERE (level1_referrer_user_id = $1 OR (level1_referrer_user_id IS NULL AND referrer_user_id = $1)) AND referred_user_id IS NOT NULL) as level1_count,
+          (SELECT COUNT(DISTINCT referred_user_id) FROM referral_attributions WHERE level2_referrer_user_id = $1 AND referred_user_id IS NOT NULL) as level2_count,
+          (SELECT COUNT(DISTINCT referred_user_id) FROM referral_attributions WHERE level3_referrer_user_id = $1 AND referred_user_id IS NOT NULL) as level3_count;
+        `,
+        [referrerUserId]
+      );
+      const row = res.rows[0];
+      const level1 = parseInt(row?.level1_count || '0', 10);
+      const level2 = parseInt(row?.level2_count || '0', 10);
+      const level3 = parseInt(row?.level3_count || '0', 10);
+      return { level1, level2, level3, total: level1 + level2 + level3 };
+    }
+
+    const l1Set = new Set<string>();
+    const l2Set = new Set<string>();
+    const l3Set = new Set<string>();
+
+    for (const attr of devReferralAttributions.values()) {
+      if (!attr.referred_user_id) continue;
+      if (
+        attr.level1_referrer_user_id === referrerUserId ||
+        (!attr.level1_referrer_user_id && attr.referrer_user_id === referrerUserId)
+      ) {
+        l1Set.add(attr.referred_user_id);
+      }
+      if (attr.level2_referrer_user_id === referrerUserId) {
+        l2Set.add(attr.referred_user_id);
+      }
+      if (attr.level3_referrer_user_id === referrerUserId) {
+        l3Set.add(attr.referred_user_id);
+      }
+    }
+
+    const level1 = l1Set.size;
+    const level2 = l2Set.size;
+    const level3 = l3Set.size;
+    return { level1, level2, level3, total: level1 + level2 + level3 };
   }
 
   static async countReferredCustomers(referrerUserId: string): Promise<number> {
@@ -788,6 +917,7 @@ export class ReferralStore {
     const profile = await this.getOrCreateProfile(userId);
     const clicksCount = await this.countClicksByReferrer(userId);
     const referredCustomersCount = await this.countReferredCustomers(userId);
+    const networkCounts = await this.countNetworkMembers(userId);
 
     const pool = getPool();
     let pendingMinor = 0;
@@ -831,6 +961,10 @@ export class ReferralStore {
       isEnabled: profile.is_enabled,
       clicksCount,
       referredCustomersCount,
+      networkLevel1Count: networkCounts.level1,
+      networkLevel2Count: networkCounts.level2,
+      networkLevel3Count: networkCounts.level3,
+      networkTotalCount: networkCounts.total,
       pendingRewardsMinor: pendingMinor,
       pendingRewardsGhc: Number((pendingMinor / 100).toFixed(2)),
       approvedRewardsMinor: approvedMinor,
