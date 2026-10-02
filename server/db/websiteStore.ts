@@ -474,6 +474,34 @@ export class WebsiteStore {
   }
 
   /**
+   * Delete a site permanently with ownership check.
+   * Releases user's one-site free limit.
+   */
+  static async deleteSite(id: string, userId: string): Promise<boolean> {
+    const existing = await this.findSiteById(id);
+    if (!existing) {
+      return false;
+    }
+
+    if (existing.user_id !== userId) {
+      throw new Error('Forbidden: You do not own this website.');
+    }
+
+    const pool = getPool();
+    if (!pool) {
+      devWebsiteStore.delete(id);
+      return true;
+    }
+
+    await pool.query(
+      `DELETE FROM website_sites WHERE id = $1 AND user_id = $2;`,
+      [id, userId]
+    );
+
+    return true;
+  }
+
+  /**
    * Normalize DB row JSONB types safely
    */
   private static normalizeRecord(row: any): WebsiteSiteRecord {

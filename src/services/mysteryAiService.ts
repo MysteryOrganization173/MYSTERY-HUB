@@ -1,4 +1,4 @@
-import { ActivePage } from '../types';
+import { ActivePage, SafeEditorAiContext } from '../types';
 import { DATA_BUNDLES, GHANA_NETWORKS } from '../data/bundles';
 import { API_BASE_URL } from './apiClient';
 
@@ -18,6 +18,193 @@ export interface SuggestedQuestion {
   id: string;
   text: string;
   category?: string;
+}
+
+/**
+ * Deterministic builder help resolver for common website editor navigation questions.
+ * Returns an instant response before calling remote AI models (0ms latency, guaranteed accurate).
+ */
+export function resolveInstantBuilderHelp(
+  query: string,
+  editorContext?: SafeEditorAiContext | null
+): { reply: string; quickAction?: ChatMessage['quickAction'] } | null {
+  const q = query.toLowerCase().trim();
+  const isEditor = editorContext?.experienceMode === 'website_editor';
+
+  // 1. Business details & Name / Tagline / Location (including exact query "How do I add my business details and phone?")
+  if (
+    q.includes('add my business details and phone') ||
+    q.includes('business details and phone') ||
+    (q.includes('business') && (q.includes('phone') || q.includes('contact') || q.includes('name') || q.includes('detail')))
+  ) {
+    return {
+      reply:
+        "Open the **Business** tab to edit your business name, tagline and location. Then open **Contact** to add your phone or WhatsApp number. Your changes are saved automatically and will appear in Preview.",
+    };
+  }
+
+  // 2. Business Details general
+  if (
+    q.includes('business details') ||
+    q.includes('change my business') ||
+    q.includes('edit business') ||
+    q.includes('business name') ||
+    q.includes('change name') ||
+    q.includes('tagline') ||
+    q.includes('subtext') ||
+    q.includes('operating hours') ||
+    (isEditor && (q.includes('my details') || q.includes('change details')))
+  ) {
+    return {
+      reply:
+        "To edit your business info, open the **Business** tab in the editor. You can update your business name, tagline, subtext, city, address, and operating hours. Your changes will update automatically in the live preview.",
+    };
+  }
+
+  // 3. Phone / WhatsApp general
+  if (
+    q.includes('add phone') ||
+    q.includes('add whatsapp') ||
+    q.includes('change phone') ||
+    q.includes('change whatsapp') ||
+    q.includes('contact details') ||
+    q.includes('phone number') ||
+    q.includes('whatsapp number') ||
+    (isEditor && (q.includes('phone') || q.includes('whatsapp') || q.includes('contact')))
+  ) {
+    return {
+      reply:
+        "Open the **Contact** tab to add your phone number and WhatsApp number. In the **Business** tab you can also set your city and physical address.",
+    };
+  }
+
+  // 4. Hero Image / Banner / Logo
+  if (
+    q.includes('hero image') ||
+    q.includes('change image') ||
+    q.includes('banner image') ||
+    q.includes('replace image') ||
+    q.includes('upload image') ||
+    q.includes('logo')
+  ) {
+    return {
+      reply:
+        "Open the **Branding** tab in the editor. Paste your image link into the **Hero Banner Image URL** field to update the hero background. You can also paste an optional **Brand Logo URL**.",
+    };
+  }
+
+  // 5. Colours / Theme Accent
+  if (
+    q.includes('colour') ||
+    q.includes('color') ||
+    q.includes('theme') ||
+    q.includes('accent') ||
+    q.includes('dark mode') ||
+    q.includes('light mode')
+  ) {
+    return {
+      reply:
+        "Open the **Branding** tab. Choose your Primary Colour Accent (Emerald, Amber, Sky Blue, Violet, Rose, or Coral) and switch between Dark and Light theme styling.",
+    };
+  }
+
+  // 6. Call to Action (CTA) Button
+  if (
+    q.includes('cta') ||
+    q.includes('button') ||
+    q.includes('call to action') ||
+    q.includes('order button')
+  ) {
+    return {
+      reply:
+        "Open the **Call To Action** tab. You can customize your main button label (e.g. 'Order via WhatsApp', 'Book a Table', 'Get Quote') and define the target phone number or link.",
+    };
+  }
+
+  // 7. Social Media Links
+  if (
+    q.includes('social') ||
+    q.includes('instagram') ||
+    q.includes('facebook') ||
+    q.includes('tiktok')
+  ) {
+    return {
+      reply:
+        "Open the **Social** tab to add your Instagram handle, Facebook page URL, or TikTok handle. These will appear linked in the footer of your live website.",
+    };
+  }
+
+  // 8. Bundle Editing (for Data Reseller template)
+  if (
+    q.includes('bundle') ||
+    q.includes('package') ||
+    q.includes('data packages') ||
+    q.includes('change price') ||
+    q.includes('bundle prices') ||
+    q.includes('add bundle') ||
+    q.includes('edit bundle')
+  ) {
+    return {
+      reply:
+        "For Data Reseller websites, open the **Bundles** tab. Click **Add Bundle** to choose the network (MTN, Telecel, or AT), enter the package name, price, and tag. You can edit or delete existing packages anytime.",
+    };
+  }
+
+  // 9. Preview
+  if (
+    q.includes('how do i preview') ||
+    q.includes('preview my website') ||
+    q.includes('see my website') ||
+    q.includes('test on mobile') ||
+    q.includes('full preview')
+  ) {
+    return {
+      reply:
+        "Tap the **Preview** button in the header toolbar to view your reactive website. Use the Desktop, Tablet, and Mobile buttons to test responsive layouts, or tap **Full Preview** for an edge-to-edge private preview.",
+    };
+  }
+
+  // 10. Publish
+  if (
+    q.includes('how do i publish') ||
+    q.includes('publish my website') ||
+    q.includes('publish website') ||
+    q.includes('make it live') ||
+    q.includes('go live')
+  ) {
+    return {
+      reply:
+        "When you're ready, tap the green **Publish** button in the top header. Your website will immediately go live with a shareable public link (`/sites/:slug`).",
+    };
+  }
+
+  // 11. Unpublish
+  if (
+    q.includes('unpublish') ||
+    q.includes('take offline') ||
+    q.includes('revert to draft')
+  ) {
+    return {
+      reply:
+        "In the top header toolbar, tap the **Unpublish** button next to the Live status. Your site will revert to Draft mode and will no longer be accessible publicly.",
+    };
+  }
+
+  // 12. Delete Website
+  if (
+    q.includes('delete website') ||
+    q.includes('delete my site') ||
+    q.includes('delete project') ||
+    q.includes('remove website') ||
+    q.includes('start over')
+  ) {
+    return {
+      reply:
+        "Open the **Danger Zone** tab at the bottom of the editor controls and click **Delete Website**. Type DELETE to confirm. Deleting permanently removes the project and releases your 1-site free allocation so you can start a new site.",
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -77,10 +264,22 @@ export function getSuggestedQuestionsForPage(page: ActivePage): SuggestedQuestio
 export async function sendMysteryAiMessage(
   userMessage: string,
   activePage: ActivePage,
-  history: ChatMessage[]
+  history: ChatMessage[],
+  editorContext?: SafeEditorAiContext | null
 ): Promise<{ reply: string; quickAction?: ChatMessage['quickAction'] }> {
+  // 1. Instant deterministic resolver for known builder questions (0ms latency, guaranteed accurate)
+  if (editorContext?.experienceMode === 'website_editor' || activePage === 'website') {
+    const instantHelp = resolveInstantBuilderHelp(userMessage, editorContext);
+    if (instantHelp) {
+      if (import.meta.env.DEV) {
+        console.log('[Mystery AI] source=deterministic_builder_help');
+      }
+      return instantHelp;
+    }
+  }
+
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
+  const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s safety timeout
 
   try {
     const url = `${API_BASE_URL}/api/mystery-ai/chat`;
@@ -94,6 +293,7 @@ export async function sendMysteryAiMessage(
         message: userMessage,
         activePage,
         history: history.slice(-8).map((m) => ({ role: m.role, content: m.content })),
+        editorContext: editorContext || undefined,
       }),
     });
 
@@ -103,7 +303,7 @@ export async function sendMysteryAiMessage(
       const data = await res.json();
       if (data && data.reply && !data.fallback) {
         if (import.meta.env.DEV) {
-          console.log(`[Mystery AI] source=gemini model=${data.model || 'gemini-3.8-flash'}`);
+          console.log(`[Mystery AI] source=gemini model=${data.model || 'gemini-3.8-flash'} routing=${data.routingClass || 'simple'} latency=${data.latencyMs || 0}ms`);
         }
         return {
           reply: data.reply,
@@ -128,7 +328,7 @@ export async function sendMysteryAiMessage(
   }
 
   // Emergency grounded local response fallback
-  return getGroundedLocalResponse(userMessage, activePage);
+  return getGroundedLocalResponse(userMessage, activePage, editorContext);
 }
 
 /**
@@ -219,9 +419,18 @@ function inferQuickAction(
  */
 export function getGroundedLocalResponse(
   query: string,
-  activePage: ActivePage
+  activePage: ActivePage,
+  editorContext?: SafeEditorAiContext | null
 ): { reply: string; quickAction?: ChatMessage['quickAction'] } {
   const q = query.toLowerCase().trim();
+
+  // 0. If in website editor or on website page, check builder help FIRST
+  if (editorContext?.experienceMode === 'website_editor' || activePage === 'website') {
+    const builderHelp = resolveInstantBuilderHelp(query, editorContext);
+    if (builderHelp) {
+      return builderHelp;
+    }
+  }
 
   // 1. Identity & Introduction
   if (
@@ -423,13 +632,15 @@ export function getGroundedLocalResponse(
   }
 
   // 11. Support & Contact
-  if (
-    q.includes('support') ||
-    q.includes('contact') ||
-    q.includes('whatsapp') ||
-    q.includes('phone') ||
-    q.includes('help')
-  ) {
+  const isGenericSupportQuery =
+    q.includes('mystery hub support') ||
+    q.includes('contact support') ||
+    q.includes('customer service') ||
+    q.includes('talk to support') ||
+    q.includes('help desk') ||
+    (!editorContext && activePage !== 'website' && (q.includes('support') || q.includes('contact') || q.includes('whatsapp') || q.includes('phone') || q.includes('help')));
+
+  if (isGenericSupportQuery) {
     return {
       reply:
         "Our support team is based in Accra, Ghana 🇬🇭. You can reach out directly via WhatsApp for quick assistance with order status or questions using the WhatsApp link on our Orders or checkout page.",

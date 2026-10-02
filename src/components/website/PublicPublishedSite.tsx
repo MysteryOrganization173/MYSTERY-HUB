@@ -71,10 +71,10 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
           </p>
         </div>
         <a
-          href="/"
+          href="/website-builder"
           className="px-5 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg"
         >
-          <span>Build Your Website on Mystery Hub</span>
+          <span>Build Your Website Free</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </a>
       </div>
@@ -94,7 +94,7 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
       {/* Free Tier Attribution Link (Tasteful, Non-Intrusive) */}
       <footer className="py-3 px-4 bg-[#090d11] border-t border-slate-800 text-center text-xs text-slate-400 select-none">
         <a
-          href="/"
+          href="/website-builder"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 hover:text-white transition-colors"

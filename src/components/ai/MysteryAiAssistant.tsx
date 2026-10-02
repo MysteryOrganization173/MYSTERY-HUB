@@ -26,6 +26,7 @@ export const MysteryAiAssistant: React.FC = () => {
     activePage,
     setActivePage,
     activeEditorSite,
+    editorAiContext,
     isMysteryAiOpen,
     mysteryAiInitialPrompt,
     openMysteryAi,

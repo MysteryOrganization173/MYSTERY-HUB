@@ -1052,6 +1052,24 @@ export async function getPublicSiteBySlug(
   return data;
 }
 
+export async function deleteWebsiteOnServer(
+  token: string,
+  id: string
+): Promise<{ success: boolean; message?: string }> {
+  const url = `${API_BASE_URL}/api/websites/${encodeURIComponent(id)}`;
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to delete website.');
+  return data;
+}
+
 
 
 

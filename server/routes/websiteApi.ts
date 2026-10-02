@@ -171,6 +171,39 @@ websiteRouter.post('/:id/unpublish', requireAuth, async (req: Request, res: Resp
 });
 
 /**
+ * 7. DELETE /api/websites/:id
+ * Permanently deletes a website project with ownership check.
+ * Releases the 1-site free limit immediately.
+ */
+websiteRouter.delete('/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = req.user!;
+    const site = await WebsiteStore.findSiteById(req.params.id);
+
+    if (!site) {
+      res.status(404).json({ error: 'Website project not found.' });
+      return;
+    }
+
+    if (site.user_id !== user.id) {
+      res.status(403).json({ error: 'Forbidden: You do not own this website.' });
+      return;
+    }
+
+    await WebsiteStore.deleteSite(req.params.id, user.id);
+
+    res.json({ success: true, message: 'Website deleted successfully.' });
+  } catch (err: any) {
+    if (err.message && err.message.includes('Forbidden')) {
+      res.status(403).json({ error: err.message });
+      return;
+    }
+    console.error('[Website API] Error deleting site:', err);
+    res.status(500).json({ error: 'Failed to delete website project.' });
+  }
+});
+
+/**
  * 7. GET /api/public/sites/:slug
  * Public endpoint to fetch a published website by its slug.
  * Returns safe public data only (no user_id, no email, no internal metadata).

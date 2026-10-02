@@ -255,3 +255,14 @@ export interface MarketplaceProduct {
   updatedAt?: string;
 }
 
+export interface SafeEditorAiContext {
+  experienceMode: 'website_editor';
+  templateId: string;
+  templateName: string;
+  siteStatus: 'draft' | 'published';
+  activeEditorSection: string;
+  previewDevice: 'desktop' | 'tablet' | 'mobile';
+  hasUnsavedChanges: boolean;
+}
+
+

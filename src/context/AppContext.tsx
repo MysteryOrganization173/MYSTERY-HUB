@@ -8,6 +8,7 @@ import {
   MarketplaceProduct,
   NetworkId,
   WebsiteSiteRecord,
+  SafeEditorAiContext,
 } from '../types';
 import { DATA_BUNDLES } from '../data/bundles';
 import { SafeUserProfile } from '../../server/types/auth';
@@ -86,6 +87,8 @@ interface AppContextType {
   mysteryAiInitialPrompt: string | null;
   openMysteryAi: (initialPrompt?: string) => void;
   closeMysteryAi: () => void;
+  editorAiContext: SafeEditorAiContext | null;
+  setEditorAiContext: (ctx: SafeEditorAiContext | null) => void;
   toasts: ToastMessage[];
   showToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
   removeToast: (id: string) => void;
@@ -358,6 +361,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authContextMessage, setAuthContextMessage] = useState<string | null>(null);
   const [pendingAuthAction, setPendingAuthAction] = useState<(() => void) | null>(null);
   const [activeEditorSite, setActiveEditorSite] = useState<WebsiteSiteRecord | null>(null);
+  const [editorAiContext, setEditorAiContext] = useState<SafeEditorAiContext | null>(null);
 
   const [isMysteryAiOpen, setIsMysteryAiOpen] = useState(false);
   const [mysteryAiInitialPrompt, setMysteryAiInitialPrompt] = useState<string | null>(null);
@@ -380,6 +384,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const closeWebsiteEditor = () => {
     setActiveEditorSite(null);
+    setEditorAiContext(null);
   };
 
   const openAuth = (
@@ -518,6 +523,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         mysteryAiInitialPrompt,
         openMysteryAi,
         closeMysteryAi,
+        editorAiContext,
+        setEditorAiContext,
         toasts,
         showToast,
         removeToast,

@@ -90,6 +90,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   // Preview container dimension tracking for responsive zoom scaling
   const canvasRef = useRef<HTMLDivElement>(null);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
+  const [isPrivateFullPreviewOpen, setIsPrivateFullPreviewOpen] = useState(false);
 
   // Base Template
   const baseTemplate = getTemplateById(currentSite.template_id);
@@ -239,20 +240,20 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const isMobileScreen = availableWidth < 640;
   const isSmallScreen = availableWidth < 768;
   const targetWidth = previewDevice === 'mobile' ? 375 : previewDevice === 'tablet' ? 768 : 1280;
-  const paddingX = previewDevice === 'desktop' ? (isMobileScreen ? 8 : 32) : 16;
+  const paddingX = (previewDevice === 'desktop' || previewDevice === 'tablet') ? (isMobileScreen ? 8 : 16) : 16;
   const usableWidth = Math.max(280, availableWidth - paddingX);
 
   // Responsive scaling:
   // 1. Mobile preview on a mobile screen: fill width naturally with scale = 1 for native readability
-  // 2. Desktop preview on a small screen: don't shrink to 0.25! Keep scale = 1 for horizontal pan & provide Open Full Preview
-  // 3. Tablet/desktop preview on wide screen: scale to fit container if needed
-  const isDesktopOnSmallScreen = previewDevice === 'desktop' && isSmallScreen;
+  // 2. Tablet (768px) & Desktop (1280px) on phone/small screen: DO NOT crush into tiny postcard! Keep scale = 1 for horizontal panning & provide private Full Preview modal
+  // 3. Wide preview on large desktop: scale gracefully to fit container if needed
+  const isWidePreviewOnSmallScreen = (previewDevice === 'tablet' || previewDevice === 'desktop') && isSmallScreen;
   const effectiveCanvasWidth =
     previewDevice === 'mobile' && isMobileScreen
       ? Math.min(usableWidth, 420)
       : targetWidth;
   const scale =
-    (previewDevice === 'mobile' && isMobileScreen) || isDesktopOnSmallScreen
+    (previewDevice === 'mobile' && isMobileScreen) || isWidePreviewOnSmallScreen
       ? 1
       : Math.min(1, usableWidth / targetWidth);
 
@@ -1395,28 +1396,44 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               </button>
             </div>
 
-            <div className="text-xs text-slate-400 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="hidden sm:inline">Live Reactive Preview</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPrivateFullPreviewOpen(true)}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Open Fullscreen Editor Preview"
+              >
+                <Eye className="w-3.5 h-3.5 text-[#00c365]" />
+                <span>Full Preview</span>
+              </button>
+              <div className="text-xs text-slate-400 hidden sm:flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Live Reactive Preview</span>
+              </div>
             </div>
           </div>
 
-          {/* Desktop Preview on Mobile/Small Screen Banner */}
-          {isDesktopOnSmallScreen && (
+          {/* Wide Preview on Mobile/Small Screen Banner */}
+          {isWidePreviewOnSmallScreen && (
             <div className="bg-amber-500/10 border-b border-amber-500/20 px-3.5 py-2 flex items-center justify-between gap-2 text-xs text-amber-300 shrink-0">
               <div className="flex items-center gap-1.5 min-w-0">
-                <Monitor className="w-3.5 h-3.5 shrink-0 text-amber-400" />
-                <span className="truncate">Desktop view (1280px). Pan horizontally or open full preview:</span>
+                {previewDevice === 'tablet' ? (
+                  <Tablet className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                ) : (
+                  <Monitor className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                )}
+                <span className="truncate">
+                  {previewDevice === 'tablet' ? 'Tablet view (768px)' : 'Desktop view (1280px)'}. Pan horizontally or open full preview:
+                </span>
               </div>
-              <a
-                href={`/sites/${currentSite.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => setIsPrivateFullPreviewOpen(true)}
                 className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-bold text-[11px] border border-amber-500/40 shrink-0 flex items-center gap-1 cursor-pointer"
               >
+                <Eye className="w-3 h-3" />
                 <span>Full Preview</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
+              </button>
             </div>
           )}
 
@@ -1424,16 +1441,16 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
           <div
             ref={canvasRef}
             className={`flex-1 w-full p-2 sm:p-4 lg:p-6 flex items-center justify-center relative bg-[#040608] ${
-              isDesktopOnSmallScreen ? 'overflow-auto block text-center' : 'overflow-hidden'
+              isWidePreviewOnSmallScreen ? 'overflow-auto block text-center' : 'overflow-hidden'
             }`}
           >
             <div
               className={`rounded-2xl border border-slate-800 shadow-2xl overflow-hidden bg-white relative transition-all duration-300 ${
-                isDesktopOnSmallScreen ? 'inline-block text-left' : ''
+                isWidePreviewOnSmallScreen ? 'inline-block text-left' : ''
               }`}
               style={{
                 width: `${effectiveCanvasWidth}px`,
-                maxWidth: isDesktopOnSmallScreen ? 'none' : '100%',
+                maxWidth: isWidePreviewOnSmallScreen ? 'none' : '100%',
                 height: '100%',
                 maxHeight: '100%',
                 transform: scale < 0.99 ? `scale(${scale})` : undefined,
@@ -1474,6 +1491,125 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
           </div>
         </div>
       </div>
+
+      {/* =========================================================
+          PRIVATE FULL PREVIEW OVERLAY
+          Renders in-memory previewTemplate directly with no public network request
+          ========================================================= */}
+      {isPrivateFullPreviewOpen && (
+        <div className="fixed inset-0 z-[100] bg-[#060a0e] text-slate-100 flex flex-col font-sans overflow-hidden animate-in fade-in duration-200">
+          {/* Private Preview Top Bar */}
+          <div className="h-14 px-3 sm:px-6 bg-[#0a1117] border-b border-slate-800 flex items-center justify-between gap-3 shrink-0 select-none">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => setIsPrivateFullPreviewOpen(false)}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Exit Preview</span>
+              </button>
+
+              <div className="hidden sm:flex items-center gap-2 min-w-0">
+                <span className="font-bold text-xs sm:text-sm text-white truncate max-w-[160px]">
+                  {content.businessName || siteName}
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                    currentSite.status === 'published'
+                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                  }`}
+                >
+                  {currentSite.status === 'published' ? 'Live Preview' : 'Draft Preview'}
+                </span>
+              </div>
+            </div>
+
+            {/* Viewport controls */}
+            <div className="flex items-center gap-1 bg-[#05090d] border border-slate-800 rounded-xl p-0.5">
+              <button
+                type="button"
+                onClick={() => setPreviewDevice('desktop')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                  previewDevice === 'desktop'
+                    ? 'bg-[#00c365] text-black font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Desktop (1280px)"
+              >
+                <Monitor className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Desktop</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewDevice('tablet')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                  previewDevice === 'tablet'
+                    ? 'bg-[#00c365] text-black font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Tablet (768px)"
+              >
+                <Tablet className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Tablet</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewDevice('mobile')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                  previewDevice === 'mobile'
+                    ? 'bg-[#00c365] text-black font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Mobile (375px)"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Mobile</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {currentSite.status === 'published' && (
+                <a
+                  href={`/sites/${currentSite.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 text-xs font-bold border border-emerald-500/30 flex items-center gap-1.5 transition-colors"
+                >
+                  <span>View Live</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Full Preview Body */}
+          <div className="flex-1 overflow-auto bg-[#040608] flex justify-center items-start p-0 sm:p-4">
+            <div
+              className={`w-full bg-white text-slate-900 min-h-full shadow-2xl transition-all ${
+                previewDevice === 'mobile'
+                  ? 'max-w-md sm:rounded-2xl sm:my-4 sm:border sm:border-slate-700'
+                  : previewDevice === 'tablet'
+                  ? 'max-w-3xl sm:rounded-2xl sm:my-4 sm:border sm:border-slate-700'
+                  : 'max-w-6xl sm:rounded-2xl sm:my-4 sm:border sm:border-slate-700'
+              }`}
+            >
+              {renderTemplateLayout(previewTemplate, {
+                isMobileView: previewDevice === 'mobile',
+              })}
+              {/* Free Tier Attribution */}
+              <div className="py-4 px-4 bg-[#090d11] border-t border-slate-800 text-center text-xs text-slate-400 select-none">
+                <span className="inline-flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-[#00c365]" />
+                  <span>Powered by</span>
+                  <span className="font-bold text-[#00c365]">Mystery Hub</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
