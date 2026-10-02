@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
+import { NetworkId } from '../../types';
 import { GHANA_NETWORKS, detectGhanaNetwork } from '../../data/bundles';
 import { usePaystack } from '../../hooks/usePaystack';
 import { BUSINESS_CONFIG } from '../../config/business';
@@ -17,6 +18,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Info,
+  Zap,
   Phone as PhoneIcon,
 } from 'lucide-react';
 
@@ -30,6 +32,7 @@ export const CheckoutModal: React.FC = () => {
     showToast,
     user,
     openOrderStatus,
+    openDataPage,
   } = useApp();
   const { initializeServerPayment, isInitializing, loadingPhase, isConfigured } = usePaystack();
 
@@ -46,8 +49,10 @@ export const CheckoutModal: React.FC = () => {
     code: string;
     title: string;
     message: string;
+    conversionNote?: string;
     supportingNote?: string;
     networkName?: string;
+    canViewInstant?: boolean;
   } | null>(null);
 
   const conflictRef = useRef<HTMLDivElement>(null);
@@ -204,8 +209,7 @@ export const CheckoutModal: React.FC = () => {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitPayment = () => {
     const rawDigits = phone.replace(/\D/g, '');
 
     if (rawDigits.length < 10) {
@@ -263,28 +267,55 @@ export const CheckoutModal: React.FC = () => {
         }
 
         const networkName = currentNetwork.name;
+        const isMtn = checkoutBundle.network === 'mtn' || detectedNet === 'mtn';
+
         if (err.code === 'BENEFICIARY_NOT_ELIGIBLE') {
           setPreflightIssue({
             code: 'BENEFICIARY_NOT_ELIGIBLE',
-            title: `This ${checkoutBundle.network === 'mtn' ? 'MTN' : networkName} number isn't ready yet`,
-            message: `This number is not currently eligible for ${checkoutBundle.network === 'mtn' ? 'MTN Express' : networkName} bundles.\nNo payment has been taken.\n\nTry another ${checkoutBundle.network === 'mtn' ? 'MTN' : networkName} number or try this number again later after it has been verified.`,
-            supportingNote: 'Mystery Hub checks eligibility before payment so you are not charged for an order that cannot be processed.',
+            title: isMtn ? "This MTN number isn't verified yet" : `This ${networkName} number isn't verified yet`,
+            message: isMtn
+              ? "We've submitted this number for MTN verification.\nNo payment has been taken.\n\nVerification may take some time. You can try again later, use another MTN number, or choose an Instant Bundle instead."
+              : `We've submitted this number for verification.\nNo payment has been taken.\n\nVerification may take some time. You can try again later, use another ${networkName} number, or choose an Instant Bundle instead.`,
+            conversionNote:
+              'Need data right now?\nInstant Bundles do not require this MTN verification step and are delivered immediately after successful payment.',
+            supportingNote:
+              'Mystery Hub checks eligibility before payment so you are not charged for an order that cannot be processed.',
             networkName,
+            canViewInstant: !isInstantBundle,
+          });
+          return;
+        }
+
+        if (err.code === 'SUPPLIER_WALLET_LOW') {
+          setPreflightIssue({
+            code: 'SUPPLIER_WALLET_LOW',
+            title: 'Service temporarily unavailable',
+            message:
+              "We can't complete this purchase right now.\nNo payment has been taken.\n\nPlease try again shortly or report the issue so our team can check it.",
+            supportingNote:
+              'Mystery Hub pre-checks telecom channels before payment so you are never charged for an unfulfillable request.',
+            networkName,
+            canViewInstant: !isInstantBundle,
           });
           return;
         }
 
         if (
-          err.code === 'SUPPLIER_WALLET_LOW' ||
           err.code === 'SERVICE_TEMPORARILY_UNAVAILABLE' ||
           err.code === 'PACKAGE_UNAVAILABLE'
         ) {
           setPreflightIssue({
             code: err.code,
-            title: err.code === 'PACKAGE_UNAVAILABLE' ? 'Package Temporarily Unavailable' : 'Telecom Service Notice',
-            message: err.message || 'This telecom package is momentarily undergoing scheduled maintenance. No payment has been taken.',
-            supportingNote: 'Mystery Hub checks eligibility and network channels before payment so your funds are never charged for unfulfillable requests.',
+            title:
+              err.code === 'PACKAGE_UNAVAILABLE'
+                ? 'Package temporarily unavailable'
+                : 'Service temporarily unavailable',
+            message:
+              "We can't complete this purchase right now.\nNo payment has been taken.\n\nPlease try again shortly or choose another package.",
+            supportingNote:
+              'Mystery Hub pre-checks telecom channels before payment so you are never charged for an unfulfillable request.',
             networkName,
+            canViewInstant: !isInstantBundle,
           });
           return;
         }
@@ -293,6 +324,38 @@ export const CheckoutModal: React.FC = () => {
         showToast(err.message || 'Payment initiation failed', 'warning');
       },
     });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    submitPayment();
+  };
+
+  const handleViewInstantBundles = () => {
+    const failedNet = checkoutBundle?.network || detectedNet || 'mtn';
+
+    // 1. Cleanly close checkout and clear any pending preflight or error state
+    setPreflightIssue(null);
+    setServerError('');
+    setActiveMtnConflict(null);
+    closeCheckout();
+
+    // 2. Set intelligent Instant Bundle network filter:
+    // If the failed number/network was MTN, prefer MTN Instant Bundles; otherwise All Networks
+    const targetNetwork: NetworkId | 'all' = failedNet === 'mtn' ? 'mtn' : 'all';
+
+    // 3. Switch to instant mode & navigate to DataPage
+    openDataPage('instant', targetNetwork);
+
+    // 4. Scroll smoothly to Instant Bundles catalogue
+    setTimeout(() => {
+      const instantSection = document.getElementById('instant-bundles-section');
+      if (instantSection) {
+        smoothScrollToElement(instantSection, { block: 'start' });
+      } else {
+        window.scrollTo({ top: 350, behavior: 'smooth' });
+      }
+    }, 120);
   };
 
   return (
@@ -486,58 +549,102 @@ export const CheckoutModal: React.FC = () => {
                 <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400 shrink-0 mt-0.5">
                   <Info className="w-4 h-4" />
                 </div>
-                <div className="space-y-1 min-w-0 flex-1">
+                <div className="space-y-2 min-w-0 flex-1">
                   <h4 className="font-semibold text-xs sm:text-sm text-white">
                     {preflightIssue.title}
                   </h4>
                   <div className="text-[11px] sm:text-xs text-slate-300 leading-relaxed whitespace-pre-line">
                     {preflightIssue.message}
                   </div>
+
+                  {preflightIssue.conversionNote && (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs space-y-1 mt-1">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                        <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                        <span>Need data right now?</span>
+                      </div>
+                      <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                        Instant Bundles do not require this MTN verification step and are delivered immediately after successful payment.
+                      </p>
+                    </div>
+                  )}
+
                   {preflightIssue.supportingNote && (
-                    <p className="text-[10px] sm:text-[11px] text-slate-400 pt-1.5 leading-relaxed border-t border-slate-800/80">
+                    <p className="text-[10px] sm:text-[11px] text-slate-400 pt-1 leading-relaxed border-t border-slate-800/80">
                       {preflightIssue.supportingNote}
                     </p>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-1 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPreflightIssue(null);
-                    if (phoneInputRef.current) {
-                      smoothScrollToElement(phoneInputRef.current, { block: 'center' });
-                      phoneInputRef.current.focus();
-                      phoneInputRef.current.select();
-                    }
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-[#00c365] hover:bg-[#00e575] text-black text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
-                >
-                  <span>Try Another Number</span>
-                </button>
-                <a
-                  href={`${BUSINESS_CONFIG.contact.supportWhatsAppUrl}?text=${encodeURIComponent(
-                    `Hello Mystery Hub Support, I am ordering ${checkoutBundle.network.toUpperCase()} bundle (${
-                      checkoutBundle.dataAmount || 'Airtime'
-                    }) for ${phone.trim()}, but preflight verification indicates this number is not currently eligible (Code: ${
-                      preflightIssue.code
-                    }). Please assist me.`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
-                >
-                  <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Report Issue</span>
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setPreflightIssue(null)}
-                  className="px-2.5 py-1.5 rounded-lg text-slate-400 hover:text-white text-xs transition-colors cursor-pointer"
-                >
-                  Dismiss
-                </button>
+              <div className="pt-2 border-t border-slate-800/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                {/* Primary Actions */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreflightIssue(null);
+                      if (phoneInputRef.current) {
+                        smoothScrollToElement(phoneInputRef.current, { block: 'center' });
+                        phoneInputRef.current.focus();
+                        phoneInputRef.current.select();
+                      }
+                    }}
+                    className="px-3 py-2 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                  >
+                    <span>Try Another Number</span>
+                  </button>
+
+                  {preflightIssue.canViewInstant && (
+                    <button
+                      type="button"
+                      onClick={handleViewInstantBundles}
+                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                    >
+                      <Zap className="w-3.5 h-3.5 fill-black text-black" />
+                      <span>View Instant Bundles</span>
+                    </button>
+                  )}
+
+                  {preflightIssue.code === 'SUPPLIER_WALLET_LOW' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreflightIssue(null);
+                        submitPayment();
+                      }}
+                      className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-semibold border border-amber-500/30 transition-all cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <span>Try Again</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Secondary Support Action */}
+                <div className="flex items-center gap-2 justify-end shrink-0">
+                  <a
+                    href={`${BUSINESS_CONFIG.contact.supportWhatsAppUrl}?text=${encodeURIComponent(
+                      `Hello Mystery Hub Support, I am ordering ${checkoutBundle.network.toUpperCase()} bundle (${
+                        checkoutBundle.dataAmount || 'Airtime'
+                      }) for ${phone.trim()}, but preflight verification indicates: ${preflightIssue.title} (Code: ${
+                        preflightIssue.code
+                      }). Please assist me.`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1 cursor-pointer py-1 px-1.5"
+                  >
+                    <MessageSquare className="w-3 h-3 text-emerald-400" />
+                    <span>Report Issue</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setPreflightIssue(null)}
+                    className="px-2 py-1 rounded text-slate-400 hover:text-white text-xs transition-colors cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </div>
             </div>
           )}

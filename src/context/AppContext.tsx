@@ -1,5 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { ActivePage, DataBundle, OrderRecord, PaymentMethod, WebsiteTemplate, MarketplaceProduct } from '../types';
+import {
+  ActivePage,
+  DataBundle,
+  OrderRecord,
+  PaymentMethod,
+  WebsiteTemplate,
+  MarketplaceProduct,
+  NetworkId,
+} from '../types';
 import { DATA_BUNDLES } from '../data/bundles';
 import { SafeUserProfile } from '../../server/types/auth';
 import { getMeOnServer, logoutOnServer } from '../services/apiClient';
@@ -22,7 +30,9 @@ interface AppContextType {
   setActivePage: (page: ActivePage) => void;
   dataProductMode: 'data' | 'instant' | 'airtime';
   setDataProductMode: (mode: 'data' | 'instant' | 'airtime') => void;
-  openDataPage: (mode?: 'data' | 'instant' | 'airtime') => void;
+  dataNetwork: NetworkId | 'all';
+  setDataNetwork: (net: NetworkId | 'all') => void;
+  openDataPage: (mode?: 'data' | 'instant' | 'airtime', network?: NetworkId | 'all') => void;
   checkoutBundle: DataBundle | null;
   checkoutInitialPhone?: string;
   openCheckout: (bundle: DataBundle, options?: { recipientPhone?: string }) => void;
@@ -80,9 +90,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [dataProductMode, setDataProductMode] = useState<'data' | 'instant' | 'airtime'>('data');
+  const [dataNetwork, setDataNetwork] = useState<NetworkId | 'all'>('mtn');
 
-  const openDataPage = (mode: 'data' | 'instant' | 'airtime' = 'data') => {
+  const openDataPage = (
+    mode: 'data' | 'instant' | 'airtime' = 'data',
+    network?: NetworkId | 'all'
+  ) => {
     setDataProductMode(mode);
+    if (network) {
+      setDataNetwork(network);
+    }
     setActivePage('data');
   };
 
@@ -403,6 +420,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActivePage,
         dataProductMode,
         setDataProductMode,
+        dataNetwork,
+        setDataNetwork,
         openDataPage,
         checkoutBundle,
         checkoutInitialPhone,

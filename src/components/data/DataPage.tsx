@@ -30,9 +30,16 @@ import {
 } from 'lucide-react';
 
 export const DataPage: React.FC = () => {
-  const { openCheckout, showToast, openWaitlist, dataProductMode, setDataProductMode } = useApp();
+  const {
+    openCheckout,
+    showToast,
+    openWaitlist,
+    dataProductMode,
+    setDataProductMode,
+    dataNetwork: activeNetwork,
+    setDataNetwork: setActiveNetwork,
+  } = useApp();
 
-  const [activeNetwork, setActiveNetwork] = useState<NetworkId | 'all'>('mtn');
   const [sizeFilter, setSizeFilter] = useState<'all' | 'small' | 'medium' | 'large'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [quickBuyPhone, setQuickBuyPhone] = useState('');
@@ -60,6 +67,18 @@ export const DataPage: React.FC = () => {
   // Scroll target refs
   const bundlesSectionRef = useRef<HTMLDivElement>(null);
   const airtimeSectionRef = useRef<HTMLFormElement>(null);
+
+  // Automatically scroll to instant bundles section when instant mode is selected
+  useEffect(() => {
+    if (dataProductMode === 'instant') {
+      const timer = setTimeout(() => {
+        if (bundlesSectionRef.current) {
+          smoothScrollToElement(bundlesSectionRef.current, { block: 'start' });
+        }
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [dataProductMode]);
 
   // Airtime top-up state
   const [airtimeNet, setAirtimeNet] = useState<NetworkId>('mtn');
@@ -640,21 +659,23 @@ export const DataPage: React.FC = () => {
           {dataProductMode !== 'instant' && (
             <div className="rounded-2xl bg-gradient-to-r from-[#0d141b] via-[#141d27] to-[#0d141b] border border-amber-500/30 p-3.5 sm:p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 shadow-lg relative overflow-hidden animate-in fade-in">
               <div className="absolute right-0 top-0 w-48 h-full bg-amber-500/5 blur-xl pointer-events-none" />
-              <div className="flex items-center gap-3 relative z-10">
+              <div className="flex items-center gap-3 relative z-10 min-w-0">
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 shadow-sm">
                   <Zap className="w-4 h-4 sm:w-5 sm:h-5 fill-amber-400" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-extrabold text-xs sm:text-sm text-white">
                       ⚡ Need data now? Go Instant
                     </h3>
-                    <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-1.5 py-0.2 rounded">
-                      Fast Delivery
-                    </span>
+                    {(activeNetwork === 'mtn' || activeNetwork === 'all') && (
+                      <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-1.5 py-0.5 rounded whitespace-nowrap">
+                        No MTN Verification
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 leading-snug">
-                    Browse available Instant Bundles for fast delivery.
+                    Browse Instant Bundles for immediate direct delivery.
                   </p>
                 </div>
               </div>
@@ -677,7 +698,7 @@ export const DataPage: React.FC = () => {
 
         {/* Dynamic Mode: Instant Bundles vs Airtime vs Standard Data */}
         {dataProductMode === 'instant' ? (
-          <div ref={bundlesSectionRef} className="scroll-mt-6">
+          <div id="instant-bundles-section" ref={bundlesSectionRef} className="scroll-mt-6">
             <InstantBundlesCatalog
               quickBuyPhone={quickBuyPhone}
               onQuickBuyPhoneChange={setQuickBuyPhone}

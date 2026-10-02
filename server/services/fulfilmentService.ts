@@ -147,7 +147,7 @@ export class FulfilmentService {
         return {
           allowed: false,
           code: 'BENEFICIARY_NOT_ELIGIBLE',
-          customerMessage: 'The recipient phone number is not eligible for this telecom bundle. Please check the number and network.',
+          customerMessage: "We've submitted this number for MTN verification. No payment has been taken. Verification may take some time.",
           internalReason: beneficiaryResult.res.reason || 'Beneficiary ineligible',
           timings: { servicesMs, catalogMs, beneficiaryMs, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
         };
