@@ -16,7 +16,10 @@ import {
   sanitizeString,
   sanitizeColor,
   sanitizeUrl,
+  sanitizeTemplateItems,
+  isValidTemplateId,
 } from '../types/website.js';
+import { WEBSITE_TEMPLATES } from '../../src/data/templates.js';
 
 // In-memory fallback store for local development/testing without PostgreSQL
 const devWebsiteStore = new Map<string, WebsiteSiteRecord>();
@@ -154,45 +157,58 @@ export class WebsiteStore {
 
     const id = `site_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const now = new Date().toISOString();
-    const name = sanitizeString(input.name || 'My Business Website', 128);
     const templateId = sanitizeString(input.template_id, 64);
+
+    const templateDef = WEBSITE_TEMPLATES.find((t) => t.id === templateId);
+    if (!templateDef) {
+      throw new Error(`Invalid or unknown templateId: "${templateId}".`);
+    }
+
+    const defaultBusinessName = templateDef.demoBusinessName || 'My Business Website';
+    const name = sanitizeString(input.name || defaultBusinessName, 128);
 
     const slug = await this.generateUniqueSlug(input.slug || name);
 
-    // Initial content with safe defaults
+    // Initial content derived from the selected template record (editable starter content)
     const initialContent: SiteContent = {
       businessName: sanitizeString(input.content?.businessName || name, 100),
-      tagline: sanitizeString(input.content?.tagline || 'Quality Products & Services in Ghana', 150),
+      tagline: sanitizeString(input.content?.tagline || templateDef.demoHeroTagline || '', 150),
       aboutText: sanitizeString(
-        input.content?.aboutText ||
-          'Welcome to our official business website. We offer top-tier products and reliable services for our esteemed customers across Ghana.',
+        input.content?.aboutText || templateDef.demoSubtext || '',
         2000
       ),
-      location: sanitizeString(input.content?.location || 'Accra, Ghana', 150),
-      phone: sanitizeString(input.content?.phone || '', 30),
-      whatsapp: sanitizeString(input.content?.whatsapp || input.content?.phone || '', 30),
+      location: sanitizeString(input.content?.location || templateDef.location || 'Accra, Ghana', 150),
+      phone: sanitizeString(input.content?.phone || templateDef.hoursOrContact || '', 30),
+      whatsapp: sanitizeString(input.content?.whatsapp || input.content?.phone || templateDef.hoursOrContact || '', 30),
       email: sanitizeString(input.content?.email || '', 100),
-      heroImage: sanitizeUrl(
-        input.content?.heroImage ||
-          'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80'
-      ),
+      heroImage: sanitizeUrl(input.content?.heroImage || templateDef.heroImage || ''),
       logoUrl: sanitizeUrl(input.content?.logoUrl || ''),
-      ctaLabel: sanitizeString(input.content?.ctaLabel || 'Order via WhatsApp', 50),
-      ctaTarget: sanitizeUrl(input.content?.ctaTarget || input.content?.whatsapp || ''),
+      ctaLabel: sanitizeString(
+        input.content?.ctaLabel || (templateDef.id === 'tmpl-data-reseller' ? 'Buy Data' : 'Order via WhatsApp'),
+        50
+      ),
+      ctaTarget: sanitizeUrl(input.content?.ctaTarget || input.content?.whatsapp || templateDef.hoursOrContact || ''),
       social: {
         instagram: sanitizeString(input.content?.social?.instagram || '', 50),
         facebook: sanitizeString(input.content?.social?.facebook || '', 100),
         tiktok: sanitizeString(input.content?.social?.tiktok || '', 50),
       },
-      items: Array.isArray(input.content?.items) ? input.content.items : [],
-      stats: Array.isArray(input.content?.stats) ? input.content.stats : [],
-      features: Array.isArray(input.content?.features) ? input.content.features : [],
+      items: sanitizeTemplateItems(input.content?.items && input.content.items.length > 0 ? input.content.items : templateDef.items),
+      stats: Array.isArray(input.content?.stats && input.content.stats.length > 0 ? input.content.stats : templateDef.stats)
+        ? (input.content?.stats || templateDef.stats || []).slice(0, 8).map((s) => ({
+            label: sanitizeString(s.label, 50),
+            value: sanitizeString(s.value, 50),
+          }))
+        : [],
+      features: Array.isArray(input.content?.features && input.content.features.length > 0 ? input.content.features : templateDef.features)
+        ? (input.content?.features || templateDef.features || []).slice(0, 10).map((f) => sanitizeString(f, 80))
+        : [],
     };
 
     const initialSettings: SiteSettings = {
-      primaryColor: sanitizeColor(input.settings?.primaryColor, '#0f172a'),
-      accentColor: sanitizeColor(input.settings?.accentColor, '#00c365'),
-      backgroundColor: sanitizeColor(input.settings?.backgroundColor, '#ffffff'),
+      primaryColor: sanitizeColor(input.settings?.primaryColor || templateDef.colorScheme?.primary, '#0f172a'),
+      accentColor: sanitizeColor(input.settings?.accentColor || templateDef.accentColor || templateDef.colorScheme?.secondary, '#00c365'),
+      backgroundColor: sanitizeColor(input.settings?.backgroundColor || templateDef.colorScheme?.background, '#ffffff'),
       fontFamily: sanitizeString(input.settings?.fontFamily || 'font-sans', 30),
       borderRadius: sanitizeString(input.settings?.borderRadius || 'rounded-xl', 30),
     };
@@ -315,7 +331,7 @@ export class WebsiteStore {
                 }
               : existing.content_json.social,
             items: Array.isArray(input.content.items)
-              ? input.content.items
+              ? sanitizeTemplateItems(input.content.items)
               : existing.content_json.items,
             stats: Array.isArray(input.content.stats)
               ? input.content.stats

@@ -6,7 +6,7 @@
 import { Router, Request, Response } from 'express';
 import { WebsiteStore } from '../db/websiteStore.js';
 import { requireAuth } from '../middleware/authMiddleware.js';
-import { PublicWebsiteSite, sanitizeString } from '../types/website.js';
+import { PublicWebsiteSite, sanitizeString, isValidTemplateId } from '../types/website.js';
 
 export const websiteRouter = Router();
 
@@ -19,7 +19,7 @@ websiteRouter.post('/', requireAuth, async (req: Request, res: Response) => {
     const user = req.user!;
     const { templateId, name, content, settings } = req.body || {};
 
-    if (!templateId || typeof templateId !== 'string') {
+    if (!templateId || typeof templateId !== 'string' || !isValidTemplateId(templateId)) {
       res.status(400).json({ error: 'Valid templateId is required.' });
       return;
     }

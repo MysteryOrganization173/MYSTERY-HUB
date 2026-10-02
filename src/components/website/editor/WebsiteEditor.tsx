@@ -22,6 +22,10 @@ import {
   Share2,
   CheckCircle2,
   RefreshCw,
+  Plus,
+  Trash2,
+  Edit2,
+  Layers,
 } from 'lucide-react';
 
 interface WebsiteEditorProps {
@@ -63,9 +67,21 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
   // Base Template
   const baseTemplate = getTemplateById(currentSite.template_id);
+  const isDataReseller = currentSite.template_id === 'tmpl-data-reseller';
 
   // Active accordion section
-  const [activeSection, setActiveSection] = useState<'business' | 'contact' | 'branding' | 'cta' | 'social'>('business');
+  const [activeSection, setActiveSection] = useState<
+    'business' | 'contact' | 'branding' | 'bundles' | 'cta' | 'social'
+  >('business');
+
+  // Bundle editing state (for Data Reseller)
+  const [bundleFilter, setBundleFilter] = useState<'all' | 'mtn' | 'telecel' | 'at'>('all');
+  const [isEditingBundle, setIsEditingBundle] = useState(false);
+  const [bundleFormId, setBundleFormId] = useState<string | null>(null);
+  const [bundleFormNetwork, setBundleFormNetwork] = useState<'mtn' | 'telecel' | 'at'>('mtn');
+  const [bundleFormName, setBundleFormName] = useState('');
+  const [bundleFormPrice, setBundleFormPrice] = useState('');
+  const [bundleFormTag, setBundleFormTag] = useState('');
 
   // Mark dirty on any edit
   const markDirty = () => {
@@ -393,6 +409,21 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               <span>Branding</span>
             </button>
 
+            {isDataReseller && (
+              <button
+                type="button"
+                onClick={() => setActiveSection('bundles')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
+                  activeSection === 'bundles'
+                    ? 'bg-[#00c365] text-black font-bold'
+                    : 'text-slate-400 hover:text-white bg-slate-900/60'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Bundles</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => setActiveSection('cta')}
@@ -442,7 +473,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                       setContent({ ...content, businessName: e.target.value });
                       markDirty();
                     }}
-                    placeholder="e.g. Accra Fresh Buka"
+                    placeholder={isDataReseller ? 'e.g. Ghana Data Express' : 'e.g. Accra Fresh Buka'}
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
                 </div>
@@ -457,7 +488,11 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                       setContent({ ...content, tagline: e.target.value });
                       markDirty();
                     }}
-                    placeholder="e.g. Authentic Ghanaian Flavours with Contemporary Craft"
+                    placeholder={
+                      isDataReseller
+                        ? 'e.g. Affordable Data Bundles, Straight to Your Line'
+                        : 'e.g. Authentic Ghanaian Flavours with Contemporary Craft'
+                    }
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
                 </div>
@@ -472,7 +507,11 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                       setContent({ ...content, aboutText: e.target.value });
                       markDirty();
                     }}
-                    placeholder="Describe your story, specialities, or mission..."
+                    placeholder={
+                      isDataReseller
+                        ? 'e.g. Buy MTN, Telecel and AirtelTigo bundles from one simple storefront. Choose your package, enter the recipient number and place your order through WhatsApp.'
+                        : 'Describe your story, specialities, or mission...'
+                    }
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl p-3 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365] leading-relaxed resize-none"
                   />
                 </div>
@@ -487,7 +526,11 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                       setContent({ ...content, location: e.target.value });
                       markDirty();
                     }}
-                    placeholder="e.g. Osu Oxford Street, Accra · Mon - Sun: 10AM - 10PM"
+                    placeholder={
+                      isDataReseller
+                        ? 'e.g. Spintex Road, Accra · Open 24/7 for WhatsApp Orders'
+                        : 'e.g. Osu Oxford Street, Accra · Mon - Sun: 10AM - 10PM'
+                    }
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
                 </div>
@@ -658,6 +701,275 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               </div>
             )}
 
+            {/* BUNDLES SECTION (FOR DATA RESELLER STOREFRONT) */}
+            {isDataReseller && activeSection === 'bundles' && (
+              <div className="space-y-5 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-sm text-white">Products / Bundles</h3>
+                    <p className="text-xs text-slate-400">
+                      Manage telecom packages and custom reseller prices.
+                    </p>
+                  </div>
+                  {!isEditingBundle && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBundleFormId(null);
+                        setBundleFormNetwork('mtn');
+                        setBundleFormName('');
+                        setBundleFormPrice('');
+                        setBundleFormTag('Standard');
+                        setIsEditingBundle(true);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Bundle</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Add / Edit Form Card */}
+                {isEditingBundle && (
+                  <div className="p-4 rounded-2xl bg-[#0d141b] border border-slate-700/80 space-y-3.5 shadow-xl text-left">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                      <h4 className="font-bold text-xs text-white">
+                        {bundleFormId ? 'Edit Data Bundle' : 'Add New Data Bundle'}
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingBundle(false)}
+                        className="text-xs text-slate-400 hover:text-white cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-300">Telecom Network</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setBundleFormNetwork('mtn')}
+                          className={`py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                            bundleFormNetwork === 'mtn'
+                              ? 'bg-[#FFCC00] text-black border-[#FFCC00]'
+                              : 'bg-slate-900 text-slate-400 border-slate-800'
+                          }`}
+                        >
+                          MTN
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBundleFormNetwork('telecel')}
+                          className={`py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                            bundleFormNetwork === 'telecel'
+                              ? 'bg-[#E60000] text-white border-[#E60000]'
+                              : 'bg-slate-900 text-slate-400 border-slate-800'
+                          }`}
+                        >
+                          Telecel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBundleFormNetwork('at')}
+                          className={`py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                            bundleFormNetwork === 'at'
+                              ? 'bg-[#002B49] text-white border-blue-400'
+                              : 'bg-slate-900 text-slate-400 border-slate-800'
+                          }`}
+                        >
+                          AT
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-300">Package Name / Size</label>
+                      <input
+                        type="text"
+                        value={bundleFormName}
+                        onChange={(e) => setBundleFormName(e.target.value)}
+                        placeholder="e.g. 5GB Non-Expiry Bundle"
+                        className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00c365]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-300">Price (GH₵)</label>
+                        <input
+                          type="text"
+                          value={bundleFormPrice}
+                          onChange={(e) => setBundleFormPrice(e.target.value)}
+                          placeholder="e.g. 48.00"
+                          className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00c365]"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-300">Tag / Badge</label>
+                        <input
+                          type="text"
+                          value={bundleFormTag}
+                          onChange={(e) => setBundleFormTag(e.target.value)}
+                          placeholder="e.g. Popular, Hot"
+                          className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00c365]"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!bundleFormName.trim()) {
+                          showToast('Please enter a package name.', 'warning');
+                          return;
+                        }
+                        const netLabel =
+                          bundleFormNetwork === 'mtn' ? 'MTN' : bundleFormNetwork === 'telecel' ? 'Telecel' : 'AT';
+                        const currentItems = Array.isArray(content.items) ? [...content.items] : [];
+
+                        if (bundleFormId) {
+                          const updated = currentItems.map((item) => {
+                            if (item.id === bundleFormId) {
+                              return {
+                                ...item,
+                                name: bundleFormName.trim(),
+                                price: bundleFormPrice.trim() || '20.00',
+                                category: netLabel,
+                                tag: bundleFormTag.trim() || undefined,
+                              };
+                            }
+                            return item;
+                          });
+                          setContent({ ...content, items: updated });
+                        } else {
+                          const newItem = {
+                            id: `ds-${bundleFormNetwork}-${Date.now().toString(36)}`,
+                            name: bundleFormName.trim(),
+                            price: bundleFormPrice.trim() || '20.00',
+                            category: netLabel,
+                            tag: bundleFormTag.trim() || undefined,
+                          };
+                          setContent({ ...content, items: [...currentItems, newItem] });
+                        }
+                        markDirty();
+                        setIsEditingBundle(false);
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md"
+                    >
+                      {bundleFormId ? 'Update Package' : 'Save Package'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Filter Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                  {(['all', 'mtn', 'telecel', 'at'] as const).map((net) => (
+                    <button
+                      key={net}
+                      type="button"
+                      onClick={() => setBundleFilter(net)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold uppercase transition-all cursor-pointer ${
+                        bundleFilter === net
+                          ? 'bg-slate-700 text-white font-bold'
+                          : 'bg-slate-900/60 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {net === 'all' ? 'All Networks' : net.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Package List */}
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                  {(content.items || [])
+                    .filter((item) => {
+                      if (bundleFilter === 'all') return true;
+                      const cat = (item.category || '').toLowerCase();
+                      if (bundleFilter === 'mtn') return cat.includes('mtn');
+                      if (bundleFilter === 'telecel') return cat.includes('telecel') || cat.includes('vodafone');
+                      if (bundleFilter === 'at') return cat.includes('at') || cat.includes('airtel');
+                      return true;
+                    })
+                    .map((item, idx) => {
+                      const net = (item.category || 'MTN').toUpperCase();
+                      const netColor =
+                        net.includes('TELECEL')
+                          ? 'text-rose-400 bg-rose-500/10 border-rose-500/30'
+                          : net.includes('AT') || net.includes('AIRTEL')
+                          ? 'text-sky-400 bg-sky-500/10 border-sky-500/30'
+                          : 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+
+                      return (
+                        <div
+                          key={item.id || idx}
+                          className="p-3 rounded-xl bg-[#0e1620] border border-slate-800 flex items-center justify-between gap-3 text-left"
+                        >
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${netColor}`}>
+                                {net}
+                              </span>
+                              <span className="font-bold text-xs text-white truncate">{item.name}</span>
+                              {item.tag && (
+                                <span className="text-[10px] text-slate-400 bg-white/5 px-1.5 py-0.5 rounded">
+                                  {item.tag}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs font-semibold text-emerald-400">
+                              GH₵ {item.price || '0.00'}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBundleFormId(item.id || `item-${idx}`);
+                                const cat = (item.category || '').toLowerCase();
+                                if (cat.includes('telecel')) setBundleFormNetwork('telecel');
+                                else if (cat.includes('at')) setBundleFormNetwork('at');
+                                else setBundleFormNetwork('mtn');
+                                setBundleFormName(item.name);
+                                setBundleFormPrice(item.price || '');
+                                setBundleFormTag(item.tag || '');
+                                setIsEditingBundle(true);
+                              }}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                              title="Edit Bundle"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const remaining = (content.items || []).filter((_, i) => i !== idx);
+                                setContent({ ...content, items: remaining });
+                                markDirty();
+                              }}
+                              className="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              title="Delete Bundle"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                  {(!content.items || content.items.length === 0) && (
+                    <div className="p-6 text-center text-xs text-slate-400 rounded-xl bg-slate-900/40 border border-slate-800">
+                      No bundles configured yet. Click "Add Bundle" above.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* 4. CALL TO ACTION SECTION */}
             {activeSection === 'cta' && (
               <div className="space-y-4 animate-in fade-in">
@@ -678,7 +990,9 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                       setContent({ ...content, ctaLabel: e.target.value });
                       markDirty();
                     }}
-                    placeholder="e.g. Order via WhatsApp, Book a Table, Get Quote"
+                    placeholder={
+                      isDataReseller ? 'e.g. Buy Data or Order via WhatsApp' : 'e.g. Order via WhatsApp, Book a Table, Get Quote'
+                    }
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
                 </div>

@@ -111,11 +111,17 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     layoutType: 'reseller',
     industry: 'Branded Mobile Data Reselling & Telecom Airtime Storefront',
     description: 'High-conversion telecom reseller storefront featuring MTN, Telecel, and AT package catalogs, recipient phone entry, and WhatsApp MoMo orders.',
-    features: ['Multi-Network Bundle Catalog', 'Custom Reseller Prices', 'Recipient Phone Entry', 'WhatsApp MoMo Ordering'],
+    features: [
+      'Build your own branded data-selling website',
+      'MTN · Telecel · AirtelTigo',
+      'Custom prices',
+      'WhatsApp ordering',
+    ],
     accentColor: '#00C365',
     demoBusinessName: 'Ghana Data Express',
-    demoHeroTagline: 'Genuine Non-Expiry Data Bundles for All Ghana Networks',
-    demoSubtext: 'Direct SIM top-up packages at wholesale customer rates. MTN Express, Telecel, and AirtelTigo packages dispatched quickly via Mobile Money.',
+    demoHeroTagline: 'Affordable Data Bundles, Straight to Your Line',
+    demoSubtext:
+      'Buy MTN, Telecel and AirtelTigo bundles from one simple storefront. Choose your package, enter the recipient number and place your order through WhatsApp.',
     location: 'Spintex Road, Accra · Open 24/7 for WhatsApp Orders',
     hoursOrContact: '+233 24 555 7788',
     isFreeTier: true,
@@ -137,12 +143,22 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
       { label: 'Average Delivery', value: '< 3 Mins' },
     ],
     items: [
-      { id: 'ds-1', name: '1GB Non-Expiry Bundle', price: 'GH₵ 12.00', category: 'MTN', tag: 'Standard' },
-      { id: 'ds-2', name: '2.5GB Non-Expiry Bundle', price: 'GH₵ 25.00', category: 'MTN', tag: 'Popular' },
-      { id: 'ds-3', name: '5GB Non-Expiry Bundle', price: 'GH₵ 48.00', category: 'MTN', tag: 'Best Value' },
-      { id: 'ds-4', name: '10GB Non-Expiry Bundle', price: 'GH₵ 90.00', category: 'MTN', tag: 'Hot' },
-      { id: 'ds-5', name: '20GB Non-Expiry Bundle', price: 'GH₵ 175.00', category: 'MTN', tag: 'Pro' },
-      { id: 'ds-6', name: '50GB Non-Expiry Bundle', price: 'GH₵ 420.00', category: 'MTN', tag: 'Wholesale' },
+      // MTN Packages
+      { id: 'ds-mtn-1', name: '1GB Non-Expiry Bundle', price: 'GH₵ 12.00', category: 'MTN', tag: 'Standard' },
+      { id: 'ds-mtn-2', name: '2.5GB Non-Expiry Bundle', price: 'GH₵ 25.00', category: 'MTN', tag: 'Popular' },
+      { id: 'ds-mtn-3', name: '5GB Non-Expiry Bundle', price: 'GH₵ 48.00', category: 'MTN', tag: 'Best Value' },
+      { id: 'ds-mtn-4', name: '10GB Non-Expiry Bundle', price: 'GH₵ 90.00', category: 'MTN', tag: 'Hot' },
+      { id: 'ds-mtn-5', name: '20GB Non-Expiry Bundle', price: 'GH₵ 175.00', category: 'MTN', tag: 'Heavy User' },
+      // Telecel Packages
+      { id: 'ds-tel-1', name: '1GB Telecel Bundle', price: 'GH₵ 11.00', category: 'Telecel', tag: 'Standard' },
+      { id: 'ds-tel-2', name: '2.5GB Telecel Bundle', price: 'GH₵ 23.00', category: 'Telecel', tag: 'Popular' },
+      { id: 'ds-tel-3', name: '5GB Telecel Bundle', price: 'GH₵ 45.00', category: 'Telecel', tag: 'Best Value' },
+      { id: 'ds-tel-4', name: '10GB Telecel Bundle', price: 'GH₵ 85.00', category: 'Telecel', tag: 'Hot' },
+      // AirtelTigo (AT) Packages
+      { id: 'ds-at-1', name: '1GB AT Big Time Bundle', price: 'GH₵ 10.00', category: 'AT', tag: 'Standard' },
+      { id: 'ds-at-2', name: '2.5GB AT Big Time Bundle', price: 'GH₵ 22.00', category: 'AT', tag: 'Popular' },
+      { id: 'ds-at-3', name: '5GB AT Big Time Bundle', price: 'GH₵ 42.00', category: 'AT', tag: 'Best Value' },
+      { id: 'ds-at-4', name: '10GB AT Big Time Bundle', price: 'GH₵ 80.00', category: 'AT', tag: 'Hot' },
     ],
     testimonials: [
       {

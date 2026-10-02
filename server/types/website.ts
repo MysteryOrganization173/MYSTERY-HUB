@@ -77,6 +77,58 @@ export interface UpdateWebsiteInput {
 }
 
 /**
+ * Valid Website Builder Template IDs
+ */
+export const VALID_TEMPLATE_IDS = new Set<string>([
+  'tmpl-buka-bistro',
+  'tmpl-data-reseller',
+  'tmpl-accra-build',
+  'tmpl-glow-salon',
+  'tmpl-goldcoast-realty',
+  'tmpl-lens-creative',
+  'tmpl-vortex-tech',
+  'tmpl-akwaaba-hotel',
+  'tmpl-horizon-edu',
+  'tmpl-makola-mart',
+  'tmpl-grace-ministry',
+  'tmpl-afrochic-threads',
+  'tmpl-legon-consult',
+]);
+
+export function isValidTemplateId(id: unknown): id is string {
+  if (typeof id !== 'string') return false;
+  return VALID_TEMPLATE_IDS.has(id.trim());
+}
+
+/**
+ * Sanitizes template/store items to protect against XSS and oversized arrays
+ */
+export function sanitizeTemplateItems(rawItems: unknown): TemplateItem[] {
+  if (!Array.isArray(rawItems)) return [];
+  return rawItems.slice(0, 50).map((raw, idx) => {
+    if (!raw || typeof raw !== 'object') {
+      return { id: `item-${idx + 1}`, name: `Item ${idx + 1}` };
+    }
+    const r = raw as Record<string, unknown>;
+    const id = sanitizeString(r.id || `item-${idx + 1}`, 64);
+    const name = sanitizeString(r.name, 100) || `Package ${idx + 1}`;
+    const price = sanitizeString(r.price, 40);
+    const category = sanitizeString(r.category || r.network, 50);
+    const desc = sanitizeString(r.desc, 300);
+    const tag = sanitizeString(r.tag, 40);
+    const image = sanitizeUrl(r.image);
+
+    const item: TemplateItem = { id, name };
+    if (price) item.price = price;
+    if (category) item.category = category;
+    if (desc) item.desc = desc;
+    if (tag) item.tag = tag;
+    if (image) item.image = image;
+    return item;
+  });
+}
+
+/**
  * Generate a safe URL-friendly slug
  */
 export function generateSafeSlug(raw: string): string {
