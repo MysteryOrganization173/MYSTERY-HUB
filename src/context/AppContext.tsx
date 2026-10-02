@@ -82,6 +82,10 @@ interface AppContextType {
   waitlistInfo: { isOpen: boolean; serviceTitle: string };
   openWaitlist: (title: string) => void;
   closeWaitlist: () => void;
+  isMysteryAiOpen: boolean;
+  mysteryAiInitialPrompt: string | null;
+  openMysteryAi: (initialPrompt?: string) => void;
+  closeMysteryAi: () => void;
   toasts: ToastMessage[];
   showToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
   removeToast: (id: string) => void;
@@ -355,6 +359,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [pendingAuthAction, setPendingAuthAction] = useState<(() => void) | null>(null);
   const [activeEditorSite, setActiveEditorSite] = useState<WebsiteSiteRecord | null>(null);
 
+  const [isMysteryAiOpen, setIsMysteryAiOpen] = useState(false);
+  const [mysteryAiInitialPrompt, setMysteryAiInitialPrompt] = useState<string | null>(null);
+
+  const openMysteryAi = (initialPrompt?: string) => {
+    if (initialPrompt) {
+      setMysteryAiInitialPrompt(initialPrompt);
+    }
+    setIsMysteryAiOpen(true);
+  };
+
+  const closeMysteryAi = () => {
+    setIsMysteryAiOpen(false);
+    setMysteryAiInitialPrompt(null);
+  };
+
   const openWebsiteEditor = (site: WebsiteSiteRecord) => {
     setActiveEditorSite(site);
   };
@@ -495,6 +514,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         waitlistInfo,
         openWaitlist,
         closeWaitlist,
+        isMysteryAiOpen,
+        mysteryAiInitialPrompt,
+        openMysteryAi,
+        closeMysteryAi,
         toasts,
         showToast,
         removeToast,

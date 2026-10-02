@@ -22,7 +22,15 @@ import {
 } from 'lucide-react';
 
 export const MysteryAiAssistant: React.FC = () => {
-  const { activePage, setActivePage } = useApp();
+  const {
+    activePage,
+    setActivePage,
+    activeEditorSite,
+    isMysteryAiOpen,
+    mysteryAiInitialPrompt,
+    openMysteryAi,
+    closeMysteryAi,
+  } = useApp();
 
   const [isOpen, setIsOpen] = useState(false);
   const [isExpandedPrompt, setIsExpandedPrompt] = useState(false);
@@ -36,7 +44,27 @@ export const MysteryAiAssistant: React.FC = () => {
   const dismissPromptTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasTriggeredPromptRef = useRef(false);
 
+  const isInsideEditor = Boolean(activeEditorSite);
+
+  // Sync external open/close from context
+  useEffect(() => {
+    if (isMysteryAiOpen && !isOpen) {
+      setIsOpen(true);
+      setIsExpandedPrompt(false);
+      if (mysteryAiInitialPrompt) {
+        setTimeout(() => {
+          handleSendMessage(mysteryAiInitialPrompt);
+        }, 100);
+      }
+    } else if (!isMysteryAiOpen && isOpen) {
+      setIsOpen(false);
+    }
+  }, [isMysteryAiOpen, mysteryAiInitialPrompt]);
+
   const getPageDisplayName = (page: ActivePage) => {
+    if (isInsideEditor) {
+      return 'Website Editor';
+    }
     switch (page) {
       case 'data':
         return 'Data & Airtime';
@@ -55,6 +83,9 @@ export const MysteryAiAssistant: React.FC = () => {
   };
 
   const getPageGreeting = (page: ActivePage): string => {
+    if (isInsideEditor) {
+      return "Hi 👋 I'm Mystery AI. I see you're building your website! Need help adding packages, editing text and colours, or publishing your live site?";
+    }
     switch (page) {
       case 'data':
         return "Hi 👋 I'm Mystery AI. I see you're browsing our Data & Airtime offers! What would you like to know about our MTN, Telecel, and AirtelTigo bundles or MoMo checkout?";
@@ -84,12 +115,13 @@ export const MysteryAiAssistant: React.FC = () => {
         },
       ]);
     }
-  }, [activePage, messages.length]);
+  }, [activePage, isInsideEditor, messages.length]);
 
-  // Inactivity expansion trigger: after 10s of quiet dwell, gently expand prompt once
+  // Inactivity expansion trigger: gently expand prompt once
   useEffect(() => {
     if (hasTriggeredPromptRef.current || isOpen) return;
 
+    const delay = isInsideEditor ? 4000 : 10000;
     promptTimeoutRef.current = setTimeout(() => {
       if (!isOpen && !hasTriggeredPromptRef.current) {
         setIsExpandedPrompt(true);
@@ -99,13 +131,13 @@ export const MysteryAiAssistant: React.FC = () => {
           setIsExpandedPrompt(false);
         }, 6000);
       }
-    }, 10000);
+    }, delay);
 
     return () => {
       if (promptTimeoutRef.current) clearTimeout(promptTimeoutRef.current);
       if (dismissPromptTimeoutRef.current) clearTimeout(dismissPromptTimeoutRef.current);
     };
-  }, [isOpen]);
+  }, [isOpen, isInsideEditor]);
 
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -126,6 +158,7 @@ export const MysteryAiAssistant: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
+        closeMysteryAi();
         setIsOpen(false);
       }
     };
@@ -135,8 +168,10 @@ export const MysteryAiAssistant: React.FC = () => {
 
   const handleToggle = () => {
     if (isOpen) {
+      closeMysteryAi();
       setIsOpen(false);
     } else {
+      openMysteryAi();
       setIsOpen(true);
       setIsExpandedPrompt(false);
     }
@@ -207,10 +242,23 @@ export const MysteryAiAssistant: React.FC = () => {
   };
 
   // Programmatically compute suggested questions dynamically for current active page
-  const suggestedQuestions: SuggestedQuestion[] = getSuggestedQuestionsForPage(activePage);
+  const suggestedQuestions: SuggestedQuestion[] = isInsideEditor
+    ? [
+        { id: 'web-edit-biz', text: 'How do I add my business details and phone?' },
+        { id: 'web-edit-bundles', text: 'How do I add or change data packages?' },
+        { id: 'web-edit-publish', text: 'How do I publish my website live?' },
+        { id: 'web-edit-orders', text: 'How do WhatsApp customer orders work?' },
+      ]
+    : getSuggestedQuestionsForPage(activePage);
 
   return (
-    <div className="fixed z-50 bottom-20 right-3 sm:bottom-6 sm:right-6 pointer-events-none max-w-[calc(100vw-1.5rem)]">
+    <div
+      className={`fixed z-[60] ${
+        isInsideEditor
+          ? 'bottom-4 right-3 sm:bottom-6 sm:right-6'
+          : 'bottom-20 right-3 sm:bottom-6 sm:right-6'
+      } pointer-events-none max-w-[calc(100vw-1.5rem)]`}
+    >
       {/* Floating Chat Panel */}
       {isOpen && (
         <div
@@ -418,20 +466,26 @@ export const MysteryAiAssistant: React.FC = () => {
 
       {/* Floating Control Button & Gentle Expanded Prompt */}
       <div className="pointer-events-auto flex items-center gap-2 justify-end">
-        {/* Subtle, gentle expansion prompt after 10s idle */}
+        {/* Subtle, gentle expansion prompt after dwell */}
         {isExpandedPrompt && !isOpen && (
           <div
             onClick={handleToggle}
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0c1217] border border-[#00c365]/40 text-xs text-white shadow-xl cursor-pointer hover:border-[#00c365] transition-all animate-in fade-in slide-in-from-right-2 duration-300"
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0c1217] border border-[#00c365]/40 text-xs text-white shadow-xl cursor-pointer hover:border-[#00c365] transition-all animate-in fade-in slide-in-from-right-2 duration-300 ${
+              isInsideEditor ? 'max-w-[280px] sm:max-w-none' : 'hidden sm:flex'
+            }`}
           >
-            <span className="w-2 h-2 rounded-full bg-[#00c365] animate-pulse" />
-            <span>Have a question? Ask Mystery AI</span>
+            <span className="w-2 h-2 rounded-full bg-[#00c365] animate-pulse shrink-0" />
+            <span className="truncate">
+              {isInsideEditor
+                ? 'Need help building your site? Ask Mystery AI'
+                : 'Have a question? Ask Mystery AI'}
+            </span>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setIsExpandedPrompt(false);
               }}
-              className="text-slate-400 hover:text-white p-0.5"
+              className="text-slate-400 hover:text-white p-0.5 shrink-0"
               aria-label="Dismiss message"
             >
               <X className="w-3 h-3" />

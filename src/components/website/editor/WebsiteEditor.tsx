@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { WebsiteSiteRecord, SiteContent, SiteSettings, WebsiteTemplate } from '../../../types';
 import { updateWebsiteOnServer, publishWebsiteOnServer, unpublishWebsiteOnServer } from '../../../services/apiClient';
 import { getTemplateById, mergeSiteWithTemplate, renderTemplateLayout } from '../../../utils/templateRendererUtils';
+import { useApp } from '../../../context/AppContext';
 import {
   ArrowLeft,
   Save,
@@ -26,6 +27,7 @@ import {
   Trash2,
   Edit2,
   Layers,
+  X,
 } from 'lucide-react';
 
 interface WebsiteEditorProps {
@@ -43,6 +45,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   onSiteUpdated,
   showToast,
 }) => {
+  const { openMysteryAi } = useApp();
   const [currentSite, setCurrentSite] = useState<WebsiteSiteRecord>(initialSite);
 
   // Form State
@@ -58,8 +61,31 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
   // View Mode: 'edit' or 'preview' (on mobile)
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
-  // Device View in Preview: 'desktop' | 'tablet' | 'mobile'
-  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+
+  // Device View in Preview: responsive default based on viewport width
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>(() => {
+    if (typeof window !== 'undefined') {
+      if (window.innerWidth < 640) return 'mobile';
+      if (window.innerWidth < 1024) return 'tablet';
+    }
+    return 'desktop';
+  });
+
+  // First-use guidance card state (persisted per site)
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem(`mh_builder_guide_dismissed_${initialSite.id}`);
+    } catch {
+      return false;
+    }
+  });
+
+  const dismissOnboarding = () => {
+    setShowOnboarding(false);
+    try {
+      localStorage.setItem(`mh_builder_guide_dismissed_${currentSite.id}`, 'true');
+    } catch {}
+  };
 
   // Preview container dimension tracking for responsive zoom scaling
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -208,19 +234,201 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const previewTemplate: WebsiteTemplate = mergeSiteWithTemplate(baseTemplate, content, settings);
 
   // Compute live scaling factors for preview canvas
-  const targetWidth = previewDevice === 'mobile' ? 375 : previewDevice === 'tablet' ? 768 : 1280;
   const availableWidth = canvasDimensions.width || 800;
   const availableHeight = canvasDimensions.height || 600;
-  const paddingX = previewDevice === 'desktop' ? 32 : 16;
+  const isMobileScreen = availableWidth < 640;
+  const isSmallScreen = availableWidth < 768;
+  const targetWidth = previewDevice === 'mobile' ? 375 : previewDevice === 'tablet' ? 768 : 1280;
+  const paddingX = previewDevice === 'desktop' ? (isMobileScreen ? 8 : 32) : 16;
   const usableWidth = Math.max(280, availableWidth - paddingX);
-  const scale = Math.min(1, usableWidth / targetWidth);
+
+  // Responsive scaling:
+  // 1. Mobile preview on a mobile screen: fill width naturally with scale = 1 for native readability
+  // 2. Desktop preview on a small screen: don't shrink to 0.25! Keep scale = 1 for horizontal pan & provide Open Full Preview
+  // 3. Tablet/desktop preview on wide screen: scale to fit container if needed
+  const isDesktopOnSmallScreen = previewDevice === 'desktop' && isSmallScreen;
+  const effectiveCanvasWidth =
+    previewDevice === 'mobile' && isMobileScreen
+      ? Math.min(usableWidth, 420)
+      : targetWidth;
+  const scale =
+    (previewDevice === 'mobile' && isMobileScreen) || isDesktopOnSmallScreen
+      ? 1
+      : Math.min(1, usableWidth / targetWidth);
 
   return (
     <div className="fixed inset-0 z-50 bg-[#080d11] text-slate-100 flex flex-col font-sans overflow-hidden">
       {/* =========================================================
-          TOP ACTION BAR
+          TOP ACTION BAR — MOBILE ONLY (< sm)
+          Two-level compact toolbar
           ========================================================= */}
-      <header className="h-14 sm:h-16 px-4 sm:px-6 bg-[#0a1117] border-b border-slate-800 flex items-center justify-between shrink-0 z-30">
+      <header className="sm:hidden bg-[#0a1117] border-b border-slate-800 flex flex-col shrink-0 z-30 select-none">
+        {/* ROW 1: Navigation, Identity, Status, Quick Actions */}
+        <div className="h-12 px-3 flex items-center justify-between gap-2 border-b border-slate-800/60">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (isDirty) {
+                  if (window.confirm('You have unsaved changes. Exit anyway?')) {
+                    onClose();
+                  }
+                } else {
+                  onClose();
+                }
+              }}
+              className="w-9 h-9 -ml-1 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 active:bg-slate-700 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              title="Back to Dashboard"
+              aria-label="Back to Dashboard"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+
+            <div className="min-w-0 flex flex-col justify-center">
+              <div className="flex items-center gap-1.5">
+                <h2 className="font-bold text-xs sm:text-sm text-white truncate max-w-[130px]">
+                  {content.businessName || siteName}
+                </h2>
+                <span
+                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-wider shrink-0 ${
+                    currentSite.status === 'published'
+                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                  }`}
+                >
+                  {currentSite.status === 'published' ? 'Live' : 'Draft'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] leading-none text-slate-400 mt-0.5">
+                {saveStatusText === 'saving' && (
+                  <span className="text-amber-400 flex items-center gap-1">
+                    <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                    <span>Saving...</span>
+                  </span>
+                )}
+                {saveStatusText === 'saved' && (
+                  <span className="text-emerald-400 flex items-center gap-1">
+                    <Check className="w-2.5 h-2.5" />
+                    <span>Saved</span>
+                  </span>
+                )}
+                {saveStatusText === 'unsaved' && (
+                  <span className="text-amber-300">Unsaved changes</span>
+                )}
+                <span className="text-slate-600">·</span>
+                <span className="truncate max-w-[90px] text-slate-400">{baseTemplate.title}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            {currentSite.status === 'published' && (
+              <>
+                <a
+                  href={`/sites/${currentSite.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-8 h-8 rounded-lg bg-slate-800 text-emerald-400 flex items-center justify-center border border-slate-700 active:scale-95"
+                  title="View Live Site"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="w-8 h-8 rounded-lg bg-slate-800 text-slate-200 flex items-center justify-center border border-slate-700 active:scale-95 cursor-pointer"
+                  title="Copy Link"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+            {isDirty && (
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                disabled={isSaving}
+                className="w-8 h-8 rounded-lg bg-slate-800 text-slate-200 flex items-center justify-center border border-slate-700 active:scale-95 cursor-pointer disabled:opacity-50"
+                title="Save Draft"
+              >
+                <Save className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ROW 2: Edit/Preview Switcher + Obvious Publish CTA */}
+        <div className="h-11 px-3 flex items-center justify-between gap-2">
+          {/* [Edit] [Preview] */}
+          <div className="flex items-center bg-[#070c10] border border-slate-800 rounded-xl p-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setActiveTab('edit')}
+              className={`h-7 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'edit'
+                  ? 'bg-[#00c365] text-black shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('preview')}
+              className={`h-7 px-3 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                activeTab === 'preview'
+                  ? 'bg-[#00c365] text-black shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Eye className="w-3 h-3" />
+              <span>Preview</span>
+            </button>
+          </div>
+
+          {/* [Publish] */}
+          <div className="flex items-center gap-1 shrink-0">
+            {currentSite.status === 'published' ? (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handlePublish}
+                  disabled={isPublishing}
+                  className="h-8 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs border border-emerald-500/40 flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isPublishing ? 'animate-spin' : ''}`} />
+                  <span>Update</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUnpublish}
+                  disabled={isPublishing}
+                  className="h-8 px-2 rounded-xl bg-slate-900 text-rose-400 hover:text-rose-300 text-xs border border-slate-800 cursor-pointer"
+                  title="Unpublish"
+                >
+                  Unpublish
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePublish}
+                disabled={isPublishing}
+                className="h-8 px-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider shadow-[0_0_12px_rgba(0,195,101,0.3)] flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span>Publish</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* =========================================================
+          TOP ACTION BAR — TABLET & DESKTOP (>= sm)
+          Information-dense single-row toolbar
+          ========================================================= */}
+      <header className="hidden sm:flex h-14 sm:h-16 px-4 sm:px-6 bg-[#0a1117] border-b border-slate-800 items-center justify-between shrink-0 z-30">
         <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
@@ -278,7 +486,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
-          {/* Mobile Tab Switcher */}
+          {/* Tablet Tab Switcher (lg:hidden) */}
           <div className="lg:hidden flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5">
             <button
               type="button"
@@ -453,6 +661,58 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
           {/* Form Content Area */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+            {/* First-Use Onboarding Guidance Card */}
+            {showOnboarding && (
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0c1824] to-[#0d141b] border border-[#00c365]/35 shadow-xl relative animate-in fade-in slide-in-from-top-2 text-left">
+                <button
+                  type="button"
+                  onClick={dismissOnboarding}
+                  className="absolute top-3 right-3 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                  aria-label="Dismiss guide"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                <div className="flex items-center gap-2 mb-2 pr-6">
+                  <div className="w-6 h-6 rounded-lg bg-[#00c365]/20 text-[#00c365] flex items-center justify-center shrink-0">
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </div>
+                  <h3 className="font-bold text-sm text-white">Your website is ready to customise</h3>
+                </div>
+
+                <ol className="space-y-1.5 text-xs text-slate-300 ml-1 mb-3.5 list-decimal list-inside">
+                  <li>Add your business details</li>
+                  <li>Replace images and colours</li>
+                  <li>Preview your website</li>
+                  <li>Publish when you're ready</li>
+                </ol>
+
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      dismissOnboarding();
+                      setActiveTab('edit');
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs cursor-pointer active:scale-95 transition-all shadow-sm"
+                  >
+                    Start Editing
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      dismissOnboarding();
+                      openMysteryAi('How do I customise and publish my new website?');
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 cursor-pointer flex items-center gap-1.5 transition-colors"
+                  >
+                    <Sparkles className="w-3 h-3 text-[#00c365]" />
+                    <span>Ask Mystery AI</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* 1. BUSINESS SECTION */}
             {activeSection === 'business' && (
               <div className="space-y-4 animate-in fade-in">
@@ -1141,16 +1401,39 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             </div>
           </div>
 
+          {/* Desktop Preview on Mobile/Small Screen Banner */}
+          {isDesktopOnSmallScreen && (
+            <div className="bg-amber-500/10 border-b border-amber-500/20 px-3.5 py-2 flex items-center justify-between gap-2 text-xs text-amber-300 shrink-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Monitor className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                <span className="truncate">Desktop view (1280px). Pan horizontally or open full preview:</span>
+              </div>
+              <a
+                href={`/sites/${currentSite.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-bold text-[11px] border border-amber-500/40 shrink-0 flex items-center gap-1 cursor-pointer"
+              >
+                <span>Full Preview</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          )}
+
           {/* Interactive Scaled Canvas Container */}
           <div
             ref={canvasRef}
-            className="flex-1 w-full p-2 sm:p-4 lg:p-6 overflow-hidden flex items-center justify-center relative bg-[#040608]"
+            className={`flex-1 w-full p-2 sm:p-4 lg:p-6 flex items-center justify-center relative bg-[#040608] ${
+              isDesktopOnSmallScreen ? 'overflow-auto block text-center' : 'overflow-hidden'
+            }`}
           >
             <div
-              className="rounded-2xl border border-slate-800 shadow-2xl overflow-hidden bg-white relative transition-all duration-300"
+              className={`rounded-2xl border border-slate-800 shadow-2xl overflow-hidden bg-white relative transition-all duration-300 ${
+                isDesktopOnSmallScreen ? 'inline-block text-left' : ''
+              }`}
               style={{
-                width: `${targetWidth}px`,
-                maxWidth: '100%',
+                width: `${effectiveCanvasWidth}px`,
+                maxWidth: isDesktopOnSmallScreen ? 'none' : '100%',
                 height: '100%',
                 maxHeight: '100%',
                 transform: scale < 0.99 ? `scale(${scale})` : undefined,
