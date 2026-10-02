@@ -975,6 +975,13 @@ adminRouter.post('/marketplace/products', async (req: Request, res: Response) =>
         featured: Boolean(body.featured),
         published: Boolean(body.published),
         sortOrder: typeof body.sortOrder === 'number' ? Math.floor(body.sortOrder) : 0,
+        purchaseEnabled: body.purchaseEnabled !== undefined ? Boolean(body.purchaseEnabled) : true,
+        fulfilmentMode: typeof body.fulfilmentMode === 'string' ? body.fulfilmentMode : 'both',
+        pickupLocations: Array.isArray(body.pickupLocations) ? body.pickupLocations : [],
+        deliveryAvailable: body.deliveryAvailable !== undefined ? Boolean(body.deliveryAvailable) : true,
+        deliveryNote: body.deliveryNote ? sanitizeString(body.deliveryNote, 500) || null : null,
+        purchaseNote: body.purchaseNote ? sanitizeString(body.purchaseNote, 500) || null : null,
+        paymentRequiredBeforeDelivery: body.paymentRequiredBeforeDelivery !== undefined ? Boolean(body.paymentRequiredBeforeDelivery) : false,
       },
       adminUser.id
     );
@@ -1115,6 +1122,13 @@ adminRouter.patch('/marketplace/products/:id', async (req: Request, res: Respons
         published: body.published !== undefined ? Boolean(body.published) : undefined,
         archived: body.archived !== undefined ? Boolean(body.archived) : undefined,
         sortOrder: typeof body.sortOrder === 'number' ? Math.floor(body.sortOrder) : undefined,
+        purchaseEnabled: body.purchaseEnabled !== undefined ? Boolean(body.purchaseEnabled) : undefined,
+        fulfilmentMode: body.fulfilmentMode !== undefined ? body.fulfilmentMode : undefined,
+        pickupLocations: Array.isArray(body.pickupLocations) ? body.pickupLocations : undefined,
+        deliveryAvailable: body.deliveryAvailable !== undefined ? Boolean(body.deliveryAvailable) : undefined,
+        deliveryNote: body.deliveryNote !== undefined ? (sanitizeString(body.deliveryNote, 500) || null) : undefined,
+        purchaseNote: body.purchaseNote !== undefined ? (sanitizeString(body.purchaseNote, 500) || null) : undefined,
+        paymentRequiredBeforeDelivery: body.paymentRequiredBeforeDelivery !== undefined ? Boolean(body.paymentRequiredBeforeDelivery) : undefined,
       },
       adminUser.id
     );

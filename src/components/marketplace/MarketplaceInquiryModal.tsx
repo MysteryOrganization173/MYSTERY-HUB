@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { submitMarketplaceInquiry } from '../../services/apiClient';
@@ -7,25 +7,23 @@ import {
   MessageSquare,
   Phone,
   Mail,
-  Send,
   CheckCircle2,
-  HelpCircle,
   Sparkles,
   ShieldCheck,
-  ArrowRight,
+  AlertCircle,
 } from 'lucide-react';
 
 const INQUIRY_QUESTIONS = [
-  'Is this product still available?',
+  'Is this still available?',
   'Where can I pick it up?',
   'Can this be delivered to my area?',
-  'General enquiry',
+  'I have a question',
 ];
 
 export const MarketplaceInquiryModal: React.FC = () => {
-  const { marketplaceInquiryProduct, closeMarketplaceInquiry, showToast } = useApp();
+  const { marketplaceInquiryProduct, closeMarketplaceInquiry, showToast, user } = useApp();
 
-  const [selectedQuestion, setSelectedQuestion] = useState<string>('Is this product still available?');
+  const [selectedQuestion, setSelectedQuestion] = useState<string>('Is this still available?');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -33,6 +31,33 @@ export const MarketplaceInquiryModal: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Prefill signed-in user details
+  useEffect(() => {
+    if (marketplaceInquiryProduct) {
+      if (user) {
+        setName(user.name || '');
+        setPhone(user.phone || '');
+        setEmail(user.email || '');
+      }
+      setSelectedQuestion('Is this still available?');
+      setSubmitError(null);
+      setIsSubmitted(false);
+    }
+  }, [marketplaceInquiryProduct, user]);
+
+  // Escape key handler
+  useEffect(() => {
+    if (!marketplaceInquiryProduct) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeMarketplaceInquiry();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [marketplaceInquiryProduct, closeMarketplaceInquiry]);
 
   if (!marketplaceInquiryProduct) return null;
 
@@ -40,6 +65,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
 
   const handleInquirySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
 
     setIsSubmitting(true);
     try {
@@ -53,38 +79,49 @@ export const MarketplaceInquiryModal: React.FC = () => {
         message: notes.trim() || undefined,
         budget: budget.trim() || undefined,
       });
-    } catch {
-      // Best-effort database recording
-    } finally {
+    } catch (err) {
       setIsSubmitting(false);
+      const errMsg = err instanceof Error ? err.message : 'Failed to record inquiry. Please try again.';
+      setSubmitError(errMsg);
+      showToast(errMsg, 'warning');
+      return;
     }
 
-    const inquiryDetails = [
-      `Inquiry: ${selectedQuestion}`,
-      notes ? `Requirements: ${notes}` : null,
-      budget ? `Target Budget: GH₵ ${budget}` : null,
-      name ? `From: ${name}` : null,
-      phone ? `Phone: ${phone}` : null,
-    ]
-      .filter(Boolean)
-      .join(' | ');
+    setIsSubmitting(false);
 
-    const whatsappUrl = BUSINESS_CONFIG.getMarketplaceInquiryWhatsAppUrl(
+    // Build formatted WhatsApp message
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://mysterybundlehub.com';
+    const productUrl = `${baseUrl}/marketplace?product=${product.slug || product.id}`;
+    const messageLines = [
+      'Hello Mystery Hub 👋',
+      '',
+      'I\'m interested in:',
       product.name,
-      inquiryDetails || undefined
-    );
+      '',
+      'Question:',
+      selectedQuestion,
+      notes.trim() ? `Details: ${notes.trim()}` : null,
+      budget.trim() ? `Target Budget: ${budget.trim()}` : null,
+      '',
+      'Name:',
+      name.trim() || 'Guest',
+      '',
+      'Phone:',
+      phone.trim() || 'Not specified',
+      '',
+      'Product:',
+      productUrl,
+    ].filter((line) => line !== null) as string[];
+
+    const fullMessage = messageLines.join('\n');
+    const whatsappUrl = `https://wa.me/233592066298?text=${encodeURIComponent(fullMessage)}`;
 
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     setIsSubmitted(true);
-    showToast(`Inquiry recorded and WhatsApp opened for ${product.name}!`, 'success');
+    showToast(`Inquiry recorded and WhatsApp launched for ${product.name}!`, 'success');
 
     setTimeout(() => {
       setIsSubmitted(false);
-      setName('');
-      setPhone('');
-      setEmail('');
-      setBudget('');
-      setNotes('');
       closeMarketplaceInquiry();
     }, 2500);
   };
@@ -109,7 +146,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
             </div>
             <div>
               <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold block">
-                Sourcing & Availability
+                Sourcing &amp; Availability
               </span>
               <h3 id="marketplace-inquiry-title" className="text-sm sm:text-base font-bold text-white">
                 Product Inquiry
@@ -152,14 +189,21 @@ export const MarketplaceInquiryModal: React.FC = () => {
             </p>
           </div>
 
+          {submitError && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <span>{submitError}</span>
+            </div>
+          )}
+
           {isSubmitted ? (
             <div className="text-center py-6 space-y-3">
               <div className="w-12 h-12 rounded-full bg-[#00c365]/20 text-[#00c365] flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-7 h-7" />
               </div>
-              <h4 className="font-bold text-lg text-white">Inquiry Dispatched!</h4>
+              <h4 className="font-bold text-lg text-white">Inquiry Recorded!</h4>
               <p className="text-xs text-slate-300 max-w-xs mx-auto">
-                Inquiry recorded in system &amp; WhatsApp launched. Our Accra sourcing desk will respond promptly.
+                Inquiry saved &amp; WhatsApp opened. Our Accra sourcing desk will respond promptly.
               </p>
             </div>
           ) : (
@@ -248,13 +292,13 @@ export const MarketplaceInquiryModal: React.FC = () => {
 
               <div className="space-y-1.5">
                 <label className="font-semibold text-slate-200 block">
-                  Additional Details / Requirements <span className="text-slate-500">(Optional)</span>
+                  Additional Details / Message <span className="text-slate-500">(Optional)</span>
                 </label>
                 <textarea
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g. Looking for 16GB RAM model, needed for delivery in East Legon"
+                  placeholder="e.g. Needed for delivery in East Legon"
                   className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365] text-xs sm:text-sm resize-none"
                 />
               </div>
@@ -267,7 +311,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
                   className="w-full py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.25)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-50"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  <span>{isSubmitting ? 'Recording Inquiry...' : 'Submit Inquiry via WhatsApp'}</span>
+                  <span>{isSubmitting ? 'Recording Inquiry...' : 'Continue on WhatsApp'}</span>
                 </button>
 
                 <div className="grid grid-cols-2 gap-2 text-[11px]">

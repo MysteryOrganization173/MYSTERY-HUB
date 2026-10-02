@@ -97,6 +97,25 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
     { label: '', value: '' },
   ]);
 
+  // Purchase & Fulfilment Settings
+  const [formPurchaseEnabled, setFormPurchaseEnabled] = useState(true);
+  const [formFulfilmentMode, setFormFulfilmentMode] = useState<'pickup' | 'delivery' | 'both' | 'inquiry_only'>('both');
+  const [formDeliveryAvailable, setFormDeliveryAvailable] = useState(true);
+  const [formPaymentRequiredBeforeDelivery, setFormPaymentRequiredBeforeDelivery] = useState(false);
+  const [formDeliveryNote, setFormDeliveryNote] = useState('');
+  const [formPurchaseNote, setFormPurchaseNote] = useState('');
+  const [formPickupLocations, setFormPickupLocations] = useState<
+    Array<{
+      id: string;
+      name: string;
+      city: string;
+      area: string;
+      addressOrLandmark?: string;
+      phone?: string;
+      active: boolean;
+    }>
+  >([]);
+
   // Image Preview Error Handling
   const [imagePreviewError, setImagePreviewError] = useState(false);
 
@@ -118,7 +137,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
     highlights: string[];
     specs: { label: string; value: string }[];
     detectedPriceOptions: { label: string; priceGhc: number }[];
-    detectedPickupLocations?: { city: string; area: string; address: string; landmark?: string }[];
+    detectedPickupLocations?: { city: string; area: string; address: string; landmark?: string; phone?: string }[];
     warnings: string[];
     sourceNotes: string[];
   } | null>(null);
@@ -169,6 +188,13 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
     setFormSortOrder(0);
     setFormHighlights(['']);
     setFormSpecs([{ label: '', value: '' }]);
+    setFormPurchaseEnabled(true);
+    setFormFulfilmentMode('both');
+    setFormDeliveryAvailable(true);
+    setFormPaymentRequiredBeforeDelivery(false);
+    setFormDeliveryNote('');
+    setFormPurchaseNote('');
+    setFormPickupLocations([]);
     setImagePreviewError(false);
     setAiAdvertInput('');
     setIsParsingAi(false);
@@ -213,6 +239,17 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
       p.specs && p.specs.length > 0
         ? p.specs.map((s) => ({ label: s.label, value: s.value }))
         : [{ label: '', value: '' }]
+    );
+    setFormPurchaseEnabled(p.purchaseEnabled !== false);
+    setFormFulfilmentMode(p.fulfilmentMode || 'both');
+    setFormDeliveryAvailable(p.deliveryAvailable !== false);
+    setFormPaymentRequiredBeforeDelivery(Boolean(p.paymentRequiredBeforeDelivery));
+    setFormDeliveryNote(p.deliveryNote || '');
+    setFormPurchaseNote(p.purchaseNote || '');
+    setFormPickupLocations(
+      p.pickupLocations && p.pickupLocations.length > 0
+        ? p.pickupLocations.map((loc) => ({ ...loc }))
+        : []
     );
     setImagePreviewError(false);
     setAiAdvertInput('');
@@ -318,6 +355,20 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
       setFormSpecs(newSpecs);
     }
 
+    // Convert AI-detected pickup locations to editable form state
+    if (aiExtraction.detectedPickupLocations && aiExtraction.detectedPickupLocations.length > 0) {
+      const extractedLocs = aiExtraction.detectedPickupLocations.map((loc, idx) => ({
+        id: `loc_ai_${Date.now()}_${idx}`,
+        name: loc.address ? `${loc.city} (${loc.area}) Pickup` : `${loc.city} Pickup Point`,
+        city: loc.city || 'Accra',
+        area: loc.area || 'Accra',
+        addressOrLandmark: loc.address || loc.landmark || '',
+        phone: loc.phone || '',
+        active: true,
+      }));
+      setFormPickupLocations(extractedLocs);
+    }
+
     // NOTE: CRITICAL SAFETY RULE
     // DO NOT wipe or overwrite an existing manually entered formImageUrl!
 
@@ -363,6 +414,13 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
         featured: formFeatured,
         published: formPublished,
         sortOrder: formSortOrder,
+        purchaseEnabled: formPurchaseEnabled,
+        fulfilmentMode: formFulfilmentMode,
+        pickupLocations: formPickupLocations,
+        deliveryAvailable: formDeliveryAvailable,
+        paymentRequiredBeforeDelivery: formPaymentRequiredBeforeDelivery,
+        deliveryNote: formDeliveryNote.trim() || undefined,
+        purchaseNote: formPurchaseNote.trim() || undefined,
       };
 
       if (editingProduct) {
@@ -855,7 +913,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                         <div className="p-2.5 rounded-lg bg-[#0e141a] border border-slate-800 space-y-1 text-[11px]">
                           <span className="font-bold text-white block flex items-center gap-1">
                             <MapPin className="w-3.5 h-3.5 text-[#00c365]" />
-                            <span>Detected Pickup Locations ({aiExtraction.detectedPickupLocations.length}):</span>
+                            <span>Detected pickup locations - review before publishing ({aiExtraction.detectedPickupLocations.length}):</span>
                           </span>
                           {aiExtraction.detectedPickupLocations.map((loc, i) => (
                             <div key={i} className="text-slate-300">
@@ -1263,6 +1321,232 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                     )}
                   </div>
                 ))}
+              </div>
+
+              {/* Purchase & Fulfilment Settings */}
+              <div className="p-4 rounded-xl bg-[#090d10] border border-slate-800 space-y-3.5">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <span className="font-bold text-white text-xs flex items-center gap-1.5">
+                    <Store className="w-4 h-4 text-[#00c365]" />
+                    <span>Purchase &amp; Fulfilment Settings</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400">Admin Controlled</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Purchase Enabled Toggle */}
+                  <label className="flex items-center gap-2.5 p-3 rounded-lg bg-[#0e141a] border border-slate-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formPurchaseEnabled}
+                      onChange={(e) => setFormPurchaseEnabled(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#00c365] bg-slate-900 border-slate-700"
+                    />
+                    <div>
+                      <span className="font-bold text-white block">Direct Purchase Enabled</span>
+                      <span className="text-[10px] text-slate-400">Show "Buy Now" button on product</span>
+                    </div>
+                  </label>
+
+                  {/* Fulfilment Mode Selector */}
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-300 block">Fulfilment Mode</label>
+                    <select
+                      value={formFulfilmentMode}
+                      onChange={(e) => setFormFulfilmentMode(e.target.value as any)}
+                      className="w-full bg-[#0e141a] border border-slate-700/80 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#00c365]"
+                    >
+                      <option value="both">Pickup + Delivery</option>
+                      <option value="pickup">Pickup Only</option>
+                      <option value="delivery">Delivery Only</option>
+                      <option value="inquiry_only">Inquiry Only</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Delivery Available Checkbox */}
+                  <label className="flex items-center gap-2.5 p-2.5 rounded-lg bg-[#0e141a] border border-slate-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formDeliveryAvailable}
+                      onChange={(e) => setFormDeliveryAvailable(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#00c365] bg-slate-900 border-slate-700"
+                    />
+                    <span className="text-slate-200 font-medium">Doorstep Delivery Available</span>
+                  </label>
+
+                  {/* Payment Required Before Delivery Checkbox */}
+                  <label className="flex items-center gap-2.5 p-2.5 rounded-lg bg-[#0e141a] border border-slate-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formPaymentRequiredBeforeDelivery}
+                      onChange={(e) => setFormPaymentRequiredBeforeDelivery(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#00c365] bg-slate-900 border-slate-700"
+                    />
+                    <span className="text-slate-200 font-medium">Payment Required Before Delivery</span>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-300 block">Delivery Note / Terms</label>
+                    <input
+                      type="text"
+                      value={formDeliveryNote}
+                      onChange={(e) => setFormDeliveryNote(e.target.value)}
+                      placeholder="e.g. Standard dispatch within 24-48 hrs"
+                      className="w-full bg-[#0e141a] border border-slate-700/80 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-300 block">Purchase Note / Banner</label>
+                    <input
+                      type="text"
+                      value={formPurchaseNote}
+                      onChange={(e) => setFormPurchaseNote(e.target.value)}
+                      placeholder="e.g. Serial numbers verified prior to dispatch"
+                      className="w-full bg-[#0e141a] border border-slate-700/80 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
+                    />
+                  </div>
+                </div>
+
+                {/* Repeatable Pickup Locations Editor */}
+                <div className="space-y-2.5 pt-2 border-t border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="font-bold text-white block text-xs flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-[#00c365]" />
+                        <span>Pickup Locations ({formPickupLocations.length})</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400">
+                        Customers will only see active locations added here. No hardcoded defaults.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newLoc = {
+                          id: `loc_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                          name: '',
+                          city: 'Accra',
+                          area: '',
+                          addressOrLandmark: '',
+                          phone: '',
+                          active: true,
+                        };
+                        setFormPickupLocations([...formPickupLocations, newLoc]);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-[#00c365]/20 hover:bg-[#00c365]/30 text-[#00c365] font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Location</span>
+                    </button>
+                  </div>
+
+                  {formPickupLocations.length === 0 ? (
+                    <div className="p-3 rounded-lg bg-[#0e141a] border border-slate-800/80 text-[11px] text-slate-400 italic text-center">
+                      No pickup locations added yet. Click "Add Location" or apply AI extraction to populate verified locations.
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {formPickupLocations.map((loc, i) => (
+                        <div key={loc.id || i} className="p-3 rounded-xl bg-[#0e141a] border border-slate-800 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-300 text-[11px]">Location #{i + 1}</span>
+                            <div className="flex items-center gap-3">
+                              <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={loc.active}
+                                  onChange={(e) => {
+                                    const updated = [...formPickupLocations];
+                                    updated[i].active = e.target.checked;
+                                    setFormPickupLocations(updated);
+                                  }}
+                                  className="w-3.5 h-3.5 rounded text-[#00c365] bg-slate-900 border-slate-700"
+                                />
+                                <span>Active</span>
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormPickupLocations(formPickupLocations.filter((_, idx) => idx !== i));
+                                }}
+                                className="p-1 text-slate-400 hover:text-red-400 rounded transition-colors cursor-pointer"
+                                title="Remove location"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <input
+                              type="text"
+                              value={loc.name}
+                              onChange={(e) => {
+                                const updated = [...formPickupLocations];
+                                updated[i].name = e.target.value;
+                                setFormPickupLocations(updated);
+                              }}
+                              placeholder="Location Name (e.g. Accra Central Hub)"
+                              className="bg-[#090d10] border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-white text-[11px] focus:outline-none focus:border-[#00c365]"
+                            />
+                            <input
+                              type="text"
+                              value={loc.city}
+                              onChange={(e) => {
+                                const updated = [...formPickupLocations];
+                                updated[i].city = e.target.value;
+                                setFormPickupLocations(updated);
+                              }}
+                              placeholder="City (e.g. Accra)"
+                              className="bg-[#090d10] border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-white text-[11px] focus:outline-none focus:border-[#00c365]"
+                            />
+                            <input
+                              type="text"
+                              value={loc.area}
+                              onChange={(e) => {
+                                const updated = [...formPickupLocations];
+                                updated[i].area = e.target.value;
+                                setFormPickupLocations(updated);
+                              }}
+                              placeholder="Area (e.g. Circle / Ridge)"
+                              className="bg-[#090d10] border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-white text-[11px] focus:outline-none focus:border-[#00c365]"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={loc.addressOrLandmark || ''}
+                              onChange={(e) => {
+                                const updated = [...formPickupLocations];
+                                updated[i].addressOrLandmark = e.target.value;
+                                setFormPickupLocations(updated);
+                              }}
+                              placeholder="Address / Landmark (e.g. Near Kwame Nkrumah Interchange)"
+                              className="bg-[#090d10] border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-white text-[11px] focus:outline-none focus:border-[#00c365]"
+                            />
+                            <input
+                              type="text"
+                              value={loc.phone || ''}
+                              onChange={(e) => {
+                                const updated = [...formPickupLocations];
+                                updated[i].phone = e.target.value;
+                                setFormPickupLocations(updated);
+                              }}
+                              placeholder="Contact Phone (Optional)"
+                              className="bg-[#090d10] border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-white text-[11px] focus:outline-none focus:border-[#00c365]"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Toggles: Featured & Published */}

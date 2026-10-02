@@ -23,6 +23,7 @@ import { OrderStatusModal } from './components/checkout/OrderStatusModal';
 import { TemplatePreviewModal } from './components/website/TemplatePreviewModal';
 import { WaitlistModal } from './components/common/WaitlistModal';
 import { AuthModal } from './components/auth/AuthModal';
+import { MarketplaceInquiryModal } from './components/marketplace/MarketplaceInquiryModal';
 import { MysteryAiAssistant } from './components/ai/MysteryAiAssistant';
 import { IsolatedTemplatePreview } from './components/website/IsolatedTemplatePreview';
 import { PublicPublishedSite } from './components/website/PublicPublishedSite';
@@ -72,6 +73,7 @@ const AppContent: React.FC = () => {
       <TemplatePreviewModal />
       <WaitlistModal />
       <AuthModal />
+      <MarketplaceInquiryModal />
       <ToastContainer />
       <MysteryAiAssistant />
     </div>

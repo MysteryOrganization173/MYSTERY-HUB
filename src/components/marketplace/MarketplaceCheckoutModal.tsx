@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { MarketplaceProduct, MarketplacePickupLocation, MarketplaceProductVariant } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { API_BASE_URL } from '../../services/apiClient';
@@ -9,11 +9,9 @@ import {
   Truck,
   CreditCard,
   Gift,
-  CheckCircle2,
   AlertTriangle,
   Info,
-  ShieldCheck,
-  Sparkles,
+  FileQuestion,
 } from 'lucide-react';
 
 interface MarketplaceCheckoutModalProps {
@@ -22,22 +20,12 @@ interface MarketplaceCheckoutModalProps {
   onClose: () => void;
 }
 
-const DEFAULT_PICKUP_LOCATION: MarketplacePickupLocation = {
-  id: 'accra_madina_default',
-  name: 'Accra — Madina Pickup Hub',
-  city: 'Accra',
-  area: 'Madina',
-  addressOrLandmark: 'Madina Zongo Junction, Accra · Details confirmed upon payment.',
-  phone: '059 206 6298',
-  active: true,
-};
-
 export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> = ({
   product,
   referralCode,
   onClose,
 }) => {
-  const { user, showToast } = useApp();
+  const { user, showToast, openMarketplaceInquiry } = useApp();
 
   // Variant State
   const activeVariants = (product.variants || []).filter((v) => v.active !== false);
@@ -54,23 +42,32 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
     ? selectedVariant.priceGhc
     : product.priceGhc ?? (product.priceMinor ? product.priceMinor / 100 : 0);
 
-  // Fulfilment Mode State
+  // Fulfilment Capabilities & Rules
   const allowedFulfilment = product.fulfilmentMode || 'both';
-  const initialFulfilmentMethod =
-    allowedFulfilment === 'pickup' ? 'pickup' : allowedFulfilment === 'delivery' ? 'delivery' : 'pickup';
+  const activePickupLocations: MarketplacePickupLocation[] = (product.pickupLocations || []).filter(
+    (loc) => loc.active !== false
+  );
+  const hasActivePickup = activePickupLocations.length > 0;
+  const isDeliveryAllowed = allowedFulfilment !== 'pickup' && product.deliveryAvailable !== false;
 
-  const [fulfilmentMethod, setFulfilmentMethod] = useState<'pickup' | 'delivery'>(initialFulfilmentMethod);
+  // Initial Fulfilment Method Selection
+  const initialMethod: 'pickup' | 'delivery' =
+    allowedFulfilment === 'pickup'
+      ? 'pickup'
+      : allowedFulfilment === 'delivery'
+      ? 'delivery'
+      : hasActivePickup
+      ? 'pickup'
+      : 'delivery';
 
-  // Pickup Location Selection
-  const activePickupLocations = (product.pickupLocations || []).filter((loc) => loc.active !== false);
-  const availablePickupLocations =
-    activePickupLocations.length > 0 ? activePickupLocations : [DEFAULT_PICKUP_LOCATION];
+  const [fulfilmentMethod, setFulfilmentMethod] = useState<'pickup' | 'delivery'>(initialMethod);
 
+  // Selected Pickup Location
   const [selectedPickupId, setSelectedPickupId] = useState<string>(
-    availablePickupLocations[0]?.id || DEFAULT_PICKUP_LOCATION.id
+    activePickupLocations[0]?.id || ''
   );
 
-  const selectedPickupLocation = availablePickupLocations.find((loc) => loc.id === selectedPickupId) || availablePickupLocations[0];
+  const selectedPickupLocation = activePickupLocations.find((loc) => loc.id === selectedPickupId) || activePickupLocations[0];
 
   // Delivery Address Form
   const [deliveryCity, setDeliveryCity] = useState('Accra');
@@ -87,7 +84,7 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Ghanaian Phone Number Format Validation (e.g., 024XXXXXXX, 059XXXXXXX, 020XXXXXXX)
+  // Ghanaian Phone Number Format Validation (e.g., 024XXXXXXX, 059XXXXXXX)
   const validatePhone = (val: string): boolean => {
     const clean = val.replace(/[^\d+]/g, '');
     if (clean.startsWith('+233')) {
@@ -95,6 +92,11 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
     }
     const numbersOnly = clean.replace(/\D/g, '');
     return numbersOnly.length === 10 && numbersOnly.startsWith('0');
+  };
+
+  const handleInquireFallback = () => {
+    onClose();
+    openMarketplaceInquiry(product);
   };
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
@@ -117,12 +119,18 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
       return;
     }
 
-    if (fulfilmentMethod === 'pickup' && !selectedPickupLocation) {
-      setErrorMessage('Please choose a valid pickup location.');
-      return;
+    if (fulfilmentMethod === 'pickup') {
+      if (!hasActivePickup || !selectedPickupLocation) {
+        setErrorMessage('Pickup locations are being confirmed. Please click Inquire below.');
+        return;
+      }
     }
 
     if (fulfilmentMethod === 'delivery') {
+      if (!isDeliveryAllowed) {
+        setErrorMessage('Delivery is not available for this product.');
+        return;
+      }
       if (!deliveryCity.trim()) {
         setErrorMessage('Please specify your delivery city.');
         return;
@@ -142,7 +150,7 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
         productSlug: product.slug,
         variantId: selectedVariantId,
         fulfilmentMethod,
-        pickupLocationId: fulfilmentMethod === 'pickup' ? selectedPickupLocation.id : undefined,
+        pickupLocationId: fulfilmentMethod === 'pickup' && selectedPickupLocation ? selectedPickupLocation.id : undefined,
         deliveryCity: fulfilmentMethod === 'delivery' ? deliveryCity.trim() : undefined,
         deliveryArea: fulfilmentMethod === 'delivery' ? deliveryArea.trim() : undefined,
         deliveryLandmark: fulfilmentMethod === 'delivery' ? deliveryLandmark.trim() : undefined,
@@ -181,6 +189,10 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
       setIsSubmitting(false);
     }
   };
+
+  // Blocked Checkout State check (e.g. pickup-only with 0 active locations, or inquiry-only)
+  const isPickupBlocked = allowedFulfilment === 'pickup' && !hasActivePickup;
+  const isDirectPurchaseBlocked = allowedFulfilment === 'inquiry_only' || (!hasActivePickup && !isDeliveryAllowed);
 
   return (
     <div
@@ -225,7 +237,7 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
             <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 space-y-1">
               <div className="flex items-center gap-2 font-bold text-xs">
                 <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-                <span>Checkout Error</span>
+                <span>Checkout Notice</span>
               </div>
               <p className="text-xs leading-relaxed">{errorMessage}</p>
             </div>
@@ -238,7 +250,7 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
               <div className="text-[11px] leading-tight">
                 <span className="font-bold text-amber-300 block">Mystery Earn Referral Attached</span>
                 <span className="text-slate-300">
-                  Referral code <span className="font-mono text-white font-bold">{referralCode}</span> is linked to this order for lifetime reward attribution.
+                  Referral code <span className="font-mono text-white font-bold">{referralCode}</span> is linked to this order.
                 </span>
               </div>
             </div>
@@ -273,7 +285,7 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
             </div>
           </div>
 
-          {/* Variant Selector (if applicable) */}
+          {/* Variant Selector */}
           {activeVariants.length > 0 && (
             <div className="space-y-2">
               <label className="font-bold text-slate-200 block text-xs">
@@ -304,154 +316,196 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
             </div>
           )}
 
-          {/* Fulfilment Method Choice */}
-          <div className="space-y-2.5">
-            <label className="font-bold text-slate-200 block text-xs">
-              Fulfilment Method:
-            </label>
-
-            {allowedFulfilment === 'both' && (
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setFulfilmentMethod('pickup')}
-                  className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all cursor-pointer ${
-                    fulfilmentMethod === 'pickup'
-                      ? 'bg-[#00c365]/20 border-[#00c365] text-white shadow-sm'
-                      : 'bg-[#090d10] border-slate-800 text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <MapPin className="w-4 h-4 text-[#00c365]" />
-                  <span>Pickup Hub (Free)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setFulfilmentMethod('delivery')}
-                  className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all cursor-pointer ${
-                    fulfilmentMethod === 'delivery'
-                      ? 'bg-[#00c365]/20 border-[#00c365] text-white shadow-sm'
-                      : 'bg-[#090d10] border-slate-800 text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Truck className="w-4 h-4 text-[#00c365]" />
-                  <span>Doorstep Delivery</span>
-                </button>
+          {/* BLOCKED PICKUP / INQUIRY FALLBACK CALLOUT */}
+          {(isPickupBlocked || isDirectPurchaseBlocked) && (
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 space-y-3 text-xs">
+              <div className="flex items-center gap-2 font-bold text-amber-300">
+                <Info className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  {isPickupBlocked
+                    ? 'Pickup Locations Unconfirmed'
+                    : 'Inquiry Required Before Purchase'}
+                </span>
               </div>
-            )}
+              <p className="leading-relaxed">
+                {isPickupBlocked
+                  ? 'Pickup locations are being confirmed. Please inquire before paying.'
+                  : 'Order options for this product are currently being verified. Please send an inquiry to confirm availability.'}
+              </p>
+              <button
+                type="button"
+                onClick={handleInquireFallback}
+                className="w-full py-2.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-extrabold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              >
+                <FileQuestion className="w-4 h-4" />
+                <span>Inquire About This Product</span>
+              </button>
+            </div>
+          )}
 
-            {/* Pickup Location Details */}
-            {fulfilmentMethod === 'pickup' && (
-              <div className="p-3.5 rounded-xl bg-[#090d10] border border-slate-800 space-y-2.5">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-200">
-                  <span className="flex items-center gap-1.5 text-emerald-400">
-                    <MapPin className="w-4 h-4" />
-                    <span>Select Pickup Point:</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400">No pickup fee</span>
+          {/* Fulfilment Method Controls (Rendered when direct purchase is enabled) */}
+          {!isDirectPurchaseBlocked && !isPickupBlocked && (
+            <div className="space-y-2.5">
+              <label className="font-bold text-slate-200 block text-xs">
+                Fulfilment Method:
+              </label>
+
+              {/* Both Pickup and Delivery allowed */}
+              {allowedFulfilment === 'both' && (
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    disabled={!hasActivePickup}
+                    onClick={() => {
+                      if (hasActivePickup) setFulfilmentMethod('pickup');
+                    }}
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 font-bold text-xs transition-all ${
+                      !hasActivePickup
+                        ? 'bg-slate-900/40 border-slate-800 text-slate-600 cursor-not-allowed opacity-60'
+                        : fulfilmentMethod === 'pickup'
+                        ? 'bg-[#00c365]/20 border-[#00c365] text-white shadow-sm cursor-pointer'
+                        : 'bg-[#090d10] border-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-[#00c365]" />
+                      <span>Pickup Hub</span>
+                    </div>
+                    {!hasActivePickup && (
+                      <span className="text-[10px] text-slate-500 font-normal">
+                        (Currently Unavailable)
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFulfilmentMethod('delivery')}
+                    className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all cursor-pointer ${
+                      fulfilmentMethod === 'delivery'
+                        ? 'bg-[#00c365]/20 border-[#00c365] text-white shadow-sm'
+                        : 'bg-[#090d10] border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Truck className="w-4 h-4 text-[#00c365]" />
+                    <span>Doorstep Delivery</span>
+                  </button>
                 </div>
+              )}
 
-                <div className="space-y-2">
-                  {availablePickupLocations.map((loc) => {
-                    const isSelected = loc.id === selectedPickupId;
-                    return (
-                      <div
-                        key={loc.id}
-                        onClick={() => setSelectedPickupId(loc.id)}
-                        className={`p-3 rounded-lg border text-xs cursor-pointer transition-all ${
-                          isSelected
-                            ? 'bg-[#00c365]/10 border-[#00c365] text-white'
-                            : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between font-bold">
-                          <span>{loc.name}</span>
-                          <span className="text-[10px] text-[#00c365] uppercase">{loc.city} — {loc.area}</span>
+              {/* Pickup Locations Selector */}
+              {fulfilmentMethod === 'pickup' && hasActivePickup && (
+                <div className="p-3.5 rounded-xl bg-[#090d10] border border-slate-800 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-200">
+                    <span className="flex items-center gap-1.5 text-emerald-400">
+                      <MapPin className="w-4 h-4" />
+                      <span>Select Verified Pickup Point:</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400">No pickup fee</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {activePickupLocations.map((loc) => {
+                      const isSelected = loc.id === selectedPickupId || activePickupLocations.length === 1;
+                      return (
+                        <div
+                          key={loc.id}
+                          onClick={() => setSelectedPickupId(loc.id)}
+                          className={`p-3 rounded-lg border text-xs cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-[#00c365]/10 border-[#00c365] text-white'
+                              : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between font-bold">
+                            <span>{loc.name}</span>
+                            <span className="text-[10px] text-[#00c365] uppercase">{loc.city} — {loc.area}</span>
+                          </div>
+                          {loc.addressOrLandmark && (
+                            <p className="text-[11px] text-slate-400 mt-1 leading-snug">{loc.addressOrLandmark}</p>
+                          )}
+                          {loc.phone && (
+                            <p className="text-[10px] text-slate-400 mt-0.5">Contact: {loc.phone}</p>
+                          )}
                         </div>
-                        {loc.addressOrLandmark && (
-                          <p className="text-[11px] text-slate-400 mt-1 leading-snug">{loc.addressOrLandmark}</p>
-                        )}
-                        {loc.phone && (
-                          <p className="text-[10px] text-slate-400 mt-0.5">Pickup Phone: {loc.phone}</p>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Delivery Details Form */}
-            {fulfilmentMethod === 'delivery' && (
-              <div className="p-3.5 rounded-xl bg-[#090d10] border border-slate-800 space-y-3">
-                <div className="flex items-center justify-between text-xs font-bold text-emerald-400">
-                  <span className="flex items-center gap-1.5">
-                    <Truck className="w-4 h-4" />
-                    <span>Delivery Address Details:</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400">Local dispatch</span>
-                </div>
+              {/* Delivery Details Form */}
+              {fulfilmentMethod === 'delivery' && isDeliveryAllowed && (
+                <div className="p-3.5 rounded-xl bg-[#090d10] border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between text-xs font-bold text-emerald-400">
+                    <span className="flex items-center gap-1.5">
+                      <Truck className="w-4 h-4" />
+                      <span>Delivery Address Details:</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400">Local dispatch</span>
+                  </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-slate-300 font-semibold block text-[11px]">
+                        City / Region <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={deliveryCity}
+                        onChange={(e) => setDeliveryCity(e.target.value)}
+                        placeholder="e.g. Accra, Kumasi, Cape Coast"
+                        className="w-full bg-[#0e141a] border border-slate-700/80 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-[#00c365]"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-slate-300 font-semibold block text-[11px]">
+                        Area / Neighborhood <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={deliveryArea}
+                        onChange={(e) => setDeliveryArea(e.target.value)}
+                        placeholder="e.g. East Legon, Spintex, Adum"
+                        className="w-full bg-[#0e141a] border border-slate-700/80 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-[#00c365]"
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-1">
                     <label className="text-slate-300 font-semibold block text-[11px]">
-                      City / Region <span className="text-red-400">*</span>
+                      Landmark / Address <span className="text-slate-500">(Optional)</span>
                     </label>
                     <input
                       type="text"
-                      value={deliveryCity}
-                      onChange={(e) => setDeliveryCity(e.target.value)}
-                      placeholder="e.g. Accra, Kumasi, Cape Coast"
+                      value={deliveryLandmark}
+                      onChange={(e) => setDeliveryLandmark(e.target.value)}
+                      placeholder="e.g. Near Shell filling station, House No. 24"
                       className="w-full bg-[#0e141a] border border-slate-700/80 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-[#00c365]"
                     />
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-slate-300 font-semibold block text-[11px]">
-                      Area / Neighborhood <span className="text-red-400">*</span>
+                      Delivery Instructions / Note <span className="text-slate-500">(Optional)</span>
                     </label>
                     <input
                       type="text"
-                      value={deliveryArea}
-                      onChange={(e) => setDeliveryArea(e.target.value)}
-                      placeholder="e.g. East Legon, Spintex, Adum"
+                      value={deliveryNote}
+                      onChange={(e) => setDeliveryNote(e.target.value)}
+                      placeholder="e.g. Call before coming"
                       className="w-full bg-[#0e141a] border border-slate-700/80 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-[#00c365]"
                     />
                   </div>
-                </div>
 
-                <div className="space-y-1">
-                  <label className="text-slate-300 font-semibold block text-[11px]">
-                    Landmark / Address <span className="text-slate-500">(Optional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={deliveryLandmark}
-                    onChange={(e) => setDeliveryLandmark(e.target.value)}
-                    placeholder="e.g. Near Shell filling station, House No. 24"
-                    className="w-full bg-[#0e141a] border border-slate-700/80 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-[#00c365]"
-                  />
+                  <p className="text-[11px] text-slate-400 italic">
+                    Note: Standard local dispatch delivery fee calculated or confirmed prior to dispatch.
+                  </p>
                 </div>
-
-                <div className="space-y-1">
-                  <label className="text-slate-300 font-semibold block text-[11px]">
-                    Delivery Instructions / Note <span className="text-slate-500">(Optional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={deliveryNote}
-                    onChange={(e) => setDeliveryNote(e.target.value)}
-                    placeholder="e.g. Call before coming"
-                    className="w-full bg-[#0e141a] border border-slate-700/80 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-[#00c365]"
-                  />
-                </div>
-
-                <p className="text-[11px] text-slate-400 italic">
-                  Note: Standard local dispatch delivery fee calculated or confirmed prior to dispatch.
-                </p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Purchase Note Banner */}
           {product.purchaseNote && (
@@ -461,99 +515,103 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
             </div>
           )}
 
-          {/* Customer Details Form */}
-          <div className="space-y-3 pt-1 border-t border-slate-800">
-            <span className="font-bold text-slate-200 block text-xs">Customer Contact Information:</span>
+          {/* Customer Details Form (Only when direct purchase is possible) */}
+          {!isDirectPurchaseBlocked && !isPickupBlocked && (
+            <>
+              <div className="space-y-3 pt-1 border-t border-slate-800">
+                <span className="font-bold text-slate-200 block text-xs">Customer Contact Information:</span>
 
-            <div className="space-y-1.5">
-              <label className="font-semibold text-slate-300 block text-[11px]">
-                Full Name <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="e.g. Kwame Asante"
-                className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-[#00c365]"
-              />
-            </div>
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-300 block text-[11px]">
+                    Full Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="e.g. Kwame Asante"
+                    className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-[#00c365]"
+                  />
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="font-semibold text-slate-300 block text-[11px]">
-                  Ghanaian Phone Number <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="e.g. 059 206 6298"
-                  className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-[#00c365]"
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-slate-300 block text-[11px]">
+                      Ghanaian Phone Number <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="e.g. 059 206 6298"
+                      className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-[#00c365]"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-slate-300 block text-[11px]">
+                      Email Address (Receipt) <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="e.g. kwame@example.com"
+                      className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-[#00c365]"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="font-semibold text-slate-300 block text-[11px]">
-                  Email Address (Receipt) <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. kwame@example.com"
-                  className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-[#00c365]"
-                />
+              {/* Order Summary Breakdown */}
+              <div className="p-4 rounded-xl bg-[#090d10] border border-slate-800 space-y-2 text-xs">
+                <span className="font-bold text-white block">Order Summary:</span>
+                <div className="flex justify-between text-slate-300">
+                  <span>
+                    {product.name} {selectedVariant ? `(${selectedVariant.name})` : ''}
+                  </span>
+                  <span className="font-mono text-white font-bold">
+                    GH₵{unitPriceGhc.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                <div className="flex justify-between text-slate-300">
+                  <span>Fulfilment ({fulfilmentMethod === 'pickup' ? 'Pickup' : 'Delivery'})</span>
+                  <span className="font-mono text-emerald-400">
+                    {fulfilmentMethod === 'pickup' ? 'Free Pickup' : 'Local Dispatch'}
+                  </span>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 flex justify-between font-extrabold text-sm text-white">
+                  <span>Total Amount Payable</span>
+                  <span className="text-emerald-400 font-mono text-base">
+                    GH₵{unitPriceGhc.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Order Summary Breakdown */}
-          <div className="p-4 rounded-xl bg-[#090d10] border border-slate-800 space-y-2 text-xs">
-            <span className="font-bold text-white block">Order Summary:</span>
-            <div className="flex justify-between text-slate-300">
-              <span>
-                {product.name} {selectedVariant ? `(${selectedVariant.name})` : ''}
-              </span>
-              <span className="font-mono text-white font-bold">
-                GH₵{unitPriceGhc.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-              </span>
-            </div>
+              {/* CTA Payment Button */}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-3.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs sm:text-sm uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.25)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-50"
+              >
+                <CreditCard className="w-4 h-4" />
+                <span>
+                  {isSubmitting
+                    ? 'Initializing Payment...'
+                    : `Proceed to Payment — GH₵${unitPriceGhc.toLocaleString('en-US', {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                      })}`}
+                </span>
+              </button>
 
-            <div className="flex justify-between text-slate-300">
-              <span>Fulfilment ({fulfilmentMethod === 'pickup' ? 'Pickup' : 'Delivery'})</span>
-              <span className="font-mono text-emerald-400">
-                {fulfilmentMethod === 'pickup' ? 'Free Pickup' : 'Local Dispatch'}
-              </span>
-            </div>
-
-            <div className="pt-2 border-t border-slate-800 flex justify-between font-extrabold text-sm text-white">
-              <span>Total Amount Payable</span>
-              <span className="text-emerald-400 font-mono text-base">
-                GH₵{unitPriceGhc.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-          </div>
-
-          {/* CTA Button */}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-3.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs sm:text-sm uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.25)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-50"
-          >
-            <CreditCard className="w-4 h-4" />
-            <span>
-              {isSubmitting
-                ? 'Initializing Payment...'
-                : `Proceed to Payment — GH₵${unitPriceGhc.toLocaleString('en-US', {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 2,
-                  })}`}
-            </span>
-          </button>
-
-          <p className="text-[10px] text-center text-slate-500">
-            Powered by Paystack · Accepts Mobile Money (MTN, Telecel, AT), Cards, Visa &amp; Bank Transfer.
-          </p>
+              <p className="text-[10px] text-center text-slate-500">
+                Powered by Paystack · Accepts Mobile Money (MTN, Telecel, AT), Cards, Visa &amp; Bank Transfer.
+              </p>
+            </>
+          )}
         </form>
       </div>
     </div>
