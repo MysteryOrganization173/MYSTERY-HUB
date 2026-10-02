@@ -102,7 +102,11 @@ export function getPageFromPath(rawPath: string | null | undefined): ActivePage 
     return 'website';
   }
 
-  if (normalized === '/marketplace' || normalized === '/marketplace/index.html') {
+  if (
+    normalized === '/marketplace' ||
+    normalized.startsWith('/marketplace/') ||
+    normalized === '/marketplace/index.html'
+  ) {
     return 'marketplace';
   }
 

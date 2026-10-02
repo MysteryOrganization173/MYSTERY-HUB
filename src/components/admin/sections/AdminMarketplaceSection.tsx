@@ -37,6 +37,7 @@ import {
   Check,
   ChevronDown,
   Info,
+  Gift,
 } from 'lucide-react';
 
 interface AdminMarketplaceSectionProps {
@@ -79,6 +80,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
   const [formDescription, setFormDescription] = useState('');
   const [formPriceType, setFormPriceType] = useState<'fixed' | 'starting_at' | 'quote'>('fixed');
   const [formPriceGhc, setFormPriceGhc] = useState<string>('');
+  const [formReferralRewardGhc, setFormReferralRewardGhc] = useState<string>('');
   const [formAvailability, setFormAvailability] = useState<
     'available' | 'check_availability' | 'limited' | 'coming_soon'
   >('available');
@@ -154,6 +156,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
     setFormDescription('');
     setFormPriceType('fixed');
     setFormPriceGhc('');
+    setFormReferralRewardGhc('');
     setFormAvailability('available');
     setFormAvailabilityLabel('');
     setFormBadge('');
@@ -186,6 +189,13 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
         ? String(p.priceGhc)
         : p.priceMinor
         ? String(p.priceMinor / 100)
+        : ''
+    );
+    setFormReferralRewardGhc(
+      p.referralRewardGhc !== null && p.referralRewardGhc !== undefined
+        ? String(p.referralRewardGhc)
+        : p.referralRewardMinor
+        ? String(p.referralRewardMinor / 100)
         : ''
     );
     setFormAvailability(p.availability || 'available');
@@ -340,6 +350,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
         description: formDescription.trim() || undefined,
         priceType: formPriceType,
         priceGhc: formPriceType !== 'quote' ? parseFloat(formPriceGhc) : undefined,
+        referralRewardGhc: formReferralRewardGhc && parseFloat(formReferralRewardGhc) > 0 ? parseFloat(formReferralRewardGhc) : null,
         availability: formAvailability,
         availabilityLabel: formAvailabilityLabel.trim() || undefined,
         badge: formBadge.trim() || undefined,
@@ -606,6 +617,12 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                       {p.badge && (
                         <span className="text-[10px] font-semibold text-slate-300 bg-slate-800 px-2 py-0.2 rounded-md">
                           {p.badge}
+                        </span>
+                      )}
+                      {p.referralRewardGhc && p.referralRewardGhc > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-2 py-0.5 rounded-md">
+                          <Gift className="w-2.5 h-2.5 text-amber-400" />
+                          <span>Earn GH₵{p.referralRewardGhc.toLocaleString()}</span>
                         </span>
                       )}
                     </div>
@@ -992,7 +1009,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                   {formPriceType !== 'quote' && (
                     <div className="space-y-1.5">
                       <label className="font-semibold text-slate-300 block">
-                        Price in GHS (GH₵) <span className="text-red-400">*</span>
+                         Price in GHS (GH₵) <span className="text-red-400">*</span>
                       </label>
                       <input
                         type="number"
@@ -1006,6 +1023,29 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                       />
                     </div>
                   )}
+
+                  {/* Mystery Earn Referral Reward */}
+                  <div className="space-y-1.5 sm:col-span-2 pt-2 border-t border-slate-800">
+                    <label className="font-semibold text-slate-300 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-[#00c365]">
+                        <Gift className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Mystery Earn Share & Earn Reward (GH₵)</span>
+                      </span>
+                      <span className="text-slate-500 font-normal text-[11px]">Optional fixed partner reward</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formReferralRewardGhc}
+                      onChange={(e) => setFormReferralRewardGhc(e.target.value)}
+                      placeholder="e.g. 200 (Leave blank or 0 to disable)"
+                      className="w-full bg-[#11171d] border border-slate-700 rounded-xl px-3.5 py-2 text-white font-mono placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
+                    />
+                    <p className="text-[11px] text-slate-400">
+                      When set &gt; 0, members can share this product and earn this amount when a referred customer completes an order.
+                    </p>
+                  </div>
                 </div>
               </div>
 

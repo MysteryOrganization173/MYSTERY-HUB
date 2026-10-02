@@ -3,7 +3,8 @@ import { useApp } from '../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { MARKETPLACE_CATEGORIES } from '../../data/marketplace';
 import { MarketplaceCategory, MarketplaceProduct } from '../../types';
-import { getPublicMarketplaceProducts } from '../../services/apiClient';
+import { getPublicMarketplaceProducts, getMyReferralSummary } from '../../services/apiClient';
+import { buildReferralUrl } from '../../utils/referralUrl';
 import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
 import { OptimizedImage } from '../common/OptimizedImage';
 import {
@@ -24,10 +25,18 @@ import {
   Phone,
   Box,
   RotateCcw,
+  Gift,
+  Share2,
+  Copy,
+  Check,
+  X,
+  MessageCircle,
+  ArrowRight,
+  Info,
 } from 'lucide-react';
 
 export const MarketplacePage: React.FC = () => {
-  const { openMarketplaceInquiry } = useApp();
+  const { openMarketplaceInquiry, user, sessionToken, openAuth, showToast } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<MarketplaceCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -39,6 +48,33 @@ export const MarketplacePage: React.FC = () => {
   // Hero image load & error states for smooth reveal
   const [heroImageLoaded, setHeroImageLoaded] = useState(false);
   const [heroImageFailed, setHeroImageFailed] = useState(false);
+
+  // Share & Earn States
+  const [referralCode, setReferralCode] = useState<string>('');
+  const [shareModalProduct, setShareModalProduct] = useState<MarketplaceProduct | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
+
+  // Load authenticated referral code if user is logged in
+  useEffect(() => {
+    let isMounted = true;
+    if (user && sessionToken) {
+      getMyReferralSummary(sessionToken)
+        .then((res) => {
+          if (isMounted && res?.summary?.code) {
+            setReferralCode(res.summary.code);
+          }
+        })
+        .catch(() => {
+          // Graceful fallback
+        });
+    } else {
+      setReferralCode('');
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [user, sessionToken]);
 
   const fetchCatalog = useCallback(async () => {
     setLoading(true);
@@ -63,6 +99,53 @@ export const MarketplacePage: React.FC = () => {
     fetchCatalog();
   }, [fetchCatalog]);
 
+  // Deep-link landing & spotlight behavior
+  useEffect(() => {
+    if (loading || products.length === 0) return;
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const targetParam =
+        searchParams.get('product') || searchParams.get('item') || searchParams.get('id');
+
+      let targetProduct: MarketplaceProduct | undefined;
+      if (targetParam) {
+        const cleanParam = targetParam.toLowerCase().trim();
+        targetProduct = products.find(
+          (p) => p.slug?.toLowerCase() === cleanParam || p.id.toLowerCase() === cleanParam
+        );
+      } else {
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        if (pathParts.length >= 2 && pathParts[0] === 'marketplace') {
+          const slugPart = pathParts[1].toLowerCase().trim();
+          targetProduct = products.find(
+            (p) => p.slug?.toLowerCase() === slugPart || p.id.toLowerCase() === slugPart
+          );
+        }
+      }
+
+      if (targetProduct) {
+        setHighlightedProductId(targetProduct.id);
+        const timerScroll = setTimeout(() => {
+          const el = document.getElementById(`marketplace-product-${targetProduct!.id}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 150);
+
+        const timerHighlight = setTimeout(() => {
+          setHighlightedProductId(null);
+        }, 5000);
+
+        return () => {
+          clearTimeout(timerScroll);
+          clearTimeout(timerHighlight);
+        };
+      }
+    } catch {
+      // Non-invasive url check
+    }
+  }, [loading, products]);
+
   const filteredProducts = useMemo(() => {
     if (!searchQuery.trim()) return products;
     const q = searchQuery.toLowerCase().trim();
@@ -74,6 +157,51 @@ export const MarketplacePage: React.FC = () => {
       return matchesName || matchesDesc || matchesTagline || matchesCategory;
     });
   }, [products, searchQuery]);
+
+  const formatGhcReward = (val: number | null | undefined): string => {
+    if (val === null || val === undefined || isNaN(val)) return '0';
+    return val.toLocaleString('en-US', {
+      minimumFractionDigits: val % 1 === 0 ? 0 : 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const handleOpenShareModal = (p: MarketplaceProduct) => {
+    setShareModalProduct(p);
+    setCopiedLink(false);
+  };
+
+  const handleCloseShareModal = () => {
+    setShareModalProduct(null);
+    setCopiedLink(false);
+  };
+
+  const handleCopyLink = (url: string) => {
+    try {
+      navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      showToast('Product referral link copied to clipboard!', 'success');
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch {
+      showToast('Failed to copy link. Please select and copy manually.', 'warning');
+    }
+  };
+
+  const handleNativeShare = (p: MarketplaceProduct, url: string) => {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator
+        .share({
+          title: `${p.name} · Mystery Hub`,
+          text: `Check out ${p.name} on Mystery Hub (${p.priceDisplay}):`,
+          url: url,
+        })
+        .catch(() => {
+          // Ignore aborted share dialogs
+        });
+    } else {
+      handleCopyLink(url);
+    }
+  };
 
   const getCategoryFallbackIcon = (category: string) => {
     switch (category) {
@@ -96,6 +224,15 @@ export const MarketplacePage: React.FC = () => {
   const heroBannerUrl = BUSINESS_CONFIG.marketplaceHeroImageUrl;
   const heroSrc = getCloudinaryUrl(heroBannerUrl, { format: 'auto', quality: 'auto' });
   const heroSrcSet = getCloudinarySrcSet(heroBannerUrl, [640, 960, 1280, 1600]);
+
+  // Active product referral link builder
+  const activeProductShareUrl = useMemo(() => {
+    if (!shareModalProduct) return '';
+    const route = `/marketplace?product=${encodeURIComponent(
+      shareModalProduct.slug || shareModalProduct.id
+    )}`;
+    return buildReferralUrl(route, referralCode || 'MYSTERY');
+  }, [shareModalProduct, referralCode]);
 
   return (
     <div className="min-h-screen py-5 sm:py-8">
@@ -453,12 +590,26 @@ export const MarketplacePage: React.FC = () => {
                 style: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
               };
 
+              const isEligibleForShare =
+                p.published !== false &&
+                !p.archived &&
+                p.availability !== 'coming_soon' &&
+                typeof p.referralRewardGhc === 'number' &&
+                p.referralRewardGhc > 0;
+
+              const rewardGhcFormatted = isEligibleForShare ? formatGhcReward(p.referralRewardGhc) : null;
               const directWhatsAppLink = BUSINESS_CONFIG.getMarketplaceInquiryWhatsAppUrl(p.name);
+              const isHighlighted = highlightedProductId === p.id;
 
               return (
                 <div
+                  id={`marketplace-product-${p.id}`}
                   key={p.id}
-                  className="rounded-2xl bg-[#0f151b] border border-slate-800 hover:border-slate-700/80 transition-all duration-200 flex flex-col justify-between overflow-hidden group shadow-md hover:shadow-xl"
+                  className={`rounded-2xl bg-[#0f151b] border transition-all duration-300 flex flex-col justify-between overflow-hidden group shadow-md hover:shadow-xl ${
+                    isHighlighted
+                      ? 'border-[#00c365] ring-2 ring-[#00c365]/50 ring-offset-2 ring-offset-[#070b0e] scale-[1.01]'
+                      : 'border-slate-800 hover:border-slate-700/80'
+                  }`}
                 >
                   <div>
                     {/* Product Image Container (4:3 Aspect Ratio, object-cover) */}
@@ -529,9 +680,31 @@ export const MarketplacePage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Card Footer: Inquire & WhatsApp CTAs */}
-                  <div className="p-4 sm:p-5 pt-0">
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80">
+                  {/* Card Footer: Share & Earn Strip + Inquire & WhatsApp CTAs */}
+                  <div className="p-4 sm:p-5 pt-0 space-y-2.5">
+                    {/* Share & Earn Action Strip (Only when eligible with reward > 0) */}
+                    {isEligibleForShare && rewardGhcFormatted && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenShareModal(p)}
+                        className="w-full px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500/10 via-[#00c365]/10 to-amber-500/10 hover:from-amber-500/20 hover:via-[#00c365]/20 hover:to-amber-500/20 border border-amber-500/30 hover:border-amber-400/60 transition-all flex items-center justify-between group/strip cursor-pointer shadow-sm active:scale-[0.98]"
+                        aria-label={`Share and earn GH₵${rewardGhcFormatted} on ${p.name}`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Gift className="w-3.5 h-3.5 text-amber-400 shrink-0 group-hover/strip:rotate-12 transition-transform" />
+                          <span className="text-xs font-bold text-white flex items-center gap-1 truncate">
+                            <span>Share &amp; Earn</span>
+                            <span className="text-amber-400 font-mono font-extrabold">GH₵{rewardGhcFormatted}</span>
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[11px] font-bold text-[#00c365] group-hover/strip:translate-x-0.5 transition-transform shrink-0">
+                          <span>Get Link</span>
+                          <Share2 className="w-3 h-3" />
+                        </div>
+                      </button>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80">
                       <button
                         onClick={() => openMarketplaceInquiry(p)}
                         className="w-full py-2 px-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1 shadow-sm cursor-pointer active:scale-95"
@@ -598,6 +771,207 @@ export const MarketplacePage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ========================================================================= */}
+      {/* SHARE & EARN MODALS (GUEST OR AUTHENTICATED) */}
+      {/* ========================================================================= */}
+      {shareModalProduct && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={handleCloseShareModal}
+        >
+          <div
+            className="relative w-full max-w-lg bg-[#0e141a] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="share-modal-title"
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-[#090d11] shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <Gift className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] text-[#00c365] uppercase tracking-wider font-bold block">
+                    Mystery Earn · Share &amp; Earn
+                  </span>
+                  <h3 id="share-modal-title" className="text-sm sm:text-base font-bold text-white">
+                    {user ? 'Product Referral Link' : 'Earn with Mystery Hub'}
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseShareModal}
+                className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-5 text-left">
+              {/* Product Preview Card */}
+              <div className="p-3.5 rounded-xl bg-[#121921] border border-slate-800 flex items-center gap-3">
+                <div className="w-14 h-14 rounded-lg bg-[#080d11] border border-slate-800 shrink-0 overflow-hidden flex items-center justify-center">
+                  {shareModalProduct.imageUrl ? (
+                    <img
+                      src={shareModalProduct.imageUrl}
+                      alt={shareModalProduct.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    getCategoryFallbackIcon(shareModalProduct.category)
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">
+                    {shareModalProduct.categoryLabel}
+                  </span>
+                  <h4 className="font-bold text-sm text-white truncate">{shareModalProduct.name}</h4>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300 font-bold">{shareModalProduct.priceDisplay}</span>
+                    <span className="font-extrabold text-amber-400 font-mono">
+                      Earn GH₵{formatGhcReward(shareModalProduct.referralRewardGhc)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* AUTHENTICATED USER EXPERIENCE */}
+              {user ? (
+                <div className="space-y-4">
+                  {/* Reward Callout */}
+                  <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-[#00c365]/10 to-amber-500/10 border border-amber-500/30 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-white">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Reward Value</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Earn <span className="font-mono font-extrabold text-amber-400">GH₵{formatGhcReward(shareModalProduct.referralRewardGhc)}</span> when a buyer completes a qualifying purchase through your link.
+                    </p>
+                  </div>
+
+                  {/* Share Link Input */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                      Your Tracked Product Link
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={activeProductShareUrl}
+                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                        className="w-full bg-[#080d11] border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 select-all focus:outline-none focus:border-[#00c365]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleCopyLink(activeProductShareUrl)}
+                        className="px-3.5 py-2 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1 shrink-0 cursor-pointer active:scale-95"
+                      >
+                        {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedLink ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Instant Sharing Actions */}
+                  <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
+                    <a
+                      href={`https://wa.me/?text=${encodeURIComponent(
+                        `Check out ${shareModalProduct.name} on Mystery Hub (${shareModalProduct.priceDisplay}):\n${activeProductShareUrl}`
+                      )}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex-1 py-2.5 px-4 rounded-xl bg-[#25D366]/20 hover:bg-[#25D366]/30 text-[#25D366] border border-[#25D366]/40 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span>Share on WhatsApp</span>
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() => handleNativeShare(shareModalProduct, activeProductShareUrl)}
+                      className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      <span>More Share Options</span>
+                    </button>
+                  </div>
+
+                  {/* Trust note */}
+                  <p className="text-[11px] text-slate-400 leading-relaxed pt-1">
+                    Rewards are credited to your Mystery Earn ledger automatically when the order reaches terminal delivery.
+                  </p>
+                </div>
+              ) : (
+                /* GUEST USER EXPERIENCE */
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <h4 className="text-lg font-extrabold text-white tracking-tight">
+                      Create your free account to earn
+                    </h4>
+                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                      Get your personal Mystery Hub referral link and earn{' '}
+                      <span className="font-mono font-extrabold text-amber-400">
+                        GH₵{formatGhcReward(shareModalProduct.referralRewardGhc)}
+                      </span>{' '}
+                      when a qualifying purchase of this product is confirmed.
+                    </p>
+                  </div>
+
+                  {/* Key Highlights */}
+                  <div className="p-3.5 rounded-xl bg-[#090e13] border border-slate-800 space-y-2 text-xs text-slate-300">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-[#00c365] shrink-0" />
+                      <span>Instant permanent referral code generated upon registration</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-[#00c365] shrink-0" />
+                      <span>Tracked lifetime attribution for future orders</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-[#00c365] shrink-0" />
+                      <span>Transparent ledger dashboard to monitor rewards</span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="pt-2 flex flex-col gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleCloseShareModal();
+                        openAuth('signup');
+                      }}
+                      className="w-full py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>Create Free Account &amp; Start Earning</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleCloseShareModal();
+                        openAuth('login');
+                      }}
+                      className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <span>I Already Have an Account</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

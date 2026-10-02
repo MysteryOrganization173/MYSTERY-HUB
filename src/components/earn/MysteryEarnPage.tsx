@@ -40,7 +40,7 @@ export interface MysteryEarnPageProps {
 }
 
 export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
-  const { user, sessionToken, isAuthChecking, openAuth, showToast } = useApp();
+  const { user, sessionToken, isAuthChecking, openAuth, showToast, setActivePage } = useApp();
 
   // Media loading
   const [heroImageLoaded, setHeroImageLoaded] = useState(false);
@@ -752,14 +752,26 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
             </div>
 
             {/* Category 2 */}
-            <div className="p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-2.5 text-left">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                <ShoppingBag className="w-4 h-4" />
+            <div className="p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-2.5 text-left flex flex-col justify-between">
+              <div className="space-y-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <ShoppingBag className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-white text-sm">Marketplace Sourcing</h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Selected marketplace products offer direct fixed referral rewards when buyers complete qualifying purchases. You can share eligible product links directly from the Marketplace.
+                </p>
               </div>
-              <h3 className="font-bold text-white text-sm">Marketplace Sourcing</h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Selected marketplace products may offer larger fixed referral rewards when buyers complete qualifying purchases.
-              </p>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setActivePage('marketplace')}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                >
+                  <span>Browse Marketplace Opportunities</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             {/* Category 3 */}

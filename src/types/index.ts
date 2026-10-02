@@ -251,6 +251,8 @@ export interface MarketplaceProduct {
   published?: boolean;
   archived?: boolean;
   sortOrder?: number;
+  referralRewardMinor?: number | null;
+  referralRewardGhc?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }

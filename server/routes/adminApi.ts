@@ -868,6 +868,21 @@ adminRouter.post('/marketplace/products', async (req: Request, res: Response) =>
       imageUrl = cleanUrl;
     }
 
+    let referralRewardMinor: number | null | undefined;
+    if (body.referralRewardMinor !== undefined) {
+      referralRewardMinor =
+        typeof body.referralRewardMinor === 'number' && !isNaN(body.referralRewardMinor)
+          ? Math.max(0, Math.floor(body.referralRewardMinor))
+          : null;
+    } else if (body.referralRewardGhc !== undefined) {
+      if (body.referralRewardGhc === null || body.referralRewardGhc === '' || body.referralRewardGhc === 0) {
+        referralRewardMinor = null;
+      } else {
+        const parsedGhc = parseFloat(String(body.referralRewardGhc));
+        referralRewardMinor = !isNaN(parsedGhc) && parsedGhc > 0 ? Math.round(parsedGhc * 100) : null;
+      }
+    }
+
     const product = await MarketplaceStore.createProduct(
       {
         slug: body.slug ? sanitizeString(body.slug, 128) : undefined,
@@ -877,6 +892,7 @@ adminRouter.post('/marketplace/products', async (req: Request, res: Response) =>
         description: sanitizeString(body.description, 5000) || null,
         priceType,
         priceMinor,
+        referralRewardMinor: referralRewardMinor !== undefined ? referralRewardMinor : null,
         availability,
         availabilityLabel: sanitizeString(body.availabilityLabel, 64) || null,
         badge: sanitizeString(body.badge, 64) || null,
@@ -990,6 +1006,21 @@ adminRouter.patch('/marketplace/products/:id', async (req: Request, res: Respons
       availability = body.availability;
     }
 
+    let referralRewardMinor: number | null | undefined;
+    if (body.referralRewardMinor !== undefined) {
+      referralRewardMinor =
+        typeof body.referralRewardMinor === 'number' && !isNaN(body.referralRewardMinor)
+          ? Math.max(0, Math.floor(body.referralRewardMinor))
+          : null;
+    } else if (body.referralRewardGhc !== undefined) {
+      if (body.referralRewardGhc === null || body.referralRewardGhc === '' || body.referralRewardGhc === 0) {
+        referralRewardMinor = null;
+      } else {
+        const parsedGhc = parseFloat(String(body.referralRewardGhc));
+        referralRewardMinor = !isNaN(parsedGhc) && parsedGhc > 0 ? Math.round(parsedGhc * 100) : null;
+      }
+    }
+
     const updated = await MarketplaceStore.updateProduct(
       id,
       {
@@ -1000,6 +1031,7 @@ adminRouter.patch('/marketplace/products/:id', async (req: Request, res: Respons
         description: body.description !== undefined ? sanitizeString(body.description, 5000) || null : undefined,
         priceType,
         priceMinor,
+        referralRewardMinor,
         availability,
         availabilityLabel: body.availabilityLabel !== undefined ? sanitizeString(body.availabilityLabel, 64) || null : undefined,
         badge: body.badge !== undefined ? sanitizeString(body.badge, 64) || null : undefined,
