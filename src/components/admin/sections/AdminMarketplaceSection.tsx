@@ -38,6 +38,7 @@ import {
   ChevronDown,
   Info,
   Gift,
+  MapPin,
 } from 'lucide-react';
 
 interface AdminMarketplaceSectionProps {
@@ -117,6 +118,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
     highlights: string[];
     specs: { label: string; value: string }[];
     detectedPriceOptions: { label: string; priceGhc: number }[];
+    detectedPickupLocations?: { city: string; area: string; address: string; landmark?: string }[];
     warnings: string[];
     sourceNotes: string[];
   } | null>(null);
@@ -843,6 +845,22 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                             <div key={i} className="flex justify-between text-slate-300">
                               <span>• {opt.label}</span>
                               <span className="font-mono text-white font-bold">GH₵{opt.priceGhc.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Detected Pickup Locations */}
+                      {aiExtraction.detectedPickupLocations && aiExtraction.detectedPickupLocations.length > 0 && (
+                        <div className="p-2.5 rounded-lg bg-[#0e141a] border border-slate-800 space-y-1 text-[11px]">
+                          <span className="font-bold text-white block flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-[#00c365]" />
+                            <span>Detected Pickup Locations ({aiExtraction.detectedPickupLocations.length}):</span>
+                          </span>
+                          {aiExtraction.detectedPickupLocations.map((loc, i) => (
+                            <div key={i} className="text-slate-300">
+                              • <span className="font-bold text-white">{loc.city}</span> ({loc.area}): {loc.address}{' '}
+                              {loc.landmark ? `[${loc.landmark}]` : ''}
                             </div>
                           ))}
                         </div>

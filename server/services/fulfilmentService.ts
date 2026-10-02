@@ -717,4 +717,30 @@ export class FulfilmentService {
 
     return order;
   }
+
+  /**
+   * 4. RECONCILE ALL ACTIVE SUPPLIER ORDERS
+   * Batch reconciles submitted/processing telecom orders with the supplier
+   */
+  static async reconcileActiveSupplierOrders(
+    force = false,
+    limit = 50
+  ): Promise<{ scanned: number; updatedCount: number }> {
+    let scanned = 0;
+    let updatedCount = 0;
+    try {
+      const activeOrders = await OrdersStore.getActiveSupplierOrders(limit);
+      scanned = activeOrders.length;
+      for (const order of activeOrders) {
+        const prevStatus = order.status;
+        const refreshed = await this.refreshOrderStatusIfDue(order, force);
+        if (refreshed.status !== prevStatus) {
+          updatedCount++;
+        }
+      }
+    } catch (err) {
+      console.warn('[Fulfilment Reconciler] Error reconciling active supplier orders:', err);
+    }
+    return { scanned, updatedCount };
+  }
 }

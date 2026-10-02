@@ -56,6 +56,10 @@ export function safeCsvCell(val: unknown): string {
  */
 adminRouter.get('/overview', async (req: Request, res: Response) => {
   try {
+    // Reconcile active supplier order statuses before calculating metrics
+    const isForce = req.query.force === 'true' || req.query.refresh === 'true';
+    await FulfilmentService.reconcileActiveSupplierOrders(isForce);
+
     const [orderMetrics, customerCount, waitlistStats] = await Promise.all([
       OrdersStore.getOverviewMetrics(),
       AuthStore.countCustomers(),
@@ -112,6 +116,9 @@ adminRouter.get('/overview', async (req: Request, res: Response) => {
  */
 adminRouter.get('/orders', async (req: Request, res: Response) => {
   try {
+    const isForce = req.query.force === 'true' || req.query.refresh === 'true';
+    await FulfilmentService.reconcileActiveSupplierOrders(isForce);
+
     const {
       q,
       serviceType,

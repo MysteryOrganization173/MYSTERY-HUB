@@ -684,6 +684,38 @@ export class OrdersStore {
   }
 
   /**
+   * Get active supplier orders (submitted or processing) that require supplier reconciliation
+   */
+  static async getActiveSupplierOrders(limit: number = 50): Promise<OrderRecord[]> {
+    const pool = getPool();
+    if (pool) {
+      const query = `
+        SELECT * FROM orders
+        WHERE status IN ('submitted', 'processing')
+          AND supplier_order_id IS NOT NULL
+          AND service_type IN ('data', 'airtime', 'instant_bundle')
+        ORDER BY created_at DESC
+        LIMIT $1;
+      `;
+      const res = await pool.query(query, [limit]);
+      return res.rows as OrderRecord[];
+    } else {
+      const all = Array.from(devMemoryStore.values()).filter(
+        (o, idx, arr) => arr.findIndex((x) => x.id === o.id) === idx
+      );
+      return all
+        .filter(
+          (o) =>
+            (o.status === 'submitted' || o.status === 'processing') &&
+            Boolean(o.supplier_order_id) &&
+            ['data', 'airtime', 'instant_bundle'].includes(o.service_type || '')
+        )
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, limit);
+    }
+  }
+
+  /**
    * Admin: Safely purge unpaid test/abandoned payment attempts
    * Only deletes records where payment_status != 'success', paid_at IS NULL,
    * supplier_order_id IS NULL, submitted_at IS NULL, delivered_at IS NULL.
@@ -824,6 +856,43 @@ export class OrdersStore {
         }
       }
       return null;
+    }
+  }
+
+  /**
+   * Find active telecom supplier orders requiring status reconciliation
+   * Excludes terminal statuses and Marketplace / manual orders
+   */
+  static async findActiveSupplierOrders(limit = 30): Promise<OrderRecord[]> {
+    const pool = getPool();
+    if (pool) {
+      const query = `
+        SELECT * FROM orders
+        WHERE status IN ('submitted', 'processing')
+          AND supplier_order_id IS NOT NULL
+          AND (service_type IS NULL OR service_type IN ('data', 'airtime', 'instant_bundle'))
+        ORDER BY supplier_last_checked_at ASC NULLS FIRST, created_at ASC
+        LIMIT $1;
+      `;
+      const result = await pool.query(query, [limit]);
+      return result.rows as OrderRecord[];
+    } else {
+      const active: OrderRecord[] = [];
+      for (const order of devMemoryStore.values()) {
+        if (
+          order.supplier_order_id &&
+          (order.status === 'submitted' || order.status === 'processing') &&
+          (!order.service_type || ['data', 'airtime', 'instant_bundle'].includes(order.service_type))
+        ) {
+          active.push(order);
+        }
+      }
+      active.sort((a, b) => {
+        const tA = a.supplier_last_checked_at ? new Date(a.supplier_last_checked_at).getTime() : 0;
+        const tB = b.supplier_last_checked_at ? new Date(b.supplier_last_checked_at).getTime() : 0;
+        return tA - tB;
+      });
+      return active.slice(0, limit);
     }
   }
 

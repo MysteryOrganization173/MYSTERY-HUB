@@ -16,11 +16,16 @@ import {
   Package,
 } from 'lucide-react';
 
+const MEMBER_HERO_ARTWORK_URL =
+  'https://res.cloudinary.com/da6oeat7m/image/upload/v1790940772/61009651-f075-49c5-a7b9-83c450f6aa3c_tf4x36.png';
+
 export const MemberHome: React.FC = () => {
   const { user, sessionToken, openDataPage, setActivePage, openOrderStatus } = useApp();
   const [recentOrders, setRecentOrders] = useState<SafePublicOrderDetails[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
+  const [heroImageLoaded, setHeroImageLoaded] = useState(false);
+  const [heroImageFailed, setHeroImageFailed] = useState(false);
 
   // Deterministic greeting using local browser time
   const getGreeting = () => {
@@ -179,29 +184,56 @@ export const MemberHome: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-6 space-y-6">
       {/* 1. Header Greeting Panel */}
-      <div className="relative rounded-2xl sm:rounded-3xl bg-[#090d11] border border-slate-800/90 overflow-hidden p-5 sm:p-7 shadow-xl">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-[#00c365]/10 rounded-full blur-[90px] pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1.5 max-w-xl">
-            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#112019] border border-[#00c365]/30 text-xs font-semibold text-[#00c365]">
+      <div className="relative rounded-2xl sm:rounded-3xl bg-[#090d11] border border-slate-800/90 overflow-hidden p-5 sm:p-7 shadow-xl group">
+        {/* Background Artwork Layer */}
+        {!heroImageFailed && (
+          <img
+            src={getCloudinaryUrl(MEMBER_HERO_ARTWORK_URL, { width: 960, quality: 'auto', format: 'auto' })}
+            srcSet={getCloudinarySrcSet(MEMBER_HERO_ARTWORK_URL, [480, 640, 768, 960, 1200, 1440])}
+            sizes="(max-width: 1024px) 100vw, 80vw"
+            alt=""
+            aria-hidden="true"
+            loading="eager"
+            // @ts-ignore
+            fetchPriority="high"
+            decoding="async"
+            onLoad={() => setHeroImageLoaded(true)}
+            onError={() => setHeroImageFailed(true)}
+            className={`absolute inset-0 w-full h-full object-cover object-[70%_center] sm:object-[75%_center] lg:object-right transition-all duration-700 ease-out z-0 ${
+              heroImageLoaded ? 'opacity-65 sm:opacity-75 lg:opacity-85 scale-100 group-hover:scale-[1.02]' : 'opacity-0'
+            }`}
+          />
+        )}
+
+        {/* Readability Gradient Overlays: Dark near-black on left/middle, fading on right */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#090d11] via-[#090d11]/90 to-[#090d11]/30 sm:via-[#090d11]/85 sm:to-[#090d11]/20 pointer-events-none z-10" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#090d11] via-transparent to-transparent opacity-80 sm:opacity-40 pointer-events-none z-10" />
+
+        {/* Ambient Background Emerald Glow */}
+        <div className="absolute top-0 right-0 w-80 h-80 bg-[#00c365]/15 rounded-full blur-[90px] pointer-events-none z-10" />
+
+        {/* Real Content Layer */}
+        <div className="relative z-20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1.5 max-w-xl text-left">
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#112019]/90 border border-[#00c365]/35 text-xs font-semibold text-[#00c365] shadow-sm backdrop-blur-md">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Your Mystery Hub Home</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight drop-shadow-sm">
               {getGreeting()}, {firstName} 👋
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-normal drop-shadow-sm">
               Buy data, build websites, track orders, and discover services from one place.
             </p>
           </div>
 
           {/* Account Benefits Chip Line */}
-          <div className="flex flex-wrap gap-2 pt-2 md:pt-0">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300">
+          <div className="flex flex-wrap gap-2 pt-1 md:pt-0 shrink-0">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#090d11]/90 border border-slate-700/80 text-[11px] font-medium text-slate-200 backdrop-blur-md shadow-sm">
               <ShieldCheck className="w-3.5 h-3.5 text-[#00c365]" />
               Account-Linked Orders
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#090d11]/90 border border-slate-700/80 text-[11px] font-medium text-slate-200 backdrop-blur-md shadow-sm">
               <Globe className="w-3.5 h-3.5 text-sky-400" />
               Website Builder Access
             </span>
