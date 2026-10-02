@@ -1,5 +1,8 @@
 import { WebsiteTemplate, TemplateCategory } from '../types';
 
+export const DATA_RESELLER_STARTER_HERO_IMAGE =
+  'https://res.cloudinary.com/da6oeat7m/image/upload/v1790933009/Neon_Data_Bundles_in_Accra_h2hkiv.png';
+
 export const TEMPLATE_CATEGORIES: { id: TemplateCategory; label: string }[] = [
   { id: 'all', label: 'All Templates' },
   { id: 'restaurant', label: 'Restaurants & Cafes' },
@@ -136,7 +139,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
       accent: '#00c365',
       border: '#1e293b',
     },
-    heroImage: 'https://images.unsplash.com/photo-1556742049-0a67e5572293?auto=format&fit=crop&w=1200&q=80',
+    heroImage: DATA_RESELLER_STARTER_HERO_IMAGE,
     stats: [
       { label: 'Bundles Delivered', value: '25,000+' },
       { label: 'Active Lines', value: '4,500+' },

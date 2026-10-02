@@ -15,6 +15,8 @@ import {
   ExternalLink,
   Wifi,
 } from 'lucide-react';
+import { getCloudinaryUrl, getCloudinarySrcSet } from '../../../utils/cloudinary';
+import { DATA_RESELLER_STARTER_HERO_IMAGE } from '../../../data/templates';
 
 interface TemplateViewProps {
   template: WebsiteTemplate;
@@ -28,6 +30,18 @@ export interface ResellerPackage {
   network: 'mtn' | 'telecel' | 'at';
   tag?: string;
   desc?: string;
+}
+
+/**
+ * Resolves the Data Reseller hero image.
+ * Protects custom images while smoothly migrating old placeholders or missing URLs
+ * to the official starter artwork.
+ */
+export function resolveDataResellerHeroImage(heroImage?: string): string {
+  if (!heroImage || heroImage.trim() === '' || heroImage.includes('photo-1556742049-0a67e5572293')) {
+    return DATA_RESELLER_STARTER_HERO_IMAGE;
+  }
+  return heroImage;
 }
 
 export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
@@ -56,9 +70,12 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
     border: '#1e293b',
   };
 
-  const heroImageSrc =
-    template.heroImage ||
-    'https://images.unsplash.com/photo-1556742049-0a67e5572293?auto=format&fit=crop&w=1200&q=80';
+  const heroImageSrc = resolveDataResellerHeroImage(template.heroImage);
+  const optimizedHeroSrc = getCloudinaryUrl(heroImageSrc, { format: 'auto', quality: 'auto', width: 1200 });
+  const heroSrcSet = getCloudinarySrcSet(heroImageSrc, [360, 430, 640, 768, 1024, 1280, 1600], {
+    format: 'auto',
+    quality: 'auto',
+  });
 
   // Helper to categorize item network
   const detectNetworkFromCategory = (cat?: string): 'mtn' | 'telecel' | 'at' => {
@@ -145,7 +162,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
       ? `Recipient Number: ${recipientPhone.trim()}`
       : 'Recipient Number: (my line)';
 
-    const text = `Hello ${businessName},\n\nI want to order:\nNetwork: ${netName}\nPackage: ${selectedPackage.name}\nPrice: GH₵ ${selectedPackage.price}\n${phoneDetail}\n\nPlease share your payment instructions.`;
+    const text = `Hello ${businessName},\n\nI want to order:\nNetwork: ${netName}\nPackage: ${selectedPackage.name}\nPrice: GH₵ ${selectedPackage.price}\n${phoneDetail}\n\nPlease share your MoMo payment details.`;
 
     const url = `https://wa.me/${cleanWhatsappNumber}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -171,6 +188,14 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
       el.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  // Restrained network accent color
+  const activeNetworkColor =
+    selectedNetwork === 'mtn'
+      ? '#FFCC00'
+      : selectedNetwork === 'telecel'
+      ? '#E60000'
+      : '#38bdf8';
 
   return (
     <div
@@ -221,12 +246,12 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
       </header>
 
       {/* =========================================================
-          2. DATA RESELLER HERO WITH REAL HERO IMAGE ASSET
+          2. DATA RESELLER HERO WITH OFFICIAL STARTER ARTWORK
           ========================================================= */}
-      <section className="px-4 sm:px-8 py-8 sm:py-14 max-w-6xl mx-auto w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+      <section className="px-4 sm:px-8 py-6 sm:py-12 max-w-6xl mx-auto w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 lg:gap-10 items-center">
           {/* Left Column: Natural Market Copy */}
-          <div className="lg:col-span-7 text-left space-y-5">
+          <div className="lg:col-span-7 text-left space-y-4 sm:space-y-5">
             <div
               className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold border"
               style={{
@@ -236,7 +261,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
               }}
             >
               <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>Quick SIM Top-Up · Instant Delivery</span>
+              <span>Direct SIM Top-Up · MTN, Telecel, AT</span>
             </div>
 
             <h2
@@ -251,7 +276,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             </p>
 
             {/* Compact Trust / Support Row */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-4 py-2 border-y" style={{ borderColor: `${p.border}80` }}>
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 py-2.5 border-y" style={{ borderColor: `${p.border}80` }}>
               <div className="space-y-0.5">
                 <div className="text-xs font-bold text-white flex items-center gap-1">
                   <Wifi className="w-3 h-3 text-emerald-400" />
@@ -275,10 +300,10 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
               <div className="space-y-0.5">
                 <div className="text-xs font-bold text-white flex items-center gap-1">
                   <MessageSquare className="w-3 h-3 text-emerald-400" />
-                  <span>WhatsApp Support</span>
+                  <span>Direct Chat</span>
                 </div>
                 <div className="text-[10px]" style={{ color: p.mutedText }}>
-                  Direct Merchant Chat
+                  Prompt WhatsApp
                 </div>
               </div>
             </div>
@@ -313,41 +338,50 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             </div>
           </div>
 
-          {/* Right Column: Hero Image Asset */}
-          <div className="lg:col-span-5 relative">
+          {/* Right Column (Desktop) / Below CTAs (Mobile): Hero Artwork */}
+          <div className="lg:col-span-5 relative w-full">
             <div
-              className="rounded-3xl border overflow-hidden p-2 sm:p-2.5 backdrop-blur-md relative shadow-2xl transition-all"
-              style={{ backgroundColor: `${p.surface}b3`, borderColor: p.border }}
+              className="rounded-2xl sm:rounded-3xl border overflow-hidden p-1.5 sm:p-2.5 backdrop-blur-md relative shadow-[0_0_35px_rgba(0,195,101,0.08)] transition-all ring-1 ring-white/5"
+              style={{
+                backgroundColor: `${p.surface}cc`,
+                borderColor: `${p.accent}33`,
+              }}
             >
-              <div className="relative rounded-2xl overflow-hidden aspect-[4/3] sm:aspect-[16/10] lg:aspect-[4/3] bg-black/60">
+              <div className="relative rounded-xl sm:rounded-2xl overflow-hidden aspect-[16/10] sm:aspect-[4/3] max-h-[260px] sm:max-h-none w-full bg-black/80">
                 {!imageError ? (
                   <img
-                    src={heroImageSrc}
+                    src={optimizedHeroSrc}
+                    srcSet={heroSrcSet || undefined}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 560px"
                     alt={businessName}
                     onError={() => setImageError(true)}
-                    className="w-full h-full object-cover object-center transition-transform duration-500 hover:scale-105"
+                    className="w-full h-full object-cover object-[center_right] sm:object-center transition-transform duration-500 hover:scale-[1.03]"
                     loading="eager"
+                    decoding="async"
+                    // @ts-expect-error fetchpriority attribute
+                    fetchpriority="high"
+                    width={1200}
+                    height={750}
                   />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-2 bg-gradient-to-br from-slate-900 to-black">
-                    <Smartphone className="w-12 h-12 text-emerald-400" />
-                    <p className="text-xs text-slate-300 font-semibold">{businessName} Storefront</p>
+                  <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-2.5 bg-gradient-to-br from-[#0c1520] to-[#060a0e]">
+                    <div
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center border shadow-md"
+                      style={{ backgroundColor: `${p.accent}15`, borderColor: `${p.accent}40`, color: p.accent }}
+                    >
+                      <Smartphone className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs sm:text-sm text-white font-bold">{businessName}</p>
+                      <p className="text-[11px]" style={{ color: p.mutedText }}>
+                        MTN · Telecel · AirtelTigo Storefront
+                      </p>
+                    </div>
                   </div>
                 )}
 
-                {/* Subtle gradient overlay to enhance text overlay readability */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-
-                {/* Overlay Badge */}
-                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-white">
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md border border-white/10 text-[11px] font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span>Instant SIM Dispatches</span>
-                  </div>
-                  <div className="px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md border border-white/10 text-[11px] font-mono text-emerald-300">
-                    MTN · Telecel · AT
-                  </div>
-                </div>
+                {/* Subtle soft edge ring without obscuring artwork */}
+                <div className="pointer-events-none absolute inset-0 rounded-xl sm:rounded-2xl ring-1 ring-inset ring-white/10" />
               </div>
             </div>
           </div>
@@ -360,20 +394,20 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
       <main id="bundle-catalog" className="px-4 sm:px-8 py-6 max-w-6xl mx-auto w-full space-y-8 flex-1 scroll-mt-20">
         {/* Network Selection Bar */}
         <div
-          className="p-3 sm:p-4 rounded-3xl border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-lg"
+          className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-lg"
           style={{ backgroundColor: p.surface, borderColor: p.border }}
         >
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
             <button
               type="button"
               onClick={() => setSelectedNetwork('mtn')}
               className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 selectedNetwork === 'mtn'
-                  ? 'bg-[#FFCC00] text-black shadow-md font-extrabold'
+                  ? 'bg-[#FFCC00] text-black shadow-[0_0_18px_rgba(255,204,0,0.35)] border border-[#FFCC00] font-extrabold scale-[1.02]'
                   : 'bg-black/30 text-slate-300 hover:text-white border border-slate-800'
               }`}
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-[#FFCC00] border border-black/40" />
+              <span className={`w-2.5 h-2.5 rounded-full ${selectedNetwork === 'mtn' ? 'bg-black/80' : 'bg-[#FFCC00]'}`} />
               <span>MTN</span>
             </button>
 
@@ -382,11 +416,11 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
               onClick={() => setSelectedNetwork('telecel')}
               className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 selectedNetwork === 'telecel'
-                  ? 'bg-[#E60000] text-white shadow-md font-extrabold'
+                  ? 'bg-[#E60000] text-white shadow-[0_0_18px_rgba(230,0,0,0.35)] border border-[#E60000] font-extrabold scale-[1.02]'
                   : 'bg-black/30 text-slate-300 hover:text-white border border-slate-800'
               }`}
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-[#E60000]" />
+              <span className="w-2.5 h-2.5 rounded-full bg-white" />
               <span>Telecel</span>
             </button>
 
@@ -395,11 +429,11 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
               onClick={() => setSelectedNetwork('at')}
               className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 selectedNetwork === 'at'
-                  ? 'bg-[#002B49] text-white border border-blue-400/50 shadow-md font-extrabold'
+                  ? 'bg-[#0284c7] text-white shadow-[0_0_18px_rgba(2,132,199,0.35)] border border-[#38bdf8] font-extrabold scale-[1.02]'
                   : 'bg-black/30 text-slate-300 hover:text-white border border-slate-800'
               }`}
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+              <span className="w-2.5 h-2.5 rounded-full bg-white" />
               <span>AirtelTigo (AT)</span>
             </button>
           </div>
@@ -435,33 +469,36 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                 <div
                   key={pkg.id}
                   onClick={() => setSelectedPackage(pkg)}
-                  className={`p-4 rounded-2xl border text-left cursor-pointer transition-all duration-200 flex flex-col justify-between space-y-3 relative group ${
+                  className={`p-3.5 sm:p-4 rounded-2xl border text-left cursor-pointer transition-all duration-200 flex flex-col justify-between space-y-3 relative group ${
                     isSelected
-                      ? 'ring-2 shadow-xl -translate-y-1'
+                      ? 'shadow-xl -translate-y-1 bg-slate-900/90 ring-2'
                       : 'hover:border-slate-600 bg-opacity-80'
                   }`}
                   style={{
                     backgroundColor: p.surface,
-                    borderColor: isSelected ? p.accent : p.border,
-                    // @ts-expect-error inline custom property
-                    '--tw-ring-color': p.accent,
+                    borderColor: isSelected ? activeNetworkColor : p.border,
+                    // @ts-expect-error inline custom property for ring
+                    '--tw-ring-color': isSelected ? activeNetworkColor : 'transparent',
                   }}
                 >
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <div className="flex items-center justify-between gap-1">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/10 text-slate-200">
-                        {pkg.tag || 'Available'}
+                        {pkg.tag || 'Standard'}
                       </span>
                       {isSelected && (
                         <div
-                          className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
-                          style={{ backgroundColor: p.accent, color: '#000000' }}
+                          className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 shadow-sm"
+                          style={{
+                            backgroundColor: activeNetworkColor,
+                            color: selectedNetwork === 'mtn' ? '#000000' : '#ffffff',
+                          }}
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5 text-black" />
+                          <CheckCircle2 className="w-3.5 h-3.5" />
                         </div>
                       )}
                     </div>
-                    <h4 className="font-extrabold text-sm sm:text-base tracking-tight" style={{ color: p.text }}>
+                    <h4 className="font-extrabold text-sm sm:text-base tracking-tight leading-snug" style={{ color: p.text }}>
                       {pkg.name}
                     </h4>
                     {pkg.desc && (
@@ -488,7 +525,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
         {/* Order Formulation Card */}
         {selectedPackage && (
           <div
-            className="p-5 sm:p-7 rounded-3xl border shadow-2xl space-y-5 max-w-lg mx-auto backdrop-blur-sm"
+            className="p-5 sm:p-7 rounded-2xl sm:rounded-3xl border shadow-2xl space-y-5 max-w-lg mx-auto backdrop-blur-sm"
             style={{ backgroundColor: p.surface, borderColor: p.border }}
           >
             <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: p.border }}>
@@ -526,7 +563,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                 />
               </div>
               <p className="text-[11px]" style={{ color: p.mutedText }}>
-                Leave empty if purchasing for the device you order from.
+                Leave empty if purchasing for the phone you are ordering with.
               </p>
             </div>
 
