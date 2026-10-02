@@ -409,12 +409,12 @@ export const MemberHome: React.FC = () => {
           )}
         </div>
 
-        {/* Mystery Earn Teaser (1 Col on Desktop) */}
+        {/* Mystery Earn (1 Col on Desktop) */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-white uppercase tracking-wider">Mystery Earn</h2>
             <span className="px-2 py-0.5 rounded-md bg-[#00c365]/10 text-[#00c365] border border-[#00c365]/30 text-[10px] font-semibold">
-              Coming Soon
+              Live Rewards
             </span>
           </div>
 
@@ -422,21 +422,21 @@ export const MemberHome: React.FC = () => {
             onClick={() => setActivePage('earn')}
             className="p-4 sm:p-5 rounded-2xl bg-[#0f151b] border border-slate-800 hover:border-[#00c365]/50 transition-all space-y-3 cursor-pointer group"
           >
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform">
+            <div className="w-9 h-9 rounded-xl bg-[#00c365]/10 border border-[#00c365]/30 flex items-center justify-center text-[#00c365] group-hover:scale-105 transition-transform">
               <Sparkles className="w-5 h-5" />
             </div>
             <div className="space-y-1">
               <h3 className="font-bold text-sm text-white group-hover:text-[#00c365] transition-colors flex items-center justify-between">
-                <span>Refer & Earn Program</span>
+                <span>Refer & Earn Dashboard</span>
                 <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-[#00c365] group-hover:translate-x-1 transition-all" />
               </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Your personal referral link, product sharing rewards and referral history are coming to your Mystery Hub account.
+                Access your personal referral link, track your referred customers, and view your real-time reward ledger.
               </p>
             </div>
             <div className="pt-1">
               <span className="inline-block text-[11px] text-[#00c365] font-semibold">
-                Learn more about Mystery Earn &rarr;
+                Open Earn Dashboard &rarr;
               </span>
             </div>
           </div>

@@ -101,6 +101,9 @@ export interface RegisterRequest {
   identifier: string;
   password: string;
   rememberMe?: boolean;
+  referralCode?: string;
+  visitorKey?: string;
+  landingPath?: string;
 }
 
 export interface LoginRequest {
@@ -133,7 +136,7 @@ export interface JoinWaitlistResponse {
 }
 
 export async function initializePaymentOnServer(
-  req: InitializePaymentRequest,
+  req: InitializePaymentRequest & { referralCode?: string; visitorKey?: string },
   sessionToken?: string | null,
   timeoutMs = 35000
 ): Promise<InitializePaymentResponse> {
@@ -143,6 +146,27 @@ export async function initializePaymentOnServer(
     headers['Authorization'] = `Bearer ${sessionToken}`;
   }
 
+  const visitorKey =
+    req.visitorKey ||
+    (typeof window !== 'undefined'
+      ? localStorage.getItem('mh_visitor_key') || sessionStorage.getItem('mh_visitor_key')
+      : undefined);
+  const referralCode =
+    req.referralCode ||
+    (typeof window !== 'undefined'
+      ? sessionStorage.getItem('mh_referral_code') || localStorage.getItem('mh_referral_code')
+      : undefined);
+
+  if (visitorKey) {
+    headers['x-visitor-key'] = visitorKey;
+  }
+
+  const payload = {
+    ...req,
+    visitorKey: visitorKey || undefined,
+    referralCode: referralCode || undefined,
+  };
+
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -150,7 +174,7 @@ export async function initializePaymentOnServer(
     const res = await fetch(url, {
       method: 'POST',
       headers,
-      body: JSON.stringify(req),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
     clearTimeout(timeoutHandle);
@@ -230,10 +254,32 @@ export async function lookupOrderOnServer(reference: string): Promise<LookupOrde
 
 export async function registerOnServer(req: RegisterRequest): Promise<AuthSessionResponse> {
   const url = `${API_BASE_URL}/api/auth/register`;
+  const visitorKey =
+    req.visitorKey ||
+    (typeof window !== 'undefined'
+      ? localStorage.getItem('mh_visitor_key') || sessionStorage.getItem('mh_visitor_key')
+      : undefined);
+  const referralCode =
+    req.referralCode ||
+    (typeof window !== 'undefined'
+      ? sessionStorage.getItem('mh_referral_code') || localStorage.getItem('mh_referral_code')
+      : undefined);
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (visitorKey) {
+    headers['x-visitor-key'] = visitorKey;
+  }
+
+  const payload = {
+    ...req,
+    visitorKey: visitorKey || undefined,
+    referralCode: referralCode || undefined,
+  };
+
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
+    headers,
+    body: JSON.stringify(payload),
   });
 
   const data = await res.json();
@@ -1069,6 +1115,166 @@ export async function deleteWebsiteOnServer(
   if (!res.ok) throw new Error(data.error || 'Failed to delete website.');
   return data;
 }
+
+// ==========================================
+// MYSTERY EARN: REFERRAL API CLIENT
+// ==========================================
+
+export interface ReferralCaptureRequest {
+  code: string;
+  visitorKey?: string | null;
+  landingPath?: string | null;
+}
+
+export interface ReferralCaptureResponse {
+  success: boolean;
+  valid: boolean;
+  code?: string;
+  referrerUserId?: string;
+  reason?: string;
+  error?: string;
+}
+
+export interface ReferralSummaryResponse {
+  success: boolean;
+  summary: {
+    code: string;
+    shareUrl: string;
+    isEnabled: boolean;
+    clicksCount: number;
+    referredCustomersCount: number;
+    pendingRewardsMinor: number;
+    pendingRewardsGhc: number;
+    approvedRewardsMinor: number;
+    approvedRewardsGhc: number;
+    totalRewardsMinor: number;
+    totalRewardsGhc: number;
+  };
+  error?: string;
+}
+
+export interface RewardLedgerItem {
+  id: string;
+  service_type: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'website_builder' | 'manual_adjustment';
+  amount_minor: number;
+  amount_ghc: number;
+  currency: 'GHS';
+  status: 'pending' | 'approved' | 'rejected' | 'reversed';
+  reason: string;
+  created_at: string;
+  approved_at: string | null;
+  reversed_at: string | null;
+}
+
+export interface RewardLedgerResponse {
+  success: boolean;
+  ledger: RewardLedgerItem[];
+  error?: string;
+}
+
+export interface PublicRewardRule {
+  id: string;
+  service_type: string;
+  product_key: string | null;
+  network: string | null;
+  reward_type: 'fixed_minor' | 'percent_bps';
+  reward_minor: number | null;
+  reward_percent_bps: number | null;
+  enabled: boolean;
+  starts_at?: string | null;
+  ends_at?: string | null;
+}
+
+export interface RewardRulesResponse {
+  success: boolean;
+  rules: PublicRewardRule[];
+  error?: string;
+}
+
+/**
+ * Dispatches non-blocking referral code capture on visitor arrival
+ */
+export async function captureReferralOnServer(
+  payload: ReferralCaptureRequest,
+  token?: string
+): Promise<ReferralCaptureResponse> {
+  const url = `${API_BASE_URL}/api/referrals/capture`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (payload.visitorKey) {
+    headers['x-visitor-key'] = payload.visitorKey;
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    return {
+      success: false,
+      valid: false,
+      error: data.error || 'Failed to capture referral',
+    };
+  }
+  return data;
+}
+
+/**
+ * Loads authenticated user's lifetime referral profile, statistics, and rewards
+ */
+export async function getMyReferralSummary(token: string): Promise<ReferralSummaryResponse> {
+  const url = `${API_BASE_URL}/api/referrals/summary`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to load referral summary.');
+  return data;
+}
+
+/**
+ * Loads authenticated user's immutable reward ledger entries
+ */
+export async function getMyRewardLedger(
+  token: string,
+  limit = 50
+): Promise<RewardLedgerResponse> {
+  const url = `${API_BASE_URL}/api/referrals/ledger?limit=${encodeURIComponent(limit)}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to load reward ledger.');
+  return data;
+}
+
+/**
+ * Loads active reward opportunities and transparent rules
+ */
+export async function getActiveRewardRules(): Promise<RewardRulesResponse> {
+  const url = `${API_BASE_URL}/api/referrals/rules`;
+  const res = await fetch(url, { method: 'GET' });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to load reward rules.');
+  return data;
+}
+
 
 
 
