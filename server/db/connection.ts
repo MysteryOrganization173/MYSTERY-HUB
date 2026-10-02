@@ -8,8 +8,10 @@ import pg from 'pg';
 const { Pool } = pg;
 
 let pool: pg.Pool | null = null;
+let connectionFailed = false;
 
 export function getPool(): pg.Pool | null {
+  if (connectionFailed) return null;
   if (pool) return pool;
 
   if (process.env.DATABASE_URL) {
@@ -28,6 +30,11 @@ export function getPool(): pg.Pool | null {
 
       console.log('PostgreSQL database pool initialized.');
     } catch (err) {
+      const isProduction = process.env.NODE_ENV === 'production';
+      if (isProduction) {
+        console.error('[DB] FATAL: Failed to initialize PostgreSQL pool in production.');
+        throw err;
+      }
       console.warn('Failed to initialize PostgreSQL pool, using development store fallback:', err);
       pool = null;
     }
@@ -37,20 +44,38 @@ export function getPool(): pg.Pool | null {
 }
 
 export function isDbConnected(): boolean {
-  return pool !== null;
+  return pool !== null && !connectionFailed;
 }
 
 /**
  * Initializes all database tables and non-destructive migrations
  */
 export async function initDatabase(): Promise<void> {
+  const isProduction = process.env.NODE_ENV === 'production';
+
   const db = getPool();
   if (!db) {
+    if (isProduction) {
+      throw new Error('[DB] FATAL: DATABASE_URL is completely missing in production!');
+    }
     console.log('[DB] Running with in-memory persistence store fallback (DATABASE_URL not configured).');
     return;
   }
 
-  const client = await db.connect();
+  let client;
+  try {
+    client = await db.connect();
+  } catch (err) {
+    if (isProduction) {
+      console.error('[DB] FATAL: Failed to connect to PostgreSQL database in production environment.');
+      throw err;
+    }
+    console.warn('[DB] Failed to connect to PostgreSQL database. Falling back to in-memory persistence:', err);
+    connectionFailed = true;
+    pool = null;
+    return;
+  }
+
   try {
     console.log('[DB] Initializing PostgreSQL schema & migrations...');
 

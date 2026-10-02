@@ -325,4 +325,7 @@ async function startServer() {
   }, 3 * 60 * 1000); // Every 3 minutes
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('FATAL: Failed to start Mystery Hub server:', err);
+  process.exit(1);
+});
