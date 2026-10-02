@@ -35,6 +35,9 @@ import {
   AlertCircle,
 } from 'lucide-react';
 
+const MYSTERY_EARN_ARTWORK_URL =
+  'https://res.cloudinary.com/da6oeat7m/image/upload/v1790940221/Neon_Rewards_Network_with_Gift_Box_ueitrt.png';
+
 export interface MysteryEarnPageProps {
   highestActiveReferralRewardMinor?: number | null;
 }
@@ -234,81 +237,101 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
       <div className="min-h-screen py-6 sm:py-10 text-slate-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
           {/* 1. Member Command Panel Hero */}
-          <div className="relative rounded-3xl bg-gradient-to-br from-[#0a1410] via-[#070b0e] to-[#0d1612] border border-[#00c365]/30 overflow-hidden shadow-2xl p-6 sm:p-8 lg:p-10">
+          <div className="relative rounded-3xl bg-gradient-to-br from-[#0a1410] via-[#070b0e] to-[#0d1612] border border-[#00c365]/30 overflow-hidden shadow-2xl p-5 sm:p-7 lg:p-8">
             {/* Ambient Background Glows */}
             <div className="absolute top-0 right-0 w-96 h-96 bg-[#00c365]/10 rounded-full blur-[100px] pointer-events-none" />
             <div className="absolute bottom-0 left-1/4 w-80 h-80 bg-amber-500/5 rounded-full blur-[90px] pointer-events-none" />
 
-            <div className="relative z-10 space-y-5 sm:space-y-6">
-              {/* Header Meta */}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00c365]/10 border border-[#00c365]/30 text-xs font-bold text-[#00c365]">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>MYSTERY EARN · ACTIVE PARTNER</span>
+            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 items-center">
+              {/* Left Column (55-60% on desktop): Content & Referral Controls */}
+              <div className="lg:col-span-7 space-y-4 sm:space-y-5">
+                {/* Header Meta */}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00c365]/10 border border-[#00c365]/30 text-xs font-bold text-[#00c365]">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>MYSTERY EARN · ACTIVE PARTNER</span>
+                  </div>
+
+                  {summary?.code && (
+                    <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-900/80 border border-slate-800 px-3 py-1 rounded-full">
+                      <span className="text-slate-400 font-medium">Referral Code:</span>
+                      <span className="font-mono font-bold text-[#00c365] tracking-wider">{summary.code}</span>
+                    </div>
+                  )}
                 </div>
 
-                {summary?.code && (
-                  <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-900/80 border border-slate-800 px-3 py-1 rounded-full">
-                    <span className="text-slate-400 font-medium">Referral Code:</span>
-                    <span className="font-mono font-bold text-[#00c365] tracking-wider">{summary.code}</span>
+                {/* Title & Simplified Copy */}
+                <div className="space-y-1.5 text-left">
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
+                    Welcome, {firstName} 👋
+                  </h1>
+                  <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                    Refer once. Earn from qualifying purchases when they return.
+                  </p>
+                </div>
+
+                {/* Personal Link Command Box */}
+                <div className="space-y-2.5 pt-1">
+                  <div className="text-xs font-bold text-slate-300 uppercase tracking-wider text-left">
+                    Your Personal Referral Link
                   </div>
-                )}
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                    {/* Readonly Link Box */}
+                    <div className="flex-1 flex items-center bg-[#070b0e] border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-mono text-slate-200 overflow-hidden shadow-inner">
+                      <span className="truncate select-all">{shareUrl}</span>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleCopyLink}
+                        aria-label="Copy referral link"
+                        className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+                      >
+                        {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        <span>{copiedLink ? 'Copied' : 'Copy'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleWhatsAppShare}
+                        aria-label="Share referral link on WhatsApp"
+                        className="px-3.5 py-2.5 rounded-xl bg-[#25D366]/20 hover:bg-[#25D366]/30 text-[#25D366] border border-[#25D366]/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        <span className="hidden sm:inline">WhatsApp</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleNativeShare}
+                        aria-label="Share referral link"
+                        className="px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Title & Copy */}
-              <div className="space-y-2 max-w-2xl text-left">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
-                  Welcome, {firstName} 👋
-                </h1>
-                <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-                  Share Mystery Hub once. When people become linked to your referral account, eligible purchases keep rewarding you when they return.
-                </p>
-              </div>
-
-              {/* Personal Link Command Box */}
-              <div className="space-y-3 pt-2">
-                <div className="text-xs font-bold text-slate-300 uppercase tracking-wider text-left">
-                  Your Personal Referral Link
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 max-w-3xl">
-                  {/* Readonly Link Box */}
-                  <div className="flex-1 flex items-center bg-[#070b0e] border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-mono text-slate-200 overflow-hidden shadow-inner">
-                    <span className="truncate select-all">{shareUrl}</span>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={handleCopyLink}
-                      aria-label="Copy referral link"
-                      className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
-                    >
-                      {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      <span>{copiedLink ? 'Copied' : 'Copy'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleWhatsAppShare}
-                      aria-label="Share referral link on WhatsApp"
-                      className="px-3.5 py-2.5 rounded-xl bg-[#25D366]/20 hover:bg-[#25D366]/30 text-[#25D366] border border-[#25D366]/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                      <span className="hidden sm:inline">WhatsApp</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleNativeShare}
-                      aria-label="Share referral link"
-                      className="px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
-                    >
-                      <Share2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+              {/* Right Column (40-45% on desktop): Official Mystery Earn Artwork */}
+              <div className="lg:col-span-5 relative rounded-2xl overflow-hidden border border-[#00c365]/25 bg-slate-950/60 shadow-xl group h-48 sm:h-56 lg:h-full lg:min-h-[250px] flex items-center justify-center mt-2 lg:mt-0">
+                <div className="absolute inset-0 bg-gradient-to-tr from-[#00c365]/10 via-transparent to-amber-500/10 opacity-70 pointer-events-none z-10" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#070b0e] via-transparent to-transparent opacity-60 lg:opacity-50 pointer-events-none z-10" />
+                <img
+                  src={getCloudinaryUrl(MYSTERY_EARN_ARTWORK_URL, { width: 960, quality: 'auto', format: 'auto' })}
+                  srcSet={getCloudinarySrcSet(MYSTERY_EARN_ARTWORK_URL, [480, 640, 768, 960, 1200, 1440])}
+                  sizes="(max-width: 1024px) 100vw, 40vw"
+                  alt="Mystery Earn Network"
+                  loading="eager"
+                  // @ts-ignore
+                  fetchPriority="high"
+                  decoding="async"
+                  className="w-full h-full object-cover object-right rounded-2xl transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                />
               </div>
             </div>
           </div>
