@@ -196,6 +196,24 @@ export async function initDatabase(): Promise<void> {
         `,
       },
       {
+        name: 'marketplace_inquiries',
+        sql: `
+          CREATE TABLE IF NOT EXISTS marketplace_inquiries (
+            id VARCHAR(64) PRIMARY KEY,
+            product_id VARCHAR(64) REFERENCES marketplace_products(id) ON DELETE CASCADE,
+            product_name VARCHAR(255) NOT NULL,
+            customer_name VARCHAR(128),
+            customer_phone VARCHAR(64),
+            customer_email VARCHAR(128),
+            inquiry_type VARCHAR(64) NOT NULL DEFAULT 'general',
+            message TEXT,
+            budget VARCHAR(128),
+            status VARCHAR(32) NOT NULL DEFAULT 'new',
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+          );
+        `,
+      },
+      {
         name: 'website_sites',
         sql: `
           CREATE TABLE IF NOT EXISTS website_sites (
@@ -404,6 +422,82 @@ export async function initDatabase(): Promise<void> {
       {
         name: 'reward_ledger.network_level',
         sql: `ALTER TABLE reward_ledger ADD COLUMN IF NOT EXISTS network_level INTEGER NOT NULL DEFAULT 1;`,
+      },
+      {
+        name: 'marketplace_products.purchase_enabled',
+        sql: `ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS purchase_enabled BOOLEAN DEFAULT TRUE;`,
+      },
+      {
+        name: 'marketplace_products.fulfilment_mode',
+        sql: `ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS fulfilment_mode VARCHAR(32) DEFAULT 'both';`,
+      },
+      {
+        name: 'marketplace_products.pickup_locations',
+        sql: `ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS pickup_locations TEXT;`,
+      },
+      {
+        name: 'marketplace_products.delivery_available',
+        sql: `ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS delivery_available BOOLEAN DEFAULT TRUE;`,
+      },
+      {
+        name: 'marketplace_products.delivery_note',
+        sql: `ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS delivery_note TEXT;`,
+      },
+      {
+        name: 'marketplace_products.purchase_note',
+        sql: `ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS purchase_note TEXT;`,
+      },
+      {
+        name: 'marketplace_products.payment_required_before_delivery',
+        sql: `ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS payment_required_before_delivery BOOLEAN DEFAULT TRUE;`,
+      },
+      {
+        name: 'marketplace_products.variants',
+        sql: `ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS variants TEXT;`,
+      },
+      {
+        name: 'orders.product_slug',
+        sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_slug VARCHAR(128);`,
+      },
+      {
+        name: 'orders.variant_id',
+        sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS variant_id VARCHAR(64);`,
+      },
+      {
+        name: 'orders.variant_snapshot',
+        sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS variant_snapshot VARCHAR(256);`,
+      },
+      {
+        name: 'orders.fulfilment_method',
+        sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS fulfilment_method VARCHAR(32);`,
+      },
+      {
+        name: 'orders.pickup_location_id',
+        sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_location_id VARCHAR(64);`,
+      },
+      {
+        name: 'orders.pickup_location_snapshot',
+        sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_location_snapshot TEXT;`,
+      },
+      {
+        name: 'orders.delivery_city',
+        sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_city VARCHAR(128);`,
+      },
+      {
+        name: 'orders.delivery_area',
+        sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_area VARCHAR(128);`,
+      },
+      {
+        name: 'orders.delivery_landmark',
+        sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_landmark TEXT;`,
+      },
+      {
+        name: 'orders.delivery_note',
+        sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_note TEXT;`,
+      },
+      {
+        name: 'orders.marketplace_status',
+        sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS marketplace_status VARCHAR(32);`,
       },
     ];
 

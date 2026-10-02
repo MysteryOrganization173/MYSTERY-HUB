@@ -291,11 +291,14 @@ export class OrdersStore {
           payment_reference, payment_status, supplier_provider, supplier_order_id,
           supplier_response, supplier_cost_minor, supplier_offer_ref,
           supplier_last_checked_at, failure_reason, created_at, updated_at,
-          paid_at, submitted_at, delivered_at, referrer_user_id, referral_attribution_id, referral_code
+          paid_at, submitted_at, delivered_at, referrer_user_id, referral_attribution_id, referral_code,
+          product_slug, variant_id, variant_snapshot, fulfilment_method, pickup_location_id,
+          pickup_location_snapshot, delivery_city, delivery_area, delivery_landmark, delivery_note, marketplace_status
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
           $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
-          $27, $28, $29, $30, $31, $32, $33, $34, $35
+          $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38,
+          $39, $40, $41, $42, $43, $44, $45, $46
         ) RETURNING *;
       `;
       const values = [
@@ -334,6 +337,17 @@ export class OrdersStore {
         order.referrer_user_id ?? null,
         order.referral_attribution_id ?? null,
         order.referral_code ?? null,
+        order.product_slug ?? null,
+        order.variant_id ?? null,
+        order.variant_snapshot ?? null,
+        order.fulfilment_method ?? null,
+        order.pickup_location_id ?? null,
+        order.pickup_location_snapshot ?? null,
+        order.delivery_city ?? null,
+        order.delivery_area ?? null,
+        order.delivery_landmark ?? null,
+        order.delivery_note ?? null,
+        order.marketplace_status ?? null,
       ];
       await pool.query(query, values);
       return order;
@@ -343,6 +357,85 @@ export class OrdersStore {
       devMemoryStore.set(`pubref:${order.public_reference}`, order);
       return order;
     }
+  }
+
+  /**
+   * Admin: Update Marketplace Fulfilment Status safely
+   */
+  static async updateMarketplaceStatus(
+    orderId: string,
+    mktStatus: 'pending_payment' | 'paid' | 'awaiting_fulfilment' | 'ready_for_pickup' | 'out_for_delivery' | 'completed' | 'cancelled' | 'refund_pending' | 'refunded',
+    adminNote?: string
+  ): Promise<OrderRecord | null> {
+    const existing = await this.findOrder(orderId);
+    if (!existing) return null;
+
+    const nowIso = new Date().toISOString();
+    let globalStatus: OrderStatus = existing.status;
+
+    if (mktStatus === 'completed') {
+      globalStatus = 'delivered';
+    } else if (mktStatus === 'refunded') {
+      globalStatus = 'refunded';
+    } else if (mktStatus === 'cancelled') {
+      globalStatus = 'cancelled';
+    } else if (mktStatus === 'awaiting_fulfilment' || mktStatus === 'ready_for_pickup' || mktStatus === 'out_for_delivery') {
+      globalStatus = 'processing';
+    }
+
+    const updated: OrderRecord = {
+      ...existing,
+      status: globalStatus,
+      marketplace_status: mktStatus,
+      admin_note: adminNote !== undefined ? adminNote : existing.admin_note,
+      updated_at: nowIso,
+      delivered_at: mktStatus === 'completed' ? (existing.delivered_at || nowIso) : existing.delivered_at,
+    };
+
+    const pool = getPool();
+    if (pool) {
+      const query = `
+        UPDATE orders
+        SET status = $1, marketplace_status = $2, admin_note = $3, updated_at = $4, delivered_at = $5
+        WHERE id = $6
+        RETURNING *;
+      `;
+      await pool.query(query, [
+        updated.status,
+        updated.marketplace_status,
+        updated.admin_note,
+        updated.updated_at,
+        updated.delivered_at,
+        existing.id,
+      ]);
+    } else {
+      devMemoryStore.set(existing.id, updated);
+      devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
+      devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
+    }
+
+    // Trigger reward ledger when order is marked completed
+    if (mktStatus === 'completed' && existing.marketplace_status !== 'completed') {
+      try {
+        await ReferralService.processOrderReward(updated);
+      } catch (err) {
+        console.warn('[OrdersStore] Failed to process marketplace referral reward:', err);
+      }
+    } else if (
+      existing.marketplace_status === 'completed' &&
+      (mktStatus === 'refunded' || mktStatus === 'cancelled')
+    ) {
+      try {
+        await ReferralService.reverseOrderRewards(
+          existing.id,
+          adminNote || `Marketplace order transitioned to ${mktStatus}`
+        );
+      } catch (err) {
+        console.warn('[OrdersStore] Failed to reverse marketplace referral reward:', err);
+      }
+    }
+
+    return updated;
   }
 
   /**

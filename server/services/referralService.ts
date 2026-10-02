@@ -6,6 +6,7 @@
 
 import { ReferralStore } from '../db/referralStore.js';
 import { AdminAuditStore } from '../db/adminAuditStore.js';
+import { MarketplaceStore } from '../db/marketplaceStore.js';
 import { OrderRecord } from '../types/orders.js';
 import {
   ReferralProfileRecord,
@@ -203,8 +204,9 @@ export class ReferralService {
    * ONLY executes for delivered telecom orders or confirmed transactions.
    */
   static async processOrderReward(order: OrderRecord): Promise<RewardLedgerRecord | null> {
-    // 1. Order must be terminal delivered and paid
-    if (order.status !== 'delivered' || (order.payment_status !== 'success' && !order.paid_at)) {
+    // 1. Order must be terminal delivered/completed and paid
+    const isTerminalDelivered = order.status === 'delivered' || order.marketplace_status === 'completed';
+    if (!isTerminalDelivered || (order.payment_status !== 'success' && !order.paid_at)) {
       return null;
     }
 
@@ -228,6 +230,80 @@ export class ReferralService {
     // 3. Prevent self-rewards
     if (order.user_id && order.user_id === referrerUserId) {
       return null;
+    }
+
+    // Special handling for Marketplace products
+    if (order.service_type === 'marketplace') {
+      let rewardMinor = 0;
+      let marketplaceProductId: string | null = order.product_id || null;
+
+      // First check product-level referral reward configured on product
+      if (order.product_id) {
+        const product = await MarketplaceStore.getProductById(order.product_id);
+        if (product && typeof product.referral_reward_minor === 'number' && product.referral_reward_minor > 0) {
+          rewardMinor = Math.floor(product.referral_reward_minor);
+        }
+      }
+
+      // Fallback: check matching global reward rule
+      if (rewardMinor <= 0) {
+        const rule = await ReferralStore.findMatchingRule('marketplace', order.network, order.product_id);
+        if (rule && rule.enabled) {
+          if (rule.reward_type === 'fixed_minor' && rule.reward_minor != null) {
+            rewardMinor = Math.max(0, Math.floor(rule.reward_minor));
+          } else if (rule.reward_type === 'percent_bps' && rule.reward_percent_bps != null) {
+            rewardMinor = Math.max(0, Math.round((order.amount * rule.reward_percent_bps) / 10000));
+          }
+        }
+      }
+
+      if (rewardMinor <= 0) {
+        return null;
+      }
+
+      const idempotencyKey = `marketplace_reward:${order.id}:${rewardMinor}`;
+      const nowIso = new Date().toISOString();
+
+      const result = await ReferralStore.createLedgerEntry({
+        referrer_user_id: referrerUserId,
+        referred_user_id: order.user_id || null,
+        referral_attribution_id: attributionId,
+        order_id: order.id,
+        marketplace_product_id: marketplaceProductId,
+        service_type: 'marketplace',
+        reward_rule_id: null,
+        amount_minor: rewardMinor,
+        currency: 'GHS',
+        status: 'approved',
+        reason: `Reward for completed Marketplace order ${order.public_reference} (${order.product_name_snapshot})`,
+        idempotency_key: idempotencyKey,
+        reversal_of_id: null,
+        approved_at: nowIso,
+        rejected_at: null,
+        reversed_at: null,
+        metadata_json: {
+          order_amount_minor: order.amount,
+          product_id: order.product_id,
+          reward_minor: rewardMinor,
+        },
+      });
+
+      if (!result.alreadyExisted) {
+        await AdminAuditStore.record({
+          adminUserId: referrerUserId,
+          action: 'reward_approved',
+          entityType: 'reward_ledger',
+          entityId: result.record.id,
+          metadata: {
+            order_id: order.id,
+            amount_minor: rewardMinor,
+            service_type: 'marketplace',
+            referrer_user_id: referrerUserId,
+          },
+        });
+      }
+
+      return result.record;
     }
 
     const serviceType: RewardServiceType =

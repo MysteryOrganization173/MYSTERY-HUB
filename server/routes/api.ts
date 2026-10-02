@@ -17,6 +17,7 @@ import { OrdersStore } from '../db/ordersStore.js';
 import { AuthStore } from '../db/authStore.js';
 import { WaitlistStore } from '../db/waitlistStore.js';
 import { MarketplaceStore } from '../db/marketplaceStore.js';
+import { parseJsonVariants, parseJsonPickupLocations } from '../types/marketplace.js';
 import { ReferralStore } from '../db/referralStore.js';
 import { ReferralService } from '../services/referralService.js';
 import { OrderRecord, toSafePublicOrder } from '../types/orders.js';
@@ -117,15 +118,15 @@ apiRouter.get('/instant-bundles', async (_req: Request, res: Response) => {
 apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: Response) => {
   const reqStart = performance.now();
   try {
-    const { productId, recipientPhone, customerEmail, customerName, serviceType, network: reqNetwork, amount: reqAmount } = req.body || {};
+    const { productId, recipientPhone, phone: bodyPhone, customerPhone, customerEmail, customerName, serviceType, network: reqNetwork, amount: reqAmount } = req.body || {};
 
     if (!productId || typeof productId !== 'string') {
       res.status(400).json({ error: 'Missing or invalid productId parameter.' });
       return;
     }
 
-    // 1. Validate Ghana recipient phone
-    const phoneVal = validateAndNormalizeGhanaPhone(recipientPhone);
+    const rawPhone = recipientPhone || bodyPhone || customerPhone;
+    const phoneVal = validateAndNormalizeGhanaPhone(rawPhone);
     if (!phoneVal.isValid || !phoneVal.normalized) {
       res.status(400).json({ error: phoneVal.error || 'Invalid recipient phone number.' });
       return;
@@ -151,6 +152,212 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
       visitorKey,
       explicitCode: explicitReferralCode,
     });
+
+    const isMarketplace =
+      serviceType === 'marketplace' ||
+      (typeof productId === 'string' && productId.startsWith('mp_'));
+
+    // ==========================================
+    // M. MARKETPLACE COMMERCE FLOW
+    // ==========================================
+    if (isMarketplace) {
+      let productRecord = await MarketplaceStore.getProductById(productId);
+      if (!productRecord) {
+        productRecord = await MarketplaceStore.getProductBySlug(productId);
+      }
+
+      if (!productRecord) {
+        res.status(404).json({ error: 'Selected marketplace product was not found.' });
+        return;
+      }
+
+      if (!productRecord.published) {
+        res.status(400).json({ error: 'This product is no longer available for direct purchase.' });
+        return;
+      }
+
+      if (productRecord.archived) {
+        res.status(400).json({ error: 'This product is archived and cannot be purchased.' });
+        return;
+      }
+
+      if (productRecord.price_type === 'quote') {
+        res.status(400).json({ error: 'This item requires a custom quote. Please click Inquire.' });
+        return;
+      }
+
+      if (productRecord.purchase_enabled === false) {
+        res.status(400).json({ error: 'This item is no longer available for direct purchase. You can still inquire with Mystery Hub.' });
+        return;
+      }
+
+      let authorPriceMinor = productRecord.price_minor;
+      let selectedVariantSnapshot: string | null = null;
+      let selectedVariantId: string | null = null;
+
+      const variants = parseJsonVariants(productRecord.variants);
+      if (req.body?.variantId && typeof req.body.variantId === 'string') {
+        const matchingVar = variants.find((v) => v.id === req.body.variantId && v.active !== false);
+        if (!matchingVar) {
+          res.status(400).json({ error: 'Selected product variant is invalid or inactive.' });
+          return;
+        }
+        authorPriceMinor = matchingVar.priceMinor;
+        selectedVariantSnapshot = matchingVar.name;
+        selectedVariantId = matchingVar.id;
+      } else if (variants.length > 0) {
+        const activeVariants = variants.filter((v) => v.active !== false);
+        if (activeVariants.length > 0 && !req.body?.variantId) {
+          res.status(400).json({ error: 'Please select a valid product variant configuration before payment.' });
+          return;
+        }
+      }
+
+      if (authorPriceMinor === null || authorPriceMinor <= 0) {
+        res.status(400).json({ error: 'This item does not have a fixed direct purchase price. Please click Inquire.' });
+        return;
+      }
+
+      const reqFulfilmentMethod = req.body?.fulfilmentMethod;
+      if (reqFulfilmentMethod !== 'pickup' && reqFulfilmentMethod !== 'delivery') {
+        res.status(400).json({ error: 'Please choose a valid fulfilment method (pickup or delivery).' });
+        return;
+      }
+
+      const productMode = productRecord.fulfilment_mode || 'both';
+      if (productMode === 'inquiry_only') {
+        res.status(400).json({ error: 'This product is available for inquiry only.' });
+        return;
+      }
+      if (reqFulfilmentMethod === 'pickup' && productMode === 'delivery') {
+        res.status(400).json({ error: 'Pickup is not available for this product.' });
+        return;
+      }
+      if (reqFulfilmentMethod === 'delivery' && (productMode === 'pickup' || productRecord.delivery_available === false)) {
+        res.status(400).json({ error: 'Delivery is not available for this product.' });
+        return;
+      }
+
+      let selectedPickupSnapshot: string | null = null;
+      let selectedPickupId: string | null = null;
+
+      if (reqFulfilmentMethod === 'pickup') {
+        const pickupLocs = parseJsonPickupLocations(productRecord.pickup_locations);
+        const reqLocId = req.body?.pickupLocationId;
+        const targetLoc = pickupLocs.find((loc) => loc.id === reqLocId && loc.active !== false);
+        if (!targetLoc) {
+          res.status(400).json({ error: 'Please select an active, valid pickup location.' });
+          return;
+        }
+        selectedPickupId = targetLoc.id;
+        selectedPickupSnapshot = `${targetLoc.name} (${targetLoc.area}, ${targetLoc.city}${targetLoc.addressOrLandmark ? ` · ${targetLoc.addressOrLandmark}` : ''})`;
+      }
+
+      let deliveryCity: string | null = null;
+      let deliveryArea: string | null = null;
+      let deliveryLandmark: string | null = null;
+      let deliveryNote: string | null = null;
+
+      if (reqFulfilmentMethod === 'delivery') {
+        deliveryCity = typeof req.body?.deliveryCity === 'string' ? req.body.deliveryCity.trim() : null;
+        deliveryArea = typeof req.body?.deliveryArea === 'string' ? req.body.deliveryArea.trim() : null;
+        deliveryLandmark = typeof req.body?.deliveryLandmark === 'string' ? req.body.deliveryLandmark.trim() : null;
+        deliveryNote = typeof req.body?.deliveryNote === 'string' ? req.body.deliveryNote.trim() : null;
+
+        if (!deliveryCity || !deliveryArea) {
+          res.status(400).json({ error: 'Please provide your delivery city and area.' });
+          return;
+        }
+      }
+
+      const timestamp = Date.now();
+      const randomHex = Math.floor(100000 + Math.random() * 900000);
+      const publicRef = `MH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${randomHex}`;
+      const paymentRef = `MH_PAY_MKT_${timestamp}_${randomHex}`;
+      const nowIso = new Date().toISOString();
+
+      const newOrder: OrderRecord = {
+        id: `ord_${timestamp}_${randomHex}`,
+        user_id: req.user?.id || null,
+        public_reference: publicRef,
+        customer_name: typeof customerName === 'string' && customerName.trim() ? customerName.trim() : (req.user?.name || 'Customer'),
+        customer_email: validEmail,
+        customer_phone: phoneVal.normalized,
+        recipient_phone: phoneVal.normalized,
+        network: 'mtn',
+        service_type: 'marketplace',
+        product_id: productRecord.id,
+        product_slug: productRecord.slug,
+        product_name_snapshot: productRecord.name,
+        bundle_size_snapshot: selectedVariantSnapshot || productRecord.availability_label || 'Direct Purchase',
+        variant_id: selectedVariantId,
+        variant_snapshot: selectedVariantSnapshot,
+        amount: authorPriceMinor,
+        currency: 'GHS',
+        status: 'pending_payment',
+        payment_provider: 'paystack',
+        payment_reference: paymentRef,
+        payment_status: 'pending',
+        supplier_provider: 'manual_supplier',
+        supplier_order_id: null,
+        supplier_response: null,
+        supplier_cost_minor: null,
+        supplier_offer_ref: null,
+        supplier_last_checked_at: null,
+        failure_reason: null,
+        fulfilment_method: reqFulfilmentMethod,
+        pickup_location_id: selectedPickupId,
+        pickup_location_snapshot: selectedPickupSnapshot,
+        delivery_city: deliveryCity,
+        delivery_area: deliveryArea,
+        delivery_landmark: deliveryLandmark,
+        delivery_note: deliveryNote,
+        marketplace_status: 'pending_payment',
+        created_at: nowIso,
+        updated_at: nowIso,
+        paid_at: null,
+        submitted_at: null,
+        delivered_at: null,
+        referrer_user_id: referralContext.referrerUserId,
+        referral_attribution_id: referralContext.attributionId,
+        referral_code: referralContext.referralCode,
+      };
+
+      await OrdersStore.createOrder(newOrder);
+
+      const paystackRes = await PaystackServerService.initializeTransaction({
+        email: validEmail,
+        amountPesewas: authorPriceMinor,
+        reference: paymentRef,
+        metadata: {
+          public_reference: publicRef,
+          recipient_phone: phoneVal.normalized,
+          service_type: 'marketplace',
+          product_id: productRecord.id,
+          product_slug: productRecord.slug,
+          product_name: productRecord.name,
+          fulfilment_method: reqFulfilmentMethod,
+        },
+      });
+
+      if (!paystackRes.success) {
+        res.status(500).json({ error: paystackRes.error || 'Failed to initialize payment with Paystack.' });
+        return;
+      }
+
+      res.json({
+        success: true,
+        orderRef: publicRef,
+        reference: paymentRef,
+        accessCode: paystackRes.accessCode,
+        authorizationUrl: paystackRes.authorizationUrl,
+        amountGhc: Number((authorPriceMinor / 100).toFixed(2)),
+        amountPesewas: authorPriceMinor,
+        currency: 'GHS',
+        isSimulated: paystackRes.isSimulated || false,
+      });
+      return;
+    }
 
     const isAirtime =
       serviceType === 'airtime' ||
@@ -1412,6 +1619,41 @@ apiRouter.get('/referrals/rules', async (_req: Request, res: Response) => {
   } catch (err) {
     console.error('Referral Rules API Exception:', err);
     res.status(500).json({ error: 'Failed to retrieve referral rules.' });
+  }
+});
+
+/**
+ * 19. POST /api/marketplace/inquiries
+ * Records customer product sourcing & availability inquiries.
+ */
+apiRouter.post('/marketplace/inquiries', async (req: Request, res: Response) => {
+  try {
+    const { productId, productName, customerName, customerPhone, customerEmail, inquiryType, message, budget } = req.body || {};
+
+    if (!productName || typeof productName !== 'string' || !productName.trim()) {
+      res.status(400).json({ error: 'Product name is required for inquiries.' });
+      return;
+    }
+
+    const created = await MarketplaceStore.createInquiry({
+      productId: typeof productId === 'string' ? productId.trim() : undefined,
+      productName: productName.trim(),
+      customerName: typeof customerName === 'string' ? customerName.trim() : undefined,
+      customerPhone: typeof customerPhone === 'string' ? customerPhone.trim() : undefined,
+      customerEmail: typeof customerEmail === 'string' ? customerEmail.trim() : undefined,
+      inquiryType: typeof inquiryType === 'string' ? inquiryType.trim() : 'general',
+      message: typeof message === 'string' ? message.trim() : undefined,
+      budget: typeof budget === 'string' ? budget.trim() : undefined,
+    });
+
+    res.json({
+      success: true,
+      inquiryId: created.id,
+      message: 'Product inquiry recorded successfully.',
+    });
+  } catch (err) {
+    console.error('Marketplace Inquiry API Exception:', err);
+    res.status(500).json({ error: 'Failed to record product inquiry.' });
   }
 });
 

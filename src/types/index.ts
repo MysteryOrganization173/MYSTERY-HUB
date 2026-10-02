@@ -46,7 +46,7 @@ export interface OrderRecord {
   id: string; // Local client ID e.g. MH1234567
   publicReference?: string; // Real authoritative backend reference e.g. MH-20260930-592025
   serverReference?: string; // Alias for backward compatibility
-  serviceType?: 'data' | 'airtime' | 'instant_bundle';
+  serviceType?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace';
   bundle: DataBundle;
   recipientPhone: string;
   network: NetworkId;
@@ -224,6 +224,26 @@ export type MarketplaceCategory =
   | 'digital_products'
   | 'business_essentials';
 
+export interface MarketplacePickupLocation {
+  id: string;
+  name: string;
+  city: string;
+  area: string;
+  addressOrLandmark?: string;
+  phone?: string;
+  active: boolean;
+}
+
+export interface MarketplaceProductVariant {
+  id: string;
+  name: string;
+  priceMinor: number;
+  priceGhc: number;
+  active: boolean;
+}
+
+export type MarketplaceFulfilmentMode = 'pickup' | 'delivery' | 'both' | 'inquiry_only';
+
 export interface MarketplaceProduct {
   id: string;
   slug: string;
@@ -253,6 +273,14 @@ export interface MarketplaceProduct {
   sortOrder?: number;
   referralRewardMinor?: number | null;
   referralRewardGhc?: number | null;
+  purchaseEnabled?: boolean;
+  fulfilmentMode?: MarketplaceFulfilmentMode;
+  pickupLocations?: MarketplacePickupLocation[];
+  deliveryAvailable?: boolean;
+  deliveryNote?: string;
+  purchaseNote?: string;
+  paymentRequiredBeforeDelivery?: boolean;
+  variants?: MarketplaceProductVariant[];
   createdAt?: string;
   updatedAt?: string;
 }

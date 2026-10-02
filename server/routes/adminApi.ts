@@ -18,7 +18,7 @@ import {
   MarketplaceProductAvailability,
   CATEGORY_LABELS,
 } from '../types/marketplace.js';
-import { toAdminOrderDetails } from '../types/orders.js';
+import { OrderRecord, toAdminOrderDetails } from '../types/orders.js';
 import { toSafeUserProfile, UserStatus } from '../types/auth.js';
 import { FulfilmentService } from '../services/fulfilmentService.js';
 import { SuccessBizHubProvider } from '../suppliers/successBizHub/provider.js';
@@ -264,6 +264,62 @@ adminRouter.patch('/orders/:reference/review', async (req: Request, res: Respons
   } catch (err) {
     console.error('[Admin API] Update order review error:', err);
     res.status(500).json({ error: 'Failed to update order review details.' });
+  }
+});
+
+/**
+ * 5b. PATCH /api/admin/orders/:reference/status
+ * Admin update order marketplace/fulfilment status
+ */
+adminRouter.patch('/orders/:reference/status', async (req: Request, res: Response) => {
+  try {
+    const ref = req.params.reference;
+    const { status, marketplaceStatus, adminNote } = req.body || {};
+
+    const order = await OrdersStore.findOrder(ref);
+    if (!order) {
+      res.status(404).json({ error: 'Order reference not found.' });
+      return;
+    }
+
+    const targetStatus = marketplaceStatus || status;
+    if (!targetStatus) {
+      res.status(400).json({ error: 'Status is required.' });
+      return;
+    }
+
+    let updated: OrderRecord | null = null;
+    if (order.service_type === 'marketplace' || marketplaceStatus) {
+      updated = await OrdersStore.updateMarketplaceStatus(order.id, targetStatus, adminNote);
+    } else {
+      updated = await OrdersStore.updateOrderStatus(order.id, targetStatus, adminNote);
+    }
+
+    if (!updated) {
+      res.status(404).json({ error: 'Failed to update order status.' });
+      return;
+    }
+
+    await AdminAuditStore.record({
+      adminUserId: req.user!.id,
+      action: 'order_status_updated',
+      entityType: 'order',
+      entityId: order.public_reference,
+      metadata: {
+        newStatus: updated.status,
+        newMarketplaceStatus: updated.marketplace_status,
+        hasAdminNote: Boolean(updated.admin_note),
+      },
+    });
+
+    res.json({
+      success: true,
+      order: toAdminOrderDetails(updated),
+      message: `Order status updated to ${updated.marketplace_status || updated.status}.`,
+    });
+  } catch (err) {
+    console.error('[Admin API] Update order status error:', err);
+    res.status(500).json({ error: 'Failed to update order status.' });
   }
 });
 

@@ -26,6 +26,26 @@ export interface MarketplaceSpecItem {
   value: string;
 }
 
+export interface MarketplacePickupLocation {
+  id: string;
+  name: string;
+  city: string;
+  area: string;
+  addressOrLandmark?: string;
+  phone?: string;
+  active: boolean;
+}
+
+export interface MarketplaceProductVariant {
+  id: string;
+  name: string;
+  priceMinor: number;
+  priceGhc: number;
+  active: boolean;
+}
+
+export type MarketplaceFulfilmentMode = 'pickup' | 'delivery' | 'both' | 'inquiry_only';
+
 export interface MarketplaceProductRecord {
   id: string;
   slug: string;
@@ -36,6 +56,14 @@ export interface MarketplaceProductRecord {
   price_type: MarketplaceProductPriceType;
   price_minor: number | null; // stored in pesewas (100 pesewas = 1 GHS)
   referral_reward_minor?: number | null; // stored in pesewas (nullable, defaults to null/disabled)
+  purchase_enabled?: boolean;
+  fulfilment_mode?: MarketplaceFulfilmentMode;
+  pickup_locations?: string | null; // JSON string of MarketplacePickupLocation[]
+  delivery_available?: boolean;
+  delivery_note?: string | null;
+  purchase_note?: string | null;
+  payment_required_before_delivery?: boolean;
+  variants?: string | null; // JSON string of MarketplaceProductVariant[]
   availability: MarketplaceProductAvailability;
   availability_label: string | null;
   badge: string | null;
@@ -75,6 +103,14 @@ export interface PublicMarketplaceProduct {
   featured: boolean;
   referralRewardMinor?: number | null;
   referralRewardGhc?: number | null;
+  purchaseEnabled: boolean;
+  fulfilmentMode: MarketplaceFulfilmentMode;
+  pickupLocations: MarketplacePickupLocation[];
+  deliveryAvailable: boolean;
+  deliveryNote?: string;
+  purchaseNote?: string;
+  paymentRequiredBeforeDelivery: boolean;
+  variants: MarketplaceProductVariant[];
 }
 
 export interface AdminMarketplaceProduct extends PublicMarketplaceProduct {
@@ -187,6 +223,43 @@ export function parseJsonSpecs(raw: string | null | undefined): MarketplaceSpecI
   return [];
 }
 
+export function parseJsonPickupLocations(raw: string | null | undefined): MarketplacePickupLocation[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (loc): loc is MarketplacePickupLocation =>
+          typeof loc === 'object' &&
+          loc !== null &&
+          typeof loc.id === 'string' &&
+          typeof loc.name === 'string' &&
+          typeof loc.city === 'string' &&
+          typeof loc.area === 'string'
+      );
+    }
+  } catch {}
+  return [];
+}
+
+export function parseJsonVariants(raw: string | null | undefined): MarketplaceProductVariant[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (v): v is MarketplaceProductVariant =>
+          typeof v === 'object' &&
+          v !== null &&
+          typeof v.id === 'string' &&
+          typeof v.name === 'string' &&
+          typeof v.priceMinor === 'number'
+      );
+    }
+  } catch {}
+  return [];
+}
+
 /**
  * Map raw database record to safe customer-facing PublicMarketplaceProduct
  */
@@ -194,6 +267,10 @@ export function toPublicMarketplaceProduct(record: MarketplaceProductRecord): Pu
   const categoryLabel = CATEGORY_LABELS[record.category] || record.category;
   const priceDisplay = formatMarketplacePrice(record.price_type, record.price_minor);
   const priceGhc = record.price_minor !== null ? record.price_minor / 100 : null;
+
+  const pickupLocations = parseJsonPickupLocations(record.pickup_locations);
+  const variants = parseJsonVariants(record.variants);
+  const purchaseEnabled = record.price_type === 'quote' ? false : (record.purchase_enabled !== false);
 
   return {
     id: record.id,
@@ -218,6 +295,14 @@ export function toPublicMarketplaceProduct(record: MarketplaceProductRecord): Pu
     featured: Boolean(record.featured),
     referralRewardMinor: record.referral_reward_minor || null,
     referralRewardGhc: record.referral_reward_minor != null ? record.referral_reward_minor / 100 : null,
+    purchaseEnabled,
+    fulfilmentMode: record.fulfilment_mode || 'both',
+    pickupLocations,
+    deliveryAvailable: record.delivery_available !== false,
+    deliveryNote: record.delivery_note || undefined,
+    purchaseNote: record.purchase_note || undefined,
+    paymentRequiredBeforeDelivery: record.payment_required_before_delivery !== false,
+    variants,
   };
 }
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../config/business';
+import { submitMarketplaceInquiry } from '../../services/apiClient';
 import {
   X,
   MessageSquare,
@@ -14,23 +15,52 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
+const INQUIRY_QUESTIONS = [
+  'Is this product still available?',
+  'Where can I pick it up?',
+  'Can this be delivered to my area?',
+  'General enquiry',
+];
+
 export const MarketplaceInquiryModal: React.FC = () => {
   const { marketplaceInquiryProduct, closeMarketplaceInquiry, showToast } = useApp();
 
+  const [selectedQuestion, setSelectedQuestion] = useState<string>('Is this product still available?');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [budget, setBudget] = useState('');
   const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   if (!marketplaceInquiryProduct) return null;
 
   const product = marketplaceInquiryProduct;
 
-  const handleWhatsAppDirect = (e: React.FormEvent) => {
+  const handleInquirySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    setIsSubmitting(true);
+    try {
+      await submitMarketplaceInquiry({
+        productId: product.id,
+        productName: product.name,
+        customerName: name.trim() || undefined,
+        customerPhone: phone.trim() || undefined,
+        customerEmail: email.trim() || undefined,
+        inquiryType: selectedQuestion,
+        message: notes.trim() || undefined,
+        budget: budget.trim() || undefined,
+      });
+    } catch {
+      // Best-effort database recording
+    } finally {
+      setIsSubmitting(false);
+    }
+
     const inquiryDetails = [
+      `Inquiry: ${selectedQuestion}`,
       notes ? `Requirements: ${notes}` : null,
       budget ? `Target Budget: GH₵ ${budget}` : null,
       name ? `From: ${name}` : null,
@@ -46,12 +76,13 @@ export const MarketplaceInquiryModal: React.FC = () => {
 
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     setIsSubmitted(true);
-    showToast(`WhatsApp inquiry prepared for ${product.name}!`, 'success');
+    showToast(`Inquiry recorded and WhatsApp opened for ${product.name}!`, 'success');
 
     setTimeout(() => {
       setIsSubmitted(false);
       setName('');
       setPhone('');
+      setEmail('');
       setBudget('');
       setNotes('');
       closeMarketplaceInquiry();
@@ -128,11 +159,37 @@ export const MarketplaceInquiryModal: React.FC = () => {
               </div>
               <h4 className="font-bold text-lg text-white">Inquiry Dispatched!</h4>
               <p className="text-xs text-slate-300 max-w-xs mx-auto">
-                WhatsApp has been launched with your inquiry details. Our Accra sourcing desk will confirm current availability and pricing promptly.
+                Inquiry recorded in system &amp; WhatsApp launched. Our Accra sourcing desk will respond promptly.
               </p>
             </div>
           ) : (
-            <form onSubmit={handleWhatsAppDirect} className="space-y-4 text-xs">
+            <form onSubmit={handleInquirySubmit} className="space-y-4 text-xs">
+              {/* Question Chips */}
+              <div className="space-y-1.5">
+                <label className="font-semibold text-slate-200 block">
+                  What would you like to inquire about?
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {INQUIRY_QUESTIONS.map((q) => {
+                    const isSelected = selectedQuestion === q;
+                    return (
+                      <button
+                        key={q}
+                        type="button"
+                        onClick={() => setSelectedQuestion(q)}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer text-xs font-medium ${
+                          isSelected
+                            ? 'bg-[#00c365]/15 border-[#00c365] text-white font-bold'
+                            : 'bg-[#090d10] border-slate-800 text-slate-300 hover:border-slate-700'
+                        }`}
+                      >
+                        {q}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="space-y-1.5">
                   <label className="font-semibold text-slate-200 block">
@@ -161,22 +218,37 @@ export const MarketplaceInquiryModal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="font-semibold text-slate-200 block">
-                  Target Budget / Quantity <span className="text-slate-500">(Optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={budget}
-                  onChange={(e) => setBudget(e.target.value)}
-                  placeholder="e.g. GH₵ 7,000 max, or 2 units"
-                  className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365] text-xs sm:text-sm"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-200 block">
+                    Email Address <span className="text-slate-500">(Optional)</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="e.g. kwame@example.com"
+                    className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365] text-xs sm:text-sm"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-200 block">
+                    Target Budget / Quantity <span className="text-slate-500">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
+                    placeholder="e.g. GH₵ 7,000 max, or 2 units"
+                    className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365] text-xs sm:text-sm"
+                  />
+                </div>
               </div>
 
               <div className="space-y-1.5">
                 <label className="font-semibold text-slate-200 block">
-                  Specific Specifications or Questions <span className="text-slate-500">(Optional)</span>
+                  Additional Details / Requirements <span className="text-slate-500">(Optional)</span>
                 </label>
                 <textarea
                   rows={2}
@@ -191,10 +263,11 @@ export const MarketplaceInquiryModal: React.FC = () => {
               <div className="pt-2 space-y-2.5">
                 <button
                   type="submit"
-                  className="w-full py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.25)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+                  disabled={isSubmitting}
+                  className="w-full py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.25)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-50"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  <span>Send Inquiry via WhatsApp (+233 59 206 6298)</span>
+                  <span>{isSubmitting ? 'Recording Inquiry...' : 'Submit Inquiry via WhatsApp'}</span>
                 </button>
 
                 <div className="grid grid-cols-2 gap-2 text-[11px]">

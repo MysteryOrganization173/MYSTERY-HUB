@@ -581,6 +581,48 @@ export async function updateAdminOrderReviewOnServer(
   return data;
 }
 
+export async function updateAdminOrderStatusOnServer(
+  token: string,
+  reference: string,
+  body: { status?: string; marketplaceStatus?: string; adminNote?: string }
+): Promise<{ success: boolean; order: AdminOrderDetails; message: string }> {
+  const url = `${API_BASE_URL}/api/admin/orders/${encodeURIComponent(reference)}/status`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to update order status.');
+  return data;
+}
+
+export async function submitMarketplaceInquiry(payload: {
+  productId: string;
+  productName: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  inquiryType?: string;
+  message?: string;
+  budget?: string;
+}): Promise<{ success: boolean; message: string }> {
+  const url = `${API_BASE_URL}/api/marketplace/inquiries`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to submit inquiry.');
+  return data;
+}
+
 export async function closeAdminTestOrderOnServer(
   token: string,
   reference: string,

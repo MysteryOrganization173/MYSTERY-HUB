@@ -24,10 +24,13 @@ export interface OrderRecord {
   customer_phone: string;
   recipient_phone: string;
   network: 'mtn' | 'telecel' | 'airteltigo';
-  service_type?: 'data' | 'airtime' | 'instant_bundle';
+  service_type?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace';
   product_id: string;
   product_name_snapshot: string;
   bundle_size_snapshot: string;
+  product_slug?: string | null;
+  variant_id?: string | null;
+  variant_snapshot?: string | null;
   amount: number; // Stored safely in pesewas (customer total e.g. 1020 for GH₵10.20)
   face_value_minor?: number | null; // Airtime face value in pesewas (e.g. 1000 for GH₵10.00)
   service_fee_minor?: number | null; // Service fee in pesewas (e.g. 20 for GH₵0.20)
@@ -45,6 +48,14 @@ export interface OrderRecord {
   failure_reason: string | null;
   manual_review?: boolean;
   admin_note?: string | null;
+  fulfilment_method?: 'pickup' | 'delivery' | null;
+  pickup_location_id?: string | null;
+  pickup_location_snapshot?: string | null;
+  delivery_city?: string | null;
+  delivery_area?: string | null;
+  delivery_landmark?: string | null;
+  delivery_note?: string | null;
+  marketplace_status?: 'pending_payment' | 'paid' | 'awaiting_fulfilment' | 'ready_for_pickup' | 'out_for_delivery' | 'completed' | 'cancelled' | 'refund_pending' | 'refunded' | null;
   created_at: string; // ISO 8601
   updated_at: string; // ISO 8601
   paid_at: string | null;
@@ -71,9 +82,18 @@ export type SafePublicOrderDetails = Pick<
   | 'delivered_at'
 > & {
   amount_ghc: number;
-  service_type?: 'data' | 'airtime' | 'instant_bundle';
+  service_type?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace';
   face_value_ghc?: number;
   service_fee_ghc?: number;
+  product_slug?: string | null;
+  variant_snapshot?: string | null;
+  fulfilment_method?: 'pickup' | 'delivery' | null;
+  pickup_location_snapshot?: string | null;
+  delivery_city?: string | null;
+  delivery_area?: string | null;
+  delivery_landmark?: string | null;
+  delivery_note?: string | null;
+  marketplace_status?: string | null;
 };
 
 export interface AdminOrderDetails extends SafePublicOrderDetails {
@@ -98,6 +118,11 @@ export interface AdminOrderDetails extends SafePublicOrderDetails {
   updated_at: string;
   submitted_at: string | null;
   payment_closed_at?: string | null;
+  referrer_user_id?: string | null;
+  referral_code?: string | null;
+  product_id?: string;
+  pickup_location_id?: string | null;
+  variant_id?: string | null;
 }
 
 export function toAdminOrderDetails(order: OrderRecord): AdminOrderDetails {
@@ -125,12 +150,16 @@ export function toAdminOrderDetails(order: OrderRecord): AdminOrderDetails {
     updated_at: order.updated_at,
     submitted_at: order.submitted_at || null,
     payment_closed_at: order.payment_closed_at || null,
+    referrer_user_id: order.referrer_user_id || null,
+    referral_code: order.referral_code || null,
+    product_id: order.product_id,
+    pickup_location_id: order.pickup_location_id || null,
+    variant_id: order.variant_id || null,
   };
 }
 
 export function toSafePublicOrder(order: OrderRecord): SafePublicOrderDetails {
-  const isAirtime = order.service_type === 'airtime' || order.product_id.startsWith('airtime-');
-  const serviceType = isAirtime ? 'airtime' : 'data';
+  const serviceType = order.service_type || (order.product_id.startsWith('airtime-') ? 'airtime' : 'data');
 
   return {
     public_reference: order.public_reference,
@@ -148,5 +177,14 @@ export function toSafePublicOrder(order: OrderRecord): SafePublicOrderDetails {
     amount_ghc: Number((order.amount / 100).toFixed(2)),
     face_value_ghc: order.face_value_minor != null ? Number((order.face_value_minor / 100).toFixed(2)) : undefined,
     service_fee_ghc: order.service_fee_minor != null ? Number((order.service_fee_minor / 100).toFixed(2)) : undefined,
+    product_slug: order.product_slug || null,
+    variant_snapshot: order.variant_snapshot || null,
+    fulfilment_method: order.fulfilment_method || null,
+    pickup_location_snapshot: order.pickup_location_snapshot || null,
+    delivery_city: order.delivery_city || null,
+    delivery_area: order.delivery_area || null,
+    delivery_landmark: order.delivery_landmark || null,
+    delivery_note: order.delivery_note || null,
+    marketplace_status: order.marketplace_status || null,
   };
 }

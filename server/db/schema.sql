@@ -164,6 +164,23 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_marketplace_slug ON marketplace_products (
 CREATE INDEX IF NOT EXISTS idx_marketplace_category ON marketplace_products (category);
 CREATE INDEX IF NOT EXISTS idx_marketplace_published ON marketplace_products (published, archived, sort_order, created_at DESC);
 
+-- MARKETPLACE INQUIRIES TABLE
+CREATE TABLE IF NOT EXISTS marketplace_inquiries (
+  id VARCHAR(64) PRIMARY KEY,
+  product_id VARCHAR(64) REFERENCES marketplace_products(id) ON DELETE CASCADE,
+  product_name VARCHAR(255) NOT NULL,
+  customer_name VARCHAR(128),
+  customer_phone VARCHAR(64),
+  customer_email VARCHAR(128),
+  inquiry_type VARCHAR(64) NOT NULL DEFAULT 'general',
+  message TEXT,
+  budget VARCHAR(128),
+  status VARCHAR(32) NOT NULL DEFAULT 'new',
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_marketplace_inquiries_created ON marketplace_inquiries (created_at DESC);
+
 -- Active MTN recipient lock index (enforces at most one active MTN order per recipient)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_active_mtn_recipient 
 ON orders (recipient_phone) 

@@ -4,6 +4,7 @@ import {
   getAdminOrdersOnServer,
   refreshAdminOrderOnServer,
   updateAdminOrderReviewOnServer,
+  updateAdminOrderStatusOnServer,
   closeAdminTestOrderOnServer,
 } from '../../../services/apiClient';
 import { AdminOrderDetails } from '../../../../server/types/orders';
@@ -24,6 +25,7 @@ import {
   Radio,
   Eye,
   SlidersHorizontal,
+  ShoppingBag,
 } from 'lucide-react';
 
 interface AdminOrdersSectionProps {
@@ -250,6 +252,29 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
     }
   };
 
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  const handleUpdateOrderStatus = async (order: AdminOrderDetails, newStatus: string) => {
+    setIsUpdatingStatus(true);
+    setActionSuccessMessage(null);
+    try {
+      const res = await updateAdminOrderStatusOnServer(sessionToken, order.public_reference, {
+        marketplaceStatus: newStatus,
+        adminNote: adminNoteInput.trim() || undefined,
+      });
+      if (res.success && res.order) {
+        selectedOrderRef.current = res.order;
+        setSelectedOrder(res.order);
+        setActionSuccessMessage(`Order status updated to "${res.order.marketplace_status || res.order.status}".`);
+        fetchOrders();
+      }
+    } catch (err) {
+      console.error('Failed to update order status:', err);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   // Helper for Status Badge
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -386,6 +411,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
               className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 focus:border-[#00c365] focus:outline-none"
             >
               <option value="">All Services</option>
+              <option value="marketplace">Marketplace Commerce</option>
               <option value="data">Data Bundles</option>
               <option value="instant_bundle">Instant Bundles</option>
               <option value="airtime">Airtime Top-up</option>
@@ -864,57 +890,144 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                 </div>
               </div>
 
-              {/* Supplier Integration Diagnostics */}
-              <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                    <Radio className="w-3.5 h-3.5 text-sky-400" />
-                    <span>Supplier Dispatch Details (Success Biz Hub)</span>
-                  </h4>
-                  {selectedOrder.supplier_order_id && (
-                    <button
-                      onClick={() => handleRefreshSupplierStatus(selectedOrder.public_reference)}
-                      disabled={isRefreshingSupplier}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 font-semibold text-[11px] border border-sky-500/30 transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-3 h-3 ${isRefreshingSupplier ? 'animate-spin' : ''}`} />
-                      <span>{isRefreshingSupplier ? 'Checking Supplier...' : 'Refresh Status'}</span>
-                    </button>
+              {/* Marketplace Specific Fulfilment Card */}
+              {selectedOrder.service_type === 'marketplace' ? (
+                <div className="p-4 rounded-xl bg-slate-900/80 border border-[#00c365]/30 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                      <ShoppingBag className="w-4 h-4 text-[#00c365]" />
+                      <span>Marketplace Commerce Order Fulfilment</span>
+                    </h4>
+                    <span className="text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 px-2 py-0.5 rounded uppercase">
+                      {selectedOrder.fulfilment_method === 'delivery' ? 'Doorstep Delivery' : 'Pickup Hub'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-[11px] text-slate-400 block">Product Ordered</span>
+                      <span className="font-bold text-white block">{selectedOrder.product_name_snapshot}</span>
+                      {selectedOrder.variant_snapshot && (
+                        <span className="text-[11px] text-amber-400 block">Variant: {selectedOrder.variant_snapshot}</span>
+                      )}
+                    </div>
+
+                    <div>
+                      <span className="text-[11px] text-slate-400 block">Fulfilment Method</span>
+                      <span className="font-bold text-white capitalize">
+                        {selectedOrder.fulfilment_method || 'Pickup'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {selectedOrder.fulfilment_method === 'pickup' ? (
+                    <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1 text-xs">
+                      <span className="text-[11px] text-slate-400 block font-bold">Pickup Location:</span>
+                      <p className="text-white font-medium">{selectedOrder.pickup_location_snapshot || 'Accra Pickup Hub'}</p>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1 text-xs">
+                      <span className="text-[11px] text-slate-400 block font-bold">Delivery Address:</span>
+                      <p className="text-white font-medium">
+                        {selectedOrder.delivery_city}, {selectedOrder.delivery_area}
+                      </p>
+                      {selectedOrder.delivery_landmark && (
+                        <p className="text-slate-300 text-[11px]">Landmark: {selectedOrder.delivery_landmark}</p>
+                      )}
+                      {selectedOrder.delivery_note && (
+                        <p className="text-amber-300 text-[11px] italic">Note: {selectedOrder.delivery_note}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Admin Status Update Action */}
+                  <div className="pt-2 border-t border-slate-800 space-y-2">
+                    <span className="text-[11px] font-bold text-slate-300 block">
+                      Update Fulfilment Status:
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { id: 'awaiting_fulfilment', label: 'Awaiting Dispatch' },
+                        { id: 'processing', label: 'Processing' },
+                        { id: 'ready_for_pickup', label: 'Ready for Pickup' },
+                        { id: 'out_for_delivery', label: 'Out for Delivery' },
+                        { id: 'completed', label: 'Completed / Delivered' },
+                        { id: 'refunded', label: 'Refunded' },
+                        { id: 'cancelled', label: 'Cancelled' },
+                      ].map((st) => {
+                        const isCurrent =
+                          selectedOrder.marketplace_status === st.id || selectedOrder.status === st.id;
+                        return (
+                          <button
+                            key={st.id}
+                            disabled={isUpdatingStatus}
+                            onClick={() => handleUpdateOrderStatus(selectedOrder, st.id)}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                              isCurrent
+                                ? 'bg-[#00c365] text-black font-extrabold shadow-sm'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700'
+                            }`}
+                          >
+                            {st.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Supplier Integration Diagnostics (Telecom Services) */
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                      <Radio className="w-3.5 h-3.5 text-sky-400" />
+                      <span>Supplier Dispatch Details (Success Biz Hub)</span>
+                    </h4>
+                    {selectedOrder.supplier_order_id && (
+                      <button
+                        onClick={() => handleRefreshSupplierStatus(selectedOrder.public_reference)}
+                        disabled={isRefreshingSupplier}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 font-semibold text-[11px] border border-sky-500/30 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isRefreshingSupplier ? 'animate-spin' : ''}`} />
+                        <span>{isRefreshingSupplier ? 'Checking Supplier...' : 'Refresh Status'}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">Supplier Order ID</span>
+                      <span className="font-mono text-white font-bold">
+                        {selectedOrder.supplier_order_id || 'Not Dispatched'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">Recorded Wholesale Cost</span>
+                      <span className="font-mono text-white">
+                        {selectedOrder.supplier_cost_minor !== null
+                          ? `GH₵ ${(selectedOrder.supplier_cost_minor / 100).toFixed(2)}`
+                          : 'N/A'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">Package Offer Code</span>
+                      <span className="font-mono text-slate-300">
+                        {selectedOrder.supplier_offer_ref || 'Standard Catalog'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {selectedOrder.failure_reason && (
+                    <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/25 text-[11px] text-red-300 font-mono">
+                      <strong className="block text-red-400 font-sans">Failure / Rejection Reason:</strong>
+                      {selectedOrder.failure_reason}
+                    </div>
                   )}
                 </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                  <div>
-                    <span className="text-[11px] text-slate-500 block">Supplier Order ID</span>
-                    <span className="font-mono text-white font-bold">
-                      {selectedOrder.supplier_order_id || 'Not Dispatched'}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-[11px] text-slate-500 block">Recorded Wholesale Cost</span>
-                    <span className="font-mono text-white">
-                      {selectedOrder.supplier_cost_minor !== null
-                        ? `GH₵ ${(selectedOrder.supplier_cost_minor / 100).toFixed(2)}`
-                        : 'N/A'}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-[11px] text-slate-500 block">Package Offer Code</span>
-                    <span className="font-mono text-slate-300">
-                      {selectedOrder.supplier_offer_ref || 'Standard Catalog'}
-                    </span>
-                  </div>
-                </div>
-
-                {selectedOrder.failure_reason && (
-                  <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/25 text-[11px] text-red-300 font-mono">
-                    <strong className="block text-red-400 font-sans">Failure / Rejection Reason:</strong>
-                    {selectedOrder.failure_reason}
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* Internal Admin Note & Manual Review Controls */}
               <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-3">

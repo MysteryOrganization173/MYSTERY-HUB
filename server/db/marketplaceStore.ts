@@ -30,6 +30,14 @@ export interface CreateMarketplaceProductInput {
   priceType: MarketplaceProductPriceType;
   priceMinor?: number | null;
   referralRewardMinor?: number | null;
+  purchaseEnabled?: boolean;
+  fulfilmentMode?: import('../types/marketplace.js').MarketplaceFulfilmentMode;
+  pickupLocations?: import('../types/marketplace.js').MarketplacePickupLocation[] | null;
+  deliveryAvailable?: boolean;
+  deliveryNote?: string | null;
+  purchaseNote?: string | null;
+  paymentRequiredBeforeDelivery?: boolean;
+  variants?: import('../types/marketplace.js').MarketplaceProductVariant[] | null;
   availability: MarketplaceProductAvailability;
   availabilityLabel?: string | null;
   badge?: string | null;
@@ -52,6 +60,14 @@ export interface UpdateMarketplaceProductInput {
   priceType?: MarketplaceProductPriceType;
   priceMinor?: number | null;
   referralRewardMinor?: number | null;
+  purchaseEnabled?: boolean;
+  fulfilmentMode?: import('../types/marketplace.js').MarketplaceFulfilmentMode;
+  pickupLocations?: import('../types/marketplace.js').MarketplacePickupLocation[] | null;
+  deliveryAvailable?: boolean;
+  deliveryNote?: string | null;
+  purchaseNote?: string | null;
+  paymentRequiredBeforeDelivery?: boolean;
+  variants?: import('../types/marketplace.js').MarketplaceProductVariant[] | null;
   availability?: MarketplaceProductAvailability;
   availabilityLabel?: string | null;
   badge?: string | null;
@@ -371,6 +387,14 @@ export class MarketplaceStore {
       price_type: input.priceType,
       price_minor: priceMinor,
       referral_reward_minor: typeof input.referralRewardMinor === 'number' ? Math.max(0, Math.floor(input.referralRewardMinor)) : null,
+      purchase_enabled: input.purchaseEnabled !== false,
+      fulfilment_mode: input.fulfilmentMode || 'both',
+      pickup_locations: input.pickupLocations && input.pickupLocations.length > 0 ? JSON.stringify(input.pickupLocations) : null,
+      delivery_available: input.deliveryAvailable !== false,
+      delivery_note: input.deliveryNote?.trim() || null,
+      purchase_note: input.purchaseNote?.trim() || null,
+      payment_required_before_delivery: input.paymentRequiredBeforeDelivery !== false,
+      variants: input.variants && input.variants.length > 0 ? JSON.stringify(input.variants) : null,
       availability: input.availability,
       availability_label: input.availabilityLabel?.trim() || null,
       badge: input.badge?.trim() || null,
@@ -392,10 +416,11 @@ export class MarketplaceStore {
       const insertSql = `
         INSERT INTO marketplace_products (
           id, slug, name, category, tagline, description, price_type, price_minor, referral_reward_minor,
+          purchase_enabled, fulfilment_mode, pickup_locations, delivery_available, delivery_note, purchase_note, payment_required_before_delivery, variants,
           availability, availability_label, badge, image_url, image_alt, gallery_urls,
           highlights, specs, featured, published, archived, sort_order, created_at, updated_at
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
         ) RETURNING *;
       `;
       const res = await pool.query(insertSql, [
@@ -408,6 +433,14 @@ export class MarketplaceStore {
         record.price_type,
         record.price_minor,
         record.referral_reward_minor,
+        record.purchase_enabled,
+        record.fulfilment_mode,
+        record.pickup_locations,
+        record.delivery_available,
+        record.delivery_note,
+        record.purchase_note,
+        record.payment_required_before_delivery,
+        record.variants,
         record.availability,
         record.availability_label,
         record.badge,
@@ -510,6 +543,14 @@ export class MarketplaceStore {
       price_type: priceType,
       price_minor: priceMinor,
       referral_reward_minor: referralRewardMinor,
+      purchase_enabled: input.purchaseEnabled !== undefined ? Boolean(input.purchaseEnabled) : (existing.purchase_enabled !== false),
+      fulfilment_mode: input.fulfilmentMode !== undefined ? input.fulfilmentMode : (existing.fulfilment_mode || 'both'),
+      pickup_locations: input.pickupLocations !== undefined ? (input.pickupLocations && input.pickupLocations.length > 0 ? JSON.stringify(input.pickupLocations) : null) : existing.pickup_locations,
+      delivery_available: input.deliveryAvailable !== undefined ? Boolean(input.deliveryAvailable) : (existing.delivery_available !== false),
+      delivery_note: input.deliveryNote !== undefined ? (input.deliveryNote ? input.deliveryNote.trim() : null) : existing.delivery_note,
+      purchase_note: input.purchaseNote !== undefined ? (input.purchaseNote ? input.purchaseNote.trim() : null) : existing.purchase_note,
+      payment_required_before_delivery: input.paymentRequiredBeforeDelivery !== undefined ? Boolean(input.paymentRequiredBeforeDelivery) : (existing.payment_required_before_delivery !== false),
+      variants: input.variants !== undefined ? (input.variants && input.variants.length > 0 ? JSON.stringify(input.variants) : null) : existing.variants,
       availability: input.availability !== undefined ? input.availability : existing.availability,
       availability_label: input.availabilityLabel !== undefined ? (input.availabilityLabel ? input.availabilityLabel.trim() : null) : existing.availability_label,
       badge: input.badge !== undefined ? (input.badge ? input.badge.trim() : null) : existing.badge,
@@ -537,19 +578,27 @@ export class MarketplaceStore {
           price_type = $7,
           price_minor = $8,
           referral_reward_minor = $9,
-          availability = $10,
-          availability_label = $11,
-          badge = $12,
-          image_url = $13,
-          image_alt = $14,
-          gallery_urls = $15,
-          highlights = $16,
-          specs = $17,
-          featured = $18,
-          published = $19,
-          archived = $20,
-          sort_order = $21,
-          updated_at = $22
+          purchase_enabled = $10,
+          fulfilment_mode = $11,
+          pickup_locations = $12,
+          delivery_available = $13,
+          delivery_note = $14,
+          purchase_note = $15,
+          payment_required_before_delivery = $16,
+          variants = $17,
+          availability = $18,
+          availability_label = $19,
+          badge = $20,
+          image_url = $21,
+          image_alt = $22,
+          gallery_urls = $23,
+          highlights = $24,
+          specs = $25,
+          featured = $26,
+          published = $27,
+          archived = $28,
+          sort_order = $29,
+          updated_at = $30
         WHERE id = $1
         RETURNING *;
       `;
@@ -563,6 +612,14 @@ export class MarketplaceStore {
         updatedRecord.price_type,
         updatedRecord.price_minor,
         updatedRecord.referral_reward_minor,
+        updatedRecord.purchase_enabled,
+        updatedRecord.fulfilment_mode,
+        updatedRecord.pickup_locations,
+        updatedRecord.delivery_available,
+        updatedRecord.delivery_note,
+        updatedRecord.purchase_note,
+        updatedRecord.payment_required_before_delivery,
+        updatedRecord.variants,
         updatedRecord.availability,
         updatedRecord.availability_label,
         updatedRecord.badge,
@@ -662,6 +719,59 @@ export class MarketplaceStore {
     });
 
     return updated;
+  }
+
+  /**
+   * 11. Get raw product by slug
+   */
+  static async getProductBySlug(slug: string): Promise<MarketplaceProductRecord | null> {
+    const pool = getPool();
+    if (pool) {
+      const res = await pool.query('SELECT * FROM marketplace_products WHERE slug = $1 LIMIT 1;', [slug]);
+      if (res.rows.length === 0) return null;
+      return res.rows[0] as MarketplaceProductRecord;
+    }
+    for (const p of devMarketplaceStore.values()) {
+      if (p.slug === slug) return p;
+    }
+    return null;
+  }
+
+  /**
+   * 12. Create product inquiry
+   */
+  static async createInquiry(payload: {
+    productId?: string;
+    productName: string;
+    customerName?: string;
+    customerPhone?: string;
+    customerEmail?: string;
+    inquiryType?: string;
+    message?: string;
+    budget?: string;
+  }): Promise<{ id: string; createdAt: string }> {
+    const id = `inq_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const nowIso = new Date().toISOString();
+    const pool = getPool();
+    if (pool) {
+      await pool.query(
+        `INSERT INTO marketplace_inquiries (id, product_id, product_name, customer_name, customer_phone, customer_email, inquiry_type, message, budget, status, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'new', $10);`,
+        [
+          id,
+          payload.productId || null,
+          payload.productName,
+          payload.customerName || null,
+          payload.customerPhone || null,
+          payload.customerEmail || null,
+          payload.inquiryType || 'general',
+          payload.message || null,
+          payload.budget || null,
+          nowIso,
+        ]
+      );
+    }
+    return { id, createdAt: nowIso };
   }
 
   /**

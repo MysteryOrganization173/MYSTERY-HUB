@@ -366,7 +366,14 @@ export class FulfilmentService {
       }
     }
 
-    // Step 4: Live dispatch to Success Biz Hub
+    // Step 4: Live dispatch to Success Biz Hub (Data / Airtime / Instant)
+    if (claimedOrder.service_type === 'marketplace') {
+      console.info(
+        `[Fulfilment Dispatch] Marketplace order ${claimedOrder.public_reference} paid successfully. Retaining status for admin/supplier fulfilment.`
+      );
+      return { order: claimedOrder, alreadyHandled: false };
+    }
+
     const isAirtime = claimedOrder.service_type === 'airtime' || claimedOrder.product_id.startsWith('airtime-');
     const isInstantBundle =
       claimedOrder.service_type === 'instant_bundle' || claimedOrder.product_id.startsWith('instant-');

@@ -7,6 +7,7 @@ import { getPublicMarketplaceProducts, getMyReferralSummary } from '../../servic
 import { buildReferralUrl } from '../../utils/referralUrl';
 import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
 import { OptimizedImage } from '../common/OptimizedImage';
+import { MarketplaceCheckoutModal } from './MarketplaceCheckoutModal';
 import {
   Laptop,
   Smartphone,
@@ -33,6 +34,7 @@ import {
   MessageCircle,
   ArrowRight,
   Info,
+  ShoppingBag,
 } from 'lucide-react';
 
 export const MarketplacePage: React.FC = () => {
@@ -52,6 +54,7 @@ export const MarketplacePage: React.FC = () => {
   // Share & Earn States
   const [referralCode, setReferralCode] = useState<string>('');
   const [shareModalProduct, setShareModalProduct] = useState<MarketplaceProduct | null>(null);
+  const [checkoutProduct, setCheckoutProduct] = useState<MarketplaceProduct | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
 
@@ -704,25 +707,39 @@ export const MarketplacePage: React.FC = () => {
                       </button>
                     )}
 
-                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80">
-                      <button
-                        onClick={() => openMarketplaceInquiry(p)}
-                        className="w-full py-2 px-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1 shadow-sm cursor-pointer active:scale-95"
-                      >
-                        <FileQuestion className="w-3.5 h-3.5" />
-                        <span>Inquire</span>
-                      </button>
+                    {/* Primary CTA: BUY NOW vs INQUIRE */}
+                    {p.purchaseEnabled !== false && p.priceType !== 'quote' ? (
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80">
+                        <button
+                          type="button"
+                          onClick={() => setCheckoutProduct(p)}
+                          className="w-full py-2 px-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1 shadow-[0_0_15px_rgba(0,195,101,0.2)] cursor-pointer active:scale-95"
+                        >
+                          <ShoppingBag className="w-3.5 h-3.5" />
+                          <span>Buy Now</span>
+                        </button>
 
-                      <a
-                        href={directWhatsAppLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="w-full py-2 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/80 transition-colors flex items-center justify-center gap-1 text-xs font-semibold cursor-pointer"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5 text-[#00c365]" />
-                        <span>WhatsApp</span>
-                      </a>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={() => openMarketplaceInquiry(p)}
+                          className="w-full py-2 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/80 transition-colors flex items-center justify-center gap-1 text-xs font-semibold cursor-pointer"
+                        >
+                          <FileQuestion className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Inquire</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="pt-1 border-t border-slate-800/80">
+                        <button
+                          type="button"
+                          onClick={() => openMarketplaceInquiry(p)}
+                          className="w-full py-2.5 px-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
+                        >
+                          <FileQuestion className="w-4 h-4" />
+                          <span>Inquire &amp; Request Quote</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -970,6 +987,15 @@ export const MarketplacePage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Buy Now Checkout Modal */}
+      {checkoutProduct && (
+        <MarketplaceCheckoutModal
+          product={checkoutProduct}
+          referralCode={referralCode}
+          onClose={() => setCheckoutProduct(null)}
+        />
       )}
     </div>
   );
