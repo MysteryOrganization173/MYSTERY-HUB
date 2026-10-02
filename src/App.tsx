@@ -25,6 +25,7 @@ import { WaitlistModal } from './components/common/WaitlistModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { MysteryAiAssistant } from './components/ai/MysteryAiAssistant';
 import { IsolatedTemplatePreview } from './components/website/IsolatedTemplatePreview';
+import { PublicPublishedSite } from './components/website/PublicPublishedSite';
 import { AdminPage } from './components/admin/AdminPage';
 
 const AppContent: React.FC = () => {
@@ -86,6 +87,13 @@ export default function App() {
 
   if (isolatedTemplateId) {
     return <IsolatedTemplatePreview templateId={isolatedTemplateId} />;
+  }
+
+  // Check if viewing a public published website (/sites/:slug)
+  const pathname = window.location.pathname;
+  const siteSlugMatch = pathname.match(/^\/sites\/([^/?#]+)/);
+  if (siteSlugMatch && siteSlugMatch[1]) {
+    return <PublicPublishedSite slug={siteSlugMatch[1]} />;
   }
 
   return (

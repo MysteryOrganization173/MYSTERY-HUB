@@ -168,3 +168,23 @@ CREATE INDEX IF NOT EXISTS idx_marketplace_published ON marketplace_products (pu
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_active_mtn_recipient 
 ON orders (recipient_phone) 
 WHERE network = 'mtn' AND status IN ('paid', 'queued', 'submitted', 'processing', 'refund_pending');
+
+-- 8. WEBSITE BUILDER SITES TABLE
+CREATE TABLE IF NOT EXISTS website_sites (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  template_id VARCHAR(64) NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  slug VARCHAR(64) UNIQUE NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'draft',
+  content_json JSONB NOT NULL,
+  settings_json JSONB NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  published_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_website_sites_user_id ON website_sites (user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_website_sites_slug ON website_sites (slug);
+CREATE INDEX IF NOT EXISTS idx_website_sites_status ON website_sites (status);
+

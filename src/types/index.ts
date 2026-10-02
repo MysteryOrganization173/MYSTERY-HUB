@@ -89,7 +89,64 @@ export type TemplateLayoutType =
   | 'ecommerce'
   | 'church'
   | 'fashion'
-  | 'services';
+  | 'services'
+  | 'reseller';
+
+export interface SiteSocialLinks {
+  instagram?: string;
+  facebook?: string;
+  tiktok?: string;
+}
+
+export interface SiteContent {
+  businessName: string;
+  tagline: string;
+  aboutText: string;
+  location: string;
+  phone: string;
+  whatsapp: string;
+  email: string;
+  heroImage: string;
+  logoUrl?: string;
+  ctaLabel: string;
+  ctaTarget: string;
+  social?: SiteSocialLinks;
+  items?: TemplateItem[];
+  stats?: Array<{ label: string; value: string }>;
+  features?: string[];
+}
+
+export interface SiteSettings {
+  primaryColor: string;
+  accentColor: string;
+  backgroundColor?: string;
+  fontFamily?: string;
+  borderRadius?: string;
+}
+
+export interface WebsiteSiteRecord {
+  id: string;
+  user_id: string;
+  template_id: string;
+  name: string;
+  slug: string;
+  status: 'draft' | 'published' | 'archived';
+  content_json: SiteContent;
+  settings_json: SiteSettings;
+  created_at: string;
+  updated_at: string;
+  published_at?: string | null;
+}
+
+export interface PublicWebsiteSite {
+  id: string;
+  template_id: string;
+  name: string;
+  slug: string;
+  content: SiteContent;
+  settings: SiteSettings;
+  published_at?: string | null;
+}
 
 export interface TemplateColorScheme {
   primary: string;

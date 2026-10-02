@@ -195,6 +195,24 @@ export async function initDatabase(): Promise<void> {
           );
         `,
       },
+      {
+        name: 'website_sites',
+        sql: `
+          CREATE TABLE IF NOT EXISTS website_sites (
+            id VARCHAR(64) PRIMARY KEY,
+            user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            template_id VARCHAR(64) NOT NULL,
+            name VARCHAR(128) NOT NULL,
+            slug VARCHAR(64) UNIQUE NOT NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'draft',
+            content_json JSONB NOT NULL,
+            settings_json JSONB NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+            published_at TIMESTAMP WITH TIME ZONE
+          );
+        `,
+      },
     ];
 
     for (const table of baseTables) {
@@ -284,6 +302,9 @@ export async function initDatabase(): Promise<void> {
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_marketplace_slug ON marketplace_products (slug);`,
       `CREATE INDEX IF NOT EXISTS idx_marketplace_category ON marketplace_products (category);`,
       `CREATE INDEX IF NOT EXISTS idx_marketplace_published ON marketplace_products (published, archived, sort_order, created_at DESC);`,
+      `CREATE INDEX IF NOT EXISTS idx_website_sites_user_id ON website_sites (user_id);`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_website_sites_slug ON website_sites (slug);`,
+      `CREATE INDEX IF NOT EXISTS idx_website_sites_status ON website_sites (status);`,
     ];
 
     for (const idxSql of indexStatements) {

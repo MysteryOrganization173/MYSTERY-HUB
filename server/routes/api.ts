@@ -26,6 +26,7 @@ import { loginRateLimiter, signupRateLimiter, waitlistRateLimiter } from '../mid
 import { PaystackServerService } from '../services/paystackService.js';
 import { FulfilmentService } from '../services/fulfilmentService.js';
 import { SuccessBizHubWebhookHandler } from '../suppliers/successBizHub/webhookHandler.js';
+import { websiteRouter, handlePublicSiteBySlug } from './websiteApi.js';
 import {
   ACTIVE_MTN_ORDER_CODE,
   ACTIVE_MTN_ORDER_MESSAGE,
@@ -33,6 +34,10 @@ import {
 } from '../services/duplicateOrderProtection.js';
 
 export const apiRouter = Router();
+
+// Mount Website Builder endpoints
+apiRouter.use('/websites', websiteRouter);
+apiRouter.get('/public/sites/:slug', handlePublicSiteBySlug);
 
 /**
  * 0. GET /api/health

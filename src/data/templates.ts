@@ -102,7 +102,58 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     ],
   },
 
-  // 2. CONSTRUCTION & CIVIL WORKS
+  // 2. DATA RESELLER STOREFRONT
+  {
+    id: 'tmpl-data-reseller',
+    title: 'Ghana Data Express Storefront',
+    category: 'retail',
+    categoryLabel: 'Data & Tech Retail',
+    layoutType: 'reseller',
+    industry: 'Branded Mobile Data Reselling & Telecom Airtime Storefront',
+    description: 'High-conversion telecom reseller storefront featuring MTN, Telecel, and AT package catalogs, recipient phone entry, and WhatsApp MoMo orders.',
+    features: ['Multi-Network Bundle Catalog', 'Custom Reseller Prices', 'Recipient Phone Entry', 'WhatsApp MoMo Ordering'],
+    accentColor: '#00C365',
+    demoBusinessName: 'Ghana Data Express',
+    demoHeroTagline: 'Genuine Non-Expiry Data Bundles for All Ghana Networks',
+    demoSubtext: 'Direct SIM top-up packages at wholesale customer rates. MTN Express, Telecel, and AirtelTigo packages dispatched quickly via Mobile Money.',
+    location: 'Spintex Road, Accra · Open 24/7 for WhatsApp Orders',
+    hoursOrContact: '+233 24 555 7788',
+    isFreeTier: true,
+    badgeText: 'New Template',
+    colorScheme: {
+      primary: '#09151f',
+      secondary: '#00c365',
+      background: '#070c10',
+      surface: '#0f1722',
+      text: '#f8fafc',
+      mutedText: '#94a3b8',
+      accent: '#00c365',
+      border: '#1e293b',
+    },
+    heroImage: 'https://images.unsplash.com/photo-1556742049-0a67e5572293?auto=format&fit=crop&w=1200&q=80',
+    stats: [
+      { label: 'Bundles Delivered', value: '25,000+' },
+      { label: 'Active Lines', value: '4,500+' },
+      { label: 'Average Delivery', value: '< 3 Mins' },
+    ],
+    items: [
+      { id: 'ds-1', name: '1GB Non-Expiry Bundle', price: 'GH₵ 12.00', category: 'MTN', tag: 'Standard' },
+      { id: 'ds-2', name: '2.5GB Non-Expiry Bundle', price: 'GH₵ 25.00', category: 'MTN', tag: 'Popular' },
+      { id: 'ds-3', name: '5GB Non-Expiry Bundle', price: 'GH₵ 48.00', category: 'MTN', tag: 'Best Value' },
+      { id: 'ds-4', name: '10GB Non-Expiry Bundle', price: 'GH₵ 90.00', category: 'MTN', tag: 'Hot' },
+      { id: 'ds-5', name: '20GB Non-Expiry Bundle', price: 'GH₵ 175.00', category: 'MTN', tag: 'Pro' },
+      { id: 'ds-6', name: '50GB Non-Expiry Bundle', price: 'GH₵ 420.00', category: 'MTN', tag: 'Wholesale' },
+    ],
+    testimonials: [
+      {
+        quote: 'Started selling data with this branded storefront. My customers love ordering directly on WhatsApp!',
+        author: 'Kwame Mensah',
+        role: 'Tech Retailer, Kumasi',
+      },
+    ],
+  },
+
+  // 3. CONSTRUCTION & CIVIL WORKS
   {
     id: 'tmpl-accra-build',
     title: 'Apex Build & Civil Contractors',

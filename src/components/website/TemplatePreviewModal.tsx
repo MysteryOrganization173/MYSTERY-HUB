@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
+import { createWebsiteOnServer } from '../../services/apiClient';
 import {
   X,
   Monitor,
@@ -23,7 +24,15 @@ import {
 } from 'lucide-react';
 
 export const TemplatePreviewModal: React.FC = () => {
-  const { selectedTemplatePreview, closeTemplatePreview, showToast, openWaitlist } = useApp();
+  const {
+    selectedTemplatePreview,
+    closeTemplatePreview,
+    showToast,
+    user,
+    sessionToken,
+    openAuth,
+    openWebsiteEditor,
+  } = useApp();
   const [deviceView, setDeviceView] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [isMobileScreen, setIsMobileScreen] = useState(false);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
@@ -103,10 +112,44 @@ export const TemplatePreviewModal: React.FC = () => {
     .replace(/[^a-z0-9]/g, '')
     .slice(0, 16);
 
-  const handleStartBuilding = () => {
+  const handleStartBuilding = async () => {
     closeTemplatePreview();
-    openWaitlist(`Website Builder (${t.title})`);
-    showToast(`Template "${t.title}" selected! Reserve your free launch access.`, 'success');
+
+    const doCreate = async (token: string) => {
+      try {
+        const res = await createWebsiteOnServer(token, {
+          templateId: t.id,
+          name: t.demoBusinessName,
+        });
+        if (res.success && res.site) {
+          openWebsiteEditor(res.site);
+          if (res.alreadyExists) {
+            showToast('Opening your active website project.', 'info');
+          } else {
+            showToast(`Website project created from "${t.title}"!`, 'success');
+          }
+        }
+      } catch (err: any) {
+        showToast(err.message || 'Failed to initialize website project.', 'warning');
+      }
+    };
+
+    if (user && sessionToken) {
+      await doCreate(sessionToken);
+    } else {
+      openAuth(
+        'signup',
+        'Create your free Mystery Hub account to save and publish your website.',
+        () => {
+          const freshToken =
+            localStorage.getItem('mystery_hub_session_token') ||
+            sessionStorage.getItem('mystery_hub_session_token');
+          if (freshToken) {
+            doCreate(freshToken);
+          }
+        }
+      );
+    }
   };
 
   // Industry-specific icon

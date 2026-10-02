@@ -22,12 +22,14 @@ import {
 interface TemplateCardPreviewProps {
   template: WebsiteTemplate;
   onPreview: () => void;
+  onUseTemplate?: () => void;
   compact?: boolean;
 }
 
 export const TemplateCardPreview: React.FC<TemplateCardPreviewProps> = ({
   template: t,
   onPreview,
+  onUseTemplate,
   compact = false,
 }) => {
   const palette = t.colorScheme || {
@@ -354,18 +356,33 @@ export const TemplateCardPreview: React.FC<TemplateCardPreviewProps> = ({
       </div>
 
       {/* Action Footer Bar */}
-      <div className="p-4 pt-0">
+      <div className="p-4 pt-0 flex items-center gap-2">
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onPreview();
           }}
-          className="w-full py-2.5 px-3 rounded-xl bg-slate-900 group-hover:bg-[#00c365] group-hover:text-black text-white text-xs font-bold border border-slate-800 group-hover:border-[#00c365] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+          className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 group-hover:bg-slate-800 text-white text-xs font-bold border border-slate-800 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
         >
-          <Eye className="w-3.5 h-3.5" />
-          <span>Interactive Preview</span>
+          <Eye className="w-3.5 h-3.5 text-slate-400" />
+          <span>Preview</span>
         </button>
+
+        {onUseTemplate && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUseTemplate();
+            }}
+            className="py-2.5 px-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-sm active:scale-95 shrink-0"
+            title="Use this template"
+          >
+            <span>Use</span>
+            <ExternalLink className="w-3 h-3" />
+          </button>
+        )}
       </div>
     </div>
   );

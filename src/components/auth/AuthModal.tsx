@@ -5,7 +5,15 @@ import { X, Lock, Phone, User as UserIcon, ArrowRight, ShieldCheck, AlertCircle 
 import { registerOnServer, loginOnServer } from '../../services/apiClient';
 
 export const AuthModal: React.FC = () => {
-  const { isAuthModalOpen, closeAuth, authMode, openAuth, loginUser, showToast } = useApp();
+  const {
+    isAuthModalOpen,
+    closeAuth,
+    authMode,
+    openAuth,
+    loginUser,
+    showToast,
+    authContextMessage,
+  } = useApp();
 
   const [name, setName] = useState('');
   const [identifier, setIdentifier] = useState(''); // phone or email
@@ -106,6 +114,13 @@ export const AuthModal: React.FC = () => {
                 <span className="px-2 py-0.5 rounded-md bg-[#00c365]/10 border border-[#00c365]/20 text-[#00c365] text-[11px] font-medium">
                   ✓ Mystery Earn coming soon
                 </span>
+              </div>
+            )}
+
+            {authContextMessage && (
+              <div className="mt-3 p-3 rounded-xl bg-[#00c365]/10 border border-[#00c365]/30 text-emerald-300 text-xs flex items-start gap-2.5 animate-in fade-in">
+                <ShieldCheck className="w-4 h-4 text-[#00c365] shrink-0 mt-0.5" />
+                <p className="leading-relaxed font-medium">{authContextMessage}</p>
               </div>
             )}
           </div>

@@ -7,6 +7,7 @@ import {
   WebsiteTemplate,
   MarketplaceProduct,
   NetworkId,
+  WebsiteSiteRecord,
 } from '../types';
 import { DATA_BUNDLES } from '../data/bundles';
 import { SafeUserProfile } from '../../server/types/auth';
@@ -57,13 +58,21 @@ interface AppContextType {
   ) => void;
   isAuthModalOpen: boolean;
   authMode: 'login' | 'signup';
-  openAuth: (mode?: 'login' | 'signup') => void;
+  authContextMessage: string | null;
+  openAuth: (
+    mode?: 'login' | 'signup',
+    contextMessage?: string,
+    onSuccess?: () => void
+  ) => void;
   closeAuth: () => void;
   user: SafeUserProfile | null;
   sessionToken: string | null;
   isAuthChecking: boolean;
   loginUser: (profile: SafeUserProfile, token: string, rememberMe?: boolean) => void;
   logoutUser: () => void;
+  activeEditorSite: WebsiteSiteRecord | null;
+  openWebsiteEditor: (site: WebsiteSiteRecord) => void;
+  closeWebsiteEditor: () => void;
   selectedTemplatePreview: WebsiteTemplate | null;
   openTemplatePreview: (template: WebsiteTemplate) => void;
   closeTemplatePreview: () => void;
@@ -342,13 +351,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const openAuth = (mode: 'login' | 'signup' = 'login') => {
+  const [authContextMessage, setAuthContextMessage] = useState<string | null>(null);
+  const [pendingAuthAction, setPendingAuthAction] = useState<(() => void) | null>(null);
+  const [activeEditorSite, setActiveEditorSite] = useState<WebsiteSiteRecord | null>(null);
+
+  const openWebsiteEditor = (site: WebsiteSiteRecord) => {
+    setActiveEditorSite(site);
+  };
+
+  const closeWebsiteEditor = () => {
+    setActiveEditorSite(null);
+  };
+
+  const openAuth = (
+    mode: 'login' | 'signup' = 'login',
+    contextMessage?: string,
+    onSuccess?: () => void
+  ) => {
     setAuthMode(mode);
+    setAuthContextMessage(contextMessage || null);
+    setPendingAuthAction(onSuccess ? () => onSuccess : null);
     setIsAuthModalOpen(true);
   };
 
   const closeAuth = () => {
     setIsAuthModalOpen(false);
+    setAuthContextMessage(null);
+    setPendingAuthAction(null);
   };
 
   const loginUser = (profile: SafeUserProfile, token: string, rememberMe = false) => {
@@ -370,7 +399,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // ignore
     }
     setIsAuthModalOpen(false);
+    setAuthContextMessage(null);
     showToast(`Welcome back, ${profile.name.split(' ')[0]}!`, 'success');
+
+    if (pendingAuthAction) {
+      const action = pendingAuthAction;
+      setPendingAuthAction(null);
+      setTimeout(() => {
+        action();
+      }, 100);
+    }
   };
 
   const logoutUser = () => {
@@ -437,6 +475,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateOrderStatus,
         isAuthModalOpen,
         authMode,
+        authContextMessage,
         openAuth,
         closeAuth,
         user,
@@ -444,6 +483,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthChecking,
         loginUser,
         logoutUser,
+        activeEditorSite,
+        openWebsiteEditor,
+        closeWebsiteEditor,
         selectedTemplatePreview,
         openTemplatePreview,
         closeTemplatePreview,

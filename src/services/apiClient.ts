@@ -913,6 +913,145 @@ export async function importMarketplaceProductWithAi(
   return data;
 }
 
+// ==========================================
+// WEBSITE BUILDER CLIENT METHODS
+// ==========================================
+
+import type {
+  WebsiteSiteRecord,
+  PublicWebsiteSite,
+  SiteContent,
+  SiteSettings,
+} from '../types/index.js';
+
+export async function createWebsiteOnServer(
+  token: string,
+  input: {
+    templateId: string;
+    name?: string;
+    content?: Partial<SiteContent>;
+    settings?: Partial<SiteSettings>;
+  }
+): Promise<{ success: boolean; site: WebsiteSiteRecord; alreadyExists?: boolean }> {
+  const url = `${API_BASE_URL}/api/websites`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to create website project.');
+  return data;
+}
+
+export async function getMyWebsitesOnServer(
+  token: string
+): Promise<{ success: boolean; sites: WebsiteSiteRecord[] }> {
+  const url = `${API_BASE_URL}/api/websites/mine`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to load your websites.');
+  return data;
+}
+
+export async function getWebsiteByIdOnServer(
+  token: string,
+  id: string
+): Promise<{ success: boolean; site: WebsiteSiteRecord }> {
+  const url = `${API_BASE_URL}/api/websites/${encodeURIComponent(id)}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to load website project.');
+  return data;
+}
+
+export async function updateWebsiteOnServer(
+  token: string,
+  id: string,
+  input: {
+    name?: string;
+    content?: Partial<SiteContent>;
+    settings?: Partial<SiteSettings>;
+  }
+): Promise<{ success: boolean; site: WebsiteSiteRecord }> {
+  const url = `${API_BASE_URL}/api/websites/${encodeURIComponent(id)}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to save website changes.');
+  return data;
+}
+
+export async function publishWebsiteOnServer(
+  token: string,
+  id: string
+): Promise<{ success: boolean; site: WebsiteSiteRecord; publicUrl: string }> {
+  const url = `${API_BASE_URL}/api/websites/${encodeURIComponent(id)}/publish`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to publish website.');
+  return data;
+}
+
+export async function unpublishWebsiteOnServer(
+  token: string,
+  id: string
+): Promise<{ success: boolean; site: WebsiteSiteRecord }> {
+  const url = `${API_BASE_URL}/api/websites/${encodeURIComponent(id)}/unpublish`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to unpublish website.');
+  return data;
+}
+
+export async function getPublicSiteBySlug(
+  slug: string
+): Promise<{ success: boolean; site: PublicWebsiteSite }> {
+  const url = `${API_BASE_URL}/api/public/sites/${encodeURIComponent(slug)}`;
+  const res = await fetch(url, { method: 'GET' });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Website not found.');
+  return data;
+}
+
 
 
 
