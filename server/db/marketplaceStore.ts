@@ -29,6 +29,7 @@ export interface CreateMarketplaceProductInput {
   description?: string | null;
   priceType: MarketplaceProductPriceType;
   priceMinor?: number | null;
+  referralRewardMinor?: number | null;
   availability: MarketplaceProductAvailability;
   availabilityLabel?: string | null;
   badge?: string | null;
@@ -50,6 +51,7 @@ export interface UpdateMarketplaceProductInput {
   description?: string | null;
   priceType?: MarketplaceProductPriceType;
   priceMinor?: number | null;
+  referralRewardMinor?: number | null;
   availability?: MarketplaceProductAvailability;
   availabilityLabel?: string | null;
   badge?: string | null;
@@ -368,6 +370,7 @@ export class MarketplaceStore {
       description: input.description?.trim() || null,
       price_type: input.priceType,
       price_minor: priceMinor,
+      referral_reward_minor: typeof input.referralRewardMinor === 'number' ? Math.max(0, Math.floor(input.referralRewardMinor)) : null,
       availability: input.availability,
       availability_label: input.availabilityLabel?.trim() || null,
       badge: input.badge?.trim() || null,
@@ -388,11 +391,11 @@ export class MarketplaceStore {
     if (pool) {
       const insertSql = `
         INSERT INTO marketplace_products (
-          id, slug, name, category, tagline, description, price_type, price_minor,
+          id, slug, name, category, tagline, description, price_type, price_minor, referral_reward_minor,
           availability, availability_label, badge, image_url, image_alt, gallery_urls,
           highlights, specs, featured, published, archived, sort_order, created_at, updated_at
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
         ) RETURNING *;
       `;
       const res = await pool.query(insertSql, [
@@ -404,6 +407,7 @@ export class MarketplaceStore {
         record.description,
         record.price_type,
         record.price_minor,
+        record.referral_reward_minor,
         record.availability,
         record.availability_label,
         record.badge,
@@ -488,6 +492,14 @@ export class MarketplaceStore {
       priceMinor = typeof input.priceMinor === 'number' ? Math.max(0, Math.floor(input.priceMinor)) : null;
     }
 
+    let referralRewardMinor = existing.referral_reward_minor;
+    if (input.referralRewardMinor !== undefined) {
+      referralRewardMinor =
+        typeof input.referralRewardMinor === 'number'
+          ? Math.max(0, Math.floor(input.referralRewardMinor))
+          : null;
+    }
+
     const updatedRecord: MarketplaceProductRecord = {
       ...existing,
       slug,
@@ -497,6 +509,7 @@ export class MarketplaceStore {
       description: input.description !== undefined ? (input.description ? input.description.trim() : null) : existing.description,
       price_type: priceType,
       price_minor: priceMinor,
+      referral_reward_minor: referralRewardMinor,
       availability: input.availability !== undefined ? input.availability : existing.availability,
       availability_label: input.availabilityLabel !== undefined ? (input.availabilityLabel ? input.availabilityLabel.trim() : null) : existing.availability_label,
       badge: input.badge !== undefined ? (input.badge ? input.badge.trim() : null) : existing.badge,
@@ -523,19 +536,20 @@ export class MarketplaceStore {
           description = $6,
           price_type = $7,
           price_minor = $8,
-          availability = $9,
-          availability_label = $10,
-          badge = $11,
-          image_url = $12,
-          image_alt = $13,
-          gallery_urls = $14,
-          highlights = $15,
-          specs = $16,
-          featured = $17,
-          published = $18,
-          archived = $19,
-          sort_order = $20,
-          updated_at = $21
+          referral_reward_minor = $9,
+          availability = $10,
+          availability_label = $11,
+          badge = $12,
+          image_url = $13,
+          image_alt = $14,
+          gallery_urls = $15,
+          highlights = $16,
+          specs = $17,
+          featured = $18,
+          published = $19,
+          archived = $20,
+          sort_order = $21,
+          updated_at = $22
         WHERE id = $1
         RETURNING *;
       `;
@@ -548,6 +562,7 @@ export class MarketplaceStore {
         updatedRecord.description,
         updatedRecord.price_type,
         updatedRecord.price_minor,
+        updatedRecord.referral_reward_minor,
         updatedRecord.availability,
         updatedRecord.availability_label,
         updatedRecord.badge,

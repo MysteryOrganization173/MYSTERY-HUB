@@ -17,6 +17,8 @@ import { OrdersStore } from '../db/ordersStore.js';
 import { AuthStore } from '../db/authStore.js';
 import { WaitlistStore } from '../db/waitlistStore.js';
 import { MarketplaceStore } from '../db/marketplaceStore.js';
+import { ReferralStore } from '../db/referralStore.js';
+import { ReferralService } from '../services/referralService.js';
 import { OrderRecord, toSafePublicOrder } from '../types/orders.js';
 import { toSafeUserProfile, WaitlistChannel } from '../types/auth.js';
 import { hashPassword, verifyPassword, generateSessionToken } from '../utils/crypto.js';
@@ -135,6 +137,20 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
       emailStr.includes('@') && emailStr.includes('.')
         ? emailStr
         : `${phoneVal.formattedLocal}@customer.mysteryhub.site`;
+
+    // 2b. Mystery Earn: Resolve authoritative referral context
+    const visitorKey = (req.headers['x-visitor-key'] as string) || (req.body?.visitorKey as string) || null;
+    const explicitReferralCode =
+      (req.body?.referralCode as string) ||
+      (req.body?.ref as string) ||
+      (req.query?.ref as string) ||
+      null;
+
+    const referralContext = await ReferralService.resolveReferralContextForOrder({
+      userId: req.user?.id || null,
+      visitorKey,
+      explicitCode: explicitReferralCode,
+    });
 
     const isAirtime =
       serviceType === 'airtime' ||
@@ -283,6 +299,9 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
         paid_at: null,
         submitted_at: null,
         delivered_at: null,
+        referrer_user_id: referralContext.referrerUserId,
+        referral_attribution_id: referralContext.attributionId,
+        referral_code: referralContext.referralCode,
       };
 
       const createResult = await OrdersStore.createOrderWithMtnDuplicateCheck(newOrder);
@@ -456,6 +475,9 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
         paid_at: null,
         submitted_at: null,
         delivered_at: null,
+        referrer_user_id: referralContext.referrerUserId,
+        referral_attribution_id: referralContext.attributionId,
+        referral_code: referralContext.referralCode,
       };
 
       const dbStart = performance.now();
@@ -617,6 +639,9 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
       paid_at: null,
       submitted_at: null,
       delivered_at: null,
+      referrer_user_id: referralContext.referrerUserId,
+      referral_attribution_id: referralContext.attributionId,
+      referral_code: referralContext.referralCode,
     };
 
     const dbStart = performance.now();
@@ -941,6 +966,44 @@ apiRouter.post('/auth/register', signupRateLimiter, async (req: Request, res: Re
     const rawToken = generateSessionToken();
     const session = await AuthStore.createSession(user.id, rawToken, Boolean(rememberMe));
 
+    // Mystery Earn: Ensure permanent referral profile is generated
+    try {
+      await ReferralStore.getOrCreateProfile(user.id);
+    } catch (refErr) {
+      console.warn('[Auth] Failed to initialize referral profile:', refErr);
+    }
+
+    // Mystery Earn: Bind first-touch referral attribution if supplied
+    const refCode = (req.body?.referralCode || req.body?.ref || req.query?.ref) as string | undefined;
+    const visitorKey = (req.body?.visitorKey || req.headers['x-visitor-key']) as string | undefined;
+    if (refCode) {
+      try {
+        await ReferralService.captureVisitorReferral({
+          code: refCode,
+          visitorKey: visitorKey || null,
+          landingPath: req.body?.landingPath || null,
+          userAgent: (req.headers['user-agent'] as string) || null,
+          currentUserId: user.id,
+        });
+      } catch (bindErr) {
+        console.warn('[Auth] Failed to bind referral code on signup:', bindErr);
+      }
+    } else if (visitorKey) {
+      try {
+        const guestAttr = await ReferralStore.findAttributionByVisitorKey(visitorKey);
+        if (guestAttr && guestAttr.referrer_user_id !== user.id) {
+          await ReferralStore.bindAttributionToUser({
+            referredUserId: user.id,
+            referrerUserId: guestAttr.referrer_user_id,
+            sourceCode: guestAttr.source_code,
+            visitorKey,
+          });
+        }
+      } catch (bindErr) {
+        console.warn('[Auth] Failed to bind visitor key referral on signup:', bindErr);
+      }
+    }
+
     res.status(201).json({
       success: true,
       user: toSafeUserProfile(user),
@@ -1256,6 +1319,99 @@ apiRouter.get('/marketplace/products/:slug', async (req: Request, res: Response)
   } catch (err) {
     console.error('Public Marketplace Product Slug API error:', err);
     res.status(500).json({ error: 'Failed to retrieve marketplace product.' });
+  }
+});
+
+// ==========================================
+// MYSTERY EARN: REFERRAL & REWARD ENDPOINTS
+// ==========================================
+
+/**
+ * 15. POST /api/referrals/capture
+ * Captures visitor referral clicks, records non-invasive click analytics,
+ * and binds lifetime attribution to active user or guest session.
+ */
+apiRouter.post('/referrals/capture', optionalAuth, async (req: Request, res: Response) => {
+  try {
+    const { code, visitorKey, landingPath } = req.body || {};
+    if (!code || typeof code !== 'string') {
+      res.status(400).json({ valid: false, error: 'Referral code parameter is required.' });
+      return;
+    }
+
+    const result = await ReferralService.captureVisitorReferral({
+      code,
+      visitorKey: visitorKey || (req.headers['x-visitor-key'] as string) || null,
+      landingPath: landingPath || null,
+      userAgent: (req.headers['user-agent'] as string) || null,
+      currentUserId: req.user?.id || null,
+    });
+
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (err) {
+    console.error('Referral Capture API Exception:', err);
+    res.status(500).json({ valid: false, error: 'Failed to record referral click.' });
+  }
+});
+
+/**
+ * 16. GET /api/referrals/summary (or /api/referrals/me)
+ * Returns authenticated user's lifetime referral statistics, share link, and rewards.
+ */
+apiRouter.get(['/referrals/summary', '/referrals/me'], requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const summary = await ReferralStore.getReferralSummary(userId);
+
+    res.json({
+      success: true,
+      summary,
+    });
+  } catch (err) {
+    console.error('Referral Summary API Exception:', err);
+    res.status(500).json({ error: 'Failed to load referral summary.' });
+  }
+});
+
+/**
+ * 17. GET /api/referrals/ledger
+ * Returns authenticated user's immutable reward ledger entries (pesewas & formatted GHS).
+ */
+apiRouter.get('/referrals/ledger', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 50;
+    const ledger = await ReferralStore.getLedgerForUser(userId, isNaN(limit) ? 50 : limit);
+
+    res.json({
+      success: true,
+      ledger,
+    });
+  } catch (err) {
+    console.error('Referral Ledger API Exception:', err);
+    res.status(500).json({ error: 'Failed to load referral reward ledger.' });
+  }
+});
+
+/**
+ * 18. GET /api/referrals/rules
+ * Returns active reward rules for public disclosure & transparency.
+ */
+apiRouter.get('/referrals/rules', async (_req: Request, res: Response) => {
+  try {
+    const rules = await ReferralStore.getAllRules();
+    const activeRules = rules.filter((r) => r.enabled);
+
+    res.json({
+      success: true,
+      rules: activeRules,
+    });
+  } catch (err) {
+    console.error('Referral Rules API Exception:', err);
+    res.status(500).json({ error: 'Failed to retrieve referral rules.' });
   }
 });
 

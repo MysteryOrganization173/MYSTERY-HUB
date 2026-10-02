@@ -12,6 +12,7 @@ import { AuthStore } from '../db/authStore.js';
 import { WaitlistStore } from '../db/waitlistStore.js';
 import { MarketplaceStore } from '../db/marketplaceStore.js';
 import { AdminAuditStore } from '../db/adminAuditStore.js';
+import { ReferralStore } from '../db/referralStore.js';
 import {
   MarketplaceProductPriceType,
   MarketplaceProductAvailability,
@@ -1192,6 +1193,68 @@ adminRouter.post('/marketplace/ai-import', async (req: Request, res: Response) =
     res.status(500).json({
       error: 'Mystery AI couldn\'t parse this advert right now. Your pasted text is still here, so you can retry or fill the form manually.',
     });
+  }
+});
+
+// ==========================================
+// ADMIN REFERRAL & REWARDS CONFIGURATION
+// ==========================================
+
+/**
+ * GET /api/admin/referrals/rules
+ * Returns all configured referral reward rules (active and disabled).
+ */
+adminRouter.get('/referrals/rules', async (_req: Request, res: Response) => {
+  try {
+    const rules = await ReferralStore.getAllRules();
+    res.json({
+      success: true,
+      rules,
+    });
+  } catch (err) {
+    console.error('[Admin API] Failed to get referral rules:', err);
+    res.status(500).json({ error: 'Failed to retrieve referral rules.' });
+  }
+});
+
+/**
+ * POST /api/admin/referrals/rules
+ * Create or update a referral reward rule.
+ */
+adminRouter.post('/referrals/rules', async (req: Request, res: Response) => {
+  try {
+    const adminUser = req.user!;
+    const rulePayload = req.body || {};
+
+    if (!rulePayload.service_type) {
+      res.status(400).json({ error: 'service_type is required.' });
+      return;
+    }
+
+    const saved = await ReferralStore.createOrUpdateRule(rulePayload);
+
+    await AdminAuditStore.record({
+      adminUserId: adminUser.id,
+      action: 'referral_rule_updated',
+      entityType: 'referral_reward_rule',
+      entityId: saved.id,
+      metadata: {
+        service_type: saved.service_type,
+        reward_type: saved.reward_type,
+        reward_minor: saved.reward_minor,
+        reward_percent_bps: saved.reward_percent_bps,
+        enabled: saved.enabled,
+      },
+    });
+
+    res.json({
+      success: true,
+      rule: saved,
+      message: 'Reward rule saved successfully.',
+    });
+  } catch (err) {
+    console.error('[Admin API] Failed to save referral rule:', err);
+    res.status(500).json({ error: 'Failed to save referral rule.' });
   }
 });
 

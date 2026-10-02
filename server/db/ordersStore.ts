@@ -13,6 +13,7 @@ import {
 } from '../utils/phone.js';
 import { PaystackServerService } from '../services/paystackService.js';
 import { FulfilmentService } from '../services/fulfilmentService.js';
+import { ReferralService } from '../services/referralService.js';
 
 // In-memory fallback repository for development when DATABASE_URL is omitted
 const devMemoryStore = new Map<string, OrderRecord>();
@@ -133,11 +134,11 @@ export class OrdersStore {
             payment_reference, payment_status, supplier_provider, supplier_order_id,
             supplier_response, supplier_cost_minor, supplier_offer_ref,
             supplier_last_checked_at, failure_reason, created_at, updated_at,
-            paid_at, submitted_at, delivered_at
+            paid_at, submitted_at, delivered_at, referrer_user_id, referral_attribution_id, referral_code
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
             $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
-            $27, $28, $29, $30, $31, $32
+            $27, $28, $29, $30, $31, $32, $33, $34, $35
           ) RETURNING *;
         `;
         const values = [
@@ -173,6 +174,9 @@ export class OrdersStore {
           order.paid_at,
           order.submitted_at,
           order.delivered_at,
+          order.referrer_user_id ?? null,
+          order.referral_attribution_id ?? null,
+          order.referral_code ?? null,
         ];
         await client.query(insertQuery, values);
         await client.query('COMMIT');
@@ -287,11 +291,11 @@ export class OrdersStore {
           payment_reference, payment_status, supplier_provider, supplier_order_id,
           supplier_response, supplier_cost_minor, supplier_offer_ref,
           supplier_last_checked_at, failure_reason, created_at, updated_at,
-          paid_at, submitted_at, delivered_at
+          paid_at, submitted_at, delivered_at, referrer_user_id, referral_attribution_id, referral_code
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
           $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
-          $27, $28, $29, $30, $31, $32
+          $27, $28, $29, $30, $31, $32, $33, $34, $35
         ) RETURNING *;
       `;
       const values = [
@@ -327,6 +331,9 @@ export class OrdersStore {
         order.paid_at,
         order.submitted_at,
         order.delivered_at,
+        order.referrer_user_id ?? null,
+        order.referral_attribution_id ?? null,
+        order.referral_code ?? null,
       ];
       await pool.query(query, values);
       return order;
@@ -874,6 +881,15 @@ export class OrdersStore {
       devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
     }
 
+    // Mystery Earn: Trigger reward ledger generation on delivery
+    if (updated.status === 'delivered') {
+      try {
+        await ReferralService.processOrderReward(updated);
+      } catch (err) {
+        console.warn('[OrdersStore] Failed to process referral reward on submission delivery:', err);
+      }
+    }
+
     return updated;
   }
 
@@ -1011,6 +1027,27 @@ export class OrdersStore {
       devMemoryStore.set(existing.id, updated);
       devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
       devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
+    }
+
+    // Mystery Earn: Trigger reward ledger generation on delivery
+    if (updated.status === 'delivered' && existing.status !== 'delivered') {
+      try {
+        await ReferralService.processOrderReward(updated);
+      } catch (err) {
+        console.warn('[OrdersStore] Failed to process referral reward on status delivery:', err);
+      }
+    } else if (
+      existing.status === 'delivered' &&
+      ['failed', 'refund_pending', 'refunded', 'cancelled'].includes(status)
+    ) {
+      try {
+        await ReferralService.reverseOrderRewards(
+          orderId,
+          failureReason || 'Order status transitioned from delivered to non-delivered'
+        );
+      } catch (err) {
+        console.warn('[OrdersStore] Failed to reverse referral reward:', err);
+      }
     }
 
     return updated;

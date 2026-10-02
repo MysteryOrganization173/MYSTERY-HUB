@@ -51,6 +51,9 @@ export interface OrderRecord {
   submitted_at: string | null;
   delivered_at: string | null;
   payment_closed_at?: string | null;
+  referrer_user_id?: string | null;
+  referral_attribution_id?: string | null;
+  referral_code?: string | null;
 }
 
 export type SafePublicOrderDetails = Pick<

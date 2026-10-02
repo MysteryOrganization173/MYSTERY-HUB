@@ -35,6 +35,7 @@ export interface MarketplaceProductRecord {
   description: string | null;
   price_type: MarketplaceProductPriceType;
   price_minor: number | null; // stored in pesewas (100 pesewas = 1 GHS)
+  referral_reward_minor?: number | null; // stored in pesewas (nullable, defaults to null/disabled)
   availability: MarketplaceProductAvailability;
   availability_label: string | null;
   badge: string | null;
@@ -72,6 +73,8 @@ export interface PublicMarketplaceProduct {
   highlights: string[];
   specs?: MarketplaceSpecItem[];
   featured: boolean;
+  referralRewardMinor?: number | null;
+  referralRewardGhc?: number | null;
 }
 
 export interface AdminMarketplaceProduct extends PublicMarketplaceProduct {
@@ -213,6 +216,8 @@ export function toPublicMarketplaceProduct(record: MarketplaceProductRecord): Pu
     highlights: parseJsonStringArray(record.highlights),
     specs: parseJsonSpecs(record.specs),
     featured: Boolean(record.featured),
+    referralRewardMinor: record.referral_reward_minor || null,
+    referralRewardGhc: record.referral_reward_minor != null ? record.referral_reward_minor / 100 : null,
   };
 }
 

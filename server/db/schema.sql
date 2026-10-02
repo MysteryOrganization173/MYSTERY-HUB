@@ -188,3 +188,105 @@ CREATE INDEX IF NOT EXISTS idx_website_sites_user_id ON website_sites (user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_website_sites_slug ON website_sites (slug);
 CREATE INDEX IF NOT EXISTS idx_website_sites_status ON website_sites (status);
 
+-- 9. MYSTERY EARN REFERRAL PROFILES
+CREATE TABLE IF NOT EXISTS referral_profiles (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(64) UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  referral_code VARCHAR(32) UNIQUE NOT NULL,
+  is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_profiles_user_id ON referral_profiles (user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_profiles_code ON referral_profiles (UPPER(referral_code));
+
+-- 10. MYSTERY EARN REFERRAL ATTRIBUTIONS (First-touch lifetime attribution)
+CREATE TABLE IF NOT EXISTS referral_attributions (
+  id VARCHAR(64) PRIMARY KEY,
+  referrer_user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  referred_user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
+  visitor_key VARCHAR(128),
+  source_code VARCHAR(32) NOT NULL,
+  first_landing_path VARCHAR(256),
+  first_seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  bound_at TIMESTAMP WITH TIME ZONE,
+  status VARCHAR(32) NOT NULL DEFAULT 'active',
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_referral_attributions_referrer ON referral_attributions (referrer_user_id);
+CREATE INDEX IF NOT EXISTS idx_referral_attributions_visitor ON referral_attributions (visitor_key);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_attributions_referred_unique ON referral_attributions (referred_user_id) WHERE referred_user_id IS NOT NULL;
+
+-- 11. MYSTERY EARN REFERRAL CLICKS
+CREATE TABLE IF NOT EXISTS referral_clicks (
+  id VARCHAR(64) PRIMARY KEY,
+  referral_profile_id VARCHAR(64) NOT NULL REFERENCES referral_profiles(id) ON DELETE CASCADE,
+  referrer_user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  referral_code VARCHAR(32) NOT NULL,
+  visitor_key VARCHAR(128),
+  landing_path VARCHAR(256),
+  user_agent_safe VARCHAR(128),
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_referral_clicks_referrer ON referral_clicks (referrer_user_id);
+CREATE INDEX IF NOT EXISTS idx_referral_clicks_created ON referral_clicks (created_at DESC);
+
+-- 12. MYSTERY EARN REWARD RULES
+CREATE TABLE IF NOT EXISTS referral_reward_rules (
+  id VARCHAR(64) PRIMARY KEY,
+  service_type VARCHAR(32) NOT NULL,
+  product_key VARCHAR(64),
+  network VARCHAR(32),
+  reward_type VARCHAR(32) NOT NULL DEFAULT 'fixed_minor',
+  reward_minor INTEGER,
+  reward_percent_bps INTEGER,
+  enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  starts_at TIMESTAMP WITH TIME ZONE,
+  ends_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reward_rules_service ON referral_reward_rules (service_type, enabled);
+
+-- 13. MYSTERY EARN REWARD LEDGER (Immutable Accounting)
+CREATE TABLE IF NOT EXISTS reward_ledger (
+  id VARCHAR(64) PRIMARY KEY,
+  referrer_user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  referred_user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
+  referral_attribution_id VARCHAR(64) REFERENCES referral_attributions(id) ON DELETE SET NULL,
+  order_id VARCHAR(64) REFERENCES orders(id) ON DELETE SET NULL,
+  marketplace_product_id VARCHAR(64) REFERENCES marketplace_products(id) ON DELETE SET NULL,
+  service_type VARCHAR(32) NOT NULL,
+  reward_rule_id VARCHAR(64) REFERENCES referral_reward_rules(id) ON DELETE SET NULL,
+  amount_minor INTEGER NOT NULL,
+  currency VARCHAR(8) NOT NULL DEFAULT 'GHS',
+  status VARCHAR(32) NOT NULL DEFAULT 'pending',
+  reason TEXT NOT NULL,
+  idempotency_key VARCHAR(128) UNIQUE NOT NULL,
+  reversal_of_id VARCHAR(64) REFERENCES reward_ledger(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  approved_at TIMESTAMP WITH TIME ZONE,
+  rejected_at TIMESTAMP WITH TIME ZONE,
+  reversed_at TIMESTAMP WITH TIME ZONE,
+  metadata_json JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_reward_ledger_referrer ON reward_ledger (referrer_user_id, status);
+CREATE INDEX IF NOT EXISTS idx_reward_ledger_order ON reward_ledger (order_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reward_ledger_idempotency ON reward_ledger (idempotency_key);
+CREATE INDEX IF NOT EXISTS idx_reward_ledger_created ON reward_ledger (created_at DESC);
+
+-- Column extensions on orders and marketplace_products
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS referrer_user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS referral_attribution_id VARCHAR(64) REFERENCES referral_attributions(id) ON DELETE SET NULL;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS referral_code VARCHAR(32);
+CREATE INDEX IF NOT EXISTS idx_orders_referrer_user_id ON orders (referrer_user_id);
+
+ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS referral_reward_minor INTEGER;
+
+
