@@ -1164,6 +1164,7 @@ export async function deleteWebsiteOnServer(
 
 export interface ReferralCaptureRequest {
   code: string;
+  captureId?: string;
   visitorKey?: string | null;
   landingPath?: string | null;
 }
@@ -1171,6 +1172,8 @@ export interface ReferralCaptureRequest {
 export interface ReferralCaptureResponse {
   success: boolean;
   valid: boolean;
+  clickRecorded: boolean;
+  attributionRecorded: boolean;
   code?: string;
   referrerUserId?: string;
   reason?: string;
@@ -1184,6 +1187,8 @@ export interface ReferralSummaryResponse {
     shareUrl: string;
     isEnabled: boolean;
     clicksCount: number;
+    rawClicksCount: number;
+    uniqueVisitorsCount: number;
     referredCustomersCount: number;
     networkLevel1Count?: number;
     networkLevel2Count?: number;
@@ -1268,6 +1273,8 @@ export async function captureReferralOnServer(
     return {
       success: false,
       valid: false,
+      clickRecorded: false,
+      attributionRecorded: false,
       error: data.error || 'Failed to capture referral',
     };
   }

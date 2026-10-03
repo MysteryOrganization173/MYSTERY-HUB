@@ -28,33 +28,38 @@ export class ReferralService {
    */
   static async captureVisitorReferral(params: {
     code: string;
+    captureId?: string;
     visitorKey?: string | null;
     landingPath?: string | null;
     userAgent?: string | null;
     currentUserId?: string | null;
   }): Promise<{
     valid: boolean;
+    clickRecorded: boolean;
+    attributionRecorded: boolean;
     code?: string;
     referrerUserId?: string;
     reason?: string;
   }> {
     if (!params.code || typeof params.code !== 'string') {
-      return { valid: false, reason: 'invalid_code' };
+      return { valid: false, clickRecorded: false, attributionRecorded: false, reason: 'invalid_code' };
     }
 
     const cleanCode = params.code.trim().toUpperCase();
     const profile = await ReferralStore.findProfileByCode(cleanCode);
 
     if (!profile || !profile.is_enabled) {
-      return { valid: false, reason: 'code_not_found' };
+      return { valid: false, clickRecorded: false, attributionRecorded: false, reason: 'code_not_found' };
     }
 
     // Protect against self-referral
     if (params.currentUserId && params.currentUserId === profile.user_id) {
-      return { valid: false, reason: 'self_referral' };
+      return { valid: false, clickRecorded: false, attributionRecorded: false, reason: 'self_referral' };
     }
 
-    // Record Click Analytics safely
+    let clickRecorded = false;
+    let attributionRecorded = false;
+    // Analytics and lifetime attribution have independent outcomes.
     try {
       await ReferralStore.recordClick({
         profileId: profile.id,
@@ -63,9 +68,11 @@ export class ReferralService {
         visitorKey: params.visitorKey,
         landingPath: params.landingPath,
         userAgentSafe: params.userAgent,
+        captureId: params.captureId,
       });
-    } catch (err) {
-      console.warn('[ReferralService] Failed to record click:', err);
+      clickRecorded = true;
+    } catch {
+      console.warn('[ReferralService] Click persistence failed; capture may be retried.');
     }
 
     // If authenticated user, bind lifetime attribution (first-touch wins)
@@ -79,21 +86,22 @@ export class ReferralService {
           landingPath: params.landingPath,
         });
 
+        attributionRecorded = Boolean(bindRes.attribution);
         if (bindRes.isNew && bindRes.attribution) {
           await AdminAuditStore.record({
-            adminUserId: profile.user_id,
+            adminUserId: bindRes.attribution.referrer_user_id,
             action: 'referral_bound',
             entityType: 'referral_attribution',
             entityId: bindRes.attribution.id,
             metadata: {
-              referrer_user_id: profile.user_id,
+              referrer_user_id: bindRes.attribution.referrer_user_id,
               referred_user_id: params.currentUserId,
-              source_code: profile.referral_code,
+              source_code: bindRes.attribution.source_code,
             },
           });
         }
-      } catch (err) {
-        console.warn('[ReferralService] Failed to bind user attribution:', err);
+      } catch {
+        console.warn('[ReferralService] User attribution persistence failed.');
       }
     } else if (params.visitorKey) {
       // Guest visitor attribution
@@ -104,13 +112,17 @@ export class ReferralService {
           sourceCode: profile.referral_code,
           landingPath: params.landingPath,
         });
-      } catch (err) {
-        console.warn('[ReferralService] Failed to create guest attribution:', err);
+        attributionRecorded = true;
+      } catch {
+        console.warn('[ReferralService] Guest attribution persistence failed.');
       }
     }
 
     return {
       valid: true,
+      clickRecorded,
+      attributionRecorded,
+      ...(!clickRecorded ? { reason: 'click_not_recorded' } : {}),
       code: profile.referral_code,
       referrerUserId: profile.user_id,
     };
@@ -161,14 +173,32 @@ export class ReferralService {
       }
     }
 
-    // 2. Guest User: Check explicit code first, then visitor key
+    // Preserve a captured visitor's first touch before considering a later code.
+    if (params.visitorKey) {
+      const guest = await ReferralStore.findAttributionByVisitorKey(params.visitorKey);
+      if (guest && guest.referrer_user_id !== params.userId) {
+        if (params.userId) {
+          const bound = await ReferralStore.bindAttributionToUser({
+            referredUserId: params.userId, referrerUserId: guest.referrer_user_id,
+            sourceCode: guest.source_code, visitorKey: params.visitorKey,
+          });
+          if (bound.attribution && bound.attribution.referrer_user_id !== params.userId) {
+            return { referrerUserId: bound.attribution.referrer_user_id,
+              attributionId: bound.attribution.id, referralCode: bound.attribution.source_code };
+          }
+        } else {
+          return { referrerUserId: guest.referrer_user_id, attributionId: guest.id, referralCode: guest.source_code };
+        }
+      }
+    }
+    // Uncaptured visitors may provide an explicit code at checkout.
     if (params.explicitCode) {
       const profile = await ReferralStore.findProfileByCode(params.explicitCode);
-      if (profile && profile.is_enabled) {
+      if (profile && profile.is_enabled && profile.user_id !== params.userId) {
         let attributionId: string | null = null;
         if (params.visitorKey) {
           const guestAttr = await ReferralStore.findAttributionByVisitorKey(params.visitorKey);
-          if (guestAttr) {
+          if (guestAttr && guestAttr.referrer_user_id === profile.user_id) {
             attributionId = guestAttr.id;
           }
         }
@@ -176,18 +206,6 @@ export class ReferralService {
           referrerUserId: profile.user_id,
           attributionId,
           referralCode: profile.referral_code,
-        };
-      }
-    }
-
-    // Check visitor key attribution
-    if (params.visitorKey) {
-      const guestAttr = await ReferralStore.findAttributionByVisitorKey(params.visitorKey);
-      if (guestAttr) {
-        return {
-          referrerUserId: guestAttr.referrer_user_id,
-          attributionId: guestAttr.id,
-          referralCode: guestAttr.source_code,
         };
       }
     }

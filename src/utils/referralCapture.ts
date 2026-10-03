@@ -9,6 +9,12 @@ import { captureReferralOnServer } from '../services/apiClient';
 const STORAGE_KEY_VISITOR = 'mh_visitor_key';
 const STORAGE_KEY_REF_CODE = 'mh_referral_code';
 const SESSION_KEY_LAST_CAPTURED = 'mh_last_captured_ref';
+let memoryVisitorKey = '';
+const captureIds = new Map<string, string>();
+const inFlight = new Map<string, Promise<string | null>>();
+const authenticatedCaptures = new Set<string>();
+const recordedCodes = new Set<string>();
+const attributedCodes = new Set<string>();
 
 /**
  * Obtains or generates a stable, non-invasive visitor key for guest attribution
@@ -25,7 +31,8 @@ export function getOrGenerateVisitorKey(): string {
     }
     return key;
   } catch {
-    return `vk_transient_${Date.now()}`;
+    memoryVisitorKey ||= `vk_transient_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    return memoryVisitorKey;
   }
 }
 
@@ -60,7 +67,17 @@ export function setStoredReferralCode(code: string): void {
 /**
  * Inspects URL on startup, captures referral attribution, and stores context without redirecting
  */
-export async function initReferralCapture(sessionToken?: string | null): Promise<string | null> {
+export function initReferralCapture(sessionToken?: string | null): Promise<string | null> {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  const identity = `${window.location.search}:${sessionToken || ''}`;
+  const pending = inFlight.get(identity);
+  if (pending) return pending;
+  const work = captureCurrentReferral(sessionToken).finally(() => inFlight.delete(identity));
+  inFlight.set(identity, work);
+  return work;
+}
+
+async function captureCurrentReferral(sessionToken?: string | null): Promise<string | null> {
   if (typeof window === 'undefined') return null;
 
   try {
@@ -80,26 +97,48 @@ export async function initReferralCapture(sessionToken?: string | null): Promise
     setStoredReferralCode(cleanCode);
 
     // Deduplicate API calls within this browser session
-    const lastCaptured = sessionStorage.getItem(SESSION_KEY_LAST_CAPTURED);
-    if (lastCaptured === cleanCode) {
+    let lastCaptured: string | null = null;
+    let storedCaptureId: string | null = null;
+    let guestAttributed = false;
+    try { lastCaptured = sessionStorage.getItem(SESSION_KEY_LAST_CAPTURED); } catch { /* storage unavailable */ }
+    try {
+      storedCaptureId = sessionStorage.getItem(`mh_capture_id:${cleanCode}`);
+      guestAttributed = sessionStorage.getItem(`mh_attributed_ref:${cleanCode}`) === '1';
+    } catch { /* use memory */ }
+    const authIdentity = `${cleanCode}:${sessionToken || ''}`;
+    const clickComplete = (lastCaptured === cleanCode && storedCaptureId) || recordedCodes.has(cleanCode);
+    const attributionComplete = sessionToken ? authenticatedCaptures.has(authIdentity) : guestAttributed || attributedCodes.has(cleanCode);
+    if (clickComplete && attributionComplete) {
       return cleanCode;
     }
 
     const visitorKey = getOrGenerateVisitorKey();
+    let captureId = captureIds.get(cleanCode);
+    try { captureId ||= sessionStorage.getItem(`mh_capture_id:${cleanCode}`) || undefined; } catch { /* use memory */ }
+    captureId ||= crypto.randomUUID();
+    captureIds.set(cleanCode, captureId);
+    try { sessionStorage.setItem(`mh_capture_id:${cleanCode}`, captureId); } catch { /* use memory */ }
     const landingPath = window.location.pathname + window.location.search;
 
     // Dispatch non-blocking capture to server
     const res = await captureReferralOnServer(
       {
         code: cleanCode,
+        captureId,
         visitorKey,
         landingPath: landingPath.slice(0, 250),
       },
       sessionToken || undefined
     );
 
-    if (res && res.valid) {
-      sessionStorage.setItem(SESSION_KEY_LAST_CAPTURED, cleanCode);
+    if (res?.valid && res.clickRecorded) {
+      recordedCodes.add(cleanCode);
+      try { sessionStorage.setItem(SESSION_KEY_LAST_CAPTURED, cleanCode); } catch { /* use memory */ }
+      if (sessionToken && res.attributionRecorded) authenticatedCaptures.add(authIdentity);
+    }
+    if (res?.valid && res.attributionRecorded && !sessionToken) {
+      attributedCodes.add(cleanCode);
+      try { sessionStorage.setItem(`mh_attributed_ref:${cleanCode}`, '1'); } catch { /* use memory */ }
     }
 
     return cleanCode;
@@ -108,4 +147,22 @@ export async function initReferralCapture(sessionToken?: string | null): Promise
     console.warn('[Referral Capture] Handled non-fatal tracking error:', err);
     return getStoredReferralCode();
   }
+}
+
+/** Observe the custom history router, including same-page query-string changes. */
+export function observeReferralNavigation(capture: () => void): () => void {
+  const history = window.history;
+  const originalPush = history.pushState;
+  const originalReplace = history.replaceState;
+  const push: History['pushState'] = function (...args) { originalPush.apply(history, args); capture(); };
+  const replace: History['replaceState'] = function (...args) { originalReplace.apply(history, args); capture(); };
+  history.pushState = push;
+  history.replaceState = replace;
+  window.addEventListener('popstate', capture);
+  capture();
+  return () => {
+    if (history.pushState === push) history.pushState = originalPush;
+    if (history.replaceState === replace) history.replaceState = originalReplace;
+    window.removeEventListener('popstate', capture);
+  };
 }

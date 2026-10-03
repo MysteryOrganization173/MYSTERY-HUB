@@ -9,6 +9,7 @@ interface RateLimitOptions {
   windowMs: number;
   max: number;
   message?: string;
+  key?: (req: Request) => string;
 }
 
 export function createRateLimiter(options: RateLimitOptions) {
@@ -33,7 +34,7 @@ export function createRateLimiter(options: RateLimitOptions) {
       return next();
     }
 
-    const ip =
+    const ip = options.key?.(req) ||
       (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ||
       req.socket.remoteAddress ||
       'unknown';
@@ -49,6 +50,10 @@ export function createRateLimiter(options: RateLimitOptions) {
     }
 
     timestamps.push(now);
+    if (hits.size >= 10_000 && !hits.has(ip)) {
+      res.status(429).json({ error: 'Please retry shortly.' });
+      return;
+    }
     hits.set(ip, timestamps);
     next();
   };
@@ -73,4 +78,14 @@ export const waitlistRateLimiter = createRateLimiter({
   windowMs: 10 * 60 * 1000,
   max: 25,
   message: 'Too many requests. Please try again shortly.',
+});
+
+// Stable visitor identity is primary; network address is only a keyless fallback.
+export const referralCaptureRateLimiter = createRateLimiter({
+  windowMs: 60_000,
+  max: 60,
+  key: req => {
+    const visitor = req.body?.visitorKey || req.headers['x-visitor-key'];
+    return typeof visitor === 'string' && visitor.length <= 128 ? `visitor:${visitor}` : '';
+  },
 });

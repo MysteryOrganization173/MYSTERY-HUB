@@ -1,3 +1,4 @@
+import { corsMiddleware } from './server/middleware/cors.js';
 import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -19,47 +20,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Allowed browser origins for production & development
-const ALLOWED_ORIGINS = [
-  'https://mysteryhub.netlify.app',
-  'https://mysterybundlehub.com',
-  'https://www.mysterybundlehub.com',
-  'https://mystery-hub.onrender.com',
-];
-
-const isAllowedOrigin = (origin: string | undefined): boolean => {
-  if (!origin) return true; // Allow server-to-server calls, Paystack webhooks, curl
-  if (ALLOWED_ORIGINS.includes(origin)) return true;
-  // Localhost development origins
-  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
-  // Cloud Run / AI Studio preview environments
-  if (/^https:\/\/ais-(dev|pre)-.*\.run\.app$/.test(origin)) return true;
-  return false;
-};
-
-// Production CORS Middleware
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-
-  if (origin && isAllowedOrigin(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Vary', 'Origin');
-  }
-
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, x-paystack-signature, x-webhook-signature, x-sbh-signature'
-  );
-
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(204);
-    return;
-  }
-
-  next();
-});
+app.use(corsMiddleware);
 
 // Root-level health check endpoint for monitoring & Render checks
 app.get('/health', (_req, res) => {

@@ -13,7 +13,7 @@ import {
 import { DATA_BUNDLES } from '../data/bundles';
 import { SafeUserProfile } from '../../server/types/auth';
 import { getMeOnServer, logoutOnServer } from '../services/apiClient';
-import { initReferralCapture } from '../utils/referralCapture';
+import { initReferralCapture, observeReferralNavigation } from '../utils/referralCapture';
 import {
   ROUTE_PATH_MAP,
   getPageFromPath,
@@ -217,7 +217,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Initialize and capture referral URL context across any landing route
   useEffect(() => {
-    initReferralCapture(sessionToken);
+    return observeReferralNavigation(() => { void initReferralCapture(sessionToken); });
   }, [sessionToken]);
 
   const [selectedTemplatePreview, setSelectedTemplatePreview] = useState<WebsiteTemplate | null>(null);

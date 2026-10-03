@@ -114,6 +114,8 @@ export interface ReferralSummary {
   shareUrl: string;
   isEnabled: boolean;
   clicksCount: number;
+  rawClicksCount: number;
+  uniqueVisitorsCount: number;
   referredCustomersCount: number; // Level 1 direct
   networkLevel1Count: number;
   networkLevel2Count: number;

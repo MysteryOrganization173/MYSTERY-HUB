@@ -25,7 +25,7 @@ import { toSafeUserProfile, WaitlistChannel } from '../types/auth.js';
 import { hashPassword, verifyPassword, generateSessionToken } from '../utils/crypto.js';
 import { parseIdentifier, validatePassword } from '../utils/authValidation.js';
 import { requireAuth, optionalAuth } from '../middleware/authMiddleware.js';
-import { loginRateLimiter, signupRateLimiter, waitlistRateLimiter } from '../middleware/rateLimiter.js';
+import { loginRateLimiter, signupRateLimiter, waitlistRateLimiter, referralCaptureRateLimiter } from '../middleware/rateLimiter.js';
 import { PaystackServerService } from '../services/paystackService.js';
 import { FulfilmentService } from '../services/fulfilmentService.js';
 import { validateOrderPayment } from '../services/paymentValidation.js';
@@ -1530,17 +1530,26 @@ apiRouter.get('/marketplace/products/:slug', async (req: Request, res: Response)
  * Captures visitor referral clicks, records non-invasive click analytics,
  * and binds lifetime attribution to active user or guest session.
  */
-apiRouter.post('/referrals/capture', optionalAuth, async (req: Request, res: Response) => {
+apiRouter.post('/referrals/capture', referralCaptureRateLimiter, optionalAuth, async (req: Request, res: Response) => {
   try {
-    const { code, visitorKey, landingPath } = req.body || {};
+    const { code, visitorKey, landingPath, captureId } = req.body || {};
     if (!code || typeof code !== 'string') {
-      res.status(400).json({ valid: false, error: 'Referral code parameter is required.' });
+      res.status(400).json({ success: false, valid: false, clickRecorded: false, attributionRecorded: false,
+        reason: 'invalid_code', error: 'Referral code parameter is required.' });
       return;
     }
 
+    const key = visitorKey || req.headers['x-visitor-key'] || null;
+    if (code.length > 32 || (key !== null && (typeof key !== 'string' || key.length > 128))
+      || (captureId !== undefined && (typeof captureId !== 'string' || !/^[a-zA-Z0-9_-]{8,100}$/.test(captureId)))
+      || (landingPath !== undefined && landingPath !== null && typeof landingPath !== 'string')) {
+      res.status(400).json({ success: false, valid: false, clickRecorded: false, attributionRecorded: false, reason: 'invalid_capture' });
+      return;
+    }
     const result = await ReferralService.captureVisitorReferral({
       code,
-      visitorKey: visitorKey || (req.headers['x-visitor-key'] as string) || null,
+      captureId,
+      visitorKey: key,
       landingPath: landingPath || null,
       userAgent: (req.headers['user-agent'] as string) || null,
       currentUserId: req.user?.id || null,
@@ -1550,9 +1559,9 @@ apiRouter.post('/referrals/capture', optionalAuth, async (req: Request, res: Res
       success: true,
       ...result,
     });
-  } catch (err) {
-    console.error('Referral Capture API Exception:', err);
-    res.status(500).json({ valid: false, error: 'Failed to record referral click.' });
+  } catch {
+    console.error('Referral capture could not be processed.');
+    res.status(503).json({ success: false, valid: false, clickRecorded: false, attributionRecorded: false, error: 'Referral capture temporarily unavailable.' });
   }
 });
 

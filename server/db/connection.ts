@@ -401,6 +401,10 @@ export async function initDatabase(): Promise<void> {
         sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_closed_at TIMESTAMP WITH TIME ZONE;`,
       },
       {
+        name: 'referral_clicks.capture_key',
+        sql: `ALTER TABLE referral_clicks ADD COLUMN IF NOT EXISTS capture_key VARCHAR(64);`,
+      },
+      {
         name: 'orders.referrer_user_id',
         sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS referrer_user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL;`,
       },
@@ -573,6 +577,8 @@ export async function initDatabase(): Promise<void> {
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_attributions_referred_unique ON referral_attributions (referred_user_id) WHERE referred_user_id IS NOT NULL;`,
       `CREATE INDEX IF NOT EXISTS idx_referral_clicks_referrer ON referral_clicks (referrer_user_id);`,
       `CREATE INDEX IF NOT EXISTS idx_referral_clicks_created ON referral_clicks (created_at DESC);`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_clicks_capture_key ON referral_clicks (capture_key);`,
+      `CREATE INDEX IF NOT EXISTS idx_referral_clicks_visitor ON referral_clicks (referral_profile_id, visitor_key, created_at DESC);`,
       `CREATE INDEX IF NOT EXISTS idx_reward_rules_service ON referral_reward_rules (service_type, enabled);`,
       `CREATE INDEX IF NOT EXISTS idx_reward_ledger_referrer ON reward_ledger (referrer_user_id, status);`,
       `CREATE INDEX IF NOT EXISTS idx_reward_ledger_order ON reward_ledger (order_id);`,

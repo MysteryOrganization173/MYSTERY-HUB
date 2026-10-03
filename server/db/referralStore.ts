@@ -5,6 +5,7 @@
  */
 
 import crypto from 'crypto';
+import type { PoolClient } from 'pg';
 import { getPool } from './connection.js';
 import {
   ReferralProfileRecord,
@@ -21,6 +22,7 @@ import { buildReferralUrl } from '../utils/referralUrl.js';
 const devReferralProfiles = new Map<string, ReferralProfileRecord>();
 const devReferralAttributions = new Map<string, ReferralAttributionRecord>();
 const devReferralClicks: ReferralClickRecord[] = [];
+const devCaptureKeys = new Map<string, ReferralClickRecord>();
 const devRewardRules = new Map<string, ReferralRewardRuleRecord>();
 const devRewardLedger = new Map<string, RewardLedgerRecord>();
 
@@ -41,6 +43,7 @@ export class ReferralStore {
     devReferralProfiles.clear();
     devReferralAttributions.clear();
     devReferralClicks.length = 0;
+    devCaptureKeys.clear();
     devRewardRules.clear();
     devRewardLedger.clear();
   }
@@ -165,9 +168,13 @@ export class ReferralStore {
     visitorKey?: string | null;
     landingPath?: string | null;
     userAgentSafe?: string | null;
+    captureId?: string;
   }): Promise<ReferralClickRecord> {
     const id = `refclk_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     const nowIso = new Date().toISOString();
+
+    const captureKey = params.captureId ? crypto.createHash('sha256')
+      .update(`${params.profileId}:${params.visitorKey || ''}:${params.captureId}`).digest('hex') : null;
 
     const record: ReferralClickRecord = {
       id,
@@ -182,24 +189,49 @@ export class ReferralStore {
 
     const pool = getPool();
     if (pool) {
-      await pool.query(
-        `
-        INSERT INTO referral_clicks (id, referral_profile_id, referrer_user_id, referral_code, visitor_key, landing_path, user_agent_safe, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
-        `,
-        [
-          record.id,
-          record.referral_profile_id,
-          record.referrer_user_id,
-          record.referral_code,
-          record.visitor_key,
-          record.landing_path,
-          record.user_agent_safe,
-          record.created_at,
-        ]
-      );
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0));',
+          [`referral-click:${params.profileId}:${params.visitorKey || captureKey || 'anonymous'}`]);
+        // Retries share a persisted capture key; rapid repeated visitor events are coalesced.
+        const previous = await client.query<ReferralClickRecord>(`
+          SELECT * FROM referral_clicks WHERE referral_profile_id = $1
+            AND (($2::text IS NOT NULL AND capture_key = $2)
+              OR ($3::text IS NOT NULL AND visitor_key = $3 AND created_at > NOW() - INTERVAL '60 seconds'))
+          ORDER BY created_at DESC LIMIT 1;
+        `, [params.profileId, captureKey, params.visitorKey || null]);
+        if (previous.rows[0]) { await client.query('COMMIT'); return previous.rows[0]; }
+        const inserted = await client.query<ReferralClickRecord>(
+          `
+          INSERT INTO referral_clicks (id, referral_profile_id, referrer_user_id, referral_code, visitor_key, landing_path, user_agent_safe, created_at, capture_key)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          RETURNING *;
+          `,
+          [
+            record.id,
+            record.referral_profile_id,
+            record.referrer_user_id,
+            record.referral_code,
+            record.visitor_key,
+            record.landing_path,
+            record.user_agent_safe,
+            record.created_at,
+            captureKey,
+          ]
+        );
+        if (!inserted.rows[0]) throw new Error('Referral click persistence was not confirmed.');
+        await client.query('COMMIT');
+        return inserted.rows[0];
+      } catch (error) { await client.query('ROLLBACK'); throw error; }
+      finally { client.release(); }
     } else {
+      const prior = (captureKey && devCaptureKeys.get(captureKey)) || devReferralClicks.find(c =>
+        params.visitorKey && c.referral_profile_id === params.profileId && c.visitor_key === params.visitorKey
+        && Date.now() - new Date(c.created_at).getTime() < 60_000);
+      if (prior) return prior;
       devReferralClicks.unshift(record);
+      if (captureKey) devCaptureKeys.set(captureKey, record);
       if (devReferralClicks.length > 5000) {
         devReferralClicks.pop();
       }
@@ -221,6 +253,20 @@ export class ReferralStore {
     return devReferralClicks.filter((c) => c.referrer_user_id === referrerUserId).length;
   }
 
+  static async countUniqueVisitorsByReferrer(referrerUserId: string): Promise<number> {
+    const pool = getPool();
+    if (pool) {
+      const result = await pool.query<{ count: string }>(`
+        SELECT COUNT(DISTINCT visitor_key) AS count FROM referral_clicks
+        WHERE referrer_user_id = $1 AND visitor_key IS NOT NULL AND BTRIM(visitor_key) <> ''
+          AND LEFT(visitor_key, 13) <> 'vk_transient_';
+      `, [referrerUserId]);
+      return Number(result.rows[0]?.count || 0);
+    }
+    return new Set(devReferralClicks.filter(c => c.referrer_user_id === referrerUserId
+      && c.visitor_key?.trim() && !c.visitor_key.startsWith('vk_transient_')).map(c => c.visitor_key)).size;
+  }
+
   // =========================================================================
   // 3. REFERRAL ATTRIBUTIONS (FIRST-TOUCH LIFETIME BINDING)
   // =========================================================================
@@ -229,9 +275,10 @@ export class ReferralStore {
    * Find existing attribution for a registered user
    */
   static async findAttributionByReferredUserId(
-    referredUserId: string
+    referredUserId: string,
+    client?: PoolClient
   ): Promise<ReferralAttributionRecord | null> {
-    const pool = getPool();
+    const pool = client || getPool();
     if (pool) {
       const res = await pool.query<ReferralAttributionRecord>(
         `SELECT * FROM referral_attributions WHERE referred_user_id = $1 LIMIT 1;`,
@@ -253,12 +300,13 @@ export class ReferralStore {
    * Find guest attribution by anonymous visitor key
    */
   static async findAttributionByVisitorKey(
-    visitorKey: string
+    visitorKey: string,
+    client?: PoolClient
   ): Promise<ReferralAttributionRecord | null> {
-    const pool = getPool();
+    const pool = client || getPool();
     if (pool) {
       const res = await pool.query<ReferralAttributionRecord>(
-        `SELECT * FROM referral_attributions WHERE visitor_key = $1 ORDER BY first_seen_at DESC LIMIT 1;`,
+        `SELECT * FROM referral_attributions WHERE visitor_key = $1 ORDER BY first_seen_at ASC, id ASC LIMIT 1;`,
         [visitorKey]
       );
       if (res.rows.length === 0) return null;
@@ -282,8 +330,19 @@ export class ReferralStore {
     visitorKey: string;
     sourceCode: string;
     landingPath?: string | null;
-  }): Promise<ReferralAttributionRecord> {
-    const existing = await this.findAttributionByVisitorKey(params.visitorKey);
+  }, client?: PoolClient): Promise<ReferralAttributionRecord> {
+    const db = getPool();
+    if (db && !client) {
+      const connection = await db.connect();
+      try {
+        await connection.query('BEGIN');
+        await connection.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0));', [`referral-visitor:${params.visitorKey}`]);
+        const result = await this.createGuestAttribution(params, connection);
+        await connection.query('COMMIT'); return result;
+      } catch (error) { await connection.query('ROLLBACK'); throw error; }
+      finally { connection.release(); }
+    }
+    const existing = await this.findAttributionByVisitorKey(params.visitorKey, client);
     if (existing) {
       return existing;
     }
@@ -305,7 +364,7 @@ export class ReferralStore {
       updated_at: nowIso,
     };
 
-    const pool = getPool();
+    const pool = client || getPool();
     if (pool) {
       const res = await pool.query<ReferralAttributionRecord>(
         `
@@ -340,7 +399,8 @@ export class ReferralStore {
    */
   static async isDescendantOrCycle(
     candidateReferrerUserId: string,
-    targetReferredUserId: string
+    targetReferredUserId: string,
+    client?: PoolClient
   ): Promise<boolean> {
     let currentId: string | null = candidateReferrerUserId;
     const visited = new Set<string>();
@@ -356,12 +416,13 @@ export class ReferralStore {
       }
       visited.add(currentId);
 
-      const uplineAttr = await this.findAttributionByReferredUserId(currentId);
+      const uplineAttr = await this.findAttributionByReferredUserId(currentId, client);
       currentId = uplineAttr?.referrer_user_id || uplineAttr?.level1_referrer_user_id || null;
       hops++;
     }
 
-    return false;
+    // A truncated chain cannot safely be certified acyclic.
+    return Boolean(currentId);
   }
 
   /**
@@ -377,20 +438,38 @@ export class ReferralStore {
     sourceCode: string;
     visitorKey?: string | null;
     landingPath?: string | null;
-  }): Promise<{ attribution: ReferralAttributionRecord | null; isNew: boolean; error?: string }> {
+  }, client?: PoolClient): Promise<{ attribution: ReferralAttributionRecord | null; isNew: boolean; error?: string }> {
+    const db = getPool();
+    if (db && !client) {
+      const connection = await db.connect();
+      try {
+        await connection.query('BEGIN');
+        await connection.query("SELECT pg_advisory_xact_lock(hashtextextended('referral-attribution-graph', 0));");
+        if (params.visitorKey) await connection.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0));', [`referral-visitor:${params.visitorKey}`]);
+        const result = await this.bindAttributionToUser(params, connection);
+        await connection.query('COMMIT'); return result;
+      } catch (error) { await connection.query('ROLLBACK'); throw error; }
+      finally { connection.release(); }
+    }
+    const original = await this.findAttributionByReferredUserId(params.referredUserId, client);
+    if (original) return { attribution: original, isNew: false };
+    const guest = params.visitorKey ? await this.findAttributionByVisitorKey(params.visitorKey, client) : null;
+    if (guest && !guest.referred_user_id) {
+      params = { ...params, referrerUserId: guest.referrer_user_id, sourceCode: guest.source_code };
+    }
     // 1. Enforce No Self-Referrals
     if (params.referredUserId === params.referrerUserId) {
       return { attribution: null, isNew: false, error: 'Self-referral is not allowed.' };
     }
 
     // 2. Enforce No Circular Referral Loops
-    const isCycle = await this.isDescendantOrCycle(params.referrerUserId, params.referredUserId);
+    const isCycle = await this.isDescendantOrCycle(params.referrerUserId, params.referredUserId, client);
     if (isCycle) {
       return { attribution: null, isNew: false, error: 'Circular referral chain is not allowed.' };
     }
 
     // 3. Check if user already has an established lifetime attribution
-    const existingForUser = await this.findAttributionByReferredUserId(params.referredUserId);
+    const existingForUser = await this.findAttributionByReferredUserId(params.referredUserId, client);
     if (existingForUser) {
       return { attribution: existingForUser, isNew: false };
     }
@@ -403,10 +482,10 @@ export class ReferralStore {
     let level3UserId: string | null = null;
 
     try {
-      const level1Attr = await this.findAttributionByReferredUserId(level1UserId);
+      const level1Attr = await this.findAttributionByReferredUserId(level1UserId, client);
       if (level1Attr && level1Attr.referrer_user_id && level1Attr.referrer_user_id !== params.referredUserId) {
         level2UserId = level1Attr.referrer_user_id;
-        const level2Attr = await this.findAttributionByReferredUserId(level2UserId);
+        const level2Attr = await this.findAttributionByReferredUserId(level2UserId, client);
         if (
           level2Attr &&
           level2Attr.referrer_user_id &&
@@ -422,14 +501,14 @@ export class ReferralStore {
 
     // 5. If visitorKey was provided, check if a guest record exists to upgrade
     if (params.visitorKey) {
-      const guestAttribution = await this.findAttributionByVisitorKey(params.visitorKey);
+      const guestAttribution = await this.findAttributionByVisitorKey(params.visitorKey, client);
       if (guestAttribution && !guestAttribution.referred_user_id) {
         // Enforce no self-referral or circular referral on upgrade
         if (guestAttribution.referrer_user_id === params.referredUserId) {
           return { attribution: null, isNew: false, error: 'Self-referral is not allowed.' };
         }
 
-        const pool = getPool();
+        const pool = client || getPool();
         if (pool) {
           const res = await pool.query<ReferralAttributionRecord>(
             `
@@ -481,7 +560,7 @@ export class ReferralStore {
       updated_at: nowIso,
     };
 
-    const pool = getPool();
+    const pool = client || getPool();
     if (pool) {
       try {
         const res = await pool.query<ReferralAttributionRecord>(
@@ -514,6 +593,7 @@ export class ReferralStore {
         );
         return { attribution: res.rows[0], isNew: true };
       } catch (err: any) {
+        if (client) throw err;
         // In case of conflict, retrieve the winning original attribution
         const winner = await this.findAttributionByReferredUserId(params.referredUserId);
         return { attribution: winner, isNew: false };
@@ -755,54 +835,68 @@ export class ReferralStore {
 
     if (pool) {
       // Check existing by idempotency_key
-      const checkRes = await pool.query<RewardLedgerRecord>(
-        `SELECT * FROM reward_ledger WHERE idempotency_key = $1 LIMIT 1;`,
-        [entry.idempotency_key]
-      );
-      if (checkRes.rows.length > 0) {
-        return { record: checkRes.rows[0], alreadyExisted: true };
-      }
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('LOCK TABLE reward_ledger IN ROW EXCLUSIVE MODE;');
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0));',
+          [`referral-reward:${entry.order_id || entry.idempotency_key}`]);
+        const checkRes = await client.query<RewardLedgerRecord>(
+          `SELECT * FROM reward_ledger WHERE idempotency_key = $1
+            OR (order_id = $2 AND service_type = $3 AND network_level = $4 AND reversal_of_id IS NULL)
+            LIMIT 1;`,
+          [entry.idempotency_key, entry.order_id, entry.service_type, entry.network_level || 1]
+        );
+        if (checkRes.rows.length > 0) {
+          await client.query('COMMIT');
+          return { record: checkRes.rows[0], alreadyExisted: true };
+        }
 
-      const res = await pool.query<RewardLedgerRecord>(
-        `
-        INSERT INTO reward_ledger (
-          id, referrer_user_id, referred_user_id, referral_attribution_id,
-          order_id, marketplace_product_id, service_type, reward_rule_id,
-          amount_minor, currency, status, reason, idempotency_key, reversal_of_id,
-          created_at, approved_at, rejected_at, reversed_at, metadata_json
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-          $15, $16, $17, $18, $19
-        ) RETURNING *;
-        `,
-        [
-          record.id,
-          record.referrer_user_id,
-          record.referred_user_id,
-          record.referral_attribution_id,
-          record.order_id,
-          record.marketplace_product_id,
-          record.service_type,
-          record.reward_rule_id,
-          record.amount_minor,
-          record.currency,
-          record.status,
-          record.reason,
-          record.idempotency_key,
-          record.reversal_of_id,
-          record.created_at,
-          record.approved_at,
-          record.rejected_at,
-          record.reversed_at,
-          record.metadata_json ? JSON.stringify(record.metadata_json) : null,
-        ]
-      );
-      return { record: res.rows[0], alreadyExisted: false };
+        const res = await client.query<RewardLedgerRecord>(
+          `
+          INSERT INTO reward_ledger (
+            id, referrer_user_id, referred_user_id, referral_attribution_id,
+            order_id, marketplace_product_id, service_type, reward_rule_id,
+            amount_minor, currency, status, reason, idempotency_key, reversal_of_id,
+            created_at, approved_at, rejected_at, reversed_at, metadata_json
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+            $15, $16, $17, $18, $19
+          ) RETURNING *;
+          `,
+          [
+            record.id,
+            record.referrer_user_id,
+            record.referred_user_id,
+            record.referral_attribution_id,
+            record.order_id,
+            record.marketplace_product_id,
+            record.service_type,
+            record.reward_rule_id,
+            record.amount_minor,
+            record.currency,
+            record.status,
+            record.reason,
+            record.idempotency_key,
+            record.reversal_of_id,
+            record.created_at,
+            record.approved_at,
+            record.rejected_at,
+            record.reversed_at,
+            record.metadata_json ? JSON.stringify(record.metadata_json) : null,
+          ]
+        );
+        await client.query('COMMIT');
+        return { record: res.rows[0], alreadyExisted: false };
+      } catch (error) { await client.query('ROLLBACK'); throw error; }
+      finally { client.release(); }
     }
 
     // In-memory check
     for (const item of devRewardLedger.values()) {
-      if (item.idempotency_key === entry.idempotency_key) {
+      if (item.idempotency_key === entry.idempotency_key || (entry.order_id && item.order_id === entry.order_id
+        && item.service_type === entry.service_type && (item.network_level || 1) === (entry.network_level || 1)
+        && !item.reversal_of_id)) {
         return { record: { ...item }, alreadyExisted: true };
       }
     }
@@ -907,6 +1001,7 @@ export class ReferralStore {
     existing.status = 'reversed';
     existing.reversed_at = nowIso;
     existing.reason = `${existing.reason} (Reversed: ${reason})`;
+    devRewardLedger.set(existing.id, existing);
     return { ...existing };
   }
 
@@ -916,6 +1011,7 @@ export class ReferralStore {
   static async getReferralSummary(userId: string): Promise<ReferralSummary> {
     const profile = await this.getOrCreateProfile(userId);
     const clicksCount = await this.countClicksByReferrer(userId);
+    const uniqueVisitorsCount = await this.countUniqueVisitorsByReferrer(userId);
     const referredCustomersCount = await this.countReferredCustomers(userId);
     const networkCounts = await this.countNetworkMembers(userId);
 
@@ -960,6 +1056,8 @@ export class ReferralStore {
       shareUrl,
       isEnabled: profile.is_enabled,
       clicksCount,
+      rawClicksCount: clicksCount,
+      uniqueVisitorsCount,
       referredCustomersCount,
       networkLevel1Count: networkCounts.level1,
       networkLevel2Count: networkCounts.level2,
