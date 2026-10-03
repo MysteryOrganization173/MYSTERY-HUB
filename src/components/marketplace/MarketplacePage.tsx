@@ -174,6 +174,25 @@ export const MarketplacePage: React.FC = () => {
     });
   };
 
+  /**
+   * Helper to ensure card overlays are strictly concise 1-line badges.
+   * Long promotional / tagline copy is omitted from the compact feed card
+   * and displayed within the rich Product Details modal.
+   */
+  const getCompactCardBadge = (badge: string | undefined): string | null => {
+    if (!badge) return null;
+    const trimmed = badge.trim();
+    if (!trimmed) return null;
+    if (trimmed.length > 18) {
+      if (/business|office|work/i.test(trimmed)) return 'Business Pick';
+      if (/student|school|study/i.test(trimmed)) return 'Student Choice';
+      if (/creator|graphics|design|mic/i.test(trimmed)) return 'Creator Pick';
+      if (/popular|best|top/i.test(trimmed)) return 'Popular';
+      return null;
+    }
+    return trimmed;
+  };
+
   const handleOpenShareModal = (p: MarketplaceProduct) => {
     setShareModalProduct(p);
     setCopiedLink(false);
@@ -243,183 +262,82 @@ export const MarketplacePage: React.FC = () => {
   }, [shareModalProduct, referralCode]);
 
   return (
-    <div className="min-h-screen py-5 sm:py-8 pb-28 sm:pb-16 text-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
+    <div className="min-h-screen py-4 sm:py-7 pb-20 sm:pb-12 text-slate-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
         
-        {/* 1. Official Marketplace Hero Header with Cloudinary Artwork Background */}
-        {/* DESKTOP & TABLET HERO (sm and above): Unchanged Premium Composition */}
-        <div className="hidden sm:flex relative rounded-3xl bg-[#070b0e] border border-slate-800/80 overflow-hidden shadow-2xl min-h-[280px] lg:min-h-[320px] items-center">
+        {/* =========================================================
+            1. COMPRESSED MARKETPLACE HERO HEADER
+               - On Mobile (< sm): Unified background-blended composition (no huge separate image block, total height ~150px)
+               - On Desktop (sm+): Wide spacious treatment
+            ========================================================= */}
+        <div className="relative rounded-2xl sm:rounded-3xl bg-[#070b0e] border border-slate-800/80 overflow-hidden shadow-xl sm:shadow-2xl min-h-[140px] sm:min-h-[260px] lg:min-h-[300px] flex items-center">
           {/* Ambient Glows */}
-          <div className="absolute top-0 right-0 w-80 h-80 bg-[#00c365]/10 rounded-full blur-[100px] pointer-events-none z-0" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-sky-500/5 rounded-full blur-[80px] pointer-events-none z-0" />
+          <div className="absolute top-0 right-0 w-72 sm:w-80 h-72 sm:h-80 bg-[#00c365]/10 rounded-full blur-[80px] pointer-events-none z-0" />
+          <div className="hidden sm:block absolute bottom-0 left-0 w-64 h-64 bg-sky-500/5 rounded-full blur-[80px] pointer-events-none z-0" />
 
-          {/* Official Visual Artwork Layer */}
+          {/* Background Visual Artwork Layer (Blended right/bottom with gradient mask) */}
           {heroBannerUrl && !heroImageFailed && (
-            <div className="absolute inset-0 z-0 select-none overflow-hidden bg-[#070b0e]">
+            <div className="absolute inset-y-0 right-0 w-3/5 sm:w-2/3 lg:w-1/2 pointer-events-none select-none z-0 overflow-hidden">
               <img
                 src={heroSrc}
                 srcSet={heroSrcSet}
-                sizes="(max-width: 1024px) 100vw, 1280px"
-                alt="Mystery Hub Technology Marketplace Sourcing"
+                sizes="(max-width: 640px) 60vw, 50vw"
+                alt=""
+                aria-hidden="true"
                 loading="eager"
                 fetchPriority="high"
                 decoding="async"
                 onLoad={() => setHeroImageLoaded(true)}
                 onError={() => setHeroImageFailed(true)}
-                className={`w-full h-full object-cover object-right lg:object-[85%_center] transition-opacity duration-300 ease-out motion-reduce:transition-none ${
-                  heroImageLoaded ? 'opacity-90 sm:opacity-95' : 'opacity-0'
+                className={`w-full h-full object-cover object-[78%_center] transition-opacity duration-300 ease-out ${
+                  heroImageLoaded ? 'opacity-40 sm:opacity-85 lg:opacity-90' : 'opacity-0'
                 }`}
               />
+              {/* Dark gradient overlays for high text readability on mobile & desktop */}
+              <div className="absolute inset-0 bg-gradient-to-r from-[#070b0e] via-[#070b0e]/95 to-[#070b0e]/40 sm:to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#070b0e] via-transparent to-[#070b0e]/30" />
             </div>
           )}
 
-          {/* Readability Gradient Overlays */}
-          <div className="hidden lg:block absolute inset-0 z-10 bg-gradient-to-r from-[#070b0e] via-[#070b0e]/90 via-45% to-transparent pointer-events-none" />
-          <div className="lg:hidden absolute inset-0 z-10 bg-gradient-to-r from-[#070b0e]/95 via-[#070b0e]/80 to-[#070b0e]/45 pointer-events-none" />
-
           {/* Hero Foreground Content */}
-          <div className="relative z-20 w-full max-w-xl lg:max-w-2xl p-8 lg:p-10 space-y-4 text-left">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#111e18]/90 border border-[#00c365]/30 text-xs font-semibold text-[#00c365] backdrop-blur-sm">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Tech & Digital Marketplace</span>
-            </div>
-
-            <h1 className="text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight">
-              Quality Technology, Creator Gear & <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E575] via-[#00c365] to-[#38bdf8]">
-                Business Essentials Sourced on Request
-              </span>
-            </h1>
-
-            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-xl">
-              Browse technology, creator tools and business essentials sourced on request for customers in Ghana. Tell us what you need and we&apos;ll help you find suitable options.
-            </p>
-
-            {/* Truthful Trust Signals */}
-            <div className="pt-1 flex flex-wrap items-center gap-y-2 gap-x-4 text-xs text-slate-300 font-medium">
-              <div className="flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#00c365]" />
-                <span>Sourced on Request</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle className="w-3.5 h-3.5 text-[#00c365]" />
-                <span>Transparent Enquiries</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle className="w-3.5 h-3.5 text-[#00c365]" />
-                <span>Direct WhatsApp Support</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* MOBILE HERO (< sm): Dedicated Stacked Composition for Clear Text + Clear Tech Artwork */}
-        <div className="block sm:hidden rounded-3xl bg-[#070b0e] border border-slate-800/80 overflow-hidden shadow-xl p-4 space-y-3.5 text-left">
-          {/* Top Crisp Text Region */}
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#111e18] border border-[#00c365]/30 text-[11px] font-semibold text-[#00c365]">
+          <div className="relative z-10 w-full max-w-xl lg:max-w-2xl p-4 sm:p-7 lg:p-9 space-y-2 sm:space-y-3.5 text-left">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#111e18]/90 border border-[#00c365]/30 text-[10px] sm:text-xs font-semibold text-[#00c365] backdrop-blur-sm">
               <Sparkles className="w-3 h-3" />
-              <span>Tech & Digital Marketplace</span>
+              <span>Tech &amp; Digital Marketplace</span>
             </div>
 
-            <h1 className="text-xl font-extrabold text-white tracking-tight leading-snug">
-              Quality Tech, Creator Gear & <br />
+            <h1 className="text-xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight">
+              Quality Technology, Creator Gear &amp; <br className="hidden sm:inline" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E575] via-[#00c365] to-[#38bdf8]">
                 Business Essentials
               </span>
             </h1>
 
-            <p className="text-slate-300 text-xs leading-relaxed">
-              Browse laptops, smartphones, creator microphones and productivity gear sourced on request for customers in Ghana.
+            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-md sm:max-w-xl">
+              Browse laptops, smartphones and creator gear sourced on request for customers in Ghana.
             </p>
-          </div>
 
-          {/* Clearly Visible Tech Artwork Region (~195px height) */}
-          <div className="relative w-full h-[195px] rounded-2xl overflow-hidden border border-slate-800/90 bg-[#070b0e] shadow-inner group">
-            {heroBannerUrl && !heroImageFailed && (
-              <img
-                src={heroSrc}
-                srcSet={heroSrcSet}
-                sizes="100vw"
-                alt="Mystery Hub Technology Sourcing"
-                loading="eager"
-                fetchPriority="high"
-                decoding="async"
-                onLoad={() => setHeroImageLoaded(true)}
-                onError={() => setHeroImageFailed(true)}
-                className={`w-full h-full object-cover object-[75%_center] transition-opacity duration-300 ease-out ${
-                  heroImageLoaded ? 'opacity-95' : 'opacity-0'
-                }`}
-              />
-            )}
-            {/* Subtle Gradient Overlays for Cinematic Integration */}
-            <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-[#070b0e] to-transparent pointer-events-none" />
-            <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#070b0e] to-transparent pointer-events-none" />
-            <div className="absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-[#070b0e]/80 to-transparent pointer-events-none" />
-          </div>
-
-          {/* Bottom Compact Trust Row */}
-          <div className="pt-0.5 flex flex-wrap items-center justify-between text-[11px] text-slate-300 font-medium gap-y-1">
-            <div className="flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#00c365]" />
-              <span>Sourced on Request</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <CheckCircle className="w-3.5 h-3.5 text-[#00c365]" />
-              <span>Direct WhatsApp</span>
+            {/* Compact Trust Row */}
+            <div className="pt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs text-slate-300 font-medium">
+              <div className="flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#00c365]" />
+                <span>Sourced on Request</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <CheckCircle className="w-3.5 h-3.5 text-[#00c365]" />
+                <span>Direct WhatsApp</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* 2. Refined WhatsApp Channel Spotlight Card */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#091813] via-[#091512] to-[#0a1b14] border border-[#00c365]/30 shadow-md">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3.5">
-            <div className="flex items-start sm:items-center gap-3.5">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#00c365]/15 border border-[#00c365]/40 flex items-center justify-center text-[#00c365] shrink-0 mt-0.5 sm:mt-0 shadow-inner">
-                <Radio className="w-5 h-5 text-[#00c365] animate-pulse" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="font-extrabold text-sm sm:text-base text-white tracking-tight">
-                    Stay in the Mystery Hub Loop
-                  </h4>
-                  <span className="text-[10px] uppercase font-bold text-[#00c365] bg-[#00c365]/15 border border-[#00c365]/30 px-2 py-0.5 rounded-full">
-                    Official Channel
-                  </span>
-                </div>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Price drops, new services, marketplace finds and launch updates, straight from our WhatsApp Channel.
-                </p>
-                <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
-                  <span className="text-[10px] text-slate-400 bg-slate-900/80 border border-slate-800 px-2 py-0.5 rounded-md">
-                    Product Drops
-                  </span>
-                  <span className="text-[10px] text-slate-400 bg-slate-900/80 border border-slate-800 px-2 py-0.5 rounded-md">
-                    Price Updates
-                  </span>
-                  <span className="text-[10px] text-slate-400 bg-slate-900/80 border border-slate-800 px-2 py-0.5 rounded-md">
-                    New Services
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <a
-              href={BUSINESS_CONFIG.contact.whatsappChannelUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="w-full md:w-auto px-5 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md shadow-[#00c365]/20 shrink-0 cursor-pointer active:scale-95"
-            >
-              <span>Follow Channel</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
-        </div>
-
-        {/* 3. Search Bar and Category Tabs (Shown ONLY when published products exist in catalog) */}
+        {/* =========================================================
+            2. SEARCH BAR & CATEGORY TABS
+               (Placed right under the compressed hero for instant discovery)
+            ========================================================= */}
         {!loading && !error && products.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="space-y-2.5">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
               {/* Compact Responsive Search Input */}
               <div className="relative flex-1 max-w-md">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -466,7 +384,7 @@ export const MarketplacePage: React.FC = () => {
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 active:scale-95 ${
+                    className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 active:scale-95 ${
                       isSelected
                         ? 'bg-[#00c365] text-black shadow-md font-bold'
                         : 'bg-[#0e141a] text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700'
@@ -480,26 +398,29 @@ export const MarketplacePage: React.FC = () => {
           </div>
         )}
 
-        {/* 4. Products Grid / Loading / Error / Honest States */}
+        {/* =========================================================
+            3. PRODUCTS FEED GRID
+               (Reaches visible 2-column cards immediately on mobile)
+            ========================================================= */}
         {loading ? (
           /* Loading Skeleton State */
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-5">
             {[1, 2, 3, 4].map((n) => (
               <div
                 key={n}
-                className="rounded-2xl bg-[#0f151b] border border-slate-800 p-3 sm:p-4 space-y-3 animate-pulse"
+                className="rounded-2xl bg-[#0f151b] border border-slate-800 p-2.5 sm:p-4 space-y-2.5 animate-pulse"
               >
                 <div className="w-full aspect-square rounded-xl bg-slate-800/50" />
-                <div className="h-3.5 bg-slate-800 rounded w-1/2" />
-                <div className="h-5 bg-slate-800 rounded w-3/4" />
+                <div className="h-3 bg-slate-800 rounded w-1/2" />
+                <div className="h-4 bg-slate-800 rounded w-3/4" />
                 <div className="h-4 bg-slate-800 rounded w-1/3" />
               </div>
             ))}
           </div>
         ) : error ? (
           /* Honest Error State */
-          <div className="text-center py-10 px-4 bg-[#0f151b] rounded-2xl border border-red-500/30 space-y-3">
-            <HelpCircle className="w-10 h-10 text-red-400 mx-auto" />
+          <div className="text-center py-8 px-4 bg-[#0f151b] rounded-2xl border border-red-500/30 space-y-3">
+            <HelpCircle className="w-9 h-9 text-red-400 mx-auto" />
             <h3 className="text-base font-bold text-white">Marketplace Service Unavailable</h3>
             <p className="text-xs text-slate-400 max-w-md mx-auto">{error}</p>
             <div className="pt-2 flex items-center justify-center gap-3">
@@ -520,32 +441,32 @@ export const MarketplacePage: React.FC = () => {
             </div>
           </div>
         ) : products.length === 0 ? (
-          /* ZERO PUBLISHED PRODUCTS EXIST: One Compact Intentional State */
-          <div className="text-center py-10 sm:py-12 px-5 bg-[#0f151b] rounded-3xl border border-slate-800/90 space-y-4 max-w-2xl mx-auto shadow-xl">
-            <div className="w-12 h-12 rounded-2xl bg-[#00c365]/10 border border-[#00c365]/30 flex items-center justify-center text-[#00c365] mx-auto shadow-inner">
-              <Box className="w-6 h-6" />
+          /* ZERO PUBLISHED PRODUCTS EXIST: Compact Intentional State */
+          <div className="text-center py-8 sm:py-10 px-4 bg-[#0f151b] rounded-3xl border border-slate-800/90 space-y-3 max-w-2xl mx-auto shadow-xl">
+            <div className="w-11 h-11 rounded-2xl bg-[#00c365]/10 border border-[#00c365]/30 flex items-center justify-center text-[#00c365] mx-auto shadow-inner">
+              <Box className="w-5 h-5" />
             </div>
 
-            <div className="space-y-2">
-              <span className="inline-block text-[11px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+            <div className="space-y-1.5">
+              <span className="inline-block text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                 New products are being added
               </span>
-              <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
                 We&apos;re building the Marketplace with real products we can actually source.
               </h3>
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-lg mx-auto">
+              <p className="text-xs text-slate-300 leading-relaxed max-w-lg mx-auto">
                 Looking for something now? Tell us what you need and we&apos;ll help you find suitable options available in Ghana.
               </p>
             </div>
 
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div className="pt-1 flex flex-col sm:flex-row items-center justify-center gap-2.5">
               <a
                 href={BUSINESS_CONFIG.getGeneralWhatsAppUrl(
                   'Hello Mystery Hub team, I have a specific hardware or software sourcing request.'
                 )}
                 target="_blank"
                 rel="noreferrer"
-                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95"
               >
                 <MessageSquare className="w-4 h-4" />
                 <span>Send Sourcing Request</span>
@@ -555,7 +476,7 @@ export const MarketplacePage: React.FC = () => {
                 href={BUSINESS_CONFIG.contact.supportWhatsAppUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="w-full sm:w-auto px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/80 text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/80 text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>WhatsApp Mystery Hub</span>
               </a>
@@ -563,11 +484,11 @@ export const MarketplacePage: React.FC = () => {
           </div>
         ) : filteredProducts.length === 0 ? (
           /* FILTERED-ZERO STATE: Search or category filter returned 0 results */
-          <div className="text-center py-10 px-4 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-3 max-w-md mx-auto">
-            <Search className="w-8 h-8 text-slate-500 mx-auto" />
-            <h3 className="text-base font-bold text-white">No matching products</h3>
+          <div className="text-center py-8 px-4 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-3 max-w-md mx-auto">
+            <Search className="w-7 h-7 text-slate-500 mx-auto" />
+            <h3 className="text-sm font-bold text-white">No matching products</h3>
             <p className="text-xs text-slate-400">Try another category or reset your search query.</p>
-            <div className="pt-2">
+            <div className="pt-1">
               <button
                 onClick={() => {
                   setSelectedCategory('all');
@@ -582,7 +503,7 @@ export const MarketplacePage: React.FC = () => {
           </div>
         ) : (
           /* LIVE PRODUCTS GRID (COMPACT COMMERCE FEED: 2-COL ON MOBILE) */
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-5">
             {filteredProducts.map((p) => {
               const availabilityBadgeMap: Record<string, { label: string; style: string }> = {
                 in_stock: {
@@ -625,6 +546,7 @@ export const MarketplacePage: React.FC = () => {
 
               const rewardGhcFormatted = isEligibleForShare ? formatGhcReward(p.referralRewardGhc) : null;
               const isHighlighted = highlightedProductId === p.id;
+              const compactBadge = getCompactCardBadge(p.badge);
 
               return (
                 <article
@@ -661,33 +583,33 @@ export const MarketplacePage: React.FC = () => {
 
                       {/* Small Status Badge on Image */}
                       <span
-                        className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md border shadow-sm ${availabilityBadge.style}`}
+                        className={`absolute top-2 left-2 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-md backdrop-blur-md border shadow-sm ${availabilityBadge.style}`}
                       >
                         {p.availabilityLabel || availabilityBadge.label}
                       </span>
 
-                      {/* Promo Badge if present */}
-                      {p.badge && (
-                        <span className="absolute top-2 right-2 text-[10px] font-bold text-white bg-black/80 backdrop-blur-md border border-slate-700 px-2 py-0.5 rounded-md shadow-sm">
-                          {p.badge}
+                      {/* Clean 1-Line Compact Promo Badge (No multiline marketing overlays on cards) */}
+                      {compactBadge && (
+                        <span className="absolute top-2 right-2 text-[9px] sm:text-[10px] font-bold text-white bg-black/85 backdrop-blur-md border border-slate-700/80 px-1.5 sm:px-2 py-0.5 rounded-md shadow-sm truncate max-w-[55%]">
+                          {compactBadge}
                         </span>
                       )}
                     </div>
 
                     {/* Compact Card Content */}
-                    <div className="p-3 sm:p-4 space-y-1.5 text-left flex-1 flex flex-col justify-between">
-                      <div className="space-y-1">
+                    <div className="p-2.5 sm:p-3.5 space-y-1 text-left flex-1 flex flex-col justify-between">
+                      <div className="space-y-0.5">
                         <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 truncate">
                           {p.categoryLabel}
                         </div>
 
-                        <h3 className="font-bold text-xs sm:text-sm text-white group-hover:text-[#00c365] transition-colors line-clamp-2 leading-snug min-h-[2.4rem] sm:min-h-[2.6rem]">
+                        <h3 className="font-bold text-xs sm:text-sm text-white group-hover:text-[#00c365] transition-colors line-clamp-2 leading-snug min-h-[2.2rem] sm:min-h-[2.6rem]">
                           {p.name}
                         </h3>
                       </div>
 
-                      <div className="pt-1">
-                        <span className="text-sm sm:text-base font-black text-white font-mono tracking-tight tabular-nums block">
+                      <div className="pt-0.5">
+                        <span className="text-xs sm:text-base font-black text-white font-mono tracking-tight tabular-nums block truncate">
                           {p.priceDisplay}
                         </span>
                       </div>
@@ -695,7 +617,7 @@ export const MarketplacePage: React.FC = () => {
                   </div>
 
                   {/* Card Bottom: Compact Share & Earn Reward Badge if eligible, else Clean Arrow */}
-                  <div className="p-3 sm:p-4 pt-0 text-left">
+                  <div className="p-2.5 sm:p-3.5 pt-0 text-left">
                     {isEligibleForShare && rewardGhcFormatted ? (
                       <button
                         type="button"
@@ -703,17 +625,17 @@ export const MarketplacePage: React.FC = () => {
                           e.stopPropagation();
                           handleOpenShareModal(p);
                         }}
-                        className="w-full px-2 py-1 sm:py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:text-amber-300 text-[10px] sm:text-xs font-bold transition-all flex items-center justify-between group/badge cursor-pointer"
+                        className="w-full px-1.5 sm:px-2 py-1 sm:py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:text-amber-300 text-[9px] sm:text-xs font-bold transition-all flex items-center justify-between group/badge cursor-pointer"
                         aria-label={`Share and earn GH₵${rewardGhcFormatted} on ${p.name}`}
                       >
                         <span className="flex items-center gap-1 truncate">
-                          <Gift className="w-3 h-3 text-amber-400 shrink-0" />
+                          <Gift className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400 shrink-0" />
                           <span>Earn GH₵{rewardGhcFormatted}</span>
                         </span>
                         <Share2 className="w-2.5 h-2.5 text-amber-400/80 group-hover/badge:translate-x-0.5 transition-transform shrink-0" />
                       </button>
                     ) : (
-                      <div className="text-[11px] text-slate-500 flex items-center justify-between font-medium group-hover:text-slate-400 transition-colors pt-0.5 border-t border-slate-800/60">
+                      <div className="text-[10px] sm:text-[11px] text-slate-500 flex items-center justify-between font-medium group-hover:text-slate-400 transition-colors pt-0.5 border-t border-slate-800/60">
                         <span>Details</span>
                         <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                       </div>
@@ -725,30 +647,69 @@ export const MarketplacePage: React.FC = () => {
           </div>
         )}
 
-        {/* 5. Custom Tech Sourcing Service Footer Banner (Rendered ONLY when published products exist) */}
+        {/* =========================================================
+            4. COMPACT WHATSAPP CHANNEL PROMOTION
+               (Demoted after products so it does not block discovery)
+            ========================================================= */}
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-[#091813] via-[#091512] to-[#0a1b14] border border-[#00c365]/30 shadow-md">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 text-left">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#00c365]/15 border border-[#00c365]/40 flex items-center justify-center text-[#00c365] shrink-0 shadow-inner">
+                <Radio className="w-4 h-4 sm:w-5 sm:h-5 text-[#00c365] animate-pulse" />
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-extrabold text-xs sm:text-base text-white tracking-tight">
+                    Stay in the Mystery Hub Loop
+                  </h4>
+                  <span className="text-[9px] uppercase font-bold text-[#00c365] bg-[#00c365]/15 border border-[#00c365]/30 px-1.5 py-0.2 rounded-full hidden sm:inline">
+                    Official Channel
+                  </span>
+                </div>
+                <p className="text-[11px] sm:text-xs text-slate-300 leading-snug">
+                  Price drops, new product finds, and sourcing updates on WhatsApp.
+                </p>
+              </div>
+            </div>
+
+            <a
+              href={BUSINESS_CONFIG.contact.whatsappChannelUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full sm:w-auto px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md shadow-[#00c365]/20 shrink-0 cursor-pointer active:scale-95"
+            >
+              <span>Follow Channel</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
+
+        {/* =========================================================
+            5. CUSTOM TECH SOURCING SERVICE FOOTER BANNER
+            ========================================================= */}
         {!loading && !error && products.length > 0 && (
-          <div className="rounded-3xl bg-gradient-to-br from-[#0e161c] via-[#091014] to-[#070b0e] border border-slate-800 p-5 sm:p-7 space-y-3.5">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
-              <div className="space-y-1.5 max-w-2xl">
-                <span className="text-xs font-bold text-[#00c365] uppercase tracking-wider">
+          <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#0e161c] via-[#091014] to-[#070b0e] border border-slate-800 p-4 sm:p-6 space-y-3">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+              <div className="space-y-1 max-w-2xl text-left">
+                <span className="text-[10px] sm:text-xs font-bold text-[#00c365] uppercase tracking-wider">
                   Custom Tech Sourcing Service
                 </span>
-                <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                <h3 className="text-base sm:text-xl font-bold text-white tracking-tight">
                   Need Specific Hardware or Software Not Listed Above?
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Whether you need specialized developer workstations, studio podcast microphones, or business software setups, Mystery Hub&apos;s sourcing desk will locate genuine models for you at competitive local rates.
+                  Whether you need developer laptops, studio microphones, or software licenses, Mystery Hub&apos;s sourcing desk will locate genuine models for you at competitive local rates.
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto shrink-0">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto shrink-0">
                 <a
                   href={BUSINESS_CONFIG.getGeneralWhatsAppUrl(
                     'Hello Mystery Hub team, I have a custom hardware or software sourcing request.'
                   )}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-5 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95"
+                  className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95"
                 >
                   <MessageSquare className="w-4 h-4" />
                   <span>WhatsApp Sourcing Desk</span>
@@ -756,7 +717,7 @@ export const MarketplacePage: React.FC = () => {
 
                 <a
                   href={BUSINESS_CONFIG.contact.phoneLink}
-                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs border border-slate-700 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs border border-slate-700 transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Phone className="w-4 h-4 text-amber-400" />
                   <span>Call: 0592066298</span>
@@ -767,9 +728,9 @@ export const MarketplacePage: React.FC = () => {
         )}
       </div>
 
-      {/* ========================================================================= */}
-      {/* 6. PRODUCT DETAIL MODAL / SHEET (DRILL-DOWN EXPERIENCE)                   */}
-      {/* ========================================================================= */}
+      {/* =========================================================
+          6. PRODUCT DETAIL MODAL / SHEET (DRILL-DOWN EXPERIENCE)
+          ========================================================= */}
       {selectedProduct && (
         <MarketplaceProductDetailModal
           product={selectedProduct}
@@ -787,9 +748,9 @@ export const MarketplacePage: React.FC = () => {
         />
       )}
 
-      {/* ========================================================================= */}
-      {/* 7. SHARE & EARN MODAL (GUEST OR AUTHENTICATED)                            */}
-      {/* ========================================================================= */}
+      {/* =========================================================
+          7. SHARE & EARN MODAL (GUEST OR AUTHENTICATED)
+          ========================================================= */}
       {shareModalProduct && (
         <div
           className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
@@ -987,9 +948,9 @@ export const MarketplacePage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 8. BUY NOW CHECKOUT MODAL                                                 */}
-      {/* ========================================================================= */}
+      {/* =========================================================
+          8. BUY NOW CHECKOUT MODAL
+          ========================================================= */}
       {checkoutProduct && (
         <MarketplaceCheckoutModal
           product={checkoutProduct}
