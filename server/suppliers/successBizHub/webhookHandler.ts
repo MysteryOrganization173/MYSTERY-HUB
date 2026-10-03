@@ -69,12 +69,16 @@ export class SuccessBizHubWebhookHandler {
           return;
         }
       } else if (process.env.NODE_ENV === 'production' && !secret) {
-        console.warn('[SBH Webhook] SUCCESS_BIZ_HUB_WEBHOOK_SECRET is not configured in production.');
+        console.error('[SBH Webhook] Configuration error: SUCCESS_BIZ_HUB_WEBHOOK_SECRET is required in production. Event rejected.');
+        res.status(503).json({ error: 'Supplier webhook verification is not configured.' });
+        return;
       }
 
       const payload = (req.body || {}) as SbhWebhookPayload;
       const eventType = payload.event;
-      const eventId = payload.event_id || payload.eventId || payload.id;
+      // Hash the authenticated body when the supplier omits an event ID.
+      const eventId = payload.event_id || payload.eventId || payload.id
+        || `body_${crypto.createHash('sha256').update(rawBody).digest('hex')}`;
 
       // Webhook test ping
       if (eventType === 'webhook.test') {
@@ -90,16 +94,6 @@ export class SuccessBizHubWebhookHandler {
         );
         res.status(200).json({ status: 'success', message: 'Balance low logged.' });
         return;
-      }
-
-      // Check idempotency for event
-      if (eventId) {
-        const isNewEvent = await OrdersStore.recordSupplierWebhookEvent(eventId, eventType, payload);
-        if (!isNewEvent) {
-          console.info(`[SBH Webhook] Duplicate event ${eventId} ignored.`);
-          res.status(200).json({ status: 'success', message: 'Duplicate event acknowledged.' });
-          return;
-        }
       }
 
       // Extract order items (supports single or grouped/bulk payloads)
@@ -135,16 +129,14 @@ export class SuccessBizHubWebhookHandler {
       }
 
       const provider = FulfilmentService.getProvider();
+      const updates: Array<{ supplierOrderId: string; status: OrderStatus; failureReason?: string; response: string }> = [];
 
       // Process each order item
       for (const item of orderItems) {
         const supplierOrderId = item.publicId || item.orderId || item.id;
-        if (!supplierOrderId) continue;
-
-        const order = await OrdersStore.findOrderBySupplierOrderId(supplierOrderId);
-        if (!order) {
-          console.warn(`[SBH Webhook] No matching Mystery Hub order found for supplier ID: ${supplierOrderId}`);
-          continue;
+        if (!supplierOrderId) {
+          res.status(400).json({ error: 'Supplier order identifier is required.' });
+          return;
         }
 
         const supplierStatus = provider.mapSupplierStatus(item.status);
@@ -157,29 +149,13 @@ export class SuccessBizHubWebhookHandler {
             ? 'processing'
             : 'submitted';
 
-        // Do not regress terminal delivered status
-        if (order.status === 'delivered' && mappedStatus !== 'delivered') {
-          continue;
-        }
-
-        await OrdersStore.updateOrderStatus(
-          order.id,
-          mappedStatus,
-          item.failureReason,
-          supplierOrderId,
-          JSON.stringify(item)
-        );
-
-        console.info(
-          `[SBH Webhook] Updated order ${order.public_reference} status: ${order.status} -> ${mappedStatus} (Supplier status: ${item.status})`
-        );
+        updates.push({ supplierOrderId, status: mappedStatus, failureReason: item.failureReason, response: JSON.stringify(item) });
       }
-
-      res.status(200).json({ status: 'success' });
-    } catch (err) {
-      console.error('[SBH Webhook] Exception processing webhook:', err);
-      // Webhooks must return 200 promptly to avoid aggressive retries
-      res.status(200).json({ status: 'error_logged' });
+      const processed = await OrdersStore.processSupplierWebhookEvent(eventId, eventType, payload, updates);
+      res.status(200).json({ status: 'success', ...(processed ? {} : { message: 'Duplicate event acknowledged.' }) });
+    } catch {
+      console.error('[SBH Webhook] Event processing failed. Completion was not recorded; supplier retry is required.');
+      res.status(503).json({ error: 'Supplier webhook processing failed. Please retry.' });
     }
   }
 }

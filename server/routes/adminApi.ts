@@ -299,7 +299,8 @@ adminRouter.patch('/orders/:reference/status', async (req: Request, res: Respons
     if (order.service_type === 'marketplace' || marketplaceStatus) {
       updated = await OrdersStore.updateMarketplaceStatus(order.id, targetStatus, adminNote);
     } else {
-      updated = await OrdersStore.updateOrderStatus(order.id, targetStatus, adminNote);
+      updated = await OrdersStore.updateOrderStatus(order.id, targetStatus, adminNote, undefined, undefined,
+        { explicitReversal: ['refund_pending', 'refunded', 'cancelled', 'failed'].includes(targetStatus) });
     }
 
     if (!updated) {
@@ -739,6 +740,7 @@ adminRouter.get('/system', async (_req: Request, res: Response) => {
 
     // 5. Authoritative fulfilment state from SuccessBizHubClient
     const fulfilmentEnabled = provider.client.isFulfillmentEnabled();
+    const uncertainSubmissionCount = await OrdersStore.getUncertainSupplierSubmissionCount();
 
     res.json({
       success: true,
@@ -770,6 +772,7 @@ adminRouter.get('/system', async (_req: Request, res: Response) => {
           fulfilmentPipeline: {
             status: fulfilmentEnabled ? 'enabled' : 'disabled',
             autoDispatch: fulfilmentEnabled && !isPaystackTestMode,
+            uncertainSubmissionCount,
           },
         },
       },

@@ -24,6 +24,8 @@ export interface PaystackInitializeResult {
 }
 
 export interface PaystackVerifyResult {
+  reference?: string;
+  isSimulated?: boolean;
   isVerified: boolean;
   status: 'success' | 'failed' | 'abandoned' | 'pending' | 'unknown';
   amountPesewas: number;
@@ -141,6 +143,8 @@ export class PaystackServerService {
         return {
           isVerified: true,
           status: 'success',
+          reference,
+          isSimulated: true,
           amountPesewas: 0, // Checked against saved order in verify route
           currency: 'GHS',
           gatewayResponse: 'Simulated dev payment verified',
@@ -167,6 +171,7 @@ export class PaystackServerService {
           customer?: { email: string };
           gateway_response?: string;
           paid_at?: string;
+          reference?: string;
         };
       };
 
@@ -185,6 +190,7 @@ export class PaystackServerService {
 
       return {
         isVerified: isSuccess,
+        reference: tx.reference,
         status: isSuccess ? 'success' : (tx.status as PaystackVerifyResult['status']),
         amountPesewas: tx.amount,
         currency: tx.currency,

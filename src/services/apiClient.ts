@@ -510,7 +510,7 @@ export interface AdminSystemStatus {
       lowBalanceThresholdGhc: number;
     };
     geminiAi: { status: string; model: string };
-    fulfilmentPipeline: { status: string; autoDispatch: boolean };
+    fulfilmentPipeline: { status: string; autoDispatch: boolean; uncertainSubmissionCount?: number };
   };
 }
 

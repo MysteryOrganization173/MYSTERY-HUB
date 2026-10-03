@@ -293,6 +293,12 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
           <p className="text-xs text-slate-400">
             Safety kill-switch prevents live dispatches when Paystack is in test mode.
           </p>
+          {(components.fulfilmentPipeline.uncertainSubmissionCount || 0) > 0 && (
+            <p className="text-xs text-amber-300">
+              {components.fulfilmentPipeline.uncertainSubmissionCount} uncertain supplier submission(s) require manual review.
+              Check Orders → Needs Attention before taking any purchase action.
+            </p>
+          )}
           <div className="pt-2 border-t border-slate-800/60 text-[11px] text-slate-500">
             Kill-switch configured via SUCCESS_BIZ_HUB_FULFILLMENT_ENABLED.
           </div>

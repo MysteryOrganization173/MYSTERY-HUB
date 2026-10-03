@@ -14,6 +14,9 @@ import {
 import { PaystackServerService } from '../services/paystackService.js';
 import { FulfilmentService } from '../services/fulfilmentService.js';
 import { ReferralService } from '../services/referralService.js';
+import type { PoolClient } from 'pg';
+import { validateOrderPayment } from '../services/paymentValidation.js';
+import { canAdvanceOrderStatus } from '../services/orderTransitions.js';
 
 // In-memory fallback repository for development when DATABASE_URL is omitted
 const devMemoryStore = new Map<string, OrderRecord>();
@@ -370,6 +373,13 @@ export class OrdersStore {
     const existing = await this.findOrder(orderId);
     if (!existing) return null;
 
+    const stages = ['pending_payment', 'paid', 'awaiting_fulfilment', 'ready_for_pickup', 'out_for_delivery', 'completed'];
+    const currentStage = stages.indexOf(existing.marketplace_status || 'pending_payment');
+    const nextStage = stages.indexOf(mktStatus);
+    const explicitReversal = ['cancelled', 'refund_pending', 'refunded'].includes(mktStatus);
+    if (!explicitReversal && (currentStage < 0 || nextStage < currentStage)) return existing;
+    if (existing.status === 'refunded' || (existing.status === 'delivered' && !explicitReversal)) return existing;
+
     const nowIso = new Date().toISOString();
     let globalStatus: OrderStatus = existing.status;
 
@@ -397,18 +407,25 @@ export class OrdersStore {
       const query = `
         UPDATE orders
         SET status = $1, marketplace_status = $2, admin_note = $3, updated_at = $4, delivered_at = $5
-        WHERE id = $6
+        WHERE id = $6 AND status = $7 AND marketplace_status IS NOT DISTINCT FROM $8
         RETURNING *;
       `;
-      await pool.query(query, [
+      const result = await pool.query<OrderRecord>(query, [
         updated.status,
         updated.marketplace_status,
         updated.admin_note,
         updated.updated_at,
         updated.delivered_at,
         existing.id,
+        existing.status,
+        existing.marketplace_status || null,
       ]);
+      if (!result.rows[0]) return this.updateMarketplaceStatus(orderId, mktStatus, adminNote);
     } else {
+      const current = devMemoryStore.get(existing.id);
+      if (current?.status !== existing.status || current?.marketplace_status !== existing.marketplace_status) {
+        return this.updateMarketplaceStatus(orderId, mktStatus, adminNote);
+      }
       devMemoryStore.set(existing.id, updated);
       devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
       devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
@@ -656,6 +673,12 @@ export class OrdersStore {
           const txRes = await PaystackServerService.verifyTransaction(order.payment_reference);
 
           if (txRes.status === 'success') {
+            const validationError = validateOrderPayment(order, txRes);
+            if (validationError) {
+              console.warn(`[Stale Reconciler] Rejected payment for ${order.public_reference}: ${validationError}`);
+              unresolvedCount++;
+              continue;
+            }
             await FulfilmentService.processPaidOrder(
               order.payment_reference,
               txRes.paidAt || new Date().toISOString(),
@@ -691,7 +714,7 @@ export class OrdersStore {
     if (pool) {
       const query = `
         SELECT * FROM orders
-        WHERE status IN ('submitted', 'processing')
+        WHERE (status IN ('submitted', 'processing') OR (status = 'queued' AND failure_reason = 'supplier_submission_uncertain'))
           AND supplier_order_id IS NOT NULL
           AND service_type IN ('data', 'airtime', 'instant_bundle')
         ORDER BY created_at DESC
@@ -706,7 +729,8 @@ export class OrdersStore {
       return all
         .filter(
           (o) =>
-            (o.status === 'submitted' || o.status === 'processing') &&
+            (o.status === 'submitted' || o.status === 'processing' ||
+              (o.status === 'queued' && o.failure_reason === 'supplier_submission_uncertain')) &&
             Boolean(o.supplier_order_id) &&
             ['data', 'airtime', 'instant_bundle'].includes(o.service_type || '')
         )
@@ -808,15 +832,15 @@ export class OrdersStore {
   /**
    * Find order by public_reference or payment_reference or id
    */
-  static async findOrder(ref: string): Promise<OrderRecord | null> {
+  static async findOrder(ref: string, client?: PoolClient): Promise<OrderRecord | null> {
     if (!ref) return null;
 
-    const pool = getPool();
+    const pool = client || getPool();
     if (pool) {
       const query = `
         SELECT * FROM orders
         WHERE public_reference = $1 OR payment_reference = $1 OR id = $1
-        LIMIT 1;
+        LIMIT 1 ${client ? 'FOR UPDATE' : ''};
       `;
       const result = await pool.query(query, [ref]);
       if (result.rows.length > 0) {
@@ -834,15 +858,15 @@ export class OrdersStore {
   /**
    * Find order by supplier_order_id
    */
-  static async findOrderBySupplierOrderId(supplierOrderId: string): Promise<OrderRecord | null> {
+  static async findOrderBySupplierOrderId(supplierOrderId: string, client?: PoolClient): Promise<OrderRecord | null> {
     if (!supplierOrderId) return null;
 
-    const pool = getPool();
+    const pool = client || getPool();
     if (pool) {
       const query = `
         SELECT * FROM orders
         WHERE supplier_order_id = $1
-        LIMIT 1;
+        LIMIT 1 ${client ? 'FOR UPDATE' : ''};
       `;
       const result = await pool.query(query, [supplierOrderId]);
       if (result.rows.length > 0) {
@@ -905,47 +929,44 @@ export class OrdersStore {
     paidAtIso: string,
     supplierQueueNotice?: string
   ): Promise<{ order: OrderRecord | null; alreadyPaid: boolean }> {
-    const existing = await this.findOrder(paymentReference);
-    if (!existing) {
-      return { order: null, alreadyPaid: false };
-    }
-
-    if (existing.status !== 'pending_payment' && existing.payment_status === 'success') {
-      return { order: existing, alreadyPaid: true };
-    }
-
-    const updatedStatus: OrderStatus = 'paid';
-    const updatedOrder: OrderRecord = {
-      ...existing,
-      status: updatedStatus,
-      payment_status: 'success',
-      paid_at: paidAtIso,
-      updated_at: new Date().toISOString(),
-      supplier_response: supplierQueueNotice || existing.supplier_response,
-    };
-
     const pool = getPool();
     if (pool) {
-      const query = `
-        UPDATE orders
-        SET status = $1, payment_status = $2, paid_at = $3, updated_at = $4, supplier_response = $5
-        WHERE id = $6;
-      `;
-      await pool.query(query, [
-        updatedOrder.status,
-        updatedOrder.payment_status,
-        updatedOrder.paid_at,
-        updatedOrder.updated_at,
-        updatedOrder.supplier_response,
-        existing.id,
-      ]);
-    } else {
+      // The predicate is evaluated by PostgreSQL while locking the current row.
+      // A duplicate confirmation cannot reset queued/submitted/terminal state.
+      const result = await pool.query<OrderRecord>(`
+        UPDATE orders SET status = CASE WHEN status = 'pending_payment' THEN 'paid' ELSE status END,
+          manual_review = CASE WHEN status IN ('cancelled', 'expired') THEN TRUE ELSE manual_review END,
+          payment_status = 'success',
+          paid_at = $2, updated_at = $3, supplier_response = COALESCE($4, supplier_response)
+        WHERE payment_reference = $1 AND status IN ('pending_payment', 'cancelled', 'expired')
+          AND payment_status IN ('pending', 'cancelled', 'expired')
+        RETURNING *;
+      `, [paymentReference, paidAtIso, new Date().toISOString(), supplierQueueNotice || null]);
+      if (result.rows[0]) return { order: result.rows[0], alreadyPaid: false };
+      const current = await this.findOrder(paymentReference);
+      return { order: current, alreadyPaid: current?.payment_status === 'success' };
+    }
+    const release = await acquireLock(`payment:${paymentReference}`);
+    try {
+      const existing = await this.findOrder(paymentReference);
+      if (!existing) return { order: null, alreadyPaid: false };
+      if (!['pending_payment', 'cancelled', 'expired'].includes(existing.status)
+        || !['pending', 'cancelled', 'expired'].includes(existing.payment_status)) {
+        return { order: existing, alreadyPaid: existing.payment_status === 'success' };
+      }
+      const updatedOrder: OrderRecord = {
+        ...existing, status: existing.status === 'pending_payment' ? 'paid' : existing.status,
+        manual_review: existing.status === 'pending_payment' ? existing.manual_review : true,
+        payment_status: 'success', paid_at: paidAtIso,
+        updated_at: new Date().toISOString(), supplier_response: supplierQueueNotice || existing.supplier_response,
+      };
       devMemoryStore.set(existing.id, updatedOrder);
       devMemoryStore.set(`payref:${existing.payment_reference}`, updatedOrder);
       devMemoryStore.set(`pubref:${existing.public_reference}`, updatedOrder);
+      return { order: updatedOrder, alreadyPaid: false };
+    } finally {
+      release();
     }
-
-    return { order: updatedOrder, alreadyPaid: false };
   }
 
   /**
@@ -962,7 +983,7 @@ export class OrdersStore {
       const query = `
         UPDATE orders
         SET status = 'queued', updated_at = $1
-        WHERE id = $2 AND status = 'paid'
+        WHERE id = $2 AND status = 'paid' AND payment_status = 'success'
         RETURNING *;
       `;
       const result = await pool.query(query, [nowIso, orderId]);
@@ -971,19 +992,24 @@ export class OrdersStore {
       }
       return null;
     } else {
-      const existing = await this.findOrder(orderId);
-      if (!existing || existing.status !== 'paid') {
-        return null;
+      const release = await acquireLock(`claim:${orderId}`);
+      try {
+        const existing = await this.findOrder(orderId);
+        if (!existing || existing.status !== 'paid' || existing.payment_status !== 'success') {
+          return null;
+        }
+        const updated: OrderRecord = {
+          ...existing,
+          status: 'queued',
+          updated_at: nowIso,
+        };
+        devMemoryStore.set(existing.id, updated);
+        devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
+        devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
+        return updated;
+      } finally {
+        release();
       }
-      const updated: OrderRecord = {
-        ...existing,
-        status: 'queued',
-        updated_at: nowIso,
-      };
-      devMemoryStore.set(existing.id, updated);
-      devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
-      devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
-      return updated;
     }
   }
 
@@ -1016,6 +1042,8 @@ export class OrdersStore {
       failure_reason: null,
     };
 
+    if (!canAdvanceOrderStatus(existing.status, submittedStatus)) return existing;
+
     const pool = getPool();
     if (pool) {
       const query = `
@@ -1023,9 +1051,10 @@ export class OrdersStore {
         SET status = $1, supplier_provider = $2, supplier_order_id = $3,
             supplier_cost_minor = $4, supplier_offer_ref = $5, supplier_response = $6,
             submitted_at = $7, updated_at = $8, supplier_last_checked_at = $9, failure_reason = NULL
-        WHERE id = $10;
+        WHERE id = $10 AND status = $11
+        RETURNING *;
       `;
-      await pool.query(query, [
+      const result = await pool.query<OrderRecord>(query, [
         updated.status,
         updated.supplier_provider,
         updated.supplier_order_id,
@@ -1036,8 +1065,13 @@ export class OrdersStore {
         updated.updated_at,
         updated.supplier_last_checked_at,
         existing.id,
+        existing.status,
       ]);
+      if (!result.rows[0]) return this.saveSupplierSubmission(orderId, supplierOrderId, supplierCostMinor, supplierOfferRef, submittedStatus, rawSupplierResponse);
     } else {
+      if (devMemoryStore.get(existing.id)?.status !== existing.status) {
+        return this.saveSupplierSubmission(orderId, supplierOrderId, supplierCostMinor, supplierOfferRef, submittedStatus, rawSupplierResponse);
+      }
       devMemoryStore.set(existing.id, updated);
       devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
       devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
@@ -1066,15 +1100,18 @@ export class OrdersStore {
   ): Promise<OrderRecord | null> {
     const existing = await this.findOrder(orderId);
     if (!existing) return null;
+    if (!['paid', 'queued', 'submitted', 'processing'].includes(existing.status)) return existing;
 
     const nowIso = new Date().toISOString();
     const updated: OrderRecord = {
       ...existing,
       supplier_provider: 'success_biz_hub',
       failure_reason: 'supplier_submission_uncertain',
+      manual_review: true,
       supplier_response: JSON.stringify({
         reason: uncertaintyReason,
-        error: rawErrorDetails,
+        // Never persist an arbitrary provider error containing credentials/request details.
+        isTimeout: true,
         timestamp: nowIso,
       }),
       updated_at: nowIso,
@@ -1084,17 +1121,21 @@ export class OrdersStore {
     if (pool) {
       const query = `
         UPDATE orders
-        SET supplier_provider = $1, failure_reason = $2, supplier_response = $3, updated_at = $4
-        WHERE id = $5;
+        SET supplier_provider = $1, failure_reason = $2, supplier_response = $3, updated_at = $4, manual_review = TRUE
+        WHERE id = $5 AND status = $6
+        RETURNING *;
       `;
-      await pool.query(query, [
+      const result = await pool.query<OrderRecord>(query, [
         updated.supplier_provider,
         updated.failure_reason,
         updated.supplier_response,
         updated.updated_at,
         existing.id,
+        existing.status,
       ]);
+      if (!result.rows[0]) return this.saveSupplierUncertainSubmission(orderId, uncertaintyReason);
     } else {
+      if (devMemoryStore.get(existing.id)?.status !== existing.status) return this.saveSupplierUncertainSubmission(orderId, uncertaintyReason);
       devMemoryStore.set(existing.id, updated);
       devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
       devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
@@ -1110,12 +1151,13 @@ export class OrdersStore {
   static async recordSupplierWebhookEvent(
     eventId: string,
     eventType: string,
-    payload?: unknown
+    payload?: unknown,
+    client?: PoolClient
   ): Promise<boolean> {
     if (!eventId) return true; // Can't deduplicate without ID
 
     const nowIso = new Date().toISOString();
-    const pool = getPool();
+    const pool = client || getPool();
 
     if (pool) {
       try {
@@ -1128,9 +1170,8 @@ export class OrdersStore {
         const payloadStr = payload ? JSON.stringify(payload) : null;
         const result = await pool.query(query, [eventId, eventType, payloadStr, nowIso]);
         return result.rows.length > 0;
-      } catch (err) {
-        console.warn('Error recording supplier webhook event:', err);
-        return false;
+      } catch {
+        throw new Error('Failed to persist supplier webhook completion.');
       }
     } else {
       if (devWebhookEventsStore.has(eventId)) {
@@ -1141,18 +1182,86 @@ export class OrdersStore {
     }
   }
 
-  /**
-   * Update arbitrary order status or failure reason safely
-   */
+  /** Atomically apply a supplier event and mark it complete, using the existing event table. */
+  static async processSupplierWebhookEvent(
+    eventId: string,
+    eventType: string,
+    payload: unknown,
+    updates: Array<{ supplierOrderId: string; status: OrderStatus; failureReason?: string; response: string }>
+  ): Promise<boolean> {
+    const pool = getPool();
+    const client = pool ? await pool.connect() : undefined;
+    const release = client ? undefined : await acquireLock(`webhook:${eventId}`);
+    const afterCommit: Array<() => Promise<void>> = [];
+    try {
+      if (client) {
+        await client.query('BEGIN');
+        // Serializes the same event across processes; order locks also protect different events.
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0));', [`supplier-event:${eventId}`]);
+        const existing = await client.query('SELECT event_id FROM supplier_webhook_events WHERE event_id = $1;', [eventId]);
+        if (existing.rows.length) {
+          await client.query('COMMIT');
+          return false;
+        }
+      } else if (devWebhookEventsStore.has(eventId)) {
+        return false;
+      }
+
+      // Stable lock order avoids deadlocks between grouped events with overlapping orders.
+      for (const update of [...updates].sort((a, b) => a.supplierOrderId.localeCompare(b.supplierOrderId))) {
+        const order = await this.findOrderBySupplierOrderId(update.supplierOrderId, client);
+        // The webhook may precede persistence of the supplier ID. Let the provider retry.
+        if (!order) throw new Error('Supplier webhook order is not yet available.');
+        const updated = await this.updateOrderStatus(order.id, update.status, update.failureReason,
+          update.supplierOrderId, update.response, { client, afterCommit });
+        if (!updated) throw new Error('Supplier webhook order update failed.');
+      }
+      await this.recordSupplierWebhookEvent(eventId, eventType, payload, client);
+      if (client) await client.query('COMMIT');
+    } catch (err) {
+      if (client) await client.query('ROLLBACK');
+      // Memory fallback can retain completed items; monotonic transitions make retries safe.
+      // Run effects for those items even when a later item failed.
+      if (!client) for (const effect of afterCommit) await effect();
+      throw err;
+    } finally {
+      client?.release();
+      release?.();
+    }
+    for (const effect of afterCommit) await effect();
+    return true;
+  }
+
+  static async getUncertainSupplierSubmissionCount(): Promise<number> {
+    const pool = getPool();
+    if (pool) {
+      const result = await pool.query<{ count: string }>(`
+        SELECT COUNT(*) AS count FROM orders WHERE failure_reason = 'supplier_submission_uncertain'
+          AND status IN ('paid', 'queued', 'submitted', 'processing');
+      `);
+      return Number(result.rows[0]?.count || 0);
+    }
+    return new Set([...devMemoryStore.values()].filter(o => o.failure_reason === 'supplier_submission_uncertain'
+      && ['paid', 'queued', 'submitted', 'processing'].includes(o.status)).map(o => o.id)).size;
+  }
+
+  /** Update order status with an atomic compare-and-set and forward transition guard. */
   static async updateOrderStatus(
     orderId: string,
     status: OrderStatus,
     failureReason?: string,
     supplierOrderId?: string,
-    supplierResponse?: string
+    supplierResponse?: string,
+    options: { client?: PoolClient; explicitReversal?: boolean; afterCommit?: Array<() => Promise<void>> } = {}
   ): Promise<OrderRecord | null> {
-    const existing = await this.findOrder(orderId);
+    const existing = await this.findOrder(orderId, options.client);
     if (!existing) return null;
+    const sameStateMetadataChange = existing.status === status && (
+      (failureReason !== undefined && failureReason !== existing.failure_reason) ||
+      (supplierOrderId !== undefined && supplierOrderId !== existing.supplier_order_id) ||
+      (supplierResponse !== undefined && supplierResponse !== existing.supplier_response)
+    );
+    if (!sameStateMetadataChange && !canAdvanceOrderStatus(existing.status, status, options.explicitReversal)) return existing;
 
     const nowIso = new Date().toISOString();
     const updated: OrderRecord = {
@@ -1166,16 +1275,17 @@ export class OrdersStore {
       supplier_last_checked_at: nowIso,
     };
 
-    const pool = getPool();
+    const pool = options.client || getPool();
     if (pool) {
       const query = `
         UPDATE orders
         SET status = $1, failure_reason = $2, supplier_order_id = $3,
             supplier_response = $4, delivered_at = $5, updated_at = $6,
             supplier_last_checked_at = $7
-        WHERE id = $8;
+        WHERE id = $8 AND status = $9
+        RETURNING *;
       `;
-      await pool.query(query, [
+      const result = await pool.query<OrderRecord>(query, [
         updated.status,
         updated.failure_reason,
         updated.supplier_order_id,
@@ -1184,33 +1294,42 @@ export class OrdersStore {
         updated.updated_at,
         updated.supplier_last_checked_at,
         existing.id,
+        existing.status,
       ]);
+      if (!result.rows[0]) return this.updateOrderStatus(orderId, status, failureReason, supplierOrderId, supplierResponse, options);
     } else {
+      if (devMemoryStore.get(existing.id)?.status !== existing.status) {
+        return this.updateOrderStatus(orderId, status, failureReason, supplierOrderId, supplierResponse, options);
+      }
       devMemoryStore.set(existing.id, updated);
       devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
       devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
     }
 
-    // Mystery Earn: Trigger reward ledger generation on delivery
-    if (updated.status === 'delivered' && existing.status !== 'delivered') {
-      try {
-        await ReferralService.processOrderReward(updated);
-      } catch (err) {
-        console.warn('[OrdersStore] Failed to process referral reward on status delivery:', err);
+    const rewardEffect = async () => {
+      // Preserve existing reward effects, but execute webhook effects only after commit.
+      if (updated.status === 'delivered' && existing.status !== 'delivered') {
+        try {
+          await ReferralService.processOrderReward(updated);
+        } catch (err) {
+          console.warn('[OrdersStore] Failed to process referral reward on status delivery:', err);
+        }
+      } else if (
+        existing.status === 'delivered' &&
+        ['failed', 'refund_pending', 'refunded', 'cancelled'].includes(status)
+      ) {
+        try {
+          await ReferralService.reverseOrderRewards(
+            orderId,
+            failureReason || 'Order status transitioned from delivered to non-delivered'
+          );
+        } catch (err) {
+          console.warn('[OrdersStore] Failed to reverse referral reward:', err);
+        }
       }
-    } else if (
-      existing.status === 'delivered' &&
-      ['failed', 'refund_pending', 'refunded', 'cancelled'].includes(status)
-    ) {
-      try {
-        await ReferralService.reverseOrderRewards(
-          orderId,
-          failureReason || 'Order status transitioned from delivered to non-delivered'
-        );
-      } catch (err) {
-        console.warn('[OrdersStore] Failed to reverse referral reward:', err);
-      }
-    }
+    };
+    if (options.afterCommit) options.afterCommit.push(rewardEffect);
+    else await rewardEffect();
 
     return updated;
   }
@@ -1351,7 +1470,7 @@ export class OrdersStore {
       }
 
       if (params.status === 'needs_attention') {
-        conditions.push(`(manual_review = TRUE OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%'))`);
+        conditions.push(`(manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%'))`);
       } else if (params.status === 'abandoned') {
         conditions.push(`status IN ('cancelled', 'expired')`);
       } else if (params.status === 'all') {
@@ -1438,6 +1557,7 @@ export class OrdersStore {
       all = all.filter(
         (o) =>
           (Boolean(o.manual_review) ||
+            (o.failure_reason === 'supplier_submission_uncertain' && ['paid', 'queued', 'submitted', 'processing'].includes(o.status)) ||
             o.status === 'refund_pending' ||
             (o.payment_status === 'success' && o.status === 'failed')) &&
           (!o.failure_reason || (!o.failure_reason.toLowerCase().startsWith('prelaunch') && !o.failure_reason.toLowerCase().startsWith('pre-launch')))
@@ -1523,14 +1643,14 @@ export class OrdersStore {
           COUNT(CASE WHEN payment_status = 'success' THEN 1 END) as total_orders,
           COALESCE(SUM(CASE WHEN payment_status = 'success' THEN amount ELSE 0 END), 0) as total_revenue,
           COALESCE(SUM(CASE WHEN payment_status = 'success' AND (supplier_order_id IS NOT NULL OR submitted_at IS NOT NULL OR status IN ('submitted', 'processing', 'delivered', 'refund_pending', 'refunded')) THEN supplier_cost_minor ELSE 0 END), 0) as total_cost,
-          COUNT(CASE WHEN (manual_review = TRUE OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%')) THEN 1 END) as manual_reviews,
+          COUNT(CASE WHEN (manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%')) THEN 1 END) as manual_reviews,
           
           -- Today
           COUNT(CASE WHEN created_at >= $1 AND payment_status = 'success' THEN 1 END) as today_orders,
           COALESCE(SUM(CASE WHEN created_at >= $1 AND payment_status = 'success' THEN amount ELSE 0 END), 0) as today_revenue,
           COUNT(CASE WHEN created_at >= $1 AND status = 'delivered' THEN 1 END) as today_delivered,
           COUNT(CASE WHEN created_at >= $1 AND status IN ('processing', 'submitted', 'queued') THEN 1 END) as today_processing,
-          COUNT(CASE WHEN created_at >= $1 AND (manual_review = TRUE OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%')) THEN 1 END) as today_attention,
+          COUNT(CASE WHEN created_at >= $1 AND (manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%')) THEN 1 END) as today_attention,
 
           -- Last 7 Days
           COUNT(CASE WHEN created_at >= $2 AND payment_status = 'success' THEN 1 END) as last7_orders,
@@ -1592,6 +1712,7 @@ export class OrdersStore {
 
     const isActionableAttention = (o: OrderRecord) =>
       (Boolean(o.manual_review) ||
+        (o.failure_reason === 'supplier_submission_uncertain' && ['paid', 'queued', 'submitted', 'processing'].includes(o.status)) ||
         o.status === 'refund_pending' ||
         (o.payment_status === 'success' && o.status === 'failed')) &&
       (!o.failure_reason || (!o.failure_reason.toLowerCase().startsWith('prelaunch') && !o.failure_reason.toLowerCase().startsWith('pre-launch')));

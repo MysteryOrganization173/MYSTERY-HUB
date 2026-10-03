@@ -28,6 +28,7 @@ import { requireAuth, optionalAuth } from '../middleware/authMiddleware.js';
 import { loginRateLimiter, signupRateLimiter, waitlistRateLimiter } from '../middleware/rateLimiter.js';
 import { PaystackServerService } from '../services/paystackService.js';
 import { FulfilmentService } from '../services/fulfilmentService.js';
+import { validateOrderPayment } from '../services/paymentValidation.js';
 import { SuccessBizHubWebhookHandler } from '../suppliers/successBizHub/webhookHandler.js';
 import { websiteRouter, handlePublicSiteBySlug } from './websiteApi.js';
 import {
@@ -943,23 +944,10 @@ apiRouter.get('/payments/verify/:reference', async (req: Request, res: Response)
     const verifyResult = await PaystackServerService.verifyTransaction(order.payment_reference);
 
     if (verifyResult.isVerified) {
-      // 1. Validate currency requirement: must be GHS
-      if (!verifyResult.currency || verifyResult.currency.toUpperCase() !== 'GHS') {
-        console.warn(
-          `Payment currency mismatch! Expected GHS, received ${verifyResult.currency || 'UNKNOWN'} for order ${order.public_reference}`
-        );
-        await OrdersStore.updateOrderStatus(order.id, 'failed', 'Payment currency mismatch detected');
-        res.status(400).json({ error: 'Payment verification failed due to currency mismatch.' });
-        return;
-      }
-
-      // 2. Validate amount match
-      if (verifyResult.amountPesewas > 0 && verifyResult.amountPesewas !== order.amount) {
-        console.warn(
-          `Payment amount mismatch! Expected ${order.amount} pesewas, received ${verifyResult.amountPesewas}`
-        );
-        await OrdersStore.updateOrderStatus(order.id, 'failed', 'Payment amount mismatch detected');
-        res.status(400).json({ error: 'Payment verification failed due to amount mismatch.' });
+      const validationError = validateOrderPayment(order, verifyResult);
+      if (validationError) {
+        console.warn(`[Payment Verify] Rejected payment for ${order.public_reference}: ${validationError}`);
+        res.status(400).json({ error: 'Payment verification did not match the saved order.' });
         return;
       }
 
@@ -1081,14 +1069,18 @@ export async function handlePaystackWebhook(req: Request, res: Response): Promis
         const order = await OrdersStore.findOrder(paymentRef);
         if (order) {
           // Idempotent update & centralized fulfillment
-          if (currency === 'GHS' && amountPesewas === order.amount) {
+          const validationError = validateOrderPayment(order, {
+            isVerified: data.status === 'success', status: data.status,
+            reference: paymentRef, currency, amountPesewas,
+          });
+          if (!validationError) {
             await FulfilmentService.processPaidOrder(
               paymentRef,
               data.paid_at || new Date().toISOString(),
               'Paystack charge.success webhook'
             );
           } else {
-            console.warn(`Webhook amount/currency mismatch for order ${order.public_reference}`);
+            console.warn(`[Paystack Webhook] Rejected payment for ${order.public_reference}: ${validationError}`);
           }
         }
       }

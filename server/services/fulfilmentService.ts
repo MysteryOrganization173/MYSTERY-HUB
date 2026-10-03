@@ -311,7 +311,7 @@ export class FulfilmentService {
       sourceNotice
     );
 
-    if (!paidOrder) {
+    if (!paidOrder || paidOrder.payment_status !== 'success') {
       return { order: null, alreadyHandled: false };
     }
 
@@ -659,7 +659,8 @@ export class FulfilmentService {
    * Can be forced by Admin manual refresh.
    */
   static async refreshOrderStatusIfDue(order: OrderRecord, force = false): Promise<OrderRecord> {
-    if (!order.supplier_order_id || (order.status !== 'submitted' && order.status !== 'processing')) {
+    const uncertainWithId = order.status === 'queued' && order.failure_reason === 'supplier_submission_uncertain';
+    if (!order.supplier_order_id || (order.status !== 'submitted' && order.status !== 'processing' && !uncertainWithId)) {
       return order;
     }
 
