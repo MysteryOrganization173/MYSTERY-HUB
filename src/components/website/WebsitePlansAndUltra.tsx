@@ -17,13 +17,13 @@ import {
 } from 'lucide-react';
 
 const FREE_TIER_ARTWORK =
-  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791053622/ChatGPT_Image_Oct_3_2026_06_52_28_PM-1_exdift.png';
+  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791055733/ChatGPT_Image_Oct_3_2026_06_52_28_PM-1_exdift.png';
 const PLUS_TIER_ARTWORK =
-  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791053622/ChatGPT_Image_Oct_3_2026_06_52_48_PM-3_pznnrh.png';
+  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791055761/ChatGPT_Image_Oct_3_2026_06_52_48_PM-3_pznnrh.png';
 const PRO_TIER_ARTWORK =
-  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791053622/ChatGPT_Image_Oct_3_2026_06_52_40_PM-2_fpgsbq.png';
+  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791055780/ChatGPT_Image_Oct_3_2026_06_52_40_PM-2_fpgsbq.png';
 const ULTRA_TIER_ARTWORK =
-  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791053622/ChatGPT_Image_Oct_3_2026_06_52_54_PM-4_glzvrg.png';
+  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791055793/ChatGPT_Image_Oct_3_2026_06_52_54_PM-4_glzvrg.png';
 
 const initialForm: UltraEnquiryInput = {
   businessName: '',
@@ -227,21 +227,21 @@ export function WebsitePlansAndUltra({
         <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 items-stretch">
           {/* PLAN 1: FREE */}
           <article className="relative rounded-2xl sm:rounded-3xl bg-[#0b1218]/95 border border-slate-800/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm overflow-hidden">
-            {/* Integrated Background-Right Artwork (Free Tier) */}
+            {/* Integrated Background-Right Artwork (Free Tier) — Clearly visible yet restrained */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl sm:rounded-3xl" aria-hidden="true">
-              <div className="absolute -right-8 -bottom-6 sm:-right-6 sm:-bottom-4 w-48 sm:w-56 h-48 sm:h-56 opacity-30 sm:opacity-35 transition-opacity">
+              <div className="absolute right-0 bottom-0 top-0 w-3/4 sm:w-2/3 flex items-end justify-end overflow-hidden">
                 <SafeImage
                   src={freeArtworkUrl}
                   srcSet={freeArtworkSrcSet || undefined}
-                  sizes="(max-width: 640px) 192px, 224px"
+                  sizes="(max-width: 640px) 240px, 320px"
                   alt=""
-                  className="w-full h-full object-cover object-right-bottom"
+                  className="w-full h-full object-cover sm:object-contain object-right-bottom opacity-48 sm:opacity-52 transition-opacity"
                   loading="lazy"
                 />
               </div>
-              {/* Dual gradient masks protecting text legibility and contrast */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0b1218] via-[#0b1218]/85 to-[#0b1218]/40" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#0b1218] via-[#0b1218]/75 to-transparent" />
+              {/* Continuous text-protection gradient: Left (strong dark), Center (medium fade), Right (light overlay) */}
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0b1218] from-30% via-[#0b1218]/85 via-65% to-[#0b1218]/20 pointer-events-none" />
+              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0b1218]/90 via-[#0b1218]/50 to-transparent pointer-events-none" />
             </div>
 
             <div className="relative z-10 space-y-3.5">
@@ -325,22 +325,22 @@ export function WebsitePlansAndUltra({
           </article>
 
           {/* PLAN 2: PLUS (HERO TIER — FUTURE PREMIUM BUILDER) */}
-          <article className="relative rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#0e1d17] via-[#0b1411] to-[#09100d] border-2 border-[#00c365] p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-[0_0_30px_rgba(0,195,101,0.14)] ring-1 ring-[#00c365]/35 overflow-visible">
-            {/* Integrated Background-Right Artwork (Plus Tier) */}
+          <article className="relative rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#0e1d17] via-[#0b1411] to-[#09100d] border-2 border-[#00c365] p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-[0_0_30px_rgba(0,195,101,0.18)] ring-1 ring-[#00c365]/35 overflow-visible">
+            {/* Integrated Background-Right Artwork (Plus Tier) — Vibrant, multi-device creative cluster */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl sm:rounded-3xl" aria-hidden="true">
-              <div className="absolute -right-8 -bottom-6 sm:-right-6 sm:-bottom-4 w-52 sm:w-64 h-52 sm:h-64 opacity-40 sm:opacity-48 transition-opacity">
+              <div className="absolute right-0 bottom-0 top-0 w-3/4 sm:w-2/3 flex items-end justify-end overflow-hidden">
                 <SafeImage
                   src={plusArtworkUrl}
                   srcSet={plusArtworkSrcSet || undefined}
-                  sizes="(max-width: 640px) 208px, 256px"
+                  sizes="(max-width: 640px) 260px, 340px"
                   alt=""
-                  className="w-full h-full object-cover object-right-bottom"
+                  className="w-full h-full object-cover sm:object-contain object-right-bottom opacity-55 sm:opacity-65 transition-opacity"
                   loading="lazy"
                 />
               </div>
-              {/* Dual gradient masks protecting text & highlighting vibrant green accents */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#09100d] via-[#0b1411]/85 to-[#0e1d17]/40" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#0e1d17] via-[#0e1d17]/80 to-transparent" />
+              {/* Continuous text-protection gradient: strong emerald-dark on left, subtle light overlay on artwork right */}
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0e1d17] from-30% via-[#0b1411]/85 via-65% to-[#09100d]/15 pointer-events-none" />
+              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#09100d]/90 via-[#09100d]/50 to-transparent pointer-events-none" />
             </div>
 
             {/* Most Popular Badge — Classic overlapping badge (half inside / half above the card edge) */}
@@ -421,21 +421,21 @@ export function WebsitePlansAndUltra({
 
           {/* PLAN 3: PRO (SERIOUS BUSINESSES & TEAMS) */}
           <article className="relative rounded-2xl sm:rounded-3xl bg-[#0b1016]/95 border border-slate-800/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm overflow-hidden">
-            {/* Integrated Background-Right Artwork (Pro Tier) */}
+            {/* Integrated Background-Right Artwork (Pro Tier) — Serious commercial analytics & operations UI */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl sm:rounded-3xl" aria-hidden="true">
-              <div className="absolute -right-8 -bottom-6 sm:-right-6 sm:-bottom-4 w-52 sm:w-64 h-52 sm:h-64 opacity-35 sm:opacity-40 transition-opacity">
+              <div className="absolute right-0 bottom-0 top-0 w-3/4 sm:w-2/3 flex items-end justify-end overflow-hidden">
                 <SafeImage
                   src={proArtworkUrl}
                   srcSet={proArtworkSrcSet || undefined}
-                  sizes="(max-width: 640px) 208px, 256px"
+                  sizes="(max-width: 640px) 260px, 340px"
                   alt=""
-                  className="w-full h-full object-cover object-right-bottom"
+                  className="w-full h-full object-cover sm:object-contain object-right-bottom opacity-52 sm:opacity-58 transition-opacity"
                   loading="lazy"
                 />
               </div>
-              {/* Dual gradient masks protecting corporate text readability */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0b1016] via-[#0b1016]/85 to-[#0b1016]/40" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#0b1016] via-[#0b1016]/80 to-transparent" />
+              {/* Slate/corporate continuous text-protection gradient */}
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0b1016] from-30% via-[#0b1016]/85 via-65% to-[#0b1016]/15 pointer-events-none" />
+              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0b1016]/90 via-[#0b1016]/50 to-transparent pointer-events-none" />
             </div>
 
             <div className="relative z-10 space-y-3.5">
@@ -597,50 +597,37 @@ export function WebsitePlansAndUltra({
             </div>
           </div>
 
-          {/* Right Column: High-End Bespoke Studio Showcase Anchor */}
-          <div className="lg:col-span-5 relative flex items-center justify-center pt-2 lg:pt-0">
-            {/* Ambient emerald backlight */}
-            <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-emerald-500/20 via-transparent to-cyan-500/10 blur-xl opacity-75 pointer-events-none" />
+          {/* Right Column: Seamlessly Blended Bespoke Studio Artwork */}
+          <div className="lg:col-span-5 relative flex items-center justify-center pt-4 lg:pt-0">
+            {/* Luminous ambient backlight glow */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 via-[#00c365]/10 to-transparent rounded-3xl blur-2xl opacity-70 pointer-events-none" />
 
-            <div className="w-full max-w-md rounded-2xl bg-[#070d12] border border-slate-700/80 shadow-2xl relative overflow-hidden group">
-              {/* Top Browser Chrome Bar */}
-              <div className="px-3 py-2 bg-[#0a1219] border-b border-slate-800/90 flex items-center justify-between text-[10px] text-slate-400 select-none">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-rose-500/80" />
-                  <span className="w-2 h-2 rounded-full bg-amber-500/80" />
-                  <span className="w-2 h-2 rounded-full bg-emerald-500/80" />
+            {/* Seamless blended container (no detached browser frame, no harsh borders) */}
+            <div className="relative w-full overflow-hidden rounded-2xl sm:rounded-3xl">
+              <SafeImage
+                src={ultraArtworkUrl}
+                srcSet={ultraArtworkSrcSet || undefined}
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 520px"
+                alt="Mystery Hub Ultra Bespoke Website Studio"
+                className="w-full aspect-[4/3] object-cover sm:object-contain object-center lg:object-right transition-transform duration-700 hover:scale-[1.02]"
+                loading="lazy"
+              />
+
+              {/* Soft left-edge gradient dissolving artwork naturally into the copy on desktop */}
+              <div className="hidden lg:block absolute inset-y-0 left-0 w-24 xl:w-32 bg-gradient-to-r from-[#091216] via-[#091216]/60 to-transparent pointer-events-none" />
+
+              {/* Soft perimeter vignette for unified background integration */}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0d161d]/85 via-transparent to-[#0d161d]/30 pointer-events-none" />
+
+              {/* Clean integrated studio status badge */}
+              <div className="absolute bottom-3 inset-x-3 flex items-center justify-between gap-2 pointer-events-none">
+                <div className="px-3 py-1 rounded-full bg-[#0c1813]/85 backdrop-blur-md border border-[#00c365]/20 text-[10px] font-medium text-slate-200 shadow-sm flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#00c365] shrink-0 animate-pulse" />
+                  <span className="truncate">Handcrafted by Mystery Hub Engineers</span>
                 </div>
-                <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#070e14] border border-slate-800 text-[9px] font-mono text-emerald-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#00c365] animate-pulse" />
-                  <span>bespoke-build.gh</span>
-                </div>
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Studio</span>
-              </div>
-
-              {/* Bespoke Studio Artwork Canvas */}
-              <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#060b0f]">
-                <SafeImage
-                  src={ultraArtworkUrl}
-                  srcSet={ultraArtworkSrcSet || undefined}
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 420px"
-                  alt="Mystery Hub Ultra Bespoke Website Studio"
-                  className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
-                  loading="lazy"
-                />
-
-                {/* Subtle vignette gradient protecting lower caption */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#070d12] via-[#070d12]/40 to-transparent pointer-events-none" />
-
-                {/* Floating Glass Meta Badges */}
-                <div className="absolute bottom-2.5 inset-x-2.5 flex items-center justify-between gap-2 pointer-events-none">
-                  <div className="px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-md border border-white/10 text-[10px] font-medium text-slate-200 shadow-sm flex items-center gap-1.5 truncate">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#00c365] shrink-0" />
-                    <span className="truncate">Handcrafted by Mystery Hub Engineers</span>
-                  </div>
-                  <span className="text-[9px] font-mono font-bold px-2 py-1 rounded-lg bg-emerald-500/20 text-[#00c365] border border-emerald-500/30 shrink-0 backdrop-blur-md">
-                    1-on-1 Scoped
-                  </span>
-                </div>
+                <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-[#00c365]/15 text-[#00c365] border border-[#00c365]/30 shrink-0 backdrop-blur-md">
+                  1-on-1 Scoped
+                </span>
               </div>
             </div>
           </div>
