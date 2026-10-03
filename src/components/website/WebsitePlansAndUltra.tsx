@@ -293,7 +293,7 @@ export function WebsitePlansAndUltra({
           </article>
 
           {/* PLAN 2: PLUS (HERO TIER — FUTURE PREMIUM BUILDER) */}
-          <article className="relative rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#0e1d17] via-[#0b1411] to-[#09100d] border-2 border-[#00c365] p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-[0_0_30px_rgba(0,195,101,0.14)] ring-1 ring-[#00c365]/35">
+          <article className="relative rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#0e1d17] via-[#0b1411] to-[#09100d] border-2 border-[#00c365] p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-[0_0_30px_rgba(0,195,101,0.14)] ring-1 ring-[#00c365]/35 overflow-visible">
             {/* Future Artwork Composition Zone (Prepared for rich customization / multi-device visual) */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl sm:rounded-3xl" aria-hidden="true">
               <div className="absolute top-0 right-0 w-36 sm:w-44 h-36 sm:h-44 pointer-events-none select-none overflow-hidden opacity-25 sm:opacity-35">
@@ -303,14 +303,14 @@ export function WebsitePlansAndUltra({
               </div>
             </div>
 
-            <div className="relative z-10 space-y-3.5">
-              {/* Most Popular Badge — Positioned safely in flow at top so it NEVER clips on any screen */}
-              <div className="flex items-center justify-center -mt-1 pb-1">
-                <span className="inline-flex items-center px-3 py-0.5 rounded-full bg-[#00c365] text-black text-[10px] font-black uppercase tracking-wider shadow-sm">
-                  Most Popular
-                </span>
-              </div>
+            {/* Most Popular Badge — Classic overlapping badge (half inside / half above the card edge) */}
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+              <span className="inline-flex items-center px-3.5 py-1 rounded-full bg-[#00c365] text-black text-[10px] font-black uppercase tracking-wider shadow-md border border-[#00e575]">
+                Most Popular
+              </span>
+            </div>
 
+            <div className="relative z-10 space-y-3.5">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-extrabold text-lg sm:text-xl text-white tracking-tight">PLUS</h3>
@@ -372,22 +372,10 @@ export function WebsitePlansAndUltra({
                   onClick={() => toggleFeatures('plus')}
                   className="pt-1 text-[11px] font-semibold text-emerald-300 hover:underline flex items-center gap-1 cursor-pointer"
                 >
-                  <span>{expandedFeatures.plus ? 'Show fewer features' : 'View all features'}</span>
+                  <span>{expandedFeatures.plus ? 'Hide features' : 'View all features'}</span>
                   {expandedFeatures.plus ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </button>
               </div>
-            </div>
-
-            {/* Plan Action Area (Structured for future waitlist / purchase without redesign) */}
-            <div className="relative z-10 pt-2">
-              <button
-                type="button"
-                onClick={() => toggleFeatures('plus')}
-                className="w-full py-3 px-4 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-[#00c365]/40 hover:border-[#00c365] text-[#00c365] font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer shadow-sm"
-              >
-                <span>{expandedFeatures.plus ? 'Hide Plus Features' : 'See Plus Features'}</span>
-                {expandedFeatures.plus ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-              </button>
             </div>
           </article>
 
@@ -464,29 +452,17 @@ export function WebsitePlansAndUltra({
                   onClick={() => toggleFeatures('pro')}
                   className="pt-1 text-[11px] font-semibold text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
                 >
-                  <span>{expandedFeatures.pro ? 'Show fewer features' : 'View all features'}</span>
+                  <span>{expandedFeatures.pro ? 'Hide features' : 'View all features'}</span>
                   {expandedFeatures.pro ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </button>
               </div>
-            </div>
-
-            {/* Plan Action Area (Structured for future waitlist / purchase without redesign) */}
-            <div className="relative z-10 pt-2">
-              <button
-                type="button"
-                onClick={() => toggleFeatures('pro')}
-                className="w-full py-3 px-4 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer shadow-sm"
-              >
-                <span>{expandedFeatures.pro ? 'Hide Pro Features' : 'See Pro Features'}</span>
-                {expandedFeatures.pro ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-              </button>
             </div>
           </article>
         </div>
 
         {/* Availability Footnote */}
         <p className="text-center text-[11px] sm:text-xs text-slate-500 max-w-xl mx-auto pt-1">
-          Websites created on the Free tier remain completely free forever. Plus and Pro tiers are launching in an upcoming release.
+          Free stays free. Plus and Pro are coming soon.
         </p>
       </section>
 
@@ -501,19 +477,19 @@ export function WebsitePlansAndUltra({
           <div className="lg:col-span-7 space-y-3">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/40 text-xs font-bold text-[#00c365] uppercase tracking-wider">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Done-For-You Professional Service</span>
+              <span>DONE-FOR-YOU WEBSITE SERVICE</span>
             </div>
 
             <div className="space-y-0.5">
               <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
-                Need something beyond the builder?
+                Need a website built for you?
               </p>
               <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                 GO ULTRA
               </h3>
             </div>
 
-            {/* Resolved Mobile Price Layout — No floating dot/separator */}
+            {/* Resolved Price Layout */}
             <div className="space-y-0.5">
               <div className="flex items-baseline gap-1.5">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">From</span>
@@ -524,35 +500,36 @@ export function WebsitePlansAndUltra({
               <p className="text-[11px] sm:text-xs text-emerald-400 font-semibold">
                 Professional website build
               </p>
-              <p className="text-[11px] text-slate-400">
-                Final pricing depends on project scope.
-              </p>
             </div>
 
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl">
-              Custom design, additional pages, advanced sections, integrations, domain setup, mobile optimization and launch support. Final pricing depends on project scope.
+              Work directly with the Mystery Hub team to create a website built around your business, brand and requirements. We handle the design, page setup, mobile optimization, domain connection and agreed integrations, then help you launch.
+            </p>
+
+            <p className="text-[11px] text-slate-400 font-medium">
+              Final pricing depends on project scope.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5 text-xs text-slate-300">
               <div className="flex items-center gap-2">
                 <Check className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
-                <span>Bespoke custom design</span>
+                <span>Built by our team</span>
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
-                <span>Multi-page architecture</span>
+                <span>Tailored to your brand</span>
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
-                <span>Domain &amp; DNS setup</span>
+                <span>Multi-page design</span>
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
-                <span>Scoped business integrations</span>
+                <span>Domain setup</span>
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
-                <span>Mobile optimization</span>
+                <span>Scoped integrations</span>
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-3.5 h-3.5 text-[#00c365] shrink-0" />

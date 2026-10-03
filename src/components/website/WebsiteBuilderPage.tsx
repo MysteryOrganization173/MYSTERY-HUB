@@ -397,12 +397,12 @@ export const WebsiteBuilderPage: React.FC = () => {
 
                 {/* Headline */}
                 <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1]">
-                  Build Your Website for Free
+                  Build a Professional Website for Free
                 </h1>
 
                 {/* Subheadline */}
                 <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-lg">
-                  Create a professional website for your business without coding. Start at GH₵0 and customise it to match your brand.
+                  Launch a polished business website without coding. Choose a design, customize your brand, and publish at GH₵0.
                 </p>
 
                 {/* Supporting Benefits */}
@@ -430,9 +430,9 @@ export const WebsiteBuilderPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={handlePrimaryHeroAction}
-                    className="px-6 py-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.35)] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                    className="px-6 py-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.35)] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <span>Build My Website Free</span>
+                    <span>START BUILDING FREE</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
 
@@ -442,18 +442,8 @@ export const WebsiteBuilderPage: React.FC = () => {
                     className="px-6 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 transition-colors flex items-center justify-center gap-2 backdrop-blur-sm cursor-pointer"
                   >
                     <Layers className="w-4 h-4 text-[#00c365]" />
-                    <span>Compare Plans</span>
+                    <span>EXPLORE PLANS</span>
                   </button>
-                </div>
-
-                {/* Compact Benefit Strip */}
-                <div className="p-3.5 rounded-xl bg-[#0a120e]/90 border border-[#00c365]/20 flex items-center gap-3 text-xs text-slate-300 backdrop-blur-sm">
-                  <div className="w-6 h-6 rounded-lg bg-[#00c365]/20 text-[#00c365] flex items-center justify-center shrink-0">
-                    <Check className="w-3.5 h-3.5" />
-                  </div>
-                  <span>
-                    <strong>START FREE AT GH₵0:</strong> Build and customise your website without paying upfront.
-                  </span>
                 </div>
               </div>
 
