@@ -50,7 +50,7 @@ const AppContent: React.FC = () => {
       <Navbar />
 
       {/* Main Content Area */}
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1">
         {activePage === 'home' && <HomePage />}
         {activePage === 'data' && <DataPage />}
         {activePage === 'website' && <WebsiteBuilderPage />}

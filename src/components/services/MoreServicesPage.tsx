@@ -56,7 +56,7 @@ export const MoreServicesPage: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen py-4 sm:py-8 lg:py-10">
+    <div className="py-4 sm:py-8 lg:py-10 text-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5 sm:space-y-8 lg:space-y-10">
         {/* Compact Hero Section */}
         <div className="relative rounded-2xl sm:rounded-3xl bg-[#070b0e] border border-slate-800/80 p-4 sm:p-8 lg:p-10 overflow-hidden shadow-2xl">

@@ -32,8 +32,8 @@ export const AboutPage: React.FC = () => {
     'https://res.cloudinary.com/da6oeat7m/image/upload/v1790866217/Neon_Ghana__Connected_Futures_qdf0ek.png';
 
   return (
-    <div className="min-h-screen pt-6 sm:pt-8 lg:pt-10 pb-8 sm:pb-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 sm:space-y-14">
+    <div className="pt-4 sm:pt-6 lg:pt-8 pb-6 sm:pb-10 text-slate-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
         
         {/* 1. About Hero Panel with Cloudinary Image 2 Artwork */}
         {/* DESKTOP & TABLET HERO (sm and above): Unchanged Premium Composition */}

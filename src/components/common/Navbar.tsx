@@ -131,7 +131,7 @@ export const Navbar: React.FC = () => {
         </nav>
 
         {/* Zone 3: Actions & Auth */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           {/* Quick Search Toggle */}
           <div className="relative">
             {searchOpen ? (
@@ -142,7 +142,7 @@ export const Navbar: React.FC = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search..."
                   autoFocus
-                  className="bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-2.5 py-1.5 w-32 xs:w-44 sm:w-64 max-w-[calc(100vw-110px)] focus:outline-none focus:border-[#00c365]"
+                  className="bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-2.5 py-1.5 w-28 xs:w-40 sm:w-64 max-w-[calc(100vw-120px)] focus:outline-none focus:border-[#00c365]"
                 />
                 <button
                   type="button"
@@ -156,7 +156,7 @@ export const Navbar: React.FC = () => {
             ) : (
               <button
                 onClick={() => setSearchOpen(true)}
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
+                className="p-1.5 sm:p-2 text-slate-400 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
                 title="Search Mystery Hub"
                 aria-label="Search"
               >
@@ -168,7 +168,7 @@ export const Navbar: React.FC = () => {
           {/* Mystery Earn Shortcut */}
           <button
             onClick={() => handleNavClick('earn')}
-            className="relative p-2 text-slate-400 hover:text-[#00c365] hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
+            className="relative p-1.5 sm:p-2 text-slate-400 hover:text-[#00c365] hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
             title="Mystery Earn"
             aria-label="Mystery Earn"
           >
@@ -184,7 +184,7 @@ export const Navbar: React.FC = () => {
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 rounded-xl text-xs text-slate-200 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#00c365]"
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 rounded-xl text-xs text-slate-200 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#00c365]"
                 aria-haspopup="true"
                 aria-expanded={accountDropdownOpen}
               >
@@ -269,7 +269,7 @@ export const Navbar: React.FC = () => {
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 onClick={() => openAuth('login')}
                 className="hidden sm:inline-flex px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white transition-colors cursor-pointer"
@@ -278,7 +278,7 @@ export const Navbar: React.FC = () => {
               </button>
               <button
                 onClick={() => openAuth('signup')}
-                className="px-4 py-2 text-xs font-semibold text-black bg-[#00c365] hover:bg-[#00e575] rounded-xl transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] active:scale-95 whitespace-nowrap cursor-pointer"
+                className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold text-black bg-[#00c365] hover:bg-[#00e575] rounded-xl transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] active:scale-95 whitespace-nowrap cursor-pointer"
               >
                 Sign Up
               </button>

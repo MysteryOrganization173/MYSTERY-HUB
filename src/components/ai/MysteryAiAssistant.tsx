@@ -31,6 +31,12 @@ export const MysteryAiAssistant: React.FC = () => {
     mysteryAiInitialPrompt,
     openMysteryAi,
     closeMysteryAi,
+    isCheckoutOpen,
+    isStatusModalOpen,
+    isAuthModalOpen,
+    selectedTemplatePreview,
+    marketplaceInquiryProduct,
+    waitlistInfo,
   } = useApp();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -252,9 +258,22 @@ export const MysteryAiAssistant: React.FC = () => {
       ]
     : getSuggestedQuestionsForPage(activePage);
 
+  // If any critical modal or preview dialog is open, step aside to avoid collision
+  const isAnyModalActive =
+    isCheckoutOpen ||
+    isStatusModalOpen ||
+    isAuthModalOpen ||
+    Boolean(selectedTemplatePreview) ||
+    Boolean(marketplaceInquiryProduct) ||
+    Boolean(waitlistInfo?.isOpen);
+
+  if (isAnyModalActive) {
+    return null;
+  }
+
   return (
     <div
-      className={`fixed z-[60] ${
+      className={`fixed ${isInsideEditor ? 'z-[55]' : 'z-40'} ${
         isInsideEditor
           ? 'bottom-4 right-3 sm:bottom-6 sm:right-6'
           : 'bottom-20 right-3 sm:bottom-6 sm:right-6'

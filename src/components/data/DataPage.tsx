@@ -361,8 +361,8 @@ export const DataPage: React.FC = () => {
   const atNotice = serviceNotices.airteltigo;
 
   return (
-    <div className="min-h-screen py-6 sm:py-10">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 space-y-8 sm:space-y-10">
+    <div className="py-4 sm:py-8 text-slate-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
         {/* Page Hero Section */}
         <div className="relative rounded-3xl bg-[#091014] border border-slate-800/80 p-3.5 sm:p-6 lg:p-10 overflow-hidden shadow-2xl">
           {/* Backdrop Artwork Layer */}

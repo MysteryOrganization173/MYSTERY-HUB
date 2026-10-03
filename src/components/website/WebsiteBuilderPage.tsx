@@ -247,8 +247,8 @@ export const WebsiteBuilderPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen pt-6 pb-28 sm:py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 sm:space-y-14">
+    <div className="py-6 sm:py-10 text-slate-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
         {/* =========================================================
             1. AUTHENTICATED USER'S ACTIVE WEBSITE DASHBOARD
                (PRIORITIZED FOR LOGGED-IN USERS WITH A WEBSITE)

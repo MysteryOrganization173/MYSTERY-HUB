@@ -157,8 +157,8 @@ export const OrdersPage: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen py-8 sm:py-12">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    <div className="py-6 sm:py-10 text-slate-100">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/30 text-xs font-semibold text-[#00c365] mb-2">

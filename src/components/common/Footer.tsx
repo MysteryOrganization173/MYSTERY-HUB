@@ -18,9 +18,9 @@ export const Footer: React.FC = () => {
   const { setActivePage } = useApp();
 
   return (
-    <footer className="bg-[#070b0e] border-t border-slate-800/80 text-slate-400 text-sm mt-16 sm:mt-20 pb-24 md:pb-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 sm:gap-10 pb-12 border-b border-slate-800/60">
+    <footer className="bg-[#070b0e] border-t border-slate-800/80 text-slate-400 text-sm mt-8 sm:mt-12 lg:mt-14 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:pb-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 sm:gap-10 pb-8 sm:pb-10 border-b border-slate-800/60">
           {/* Brand Col & Direct Contact */}
           <div className="lg:col-span-2 space-y-4 text-left">
             <BrandLogo size="md" />

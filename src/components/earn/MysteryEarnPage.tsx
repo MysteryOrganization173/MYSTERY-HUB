@@ -218,7 +218,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
   // 0. AUTH HYDRATION SKELETON (Prevents flash of guest page)
   if (isAuthChecking) {
     return (
-      <div className="min-h-screen py-6 sm:py-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 animate-pulse">
+      <div className="py-6 sm:py-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 animate-pulse">
         <div className="h-64 sm:h-80 bg-slate-900/60 rounded-3xl border border-slate-800" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="h-28 bg-slate-900/40 rounded-2xl border border-slate-800" />
@@ -237,7 +237,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
     const firstName = user.name ? user.name.trim().split(' ')[0] : 'Partner';
 
     return (
-      <div className="min-h-screen py-6 sm:py-10 text-slate-100">
+      <div className="py-6 sm:py-10 text-slate-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
           {/* 1. Member Command Panel Hero (Unified Card with Seamless Artwork Integration) */}
           <div className="relative rounded-3xl bg-gradient-to-br from-[#0a1410] via-[#070b0e] to-[#0d1612] border border-[#00c365]/35 overflow-hidden shadow-2xl p-5 sm:p-7 lg:p-8">
@@ -713,7 +713,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
   // EXPERIENCE B: PUBLIC / GUEST OPPORTUNITY PAGE
   // =========================================================================
   return (
-    <div className="min-h-screen py-6 sm:py-10 text-slate-100">
+    <div className="py-6 sm:py-10 text-slate-100">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
         {/* 1. Official Hero Banner Panel */}
         {/* DESKTOP & TABLET HERO (sm and above) */}
