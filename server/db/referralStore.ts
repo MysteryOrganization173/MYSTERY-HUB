@@ -17,6 +17,8 @@ import {
   ReferralSummary,
 } from '../types/referral.js';
 import { buildReferralUrl } from '../utils/referralUrl.js';
+import { compareReferralRules, isActiveReferralRule } from '../services/referralRulePolicy.js';
+import type { PurchaseStage } from '../types/referral.js';
 
 // In-Memory Dev/Test Stores
 const devReferralProfiles = new Map<string, ReferralProfileRecord>();
@@ -25,6 +27,7 @@ const devReferralClicks: ReferralClickRecord[] = [];
 const devCaptureKeys = new Map<string, ReferralClickRecord>();
 const devRewardRules = new Map<string, ReferralRewardRuleRecord>();
 const devRewardLedger = new Map<string, RewardLedgerRecord>();
+const devRewardLocks = new Map<string, Promise<void>>();
 
 // Ambiguity-free alphanumeric alphabet for clean readable referral codes
 const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -691,10 +694,13 @@ export class ReferralStore {
   static async findMatchingRule(
     serviceType: RewardServiceType,
     network?: string | null,
-    productKey?: string | null
+    productKey?: string | null,
+    purchaseStage: PurchaseStage = 'any',
+    client?: PoolClient,
+    at = new Date().toISOString()
   ): Promise<ReferralRewardRuleRecord | null> {
-    const pool = getPool();
-    const nowIso = new Date().toISOString();
+    const pool = client || getPool();
+    const nowIso = at;
 
     if (pool) {
       const res = await pool.query<ReferralRewardRuleRecord>(
@@ -706,23 +712,27 @@ export class ReferralStore {
           AND (product_key IS NULL OR product_key = '' OR product_key = $3)
           AND (starts_at IS NULL OR starts_at <= $4)
           AND (ends_at IS NULL OR ends_at >= $4)
+          AND purchase_stage IN ('any', $5)
         ORDER BY
           CASE WHEN product_key IS NOT NULL AND product_key != '' THEN 1 ELSE 2 END,
           CASE WHEN network IS NOT NULL AND network != '' THEN 1 ELSE 2 END,
-          created_at DESC
+          CASE WHEN service_type = $1 THEN 1 ELSE 2 END,
+          CASE WHEN purchase_stage = 'any' THEN 2 ELSE 1 END,
+          created_at DESC, id ASC
         LIMIT 1;
         `,
-        [serviceType, network || '', productKey || '', nowIso]
+        [serviceType, network || '', productKey || '', nowIso, purchaseStage]
       );
       if (res.rows.length === 0) return null;
       return res.rows[0];
     }
 
     const activeRules = Array.from(devRewardRules.values()).filter((r) => {
-      if (!r.enabled) return false;
+      if (!isActiveReferralRule(r, nowIso)) return false;
       if (r.service_type !== 'all' && r.service_type !== serviceType) return false;
-      if (r.network && network && r.network.toLowerCase() !== network.toLowerCase()) return false;
-      if (r.product_key && productKey && r.product_key !== productKey) return false;
+      if (r.network && r.network.toLowerCase() !== (network || '').toLowerCase()) return false;
+      if (r.product_key && r.product_key !== productKey) return false;
+      if ((r.purchase_stage || 'any') !== 'any' && r.purchase_stage !== purchaseStage) return false;
       if (r.starts_at && new Date(r.starts_at) > new Date(nowIso)) return false;
       if (r.ends_at && new Date(r.ends_at) < new Date(nowIso)) return false;
       return true;
@@ -730,11 +740,7 @@ export class ReferralStore {
 
     if (activeRules.length === 0) return null;
     // Prefer most specific rule
-    activeRules.sort((a, b) => {
-      const aScore = (a.product_key ? 2 : 0) + (a.network ? 1 : 0);
-      const bScore = (b.product_key ? 2 : 0) + (b.network ? 1 : 0);
-      return bScore - aScore;
-    });
+    activeRules.sort((a, b) => compareReferralRules(a, b, serviceType));
 
     return { ...activeRules[0] };
   }
@@ -759,6 +765,11 @@ export class ReferralStore {
     const record: ReferralRewardRuleRecord = {
       id,
       service_type: rule.service_type,
+      purchase_stage: rule.purchase_stage || 'any',
+      level2_reward_minor: rule.level2_reward_minor,
+      level2_percent_bps: rule.level2_percent_bps,
+      level3_reward_minor: rule.level3_reward_minor,
+      level3_percent_bps: rule.level3_percent_bps,
       product_key: rule.product_key || null,
       network: rule.network || null,
       reward_type: rule.reward_type || 'fixed_minor',
@@ -775,10 +786,11 @@ export class ReferralStore {
     if (pool) {
       const res = await pool.query<ReferralRewardRuleRecord>(
         `
-        INSERT INTO referral_reward_rules (id, service_type, product_key, network, reward_type, reward_minor, reward_percent_bps, enabled, starts_at, ends_at, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        INSERT INTO referral_reward_rules (id, service_type, product_key, network, reward_type, reward_minor, reward_percent_bps, enabled, starts_at, ends_at, created_at, updated_at, purchase_stage)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         ON CONFLICT (id) DO UPDATE SET
           service_type = EXCLUDED.service_type,
+          purchase_stage = EXCLUDED.purchase_stage,
           product_key = EXCLUDED.product_key,
           network = EXCLUDED.network,
           reward_type = EXCLUDED.reward_type,
@@ -803,6 +815,7 @@ export class ReferralStore {
           record.ends_at,
           record.created_at,
           record.updated_at,
+          record.purchase_stage,
         ]
       );
       return res.rows[0];
@@ -821,7 +834,8 @@ export class ReferralStore {
    * Prevents duplicate rewards for the same order/event.
    */
   static async createLedgerEntry(
-    entry: Omit<RewardLedgerRecord, 'id' | 'created_at'>
+    entry: Omit<RewardLedgerRecord, 'id' | 'created_at'>,
+    transactionClient?: PoolClient
   ): Promise<{ record: RewardLedgerRecord; alreadyExisted: boolean }> {
     const pool = getPool();
     const id = `rew_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
@@ -829,18 +843,22 @@ export class ReferralStore {
 
     const record: RewardLedgerRecord = {
       ...entry,
+      reward_stage: entry.reward_stage || 'standard',
+      reward_relationship_key: entry.reward_relationship_key || null,
       id,
       created_at: nowIso,
     };
 
     if (pool) {
       // Check existing by idempotency_key
-      const client = await pool.connect();
+      const client = transactionClient || await pool.connect();
       try {
-        await client.query('BEGIN');
-        await client.query('LOCK TABLE reward_ledger IN ROW EXCLUSIVE MODE;');
-        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0));',
-          [`referral-reward:${entry.order_id || entry.idempotency_key}`]);
+        if (!transactionClient) {
+          await client.query('BEGIN');
+          await client.query('LOCK TABLE reward_ledger IN ROW EXCLUSIVE MODE;');
+          await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0));',
+            [`referral-reward:${entry.order_id || entry.idempotency_key}`]);
+        }
         const checkRes = await client.query<RewardLedgerRecord>(
           `SELECT * FROM reward_ledger WHERE idempotency_key = $1
             OR (order_id = $2 AND service_type = $3 AND network_level = $4 AND reversal_of_id IS NULL)
@@ -848,7 +866,7 @@ export class ReferralStore {
           [entry.idempotency_key, entry.order_id, entry.service_type, entry.network_level || 1]
         );
         if (checkRes.rows.length > 0) {
-          await client.query('COMMIT');
+          if (!transactionClient) await client.query('COMMIT');
           return { record: checkRes.rows[0], alreadyExisted: true };
         }
 
@@ -858,10 +876,10 @@ export class ReferralStore {
             id, referrer_user_id, referred_user_id, referral_attribution_id,
             order_id, marketplace_product_id, service_type, reward_rule_id,
             amount_minor, currency, status, reason, idempotency_key, reversal_of_id,
-            created_at, approved_at, rejected_at, reversed_at, metadata_json
+            created_at, approved_at, rejected_at, reversed_at, metadata_json, reward_stage, reward_relationship_key
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-            $15, $16, $17, $18, $19
+            $15, $16, $17, $18, $19, $20, $21
           ) RETURNING *;
           `,
           [
@@ -884,12 +902,14 @@ export class ReferralStore {
             record.rejected_at,
             record.reversed_at,
             record.metadata_json ? JSON.stringify(record.metadata_json) : null,
+            record.reward_stage,
+            record.reward_relationship_key,
           ]
         );
-        await client.query('COMMIT');
+        if (!transactionClient) await client.query('COMMIT');
         return { record: res.rows[0], alreadyExisted: false };
-      } catch (error) { await client.query('ROLLBACK'); throw error; }
-      finally { client.release(); }
+      } catch (error) { if (!transactionClient) await client.query('ROLLBACK'); throw error; }
+      finally { if (!transactionClient) client.release(); }
     }
 
     // In-memory check
@@ -920,8 +940,8 @@ export class ReferralStore {
     return item ? { ...item } : null;
   }
 
-  static async findLedgerByOrderId(orderId: string): Promise<RewardLedgerRecord[]> {
-    const pool = getPool();
+  static async findLedgerByOrderId(orderId: string, client?: PoolClient): Promise<RewardLedgerRecord[]> {
+    const pool = client || getPool();
     if (pool) {
       const res = await pool.query<RewardLedgerRecord>(
         `SELECT * FROM reward_ledger WHERE order_id = $1 ORDER BY created_at ASC;`,
@@ -1080,6 +1100,7 @@ export class ReferralStore {
     return records.map((r) => ({
       id: r.id,
       service_type: r.service_type,
+      reward_stage: r.reward_stage || 'standard',
       amount_minor: r.amount_minor,
       amount_ghc: Number((r.amount_minor / 100).toFixed(2)),
       currency: r.currency,
@@ -1090,4 +1111,61 @@ export class ReferralStore {
       reversed_at: r.reversed_at,
     }));
   }
+  static async withRewardTransaction<T>(relationshipKey: string, orderId: string,
+    work: (client?: PoolClient) => Promise<T>): Promise<T> {
+    const pool = getPool();
+    if (pool) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('LOCK TABLE reward_ledger IN ROW EXCLUSIVE MODE;');
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0));', [`referral-stage:${relationshipKey}`]);
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0));', [`referral-reward:${orderId}`]);
+        const result = await work(client);
+        await client.query('COMMIT'); return result;
+      } catch (error) { await client.query('ROLLBACK'); throw error; }
+      finally { client.release(); }
+    }
+    const releases: Array<() => void> = [];
+    try {
+      for (const key of [`stage:${relationshipKey}`, `order:${orderId}`]) {
+        const previous = devRewardLocks.get(key) || Promise.resolve();
+        let release!: () => void;
+        const pending = new Promise<void>(resolve => { release = resolve; });
+        const tail = previous.then(() => pending);
+        devRewardLocks.set(key, tail);
+        await previous;
+        releases.push(() => { release(); if (devRewardLocks.get(key) === tail) devRewardLocks.delete(key); });
+      }
+      return await work();
+    } finally { for (const release of releases.reverse()) release(); }
+  }
+
+  static async findAttributionById(id: string, client?: PoolClient): Promise<ReferralAttributionRecord | null> {
+    const pool = client || getPool();
+    if (pool) return (await pool.query<ReferralAttributionRecord>('SELECT * FROM referral_attributions WHERE id = $1;', [id])).rows[0] || null;
+    return devReferralAttributions.get(id) || null;
+  }
+
+  static async hasRewardedPurchase(params: { referrerId: string; userId?: string | null; attributionId?: string | null;
+    service: RewardServiceType; relationshipKey: string; orderId: string }, client?: PoolClient): Promise<boolean> {
+    const pool = client || getPool();
+    if (pool) {
+      const result = await pool.query<{ present: boolean }>(`
+        SELECT EXISTS (SELECT 1 FROM reward_ledger WHERE referrer_user_id = $1 AND service_type = $2
+          AND network_level = 1 AND order_id IS NOT NULL AND order_id <> $6
+          AND status IN ('approved', 'reversed') AND reversal_of_id IS NULL
+          AND reward_stage IN ('standard', 'acquisition')
+          AND (reward_relationship_key = $3 OR referred_user_id = $4 OR referral_attribution_id = $5)) AS present;
+      `, [params.referrerId, params.service, params.relationshipKey, params.userId || null, params.attributionId || null, params.orderId]);
+      return result.rows[0]?.present || false;
+    }
+    return [...devRewardLedger.values()].some(entry => entry.referrer_user_id === params.referrerId
+      && entry.service_type === params.service && (entry.network_level || 1) === 1 && entry.order_id && entry.order_id !== params.orderId
+      && ['approved', 'reversed'].includes(entry.status) && !entry.reversal_of_id
+      && (entry.reward_stage || 'standard') !== 'recurring'
+      && (entry.reward_relationship_key === params.relationshipKey || (params.userId && entry.referred_user_id === params.userId)
+        || (params.attributionId && entry.referral_attribution_id === params.attributionId)));
+  }
+
 }

@@ -6,6 +6,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { validateReferralRule, ReferralRuleValidationError } from '../services/referralRulePolicy.js';
 import { requireAdmin } from '../middleware/authMiddleware.js';
 import { OrdersStore } from '../db/ordersStore.js';
 import { AuthStore } from '../db/authStore.js';
@@ -1338,12 +1339,19 @@ adminRouter.post('/referrals/rules', async (req: Request, res: Response) => {
     const adminUser = req.user!;
     const rulePayload = req.body || {};
 
-    if (!rulePayload.service_type) {
-      res.status(400).json({ error: 'service_type is required.' });
-      return;
+    const rules = await ReferralStore.getAllRules();
+    const existing = rules.find(rule => rule.id === rulePayload.id);
+    const normalized = validateReferralRule(rulePayload, existing);
+    const saved = await ReferralStore.createOrUpdateRule(normalized);
+    const warnings = saved.reward_type === 'fixed_minor'
+      ? ['Fixed rewards must fit the customer charge. Orders below this reward will not receive a payout; configured amounts are never reduced automatically.'] : [];
+    if (rules.some(rule => rule.id !== saved.id && rule.enabled && saved.enabled
+      && rule.service_type === saved.service_type && rule.network === saved.network
+      && rule.product_key === saved.product_key && (rule.purchase_stage || 'any') === saved.purchase_stage
+      && (!rule.ends_at || !saved.starts_at || new Date(rule.ends_at) >= new Date(saved.starts_at))
+      && (!saved.ends_at || !rule.starts_at || new Date(saved.ends_at) >= new Date(rule.starts_at)))) {
+      warnings.push('An enabled rule overlaps this scope and stage. The newest created rule wins; rule ID breaks ties.');
     }
-
-    const saved = await ReferralStore.createOrUpdateRule(rulePayload);
 
     await AdminAuditStore.record({
       adminUserId: adminUser.id,
@@ -1352,6 +1360,7 @@ adminRouter.post('/referrals/rules', async (req: Request, res: Response) => {
       entityId: saved.id,
       metadata: {
         service_type: saved.service_type,
+        purchase_stage: saved.purchase_stage,
         reward_type: saved.reward_type,
         reward_minor: saved.reward_minor,
         reward_percent_bps: saved.reward_percent_bps,
@@ -1362,9 +1371,14 @@ adminRouter.post('/referrals/rules', async (req: Request, res: Response) => {
     res.json({
       success: true,
       rule: saved,
+      warnings,
       message: 'Reward rule saved successfully.',
     });
   } catch (err) {
+    if (err instanceof ReferralRuleValidationError) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
     console.error('[Admin API] Failed to save referral rule:', err);
     res.status(500).json({ error: 'Failed to save referral rule.' });
   }

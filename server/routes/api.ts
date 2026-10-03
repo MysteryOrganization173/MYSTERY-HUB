@@ -3,6 +3,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { isActiveReferralRule, publicReferralRule } from '../services/referralRulePolicy.js';
 import { validateAndNormalizeGhanaPhone } from '../utils/phone.js';
 import { getAuthoritativeProduct } from '../data/productCatalog.js';
 import { calculateAirtimeOrder, validateAirtimeAmount, AIRTIME_SERVICE_FEE_PERCENT } from '../data/airtimePricing.js';
@@ -1611,7 +1612,7 @@ apiRouter.get('/referrals/ledger', requireAuth, async (req: Request, res: Respon
 apiRouter.get('/referrals/rules', async (_req: Request, res: Response) => {
   try {
     const rules = await ReferralStore.getAllRules();
-    const activeRules = rules.filter((r) => r.enabled);
+    const activeRules = rules.filter(r => isActiveReferralRule(r)).map(publicReferralRule);
 
     res.json({
       success: true,

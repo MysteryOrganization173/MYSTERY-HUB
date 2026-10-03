@@ -5,6 +5,7 @@
  */
 
 import { ReferralStore } from '../db/referralStore.js';
+import { OrdersStore } from '../db/ordersStore.js';
 import { AdminAuditStore } from '../db/adminAuditStore.js';
 import { MarketplaceStore } from '../db/marketplaceStore.js';
 import { OrderRecord } from '../types/orders.js';
@@ -13,7 +14,6 @@ import {
   ReferralAttributionRecord,
   ReferralRewardRuleRecord,
   RewardLedgerRecord,
-  RewardServiceType,
 } from '../types/referral.js';
 
 export interface ReferralResolutionResult {
@@ -221,179 +221,82 @@ export class ReferralService {
    * Processes reward ledger creation upon successful order delivery.
    * ONLY executes for delivered telecom orders or confirmed transactions.
    */
-  static async processOrderReward(order: OrderRecord): Promise<RewardLedgerRecord | null> {
-    // 1. Order must be terminal delivered/completed and paid
-    const isTerminalDelivered = order.status === 'delivered' || order.marketplace_status === 'completed';
-    if (!isTerminalDelivered || (order.payment_status !== 'success' && !order.paid_at)) {
-      return null;
-    }
+  static async processOrderReward(input: OrderRecord): Promise<RewardLedgerRecord | null> {
+    // Successful payment is authoritative; a historical paid_at alone is insufficient.
+    if (input.status !== 'delivered' || input.payment_status !== 'success' || input.currency !== 'GHS'
+      || (input.service_type === 'marketplace' && input.marketplace_status !== 'completed')) return null;
+    const lifetime = input.user_id ? await ReferralStore.findAttributionByReferredUserId(input.user_id) : null;
+    const linked = input.referral_attribution_id ? await ReferralStore.findAttributionById(input.referral_attribution_id) : null;
+    const referrerId = input.referrer_user_id || lifetime?.referrer_user_id || linked?.referrer_user_id;
+    if (!referrerId || input.user_id === referrerId
+      || (lifetime && lifetime.referrer_user_id !== referrerId)
+      || (linked && (linked.referrer_user_id !== referrerId || (linked.referred_user_id && input.user_id && linked.referred_user_id !== input.user_id)))) return null;
+    const attribution = lifetime || linked;
+    const attributionId = attribution?.id || null;
+    const service = input.service_type || 'data';
+    // A captured guest upgraded at signup retains the same attribution key.
+    const identity = attributionId ? `attribution:${attributionId}` : input.user_id ? `user:${input.user_id}` : null;
+    const relationshipKey = identity ? `${referrerId}:${identity}:${service}` : null;
+    const audit: { pending: { record: RewardLedgerRecord; rule: ReferralRewardRuleRecord | null } | null } = { pending: null };
+    const result = await ReferralStore.withRewardTransaction(relationshipKey || `unidentified:${input.id}`, input.id, async client => {
+      const order = client ? await OrdersStore.findOrder(input.id, client) : (await OrdersStore.findOrder(input.id)) || input;
+      if (!order || order.status !== 'delivered' || order.payment_status !== 'success'
+        || order.currency !== 'GHS' || (service === 'marketplace' && order.marketplace_status !== 'completed')) return null;
+      if ((order.referrer_user_id && order.referrer_user_id !== referrerId) || order.user_id === referrerId
+        || (order.user_id || null) !== (input.user_id || null) || (order.service_type || 'data') !== service
+        || (order.referral_attribution_id || null) !== (input.referral_attribution_id || null)) return null;
+      const existing = (await ReferralStore.findLedgerByOrderId(order.id, client)).find(entry => (entry.network_level || 1) === 1 && !entry.reversal_of_id);
+      if (existing) return existing; // Never recompute historical, reversed or already awarded entries.
 
-    // 2. Resolve referrer
-    let referrerUserId = order.referrer_user_id || null;
-    let attributionId = order.referral_attribution_id || null;
-
-    // If order record did not store referrer directly, check lifetime user attribution
-    if (!referrerUserId && order.user_id) {
-      const lifetime = await ReferralStore.findAttributionByReferredUserId(order.user_id);
-      if (lifetime) {
-        referrerUserId = lifetime.referrer_user_id;
-        attributionId = lifetime.id;
-      }
-    }
-
-    if (!referrerUserId) {
-      return null;
-    }
-
-    // 3. Prevent self-rewards
-    if (order.user_id && order.user_id === referrerUserId) {
-      return null;
-    }
-
-    // Special handling for Marketplace products
-    if (order.service_type === 'marketplace') {
-      let rewardMinor = 0;
-      let marketplaceProductId: string | null = order.product_id || null;
-
-      // First check product-level referral reward configured on product
-      if (order.product_id) {
+      const prior = relationshipKey && (await ReferralStore.hasRewardedPurchase({ referrerId,
+        userId: order.user_id, attributionId, service, relationshipKey, orderId: order.id }, client)
+        || await OrdersStore.hasEarlierQualifyingReferralOrder(order, { referrerId, userId: order.user_id,
+          attributionId, attributionFirstSeen: attribution?.first_seen_at }, client));
+      const purchaseStage = relationshipKey ? (prior ? 'recurring' : 'acquisition') : 'any';
+      const at = order.delivered_at || new Date().toISOString();
+      let rule: ReferralRewardRuleRecord | null = null;
+      let amount = 0;
+      // Preserve Marketplace product-level precedence and economics.
+      if (service === 'marketplace' && order.product_id) {
         const product = await MarketplaceStore.getProductById(order.product_id);
-        if (product && typeof product.referral_reward_minor === 'number' && product.referral_reward_minor > 0) {
-          rewardMinor = Math.floor(product.referral_reward_minor);
-        }
+        if (product?.referral_reward_minor && product.referral_reward_minor > 0) amount = Math.floor(product.referral_reward_minor);
       }
-
-      // Fallback: check matching global reward rule
-      if (rewardMinor <= 0) {
-        const rule = await ReferralStore.findMatchingRule('marketplace', order.network, order.product_id);
-        if (rule && rule.enabled) {
-          if (rule.reward_type === 'fixed_minor' && rule.reward_minor != null) {
-            rewardMinor = Math.max(0, Math.floor(rule.reward_minor));
-          } else if (rule.reward_type === 'percent_bps' && rule.reward_percent_bps != null) {
-            rewardMinor = Math.max(0, Math.round((order.amount * rule.reward_percent_bps) / 10000));
-          }
-        }
+      if (!amount) {
+        rule = await ReferralStore.findMatchingRule(service, order.network, order.product_id, purchaseStage, client, at);
+        if (!rule) return null;
+        if (rule.reward_type === 'fixed_minor' && rule.reward_minor != null) amount = rule.reward_minor;
+        else if (rule.reward_type === 'percent_bps' && rule.reward_percent_bps != null) amount = Math.round(order.amount * rule.reward_percent_bps / 10_000);
       }
-
-      if (rewardMinor <= 0) {
+      if (!Number.isSafeInteger(amount) || amount <= 0) return null;
+      if (amount > order.amount) {
+        console.warn(`[Referral Reward] Configured reward exceeds the customer charge for ${order.public_reference}; reward not issued.`);
         return null;
       }
-
-      const idempotencyKey = `marketplace_reward:${order.id}:${rewardMinor}`;
-      const nowIso = new Date().toISOString();
-
-      const result = await ReferralStore.createLedgerEntry({
-        referrer_user_id: referrerUserId,
-        referred_user_id: order.user_id || null,
-        referral_attribution_id: attributionId,
-        order_id: order.id,
-        marketplace_product_id: marketplaceProductId,
-        service_type: 'marketplace',
-        reward_rule_id: null,
-        amount_minor: rewardMinor,
-        currency: 'GHS',
-        status: 'approved',
-        reason: `Reward for completed Marketplace order ${order.public_reference} (${order.product_name_snapshot})`,
-        idempotency_key: idempotencyKey,
-        reversal_of_id: null,
-        approved_at: nowIso,
-        rejected_at: null,
-        reversed_at: null,
-        metadata_json: {
-          order_amount_minor: order.amount,
-          product_id: order.product_id,
-          reward_minor: rewardMinor,
-        },
-      });
-
-      if (!result.alreadyExisted) {
-        await AdminAuditStore.record({
-          adminUserId: referrerUserId,
-          action: 'reward_approved',
-          entityType: 'reward_ledger',
-          entityId: result.record.id,
-          metadata: {
-            order_id: order.id,
-            amount_minor: rewardMinor,
-            service_type: 'marketplace',
-            referrer_user_id: referrerUserId,
-          },
-        });
-      }
-
-      return result.record;
-    }
-
-    const serviceType: RewardServiceType =
-      order.service_type === 'airtime'
-        ? 'airtime'
-        : order.service_type === 'instant_bundle'
-        ? 'instant_bundle'
-        : 'data';
-
-    // 4. Find matching reward rule
-    const rule = await ReferralStore.findMatchingRule(serviceType, order.network, order.product_id);
-    if (!rule || !rule.enabled) {
-      return null;
-    }
-
-    // 5. Calculate reward amount in integer pesewas
-    let rewardMinor = 0;
-    if (rule.reward_type === 'fixed_minor' && rule.reward_minor != null) {
-      rewardMinor = Math.max(0, Math.floor(rule.reward_minor));
-    } else if (rule.reward_type === 'percent_bps' && rule.reward_percent_bps != null) {
-      rewardMinor = Math.max(0, Math.round((order.amount * rule.reward_percent_bps) / 10000));
-    }
-
-    if (rewardMinor <= 0) {
-      return null;
-    }
-
-    // 6. Idempotently record immutable reward in ledger
-    const idempotencyKey = `order_reward:${order.id}:${rule.id}`;
-    const nowIso = new Date().toISOString();
-
-    const result = await ReferralStore.createLedgerEntry({
-      referrer_user_id: referrerUserId,
-      referred_user_id: order.user_id || null,
-      referral_attribution_id: attributionId,
-      order_id: order.id,
-      marketplace_product_id: null,
-      service_type: serviceType,
-      reward_rule_id: rule.id,
-      amount_minor: rewardMinor,
-      currency: 'GHS',
-      status: 'approved',
-      reason: `Reward for delivered ${serviceType} order ${order.public_reference} (${order.network.toUpperCase()} ${order.bundle_size_snapshot || ''})`,
-      idempotency_key: idempotencyKey,
-      reversal_of_id: null,
-      approved_at: nowIso,
-      rejected_at: null,
-      reversed_at: null,
-      metadata_json: {
-        order_amount_minor: order.amount,
-        product_id: order.product_id,
-        rule_type: rule.reward_type,
-        rule_value: rule.reward_type === 'fixed_minor' ? rule.reward_minor : rule.reward_percent_bps,
-      },
+      const rewardStage = rule && (rule.purchase_stage || 'any') !== 'any' ? purchaseStage : 'standard';
+      const now = new Date().toISOString();
+      const saved = await ReferralStore.createLedgerEntry({
+        referrer_user_id: referrerId, referred_user_id: order.user_id || null, referral_attribution_id: attributionId,
+        order_id: order.id, marketplace_product_id: service === 'marketplace' ? order.product_id : null,
+        service_type: service, reward_rule_id: rule?.id || null, network_level: 1,
+        reward_stage: rewardStage === 'any' ? 'standard' : rewardStage, reward_relationship_key: relationshipKey,
+        amount_minor: amount, currency: 'GHS', status: 'approved',
+        reason: `Reward for delivered ${service} order ${order.public_reference} (${rewardStage})`,
+        idempotency_key: service === 'marketplace' && !rule ? `marketplace_reward:${order.id}:${amount}` : `order_reward:${order.id}:${rule!.id}`,
+        reversal_of_id: null, approved_at: now, rejected_at: null, reversed_at: null,
+        metadata_json: { order_amount_minor: order.amount, product_id: order.product_id,
+          purchase_stage: purchaseStage, reward_stage: rewardStage, rule_purchase_stage: rule?.purchase_stage || 'any',
+          rule_type: rule?.reward_type || 'fixed_minor',
+          rule_value: rule ? (rule.reward_type === 'fixed_minor' ? rule.reward_minor : rule.reward_percent_bps) : amount },
+      }, client);
+      if (!saved.alreadyExisted) audit.pending = { record: saved.record, rule };
+      return saved.record;
     });
-
-    if (!result.alreadyExisted) {
-      await AdminAuditStore.record({
-        adminUserId: referrerUserId,
-        action: 'reward_approved',
-        entityType: 'reward_ledger',
-        entityId: result.record.id,
-        metadata: {
-          order_id: order.id,
-          amount_minor: rewardMinor,
-          service_type: serviceType,
-          referrer_user_id: referrerUserId,
-        },
-      });
-    }
-
-    return result.record;
+    // Ledger is committed before best-effort audit recording.
+    if (audit.pending) await AdminAuditStore.record({ adminUserId: referrerId, action: 'reward_approved',
+      entityType: 'reward_ledger', entityId: audit.pending.record.id,
+      metadata: { order_id: input.id, amount_minor: audit.pending.record.amount_minor, service_type: service,
+        referrer_user_id: referrerId, reward_stage: audit.pending.record.reward_stage, reward_rule_id: audit.pending.rule?.id || null } });
+    return result;
   }
 
   /**
