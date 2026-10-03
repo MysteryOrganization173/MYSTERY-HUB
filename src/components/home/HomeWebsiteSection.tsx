@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { WEBSITE_TEMPLATES } from '../../data/templates';
+import { orderedWebsiteTemplates } from '../../data/templates';
 import { TemplateCardPreview } from '../website/TemplateCardPreview';
 import { Globe, ArrowRight, Smartphone, Zap } from 'lucide-react';
 
@@ -8,7 +8,7 @@ export const HomeWebsiteSection: React.FC = () => {
   const { setActivePage, openTemplatePreview } = useApp();
 
   // 3 sample templates for the home showcase
-  const previewTemplates = WEBSITE_TEMPLATES.slice(0, 3);
+  const previewTemplates = orderedWebsiteTemplates().slice(0, 3);
 
   return (
     <section className="py-6 sm:py-10 lg:py-14 bg-[#090d10] border-y border-slate-800/80">

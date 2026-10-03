@@ -1,3 +1,4 @@
+import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
 import {
@@ -90,12 +91,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
       {/* Hero Section */}
       <div className="relative py-14 sm:py-20 px-6 sm:px-12 bg-gradient-to-br from-[#2a0e14] via-[#3b151d] to-[#1c090d] text-[#fcf9f5] overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-30 bg-cover bg-center mix-blend-overlay"
-          style={{
-            backgroundImage: `url(${template.heroImage || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5'})`,
-          }}
-        />
+        <SafeImage className="absolute inset-0 opacity-45   " src={template.heroImage || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-3xl space-y-5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#c99a45]/20 border border-[#c99a45]/40 text-[#c99a45] text-xs font-sans font-semibold tracking-wider uppercase">
             <Utensils className="w-3.5 h-3.5" />
@@ -179,13 +175,10 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
             >
               {item.image && (
                 <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-slate-100">
-                  <img
+                  <SafeImage
                     src={item.image}
                     alt={item.name}
                     className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = 'none';
-                    }}
                   />
                 </div>
               )}

@@ -1,3 +1,4 @@
+import { SafeImage } from './SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate, TemplateItem } from '../../types';
 import {
@@ -200,10 +201,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
           }}
         >
           {template.heroImage && (
-            <div
-              className="absolute inset-0 opacity-25 bg-cover bg-center mix-blend-overlay"
-              style={{ backgroundImage: `url(${template.heroImage})` }}
-            />
+            <SafeImage className="absolute inset-0 opacity-45   " src={template.heroImage} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
           )}
           <div className="relative max-w-3xl space-y-4">
             <div
@@ -295,7 +293,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
               >
                 {item.image && (
                   <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden shrink-0 bg-slate-100">
-                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    <SafeImage src={item.image} alt={item.name} className="w-full h-full object-cover" />
                   </div>
                 )}
                 <div className="flex-1 space-y-1 min-w-0">
@@ -511,10 +509,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
           }}
         >
           {template.heroImage && (
-            <div
-              className="absolute inset-0 opacity-20 bg-cover bg-center mix-blend-luminosity"
-              style={{ backgroundImage: `url(${template.heroImage})` }}
-            />
+            <SafeImage className="absolute inset-0 opacity-40   mix-blend-luminosity" src={template.heroImage} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
           )}
           <div className="relative max-w-3xl space-y-4 sm:space-y-5">
             <div
@@ -606,7 +601,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                 <div>
                   {item.image && (
                     <div className="h-40 overflow-hidden relative bg-slate-900">
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      <SafeImage src={item.image} alt={item.name} className="w-full h-full object-cover" />
                       <div className="absolute top-2.5 right-2.5 bg-black/80 px-2 py-0.5 rounded text-[10px] font-mono text-white font-bold border border-white/20">
                         {item.price}
                       </div>
@@ -777,10 +772,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
         }}
       >
         {template.heroImage && (
-          <div
-            className="absolute inset-0 opacity-20 bg-cover bg-center"
-            style={{ backgroundImage: `url(${template.heroImage})` }}
-          />
+          <SafeImage className="absolute inset-0 opacity-40  " src={template.heroImage} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         )}
         <div className="relative max-w-3xl space-y-4">
           <span
@@ -850,13 +842,10 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
               <div>
                 {item.image && (
                   <div className="h-44 sm:h-48 overflow-hidden relative bg-slate-950/20">
-                    <img
+                    <SafeImage
                       src={item.image}
                       alt={item.name}
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
                     />
                     {item.price && (
                       <div

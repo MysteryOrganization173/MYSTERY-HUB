@@ -1,3 +1,4 @@
+import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
 import {
@@ -81,12 +82,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
 
       {/* Hero Banner */}
       <div className="relative py-16 sm:py-24 px-6 sm:px-12 bg-gradient-to-r from-[#381425] via-[#4d1b33] to-[#2b0f1d] text-white overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-25 bg-cover bg-center mix-blend-overlay"
-          style={{
-            backgroundImage: `url(${template.heroImage || 'https://images.unsplash.com/photo-1560066984-138dadb4c035'})`,
-          }}
-        />
+        <SafeImage className="absolute inset-0 opacity-45   " src={template.heroImage || 'https://images.unsplash.com/photo-1560066984-138dadb4c035'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-2xl space-y-5">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-[#fbcfe8] text-xs font-semibold uppercase tracking-wider">
             <Heart className="w-3.5 h-3.5 text-[#ec4899]" />
@@ -153,13 +149,10 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
               <div>
                 {item.image && (
                   <div className="h-44 overflow-hidden relative">
-                    <img
+                    <SafeImage
                       src={item.image}
                       alt={item.name}
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
                     />
                     <div className="absolute top-2.5 right-2.5 bg-black/70 backdrop-blur-sm px-2.5 py-0.5 rounded-full text-xs font-bold text-pink-200">
                       {item.price}

@@ -1,3 +1,4 @@
+import { SafeImage } from '../SafeImage.js';
 import React, { useState, useEffect, useMemo } from 'react';
 import { WebsiteTemplate, TemplateItem } from '../../../types';
 import {
@@ -48,7 +49,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
   const [selectedNetwork, setSelectedNetwork] = useState<'mtn' | 'telecel' | 'at'>('mtn');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [orderNotice, setOrderNotice] = useState<string | null>(null);
-  const [imageError, setImageError] = useState(false);
+
 
   const businessName = template.demoBusinessName || 'Ghana Data Express';
   const tagline = template.demoHeroTagline || 'Affordable Data Bundles, Straight to Your Line';
@@ -348,37 +349,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
               }}
             >
               <div className="relative rounded-xl sm:rounded-2xl overflow-hidden aspect-[16/10] sm:aspect-[4/3] max-h-[260px] sm:max-h-none w-full bg-black/80">
-                {!imageError ? (
-                  <img
-                    src={optimizedHeroSrc}
-                    srcSet={heroSrcSet || undefined}
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 560px"
-                    alt={businessName}
-                    onError={() => setImageError(true)}
-                    className="w-full h-full object-cover object-[center_right] sm:object-center transition-transform duration-500 hover:scale-[1.03]"
-                    loading="eager"
-                    decoding="async"
-                    // @ts-expect-error fetchpriority attribute
-                    fetchpriority="high"
-                    width={1200}
-                    height={750}
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-2.5 bg-gradient-to-br from-[#0c1520] to-[#060a0e]">
-                    <div
-                      className="w-12 h-12 rounded-2xl flex items-center justify-center border shadow-md"
-                      style={{ backgroundColor: `${p.accent}15`, borderColor: `${p.accent}40`, color: p.accent }}
-                    >
-                      <Smartphone className="w-6 h-6" />
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-xs sm:text-sm text-white font-bold">{businessName}</p>
-                      <p className="text-[11px]" style={{ color: p.mutedText }}>
-                        MTN · Telecel · AirtelTigo Storefront
-                      </p>
-                    </div>
-                  </div>
-                )}
+                <SafeImage src={optimizedHeroSrc} srcSet={heroSrcSet || undefined} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 560px" alt={businessName} className="w-full h-full" style={{ objectPosition: '60% center' }} loading="eager" fetchPriority="high" width={1200} height={750} />
 
                 {/* Subtle soft edge ring without obscuring artwork */}
                 <div className="pointer-events-none absolute inset-0 rounded-xl sm:rounded-2xl ring-1 ring-inset ring-white/10" />

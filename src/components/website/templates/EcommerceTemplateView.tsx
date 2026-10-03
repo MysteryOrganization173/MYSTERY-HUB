@@ -1,3 +1,4 @@
+import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
 import {
@@ -102,12 +103,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
 
       {/* Hero Showcase */}
       <div className="relative py-12 sm:py-16 px-6 sm:px-12 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 text-white overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-20 bg-cover bg-center"
-          style={{
-            backgroundImage: `url(${template.heroImage || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e'})`,
-          }}
-        />
+        <SafeImage className="absolute inset-0 opacity-40  " src={template.heroImage || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-2xl space-y-4">
           <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30">
             100% Genuine Guaranteed · Official Warranty
@@ -212,13 +208,10 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
               <div>
                 {p.image && (
                   <div className="h-48 overflow-hidden relative bg-slate-50 p-4 flex items-center justify-center">
-                    <img
+                    <SafeImage
                       src={p.image}
                       alt={p.name}
                       className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
                     />
                     {p.tag && (
                       <span className="absolute top-3 left-3 bg-[#ef4444] text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">

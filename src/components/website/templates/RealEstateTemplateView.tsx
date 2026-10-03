@@ -1,3 +1,4 @@
+import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
 import {
@@ -94,12 +95,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
       {/* Hero with Embedded Property Search Bar */}
       <div className="relative py-14 sm:py-20 px-6 sm:px-12 bg-gradient-to-r from-[#0c131f] via-[#111e31] to-[#0a101b] text-white overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-30 bg-cover bg-center"
-          style={{
-            backgroundImage: `url(${template.heroImage || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9'})`,
-          }}
-        />
+        <SafeImage className="absolute inset-0 opacity-45  " src={template.heroImage || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-4xl mx-auto space-y-6 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#0ea5e9]/20 border border-[#0ea5e9]/40 text-[#38bdf8] text-xs font-semibold uppercase tracking-wider">
             <span>Prime Real Estate in Ghana</span>
@@ -210,13 +206,10 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
               <div>
                 {prop.image && (
                   <div className="h-48 overflow-hidden relative bg-slate-100">
-                    <img
+                    <SafeImage
                       src={prop.image}
                       alt={prop.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
                     />
                     <div className="absolute top-3 left-3 bg-[#0f172a]/90 backdrop-blur-sm px-2.5 py-1 rounded-md text-[10px] font-bold text-white uppercase tracking-wider">
                       {prop.category}

@@ -1,3 +1,4 @@
+import type { WebsiteComposition } from '../config/websiteBuilder.js';
 export type NetworkId = 'mtn' | 'telecel' | 'airteltigo';
 
 export interface NetworkInfo {
@@ -90,7 +91,8 @@ export type TemplateLayoutType =
   | 'church'
   | 'fashion'
   | 'services'
-  | 'reseller';
+  | 'reseller'
+  | 'blank';
 
 export interface SiteSocialLinks {
   instagram?: string;
@@ -99,6 +101,7 @@ export interface SiteSocialLinks {
 }
 
 export interface SiteContent {
+  composition?: WebsiteComposition;
   businessName: string;
   tagline: string;
   aboutText: string;
@@ -139,6 +142,7 @@ export interface WebsiteSiteRecord {
 }
 
 export interface PublicWebsiteSite {
+  showAttribution?: boolean;
   id: string;
   template_id: string;
   name: string;
@@ -172,6 +176,10 @@ export interface TemplateItem {
 }
 
 export interface WebsiteTemplate {
+  priority?: number;
+  integrations?: readonly { id: string; label: string; status: "upcoming" }[];
+  composition?: WebsiteComposition;
+  siteContent?: Partial<SiteContent>;
   id: string;
   title: string;
   category: TemplateCategory;

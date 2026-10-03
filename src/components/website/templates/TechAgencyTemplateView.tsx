@@ -1,3 +1,4 @@
+import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
 import {
@@ -77,12 +78,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
       {/* Hero Section */}
       <div className="relative py-16 sm:py-24 px-6 sm:px-12 bg-gradient-to-b from-[#090d14] via-[#0d131f] to-[#070a0f] border-b border-slate-800 overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-15 bg-cover bg-center"
-          style={{
-            backgroundImage: `url(${template.heroImage || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa'})`,
-          }}
-        />
+        <SafeImage className="absolute inset-0 opacity-40  " src={template.heroImage || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-3xl space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#8b5cf6]/15 border border-[#8b5cf6]/40 text-[#c084fc] text-xs font-mono font-bold uppercase tracking-wider">
             <Zap className="w-3.5 h-3.5 text-[#06b6d4]" />

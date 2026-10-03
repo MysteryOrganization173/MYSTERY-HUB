@@ -1,3 +1,5 @@
+import { validateWebsiteComposition } from '../services/websiteValidation.js';
+import { resolveWebsitePlan, WEBSITE_PLANS, createWebsiteComposition } from '../../src/config/websiteBuilder.js';
 /**
  * Website Builder Data Store
  * Persists and queries user websites in PostgreSQL with in-memory fallback.
@@ -150,7 +152,7 @@ export class WebsiteStore {
   ): Promise<{ site: WebsiteSiteRecord; alreadyExists?: boolean }> {
     // 1. Enforce 1 active site limit per user for V1
     const existingSites = await this.findSitesByUserId(userId);
-    if (existingSites.length > 0) {
+    if (existingSites.length >= WEBSITE_PLANS[resolveWebsitePlan(userId)].maxSites) {
       // User already has an active site, return it instead of silently duplicating
       return { site: existingSites[0], alreadyExists: true };
     }
@@ -171,20 +173,21 @@ export class WebsiteStore {
 
     // Initial content derived from the selected template record (editable starter content)
     const initialContent: SiteContent = {
+      ...(input.content?.composition !== undefined ? { composition: validateWebsiteComposition(input.content.composition, userId) } : templateId === "tmpl-start-blank" ? { composition: createWebsiteComposition() } : {}),
       businessName: sanitizeString(input.content?.businessName || name, 100),
       tagline: sanitizeString(input.content?.tagline || templateDef.demoHeroTagline || '', 150),
       aboutText: sanitizeString(
         input.content?.aboutText || templateDef.demoSubtext || '',
         2000
       ),
-      location: sanitizeString(input.content?.location || templateDef.location || 'Accra, Ghana', 150),
+      location: sanitizeString(input.content?.location || templateDef.location || (templateId === 'tmpl-start-blank' ? '' : 'Accra, Ghana'), 150),
       phone: sanitizeString(input.content?.phone || templateDef.hoursOrContact || '', 30),
       whatsapp: sanitizeString(input.content?.whatsapp || input.content?.phone || templateDef.hoursOrContact || '', 30),
       email: sanitizeString(input.content?.email || '', 100),
       heroImage: sanitizeUrl(input.content?.heroImage || templateDef.heroImage || ''),
       logoUrl: sanitizeUrl(input.content?.logoUrl || ''),
       ctaLabel: sanitizeString(
-        input.content?.ctaLabel || (templateDef.id === 'tmpl-data-reseller' ? 'Buy Data' : 'Order via WhatsApp'),
+        input.content?.ctaLabel || (templateDef.id === 'tmpl-data-reseller' ? 'Buy Data' : templateDef.id === 'tmpl-start-blank' ? 'Contact us' : 'Order via WhatsApp'),
         50
       ),
       ctaTarget: sanitizeUrl(input.content?.ctaTarget || input.content?.whatsapp || templateDef.hoursOrContact || ''),
@@ -194,13 +197,13 @@ export class WebsiteStore {
         tiktok: sanitizeString(input.content?.social?.tiktok || '', 50),
       },
       items: sanitizeTemplateItems(input.content?.items && input.content.items.length > 0 ? input.content.items : templateDef.items),
-      stats: Array.isArray(input.content?.stats && input.content.stats.length > 0 ? input.content.stats : templateDef.stats)
+      stats: Array.isArray(input.content?.stats && input.content.stats.length > 0 ? input.content.stats.slice(0, 8).map(s => ({ label: sanitizeString(s.label, 50), value: sanitizeString(s.value, 50) })) : templateDef.stats)
         ? (input.content?.stats || templateDef.stats || []).slice(0, 8).map((s) => ({
             label: sanitizeString(s.label, 50),
             value: sanitizeString(s.value, 50),
           }))
         : [],
-      features: Array.isArray(input.content?.features && input.content.features.length > 0 ? input.content.features : templateDef.features)
+      features: Array.isArray(input.content?.features && input.content.features.length > 0 ? input.content.features.slice(0, 10).map(f => sanitizeString(f, 80)) : templateDef.features)
         ? (input.content?.features || templateDef.features || []).slice(0, 10).map((f) => sanitizeString(f, 80))
         : [],
     };
@@ -277,6 +280,7 @@ export class WebsiteStore {
 
     const mergedContent: SiteContent = {
       ...existing.content_json,
+      ...(input.content?.composition !== undefined ? { composition: validateWebsiteComposition(input.content.composition, userId) } : {}),
       ...(input.content
         ? {
             businessName:

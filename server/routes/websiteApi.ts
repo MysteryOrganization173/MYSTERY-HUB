@@ -1,3 +1,6 @@
+import { WebsiteInputError } from '../services/websiteValidation.js';
+import { resolveWebsitePlan, showWebsiteAttribution } from '../../src/config/websiteBuilder.js';
+import { ultraRouter } from './websiteUltraApi.js';
 /**
  * Website Builder API Routes
  * Endpoints for site creation, editing, live previewing, saving, publishing, and public display.
@@ -9,6 +12,7 @@ import { requireAuth } from '../middleware/authMiddleware.js';
 import { PublicWebsiteSite, sanitizeString, isValidTemplateId } from '../types/website.js';
 
 export const websiteRouter = Router();
+websiteRouter.use("/ultra", ultraRouter);
 
 /**
  * 1. POST /api/websites
@@ -39,6 +43,7 @@ websiteRouter.post('/', requireAuth, async (req: Request, res: Response) => {
       alreadyExists: Boolean(result.alreadyExists),
     });
   } catch (err) {
+    if (err instanceof WebsiteInputError) { res.status(400).json({ error: err.message }); return; }
     console.error('[Website API] Error creating site:', err);
     res.status(500).json({ error: 'Failed to create website project.' });
   }
@@ -107,6 +112,7 @@ websiteRouter.patch('/:id', requireAuth, async (req: Request, res: Response) => 
 
     res.json({ success: true, site: updated });
   } catch (err: any) {
+    if (err instanceof WebsiteInputError) { res.status(400).json({ error: err.message }); return; }
     if (err.message && err.message.includes('Forbidden')) {
       res.status(403).json({ error: err.message });
       return;
@@ -224,6 +230,7 @@ export async function handlePublicSiteBySlug(req: Request, res: Response): Promi
     }
 
     const publicData: PublicWebsiteSite = {
+      showAttribution: showWebsiteAttribution(resolveWebsitePlan(site.user_id)),
       id: site.id,
       template_id: site.template_id,
       name: site.name,

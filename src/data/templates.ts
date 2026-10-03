@@ -1,3 +1,4 @@
+import { createWebsiteComposition, RESELLER_INTEGRATIONS } from '../config/websiteBuilder.js';
 import { WebsiteTemplate, TemplateCategory } from '../types';
 
 export const DATA_RESELLER_STARTER_HERO_IMAGE =
@@ -23,6 +24,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   // 1. RESTAURANT & CHOP BAR
   {
     id: 'tmpl-buka-bistro',
+    priority: 30,
     title: 'Gold Coast Artisan Kitchen & Grill',
     category: 'restaurant',
     categoryLabel: 'Restaurants & Cafes',
@@ -108,6 +110,8 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   // 2. DATA RESELLER STOREFRONT
   {
     id: 'tmpl-data-reseller',
+    integrations: RESELLER_INTEGRATIONS,
+    priority: 10,
     title: 'Ghana Data Express Storefront',
     category: 'retail',
     categoryLabel: 'Data & Tech Retail',
@@ -175,6 +179,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   // 3. CONSTRUCTION & CIVIL WORKS
   {
     id: 'tmpl-accra-build',
+    priority: 100,
     title: 'Apex Build & Civil Contractors',
     category: 'construction',
     categoryLabel: 'Construction & Civil',
@@ -200,7 +205,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
       accent: '#f97316',
       border: '#1e293b',
     },
-    heroImage: 'https://images.unsplash.com/photo-1541888946425-d0fbb186156f?auto=format&fit=crop&w=1200&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1200&q=80',
     stats: [
       { label: 'Completed Developments', value: '148+' },
       { label: 'Years in Operation', value: '18 Yrs' },
@@ -241,6 +246,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   // 3. SALON & BEAUTY
   {
     id: 'tmpl-glow-salon',
+    priority: 40,
     title: 'Nectar Glow Salon & Barber Studio',
     category: 'beauty',
     categoryLabel: 'Salons & Barber Studios',
@@ -306,6 +312,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   // 4. REAL ESTATE & LUXURY PROPERTIES
   {
     id: 'tmpl-goldcoast-realty',
+    priority: 60,
     title: 'GoldCoast Realty & Luxury Living',
     category: 'realestate',
     categoryLabel: 'Real Estate & Properties',
@@ -374,6 +381,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   // 5. PHOTOGRAPHY & CREATIVE PORTFOLIO
   {
     id: 'tmpl-lens-creative',
+    priority: 80,
     title: 'Kofi Lens — Visual Storyteller & Filmmaker',
     category: 'portfolio',
     categoryLabel: 'Portfolios & Creators',
@@ -433,6 +441,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   // 6. TECH STARTUP & DIGITAL AGENCY
   {
     id: 'tmpl-vortex-tech',
+    priority: 110,
     title: 'Vortex Cloud & Digital Systems',
     category: 'agency',
     categoryLabel: 'Tech & Digital Agency',
@@ -487,6 +496,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   // 7. HOTEL & HOSPITALITY
   {
     id: 'tmpl-akwaaba-hotel',
+    priority: 50,
     title: 'Akwaaba Eco-Resort & Spa',
     category: 'hotel',
     categoryLabel: 'Hotels & Hospitality',
@@ -545,6 +555,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   // 8. EDUCATION & ACADEMY
   {
     id: 'tmpl-horizon-edu',
+    priority: 120,
     title: 'Horizon STEM & Tech Academy',
     category: 'education',
     categoryLabel: 'Education & Academies',
@@ -601,6 +612,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   // 9. E-COMMERCE & RETAIL
   {
     id: 'tmpl-makola-mart',
+    priority: 20,
     title: 'GadgetHub Ghana — Electronics & Gear',
     category: 'retail',
     categoryLabel: 'E-Commerce & Retail',
@@ -669,6 +681,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   // 10. CHURCH & MINISTRY
   {
     id: 'tmpl-grace-ministry',
+    priority: 90,
     title: 'Grace City Chapel International',
     category: 'church',
     categoryLabel: 'Churches & Ministries',
@@ -728,6 +741,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   // 11. FASHION & ATELIER
   {
     id: 'tmpl-afrochic-threads',
+    priority: 70,
     title: 'Akwete Bespoke Atelier & Kente House',
     category: 'fashion',
     categoryLabel: 'Fashion & Bespoke',
@@ -784,6 +798,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   // 12. PROFESSIONAL LEGAL & CONSULTING
   {
     id: 'tmpl-legon-consult',
+    priority: 101,
     title: 'Vanguard Legal & Accounting Partners',
     category: 'services',
     categoryLabel: 'Corporate & Legal',
@@ -833,3 +848,6 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     ],
   },
 ];
+
+WEBSITE_TEMPLATES.push({ id: 'tmpl-start-blank', priority: 999, title: 'Start Blank', category: 'services', categoryLabel: 'Blank Foundation', industry: 'Your business', description: 'Start with Header, Hero, Contact and Footer. Add approved sections in the editor.', features: [], accentColor: '#00c365', demoBusinessName: 'My Business', demoHeroTagline: 'Introduce your business', demoSubtext: 'Tell visitors what you offer.', isFreeTier: true, layoutType: 'blank', composition: createWebsiteComposition() });
+export function orderedWebsiteTemplates() { return [...WEBSITE_TEMPLATES].sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999) || a.id.localeCompare(b.id)); }

@@ -1,3 +1,4 @@
+import { WebsiteSectionsControl } from './WebsiteSectionsControl.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { WebsiteSiteRecord, SiteContent, SiteSettings, WebsiteTemplate } from '../../../types';
 import { updateWebsiteOnServer, publishWebsiteOnServer, unpublishWebsiteOnServer } from '../../../services/apiClient';
@@ -662,6 +663,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
           {/* Form Content Area */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+            <WebsiteSectionsControl content={content} onChange={next => { setContent(next); markDirty(); }} />
             {/* First-Use Onboarding Guidance Card */}
             {showOnboarding && (
               <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0c1824] to-[#0d141b] border border-[#00c365]/35 shadow-xl relative animate-in fade-in slide-in-from-top-2 text-left">
