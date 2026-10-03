@@ -6,7 +6,11 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { validateReferralRule, ReferralRuleValidationError } from '../services/referralRulePolicy.js';
+import { adminEarnRouter } from './adminEarnApi.js';
+import { AdminEarnStore } from '../db/adminEarnStore.js';
+import { describeAdminRule, saveAdminRewardRule } from '../services/adminEarnControls.js';
+import { EarnInputError } from '../services/adminEarnQuery.js';
+import { ReferralRuleValidationError } from '../services/referralRulePolicy.js';
 import { requireAdmin } from '../middleware/authMiddleware.js';
 import { OrdersStore } from '../db/ordersStore.js';
 import { AuthStore } from '../db/authStore.js';
@@ -33,6 +37,7 @@ export const adminRouter = Router();
 
 // Apply strict admin authentication and authorization to all admin routes
 adminRouter.use(requireAdmin);
+adminRouter.use('/referrals', adminEarnRouter);
 
 /**
  * Neutralizes spreadsheet formula injection (CSV Injection) and escapes quotes
@@ -616,9 +621,10 @@ adminRouter.get('/users/:id', async (req: Request, res: Response) => {
       return;
     }
 
-    const [orders, waitlist] = await Promise.all([
+    const [orders, waitlist, earn] = await Promise.all([
       OrdersStore.findOrdersByUserId(userId),
       WaitlistStore.findUserWaitlists(userId),
+      AdminEarnStore.customerSummary(userId),
     ]);
 
     res.json({
@@ -626,6 +632,7 @@ adminRouter.get('/users/:id', async (req: Request, res: Response) => {
       user: toSafeUserProfile(user),
       orders: orders.map(toAdminOrderDetails),
       waitlist,
+      earn,
     });
   } catch (err) {
     console.error('[Admin API] Get user details error:', err);
@@ -1322,7 +1329,7 @@ adminRouter.get('/referrals/rules', async (_req: Request, res: Response) => {
     const rules = await ReferralStore.getAllRules();
     res.json({
       success: true,
-      rules,
+      rules: rules.map(rule => describeAdminRule(rule, rules)),
     });
   } catch (err) {
     console.error('[Admin API] Failed to get referral rules:', err);
@@ -1339,43 +1346,10 @@ adminRouter.post('/referrals/rules', async (req: Request, res: Response) => {
     const adminUser = req.user!;
     const rulePayload = req.body || {};
 
-    const rules = await ReferralStore.getAllRules();
-    const existing = rules.find(rule => rule.id === rulePayload.id);
-    const normalized = validateReferralRule(rulePayload, existing);
-    const saved = await ReferralStore.createOrUpdateRule(normalized);
-    const warnings = saved.reward_type === 'fixed_minor'
-      ? ['Fixed rewards must fit the customer charge. Orders below this reward will not receive a payout; configured amounts are never reduced automatically.'] : [];
-    if (rules.some(rule => rule.id !== saved.id && rule.enabled && saved.enabled
-      && rule.service_type === saved.service_type && rule.network === saved.network
-      && rule.product_key === saved.product_key && (rule.purchase_stage || 'any') === saved.purchase_stage
-      && (!rule.ends_at || !saved.starts_at || new Date(rule.ends_at) >= new Date(saved.starts_at))
-      && (!saved.ends_at || !rule.starts_at || new Date(saved.ends_at) >= new Date(rule.starts_at)))) {
-      warnings.push('An enabled rule overlaps this scope and stage. The newest created rule wins; rule ID breaks ties.');
-    }
-
-    await AdminAuditStore.record({
-      adminUserId: adminUser.id,
-      action: 'referral_rule_updated',
-      entityType: 'referral_reward_rule',
-      entityId: saved.id,
-      metadata: {
-        service_type: saved.service_type,
-        purchase_stage: saved.purchase_stage,
-        reward_type: saved.reward_type,
-        reward_minor: saved.reward_minor,
-        reward_percent_bps: saved.reward_percent_bps,
-        enabled: saved.enabled,
-      },
-    });
-
-    res.json({
-      success: true,
-      rule: saved,
-      warnings,
-      message: 'Reward rule saved successfully.',
-    });
+    const saved = await saveAdminRewardRule(adminUser.id, rulePayload);
+    res.json({ success: true, ...saved, message: 'Reward rule saved successfully.' });
   } catch (err) {
-    if (err instanceof ReferralRuleValidationError) {
+    if (err instanceof ReferralRuleValidationError || err instanceof EarnInputError) {
       res.status(400).json({ error: err.message });
       return;
     }

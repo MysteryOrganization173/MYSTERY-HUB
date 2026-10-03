@@ -4,6 +4,7 @@
  */
 
 import { getPool } from './connection.js';
+import type { PoolClient } from 'pg';
 
 export interface AuditLogRecord {
   id: string;
@@ -27,7 +28,7 @@ export class AdminAuditStore {
     entityType: string;
     entityId: string;
     metadata?: Record<string, unknown> | null;
-  }): Promise<AuditLogRecord> {
+  }, client?: PoolClient): Promise<AuditLogRecord> {
     const id = `aud_${Date.now()}_${Math.floor(100000 + Math.random() * 900000)}`;
     const nowIso = new Date().toISOString();
 
@@ -60,7 +61,7 @@ export class AdminAuditStore {
       created_at: nowIso,
     };
 
-    const pool = getPool();
+    const pool = client || getPool();
     if (pool) {
       try {
         const query = `
@@ -79,6 +80,7 @@ export class AdminAuditStore {
         ]);
         return res.rows[0] as AuditLogRecord;
       } catch (err) {
+        if (client) throw err;
         console.warn('[Admin Audit] Failed to record in PostgreSQL:', err);
       }
     }

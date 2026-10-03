@@ -13,6 +13,7 @@ const devUsersStore = new Map<string, UserRecord>();
 const devSessionsStore = new Map<string, SessionRecord>();
 
 export class AuthStore {
+  static adminDevUsers() { return [...devUsersStore.values()]; }
   /**
    * Create a new user record
    */

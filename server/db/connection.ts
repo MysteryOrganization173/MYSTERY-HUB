@@ -349,6 +349,14 @@ export async function initDatabase(): Promise<void> {
       },
     ];
 
+    baseTables.push({ name: 'referral_profile_suspensions', sql: `CREATE TABLE IF NOT EXISTS referral_profile_suspensions (
+      id VARCHAR(64) PRIMARY KEY, profile_id VARCHAR(64) NOT NULL REFERENCES referral_profiles(id),
+      starts_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), ends_at TIMESTAMPTZ,
+      CHECK (ends_at IS NULL OR ends_at >= starts_at));` });
+    baseTables.push({ name: 'referral_reward_suppressions', sql: `CREATE TABLE IF NOT EXISTS referral_reward_suppressions (
+      referrer_user_id VARCHAR(64) NOT NULL REFERENCES users(id), order_id VARCHAR(64) NOT NULL REFERENCES orders(id),
+      reason VARCHAR(32) NOT NULL DEFAULT 'profile_suspended', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (referrer_user_id, order_id));` });
     for (const table of baseTables) {
       try {
         await client.query(table.sql);
@@ -598,6 +606,8 @@ export async function initDatabase(): Promise<void> {
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_reward_ledger_idempotency ON reward_ledger (idempotency_key);`,
       `CREATE INDEX IF NOT EXISTS idx_reward_ledger_created ON reward_ledger (created_at DESC);`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_reward_acquisition_relationship ON reward_ledger (reward_relationship_key, service_type) WHERE reward_stage = 'acquisition' AND network_level = 1 AND reward_relationship_key IS NOT NULL;`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_suspension_open ON referral_profile_suspensions(profile_id) WHERE ends_at IS NULL;`,
+      `CREATE INDEX IF NOT EXISTS idx_referral_suspension_history ON referral_profile_suspensions(profile_id, starts_at, ends_at);`,
     ];
 
     for (const idxSql of indexStatements) {

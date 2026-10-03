@@ -714,7 +714,7 @@ export async function getAdminUsersOnServer(
 export async function getAdminUserDetailsOnServer(
   token: string,
   userId: string
-): Promise<{ success: boolean; user: SafeUserProfile; orders: AdminOrderDetails[]; waitlist: WaitlistRecord[] }> {
+): Promise<{ success: boolean; user: SafeUserProfile; orders: AdminOrderDetails[]; waitlist: WaitlistRecord[]; earn: import('../../server/types/adminEarn').EarnCustomerSummary | null }> {
   const url = `${API_BASE_URL}/api/admin/users/${encodeURIComponent(userId)}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
@@ -1336,3 +1336,15 @@ export async function getActiveRewardRules(): Promise<RewardRulesResponse> {
 
 
 
+
+// Admin Mystery Earn: server-derived metrics and bounded read-only inspection.
+export type { EarnOverview, EarnReferrer, EarnDetail, EarnLedgerRow, EarnCustomerSummary } from '../../server/types/adminEarn';
+export type AdminEarnRule = ReturnType<typeof import('../../server/services/adminEarnControls').describeAdminRule>;
+export type AdminEarnPolicy = Awaited<ReturnType<typeof import('../../server/services/adminEarnControls').recommendedPolicyStatus>>;
+export async function adminEarnRequest<T>(token: string, path: string, params: Record<string,string|number|boolean|undefined> = {}, payload?: unknown, method = 'GET', signal?: AbortSignal): Promise<T> {
+  const search = new URLSearchParams(); for (const [key,value] of Object.entries(params)) if(value!==undefined&&value!=='')search.set(key,String(value));
+  const response = await fetch(`${API_BASE_URL}/api/admin/referrals/${path}?${search}`, {method,signal,
+    headers:{Authorization:`Bearer ${token}`,...(payload!==undefined?{'Content-Type':'application/json'}:{})},
+    ...(payload!==undefined?{body:JSON.stringify(payload)}:{})});
+  const result=await response.json(); if(!response.ok)throw new Error(result.error||'Mystery Earn request failed.'); return result;
+}

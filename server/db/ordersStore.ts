@@ -42,6 +42,7 @@ async function acquireLock(key: string): Promise<() => void> {
 }
 
 export class OrdersStore {
+  static adminDevOrders() { return [...new Map([...devMemoryStore.values()].map(order => [order.id, order])).values()]; }
   /**
    * Initializes database table if PostgreSQL is configured
    */
