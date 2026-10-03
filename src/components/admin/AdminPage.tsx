@@ -7,6 +7,7 @@ import { AdminMarketplaceSection } from './sections/AdminMarketplaceSection';
 import { AdminWaitlistSection } from './sections/AdminWaitlistSection';
 import { AdminCustomersSection } from './sections/AdminCustomersSection';
 import { AdminSystemSection } from './sections/AdminSystemSection';
+import { AdminMysteryEarnSection } from './sections/AdminMysteryEarnSection';
 import { BrandLogo } from '../common/BrandLogo';
 import {
   LayoutDashboard,
@@ -22,11 +23,13 @@ import {
   Radio,
 } from 'lucide-react';
 
-export type AdminTab = 'overview' | 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system';
+export type AdminTab = 'overview' | 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system' | 'earn';
 
 export const AdminPage: React.FC = () => {
   const { user, sessionToken, logoutUser, setActivePage } = useApp();
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const [earnUserId, setEarnUserId] = useState<string | null>(null);
+  const [customerUserId, setCustomerUserId] = useState<string | null>(null);
 
   // 1. Unauthenticated -> Show Admin Login Form
   if (!user || !sessionToken) {
@@ -117,6 +120,7 @@ export const AdminPage: React.FC = () => {
           {/* Desktop Sidebar Navigation (lg:col-span-3) */}
           <aside className="hidden lg:block lg:col-span-3 space-y-4">
             <div className="p-3 bg-[#0f171d] border border-slate-800/90 rounded-2xl space-y-1">
+              <button onClick={() => { setEarnUserId(null); setActiveTab('earn'); }} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold ${activeTab === 'earn' ? 'bg-[#00c365] text-black' : 'text-slate-400 hover:text-white hover:bg-slate-900'}`}><Users className="w-4 h-4" /><span>Mystery Earn</span></button>
               <button
                 onClick={() => setActiveTab('overview')}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
@@ -204,6 +208,7 @@ export const AdminPage: React.FC = () => {
 
           {/* Mobile / Tablet Horizontal Navigation Tabs */}
           <div className="lg:hidden col-span-1 flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            <button onClick={() => { setEarnUserId(null); setActiveTab('earn'); }} className={`min-h-10 px-3 py-2 rounded-xl shrink-0 text-xs font-semibold ${activeTab === 'earn' ? 'bg-[#00c365] text-black' : 'bg-slate-900 border border-slate-800 text-slate-400'}`}>Mystery Earn</button>
             <button
               onClick={() => setActiveTab('overview')}
               className={`px-3 py-2 rounded-xl shrink-0 flex items-center gap-1.5 font-semibold transition-colors ${
@@ -279,6 +284,7 @@ export const AdminPage: React.FC = () => {
 
           {/* Active Tab Workspace (lg:col-span-9) */}
           <main className="col-span-1 lg:col-span-9">
+            {activeTab === 'earn' && <AdminMysteryEarnSection sessionToken={sessionToken} initialReferrerId={earnUserId} onOpenCustomer={id => { setCustomerUserId(id); setActiveTab('customers'); }} />}
             {activeTab === 'overview' && (
               <AdminOverviewSection
                 sessionToken={sessionToken}
@@ -298,6 +304,8 @@ export const AdminPage: React.FC = () => {
               <AdminCustomersSection
                 sessionToken={sessionToken}
                 currentAdminId={user.id}
+                initialUserId={customerUserId}
+                onOpenEarn={id => { setEarnUserId(id); setActiveTab('earn'); }}
               />
             )}
             {activeTab === 'system' && (

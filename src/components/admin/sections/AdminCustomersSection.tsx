@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { earnMoney } from './AdminEarnUi';
+import type { EarnCustomerSummary } from '../../../../server/types/adminEarn';
 import {
   AdminUsersResponse,
   AdminCustomerProfile,
@@ -31,11 +33,15 @@ import {
 interface AdminCustomersSectionProps {
   sessionToken: string;
   currentAdminId: string;
+  initialUserId?: string | null;
+  onOpenEarn?: (id: string) => void;
 }
 
 export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
   sessionToken,
   currentAdminId,
+  initialUserId,
+  onOpenEarn,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -54,6 +60,20 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
   const [userOrders, setUserOrders] = useState<AdminOrderDetails[]>([]);
   const [userWaitlists, setUserWaitlists] = useState<WaitlistRecord[]>([]);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [earnSummary, setEarnSummary] = useState<EarnCustomerSummary | null>(null);
+  const detailRequest = useRef(0);
+  useEffect(() => () => { detailRequest.current++; }, []);
+  useEffect(() => {
+    if (!initialUserId) return;
+    const request = ++detailRequest.current;
+    let active = true; setIsLoadingDetails(true); setEarnSummary(null); setUserOrders([]); setUserWaitlists([]);
+    getAdminUserDetailsOnServer(sessionToken, initialUserId).then(res => {
+      if (!active || request !== detailRequest.current) return;
+      setSelectedUser({ ...res.user, orderCount: 0, totalSpentGhc: 0 });
+      setUserOrders(res.orders); setUserWaitlists(res.waitlist); setEarnSummary(res.earn);
+    }).catch(err => { if (active && request === detailRequest.current) setError(err.message); }).finally(() => { if (active && request === detailRequest.current) setIsLoadingDetails(false); });
+    return () => { active = false; };
+  }, [initialUserId, sessionToken]);
 
   // Status Change Confirmation Dialog
   const [statusTargetUser, setStatusTargetUser] = useState<{ id: string; name: string; currentStatus: UserStatus } | null>(null);
@@ -89,18 +109,21 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
 
   // Open User Drawer & Fetch Details
   const openUserDetails = async (user: AdminCustomerProfile) => {
+    const request = ++detailRequest.current;
     setSelectedUser(user);
+    setEarnSummary(null); setUserOrders([]); setUserWaitlists([]);
     setIsLoadingDetails(true);
     try {
       const res = await getAdminUserDetailsOnServer(sessionToken, user.id);
-      if (res.success) {
+      if (res.success && request === detailRequest.current) {
         setUserOrders(res.orders || []);
         setUserWaitlists(res.waitlist || []);
+        setEarnSummary(res.earn);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load full customer history.');
+      if (request === detailRequest.current) setError(err instanceof Error ? err.message : 'Failed to load full customer history.');
     } finally {
-      setIsLoadingDetails(false);
+      if (request === detailRequest.current) setIsLoadingDetails(false);
     }
   };
 
@@ -514,6 +537,15 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
               </div>
 
               {/* Order History */}
+              <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+                <h4 className="font-bold text-white">Mystery Earn</h4>
+                {isLoadingDetails ? <p className="text-slate-400">Loading Earn summary…</p> : earnSummary ? <>
+                  <p>Code: {earnSummary.code} · {earnSummary.enabled ? 'Active' : 'Suspended'}</p>
+                  <p>Visitors: {earnSummary.uniqueVisitors} · People referred: {earnSummary.peopleReferred} · Approved rewards: {earnMoney(earnSummary.approvedRewardsMinor)}</p>
+                  <p className="text-slate-500">Lifetime activity</p>
+                  <button className="min-h-10 px-3 py-2 rounded-xl bg-slate-800 text-[#00c365]" onClick={() => onOpenEarn?.(selectedUser.id)}>View in Mystery Earn</button>
+                </> : <p className="text-slate-400">No Mystery Earn activity yet.</p>}
+              </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-white flex items-center gap-1.5">

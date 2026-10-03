@@ -186,6 +186,11 @@ export class ReferralService {
             return { referrerUserId: bound.attribution.referrer_user_id,
               attributionId: bound.attribution.id, referralCode: bound.attribution.source_code };
           }
+          // Preserve a suspended first touch without bypassing cycle/self-referral failures.
+          if (bound.error === 'Referral profile is suspended.') {
+            return { referrerUserId: guest.referrer_user_id, attributionId: guest.id, referralCode: guest.source_code };
+          }
+          return { referrerUserId: null, attributionId: null, referralCode: null };
         } else {
           return { referrerUserId: guest.referrer_user_id, attributionId: guest.id, referralCode: guest.source_code };
         }
@@ -247,6 +252,7 @@ export class ReferralService {
         || (order.referral_attribution_id || null) !== (input.referral_attribution_id || null)) return null;
       const existing = (await ReferralStore.findLedgerByOrderId(order.id, client)).find(entry => (entry.network_level || 1) === 1 && !entry.reversal_of_id);
       if (existing) return existing; // Never recompute historical, reversed or already awarded entries.
+      if (!await ReferralStore.rewardAllowed(referrerId, order.delivered_at || order.updated_at || order.created_at, client, order.id)) return null;
 
       const prior = relationshipKey && (await ReferralStore.hasRewardedPurchase({ referrerId,
         userId: order.user_id, attributionId, service, relationshipKey, orderId: order.id }, client)
@@ -290,7 +296,7 @@ export class ReferralService {
       }, client);
       if (!saved.alreadyExisted) audit.pending = { record: saved.record, rule };
       return saved.record;
-    });
+    }, referrerId);
     // Ledger is committed before best-effort audit recording.
     if (audit.pending) await AdminAuditStore.record({ adminUserId: referrerId, action: 'reward_approved',
       entityType: 'reward_ledger', entityId: audit.pending.record.id,

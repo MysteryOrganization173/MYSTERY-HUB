@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { AdminEarnPulse } from './AdminEarnPulse';
 import {
   AdminOverviewMetrics,
   getAdminOverviewOnServer,
@@ -20,7 +21,7 @@ import {
 
 interface AdminOverviewSectionProps {
   sessionToken: string;
-  onNavigateTab: (tab: 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system') => void;
+  onNavigateTab: (tab: 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system' | 'earn') => void;
 }
 
 export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({
@@ -83,6 +84,7 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({
 
   return (
     <div className="space-y-6">
+      <AdminEarnPulse sessionToken={sessionToken} onOpen={() => onNavigateTab('earn')} />
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

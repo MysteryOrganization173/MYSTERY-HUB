@@ -7,6 +7,7 @@
 import crypto from 'crypto';
 import type { PoolClient } from 'pg';
 import { getPool } from './connection.js';
+import { AdminAuditStore } from './adminAuditStore.js';
 import {
   ReferralProfileRecord,
   ReferralAttributionRecord,
@@ -28,6 +29,8 @@ const devCaptureKeys = new Map<string, ReferralClickRecord>();
 const devRewardRules = new Map<string, ReferralRewardRuleRecord>();
 const devRewardLedger = new Map<string, RewardLedgerRecord>();
 const devRewardLocks = new Map<string, Promise<void>>();
+const devSuspensions: Array<{ profile_id: string; starts_at: string; ends_at: string | null }> = [];
+const devSuppressedRewards = new Set<string>();
 
 // Ambiguity-free alphanumeric alphabet for clean readable referral codes
 const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -42,6 +45,74 @@ function generateRandomCode(): string {
 }
 
 export class ReferralStore {
+  static adminDevSnapshot() { return { profiles: [...devReferralProfiles.values()], attributions: [...devReferralAttributions.values()],
+    clicks: [...devReferralClicks], ledger: [...devRewardLedger.values()] }; }
+  static async profileAcceptsReferrals(userId: string, client?: PoolClient): Promise<boolean> {
+    const db = client || getPool();
+    const profile = db ? (await db.query<ReferralProfileRecord>(`SELECT * FROM referral_profiles WHERE user_id = $1 ${client ? 'FOR SHARE' : ''};`, [userId])).rows[0]
+      : await this.findProfileByUserId(userId);
+    // Existing legacy orders/attributions may predate profile creation.
+    return !profile || profile.is_enabled;
+  }
+  static async rewardAllowed(userId: string, deliveredAt: string, client?: PoolClient, orderId?: string): Promise<boolean> {
+    const enabled = await this.profileAcceptsReferrals(userId, client);
+    const db = client || getPool();
+    if (db) {
+      const blocked = !enabled || (await db.query<{ blocked: boolean }>(`SELECT EXISTS (SELECT 1 FROM referral_profile_suspensions s
+      JOIN referral_profiles p ON p.id = s.profile_id WHERE p.user_id = $1 AND s.starts_at <= $2::timestamptz
+      AND (s.ends_at IS NULL OR s.ends_at > $2::timestamptz)) OR EXISTS
+      (SELECT 1 FROM referral_reward_suppressions WHERE referrer_user_id = $1 AND order_id = $3) AS blocked;`, [userId, deliveredAt, orderId || null])).rows[0]?.blocked;
+      if (blocked && orderId) await db.query(`INSERT INTO referral_reward_suppressions(referrer_user_id,order_id) VALUES ($1,$2) ON CONFLICT DO NOTHING;`, [userId,orderId]);
+      return !blocked;
+    }
+    const profile = await this.findProfileByUserId(userId);
+    const key = `${userId}:${orderId}`;
+    const blocked = !enabled || devSuppressedRewards.has(key) || devSuspensions.some(s => s.profile_id === profile?.id && Date.parse(s.starts_at) <= Date.parse(deliveredAt)
+      && (!s.ends_at || Date.parse(s.ends_at) > Date.parse(deliveredAt)));
+    if (blocked && orderId) devSuppressedRewards.add(key);
+    return !blocked;
+  }
+  static async setProfileEnabled(userId: string, enabled: boolean, adminId?: string): Promise<{ profile: ReferralProfileRecord; changed: boolean }> {
+    const pool = getPool();
+    if (pool) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const profile = (await client.query<ReferralProfileRecord>('SELECT * FROM referral_profiles WHERE user_id = $1 FOR UPDATE;', [userId])).rows[0];
+        if (!profile) throw new Error('Referral profile not found.');
+        const changed = profile.is_enabled !== enabled;
+        if (changed) {
+          if (!enabled) await client.query(`INSERT INTO referral_profile_suspensions(id, profile_id, starts_at) VALUES ($1, $2, NOW());`, [`susp_${crypto.randomUUID()}`, profile.id]);
+          else {
+            // Preserve a legacy disabled profile's known interval if no history exists yet.
+            await client.query(`INSERT INTO referral_profile_suspensions(id, profile_id, starts_at, ends_at)
+              SELECT $1, $2, $3::timestamptz, NOW() WHERE NOT EXISTS (SELECT 1 FROM referral_profile_suspensions WHERE profile_id = $2 AND ends_at IS NULL);`,
+              [`susp_${crypto.randomUUID()}`, profile.id, profile.updated_at]);
+            await client.query('UPDATE referral_profile_suspensions SET ends_at = NOW() WHERE profile_id = $1 AND ends_at IS NULL;', [profile.id]);
+          }
+          const updated = await client.query<ReferralProfileRecord>('UPDATE referral_profiles SET is_enabled = $2, updated_at = NOW() WHERE id = $1 RETURNING *;', [profile.id, enabled]);
+          if (adminId) await AdminAuditStore.record({ adminUserId: adminId, action: enabled ? 'referral_profile_resumed' : 'referral_profile_suspended',
+            entityType: 'referral_profile', entityId: profile.id, metadata: { user_id: userId, enabled } }, client);
+          await client.query('COMMIT'); return { profile: updated.rows[0], changed };
+        }
+        await client.query('COMMIT'); return { profile, changed };
+      } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+    }
+    return this.withRewardTransaction(`profile:${userId}`, `profile:${userId}`, async () => {
+      const profile = [...devReferralProfiles.values()].find(p => p.user_id === userId);
+      if (!profile) throw new Error('Referral profile not found.');
+      const changed = profile.is_enabled !== enabled; const now = new Date().toISOString();
+      if (changed) {
+        if (!enabled) devSuspensions.push({ profile_id: profile.id, starts_at: now, ends_at: null });
+        else { const open = devSuspensions.find(s => s.profile_id === profile.id && !s.ends_at);
+          if (open) open.ends_at = now; else devSuspensions.push({ profile_id: profile.id, starts_at: profile.updated_at, ends_at: now }); }
+        profile.is_enabled = enabled; profile.updated_at = now;
+        if (adminId) await AdminAuditStore.record({ adminUserId: adminId, action: enabled ? 'referral_profile_resumed' : 'referral_profile_suspended',
+          entityType: 'referral_profile', entityId: profile.id, metadata: { user_id: userId, enabled } });
+      }
+      return { profile: { ...profile }, changed };
+    }, userId);
+  }
   static _clearDevStore(): void {
     devReferralProfiles.clear();
     devReferralAttributions.clear();
@@ -49,6 +120,8 @@ export class ReferralStore {
     devCaptureKeys.clear();
     devRewardRules.clear();
     devRewardLedger.clear();
+    devSuspensions.length = 0;
+    devSuppressedRewards.clear();
   }
 
   // =========================================================================
@@ -197,6 +270,7 @@ export class ReferralStore {
         await client.query('BEGIN');
         await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0));',
           [`referral-click:${params.profileId}:${params.visitorKey || captureKey || 'anonymous'}`]);
+        if (!await this.profileAcceptsReferrals(params.referrerUserId, client)) throw new Error('Referral profile is suspended.');
         // Retries share a persisted capture key; rapid repeated visitor events are coalesced.
         const previous = await client.query<ReferralClickRecord>(`
           SELECT * FROM referral_clicks WHERE referral_profile_id = $1
@@ -229,6 +303,7 @@ export class ReferralStore {
       } catch (error) { await client.query('ROLLBACK'); throw error; }
       finally { client.release(); }
     } else {
+      if (!await this.profileAcceptsReferrals(params.referrerUserId)) throw new Error('Referral profile is suspended.');
       const prior = (captureKey && devCaptureKeys.get(captureKey)) || devReferralClicks.find(c =>
         params.visitorKey && c.referral_profile_id === params.profileId && c.visitor_key === params.visitorKey
         && Date.now() - new Date(c.created_at).getTime() < 60_000);
@@ -349,6 +424,7 @@ export class ReferralStore {
     if (existing) {
       return existing;
     }
+    if (!await this.profileAcceptsReferrals(params.referrerUserId, client)) throw new Error('Referral profile is suspended.');
 
     const id = `refatt_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     const nowIso = new Date().toISOString();
@@ -460,6 +536,7 @@ export class ReferralStore {
     if (guest && !guest.referred_user_id) {
       params = { ...params, referrerUserId: guest.referrer_user_id, sourceCode: guest.source_code };
     }
+    if (!await this.profileAcceptsReferrals(params.referrerUserId, client)) return { attribution: null, isNew: false, error: 'Referral profile is suspended.' };
     // 1. Enforce No Self-Referrals
     if (params.referredUserId === params.referrerUserId) {
       return { attribution: null, isNew: false, error: 'Self-referral is not allowed.' };
@@ -745,8 +822,8 @@ export class ReferralStore {
     return { ...activeRules[0] };
   }
 
-  static async getAllRules(): Promise<ReferralRewardRuleRecord[]> {
-    const pool = getPool();
+  static async getAllRules(client?: PoolClient): Promise<ReferralRewardRuleRecord[]> {
+    const pool = client || getPool();
     if (pool) {
       const res = await pool.query<ReferralRewardRuleRecord>(
         `SELECT * FROM referral_reward_rules ORDER BY created_at DESC;`
@@ -757,7 +834,7 @@ export class ReferralStore {
   }
 
   static async createOrUpdateRule(
-    rule: Partial<ReferralRewardRuleRecord> & { service_type: RewardServiceType | 'all' }
+    rule: Partial<ReferralRewardRuleRecord> & { service_type: RewardServiceType | 'all' }, client?: PoolClient
   ): Promise<ReferralRewardRuleRecord> {
     const id = rule.id || `rewrule_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
     const nowIso = new Date().toISOString();
@@ -782,7 +859,7 @@ export class ReferralStore {
       updated_at: nowIso,
     };
 
-    const pool = getPool();
+    const pool = client || getPool();
     if (pool) {
       const res = await pool.query<ReferralRewardRuleRecord>(
         `
@@ -1112,7 +1189,7 @@ export class ReferralStore {
     }));
   }
   static async withRewardTransaction<T>(relationshipKey: string, orderId: string,
-    work: (client?: PoolClient) => Promise<T>): Promise<T> {
+    work: (client?: PoolClient) => Promise<T>, profileUserId?: string): Promise<T> {
     const pool = getPool();
     if (pool) {
       const client = await pool.connect();
@@ -1128,7 +1205,7 @@ export class ReferralStore {
     }
     const releases: Array<() => void> = [];
     try {
-      for (const key of [`stage:${relationshipKey}`, `order:${orderId}`]) {
+      for (const key of [...(profileUserId ? [`profile:${profileUserId}`] : []), `stage:${relationshipKey}`, `order:${orderId}`]) {
         const previous = devRewardLocks.get(key) || Promise.resolve();
         let release!: () => void;
         const pending = new Promise<void>(resolve => { release = resolve; });
