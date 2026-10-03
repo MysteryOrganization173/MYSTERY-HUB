@@ -27,6 +27,9 @@ import {
   Copy,
   Edit3,
   Compass,
+  Layers,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 export const WebsiteBuilderPage: React.FC = () => {
@@ -43,6 +46,7 @@ export const WebsiteBuilderPage: React.FC = () => {
 
   const [selectedCategory, setSelectedCategory] = useState<TemplateCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAllTemplates, setShowAllTemplates] = useState(false);
   const [mySites, setMySites] = useState<WebsiteSiteRecord[]>([]);
   const [isLoadingSites, setIsLoadingSites] = useState(false);
   const [actionLoadingSiteId, setActionLoadingSiteId] = useState<string | null>(null);
@@ -84,6 +88,9 @@ export const WebsiteBuilderPage: React.FC = () => {
       t.features.some((f) => f.toLowerCase().includes(q))
     );
   });
+
+  const isFiltering = selectedCategory !== 'all' || searchQuery.trim().length > 0;
+  const displayedTemplates = isFiltering || showAllTemplates ? filteredTemplates : filteredTemplates.slice(0, 6);
 
   const handleCreateSite = async (templateId: string, templateName?: string) => {
     const doCreate = async (token: string) => {
@@ -147,6 +154,16 @@ export const WebsiteBuilderPage: React.FC = () => {
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const scrollToPlans = () => {
+    const el = document.getElementById('plans-pricing');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const scrollToTemplates = () => {
+    const el = document.getElementById('templates-showcase');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
+
   const handleTogglePublish = async (site: WebsiteSiteRecord) => {
     if (!sessionToken) return;
     setActionLoadingSiteId(site.id);
@@ -196,17 +213,18 @@ export const WebsiteBuilderPage: React.FC = () => {
 
   return (
     <div className="min-h-screen pt-6 pb-28 sm:py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 sm:space-y-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 sm:space-y-14">
         {/* =========================================================
             1. AUTHENTICATED USER'S ACTIVE WEBSITE DASHBOARD
+               (PRIORITIZED FOR LOGGED-IN USERS WITH A WEBSITE)
             ========================================================= */}
-        {user && activeSite && (
-          <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-[#0d161d] via-[#101b24] to-[#0a1218] border border-slate-700/80 shadow-2xl text-left space-y-5 animate-in fade-in">
+        {user && activeSite ? (
+          <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-[#0d161d] via-[#101b24] to-[#0a1218] border border-[#00c365]/35 shadow-2xl text-left space-y-5 animate-in fade-in">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
               <div className="space-y-1">
                 <div className="inline-flex items-center gap-2 text-xs font-bold text-[#00c365] uppercase tracking-wider">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>My Website Project</span>
+                  <span>My Active Website Project</span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                   {activeSite.content_json?.businessName || activeSite.name}
@@ -256,6 +274,15 @@ export const WebsiteBuilderPage: React.FC = () => {
 
                 <button
                   type="button"
+                  onClick={scrollToTemplates}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Compass className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Browse Templates</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => handleTogglePublish(activeSite)}
                   disabled={actionLoadingSiteId === activeSite.id}
                   className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
@@ -283,169 +310,182 @@ export const WebsiteBuilderPage: React.FC = () => {
               )}
             </div>
           </div>
+        ) : (
+          /* =========================================================
+             2. HERO SECTION FOR VISITORS & USERS WITHOUT A WEBSITE
+             ========================================================= */
+          <div className="relative rounded-3xl bg-[#08100d] border border-slate-800/80 p-6 sm:p-12 lg:p-16 overflow-hidden shadow-2xl">
+            {/* Backdrop Artwork Layer */}
+            <div
+              className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0"
+              aria-hidden="true"
+              role="presentation"
+            >
+              <picture>
+                <source
+                  media="(max-width: 767px)"
+                  srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_800,c_fill,g_east/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png 800w"
+                  sizes="100vw"
+                />
+                <source
+                  media="(max-width: 1023px)"
+                  srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1200,c_fill,g_east/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png 1200w"
+                  sizes="100vw"
+                />
+                <img
+                  src="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1600/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png"
+                  srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1280/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png 1280w,
+                          https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1600/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png 1600w"
+                  sizes="100vw"
+                  alt=""
+                  fetchPriority="high"
+                  loading="eager"
+                  decoding="async"
+                  className="w-full h-full object-cover object-[92%_top] sm:object-[88%_center] lg:object-right opacity-80 sm:opacity-85 lg:opacity-90"
+                />
+              </picture>
+
+              <div className="hidden lg:block absolute inset-0 bg-gradient-to-r from-[#08100d] via-[#08100d]/85 to-transparent from-0% via-42% to-75%" />
+              <div className="lg:hidden absolute inset-0 bg-gradient-to-r from-[#08100d]/95 via-[#08100d]/70 to-[#08100d]/25 from-0% via-48% to-100%" />
+              <div className="lg:hidden absolute inset-0 bg-gradient-to-b from-[#08100d]/30 via-transparent to-[#08100d] from-0% via-60% to-98%" />
+            </div>
+
+            <div className="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#00c365]/15 rounded-full blur-[100px] pointer-events-none" />
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center relative z-10">
+              <div className="lg:col-span-7 space-y-6 text-left">
+                {/* Badge */}
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/30 text-xs font-semibold text-[#00c365]">
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Mystery Hub Website Studio</span>
+                </div>
+
+                {/* Headline */}
+                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1]">
+                  Build Your Website for Free
+                </h1>
+
+                {/* Subheadline */}
+                <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-lg">
+                  Create a professional website for your business without coding. Start at GH₵0 and customise it to match your brand.
+                </p>
+
+                {/* Supporting Benefits */}
+                <div className="grid grid-cols-2 gap-2 max-w-md pt-1 text-xs text-slate-200">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#00c365] font-bold">✓</span>
+                    <span>Start free</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#00c365] font-bold">✓</span>
+                    <span>No coding required</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#00c365] font-bold">✓</span>
+                    <span>Mobile responsive</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#00c365] font-bold">✓</span>
+                    <span>Built for Ghanaian businesses</span>
+                  </div>
+                </div>
+
+                {/* CTAs */}
+                <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handlePrimaryHeroAction}
+                    className="px-6 py-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.35)] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Build My Website Free</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={scrollToPlans}
+                    className="px-6 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 transition-colors flex items-center justify-center gap-2 backdrop-blur-sm cursor-pointer"
+                  >
+                    <Layers className="w-4 h-4 text-[#00c365]" />
+                    <span>Compare Plans</span>
+                  </button>
+                </div>
+
+                {/* Compact Benefit Strip */}
+                <div className="p-3.5 rounded-xl bg-[#0a120e]/90 border border-[#00c365]/20 flex items-center gap-3 text-xs text-slate-300 backdrop-blur-sm">
+                  <div className="w-6 h-6 rounded-lg bg-[#00c365]/20 text-[#00c365] flex items-center justify-center shrink-0">
+                    <Check className="w-3.5 h-3.5" />
+                  </div>
+                  <span>
+                    <strong>START FREE AT GH₵0:</strong> Build and customise your website without paying upfront.
+                  </span>
+                </div>
+              </div>
+
+              <div className="hidden lg:block lg:col-span-5 pointer-events-none min-h-[380px]" aria-hidden="true" />
+            </div>
+          </div>
         )}
 
         {/* =========================================================
-            2. HERO SECTION (PRODUCT POSITIONING - EXACT V1 SPEC)
+            2. COMPACT TRUST / VALUE STRIP
             ========================================================= */}
-        <div className="relative rounded-3xl bg-[#08100d] border border-slate-800/80 p-6 sm:p-12 lg:p-16 overflow-hidden shadow-2xl">
-          {/* Backdrop Artwork Layer */}
-          <div
-            className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0"
-            aria-hidden="true"
-            role="presentation"
-          >
-            <picture>
-              <source
-                media="(max-width: 767px)"
-                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_800,c_fill,g_east/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png 800w"
-                sizes="100vw"
-              />
-              <source
-                media="(max-width: 1023px)"
-                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1200,c_fill,g_east/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png 1200w"
-                sizes="100vw"
-              />
-              <img
-                src="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1600/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png"
-                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1280/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png 1280w,
-                        https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1600/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png 1600w"
-                sizes="100vw"
-                alt=""
-                fetchPriority="high"
-                loading="eager"
-                decoding="async"
-                className="w-full h-full object-cover object-[92%_top] sm:object-[88%_center] lg:object-right opacity-80 sm:opacity-85 lg:opacity-90"
-              />
-            </picture>
-
-            <div className="hidden lg:block absolute inset-0 bg-gradient-to-r from-[#08100d] via-[#08100d]/85 to-transparent from-0% via-42% to-75%" />
-            <div className="lg:hidden absolute inset-0 bg-gradient-to-r from-[#08100d]/95 via-[#08100d]/70 to-[#08100d]/25 from-0% via-48% to-100%" />
-            <div className="lg:hidden absolute inset-0 bg-gradient-to-b from-[#08100d]/30 via-transparent to-[#08100d] from-0% via-60% to-98%" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+          <div className="p-5 sm:p-6 rounded-2xl bg-[#0f151b] border border-slate-800/80 space-y-2.5 text-left">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-[#00c365]">
+              <Smartphone className="w-4 h-4" />
+            </div>
+            <h3 className="font-bold text-sm sm:text-base text-white">Made for Ghanaian Businesses</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Every template is styled with authentic color schemes, typography, and sections crafted for Ghanaian commerce.
+            </p>
           </div>
 
-          <div className="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#00c365]/15 rounded-full blur-[100px] pointer-events-none" />
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center relative z-10">
-            <div className="lg:col-span-7 space-y-6 text-left">
-              {/* Badge */}
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/30 text-xs font-semibold text-[#00c365]">
-                <Globe className="w-3.5 h-3.5" />
-                <span>Mystery Hub Website Studio</span>
-              </div>
-
-              {/* Headline */}
-              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1]">
-                Build Your Website for Free
-              </h1>
-
-              {/* Subheadline */}
-              <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-lg">
-                Create a professional website for your business without coding. Start at GH₵0 and customise it to match your brand.
-              </p>
-
-              {/* Supporting Benefits */}
-              <div className="grid grid-cols-2 gap-2 max-w-md pt-1 text-xs text-slate-200">
-                <div className="flex items-center gap-2">
-                  <span className="text-[#00c365] font-bold">✓</span>
-                  <span>Start free</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[#00c365] font-bold">✓</span>
-                  <span>No coding required</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[#00c365] font-bold">✓</span>
-                  <span>Mobile responsive</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[#00c365] font-bold">✓</span>
-                  <span>Built for Ghanaian businesses</span>
-                </div>
-              </div>
-
-              {/* CTAs */}
-              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handlePrimaryHeroAction}
-                  className="px-6 py-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.35)] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span>{activeSite ? 'Go to My Website Dashboard' : 'BUILD MY WEBSITE FREE'}</span>
-                </button>
-
-                <a
-                  href="#templates-showcase"
-                  className="px-6 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 transition-colors flex items-center justify-center gap-2 backdrop-blur-sm"
-                >
-                  <Eye className="w-4 h-4 text-slate-400" />
-                  <span>EXPLORE TEMPLATES</span>
-                </a>
-              </div>
-
-              {/* Compact Benefit Strip */}
-              <div className="p-3.5 rounded-xl bg-[#0a120e]/90 border border-[#00c365]/20 flex items-center gap-3 text-xs text-slate-300 backdrop-blur-sm">
-                <div className="w-6 h-6 rounded-lg bg-[#00c365]/20 text-[#00c365] flex items-center justify-center shrink-0">
-                  <Check className="w-3.5 h-3.5" />
-                </div>
-                <span>
-                  <strong>START FREE AT GH₵0:</strong> Build and customise your website without paying upfront.
-                </span>
-              </div>
+          <div className="p-5 sm:p-6 rounded-2xl bg-[#0f151b] border border-slate-800/80 space-y-2.5 text-left">
+            <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
+              <Zap className="w-4 h-4" />
             </div>
+            <h3 className="font-bold text-sm sm:text-base text-white">Direct WhatsApp Ordering</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Route orders and inquiries straight to your WhatsApp line with one tap, including pre-filled customer details.
+            </p>
+          </div>
 
-            <div className="hidden lg:block lg:col-span-5 pointer-events-none min-h-[380px]" aria-hidden="true" />
+          <div className="p-5 sm:p-6 rounded-2xl bg-[#0f151b] border border-slate-800/80 space-y-2.5 text-left">
+            <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+              <Layout className="w-4 h-4" />
+            </div>
+            <h3 className="font-bold text-sm sm:text-base text-white">13+ Handcrafted Designs</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              From data resellers and tech agencies to salons, food bukas, and churches — ready to launch in minutes.
+            </p>
           </div>
         </div>
 
         {/* =========================================================
-            3. CORE VALUE PROPS (COMMERCIAL FEATURES)
+            3. PLANS / PRICING & ULTRA PREMIER SERVICE
+               (DISCOVERABLE IMMEDIATELY WITHOUT EXCESSIVE SCROLLING)
             ========================================================= */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 rounded-2xl bg-[#0f151b] border border-slate-800 space-y-3 text-left">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-[#00c365]">
-              <Smartphone className="w-5 h-5" />
-            </div>
-            <h3 className="font-bold text-base text-white">Made for Ghanaian Businesses</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Every template has its own unique color personality, typography, and section components crafted for Ghanaian commerce.
-            </p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-[#0f151b] border border-slate-800 space-y-3 text-left">
-            <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
-              <Zap className="w-5 h-5" />
-            </div>
-            <h3 className="font-bold text-base text-white">Direct WhatsApp Ordering</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Route orders and inquiries straight to your WhatsApp line with one tap, including pre-filled customer order details.
-            </p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-[#0f151b] border border-slate-800 space-y-3 text-left">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
-              <Layout className="w-5 h-5" />
-            </div>
-            <h3 className="font-bold text-base text-white">13+ Handcrafted Designs</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              From data resellers and civil engineering to salons, restaurants, and tech agencies — ready to customise in minutes.
-            </p>
-          </div>
+        <div id="plans" className="scroll-mt-20">
+          <WebsitePlansAndUltra
+            sessionToken={sessionToken || undefined}
+            onStartBlank={() => handleCreateSite('tmpl-start-blank', 'My Business')}
+          />
         </div>
 
         {/* =========================================================
             4. TEMPLATES SHOWCASE GRID & FILTER SECTION
+               (FEATURED FIRST: TOP 6 SHOWN INITIALLY, EXPANDABLE)
             ========================================================= */}
         <div id="templates-showcase" className="space-y-6 scroll-mt-24">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div className="text-left">
               <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#00c365] uppercase tracking-wider mb-1">
                 <Compass className="w-3.5 h-3.5" />
-                <span>Explore 13 Handcrafted Designs</span>
+                <span>Handcrafted Website Templates</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                Choose Your Industry Website
+                {isFiltering ? 'Matching Industry Templates' : 'Featured Industry Templates'}
               </h2>
               <p className="text-xs text-slate-400 mt-1">
                 Click "Preview" to test on any device or "Use" to create your free website immediately.
@@ -492,21 +532,36 @@ export const WebsiteBuilderPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Result Count Indicator */}
-          <div className="text-xs text-slate-400 flex items-center justify-between">
+          {/* Result Count Indicator & Expand Toggle */}
+          <div className="text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
             <span>
-              Showing <strong>{filteredTemplates.length}</strong> template{filteredTemplates.length === 1 ? '' : 's'}
+              Showing <strong>{displayedTemplates.length}</strong> of{' '}
+              <strong>{filteredTemplates.length}</strong> template{filteredTemplates.length === 1 ? '' : 's'}
               {searchQuery && ` matching "${searchQuery}"`}
             </span>
-            {selectedCategory !== 'all' && (
-              <button
-                type="button"
-                onClick={() => setSelectedCategory('all')}
-                className="text-[#00c365] hover:underline cursor-pointer"
-              >
-                Clear category filter
-              </button>
-            )}
+
+            <div className="flex items-center gap-3">
+              {selectedCategory !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('all')}
+                  className="text-[#00c365] hover:underline cursor-pointer"
+                >
+                  Clear category filter
+                </button>
+              )}
+
+              {!isFiltering && filteredTemplates.length > 6 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllTemplates((prev) => !prev)}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#00c365] hover:text-[#00e575] transition-colors cursor-pointer"
+                >
+                  <span>{showAllTemplates ? 'Show Top 6 Featured' : `View All ${filteredTemplates.length} Templates`}</span>
+                  {showAllTemplates ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Templates Cards Grid */}
@@ -526,7 +581,7 @@ export const WebsiteBuilderPage: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredTemplates.map((t) => (
+              {displayedTemplates.map((t) => (
                 <TemplateCardPreview
                   key={t.id}
                   template={t}
@@ -536,9 +591,27 @@ export const WebsiteBuilderPage: React.FC = () => {
               ))}
             </div>
           )}
+
+          {/* Expand/Collapse Footer Action for Featured Templates */}
+          {!isFiltering && filteredTemplates.length > 6 && (
+            <div className="pt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAllTemplates((prev) => !prev);
+                  if (showAllTemplates) {
+                    scrollToTemplates();
+                  }
+                }}
+                className="px-6 py-3 rounded-2xl bg-[#0f171e] hover:bg-[#15202a] text-slate-200 border border-slate-700/80 font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-md hover:border-[#00c365]/40"
+              >
+                <span>{showAllTemplates ? 'Show Fewer Templates' : `View All ${filteredTemplates.length} Templates`}</span>
+                {showAllTemplates ? <ChevronUp className="w-4 h-4 text-[#00c365]" /> : <ChevronDown className="w-4 h-4 text-[#00c365]" />}
+              </button>
+            </div>
+          )}
         </div>
       </div>
-      <WebsitePlansAndUltra sessionToken={sessionToken || undefined} onStartBlank={() => handleCreateSite("tmpl-start-blank", "My Business")} />
     </div>
   );
 };
