@@ -1,9 +1,7 @@
 import { API_BASE_URL } from '../../services/apiClient.js';
 import React, { useState, useEffect } from 'react';
 import { ULTRA_SERVICE, type UltraEnquiryInput } from '../../config/websiteBuilder.js';
-import { BUSINESS_CONFIG } from '../../config/business';
 import {
-  Sparkles,
   Check,
   ArrowRight,
   X,
@@ -14,11 +12,6 @@ import {
   ChevronDown,
   ChevronUp,
   Send,
-  Building,
-  Layers,
-  Globe,
-  Smartphone,
-  ExternalLink,
 } from 'lucide-react';
 
 const initialForm: UltraEnquiryInput = {
@@ -200,21 +193,23 @@ export function WebsitePlansAndUltra({
             Simple, Transparent Pricing
           </h2>
           <p className="text-xs sm:text-sm text-slate-400">
-            Start at GH₵0 today with standard publishing, or upgrade as your business scales.
+            Create and publish your business website for free today, or explore upcoming premium capabilities as you grow.
           </p>
         </div>
 
         {/* =========================================================
-            COMMERCIAL PRICING GRID (COMPACT & ARTWORK-PREPARED)
+            COMMERCIAL PRICING GRID (TRUTHFUL & ARTWORK-PREPARED)
             ========================================================= */}
         <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 items-stretch">
           {/* PLAN 1: FREE */}
-          <article className="relative rounded-2xl sm:rounded-3xl bg-[#0b1218]/95 border border-slate-800/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm overflow-hidden">
-            {/* Future Artwork Composition Zone (Prepared for tier visual) */}
-            <div className="absolute top-0 right-0 w-36 sm:w-44 h-36 sm:h-44 pointer-events-none select-none overflow-hidden opacity-25 sm:opacity-35" aria-hidden="true">
-              <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0b1218]/80 to-[#0b1218]" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0b1218] to-transparent" />
-              <div className="w-full h-full border border-dashed border-slate-700/50 rounded-full scale-125 -translate-y-6 translate-x-8" />
+          <article className="relative rounded-2xl sm:rounded-3xl bg-[#0b1218]/95 border border-slate-800/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm">
+            {/* Future Artwork Composition Zone (Prepared for single site / device visual) */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl sm:rounded-3xl" aria-hidden="true">
+              <div className="absolute top-0 right-0 w-36 sm:w-44 h-36 sm:h-44 pointer-events-none select-none overflow-hidden opacity-20 sm:opacity-30">
+                <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0b1218]/80 to-[#0b1218]" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0b1218] to-transparent" />
+                <div className="w-full h-full border border-dashed border-slate-700/50 rounded-full scale-125 -translate-y-6 translate-x-8" />
+              </div>
             </div>
 
             <div className="relative z-10 space-y-3.5">
@@ -223,7 +218,7 @@ export function WebsitePlansAndUltra({
                   <h3 className="font-extrabold text-lg sm:text-xl text-white tracking-tight">FREE</h3>
                   <p className="text-xs text-slate-400 font-medium">Start building for free.</p>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-[#00c365] border border-emerald-500/25">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-[#00c365] border border-emerald-500/25 shrink-0">
                   Live Today
                 </span>
               </div>
@@ -245,11 +240,15 @@ export function WebsitePlansAndUltra({
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Standard Ghanaian templates</span>
+                  <span>Standard Ghana-focused templates</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Core business sections &amp; WhatsApp</span>
+                  <span>Core business sections</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
+                  <span>WhatsApp &amp; contact integration</span>
                 </div>
 
                 {/* Progressive Disclosure for Extra Features */}
@@ -265,7 +264,7 @@ export function WebsitePlansAndUltra({
                     </div>
                     <div className="flex items-center gap-2 text-slate-300">
                       <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Mystery Hub attribution</span>
+                      <span>Clean responsive mobile view</span>
                     </div>
                   </div>
                 )}
@@ -293,27 +292,31 @@ export function WebsitePlansAndUltra({
             </div>
           </article>
 
-          {/* PLAN 2: PLUS (HERO / RECOMMENDED PLAN) */}
-          <article className="relative rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#0e1d17] via-[#0b1411] to-[#09100d] border-2 border-[#00c365] p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-[0_0_28px_rgba(0,195,101,0.16)] ring-1 ring-[#00c365]/30 overflow-hidden">
-            {/* Future Artwork Composition Zone (Prepared for tier visual) */}
-            <div className="absolute top-0 right-0 w-36 sm:w-44 h-36 sm:h-44 pointer-events-none select-none overflow-hidden opacity-30 sm:opacity-40" aria-hidden="true">
-              <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0e1d17]/85 to-[#0e1d17]" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#09100d] to-transparent" />
-              <div className="w-full h-full border border-dashed border-[#00c365]/40 rounded-full scale-125 -translate-y-6 translate-x-8" />
-            </div>
-
-            {/* Most Popular Badge */}
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-[#00c365] text-black text-[10px] font-black uppercase tracking-wider shadow-md z-20">
-              Most Popular
+          {/* PLAN 2: PLUS (HERO TIER — FUTURE PREMIUM BUILDER) */}
+          <article className="relative rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#0e1d17] via-[#0b1411] to-[#09100d] border-2 border-[#00c365] p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-[0_0_30px_rgba(0,195,101,0.14)] ring-1 ring-[#00c365]/35">
+            {/* Future Artwork Composition Zone (Prepared for rich customization / multi-device visual) */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl sm:rounded-3xl" aria-hidden="true">
+              <div className="absolute top-0 right-0 w-36 sm:w-44 h-36 sm:h-44 pointer-events-none select-none overflow-hidden opacity-25 sm:opacity-35">
+                <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0e1d17]/85 to-[#0e1d17]" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#09100d] to-transparent" />
+                <div className="w-full h-full border border-dashed border-[#00c365]/40 rounded-full scale-125 -translate-y-6 translate-x-8" />
+              </div>
             </div>
 
             <div className="relative z-10 space-y-3.5">
+              {/* Most Popular Badge — Positioned safely in flow at top so it NEVER clips on any screen */}
+              <div className="flex items-center justify-center -mt-1 pb-1">
+                <span className="inline-flex items-center px-3 py-0.5 rounded-full bg-[#00c365] text-black text-[10px] font-black uppercase tracking-wider shadow-sm">
+                  Most Popular
+                </span>
+              </div>
+
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-extrabold text-lg sm:text-xl text-white tracking-tight">PLUS</h3>
-                  <p className="text-xs text-emerald-400 font-medium">Best for growing businesses.</p>
+                  <p className="text-xs text-emerald-400 font-medium">For growing businesses that want more control over their brand and website.</p>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 shrink-0">
                   Coming Soon
                 </span>
               </div>
@@ -324,26 +327,30 @@ export function WebsitePlansAndUltra({
               </div>
 
               <p className="text-xs text-slate-200 leading-relaxed">
-                Enhanced creative freedom, AI assistance, and independent brand identity for established shops.
+                Enhanced creative freedom, AI editing tools, and custom branding for growing Ghanaian businesses.
               </p>
 
               {/* Core Features Strip */}
               <div className="pt-2 border-t border-[#00c365]/25 space-y-2 text-xs text-slate-100">
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Everything in Free</span>
+                  <span>Premium website designs</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Handcrafted premium designs</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Mystery AI copywriting &amp; editing</span>
+                  <span>Expanded branding &amp; design controls</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
                   <span>Custom domain connection</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
+                  <span>Mystery AI editing tools</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
+                  <span>Expanded project capacity</span>
                 </div>
 
                 {/* Progressive Disclosure for Extra Features */}
@@ -351,11 +358,11 @@ export function WebsitePlansAndUltra({
                   <div className="space-y-2 pt-1 animate-in fade-in duration-200">
                     <div className="flex items-center gap-2 text-slate-200">
                       <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Extended typography &amp; branding control</span>
+                      <span>Extended typography &amp; styling</span>
                     </div>
                     <div className="flex items-center gap-2 text-slate-200">
                       <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Expanded website project limits</span>
+                      <span>Priority CDN asset hosting</span>
                     </div>
                   </div>
                 )}
@@ -371,25 +378,28 @@ export function WebsitePlansAndUltra({
               </div>
             </div>
 
+            {/* Plan Action Area (Structured for future waitlist / purchase without redesign) */}
             <div className="relative z-10 pt-2">
               <button
                 type="button"
-                onClick={onStartBlank}
-                className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-[#00c365]/50 hover:border-[#00c365] text-[#00c365] font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer shadow-sm"
+                onClick={() => toggleFeatures('plus')}
+                className="w-full py-3 px-4 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-[#00c365]/40 hover:border-[#00c365] text-[#00c365] font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer shadow-sm"
               >
-                <span>Start Free (Upgrade Later)</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>{expandedFeatures.plus ? 'Hide Plus Features' : 'See Plus Features'}</span>
+                {expandedFeatures.plus ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
             </div>
           </article>
 
           {/* PLAN 3: PRO (SERIOUS BUSINESSES & TEAMS) */}
-          <article className="relative rounded-2xl sm:rounded-3xl bg-[#0b1016]/95 border border-slate-800/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm overflow-hidden">
-            {/* Future Artwork Composition Zone (Prepared for tier visual) */}
-            <div className="absolute top-0 right-0 w-36 sm:w-44 h-36 sm:h-44 pointer-events-none select-none overflow-hidden opacity-25 sm:opacity-35" aria-hidden="true">
-              <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0b1016]/85 to-[#0b1016]" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0b1016] to-transparent" />
-              <div className="w-full h-full border border-dashed border-slate-700/50 rounded-full scale-125 -translate-y-6 translate-x-8" />
+          <article className="relative rounded-2xl sm:rounded-3xl bg-[#0b1016]/95 border border-slate-800/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm">
+            {/* Future Artwork Composition Zone (Prepared for business systems / integrations visual) */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl sm:rounded-3xl" aria-hidden="true">
+              <div className="absolute top-0 right-0 w-36 sm:w-44 h-36 sm:h-44 pointer-events-none select-none overflow-hidden opacity-20 sm:opacity-30">
+                <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0b1016]/85 to-[#0b1016]" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0b1016] to-transparent" />
+                <div className="w-full h-full border border-dashed border-slate-700/50 rounded-full scale-125 -translate-y-6 translate-x-8" />
+              </div>
             </div>
 
             <div className="relative z-10 space-y-3.5">
@@ -398,7 +408,7 @@ export function WebsitePlansAndUltra({
                   <h3 className="font-extrabold text-lg sm:text-xl text-white tracking-tight">PRO</h3>
                   <p className="text-xs text-slate-400 font-medium">For serious businesses and teams.</p>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
                   Coming Soon
                 </span>
               </div>
@@ -416,11 +426,11 @@ export function WebsitePlansAndUltra({
               <div className="pt-2 border-t border-slate-800/80 space-y-2 text-xs text-slate-200">
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Everything in Plus</span>
+                  <span>Advanced commerce &amp; business tools</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Advanced commerce &amp; custom forms</span>
+                  <span>Custom forms &amp; advanced workflows</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
@@ -428,7 +438,11 @@ export function WebsitePlansAndUltra({
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Priority account &amp; technical support</span>
+                  <span>Higher-capacity catalogs and assets</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
+                  <span>Priority technical &amp; account support</span>
                 </div>
 
                 {/* Progressive Disclosure for Extra Features */}
@@ -436,11 +450,11 @@ export function WebsitePlansAndUltra({
                   <div className="space-y-2 pt-1 animate-in fade-in duration-200">
                     <div className="flex items-center gap-2 text-slate-300">
                       <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Higher storage &amp; asset capacity</span>
+                      <span>Team collaboration capabilities</span>
                     </div>
                     <div className="flex items-center gap-2 text-slate-300">
                       <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>High-capacity Mystery AI tools</span>
+                      <span>Dedicated infrastructure scaling</span>
                     </div>
                   </div>
                 )}
@@ -456,41 +470,41 @@ export function WebsitePlansAndUltra({
               </div>
             </div>
 
+            {/* Plan Action Area (Structured for future waitlist / purchase without redesign) */}
             <div className="relative z-10 pt-2">
-              <a
-                href={BUSINESS_CONFIG.getGeneralWhatsAppUrl('Hello Mystery Hub, I am inquiring about the Pro Website Studio plan for my business/team.')}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 hover:text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer shadow-sm"
+              <button
+                type="button"
+                onClick={() => toggleFeatures('pro')}
+                className="w-full py-3 px-4 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer shadow-sm"
               >
-                <span>Inquire for Teams</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+                <span>{expandedFeatures.pro ? 'Hide Pro Features' : 'See Pro Features'}</span>
+                {expandedFeatures.pro ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
             </div>
           </article>
         </div>
 
         {/* Availability Footnote */}
         <p className="text-center text-[11px] sm:text-xs text-slate-500 max-w-xl mx-auto pt-1">
-          Websites created on the Free tier remain completely free forever. Plus and Pro tiers are launching soon with standard billing.
+          Websites created on the Free tier remain completely free forever. Plus and Pro tiers are launching in an upcoming release.
         </p>
       </section>
 
       {/* =========================================================
           ULTRA — SEPARATE DISTINCT SERVICE BLOCK (RICH VISUALS)
           ========================================================= */}
-      <section className="rounded-3xl bg-gradient-to-r from-[#0c1813] via-[#091216] to-[#0d161d] border border-slate-700/80 p-5 sm:p-8 lg:p-10 shadow-2xl relative overflow-hidden text-left">
+      <section className="rounded-3xl bg-gradient-to-r from-[#0c1813] via-[#091216] to-[#0d161d] border border-slate-700/80 p-5 sm:p-7 lg:p-8 shadow-2xl relative overflow-hidden text-left">
         <div className="absolute top-0 right-0 w-96 h-96 bg-[#00c365]/10 rounded-full blur-[110px] pointer-events-none" />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 lg:gap-8 items-center relative z-10">
           {/* Left Column: Scope, Pricing, Features, CTA */}
-          <div className="lg:col-span-7 space-y-3.5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/40 text-xs font-bold text-[#00c365]">
+          <div className="lg:col-span-7 space-y-3">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/40 text-xs font-bold text-[#00c365] uppercase tracking-wider">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Done-For-You Agency Service</span>
+              <span>Done-For-You Professional Service</span>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
                 Need something beyond the builder?
               </p>
@@ -499,41 +513,58 @@ export function WebsitePlansAndUltra({
               </h3>
             </div>
 
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono">
-                From GH₵{(ULTRA_SERVICE.startingMinor / 100).toLocaleString()}
-              </span>
-              <span className="text-xs text-slate-400">· Professional build service</span>
+            {/* Resolved Mobile Price Layout — No floating dot/separator */}
+            <div className="space-y-0.5">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">From</span>
+                <span className="text-2xl sm:text-3xl font-black text-white font-mono">
+                  GH₵{(ULTRA_SERVICE.startingMinor / 100).toLocaleString()}
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-emerald-400 font-semibold">
+                Professional website build
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Final pricing depends on project scope.
+              </p>
             </div>
 
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl">
-              Custom design, additional pages, advanced sections, integrations, domain setup, mobile optimization and dedicated launch support. Final pricing depends on project scope.
+              Custom design, additional pages, advanced sections, integrations, domain setup, mobile optimization and launch support. Final pricing depends on project scope.
             </p>
 
-            <div className="grid grid-cols-2 gap-2 pt-1 text-xs text-slate-300">
-              <div className="flex items-center gap-1.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5 text-xs text-slate-300">
+              <div className="flex items-center gap-2">
                 <Check className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
                 <span>Bespoke custom design</span>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <Check className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
                 <span>Multi-page architecture</span>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <Check className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
-                <span>Domain & DNS setup</span>
+                <span>Domain &amp; DNS setup</span>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <Check className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
-                <span>WhatsApp MoMo integration</span>
+                <span>Scoped business integrations</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
+                <span>Mobile optimization</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
+                <span>Launch support</span>
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className="pt-1.5">
               <button
                 type="button"
                 onClick={handleOpenUltraModal}
-                className="px-6 py-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.3)] active:scale-[0.98] inline-flex items-center gap-2 cursor-pointer"
+                className="px-6 py-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.25)] active:scale-[0.98] inline-flex items-center gap-2 cursor-pointer"
               >
                 <span>Request an Ultra Build</span>
                 <ArrowRight className="w-4 h-4" />
@@ -541,11 +572,11 @@ export function WebsitePlansAndUltra({
             </div>
           </div>
 
-          {/* Right Column: Layered Custom-Build Preview Canvas */}
-          <div className="lg:col-span-5 relative flex items-center justify-center pt-2 lg:pt-0">
-            <div className="w-full max-w-sm rounded-2xl bg-[#070d12] border border-slate-700/80 p-3.5 shadow-xl relative overflow-hidden group">
+          {/* Right Column: Layered Custom-Build Preview Canvas (Compact studio visual) */}
+          <div className="lg:col-span-5 relative flex items-center justify-center pt-1 lg:pt-0">
+            <div className="w-full max-w-sm rounded-2xl bg-[#070d12] border border-slate-700/80 p-3 shadow-xl relative overflow-hidden group">
               {/* Top Window Dots */}
-              <div className="flex items-center justify-between pb-2.5 border-b border-slate-800 text-[9px] text-slate-400">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-[9px] text-slate-400">
                 <div className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-rose-500/80" />
                   <span className="w-2 h-2 rounded-full bg-amber-500/80" />
@@ -555,8 +586,8 @@ export function WebsitePlansAndUltra({
               </div>
 
               {/* Wireframe Mock Site Elements */}
-              <div className="pt-3 space-y-2.5">
-                <div className="p-2.5 rounded-xl bg-[#0e171f] border border-slate-800 space-y-1.5">
+              <div className="pt-2.5 space-y-2">
+                <div className="p-2 rounded-xl bg-[#0e171f] border border-slate-800 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold text-white">Custom Brand Layout</span>
                     <span className="text-[9px] font-mono text-[#00c365] bg-[#00c365]/10 px-1.5 py-0.5 rounded">Tailored</span>
@@ -567,7 +598,7 @@ export function WebsitePlansAndUltra({
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="p-2 rounded-lg bg-[#0e171f] border border-slate-800 space-y-1">
-                    <span className="text-[9px] font-bold text-slate-300">Catalog & Orders</span>
+                    <span className="text-[9px] font-bold text-slate-300">Catalog &amp; Orders</span>
                     <div className="w-12 h-1 rounded bg-slate-700" />
                   </div>
                   <div className="p-2 rounded-lg bg-[#0e171f] border border-slate-800 space-y-1">
