@@ -262,26 +262,25 @@ export const MarketplacePage: React.FC = () => {
   }, [shareModalProduct, referralCode]);
 
   return (
-    <div className="min-h-screen py-4 sm:py-7 pb-20 sm:pb-12 text-slate-100">
+    <div className="py-4 sm:py-6 text-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
         
         {/* =========================================================
-            1. COMPRESSED MARKETPLACE HERO HEADER
-               - On Mobile (< sm): Unified background-blended composition (no huge separate image block, total height ~150px)
-               - On Desktop (sm+): Wide spacious treatment
+            1. CONTINUOUS BLENDED MARKETPLACE HERO HEADER
+               - Full-bleed background artwork with smooth left-to-right dark gradient
+               - No vertical seam; text is crisp on left; tech gear pops on right
             ========================================================= */}
         <div className="relative rounded-2xl sm:rounded-3xl bg-[#070b0e] border border-slate-800/80 overflow-hidden shadow-xl sm:shadow-2xl min-h-[140px] sm:min-h-[260px] lg:min-h-[300px] flex items-center">
-          {/* Ambient Glows */}
-          <div className="absolute top-0 right-0 w-72 sm:w-80 h-72 sm:h-80 bg-[#00c365]/10 rounded-full blur-[80px] pointer-events-none z-0" />
-          <div className="hidden sm:block absolute bottom-0 left-0 w-64 h-64 bg-sky-500/5 rounded-full blur-[80px] pointer-events-none z-0" />
+          {/* Subtle Ambient Eco Glow */}
+          <div className="absolute top-1/2 left-1/4 -translate-y-1/2 -translate-x-1/2 w-80 h-80 bg-[#00c365]/10 rounded-full blur-[100px] pointer-events-none z-0" />
 
-          {/* Background Visual Artwork Layer (Blended right/bottom with gradient mask) */}
+          {/* Continuous Full-Bleed Artwork Layer Covering Entire Hero Background */}
           {heroBannerUrl && !heroImageFailed && (
-            <div className="absolute inset-y-0 right-0 w-3/5 sm:w-2/3 lg:w-1/2 pointer-events-none select-none z-0 overflow-hidden">
+            <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden bg-[#070b0e]">
               <img
                 src={heroSrc}
                 srcSet={heroSrcSet}
-                sizes="(max-width: 640px) 60vw, 50vw"
+                sizes="100vw"
                 alt=""
                 aria-hidden="true"
                 loading="eager"
@@ -289,13 +288,18 @@ export const MarketplacePage: React.FC = () => {
                 decoding="async"
                 onLoad={() => setHeroImageLoaded(true)}
                 onError={() => setHeroImageFailed(true)}
-                className={`w-full h-full object-cover object-[78%_center] transition-opacity duration-300 ease-out ${
-                  heroImageLoaded ? 'opacity-40 sm:opacity-85 lg:opacity-90' : 'opacity-0'
+                className={`w-full h-full object-cover object-[85%_center] sm:object-[80%_center] transition-opacity duration-300 ease-out ${
+                  heroImageLoaded ? 'opacity-85 sm:opacity-90' : 'opacity-0'
                 }`}
               />
-              {/* Dark gradient overlays for high text readability on mobile & desktop */}
-              <div className="absolute inset-0 bg-gradient-to-r from-[#070b0e] via-[#070b0e]/95 to-[#070b0e]/40 sm:to-transparent" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#070b0e] via-transparent to-[#070b0e]/30" />
+              {/* Left-to-Right Continuous Dark Gradient Overlay:
+                  Left: Strong dark green/black overlay behind text for 100% crisp readability
+                  Center: Smooth medium overlay with zero hard transition/seam
+                  Right: Subtle light overlay so tech gear visually pops and remains attractive
+              */}
+              <div className="absolute inset-0 bg-gradient-to-r from-[#070b0e] via-[#070b0e]/85 via-50% to-[#070b0e]/20 to-100% sm:from-[#070b0e] sm:via-[#070b0e]/90 sm:via-45% sm:to-transparent" />
+              {/* Gentle top/bottom integration vignette */}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#070b0e]/60 via-transparent to-[#070b0e]/20" />
             </div>
           )}
 
