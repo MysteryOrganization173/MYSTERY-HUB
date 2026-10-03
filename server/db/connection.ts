@@ -1,3 +1,4 @@
+import { ULTRA_ENQUIRY_SCHEMA } from './websiteUltraSchema.js';
 /**
  * Shared PostgreSQL Connection Pool & Initialization
  * Ensures Orders, Auth, Waitlist, and Admin use ONE single database connection pool.
@@ -357,6 +358,7 @@ export async function initDatabase(): Promise<void> {
       referrer_user_id VARCHAR(64) NOT NULL REFERENCES users(id), order_id VARCHAR(64) NOT NULL REFERENCES orders(id),
       reason VARCHAR(32) NOT NULL DEFAULT 'profile_suspended', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (referrer_user_id, order_id));` });
+    baseTables.push({ name: 'website_ultra_enquiries', sql: ULTRA_ENQUIRY_SCHEMA });
     for (const table of baseTables) {
       try {
         await client.query(table.sql);

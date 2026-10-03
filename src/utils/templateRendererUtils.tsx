@@ -1,3 +1,4 @@
+import { SectionSiteRenderer } from '../components/website/SectionSiteRenderer.js';
 /**
  * Shared Template & Site Rendering Utilities
  * Ensures Editor Preview, Template Preview, and Published Live Sites
@@ -46,6 +47,8 @@ export function mergeSiteWithTemplate(
 
   return {
     ...baseTemplate,
+    composition: content?.composition ?? baseTemplate.composition,
+    siteContent: content,
     demoBusinessName: content?.businessName || baseTemplate.demoBusinessName,
     demoHeroTagline: content?.tagline || baseTemplate.demoHeroTagline,
     demoSubtext: content?.aboutText || baseTemplate.demoSubtext,
@@ -86,6 +89,7 @@ export function renderTemplateLayout(
     isMobileView?: boolean;
   }
 ): React.ReactElement {
+  if (template.composition) return <SectionSiteRenderer template={template} onCtaClick={options?.onCtaClick} />;
   const layout = (template.layoutType || template.category || '').toLowerCase();
   const { onCtaClick, isMobileView } = options || {};
 

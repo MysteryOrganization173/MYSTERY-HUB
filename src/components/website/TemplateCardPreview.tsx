@@ -1,3 +1,4 @@
+import { SafeImage } from './SafeImage.js';
 import React from 'react';
 import { WebsiteTemplate } from '../../types';
 import {
@@ -129,10 +130,7 @@ export const TemplateCardPreview: React.FC<TemplateCardPreviewProps> = ({
           <div className="relative h-48 sm:h-52 w-full overflow-hidden flex flex-col justify-between text-left select-none">
             {/* Background Image Layer */}
             {t.heroImage ? (
-              <div
-                className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-                style={{ backgroundImage: `url(${t.heroImage})` }}
-              />
+              <SafeImage className="absolute inset-0   transition-transform duration-700 group-hover:scale-105" src={t.heroImage} alt={t.demoBusinessName} loading="lazy"  />
             ) : null}
 
             {/* Layout-Specific Gradient Filter Overlay */}
@@ -141,24 +139,24 @@ export const TemplateCardPreview: React.FC<TemplateCardPreviewProps> = ({
               style={{
                 background:
                   layout === 'restaurant'
-                    ? `linear-gradient(135deg, rgba(122, 28, 40, 0.94) 0%, rgba(20, 10, 12, 0.96) 100%)`
+                    ? `linear-gradient(135deg, rgba(122, 28, 40, 0.62) 0%, rgba(20, 10, 12, 0.62) 100%)`
                     : layout === 'construction'
-                    ? `linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(20, 20, 24, 0.96) 100%)`
+                    ? `linear-gradient(135deg, rgba(15, 23, 42, 0.62) 0%, rgba(20, 20, 24, 0.62) 100%)`
                     : layout === 'salon' || layout === 'beauty'
-                    ? `linear-gradient(135deg, rgba(13, 27, 24, 0.95) 0%, rgba(6, 15, 13, 0.97) 100%)`
+                    ? `linear-gradient(135deg, rgba(13, 27, 24, 0.62) 0%, rgba(6, 15, 13, 0.62) 100%)`
                     : layout === 'realestate'
-                    ? `linear-gradient(135deg, rgba(15, 28, 44, 0.95) 0%, rgba(6, 12, 20, 0.97) 100%)`
+                    ? `linear-gradient(135deg, rgba(15, 28, 44, 0.62) 0%, rgba(6, 12, 20, 0.62) 100%)`
                     : layout === 'agency'
-                    ? `linear-gradient(135deg, rgba(10, 18, 30, 0.95) 0%, rgba(5, 8, 15, 0.98) 100%)`
+                    ? `linear-gradient(135deg, rgba(10, 18, 30, 0.62) 0%, rgba(5, 8, 15, 0.62) 100%)`
                     : layout === 'portfolio'
-                    ? `linear-gradient(135deg, rgba(20, 20, 25, 0.95) 0%, rgba(8, 8, 10, 0.98) 100%)`
+                    ? `linear-gradient(135deg, rgba(20, 20, 25, 0.62) 0%, rgba(8, 8, 10, 0.62) 100%)`
                     : layout === 'hotel'
-                    ? `linear-gradient(135deg, rgba(12, 30, 36, 0.95) 0%, rgba(5, 15, 18, 0.98) 100%)`
+                    ? `linear-gradient(135deg, rgba(12, 30, 36, 0.62) 0%, rgba(5, 15, 18, 0.62) 100%)`
                     : layout === 'retail' || layout === 'ecommerce'
-                    ? `linear-gradient(135deg, rgba(22, 18, 32, 0.95) 0%, rgba(10, 8, 16, 0.98) 100%)`
+                    ? `linear-gradient(135deg, rgba(22, 18, 32, 0.62) 0%, rgba(10, 8, 16, 0.62) 100%)`
                     : layout === 'church'
-                    ? `linear-gradient(135deg, rgba(30, 20, 15, 0.95) 0%, rgba(12, 8, 5, 0.98) 100%)`
-                    : `linear-gradient(135deg, ${palette.primary} 0%, #080c10 100%)`,
+                    ? `linear-gradient(135deg, rgba(30, 20, 15, 0.62) 0%, rgba(12, 8, 5, 0.62) 100%)`
+                    : `linear-gradient(135deg, ${palette.primary}bb 0%, #080c1080 100%)`,
               }}
             />
 

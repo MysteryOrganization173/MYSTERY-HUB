@@ -1,3 +1,4 @@
+import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
 import {
@@ -98,12 +99,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
 
       {/* Hero Section */}
       <div className="relative py-16 sm:py-24 px-6 sm:px-12 bg-gradient-to-r from-[#090d13] via-[#0d1520] to-[#121c29] border-b border-slate-800 overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-20 bg-cover bg-center mix-blend-luminosity"
-          style={{
-            backgroundImage: `url(${template.heroImage || 'https://images.unsplash.com/photo-1541888946425-d0fbb186156f'})`,
-          }}
-        />
+        <SafeImage className="absolute inset-0 opacity-40   mix-blend-luminosity" src={template.heroImage || 'https://images.unsplash.com/photo-1504307651254-35680f356dfd'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         {/* Architectural diagonal lines overlay */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293708_1px,transparent_1px),linear-gradient(to_bottom,#1f293708_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
 
@@ -191,13 +187,10 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
               <div>
                 {p.image && (
                   <div className="h-44 overflow-hidden relative bg-slate-900">
-                    <img
+                    <SafeImage
                       src={p.image}
                       alt={p.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
                     />
                     <div className="absolute top-2.5 right-2.5 bg-black/80 px-2 py-0.5 rounded text-[10px] font-mono text-[#f97316] font-bold border border-[#f97316]/30">
                       {p.price}

@@ -1,6 +1,7 @@
+import { WebsitePlansAndUltra } from './WebsitePlansAndUltra.js';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { TEMPLATE_CATEGORIES, WEBSITE_TEMPLATES } from '../../data/templates';
+import { TEMPLATE_CATEGORIES, WEBSITE_TEMPLATES, orderedWebsiteTemplates } from '../../data/templates';
 import { TemplateCategory, WebsiteTemplate, WebsiteSiteRecord } from '../../types';
 import { TemplateCardPreview } from './TemplateCardPreview';
 import { WebsiteEditor } from './editor/WebsiteEditor';
@@ -69,7 +70,7 @@ export const WebsiteBuilderPage: React.FC = () => {
 
   const activeSite = mySites.length > 0 ? mySites[0] : null;
 
-  const filteredTemplates = WEBSITE_TEMPLATES.filter((t) => {
+  const filteredTemplates = orderedWebsiteTemplates().filter((t) => {
     const matchesCategory = selectedCategory === 'all' || t.category === selectedCategory;
     if (!matchesCategory) return false;
 
@@ -537,6 +538,7 @@ export const WebsiteBuilderPage: React.FC = () => {
           )}
         </div>
       </div>
+      <WebsitePlansAndUltra sessionToken={sessionToken || undefined} onStartBlank={() => handleCreateSite("tmpl-start-blank", "My Business")} />
     </div>
   );
 };

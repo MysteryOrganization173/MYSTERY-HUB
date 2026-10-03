@@ -1,3 +1,4 @@
+import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
 import {
@@ -118,10 +119,7 @@ export const GenericTemplateView: React.FC<TemplateViewProps> = ({ template, onC
         }}
       >
         {template.heroImage && (
-          <div
-            className="absolute inset-0 opacity-20 bg-cover bg-center"
-            style={{ backgroundImage: `url(${template.heroImage})` }}
-          />
+          <SafeImage className="absolute inset-0 opacity-40  " src={template.heroImage} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         )}
         <div className="relative max-w-3xl space-y-5">
           <span
@@ -188,13 +186,10 @@ export const GenericTemplateView: React.FC<TemplateViewProps> = ({ template, onC
               <div>
                 {item.image && (
                   <div className="h-44 rounded-xl overflow-hidden mb-3">
-                    <img
+                    <SafeImage
                       src={item.image}
                       alt={item.name}
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
                     />
                   </div>
                 )}

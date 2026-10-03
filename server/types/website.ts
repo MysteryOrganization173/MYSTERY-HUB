@@ -1,3 +1,4 @@
+import type { WebsiteComposition } from '../../src/config/websiteBuilder.js';
 /**
  * Website Builder V1 Types & Schemas
  */
@@ -13,6 +14,7 @@ export interface SiteSocialLinks {
 }
 
 export interface SiteContent {
+  composition?: WebsiteComposition;
   businessName: string;
   tagline: string;
   aboutText: string;
@@ -53,6 +55,7 @@ export interface WebsiteSiteRecord {
 }
 
 export interface PublicWebsiteSite {
+  showAttribution?: boolean;
   id: string;
   template_id: string;
   name: string;
@@ -80,6 +83,7 @@ export interface UpdateWebsiteInput {
  * Valid Website Builder Template IDs
  */
 export const VALID_TEMPLATE_IDS = new Set<string>([
+  'tmpl-start-blank',
   'tmpl-buka-bistro',
   'tmpl-data-reseller',
   'tmpl-accra-build',

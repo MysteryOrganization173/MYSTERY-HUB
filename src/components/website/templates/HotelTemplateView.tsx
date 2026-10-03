@@ -1,3 +1,4 @@
+import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
 import {
@@ -78,12 +79,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
 
       {/* Hero Section */}
       <div className="relative py-16 sm:py-24 px-6 sm:px-12 bg-gradient-to-r from-[#0d1e17] via-[#143025] to-[#0b1812] text-white overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-30 bg-cover bg-center"
-          style={{
-            backgroundImage: `url(${template.heroImage || 'https://images.unsplash.com/photo-1566073771259-6a8506099945'})`,
-          }}
-        />
+        <SafeImage className="absolute inset-0 opacity-45  " src={template.heroImage || 'https://images.unsplash.com/photo-1566073771259-6a8506099945'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-3xl space-y-5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#10b981]/20 border border-[#10b981]/40 text-[#a7f3d0] text-xs font-semibold uppercase tracking-wider">
             <Compass className="w-3.5 h-3.5 text-[#10b981]" />
@@ -202,13 +198,10 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
               <div>
                 {suite.image && (
                   <div className="h-56 overflow-hidden relative">
-                    <img
+                    <SafeImage
                       src={suite.image}
                       alt={suite.name}
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
                     />
                     <div className="absolute bottom-3 right-3 bg-[#132e23] text-white px-3 py-1 rounded-full text-xs font-bold">
                       {suite.price}

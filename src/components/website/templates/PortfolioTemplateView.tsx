@@ -1,3 +1,4 @@
+import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
 import {
@@ -78,12 +79,7 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
 
       {/* Full-Bleed Editorial Statement Hero */}
       <div className="relative py-20 sm:py-32 px-6 sm:px-12 border-b border-[#27272a] overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-15 bg-cover bg-center grayscale"
-          style={{
-            backgroundImage: `url(${template.heroImage || 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32'})`,
-          }}
-        />
+        <SafeImage className="absolute inset-0 opacity-40   grayscale" src={template.heroImage || 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-4xl mx-auto space-y-6 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs font-mono">
             <Camera className="w-3.5 h-3.5 text-[#00c365]" />
@@ -163,13 +159,10 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
             >
               {work.image && (
                 <div className="h-72 overflow-hidden bg-zinc-950">
-                  <img
+                  <SafeImage
                     src={work.image}
                     alt={work.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = 'none';
-                    }}
                   />
                 </div>
               )}

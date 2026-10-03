@@ -92,7 +92,7 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
       </div>
 
       {/* Free Tier Attribution Link (Tasteful, Non-Intrusive) */}
-      <footer className="py-3 px-4 bg-[#090d11] border-t border-slate-800 text-center text-xs text-slate-400 select-none">
+      {site.showAttribution !== false && <footer className="py-3 px-4 bg-[#090d11] border-t border-slate-800 text-center text-xs text-slate-400 select-none">
         <a
           href="/website-builder"
           target="_blank"
@@ -104,7 +104,7 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
           <span className="font-bold text-[#00c365]">Mystery Hub</span>
           <span className="text-[10px] text-slate-400">· Build Free</span>
         </a>
-      </footer>
+      </footer>}
     </div>
   );
 };

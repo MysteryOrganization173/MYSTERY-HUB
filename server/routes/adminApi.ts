@@ -1,3 +1,4 @@
+import { WebsiteUltraStore } from '../db/websiteUltraStore.js';
 /**
  * Production Admin V1 API Routes
  * Strict RBAC enforcement: Requires active session with role === 'admin'.
@@ -38,6 +39,12 @@ export const adminRouter = Router();
 // Apply strict admin authentication and authorization to all admin routes
 adminRouter.use(requireAdmin);
 adminRouter.use('/referrals', adminEarnRouter);
+adminRouter.get('/websites/ultra-enquiries', async (req, res) => {
+  const limit = Number(req.query.limit ?? 25), offset = Number(req.query.offset ?? 0);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0 || offset > 100000) { res.status(400).json({ error: 'Invalid pagination.' }); return; }
+  try { res.json({ success: true, ...(await WebsiteUltraStore.list(limit, offset)), limit, offset }); }
+  catch { res.status(503).json({ error: 'Could not retrieve enquiries.' }); }
+});
 
 /**
  * Neutralizes spreadsheet formula injection (CSV Injection) and escapes quotes
