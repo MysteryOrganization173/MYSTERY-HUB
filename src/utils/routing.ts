@@ -96,6 +96,8 @@ export function getPageFromPath(rawPath: string | null | undefined): ActivePage 
   if (
     normalized === '/website-builder' ||
     normalized === '/website' ||
+    normalized.startsWith('/website-builder/') ||
+    normalized.startsWith('/website/') ||
     normalized === '/website-builder/index.html' ||
     normalized === '/website/index.html'
   ) {

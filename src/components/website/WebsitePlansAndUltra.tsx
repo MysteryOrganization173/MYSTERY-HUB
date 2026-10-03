@@ -1,6 +1,7 @@
 import { API_BASE_URL } from '../../services/apiClient.js';
 import React, { useState, useEffect } from 'react';
 import { ULTRA_SERVICE, type UltraEnquiryInput } from '../../config/websiteBuilder.js';
+import { BUSINESS_CONFIG } from '../../config/business';
 import {
   Sparkles,
   Check,
@@ -193,7 +194,6 @@ export function WebsitePlansAndUltra({
         {/* Section Header */}
         <div className="relative z-10 space-y-2 text-center max-w-2xl mx-auto">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/35 text-xs font-bold text-[#00c365] uppercase tracking-wider">
-            <Sparkles className="w-3.5 h-3.5" />
             <span>Website Studio Plans</span>
           </div>
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white">
@@ -205,18 +205,25 @@ export function WebsitePlansAndUltra({
         </div>
 
         {/* =========================================================
-            COMMERCIAL PRICING GRID (COMPRESSED ON MOBILE)
+            COMMERCIAL PRICING GRID (COMPACT & ARTWORK-PREPARED)
             ========================================================= */}
         <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 items-stretch">
           {/* PLAN 1: FREE */}
-          <article className="rounded-2xl sm:rounded-3xl bg-[#0b1218]/90 border border-slate-800 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm">
-            <div className="space-y-3.5">
+          <article className="relative rounded-2xl sm:rounded-3xl bg-[#0b1218]/95 border border-slate-800/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm overflow-hidden">
+            {/* Future Artwork Composition Zone (Prepared for tier visual) */}
+            <div className="absolute top-0 right-0 w-36 sm:w-44 h-36 sm:h-44 pointer-events-none select-none overflow-hidden opacity-25 sm:opacity-35" aria-hidden="true">
+              <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0b1218]/80 to-[#0b1218]" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0b1218] to-transparent" />
+              <div className="w-full h-full border border-dashed border-slate-700/50 rounded-full scale-125 -translate-y-6 translate-x-8" />
+            </div>
+
+            <div className="relative z-10 space-y-3.5">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-extrabold text-lg sm:text-xl text-white tracking-tight">FREE</h3>
                   <p className="text-xs text-slate-400 font-medium">Start building for free.</p>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-[#00c365] border border-emerald-500/25">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-[#00c365] border border-emerald-500/25">
                   Live Today
                 </span>
               </div>
@@ -242,7 +249,7 @@ export function WebsitePlansAndUltra({
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Core business sections & WhatsApp</span>
+                  <span>Core business sections &amp; WhatsApp</span>
                 </div>
 
                 {/* Progressive Disclosure for Extra Features */}
@@ -250,7 +257,7 @@ export function WebsitePlansAndUltra({
                   <div className="space-y-2 pt-1 animate-in fade-in duration-200">
                     <div className="flex items-center gap-2 text-slate-300">
                       <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Essential branding & contact setup</span>
+                      <span>Essential branding &amp; contact setup</span>
                     </div>
                     <div className="flex items-center gap-2 text-slate-300">
                       <Check className="w-4 h-4 text-[#00c365] shrink-0" />
@@ -274,33 +281,40 @@ export function WebsitePlansAndUltra({
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className="relative z-10 pt-2">
               <button
                 type="button"
                 onClick={onStartBlank}
-                className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 shadow-sm"
+                className="w-full py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,195,101,0.2)] active:scale-98 cursor-pointer"
               >
                 <span>Start Free</span>
-                <ArrowRight className="w-4 h-4 text-[#00c365]" />
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </article>
 
           {/* PLAN 2: PLUS (HERO / RECOMMENDED PLAN) */}
-          <article className="rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#0e1d17] via-[#0b1411] to-[#09100d] border-2 border-[#00c365] p-5 sm:p-6 flex flex-col justify-between space-y-4 relative shadow-[0_0_28px_rgba(0,195,101,0.16)] ring-1 ring-[#00c365]/30">
+          <article className="relative rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#0e1d17] via-[#0b1411] to-[#09100d] border-2 border-[#00c365] p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-[0_0_28px_rgba(0,195,101,0.16)] ring-1 ring-[#00c365]/30 overflow-hidden">
+            {/* Future Artwork Composition Zone (Prepared for tier visual) */}
+            <div className="absolute top-0 right-0 w-36 sm:w-44 h-36 sm:h-44 pointer-events-none select-none overflow-hidden opacity-30 sm:opacity-40" aria-hidden="true">
+              <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0e1d17]/85 to-[#0e1d17]" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#09100d] to-transparent" />
+              <div className="w-full h-full border border-dashed border-[#00c365]/40 rounded-full scale-125 -translate-y-6 translate-x-8" />
+            </div>
+
             {/* Most Popular Badge */}
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-[#00c365] text-black text-[10px] font-black uppercase tracking-wider shadow-md">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-[#00c365] text-black text-[10px] font-black uppercase tracking-wider shadow-md z-20">
               Most Popular
             </div>
 
-            <div className="space-y-3.5">
+            <div className="relative z-10 space-y-3.5">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-extrabold text-lg sm:text-xl text-white tracking-tight">PLUS</h3>
                   <p className="text-xs text-emerald-400 font-medium">Best for growing businesses.</p>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                  Launching soon
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  Coming Soon
                 </span>
               </div>
 
@@ -325,7 +339,7 @@ export function WebsitePlansAndUltra({
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Mystery AI copywriting & editing</span>
+                  <span>Mystery AI copywriting &amp; editing</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
@@ -337,7 +351,7 @@ export function WebsitePlansAndUltra({
                   <div className="space-y-2 pt-1 animate-in fade-in duration-200">
                     <div className="flex items-center gap-2 text-slate-200">
                       <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Extended typography & branding control</span>
+                      <span>Extended typography &amp; branding control</span>
                     </div>
                     <div className="flex items-center gap-2 text-slate-200">
                       <Check className="w-4 h-4 text-[#00c365] shrink-0" />
@@ -357,27 +371,35 @@ export function WebsitePlansAndUltra({
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className="relative z-10 pt-2">
               <button
                 type="button"
-                disabled
-                className="w-full py-3 px-4 rounded-xl bg-[#00c365]/20 border border-[#00c365]/40 text-[#00c365] font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed opacity-90"
+                onClick={onStartBlank}
+                className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-[#00c365]/50 hover:border-[#00c365] text-[#00c365] font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer shadow-sm"
               >
-                <span>Launching Soon</span>
+                <span>Start Free (Upgrade Later)</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </article>
 
           {/* PLAN 3: PRO (SERIOUS BUSINESSES & TEAMS) */}
-          <article className="rounded-2xl sm:rounded-3xl bg-[#0b1016]/90 border border-slate-800 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm">
-            <div className="space-y-3.5">
+          <article className="relative rounded-2xl sm:rounded-3xl bg-[#0b1016]/95 border border-slate-800/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm overflow-hidden">
+            {/* Future Artwork Composition Zone (Prepared for tier visual) */}
+            <div className="absolute top-0 right-0 w-36 sm:w-44 h-36 sm:h-44 pointer-events-none select-none overflow-hidden opacity-25 sm:opacity-35" aria-hidden="true">
+              <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0b1016]/85 to-[#0b1016]" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0b1016] to-transparent" />
+              <div className="w-full h-full border border-dashed border-slate-700/50 rounded-full scale-125 -translate-y-6 translate-x-8" />
+            </div>
+
+            <div className="relative z-10 space-y-3.5">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-extrabold text-lg sm:text-xl text-white tracking-tight">PRO</h3>
                   <p className="text-xs text-slate-400 font-medium">For serious businesses and teams.</p>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                  Launching soon
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                  Coming Soon
                 </span>
               </div>
 
@@ -398,7 +420,7 @@ export function WebsitePlansAndUltra({
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Advanced commerce & custom forms</span>
+                  <span>Advanced commerce &amp; custom forms</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
@@ -406,7 +428,7 @@ export function WebsitePlansAndUltra({
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Priority account & technical support</span>
+                  <span>Priority account &amp; technical support</span>
                 </div>
 
                 {/* Progressive Disclosure for Extra Features */}
@@ -414,7 +436,7 @@ export function WebsitePlansAndUltra({
                   <div className="space-y-2 pt-1 animate-in fade-in duration-200">
                     <div className="flex items-center gap-2 text-slate-300">
                       <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Higher storage & asset capacity</span>
+                      <span>Higher storage &amp; asset capacity</span>
                     </div>
                     <div className="flex items-center gap-2 text-slate-300">
                       <Check className="w-4 h-4 text-[#00c365] shrink-0" />
@@ -434,14 +456,16 @@ export function WebsitePlansAndUltra({
               </div>
             </div>
 
-            <div className="pt-2">
-              <button
-                type="button"
-                disabled
-                className="w-full py-3 px-4 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed opacity-80"
+            <div className="relative z-10 pt-2">
+              <a
+                href={BUSINESS_CONFIG.getGeneralWhatsAppUrl('Hello Mystery Hub, I am inquiring about the Pro Website Studio plan for my business/team.')}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 hover:text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer shadow-sm"
               >
-                <span>Launching Soon</span>
-              </button>
+                <span>Inquire for Teams</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
             </div>
           </article>
         </div>

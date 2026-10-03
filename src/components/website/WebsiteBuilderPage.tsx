@@ -72,6 +72,41 @@ export const WebsiteBuilderPage: React.FC = () => {
     }
   }, [sessionToken]);
 
+  // Deep-link template preview support (e.g. /website-builder?template=tmpl-quickbyte-data or /website-builder/template/tmpl-buka-bistro)
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const queryTemplate = url.searchParams.get('template') || url.searchParams.get('t');
+
+      let targetId = queryTemplate;
+      if (!targetId) {
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        if (
+          pathParts.length >= 3 &&
+          (pathParts[0] === 'website-builder' || pathParts[0] === 'website') &&
+          (pathParts[1] === 'template' || pathParts[1] === 'templates')
+        ) {
+          targetId = pathParts[2];
+        }
+      }
+
+      if (targetId) {
+        const cleanId = targetId.toLowerCase().trim();
+        const found = WEBSITE_TEMPLATES.find(
+          (t) =>
+            t.id.toLowerCase() === cleanId ||
+            t.id.replace(/^tmpl-/, '').toLowerCase() === cleanId ||
+            t.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') === cleanId
+        );
+        if (found) {
+          openTemplatePreview(found);
+        }
+      }
+    } catch {
+      // Graceful fallback
+    }
+  }, [openTemplatePreview]);
+
   const activeSite = mySites.length > 0 ? mySites[0] : null;
 
   const filteredTemplates = orderedWebsiteTemplates().filter((t) => {
@@ -223,7 +258,7 @@ export const WebsiteBuilderPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
               <div className="space-y-1">
                 <div className="inline-flex items-center gap-2 text-xs font-bold text-[#00c365] uppercase tracking-wider">
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Globe className="w-3.5 h-3.5" />
                   <span>My Active Website Project</span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
@@ -397,8 +432,8 @@ export const WebsiteBuilderPage: React.FC = () => {
                     onClick={handlePrimaryHeroAction}
                     className="px-6 py-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.35)] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <Sparkles className="w-4 h-4" />
                     <span>Build My Website Free</span>
+                    <ArrowRight className="w-4 h-4" />
                   </button>
 
                   <button
