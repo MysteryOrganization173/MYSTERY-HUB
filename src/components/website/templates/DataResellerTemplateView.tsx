@@ -51,8 +51,8 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
   const [orderNotice, setOrderNotice] = useState<string | null>(null);
 
 
-  const businessName = template.demoBusinessName || 'Ghana Data Express';
-  const tagline = template.demoHeroTagline || 'Affordable Data Bundles, Straight to Your Line';
+  const businessName = template.demoBusinessName || 'QuickByte Data';
+  const tagline = template.demoHeroTagline || 'Affordable data. Simple delivery.';
   const aboutText =
     template.demoSubtext ||
     'Buy MTN, Telecel and AirtelTigo bundles from one simple storefront. Choose your package, enter the recipient number and place your order through WhatsApp.';
@@ -61,13 +61,13 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
   const whatsapp = template.hoursOrContact || contact;
 
   const p = template.colorScheme || {
-    primary: '#09151f',
-    secondary: '#00c365',
-    background: '#070c10',
-    surface: '#0f1722',
+    primary: '#0f172a',
+    secondary: '#2563eb',
+    background: '#0a0f1d',
+    surface: '#111a2e',
     text: '#f8fafc',
     mutedText: '#94a3b8',
-    accent: '#00c365',
+    accent: '#2563eb',
     border: '#1e293b',
   };
 
@@ -200,7 +200,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
 
   return (
     <div
-      className="min-h-full font-sans antialiased text-slate-100 flex flex-col selection:bg-[#00c365] selection:text-black"
+      className="min-h-full font-sans antialiased text-slate-100 flex flex-col selection:bg-[#2563eb] selection:text-white"
       style={{ backgroundColor: p.background }}
     >
       {/* =========================================================
@@ -212,17 +212,17 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
       >
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-md shrink-0"
-            style={{ backgroundColor: p.accent, color: '#000000' }}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-md shrink-0 text-white"
+            style={{ backgroundColor: p.accent }}
           >
-            <Smartphone className="w-5 h-5 text-black" />
+            <Smartphone className="w-5 h-5 text-white" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-extrabold text-sm sm:text-base tracking-tight leading-none" style={{ color: p.text }}>
                 {businessName}
               </h1>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
             </div>
             <p className="text-[10px] sm:text-xs font-medium" style={{ color: p.mutedText }}>
               Direct SIM Top-Up Storefront
@@ -235,10 +235,9 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             <button
               type="button"
               onClick={handleChatWhatsapp}
-              className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
-              style={{ backgroundColor: p.accent, color: '#000000' }}
+              className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 bg-[#25D366] hover:bg-[#22c35e] text-white"
             >
-              <MessageSquare className="w-3.5 h-3.5 fill-black" />
+              <MessageSquare className="w-3.5 h-3.5 fill-white" />
               <span className="hidden sm:inline">WhatsApp Support</span>
               <span className="sm:hidden">WhatsApp</span>
             </button>
@@ -280,7 +279,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             <div className="grid grid-cols-3 gap-2 sm:gap-4 py-2.5 border-y" style={{ borderColor: `${p.border}80` }}>
               <div className="space-y-0.5">
                 <div className="text-xs font-bold text-white flex items-center gap-1">
-                  <Wifi className="w-3 h-3 text-emerald-400" />
+                  <Wifi className="w-3 h-3 text-blue-400" />
                   <span>Multiple Networks</span>
                 </div>
                 <div className="text-[10px]" style={{ color: p.mutedText }}>
@@ -290,7 +289,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
 
               <div className="space-y-0.5">
                 <div className="text-xs font-bold text-white flex items-center gap-1">
-                  <ShoppingBag className="w-3 h-3 text-emerald-400" />
+                  <ShoppingBag className="w-3 h-3 text-blue-400" />
                   <span>Simple Ordering</span>
                 </div>
                 <div className="text-[10px]" style={{ color: p.mutedText }}>
@@ -300,7 +299,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
 
               <div className="space-y-0.5">
                 <div className="text-xs font-bold text-white flex items-center gap-1">
-                  <MessageSquare className="w-3 h-3 text-emerald-400" />
+                  <MessageSquare className="w-3 h-3 text-blue-400" />
                   <span>Direct Chat</span>
                 </div>
                 <div className="text-[10px]" style={{ color: p.mutedText }}>
@@ -314,8 +313,8 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
               <button
                 type="button"
                 onClick={scrollToCatalog}
-                className="px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 cursor-pointer active:scale-95"
-                style={{ backgroundColor: p.accent, color: '#000000' }}
+                className="px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 cursor-pointer active:scale-95 text-white"
+                style={{ backgroundColor: p.accent }}
               >
                 <span>Buy Data</span>
                 <ArrowRight className="w-4 h-4" />
@@ -332,7 +331,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                     color: p.text,
                   }}
                 >
-                  <MessageSquare className="w-4 h-4" />
+                  <MessageSquare className="w-4 h-4 text-emerald-400" />
                   <span>Chat on WhatsApp</span>
                 </button>
               )}
@@ -342,7 +341,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           {/* Right Column (Desktop) / Below CTAs (Mobile): Hero Artwork */}
           <div className="lg:col-span-5 relative w-full">
             <div
-              className="rounded-2xl sm:rounded-3xl border overflow-hidden p-1.5 sm:p-2.5 backdrop-blur-md relative shadow-[0_0_35px_rgba(0,195,101,0.08)] transition-all ring-1 ring-white/5"
+              className="rounded-2xl sm:rounded-3xl border overflow-hidden p-1.5 sm:p-2.5 backdrop-blur-md relative shadow-[0_0_35px_rgba(37,99,235,0.12)] transition-all ring-1 ring-white/5"
               style={{
                 backgroundColor: `${p.surface}cc`,
                 borderColor: `${p.accent}33`,
@@ -547,8 +546,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             <button
               type="button"
               onClick={handleOrderViaWhatsapp}
-              className="w-full py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-xl cursor-pointer active:scale-[0.99]"
-              style={{ backgroundColor: p.accent, color: '#000000' }}
+              className="w-full py-3.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-xl cursor-pointer active:scale-[0.99] bg-[#25D366] hover:bg-[#22c35e] text-black"
             >
               <MessageSquare className="w-4 h-4 fill-black" />
               <span>Order via WhatsApp · GH₵ {selectedPackage.price}</span>

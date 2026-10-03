@@ -239,102 +239,99 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
     return (
       <div className="min-h-screen py-6 sm:py-10 text-slate-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
-          {/* 1. Member Command Panel Hero */}
-          <div className="relative rounded-3xl bg-gradient-to-br from-[#0a1410] via-[#070b0e] to-[#0d1612] border border-[#00c365]/30 overflow-hidden shadow-2xl p-5 sm:p-7 lg:p-8">
+          {/* 1. Member Command Panel Hero (Unified Card with Seamless Artwork Integration) */}
+          <div className="relative rounded-3xl bg-gradient-to-br from-[#0a1410] via-[#070b0e] to-[#0d1612] border border-[#00c365]/35 overflow-hidden shadow-2xl p-5 sm:p-7 lg:p-8">
+            {/* Integrated Artwork Layer (Background on Mobile, Seamless Right Wing on Desktop) */}
+            <div className="absolute inset-y-0 right-0 w-full sm:w-2/3 lg:w-1/2 pointer-events-none select-none z-0 overflow-hidden">
+              <img
+                src={getCloudinaryUrl(MYSTERY_EARN_ARTWORK_URL, { width: 960, quality: 'auto', format: 'auto' })}
+                srcSet={getCloudinarySrcSet(MYSTERY_EARN_ARTWORK_URL, [480, 640, 768, 960, 1200])}
+                sizes="(max-width: 640px) 100vw, 50vw"
+                alt=""
+                aria-hidden="true"
+                className="w-full h-full object-cover object-[85%_center] opacity-35 sm:opacity-65 lg:opacity-85"
+              />
+              {/* Desktop smooth gradient mask */}
+              <div className="hidden lg:block absolute inset-0 bg-gradient-to-r from-[#070b0e] via-[#070b0e]/75 to-transparent" />
+              {/* Mobile gradient overlay for strong text readability */}
+              <div className="lg:hidden absolute inset-0 bg-gradient-to-r from-[#070b0e]/95 via-[#070b0e]/85 to-[#070b0e]/50" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#070b0e] via-transparent to-[#070b0e]/30" />
+            </div>
+
             {/* Ambient Background Glows */}
             <div className="absolute top-0 right-0 w-96 h-96 bg-[#00c365]/10 rounded-full blur-[100px] pointer-events-none" />
             <div className="absolute bottom-0 left-1/4 w-80 h-80 bg-amber-500/5 rounded-full blur-[90px] pointer-events-none" />
 
-            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 items-center">
-              {/* Left Column (55-60% on desktop): Content & Referral Controls */}
-              <div className="lg:col-span-7 space-y-4 sm:space-y-5">
-                {/* Header Meta */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00c365]/10 border border-[#00c365]/30 text-xs font-bold text-[#00c365]">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>MYSTERY EARN · ACTIVE PARTNER</span>
-                  </div>
-
-                  {summary?.code && (
-                    <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-900/80 border border-slate-800 px-3 py-1 rounded-full">
-                      <span className="text-slate-400 font-medium">Referral Code:</span>
-                      <span className="font-mono font-bold text-[#00c365] tracking-wider">{summary.code}</span>
-                    </div>
-                  )}
+            <div className="relative z-10 max-w-xl lg:max-w-2xl space-y-4 sm:space-y-5">
+              {/* Header Meta */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00c365]/15 border border-[#00c365]/40 text-xs font-bold text-[#00c365] backdrop-blur-sm">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>MYSTERY EARN · ACTIVE PARTNER</span>
                 </div>
 
-                {/* Title & Simplified Copy */}
-                <div className="space-y-1.5 text-left">
-                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
-                    Welcome, {firstName} 👋
-                  </h1>
-                  <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-                    Refer once. Earn from qualifying purchases when they return.
-                  </p>
-                </div>
-
-                {/* Personal Link Command Box */}
-                <div className="space-y-2.5 pt-1">
-                  <div className="text-xs font-bold text-slate-300 uppercase tracking-wider text-left">
-                    Your Personal Referral Link
+                {summary?.code && (
+                  <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-900/90 border border-slate-700/80 px-3 py-1 rounded-full backdrop-blur-sm">
+                    <span className="text-slate-400 font-medium">Referral Code:</span>
+                    <span className="font-mono font-bold text-[#00c365] tracking-wider">{summary.code}</span>
                   </div>
-
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-                    {/* Readonly Link Box */}
-                    <div className="flex-1 flex items-center bg-[#070b0e] border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-mono text-slate-200 overflow-hidden shadow-inner">
-                      <span className="truncate select-all">{shareUrl}</span>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={handleCopyLink}
-                        aria-label="Copy referral link"
-                        className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
-                      >
-                        {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        <span>{copiedLink ? 'Copied' : 'Copy'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleWhatsAppShare}
-                        aria-label="Share referral link on WhatsApp"
-                        className="px-3.5 py-2.5 rounded-xl bg-[#25D366]/20 hover:bg-[#25D366]/30 text-[#25D366] border border-[#25D366]/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                        <span className="hidden sm:inline">WhatsApp</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleNativeShare}
-                        aria-label="Share referral link"
-                        className="px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
-                      >
-                        <Share2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
 
-              {/* Right Column (40-45% on desktop): Official Mystery Earn Artwork */}
-              <div className="lg:col-span-5 relative rounded-2xl overflow-hidden border border-[#00c365]/25 bg-slate-950/60 shadow-xl group h-48 sm:h-56 lg:h-full lg:min-h-[250px] flex items-center justify-center mt-2 lg:mt-0">
-                <div className="absolute inset-0 bg-gradient-to-tr from-[#00c365]/10 via-transparent to-amber-500/10 opacity-70 pointer-events-none z-10" />
-                <div className="absolute inset-0 bg-gradient-to-r from-[#070b0e] via-transparent to-transparent opacity-60 lg:opacity-50 pointer-events-none z-10" />
-                <img
-                  src={getCloudinaryUrl(MYSTERY_EARN_ARTWORK_URL, { width: 960, quality: 'auto', format: 'auto' })}
-                  srcSet={getCloudinarySrcSet(MYSTERY_EARN_ARTWORK_URL, [480, 640, 768, 960, 1200, 1440])}
-                  sizes="(max-width: 1024px) 100vw, 40vw"
-                  alt="Mystery Earn Network"
-                  loading="eager"
-                  // @ts-ignore
-                  fetchPriority="high"
-                  decoding="async"
-                  className="w-full h-full object-cover object-right rounded-2xl transition-transform duration-700 ease-out group-hover:scale-[1.03]"
-                />
+              {/* Title & Simplified Copy */}
+              <div className="space-y-1.5 text-left">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
+                  Welcome, {firstName} 👋
+                </h1>
+                <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-normal">
+                  Refer once. Earn from qualifying purchases when they return.
+                </p>
+              </div>
+
+              {/* Personal Link Command Box */}
+              <div className="space-y-2.5 pt-1">
+                <div className="text-xs font-bold text-slate-300 uppercase tracking-wider text-left">
+                  Your Personal Referral Link
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                  {/* Readonly Link Box */}
+                  <div className="flex-1 flex items-center bg-[#070b0e]/95 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-mono text-slate-200 overflow-hidden shadow-inner backdrop-blur-sm">
+                    <span className="truncate select-all">{shareUrl}</span>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleCopyLink}
+                      aria-label="Copy referral link"
+                      className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+                    >
+                      {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      <span>{copiedLink ? 'Copied' : 'Copy'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleWhatsAppShare}
+                      aria-label="Share referral link on WhatsApp"
+                      className="px-3.5 py-2.5 rounded-xl bg-[#25D366]/25 hover:bg-[#25D366]/35 text-[#25D366] border border-[#25D366]/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer backdrop-blur-sm"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span className="hidden sm:inline">WhatsApp</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleNativeShare}
+                      aria-label="Share referral link"
+                      className="px-3 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer backdrop-blur-sm"
+                    >
+                      <Share2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -692,55 +689,20 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
             </div>
           </div>
 
-          {/* 5. Active Reward Opportunities (Live Rules Transparency) */}
-          <div className="space-y-3 text-left">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Earning Rules</h2>
-              <span className="text-[11px] text-slate-500">Live Server Rules</span>
+          {/* 5. Qualifying Purchases & Reward Transparency */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-[#0b1015] border border-slate-800 text-left space-y-3">
+            <div className="flex items-center gap-2">
+              <Award className="w-4 h-4 text-[#00c365]" />
+              <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                Earn From Qualifying Purchases
+              </h2>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
-              {rules.length > 0 ? (
-                rules.map((rule) => {
-                  const rewardDescription = describeReferralReward(rule);
-
-                  const title =
-                    rule.service_type === 'data'
-                      ? `${(rule.network || 'Telecom').toUpperCase()} Data Bundles`
-                      : rule.service_type === 'instant_bundle'
-                      ? 'Instant Bundles'
-                      : rule.service_type === 'airtime'
-                      ? 'Airtime Top-Up'
-                      : rule.service_type === 'marketplace'
-                      ? 'Marketplace Sourcing'
-                      : 'All Services';
-
-                  return (
-                    <div
-                      key={rule.id}
-                      className="p-4 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-2 text-left"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-white">{title}</span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#00c365]/10 text-[#00c365] border border-[#00c365]/30">
-                          Active
-                        </span>
-                      </div>
-                      <div className="text-sm font-extrabold text-[#00c365] font-mono">
-                        {rewardDescription || 'Active Referral Reward'}
-                      </div>
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Qualifying paid and delivered purchases only. More specific network or product rules take precedence.
-                      </p>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="col-span-full p-5 rounded-2xl bg-[#0b1015] border border-slate-800 text-xs text-slate-400 text-center">
-                  New earning opportunities are being prepared.
-                </div>
-              )}
-            </div>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
+              Rewards vary by eligible product and order value. When a referred customer completes a qualifying purchase, your reward is credited automatically.
+            </p>
+            <p className="text-[11px] text-slate-400">
+              Every reward credited to your account is tracked with full transaction details in your Reward Ledger Activity above.
+            </p>
           </div>
         </div>
       </div>
@@ -963,26 +925,36 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4">
-            {/* Category 1 */}
-            <div className="p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-2.5 text-left">
-              <div className="w-9 h-9 rounded-xl bg-[#00c365]/10 border border-[#00c365]/30 flex items-center justify-center text-[#00c365]">
-                <Smartphone className="w-4 h-4" />
+            {/* Category 1: Telecom */}
+            <div className="p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-3 text-left">
+              <div className="flex items-center justify-between">
+                <div className="w-9 h-9 rounded-xl bg-[#00c365]/10 border border-[#00c365]/30 flex items-center justify-center text-[#00c365]">
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#00c365]/10 text-[#00c365] border border-[#00c365]/30">
+                  Active Channel
+                </span>
               </div>
               <h3 className="font-bold text-white text-sm">Data & Digital Services</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Share Mystery Hub services. Eligible repeat purchases from referred customers can continue generating rewards.
+                Share daily data bundles and airtime top-ups. When your referred customers complete qualifying telecom orders, your reward is attributed automatically.
               </p>
             </div>
 
-            {/* Category 2 */}
-            <div className="p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-2.5 text-left flex flex-col justify-between">
-              <div className="space-y-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                  <ShoppingBag className="w-4 h-4" />
+            {/* Category 2: Marketplace */}
+            <div className="p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-3 text-left flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                    <ShoppingBag className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                    Active Channel
+                  </span>
                 </div>
                 <h3 className="font-bold text-white text-sm">Marketplace Sourcing</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Selected marketplace products offer direct fixed referral rewards when buyers complete qualifying purchases. You can share eligible product links directly from the Marketplace.
+                  Share verified hardware, phones, and sourced products from the Marketplace. Eligible products credit referral rewards upon successful order delivery.
                 </p>
               </div>
               <div className="pt-2">
@@ -997,52 +969,78 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
               </div>
             </div>
 
-            {/* Category 3 */}
-            <div className="p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-2.5 text-left">
-              <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
-                <Globe className="w-4 h-4" />
+            {/* Category 3: Website Builder */}
+            <div className="p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-3 text-left">
+              <div className="flex items-center justify-between">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                  <Globe className="w-4 h-4" />
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                  Coming Later
+                </span>
               </div>
               <h3 className="font-bold text-white text-sm">Website Builder</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Referral rewards for paid Website Builder plans are planned for a future phase.
+                Refer businesses to the Mystery Hub Website Studio. Referral rewards for professional plans will activate in an upcoming phase.
               </p>
             </div>
           </div>
         </div>
 
-        {/* 4. ACTIVE REWARD RULES TRANSPARENCY */}
-        {rules.length > 0 && (
-          <div className="space-y-3 text-left">
-            <div className="space-y-1">
-              <span className="text-xs font-bold text-[#00c365] uppercase tracking-wider">Current Opportunities</span>
-              <h2 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
-                Active Earning Rates
-              </h2>
+        {/* 4. BENEFIT-FOCUSED EARNING JOURNEY (Zero Fixed-Rate Promises) */}
+        <div className="space-y-4 text-left">
+          <div className="space-y-1">
+            <span className="text-xs font-bold text-[#00c365] uppercase tracking-wider">How Earning Works</span>
+            <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+              Earn From Qualifying Purchases
+            </h2>
+            <p className="text-xs text-slate-400">
+              Rewards vary by eligible product and order value. Here is how your referrals generate rewards:
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="p-4.5 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-2">
+              <span className="text-[10px] font-mono font-bold text-[#00c365] bg-[#00c365]/10 px-2 py-0.5 rounded border border-[#00c365]/20">
+                01 · SHARE
+              </span>
+              <h3 className="font-bold text-sm text-white pt-1">Share Mystery Hub</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Invite friends and customers using your personal link or direct product shares.
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {rules.map((rule) => {
-                const rewardDesc = describeReferralReward(rule);
+            <div className="p-4.5 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-2">
+              <span className="text-[10px] font-mono font-bold text-[#00c365] bg-[#00c365]/10 px-2 py-0.5 rounded border border-[#00c365]/20">
+                02 · QUALIFY
+              </span>
+              <h3 className="font-bold text-sm text-white pt-1">Customer Purchases</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Your referred customer completes a qualifying purchase across eligible services.
+              </p>
+            </div>
 
-                const ruleTitle =
-                  rule.service_type === 'data'
-                    ? `${(rule.network || 'MTN/Telecel/AT').toUpperCase()} Data Bundles`
-                    : rule.service_type === 'instant_bundle'
-                    ? 'Instant Bundles'
-                    : rule.service_type === 'airtime'
-                    ? 'Airtime Top-Up'
-                    : 'Digital Services';
+            <div className="p-4.5 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-2">
+              <span className="text-[10px] font-mono font-bold text-[#00c365] bg-[#00c365]/10 px-2 py-0.5 rounded border border-[#00c365]/20">
+                03 · REWARD
+              </span>
+              <h3 className="font-bold text-sm text-white pt-1">You Earn a Reward</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                When order fulfillment is delivered, your earned reward is credited automatically to your ledger.
+              </p>
+            </div>
 
-                return (
-                  <div key={rule.id} className="p-4 rounded-xl bg-[#0b1015] border border-slate-800/80 space-y-1">
-                    <span className="font-bold text-xs text-white">{ruleTitle}</span>
-                    <div className="text-sm font-extrabold text-[#00c365] font-mono">{rewardDesc}</div>
-                  </div>
-                );
-              })}
+            <div className="p-4.5 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-2">
+              <span className="text-[10px] font-mono font-bold text-[#00c365] bg-[#00c365]/10 px-2 py-0.5 rounded border border-[#00c365]/20">
+                04 · LIFETIME
+              </span>
+              <h3 className="font-bold text-sm text-white pt-1">Ongoing Purchases</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Future qualifying purchases from your linked customers may keep earning rewards.
+              </p>
             </div>
           </div>
-        )}
+        </div>
 
         {/* 5. Bottom Guest CTA Card */}
         <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#0c1813] to-[#070b0e] border border-[#00c365]/30 text-center space-y-4">

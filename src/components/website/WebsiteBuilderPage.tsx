@@ -195,7 +195,7 @@ export const WebsiteBuilderPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen py-8 sm:py-12">
+    <div className="min-h-screen pt-6 pb-28 sm:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 sm:space-y-16">
         {/* =========================================================
             1. AUTHENTICATED USER'S ACTIVE WEBSITE DASHBOARD
@@ -474,16 +474,16 @@ export const WebsiteBuilderPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Category Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-thin">
+          {/* Category Filter Pills (Smooth Mobile Horizontal Scroll, Zero Browser Scrollbar) */}
+          <div className="flex items-center gap-2 overflow-x-auto py-1 scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {TEMPLATE_CATEGORIES.map((cat) => (
               <button
                 key={cat.id}
                 type="button"
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 active:scale-95 ${
                   selectedCategory === cat.id
-                    ? 'bg-[#00c365] text-black font-bold shadow-md'
+                    ? 'bg-[#00c365] text-black font-bold shadow-[0_0_12px_rgba(0,195,101,0.35)] scale-[1.02]'
                     : 'bg-[#10171f] border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
                 }`}
               >
