@@ -14,6 +14,8 @@ export type RewardServiceType =
   | 'manual_adjustment';
 
 export type RewardCalculationType = 'fixed_minor' | 'percent_bps';
+export type PurchaseStage = 'any' | 'acquisition' | 'recurring';
+export type RewardStage = 'standard' | 'acquisition' | 'recurring';
 
 export interface ReferralProfileRecord {
   id: string;
@@ -55,6 +57,7 @@ export interface ReferralClickRecord {
 export interface ReferralRewardRuleRecord {
   id: string;
   service_type: RewardServiceType | 'all';
+  purchase_stage?: PurchaseStage;
   product_key: string | null;
   network: string | null;
   reward_type: RewardCalculationType;
@@ -81,6 +84,8 @@ export interface RewardLedgerRecord {
   service_type: RewardServiceType;
   reward_rule_id: string | null;
   network_level?: number; // 1, 2, or 3
+  reward_stage?: RewardStage;
+  reward_relationship_key?: string | null;
   amount_minor: number; // integer pesewas
   currency: 'GHS';
   status: RewardLedgerStatus;
@@ -97,6 +102,7 @@ export interface RewardLedgerRecord {
 export interface SafeRewardLedgerItem {
   id: string;
   service_type: RewardServiceType;
+  reward_stage?: RewardStage;
   network_level?: number; // 1 = Direct Referral, 2 = Level 2, 3 = Level 3
   level_label?: string;
   amount_minor: number;

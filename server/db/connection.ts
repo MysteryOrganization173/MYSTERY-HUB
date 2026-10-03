@@ -433,6 +433,18 @@ export async function initDatabase(): Promise<void> {
         sql: `ALTER TABLE referral_attributions ADD COLUMN IF NOT EXISTS level3_referrer_user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL;`,
       },
       {
+        name: 'referral_reward_rules.purchase_stage',
+        sql: `ALTER TABLE referral_reward_rules ADD COLUMN IF NOT EXISTS purchase_stage VARCHAR(16) NOT NULL DEFAULT 'any' CHECK (purchase_stage IN ('any', 'acquisition', 'recurring'));`,
+      },
+      {
+        name: 'reward_ledger.reward_stage',
+        sql: `ALTER TABLE reward_ledger ADD COLUMN IF NOT EXISTS reward_stage VARCHAR(16) NOT NULL DEFAULT 'standard' CHECK (reward_stage IN ('standard', 'acquisition', 'recurring'));`,
+      },
+      {
+        name: 'reward_ledger.reward_relationship_key',
+        sql: `ALTER TABLE reward_ledger ADD COLUMN IF NOT EXISTS reward_relationship_key VARCHAR(256);`,
+      },
+      {
         name: 'referral_reward_rules.level2_reward_minor',
         sql: `ALTER TABLE referral_reward_rules ADD COLUMN IF NOT EXISTS level2_reward_minor INTEGER;`,
       },
@@ -585,6 +597,7 @@ export async function initDatabase(): Promise<void> {
       `CREATE INDEX IF NOT EXISTS idx_reward_ledger_network_level ON reward_ledger (network_level);`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_reward_ledger_idempotency ON reward_ledger (idempotency_key);`,
       `CREATE INDEX IF NOT EXISTS idx_reward_ledger_created ON reward_ledger (created_at DESC);`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_reward_acquisition_relationship ON reward_ledger (reward_relationship_key, service_type) WHERE reward_stage = 'acquisition' AND network_level = 1 AND reward_relationship_key IS NOT NULL;`,
     ];
 
     for (const idxSql of indexStatements) {

@@ -213,6 +213,38 @@ export class OrdersStore {
     devWebhookEventsStore.clear();
   }
 
+  static async hasEarlierQualifyingReferralOrder(order: OrderRecord, params: {
+    referrerId: string; userId?: string | null; attributionId?: string | null; attributionFirstSeen?: string | null;
+  }, client?: PoolClient): Promise<boolean> {
+    const pool = client || getPool();
+    const at = order.delivered_at || order.updated_at || order.created_at;
+    const service = order.service_type || 'data';
+    if (pool) {
+      const result = await pool.query<{ present: boolean }>(`
+        SELECT EXISTS (SELECT 1 FROM orders WHERE id <> $1 AND payment_status = 'success'
+          AND status = 'delivered' AND currency = 'GHS' AND COALESCE(service_type, 'data') = $2
+          AND (service_type IS DISTINCT FROM 'marketplace' OR marketplace_status = 'completed')
+          AND (referrer_user_id = $3 OR (referrer_user_id IS NULL AND
+            (referral_attribution_id = $5 OR (referral_attribution_id IS NULL AND user_id = $4 AND created_at >= $6))))
+          AND (user_id = $4 OR referral_attribution_id = $5)
+          AND (COALESCE(delivered_at, updated_at, created_at), id) < ($7::timestamptz, $1)) AS present;
+      `, [order.id, service, params.referrerId, params.userId || null, params.attributionId || null,
+        params.attributionFirstSeen || null, at]);
+      return result.rows[0]?.present || false;
+    }
+    return [...devMemoryStore.values()].some(previous => previous.id !== order.id
+      && previous.payment_status === 'success' && previous.status === 'delivered' && previous.currency === 'GHS'
+      && (previous.service_type || 'data') === service
+      && (service !== 'marketplace' || previous.marketplace_status === 'completed')
+      && (previous.referrer_user_id === params.referrerId || (!previous.referrer_user_id
+        && ((params.attributionId && previous.referral_attribution_id === params.attributionId)
+          || (!previous.referral_attribution_id && params.userId && previous.user_id === params.userId
+            && params.attributionFirstSeen && new Date(previous.created_at) >= new Date(params.attributionFirstSeen)))))
+      && ((params.userId && previous.user_id === params.userId) || (params.attributionId && previous.referral_attribution_id === params.attributionId))
+      && (new Date(previous.delivered_at || previous.updated_at || previous.created_at).getTime() < new Date(at).getTime()
+        || (new Date(previous.delivered_at || previous.updated_at || previous.created_at).getTime() === new Date(at).getTime() && previous.id < order.id)));
+  }
+
   /**
    * Delete order by id (internal / administrative cleanup use only)
    */

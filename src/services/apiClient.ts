@@ -1205,6 +1205,7 @@ export interface ReferralSummaryResponse {
 }
 
 export interface RewardLedgerItem {
+  reward_stage?: 'standard' | 'acquisition' | 'recurring';
   id: string;
   service_type: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'website_builder' | 'manual_adjustment';
   network_level?: number;
@@ -1226,6 +1227,7 @@ export interface RewardLedgerResponse {
 }
 
 export interface PublicRewardRule {
+  purchase_stage?: 'any' | 'acquisition' | 'recurring';
   id: string;
   service_type: string;
   product_key: string | null;

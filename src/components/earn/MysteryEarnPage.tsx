@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { describeReferralReward } from '../../utils/referralRewardCopy';
 import { createEarnDashboardRefresh } from '../../utils/earnDashboardRefresh';
 import { useApp } from '../../context/AppContext';
 import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
@@ -701,12 +702,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
               {rules.length > 0 ? (
                 rules.map((rule) => {
-                  let rewardDescription = '';
-                  if (rule.reward_type === 'fixed_minor' && rule.reward_minor) {
-                    rewardDescription = `GH₵${(rule.reward_minor / 100).toFixed(2)} per delivered order`;
-                  } else if (rule.reward_type === 'percent_bps' && rule.reward_percent_bps) {
-                    rewardDescription = `${(rule.reward_percent_bps / 100).toFixed(1)}% of order total`;
-                  }
+                  const rewardDescription = describeReferralReward(rule);
 
                   const title =
                     rule.service_type === 'data'
@@ -734,7 +730,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                         {rewardDescription || 'Active Referral Reward'}
                       </div>
                       <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Credited automatically to your ledger upon terminal order delivery.
+                        Qualifying paid and delivered purchases only. More specific network or product rules take precedence.
                       </p>
                     </div>
                   );
@@ -1026,12 +1022,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {rules.map((rule) => {
-                let rewardDesc = '';
-                if (rule.reward_type === 'fixed_minor' && rule.reward_minor) {
-                  rewardDesc = `GH₵${(rule.reward_minor / 100).toFixed(2)} per order`;
-                } else if (rule.reward_type === 'percent_bps' && rule.reward_percent_bps) {
-                  rewardDesc = `${(rule.reward_percent_bps / 100).toFixed(1)}% of total`;
-                }
+                const rewardDesc = describeReferralReward(rule);
 
                 const ruleTitle =
                   rule.service_type === 'data'
