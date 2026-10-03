@@ -8,6 +8,7 @@ import { buildReferralUrl } from '../../utils/referralUrl';
 import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
 import { OptimizedImage } from '../common/OptimizedImage';
 import { MarketplaceCheckoutModal } from './MarketplaceCheckoutModal';
+import { MarketplaceProductDetailModal } from './MarketplaceProductDetailModal';
 import {
   Laptop,
   Smartphone,
@@ -46,6 +47,9 @@ export const MarketplacePage: React.FC = () => {
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Selected Product for Rich Product Detail View (Drill-down experience)
+  const [selectedProduct, setSelectedProduct] = useState<MarketplaceProduct | null>(null);
 
   // Hero image load & error states for smooth reveal
   const [heroImageLoaded, setHeroImageLoaded] = useState(false);
@@ -102,7 +106,7 @@ export const MarketplacePage: React.FC = () => {
     fetchCatalog();
   }, [fetchCatalog]);
 
-  // Deep-link landing & spotlight behavior
+  // Deep-link landing & spotlight behavior (also auto-opens product detail modal if link points to product)
   useEffect(() => {
     if (loading || products.length === 0) return;
     try {
@@ -128,6 +132,7 @@ export const MarketplacePage: React.FC = () => {
 
       if (targetProduct) {
         setHighlightedProductId(targetProduct.id);
+        setSelectedProduct(targetProduct);
         const timerScroll = setTimeout(() => {
           const el = document.getElementById(`marketplace-product-${targetProduct!.id}`);
           if (el) {
@@ -238,8 +243,8 @@ export const MarketplacePage: React.FC = () => {
   }, [shareModalProduct, referralCode]);
 
   return (
-    <div className="min-h-screen py-5 sm:py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5 sm:space-y-8">
+    <div className="min-h-screen py-5 sm:py-8 pb-28 sm:pb-16 text-slate-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
         
         {/* 1. Official Marketplace Hero Header with Cloudinary Artwork Background */}
         {/* DESKTOP & TABLET HERO (sm and above): Unchanged Premium Composition */}
@@ -415,7 +420,7 @@ export const MarketplacePage: React.FC = () => {
         {!loading && !error && products.length > 0 && (
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              {/* Search Input */}
+              {/* Compact Responsive Search Input */}
               <div className="relative flex-1 max-w-md">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -423,26 +428,45 @@ export const MarketplacePage: React.FC = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search laptops, microphones, tools, software..."
-                  className="w-full bg-[#0e141a] border border-slate-700/80 rounded-xl pl-10 pr-4 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
+                  className="w-full bg-[#0e141a] border border-slate-700/80 rounded-xl pl-10 pr-9 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 text-xs"
+                    aria-label="Clear search query"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
 
-              <div className="text-xs text-slate-400 flex items-center gap-2 self-start sm:self-auto">
+              <div className="text-xs text-slate-400 flex items-center justify-between sm:justify-start gap-2">
                 <span>
                   Showing <span className="font-bold text-white">{filteredProducts.length}</span> sourced items
                 </span>
+                {selectedCategory !== 'all' && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('all')}
+                    className="text-[#00c365] hover:underline cursor-pointer sm:ml-2"
+                  >
+                    Clear filter
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Category Tabs */}
-            <div className="w-full flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {/* Category Tabs (Smooth mobile horizontal scroll, hidden native scrollbars) */}
+            <div className="w-full flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
               {MARKETPLACE_CATEGORIES.map((cat) => {
                 const isSelected = selectedCategory === cat.id;
                 return (
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 active:scale-95 ${
                       isSelected
                         ? 'bg-[#00c365] text-black shadow-md font-bold'
                         : 'bg-[#0e141a] text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700'
@@ -459,17 +483,16 @@ export const MarketplacePage: React.FC = () => {
         {/* 4. Products Grid / Loading / Error / Honest States */}
         {loading ? (
           /* Loading Skeleton State */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-            {[1, 2, 3].map((n) => (
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
+            {[1, 2, 3, 4].map((n) => (
               <div
                 key={n}
-                className="rounded-2xl bg-[#0f151b] border border-slate-800 p-4 sm:p-5 space-y-4 animate-pulse"
+                className="rounded-2xl bg-[#0f151b] border border-slate-800 p-3 sm:p-4 space-y-3 animate-pulse"
               >
-                <div className="w-full aspect-[4/3] rounded-xl bg-slate-800/50" />
+                <div className="w-full aspect-square rounded-xl bg-slate-800/50" />
+                <div className="h-3.5 bg-slate-800 rounded w-1/2" />
+                <div className="h-5 bg-slate-800 rounded w-3/4" />
                 <div className="h-4 bg-slate-800 rounded w-1/3" />
-                <div className="h-6 bg-slate-800 rounded w-3/4" />
-                <div className="h-3 bg-slate-800 rounded w-full" />
-                <div className="h-8 bg-slate-800 rounded w-full mt-4" />
               </div>
             ))}
           </div>
@@ -558,39 +581,39 @@ export const MarketplacePage: React.FC = () => {
             </div>
           </div>
         ) : (
-          /* LIVE PRODUCTS GRID */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          /* LIVE PRODUCTS GRID (COMPACT COMMERCE FEED: 2-COL ON MOBILE) */
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
             {filteredProducts.map((p) => {
               const availabilityBadgeMap: Record<string, { label: string; style: string }> = {
                 in_stock: {
                   label: 'In Stock',
-                  style: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+                  style: 'bg-emerald-500/85 text-white border-emerald-400/40',
                 },
                 sourcing_on_demand: {
                   label: 'Sourced on Request',
-                  style: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+                  style: 'bg-sky-500/85 text-white border-sky-400/40',
                 },
                 preorder: {
                   label: 'Pre-Order',
-                  style: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+                  style: 'bg-amber-500/85 text-white border-amber-400/40',
                 },
                 out_of_stock: {
                   label: 'Out of Stock',
-                  style: 'bg-slate-800 text-slate-400 border-slate-700',
+                  style: 'bg-slate-800 text-slate-300 border-slate-700',
                 },
                 available: {
                   label: 'In Stock',
-                  style: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+                  style: 'bg-emerald-500/85 text-white border-emerald-400/40',
                 },
                 check_availability: {
                   label: 'Sourced on Request',
-                  style: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+                  style: 'bg-sky-500/85 text-white border-sky-400/40',
                 },
               };
 
               const availabilityBadge = availabilityBadgeMap[p.availability] || {
                 label: 'Sourced on Request',
-                style: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+                style: 'bg-sky-500/85 text-white border-sky-400/40',
               };
 
               const isEligibleForShare =
@@ -601,147 +624,102 @@ export const MarketplacePage: React.FC = () => {
                 p.referralRewardGhc > 0;
 
               const rewardGhcFormatted = isEligibleForShare ? formatGhcReward(p.referralRewardGhc) : null;
-              const directWhatsAppLink = BUSINESS_CONFIG.getMarketplaceInquiryWhatsAppUrl(p.name);
               const isHighlighted = highlightedProductId === p.id;
 
               return (
-                <div
+                <article
                   id={`marketplace-product-${p.id}`}
                   key={p.id}
-                  className={`rounded-2xl bg-[#0f151b] border transition-all duration-300 flex flex-col justify-between overflow-hidden group shadow-md hover:shadow-xl ${
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`View details for ${p.name}`}
+                  onClick={() => setSelectedProduct(p)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedProduct(p);
+                    }
+                  }}
+                  className={`group relative rounded-2xl bg-[#0f151b] border transition-all duration-200 flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-xl cursor-pointer active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#00c365] ${
                     isHighlighted
-                      ? 'border-[#00c365] ring-2 ring-[#00c365]/50 ring-offset-2 ring-offset-[#070b0e] scale-[1.01]'
-                      : 'border-slate-800 hover:border-slate-700/80'
+                      ? 'border-[#00c365] ring-2 ring-[#00c365]/50 ring-offset-2 ring-offset-[#070b0e]'
+                      : 'border-slate-800 hover:border-slate-700 hover:bg-[#121921]'
                   }`}
                 >
-                  <div>
-                    {/* Product Image Container (4:3 Aspect Ratio, object-cover) */}
-                    <div className="relative w-full aspect-[4/3] bg-gradient-to-b from-[#090e13] to-[#0f151b] border-b border-slate-800/80 overflow-hidden">
+                  <div className="flex flex-col">
+                    {/* Commerce Product Image (square on mobile, 4:3 on desktop) */}
+                    <div className="relative w-full aspect-square sm:aspect-[4/3] bg-gradient-to-b from-[#090e13] to-[#0f151b] border-b border-slate-800/80 overflow-hidden">
                       <OptimizedImage
                         src={p.imageUrl}
                         alt={p.imageAlt || p.name}
-                        aspectRatio="4/3"
+                        aspectRatio="square"
                         objectFit="cover"
                         objectPosition="center center"
                         fallbackIcon={getCategoryFallbackIcon(p.category)}
-                        className="transition-transform duration-300 group-hover:scale-105"
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
+
+                      {/* Small Status Badge on Image */}
+                      <span
+                        className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md border shadow-sm ${availabilityBadge.style}`}
+                      >
+                        {p.availabilityLabel || availabilityBadge.label}
+                      </span>
 
                       {/* Promo Badge if present */}
                       {p.badge && (
-                        <span className="absolute top-3 right-3 text-[10px] font-bold text-white bg-black/70 backdrop-blur-md border border-slate-700 px-2 py-0.5 rounded-md shadow-sm">
+                        <span className="absolute top-2 right-2 text-[10px] font-bold text-white bg-black/80 backdrop-blur-md border border-slate-700 px-2 py-0.5 rounded-md shadow-sm">
                           {p.badge}
                         </span>
                       )}
                     </div>
 
-                    {/* Product Meta & Details */}
-                    <div className="p-4 sm:p-5 space-y-2.5">
-                      {/* Category & Availability Pill */}
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-semibold text-slate-400">
+                    {/* Compact Card Content */}
+                    <div className="p-3 sm:p-4 space-y-1.5 text-left flex-1 flex flex-col justify-between">
+                      <div className="space-y-1">
+                        <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 truncate">
                           {p.categoryLabel}
-                        </span>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${availabilityBadge.style}`}
-                        >
-                          {p.availabilityLabel || availabilityBadge.label}
-                        </span>
-                      </div>
+                        </div>
 
-                      {/* Product Name & Tagline */}
-                      <div>
-                        <h3 className="font-extrabold text-base sm:text-lg text-white group-hover:text-[#00c365] transition-colors line-clamp-2">
+                        <h3 className="font-bold text-xs sm:text-sm text-white group-hover:text-[#00c365] transition-colors line-clamp-2 leading-snug min-h-[2.4rem] sm:min-h-[2.6rem]">
                           {p.name}
                         </h3>
-                        {p.tagline && (
-                          <p className="text-xs text-slate-400 mt-0.5 leading-relaxed line-clamp-2">
-                            {p.tagline}
-                          </p>
-                        )}
                       </div>
 
-                      {/* Prominent Price */}
-                      <div className="pt-1 flex items-baseline justify-between">
-                        <span className="text-xs text-slate-400 font-medium">Estimated Pricing</span>
-                        <span className="text-base sm:text-lg font-extrabold text-white tabular-nums tracking-tight">
+                      <div className="pt-1">
+                        <span className="text-sm sm:text-base font-black text-white font-mono tracking-tight tabular-nums block">
                           {p.priceDisplay}
                         </span>
                       </div>
-
-                      {/* 2-3 Bullet Highlights */}
-                      {p.highlights && p.highlights.length > 0 && (
-                        <div className="space-y-1 pt-2 border-t border-slate-800/80 text-[11px] text-slate-300">
-                          {p.highlights.slice(0, 3).map((h, i) => (
-                            <div key={i} className="flex items-center gap-1.5">
-                              <CheckCircle className="w-3.5 h-3.5 text-[#00c365] shrink-0" />
-                              <span className="truncate">{h}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
 
-                  {/* Card Footer: Share & Earn Strip + Inquire & WhatsApp CTAs */}
-                  <div className="p-4 sm:p-5 pt-0 space-y-2.5">
-                    {/* Share & Earn Action Strip (Only when eligible with reward > 0) */}
-                    {isEligibleForShare && rewardGhcFormatted && (
+                  {/* Card Bottom: Compact Share & Earn Reward Badge if eligible, else Clean Arrow */}
+                  <div className="p-3 sm:p-4 pt-0 text-left">
+                    {isEligibleForShare && rewardGhcFormatted ? (
                       <button
                         type="button"
-                        onClick={() => handleOpenShareModal(p)}
-                        className="w-full px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500/10 via-[#00c365]/10 to-amber-500/10 hover:from-amber-500/20 hover:via-[#00c365]/20 hover:to-amber-500/20 border border-amber-500/30 hover:border-amber-400/60 transition-all flex items-center justify-between group/strip cursor-pointer shadow-sm active:scale-[0.98]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenShareModal(p);
+                        }}
+                        className="w-full px-2 py-1 sm:py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:text-amber-300 text-[10px] sm:text-xs font-bold transition-all flex items-center justify-between group/badge cursor-pointer"
                         aria-label={`Share and earn GH₵${rewardGhcFormatted} on ${p.name}`}
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Gift className="w-3.5 h-3.5 text-amber-400 shrink-0 group-hover/strip:rotate-12 transition-transform" />
-                          <span className="text-xs font-bold text-white flex items-center gap-1 truncate">
-                            <span>Share &amp; Earn</span>
-                            <span className="text-amber-400 font-mono font-extrabold">GH₵{rewardGhcFormatted}</span>
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 text-[11px] font-bold text-[#00c365] group-hover/strip:translate-x-0.5 transition-transform shrink-0">
-                          <span>Get Link</span>
-                          <Share2 className="w-3 h-3" />
-                        </div>
+                        <span className="flex items-center gap-1 truncate">
+                          <Gift className="w-3 h-3 text-amber-400 shrink-0" />
+                          <span>Earn GH₵{rewardGhcFormatted}</span>
+                        </span>
+                        <Share2 className="w-2.5 h-2.5 text-amber-400/80 group-hover/badge:translate-x-0.5 transition-transform shrink-0" />
                       </button>
-                    )}
-
-                    {/* Primary CTA: BUY NOW vs INQUIRE */}
-                    {p.purchaseEnabled !== false && p.priceType !== 'quote' ? (
-                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80">
-                        <button
-                          type="button"
-                          onClick={() => setCheckoutProduct(p)}
-                          className="w-full py-2 px-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1 shadow-[0_0_15px_rgba(0,195,101,0.2)] cursor-pointer active:scale-95"
-                        >
-                          <ShoppingBag className="w-3.5 h-3.5" />
-                          <span>Buy Now</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => openMarketplaceInquiry(p)}
-                          className="w-full py-2 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/80 transition-colors flex items-center justify-center gap-1 text-xs font-semibold cursor-pointer"
-                        >
-                          <FileQuestion className="w-3.5 h-3.5 text-slate-400" />
-                          <span>Inquire</span>
-                        </button>
-                      </div>
                     ) : (
-                      <div className="pt-1 border-t border-slate-800/80">
-                        <button
-                          type="button"
-                          onClick={() => openMarketplaceInquiry(p)}
-                          className="w-full py-2.5 px-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
-                        >
-                          <FileQuestion className="w-4 h-4" />
-                          <span>Inquire &amp; Request Quote</span>
-                        </button>
+                      <div className="text-[11px] text-slate-500 flex items-center justify-between font-medium group-hover:text-slate-400 transition-colors pt-0.5 border-t border-slate-800/60">
+                        <span>Details</span>
+                        <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                       </div>
                     )}
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>
@@ -790,11 +768,31 @@ export const MarketplacePage: React.FC = () => {
       </div>
 
       {/* ========================================================================= */}
-      {/* SHARE & EARN MODALS (GUEST OR AUTHENTICATED) */}
+      {/* 6. PRODUCT DETAIL MODAL / SHEET (DRILL-DOWN EXPERIENCE)                   */}
+      {/* ========================================================================= */}
+      {selectedProduct && (
+        <MarketplaceProductDetailModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          onBuyNow={(prod) => {
+            setCheckoutProduct(prod);
+          }}
+          onInquire={(prod) => {
+            openMarketplaceInquiry(prod);
+          }}
+          onShare={(prod) => {
+            handleOpenShareModal(prod);
+          }}
+          formatGhcReward={formatGhcReward}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 7. SHARE & EARN MODAL (GUEST OR AUTHENTICATED)                            */}
       {/* ========================================================================= */}
       {shareModalProduct && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
           onClick={handleCloseShareModal}
         >
           <div
@@ -989,7 +987,9 @@ export const MarketplacePage: React.FC = () => {
         </div>
       )}
 
-      {/* Buy Now Checkout Modal */}
+      {/* ========================================================================= */}
+      {/* 8. BUY NOW CHECKOUT MODAL                                                 */}
+      {/* ========================================================================= */}
       {checkoutProduct && (
         <MarketplaceCheckoutModal
           product={checkoutProduct}
@@ -1000,4 +1000,3 @@ export const MarketplacePage: React.FC = () => {
     </div>
   );
 };
-
