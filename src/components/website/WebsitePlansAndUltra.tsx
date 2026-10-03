@@ -1,6 +1,8 @@
 import { API_BASE_URL } from '../../services/apiClient.js';
 import React, { useState, useEffect } from 'react';
 import { ULTRA_SERVICE, type UltraEnquiryInput } from '../../config/websiteBuilder.js';
+import { SafeImage } from './SafeImage.js';
+import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary.js';
 import {
   Check,
   ArrowRight,
@@ -13,6 +15,15 @@ import {
   ChevronUp,
   Send,
 } from 'lucide-react';
+
+const FREE_TIER_ARTWORK =
+  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791053622/ChatGPT_Image_Oct_3_2026_06_52_28_PM-1_exdift.png';
+const PLUS_TIER_ARTWORK =
+  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791053622/ChatGPT_Image_Oct_3_2026_06_52_48_PM-3_pznnrh.png';
+const PRO_TIER_ARTWORK =
+  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791053622/ChatGPT_Image_Oct_3_2026_06_52_40_PM-2_fpgsbq.png';
+const ULTRA_TIER_ARTWORK =
+  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791053622/ChatGPT_Image_Oct_3_2026_06_52_54_PM-4_glzvrg.png';
 
 const initialForm: UltraEnquiryInput = {
   businessName: '',
@@ -55,6 +66,19 @@ export function WebsitePlansAndUltra({
       [planKey]: !prev[planKey],
     }));
   };
+
+  // Transformed Cloudinary URLs and responsive srcSets for pricing card artwork
+  const freeArtworkUrl = getCloudinaryUrl(FREE_TIER_ARTWORK, { format: 'auto', quality: 'auto', width: 800 });
+  const freeArtworkSrcSet = getCloudinarySrcSet(FREE_TIER_ARTWORK, [360, 600, 800]);
+
+  const plusArtworkUrl = getCloudinaryUrl(PLUS_TIER_ARTWORK, { format: 'auto', quality: 'auto', width: 900 });
+  const plusArtworkSrcSet = getCloudinarySrcSet(PLUS_TIER_ARTWORK, [360, 600, 900]);
+
+  const proArtworkUrl = getCloudinaryUrl(PRO_TIER_ARTWORK, { format: 'auto', quality: 'auto', width: 900 });
+  const proArtworkSrcSet = getCloudinarySrcSet(PRO_TIER_ARTWORK, [360, 600, 900]);
+
+  const ultraArtworkUrl = getCloudinaryUrl(ULTRA_TIER_ARTWORK, { format: 'auto', quality: 'auto', width: 1200 });
+  const ultraArtworkSrcSet = getCloudinarySrcSet(ULTRA_TIER_ARTWORK, [480, 800, 1200]);
 
   // Close modal on Escape key
   useEffect(() => {
@@ -202,14 +226,22 @@ export function WebsitePlansAndUltra({
             ========================================================= */}
         <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 items-stretch">
           {/* PLAN 1: FREE */}
-          <article className="relative rounded-2xl sm:rounded-3xl bg-[#0b1218]/95 border border-slate-800/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm">
-            {/* Future Artwork Composition Zone (Prepared for single site / device visual) */}
+          <article className="relative rounded-2xl sm:rounded-3xl bg-[#0b1218]/95 border border-slate-800/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm overflow-hidden">
+            {/* Integrated Background-Right Artwork (Free Tier) */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl sm:rounded-3xl" aria-hidden="true">
-              <div className="absolute top-0 right-0 w-36 sm:w-44 h-36 sm:h-44 pointer-events-none select-none overflow-hidden opacity-20 sm:opacity-30">
-                <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0b1218]/80 to-[#0b1218]" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0b1218] to-transparent" />
-                <div className="w-full h-full border border-dashed border-slate-700/50 rounded-full scale-125 -translate-y-6 translate-x-8" />
+              <div className="absolute -right-8 -bottom-6 sm:-right-6 sm:-bottom-4 w-48 sm:w-56 h-48 sm:h-56 opacity-30 sm:opacity-35 transition-opacity">
+                <SafeImage
+                  src={freeArtworkUrl}
+                  srcSet={freeArtworkSrcSet || undefined}
+                  sizes="(max-width: 640px) 192px, 224px"
+                  alt=""
+                  className="w-full h-full object-cover object-right-bottom"
+                  loading="lazy"
+                />
               </div>
+              {/* Dual gradient masks protecting text legibility and contrast */}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0b1218] via-[#0b1218]/85 to-[#0b1218]/40" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0b1218] via-[#0b1218]/75 to-transparent" />
             </div>
 
             <div className="relative z-10 space-y-3.5">
@@ -294,13 +326,21 @@ export function WebsitePlansAndUltra({
 
           {/* PLAN 2: PLUS (HERO TIER — FUTURE PREMIUM BUILDER) */}
           <article className="relative rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#0e1d17] via-[#0b1411] to-[#09100d] border-2 border-[#00c365] p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-[0_0_30px_rgba(0,195,101,0.14)] ring-1 ring-[#00c365]/35 overflow-visible">
-            {/* Future Artwork Composition Zone (Prepared for rich customization / multi-device visual) */}
+            {/* Integrated Background-Right Artwork (Plus Tier) */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl sm:rounded-3xl" aria-hidden="true">
-              <div className="absolute top-0 right-0 w-36 sm:w-44 h-36 sm:h-44 pointer-events-none select-none overflow-hidden opacity-25 sm:opacity-35">
-                <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0e1d17]/85 to-[#0e1d17]" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#09100d] to-transparent" />
-                <div className="w-full h-full border border-dashed border-[#00c365]/40 rounded-full scale-125 -translate-y-6 translate-x-8" />
+              <div className="absolute -right-8 -bottom-6 sm:-right-6 sm:-bottom-4 w-52 sm:w-64 h-52 sm:h-64 opacity-40 sm:opacity-48 transition-opacity">
+                <SafeImage
+                  src={plusArtworkUrl}
+                  srcSet={plusArtworkSrcSet || undefined}
+                  sizes="(max-width: 640px) 208px, 256px"
+                  alt=""
+                  className="w-full h-full object-cover object-right-bottom"
+                  loading="lazy"
+                />
               </div>
+              {/* Dual gradient masks protecting text & highlighting vibrant green accents */}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#09100d] via-[#0b1411]/85 to-[#0e1d17]/40" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0e1d17] via-[#0e1d17]/80 to-transparent" />
             </div>
 
             {/* Most Popular Badge — Classic overlapping badge (half inside / half above the card edge) */}
@@ -380,14 +420,22 @@ export function WebsitePlansAndUltra({
           </article>
 
           {/* PLAN 3: PRO (SERIOUS BUSINESSES & TEAMS) */}
-          <article className="relative rounded-2xl sm:rounded-3xl bg-[#0b1016]/95 border border-slate-800/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm">
-            {/* Future Artwork Composition Zone (Prepared for business systems / integrations visual) */}
+          <article className="relative rounded-2xl sm:rounded-3xl bg-[#0b1016]/95 border border-slate-800/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm overflow-hidden">
+            {/* Integrated Background-Right Artwork (Pro Tier) */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl sm:rounded-3xl" aria-hidden="true">
-              <div className="absolute top-0 right-0 w-36 sm:w-44 h-36 sm:h-44 pointer-events-none select-none overflow-hidden opacity-20 sm:opacity-30">
-                <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#0b1016]/85 to-[#0b1016]" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0b1016] to-transparent" />
-                <div className="w-full h-full border border-dashed border-slate-700/50 rounded-full scale-125 -translate-y-6 translate-x-8" />
+              <div className="absolute -right-8 -bottom-6 sm:-right-6 sm:-bottom-4 w-52 sm:w-64 h-52 sm:h-64 opacity-35 sm:opacity-40 transition-opacity">
+                <SafeImage
+                  src={proArtworkUrl}
+                  srcSet={proArtworkSrcSet || undefined}
+                  sizes="(max-width: 640px) 208px, 256px"
+                  alt=""
+                  className="w-full h-full object-cover object-right-bottom"
+                  loading="lazy"
+                />
               </div>
+              {/* Dual gradient masks protecting corporate text readability */}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0b1016] via-[#0b1016]/85 to-[#0b1016]/40" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0b1016] via-[#0b1016]/80 to-transparent" />
             </div>
 
             <div className="relative z-10 space-y-3.5">
@@ -549,45 +597,49 @@ export function WebsitePlansAndUltra({
             </div>
           </div>
 
-          {/* Right Column: Layered Custom-Build Preview Canvas (Compact studio visual) */}
-          <div className="lg:col-span-5 relative flex items-center justify-center pt-1 lg:pt-0">
-            <div className="w-full max-w-sm rounded-2xl bg-[#070d12] border border-slate-700/80 p-3 shadow-xl relative overflow-hidden group">
-              {/* Top Window Dots */}
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-[9px] text-slate-400">
-                <div className="flex items-center gap-1">
+          {/* Right Column: High-End Bespoke Studio Showcase Anchor */}
+          <div className="lg:col-span-5 relative flex items-center justify-center pt-2 lg:pt-0">
+            {/* Ambient emerald backlight */}
+            <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-emerald-500/20 via-transparent to-cyan-500/10 blur-xl opacity-75 pointer-events-none" />
+
+            <div className="w-full max-w-md rounded-2xl bg-[#070d12] border border-slate-700/80 shadow-2xl relative overflow-hidden group">
+              {/* Top Browser Chrome Bar */}
+              <div className="px-3 py-2 bg-[#0a1219] border-b border-slate-800/90 flex items-center justify-between text-[10px] text-slate-400 select-none">
+                <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-rose-500/80" />
                   <span className="w-2 h-2 rounded-full bg-amber-500/80" />
                   <span className="w-2 h-2 rounded-full bg-emerald-500/80" />
                 </div>
-                <span className="font-mono text-emerald-400 text-[10px]">ultra-custom.gh</span>
+                <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#070e14] border border-slate-800 text-[9px] font-mono text-emerald-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#00c365] animate-pulse" />
+                  <span>bespoke-build.gh</span>
+                </div>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Studio</span>
               </div>
 
-              {/* Wireframe Mock Site Elements */}
-              <div className="pt-2.5 space-y-2">
-                <div className="p-2 rounded-xl bg-[#0e171f] border border-slate-800 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-white">Custom Brand Layout</span>
-                    <span className="text-[9px] font-mono text-[#00c365] bg-[#00c365]/10 px-1.5 py-0.5 rounded">Tailored</span>
-                  </div>
-                  <div className="w-3/4 h-2 rounded bg-slate-700" />
-                  <div className="w-1/2 h-1.5 rounded bg-slate-800" />
-                </div>
+              {/* Bespoke Studio Artwork Canvas */}
+              <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#060b0f]">
+                <SafeImage
+                  src={ultraArtworkUrl}
+                  srcSet={ultraArtworkSrcSet || undefined}
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 420px"
+                  alt="Mystery Hub Ultra Bespoke Website Studio"
+                  className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                  loading="lazy"
+                />
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2 rounded-lg bg-[#0e171f] border border-slate-800 space-y-1">
-                    <span className="text-[9px] font-bold text-slate-300">Catalog &amp; Orders</span>
-                    <div className="w-12 h-1 rounded bg-slate-700" />
-                  </div>
-                  <div className="p-2 rounded-lg bg-[#0e171f] border border-slate-800 space-y-1">
-                    <span className="text-[9px] font-bold text-slate-300">Direct WhatsApp</span>
-                    <div className="w-14 h-1 rounded bg-emerald-500/40" />
-                  </div>
-                </div>
+                {/* Subtle vignette gradient protecting lower caption */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#070d12] via-[#070d12]/40 to-transparent pointer-events-none" />
 
-                {/* Service Tag Strip */}
-                <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between text-[10px] text-emerald-300">
-                  <span className="font-semibold">Dedicated Lead Developer</span>
-                  <span className="font-mono font-bold">1-on-1 Scoped</span>
+                {/* Floating Glass Meta Badges */}
+                <div className="absolute bottom-2.5 inset-x-2.5 flex items-center justify-between gap-2 pointer-events-none">
+                  <div className="px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-md border border-white/10 text-[10px] font-medium text-slate-200 shadow-sm flex items-center gap-1.5 truncate">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00c365] shrink-0" />
+                    <span className="truncate">Handcrafted by Mystery Hub Engineers</span>
+                  </div>
+                  <span className="text-[9px] font-mono font-bold px-2 py-1 rounded-lg bg-emerald-500/20 text-[#00c365] border border-emerald-500/30 shrink-0 backdrop-blur-md">
+                    1-on-1 Scoped
+                  </span>
                 </div>
               </div>
             </div>

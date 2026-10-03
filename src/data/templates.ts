@@ -2,7 +2,7 @@ import { createWebsiteComposition, RESELLER_INTEGRATIONS } from '../config/websi
 import { WebsiteTemplate, TemplateCategory } from '../types';
 
 export const DATA_RESELLER_STARTER_HERO_IMAGE =
-  'https://res.cloudinary.com/da6oeat7m/image/upload/v1790933009/Neon_Data_Bundles_in_Accra_h2hkiv.png';
+  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791053950/ChatGPT_Image_Oct_3_2026_06_58_33_PM_jr9ait.png';
 
 export const TEMPLATE_CATEGORIES: { id: TemplateCategory; label: string }[] = [
   { id: 'all', label: 'All Templates' },

@@ -39,7 +39,12 @@ export interface ResellerPackage {
  * to the official starter artwork.
  */
 export function resolveDataResellerHeroImage(heroImage?: string): string {
-  if (!heroImage || heroImage.trim() === '' || heroImage.includes('photo-1556742049-0a67e5572293')) {
+  if (
+    !heroImage ||
+    heroImage.trim() === '' ||
+    heroImage.includes('photo-1556742049-0a67e5572293') ||
+    heroImage.includes('Neon_Data_Bundles_in_Accra')
+  ) {
     return DATA_RESELLER_STARTER_HERO_IMAGE;
   }
   return heroImage;
