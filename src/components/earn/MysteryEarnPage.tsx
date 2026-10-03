@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createEarnDashboardRefresh } from '../../utils/earnDashboardRefresh';
 import { useApp } from '../../context/AppContext';
 import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
 import {
@@ -53,6 +54,9 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
   const [ledger, setLedger] = useState<RewardLedgerItem[]>([]);
   const [rules, setRules] = useState<PublicRewardRule[]>([]);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const refreshDashboard = useRef<(() => Promise<void>) | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
   // Official Hero Artwork Assets
@@ -89,36 +93,34 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
     if (!user || !sessionToken) {
       setSummary(null);
       setLedger([]);
+      setRefreshError(null);
+      setIsLoadingDashboard(false);
+      setIsRefreshing(false);
       return;
     }
 
-    let isMounted = true;
+    setSummary(null);
+    setLedger([]);
     setIsLoadingDashboard(true);
-
-    Promise.allSettled([
-      getMyReferralSummary(sessionToken),
-      getMyRewardLedger(sessionToken, 50),
-    ])
-      .then(([summaryResult, ledgerResult]) => {
-        if (!isMounted) return;
-
-        if (summaryResult.status === 'fulfilled' && summaryResult.value.success) {
-          setSummary(summaryResult.value.summary);
-        }
-        if (ledgerResult.status === 'fulfilled' && ledgerResult.value.success) {
-          setLedger(ledgerResult.value.ledger || []);
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsLoadingDashboard(false);
-        }
-      });
-
+    const controller = createEarnDashboardRefresh({
+      loadSummary: () => getMyReferralSummary(sessionToken),
+      loadLedger: () => getMyRewardLedger(sessionToken, 50),
+      onSummary: setSummary,
+      onLedger: setLedger,
+      onState: state => {
+        setIsRefreshing(state.refreshing);
+        setRefreshError(state.error);
+        if (!state.refreshing) setIsLoadingDashboard(false);
+      },
+      window, document,
+    });
+    refreshDashboard.current = controller.refresh;
+    void controller.refresh();
     return () => {
-      isMounted = false;
+      controller.dispose();
+      refreshDashboard.current = null;
     };
-  }, [user, sessionToken]);
+  }, [user?.id, sessionToken]);
 
   // Handle Share Actions
   const shareUrl =
@@ -340,22 +342,25 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Performance Metrics</h2>
+              <button type="button" disabled={isRefreshing} onClick={() => void refreshDashboard.current?.()}
+                className="text-xs text-[#00c365] disabled:opacity-50">{isRefreshing ? 'Refreshing…' : 'Refresh'}</button>
               {isLoadingDashboard && (
                 <span className="text-[11px] text-[#00c365] animate-pulse font-medium">Syncing live ledger...</span>
               )}
             </div>
+            {refreshError && <p role="status" className="text-xs text-amber-300">{refreshError}</p>}
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {/* Stat 1: Clicks */}
               <div className="p-4 sm:p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 shadow-sm space-y-1.5 text-left">
                 <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-xs font-semibold">Total Clicks</span>
+                  <span className="text-xs font-semibold">Unique Visitors</span>
                   <MousePointerClick className="w-4 h-4 text-slate-400" />
                 </div>
                 <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                  {summary ? summary.clicksCount.toLocaleString() : '0'}
+                  {summary?.uniqueVisitorsCount != null ? summary.uniqueVisitorsCount.toLocaleString() : '—'}
                 </div>
-                <p className="text-[11px] text-slate-400">Unique referral link visits</p>
+                <p className="text-[11px] text-slate-400">Distinct browsers that opened your referral links</p>
               </div>
 
               {/* Stat 2: Referred Customers */}

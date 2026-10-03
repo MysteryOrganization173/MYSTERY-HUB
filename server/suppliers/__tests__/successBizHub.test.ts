@@ -564,6 +564,16 @@ async function runTests() {
     } as unknown as import('express').Response;
 
     await SuccessBizHubWebhookHandler.handle(req, res);
+    // An unknown ID may arrive before submission persistence; do not consume the grouped event.
+    assert.strictEqual(statusCode, 503);
+    await OrdersStore.createOrder({
+      ...orderRecord,
+      id: `${orderRecord.id}_second`,
+      public_reference: `${orderRecord.public_reference}_second`,
+      payment_reference: `${orderRecord.payment_reference}_second`,
+      supplier_order_id: 'other_unknown_id',
+    });
+    await SuccessBizHubWebhookHandler.handle(req, res);
     assert.strictEqual(statusCode, 200);
 
     const updated = await OrdersStore.findOrder(orderRecord.id);

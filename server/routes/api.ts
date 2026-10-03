@@ -25,9 +25,10 @@ import { toSafeUserProfile, WaitlistChannel } from '../types/auth.js';
 import { hashPassword, verifyPassword, generateSessionToken } from '../utils/crypto.js';
 import { parseIdentifier, validatePassword } from '../utils/authValidation.js';
 import { requireAuth, optionalAuth } from '../middleware/authMiddleware.js';
-import { loginRateLimiter, signupRateLimiter, waitlistRateLimiter } from '../middleware/rateLimiter.js';
+import { loginRateLimiter, signupRateLimiter, waitlistRateLimiter, referralCaptureRateLimiter } from '../middleware/rateLimiter.js';
 import { PaystackServerService } from '../services/paystackService.js';
 import { FulfilmentService } from '../services/fulfilmentService.js';
+import { validateOrderPayment } from '../services/paymentValidation.js';
 import { SuccessBizHubWebhookHandler } from '../suppliers/successBizHub/webhookHandler.js';
 import { websiteRouter, handlePublicSiteBySlug } from './websiteApi.js';
 import {
@@ -943,23 +944,10 @@ apiRouter.get('/payments/verify/:reference', async (req: Request, res: Response)
     const verifyResult = await PaystackServerService.verifyTransaction(order.payment_reference);
 
     if (verifyResult.isVerified) {
-      // 1. Validate currency requirement: must be GHS
-      if (!verifyResult.currency || verifyResult.currency.toUpperCase() !== 'GHS') {
-        console.warn(
-          `Payment currency mismatch! Expected GHS, received ${verifyResult.currency || 'UNKNOWN'} for order ${order.public_reference}`
-        );
-        await OrdersStore.updateOrderStatus(order.id, 'failed', 'Payment currency mismatch detected');
-        res.status(400).json({ error: 'Payment verification failed due to currency mismatch.' });
-        return;
-      }
-
-      // 2. Validate amount match
-      if (verifyResult.amountPesewas > 0 && verifyResult.amountPesewas !== order.amount) {
-        console.warn(
-          `Payment amount mismatch! Expected ${order.amount} pesewas, received ${verifyResult.amountPesewas}`
-        );
-        await OrdersStore.updateOrderStatus(order.id, 'failed', 'Payment amount mismatch detected');
-        res.status(400).json({ error: 'Payment verification failed due to amount mismatch.' });
+      const validationError = validateOrderPayment(order, verifyResult);
+      if (validationError) {
+        console.warn(`[Payment Verify] Rejected payment for ${order.public_reference}: ${validationError}`);
+        res.status(400).json({ error: 'Payment verification did not match the saved order.' });
         return;
       }
 
@@ -1081,14 +1069,18 @@ export async function handlePaystackWebhook(req: Request, res: Response): Promis
         const order = await OrdersStore.findOrder(paymentRef);
         if (order) {
           // Idempotent update & centralized fulfillment
-          if (currency === 'GHS' && amountPesewas === order.amount) {
+          const validationError = validateOrderPayment(order, {
+            isVerified: data.status === 'success', status: data.status,
+            reference: paymentRef, currency, amountPesewas,
+          });
+          if (!validationError) {
             await FulfilmentService.processPaidOrder(
               paymentRef,
               data.paid_at || new Date().toISOString(),
               'Paystack charge.success webhook'
             );
           } else {
-            console.warn(`Webhook amount/currency mismatch for order ${order.public_reference}`);
+            console.warn(`[Paystack Webhook] Rejected payment for ${order.public_reference}: ${validationError}`);
           }
         }
       }
@@ -1538,17 +1530,26 @@ apiRouter.get('/marketplace/products/:slug', async (req: Request, res: Response)
  * Captures visitor referral clicks, records non-invasive click analytics,
  * and binds lifetime attribution to active user or guest session.
  */
-apiRouter.post('/referrals/capture', optionalAuth, async (req: Request, res: Response) => {
+apiRouter.post('/referrals/capture', referralCaptureRateLimiter, optionalAuth, async (req: Request, res: Response) => {
   try {
-    const { code, visitorKey, landingPath } = req.body || {};
+    const { code, visitorKey, landingPath, captureId } = req.body || {};
     if (!code || typeof code !== 'string') {
-      res.status(400).json({ valid: false, error: 'Referral code parameter is required.' });
+      res.status(400).json({ success: false, valid: false, clickRecorded: false, attributionRecorded: false,
+        reason: 'invalid_code', error: 'Referral code parameter is required.' });
       return;
     }
 
+    const key = visitorKey || req.headers['x-visitor-key'] || null;
+    if (code.length > 32 || (key !== null && (typeof key !== 'string' || key.length > 128))
+      || (captureId !== undefined && (typeof captureId !== 'string' || !/^[a-zA-Z0-9_-]{8,100}$/.test(captureId)))
+      || (landingPath !== undefined && landingPath !== null && typeof landingPath !== 'string')) {
+      res.status(400).json({ success: false, valid: false, clickRecorded: false, attributionRecorded: false, reason: 'invalid_capture' });
+      return;
+    }
     const result = await ReferralService.captureVisitorReferral({
       code,
-      visitorKey: visitorKey || (req.headers['x-visitor-key'] as string) || null,
+      captureId,
+      visitorKey: key,
       landingPath: landingPath || null,
       userAgent: (req.headers['user-agent'] as string) || null,
       currentUserId: req.user?.id || null,
@@ -1558,9 +1559,9 @@ apiRouter.post('/referrals/capture', optionalAuth, async (req: Request, res: Res
       success: true,
       ...result,
     });
-  } catch (err) {
-    console.error('Referral Capture API Exception:', err);
-    res.status(500).json({ valid: false, error: 'Failed to record referral click.' });
+  } catch {
+    console.error('Referral capture could not be processed.');
+    res.status(503).json({ success: false, valid: false, clickRecorded: false, attributionRecorded: false, error: 'Referral capture temporarily unavailable.' });
   }
 });
 

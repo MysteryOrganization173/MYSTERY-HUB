@@ -435,7 +435,11 @@ async function runMtnDuplicateTests() {
     (FulfilmentService as unknown as { provider: SuccessBizHubProvider }).provider = new SuccessBizHubProvider(mockClient);
 
     // Attempt fulfilment on Order 2
+    const savedPaymentKey = process.env.PAYSTACK_SECRET_KEY;
+    process.env.PAYSTACK_SECRET_KEY = 'sk_live_mock_duplicate_guard';
     const result = await FulfilmentService.processPaidOrder(paidOrder.payment_reference, new Date().toISOString());
+    if (savedPaymentKey === undefined) delete process.env.PAYSTACK_SECRET_KEY;
+    else process.env.PAYSTACK_SECRET_KEY = savedPaymentKey;
     assert.ok(result.order);
     assert.strictEqual(supplierCalls, 0, 'Supplier createOrder must NOT be called when another order is active');
     assert.strictEqual(result.order.status, 'queued', 'Second order must remain in queued state');
