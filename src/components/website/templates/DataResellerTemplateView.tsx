@@ -251,12 +251,57 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
       </header>
 
       {/* =========================================================
-          2. DATA RESELLER HERO WITH OFFICIAL STARTER ARTWORK
+          2. DATA RESELLER HERO WITH BLENDED STARTER ARTWORK
           ========================================================= */}
-      <section className="px-4 sm:px-8 py-6 sm:py-12 max-w-6xl mx-auto w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 lg:gap-10 items-center">
-          {/* Left Column: Natural Market Copy */}
-          <div className="lg:col-span-7 text-left space-y-4 sm:space-y-5">
+      <section className="px-4 sm:px-8 py-4 sm:py-8 max-w-6xl mx-auto w-full">
+        <div
+          className="relative rounded-2xl sm:rounded-3xl border overflow-hidden p-5 sm:p-8 lg:p-10 shadow-2xl transition-all"
+          style={{
+            backgroundColor: p.surface,
+            borderColor: `${p.accent}25`,
+          }}
+        >
+          {/* Integrated Background Artwork Layer (Right on Desktop, Right/Lower on Mobile) */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none select-none" aria-hidden="true">
+            {/* Ambient Accent Glow */}
+            <div
+              className="absolute -top-12 -right-12 w-72 sm:w-96 h-72 sm:h-96 rounded-full blur-[100px] opacity-35"
+              style={{ backgroundColor: p.accent }}
+            />
+
+            {/* Artwork Image */}
+            <div className="absolute right-0 bottom-0 top-0 w-full sm:w-3/5 lg:w-1/2 flex items-end justify-end">
+              <SafeImage
+                src={optimizedHeroSrc}
+                srcSet={heroSrcSet || undefined}
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 60vw, 600px"
+                alt={businessName}
+                className="w-full h-full object-cover object-right-bottom sm:object-right opacity-45 sm:opacity-55 transition-opacity"
+                loading="eager"
+                fetchPriority="high"
+                width={1200}
+                height={750}
+              />
+            </div>
+
+            {/* Continuous Text Protection Dark Gradient: Left strong protection, Center medium fade, Right light overlay */}
+            <div
+              className="hidden sm:block absolute inset-0 pointer-events-none"
+              style={{
+                background: `linear-gradient(to right, ${p.surface} 0%, ${p.surface} 45%, ${p.surface}e6 65%, ${p.surface}4d 85%, transparent 100%)`,
+              }}
+            />
+            {/* Mobile Gradient: strong at top/left, soft fade to right/bottom allowing artwork recognition */}
+            <div
+              className="sm:hidden absolute inset-0 pointer-events-none"
+              style={{
+                background: `linear-gradient(to bottom, ${p.surface} 0%, ${p.surface}f2 55%, ${p.surface}b3 100%)`,
+              }}
+            />
+          </div>
+
+          {/* Content Layer (Left-aligned, crisp, high-contrast, fully protected) */}
+          <div className="relative z-10 max-w-xl text-left space-y-4 sm:space-y-5">
             <div
               className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold border"
               style={{
@@ -276,12 +321,12 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
               {tagline}
             </h2>
 
-            <p className="text-xs sm:text-sm leading-relaxed max-w-xl" style={{ color: p.mutedText }}>
+            <p className="text-xs sm:text-sm leading-relaxed max-w-lg" style={{ color: p.mutedText }}>
               {aboutText}
             </p>
 
             {/* Compact Trust / Support Row */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-4 py-2.5 border-y" style={{ borderColor: `${p.border}80` }}>
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 py-2.5 border-y max-w-lg" style={{ borderColor: `${p.border}80` }}>
               <div className="space-y-0.5">
                 <div className="text-xs font-bold text-white flex items-center gap-1">
                   <Wifi className="w-3 h-3 text-blue-400" />
@@ -331,7 +376,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                   onClick={handleChatWhatsapp}
                   className="px-5 py-3 rounded-xl font-semibold text-xs transition-colors flex items-center gap-2 border cursor-pointer hover:bg-white/5"
                   style={{
-                    backgroundColor: `${p.surface}b3`,
+                    backgroundColor: `${p.background}b3`,
                     borderColor: p.border,
                     color: p.text,
                   }}
@@ -340,24 +385,6 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                   <span>Chat on WhatsApp</span>
                 </button>
               )}
-            </div>
-          </div>
-
-          {/* Right Column (Desktop) / Below CTAs (Mobile): Hero Artwork */}
-          <div className="lg:col-span-5 relative w-full">
-            <div
-              className="rounded-2xl sm:rounded-3xl border overflow-hidden p-1.5 sm:p-2.5 backdrop-blur-md relative shadow-[0_0_35px_rgba(37,99,235,0.12)] transition-all ring-1 ring-white/5"
-              style={{
-                backgroundColor: `${p.surface}cc`,
-                borderColor: `${p.accent}33`,
-              }}
-            >
-              <div className="relative rounded-xl sm:rounded-2xl overflow-hidden aspect-[16/10] sm:aspect-[4/3] max-h-[260px] sm:max-h-none w-full bg-black/80">
-                <SafeImage src={optimizedHeroSrc} srcSet={heroSrcSet || undefined} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 560px" alt={businessName} className="w-full h-full" style={{ objectPosition: '60% center' }} loading="eager" fetchPriority="high" width={1200} height={750} />
-
-                {/* Subtle soft edge ring without obscuring artwork */}
-                <div className="pointer-events-none absolute inset-0 rounded-xl sm:rounded-2xl ring-1 ring-inset ring-white/10" />
-              </div>
             </div>
           </div>
         </div>

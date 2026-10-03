@@ -619,13 +619,13 @@ export function WebsitePlansAndUltra({
               {/* Soft perimeter vignette for unified background integration */}
               <div className="absolute inset-0 bg-gradient-to-t from-[#0d161d]/85 via-transparent to-[#0d161d]/30 pointer-events-none" />
 
-              {/* Clean integrated studio status badge */}
-              <div className="absolute bottom-3 inset-x-3 flex items-center justify-between gap-2 pointer-events-none">
-                <div className="px-3 py-1 rounded-full bg-[#0c1813]/85 backdrop-blur-md border border-[#00c365]/20 text-[10px] font-medium text-slate-200 shadow-sm flex items-center gap-1.5">
+              {/* Clean integrated studio status badge (mobile-safe layout) */}
+              <div className="absolute bottom-2.5 sm:bottom-3 inset-x-2.5 sm:inset-x-3 flex flex-wrap sm:flex-nowrap items-center justify-between gap-1.5 sm:gap-2 pointer-events-none">
+                <div className="min-w-0 flex-1 sm:flex-initial px-2.5 sm:px-3 py-1 rounded-full bg-[#0c1813]/90 backdrop-blur-md border border-[#00c365]/20 text-[9px] sm:text-[10px] font-medium text-slate-200 shadow-sm flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#00c365] shrink-0 animate-pulse" />
                   <span className="truncate">Handcrafted by Mystery Hub Engineers</span>
                 </div>
-                <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-[#00c365]/15 text-[#00c365] border border-[#00c365]/30 shrink-0 backdrop-blur-md">
+                <span className="text-[9px] sm:text-[10px] font-mono font-bold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-[#00c365]/20 text-[#00c365] border border-[#00c365]/30 shrink-0 backdrop-blur-md whitespace-nowrap">
                   1-on-1 Scoped
                 </span>
               </div>
