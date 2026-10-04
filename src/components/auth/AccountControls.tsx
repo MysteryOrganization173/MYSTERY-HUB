@@ -61,7 +61,7 @@ function MyAccount() {
 
 export function AccountControls() {
   const { user, isAccountOpen, isAuthChecking } = useApp();
-  if (isAuthChecking) return <SecurityDialog title="Checking your session" mandatory><p>Please wait…</p></SecurityDialog>;
   if (user?.mustChangePassword) return <SecurityDialog title="Create a new password" mandatory><PasswordForm forced /></SecurityDialog>;
+  if (isAuthChecking) return <SecurityDialog title="Checking your session" mandatory><p>Please wait…</p></SecurityDialog>;
   return user && isAccountOpen ? <MyAccount key={user.id} /> : null;
 }

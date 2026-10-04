@@ -14,6 +14,7 @@ import {
 import { DATA_BUNDLES } from '../data/bundles';
 import { SafeUserProfile } from '../../server/types/auth';
 import { getMeOnServer, logoutOnServer } from '../services/apiClient';
+import { readAuthBootstrap } from '../utils/authStorage';
 import { initReferralCapture, observeReferralNavigation } from '../utils/referralCapture';
 import {
   ROUTE_PATH_MAP,
@@ -151,31 +152,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAccountOpen, setAccountOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
-  const [sessionToken, setSessionToken] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem('mystery_hub_session_token') || sessionStorage.getItem('mystery_hub_session_token');
-    } catch {
-      return null;
-    }
-  });
-
-  const [user, setUser] = useState<SafeUserProfile | null>(() => {
-    try {
-      const saved = localStorage.getItem('mystery_hub_user') || sessionStorage.getItem('mystery_hub_user');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // fallback
-    }
-    return null;
-  });
-
-  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => {
-    try {
-      return Boolean(localStorage.getItem('mystery_hub_session_token') || sessionStorage.getItem('mystery_hub_session_token'));
-    } catch {
-      return false;
-    }
-  });
+  const [authBootstrap] = useState(readAuthBootstrap);
+  const [sessionToken, setSessionToken] = useState<string | null>(authBootstrap.token);
+  const [user, setUser] = useState<SafeUserProfile | null>(authBootstrap.user);
+  // A known cached identity renders immediately while /me validates in the background.
+  const [isAuthChecking, setIsAuthChecking] = useState(Boolean(authBootstrap.token && !authBootstrap.user));
 
   // Recheck on refresh, focus and periodically so remote resets/revocations clear stale profiles.
   useEffect(() => {
