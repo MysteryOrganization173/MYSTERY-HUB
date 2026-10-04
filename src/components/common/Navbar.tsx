@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { activePage, setActivePage, openAuth, user, logoutUser } = useApp();
+  const { activePage, setActivePage, openAuth, user, logoutUser, openAccount } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -252,6 +252,7 @@ export const Navbar: React.FC = () => {
                     </button>
                   </div>
 
+                  <button onClick={() => { setAccountDropdownOpen(false); openAccount(); }} className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2"><UserIcon className="w-4 h-4" />My Account</button>
                   {/* Sign Out */}
                   <div className="pt-1 border-t border-slate-800">
                     <button

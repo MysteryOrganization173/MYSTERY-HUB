@@ -1,6 +1,6 @@
 import { corsMiddleware } from './server/middleware/cors.js';
 import express from 'express';
-import dotenv from 'dotenv';
+import { loadApplicationEnvironment } from './server/utils/environment.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getGeminiClient } from './server/services/geminiClient.js';
@@ -12,7 +12,7 @@ import { buildMysteryAiSystemInstruction } from './server/services/mysteryAiCont
 import { OrdersStore } from './server/db/ordersStore.js';
 import { FulfilmentService } from './server/services/fulfilmentService.js';
 
-dotenv.config();
+loadApplicationEnvironment();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

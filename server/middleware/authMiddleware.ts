@@ -26,6 +26,17 @@ export function extractBearerToken(req: Request): string | null {
   return null;
 }
 
+function requiresPasswordChange(req: Request, res: Response, user: UserRecord): boolean {
+  const path = req.originalUrl.split('?')[0].replace(/\/$/, '');
+  const allowed = (req.method === 'GET' && path === '/api/auth/me') ||
+    (req.method === 'POST' && ['/api/auth/change-password', '/api/auth/logout', '/api/auth/logout-all'].includes(path));
+  if (user.must_change_password && !allowed) {
+    res.status(403).json({ error: 'Create a new password before continuing.', code: 'PASSWORD_CHANGE_REQUIRED' });
+    return true;
+  }
+  return false;
+}
+
 /**
  * Middleware requiring a valid, active user session.
  */
@@ -55,6 +66,8 @@ export async function requireAuth(
     }
 
     // Touch session asynchronously (no need to block request)
+    if (requiresPasswordChange(req, res, user)) return;
+    res.setHeader('Cache-Control', 'no-store');
     AuthStore.touchSession(token).catch(() => {});
 
     req.user = user;
@@ -99,6 +112,8 @@ export async function requireAdmin(
       return;
     }
 
+    if (requiresPasswordChange(req, res, user)) return;
+
     AuthStore.touchSession(token).catch(() => {});
 
     req.user = user;
@@ -125,7 +140,10 @@ export async function optionalAuth(
     }
 
     const sessionData = await AuthStore.findSessionByToken(token);
+    if (!sessionData) { res.status(401).json({ error: 'Invalid or expired session. Please log in again.' }); return; }
+    if (sessionData.user.status !== 'active') { res.status(403).json({ error: 'Your account has been disabled. Please contact support.' }); return; }
     if (sessionData && sessionData.user.status === 'active') {
+      if (requiresPasswordChange(req, res, sessionData.user)) return;
       req.user = sessionData.user;
       req.sessionToken = token;
       AuthStore.touchSession(token).catch(() => {});
@@ -133,7 +151,7 @@ export async function optionalAuth(
 
     next();
   } catch (err) {
-    // Non-blocking for optional auth
-    next();
+    // A supplied credential must never downgrade to a guest purchase when verification fails.
+    res.status(503).json({ error: 'Could not verify your session. Please try again.' });
   }
 }

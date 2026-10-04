@@ -4,6 +4,7 @@
  */
 
 import { getPool } from './connection.js';
+import type { PoolClient } from 'pg';
 import { UserRecord, SessionRecord, UserRole, UserStatus } from '../types/auth.js';
 import { hashSessionToken } from '../utils/crypto.js';
 import { getGhanaPhoneLookupVariants } from '../utils/phone.js';
@@ -11,8 +12,56 @@ import { getGhanaPhoneLookupVariants } from '../utils/phone.js';
 // In-memory fallback stores
 const devUsersStore = new Map<string, UserRecord>();
 const devSessionsStore = new Map<string, SessionRecord>();
+const accountLocks = new Map<string, Promise<void>>();
 
 export class AuthStore {
+  /** Serialize account security mutations; SQL mutations and audits commit together. */
+  static async withLockedUser<T>(id: string, action: (user: UserRecord | null, client?: PoolClient) => Promise<T>): Promise<T> {
+    const pool = getPool();
+    if (pool) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const result = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE;', [id]);
+        const value = await action(result.rows[0] ?? null, client);
+        await client.query('COMMIT');
+        return value;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally { client.release(); }
+    }
+    const previous = accountLocks.get(id) ?? Promise.resolve();
+    let release!: () => void;
+    const lock = new Promise<void>(resolve => { release = resolve; });
+    const queued = previous.then(() => lock);
+    accountLocks.set(id, queued);
+    await previous;
+    try { return await action(devUsersStore.get(id) ?? null); }
+    finally { release(); if (accountLocks.get(id) === queued) accountLocks.delete(id); }
+  }
+
+  static async saveAccount(user: UserRecord, client?: PoolClient): Promise<UserRecord> {
+    user.updated_at = new Date().toISOString();
+    if (client) {
+      const result = await client.query(`UPDATE users SET name=$2, email=$3, phone=$4,
+        password_hash=$5, must_change_password=$6, password_changed_at=$7, updated_at=$8
+        WHERE id=$1 RETURNING *;`, [user.id, user.name, user.email, user.phone,
+        user.password_hash, user.must_change_password, user.password_changed_at, user.updated_at]);
+      return result.rows[0];
+    }
+    // Match authoritative database uniqueness in the development fallback.
+    for (const other of devUsersStore.values()) {
+      if (other.id === user.id) continue;
+      for (const field of ['email', 'phone'] as const) {
+        if (user[field] && other[field] === user[field]) {
+          throw Object.assign(new Error('Identifier conflict'), { code: '23505', constraint: `idx_users_${field}_unique` });
+        }
+      }
+    }
+    devUsersStore.set(user.id, user);
+    return user;
+  }
   static adminDevUsers() { return [...devUsersStore.values()]; }
   /**
    * Create a new user record
@@ -38,6 +87,8 @@ export class AuthStore {
       created_at: nowIso,
       updated_at: nowIso,
       last_login_at: null,
+      must_change_password: false,
+      password_changed_at: null,
     };
 
     const pool = getPool();
@@ -153,7 +204,8 @@ export class AuthStore {
   static async createSession(
     userId: string,
     rawToken: string,
-    rememberMe = false
+    rememberMe = false,
+    client?: PoolClient
   ): Promise<SessionRecord> {
     const tokenHash = hashSessionToken(rawToken);
     const now = Date.now();
@@ -170,7 +222,7 @@ export class AuthStore {
       last_seen_at: nowIso,
     };
 
-    const pool = getPool();
+    const pool = client || getPool();
     if (pool) {
       const query = `
         INSERT INTO sessions (id, user_id, token_hash, created_at, expires_at, last_seen_at)
@@ -208,7 +260,8 @@ export class AuthStore {
         SELECT s.*, 
                u.id as u_id, u.name as u_name, u.email as u_email, u.phone as u_phone,
                u.password_hash as u_password_hash, u.role as u_role, u.status as u_status,
-               u.created_at as u_created_at, u.updated_at as u_updated_at, u.last_login_at as u_last_login_at
+               u.created_at as u_created_at, u.updated_at as u_updated_at, u.last_login_at as u_last_login_at,
+               u.must_change_password as u_must_change_password, u.password_changed_at as u_password_changed_at
         FROM sessions s
         JOIN users u ON s.user_id = u.id
         WHERE s.token_hash = $1 AND s.expires_at > $2
@@ -238,6 +291,8 @@ export class AuthStore {
         created_at: row.u_created_at,
         updated_at: row.u_updated_at,
         last_login_at: row.u_last_login_at,
+        must_change_password: row.u_must_change_password === true,
+        password_changed_at: row.u_password_changed_at,
       };
 
       return { session, user };
@@ -296,8 +351,8 @@ export class AuthStore {
   /**
    * Revoke all sessions for a user (e.g. security reset or password change)
    */
-  static async revokeAllUserSessions(userId: string): Promise<void> {
-    const pool = getPool();
+  static async revokeAllUserSessions(userId: string, client?: PoolClient): Promise<void> {
+    const pool = client || getPool();
     if (pool) {
       await pool.query(`DELETE FROM sessions WHERE user_id = $1;`, [userId]);
       return;

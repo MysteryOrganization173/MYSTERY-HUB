@@ -72,6 +72,11 @@ interface AppContextType {
   isAuthChecking: boolean;
   loginUser: (profile: SafeUserProfile, token: string, rememberMe?: boolean) => void;
   logoutUser: () => void;
+  isAccountOpen: boolean;
+  openAccount: () => void;
+  closeAccount: () => void;
+  updateUserProfile: (profile: SafeUserProfile) => void;
+  replaceAuthSession: (profile: SafeUserProfile, token: string) => void;
   activeEditorSite: WebsiteSiteRecord | null;
   openWebsiteEditor: (site: WebsiteSiteRecord) => void;
   closeWebsiteEditor: () => void;
@@ -139,6 +144,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAccountOpen, setAccountOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [sessionToken, setSessionToken] = useState<string | null>(() => {
     try {
@@ -166,54 +172,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  // Verify server-side session token on startup
+  // Recheck on refresh, focus and periodically so remote resets/revocations clear stale profiles.
   useEffect(() => {
-    const token = localStorage.getItem('mystery_hub_session_token') || sessionStorage.getItem('mystery_hub_session_token');
-    if (!token) {
-      setIsAuthChecking(false);
-      return;
-    }
-
-    let isMounted = true;
-    getMeOnServer(token)
-      .then((res) => {
-        if (isMounted && res.success && res.user) {
-          setUser(res.user);
-          try {
-            if (localStorage.getItem('mystery_hub_session_token')) {
-              localStorage.setItem('mystery_hub_user', JSON.stringify(res.user));
-            } else if (sessionStorage.getItem('mystery_hub_session_token')) {
-              sessionStorage.setItem('mystery_hub_user', JSON.stringify(res.user));
-            }
-          } catch {
-            // ignore
-          }
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setUser(null);
-          setSessionToken(null);
-          try {
-            localStorage.removeItem('mystery_hub_session_token');
-            localStorage.removeItem('mystery_hub_user');
-            sessionStorage.removeItem('mystery_hub_session_token');
-            sessionStorage.removeItem('mystery_hub_user');
-          } catch {
-            // ignore
-          }
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsAuthChecking(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
+    if (!sessionToken) { setIsAuthChecking(false); return; }
+    let active = true;
+    const refresh = async () => {
+      try {
+        const result = await getMeOnServer(sessionToken);
+        if (active) updateUserProfile(result.user);
+      } catch (error) {
+        if (active && [401, 403].includes((error as { status?: number }).status ?? 0)) clearLocalAuth();
+      } finally { if (active) setIsAuthChecking(false); }
     };
-  }, []);
+    const invalid = (event: Event) => { if ((event as CustomEvent).detail?.token === sessionToken) clearLocalAuth(); };
+    void refresh();
+    const timer = window.setInterval(refresh, 30_000);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('mystery-auth-refresh', refresh);
+    window.addEventListener('mystery-auth-invalid', invalid);
+    const storageChanged = (event: StorageEvent) => { if (event.key === 'mystery_hub_session_token') { clearLocalAuth(); } };
+    window.addEventListener('storage', storageChanged);
+    return () => { active = false; clearInterval(timer); window.removeEventListener('focus', refresh); window.removeEventListener('mystery-auth-refresh', refresh); window.removeEventListener('mystery-auth-invalid', invalid); window.removeEventListener('storage', storageChanged); };
+  }, [sessionToken]);
 
   // Initialize and capture referral URL context across any landing route
   useEffect(() => {
@@ -432,7 +412,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAuthContextMessage(null);
     showToast(`Welcome back, ${profile.name.split(' ')[0]}!`, 'success');
 
-    if (pendingAuthAction) {
+    if (pendingAuthAction && !profile.mustChangePassword) {
       const action = pendingAuthAction;
       setPendingAuthAction(null);
       setTimeout(() => {
@@ -441,21 +421,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const logoutUser = () => {
-    const token = sessionToken || localStorage.getItem('mystery_hub_session_token') || sessionStorage.getItem('mystery_hub_session_token');
-    logoutOnServer(token);
-    setUser(null);
-    setSessionToken(null);
+  const updateUserProfile = (profile: SafeUserProfile) => {
+    setUser(profile);
     try {
-      localStorage.removeItem('mystery_hub_user');
-      localStorage.removeItem('mystery_hub_session_token');
-      sessionStorage.removeItem('mystery_hub_user');
-      sessionStorage.removeItem('mystery_hub_session_token');
-    } catch {
-      // ignore
-    }
+      const storage = localStorage.getItem('mystery_hub_session_token') ? localStorage : sessionStorage;
+      storage.setItem('mystery_hub_user', JSON.stringify(profile));
+    } catch { /* Browser storage may be unavailable. */ }
+  };
+  const replaceAuthSession = (profile: SafeUserProfile, token: string) => {
+    const rememberMe = Boolean(localStorage.getItem('mystery_hub_session_token'));
+    setPendingAuthAction(null);
+    loginUser(profile, token, rememberMe);
+  };
+  const clearLocalAuth = () => {
+    setUser(null); setSessionToken(null); setAccountOpen(false); setPendingAuthAction(null); setIsCheckoutOpen(false);
+    try { for (const storage of [localStorage, sessionStorage]) { storage.removeItem('mystery_hub_user'); storage.removeItem('mystery_hub_session_token'); } } catch { /* Ignore unavailable storage. */ }
+  };
+  const logoutUser = () => {
+    void logoutOnServer(sessionToken);
+    clearLocalAuth();
     showToast('You have been logged out.', 'info');
   };
+  const openAccount = () => { if (user) setAccountOpen(true); else openAuth('login'); };
+  const closeAccount = () => setAccountOpen(false);
 
   const openTemplatePreview = (template: WebsiteTemplate) => {
     setSelectedTemplatePreview(template);
@@ -513,6 +501,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthChecking,
         loginUser,
         logoutUser,
+        isAccountOpen, openAccount, closeAccount, updateUserProfile, replaceAuthSession,
         activeEditorSite,
         openWebsiteEditor,
         closeWebsiteEditor,

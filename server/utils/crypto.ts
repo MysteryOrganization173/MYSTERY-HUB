@@ -65,6 +65,13 @@ export function generateSessionToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
+/** 16 unbiased symbols, about 92 bits of entropy; separators aid transcription. */
+export function generateTemporaryPassword(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  const symbols = Array.from({ length: 16 }, () => alphabet[crypto.randomInt(alphabet.length)]).join('');
+  return symbols.match(/.{4}/g)!.join('-');
+}
+
 /**
  * Computes SHA-256 hash of a session token for secure server-side storage.
  */

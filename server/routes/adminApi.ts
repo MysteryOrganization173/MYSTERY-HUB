@@ -34,10 +34,13 @@ import { parseSupplierAdvertWithAi } from '../services/marketplaceAiImporter.js'
 // Simple sliding window rate limit map for Admin AI Importer
 const adminAiRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
+import { adminAccountRouter } from './adminAccountApi.js';
+
 export const adminRouter = Router();
 
 // Apply strict admin authentication and authorization to all admin routes
 adminRouter.use(requireAdmin);
+adminRouter.use(adminAccountRouter);
 adminRouter.use('/referrals', adminEarnRouter);
 adminRouter.get('/websites/ultra-enquiries', async (req, res) => {
   const limit = Number(req.query.limit ?? 25), offset = Number(req.query.offset ?? 0);
