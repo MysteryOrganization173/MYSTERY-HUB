@@ -280,11 +280,11 @@ export const MoreServicesPage: React.FC = () => {
                 {artwork && (
                   <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl" aria-hidden="true">
                     {/* Artwork on the right 50-55% */}
-                    <div className="absolute right-0 bottom-0 top-0 w-3/5 lg:w-1/2 flex items-end justify-end overflow-hidden">
+                    <div className="absolute right-0 bottom-0 top-0 w-3/4 sm:w-3/5 lg:w-[55%] flex items-end justify-end overflow-hidden">
                       <img
                         src={getCloudinaryUrl(artwork.url, { format: 'auto', quality: 'auto', width: 640 })}
                         srcSet={getCloudinarySrcSet(artwork.url, [360, 480, 640]) || undefined}
-                        sizes="(max-width: 1024px) 50vw, 380px"
+                        sizes="(max-width: 1024px) 55vw, 420px"
                         alt=""
                         loading="lazy"
                         decoding="async"
@@ -292,15 +292,15 @@ export const MoreServicesPage: React.FC = () => {
                       />
                     </div>
 
-                    {/* Continuous Text Protection Gradient:
-                        LEFT: near card background (#0f151b 95-100%)
-                        CENTER: medium fade (#0f151b/85 around 60%)
-                        RIGHT: light overlay (#0f151b/15 around 85-100%)
+                    {/* Directional Text Protection Gradient:
+                        LEFT: strong dark protection (90-95%)
+                        CENTER: medium fade (50-65%)
+                        RIGHT: light overlay only (10-20%) so artwork is clearly recognized
                     */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#0f151b] from-35% via-[#0f151b]/85 via-65% to-[#0f151b]/15 pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#0f151b] from-25% via-[#0f151b]/65 via-50% to-[#0f151b]/10 pointer-events-none" />
 
                     {/* Subtle bottom grounding gradient behind Notify Me button */}
-                    <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0f151b]/90 via-[#0f151b]/50 to-transparent pointer-events-none" />
+                    <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[#0f151b]/85 via-transparent to-transparent pointer-events-none" />
                   </div>
                 )}
 

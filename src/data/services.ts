@@ -129,19 +129,19 @@ export const SAMPLE_SERVICE_ARTWORK: Record<string, ServiceArtworkConfig> = {
     url: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1791120377/ChatGPT_Image_Oct_4_2026_01_25_37_PM-1_hc026e.png',
     alt: 'ECG electricity meter and mobile power token top-up interface',
     objectPosition: 'object-[85%_center]',
-    opacity: 'opacity-40 sm:opacity-48',
+    opacity: 'opacity-52 sm:opacity-62',
   },
   'srv-water': {
     url: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1791120377/ChatGPT_Image_Oct_4_2026_01_25_42_PM-2_igylic.png',
     alt: 'Ghana Water GWCL smart meter and municipal bill payment',
     objectPosition: 'object-[85%_center]',
-    opacity: 'opacity-40 sm:opacity-48',
+    opacity: 'opacity-55 sm:opacity-65',
   },
   'srv-tv': {
     url: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1791120377/ChatGPT_Image_Oct_4_2026_01_25_50_PM-3_pnzq7z.png',
     alt: 'DStv, GOtv and StarTimes TV bouquet renewal and entertainment screen',
     objectPosition: 'object-[85%_center]',
-    opacity: 'opacity-38 sm:opacity-45',
+    opacity: 'opacity-50 sm:opacity-60',
   },
 };
 

@@ -60,15 +60,15 @@ export const HomeComingSoonSection: React.FC = () => {
                       />
                     </div>
 
-                    {/* Continuous Text Protection Horizontal Gradient:
-                        LEFT: dark card background (#0d1217 95-100%)
-                        CENTER: medium fade (#0d1217/85)
-                        RIGHT: light overlay (#0d1217/15)
+                    {/* Directional Text Protection Horizontal Gradient:
+                        LEFT: strong dark protection (90-95%)
+                        CENTER: medium fade (50-65%)
+                        RIGHT: light overlay only (10-20%) so artwork is clearly recognized
                     */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#0d1217] from-30% via-[#0d1217]/85 via-65% to-[#0d1217]/15 pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#0d1217] from-25% via-[#0d1217]/65 via-50% to-[#0d1217]/10 pointer-events-none" />
 
-                    {/* Mobile Combined Vertical Gradient: slightly darker bottom zone behind Notify Me */}
-                    <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0d1217] via-[#0d1217]/70 to-transparent pointer-events-none" />
+                    {/* Mobile Combined Vertical Gradient: soft grounding behind Notify Me button */}
+                    <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[#0d1217]/85 via-transparent to-transparent pointer-events-none" />
                   </div>
                 )}
 
