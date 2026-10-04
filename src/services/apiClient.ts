@@ -85,6 +85,7 @@ export interface VerifyPaymentResponse {
 }
 
 export interface ApiError extends Error {
+  status?: number;
   code?: string;
   existingOrderReference?: string;
   existingOrderStatus?: string;
@@ -284,7 +285,7 @@ export async function registerOnServer(req: RegisterRequest): Promise<AuthSessio
 
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.error || 'Registration failed.');
+    throw Object.assign(new Error(data.error || 'Registration failed.'), { status: res.status, code: data.code });
   }
 
   return data;
@@ -317,7 +318,7 @@ export async function getMeOnServer(token: string): Promise<{ success: boolean; 
 
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.error || 'Failed to authenticate session.');
+    throw Object.assign(new Error(data.error || 'Failed to authenticate session.'), { status: res.status, code: data.code });
   }
 
   return data;
@@ -1348,3 +1349,21 @@ export async function adminEarnRequest<T>(token: string, path: string, params: R
     ...(payload!==undefined?{body:JSON.stringify(payload)}:{})});
   const result=await response.json(); if(!response.ok)throw new Error(result.error||'Mystery Earn request failed.'); return result;
 }
+
+export interface ProfileUpdateRequest { name?: string; email?: string | null; phone?: string | null; currentPassword?: string; }
+async function accountRequest<T>(token: string, path: string, method: string, body: unknown): Promise<T> {
+  const response = await fetch(API_BASE_URL + '/api/' + path, { method, cache: 'no-store', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await response.json();
+  if (!response.ok) {
+    if (response.status === 401) window.dispatchEvent(new CustomEvent('mystery-auth-invalid', { detail: { token } }));
+    if (data.code === 'PASSWORD_CHANGE_REQUIRED') window.dispatchEvent(new Event('mystery-auth-refresh'));
+    throw Object.assign(new Error(data.error || 'Account action failed.'), { status: response.status, code: data.code });
+  }
+  return data;
+}
+export const changePasswordOnServer = (token: string, body: { currentPassword?: string; newPassword: string }) => accountRequest<AuthSessionResponse>(token, 'auth/change-password', 'POST', body);
+export const updateProfileOnServer = (token: string, body: ProfileUpdateRequest) => accountRequest<{ success: boolean; user: SafeUserProfile }>(token, 'auth/profile', 'PATCH', body);
+export const revokeOwnSessionsOnServer = (token: string) => accountRequest<{ success: boolean }>(token, 'auth/logout-all', 'POST', {});
+export const resetAdminCustomerPassword = (token: string, id: string) => accountRequest<{ success: boolean; temporaryPassword: string; user: SafeUserProfile }>(token, 'admin/users/' + encodeURIComponent(id) + '/reset-password', 'POST', { confirm: true });
+export const revokeAdminCustomerSessions = (token: string, id: string) => accountRequest<{ success: boolean }>(token, 'admin/users/' + encodeURIComponent(id) + '/revoke-sessions', 'POST', { confirm: true });
+export const updateAdminCustomerProfile = (token: string, id: string, body: ProfileUpdateRequest) => accountRequest<{ success: boolean; user: SafeUserProfile }>(token, 'admin/users/' + encodeURIComponent(id) + '/profile', 'PATCH', body);

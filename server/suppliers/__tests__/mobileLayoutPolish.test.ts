@@ -71,7 +71,8 @@ describe('Mystery Hub Mobile Layout Polish & Geometry Verification', () => {
     const waitlistModal = fs.readFileSync(path.resolve(process.cwd(), 'src/components/common/WaitlistModal.tsx'), 'utf8');
 
     assert.ok(checkoutModal.includes('max-w-[calc(100vw-1rem)]'), 'CheckoutModal must be bounded by viewport');
-    assert.ok(authModal.includes('max-w-[calc(100vw-1rem)]'), 'AuthModal must be bounded by viewport');
+    const securityDialog = fs.readFileSync(path.resolve(process.cwd(), 'src/components/auth/SecurityDialog.tsx'), 'utf8');
+    assert.ok(authModal.includes('<SecurityDialog') && securityDialog.includes('w-full min-w-0') && securityDialog.includes('p-3 sm:p-5'), 'AuthModal shared dialog must stay within padded viewport');
     assert.ok(orderStatusModal.includes('max-w-[calc(100vw-1rem)]'), 'OrderStatusModal must be bounded by viewport');
     assert.ok(waitlistModal.includes('max-w-[calc(100vw-1rem)]'), 'WaitlistModal must be bounded by viewport');
   });

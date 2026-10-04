@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test": "tsx scripts/runTests.ts",
     "dev": "tsx server.ts",
     "build": "vite build",
     "start": "tsx server.ts",

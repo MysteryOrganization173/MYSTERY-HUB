@@ -18,6 +18,10 @@ import { OrdersStore } from '../../db/ordersStore.js';
 import { runPrelaunchCleanup, maskRecipientPhone } from '../../../scripts/cleanupPrelaunchOrders.js';
 import { OrderRecord } from '../../types/orders.js';
 
+// Synthetic cleanup fixtures always use memory, never an inherited database URL.
+delete process.env.DATABASE_URL;
+process.env.NODE_ENV = 'test';
+
 function createMockOrder(overrides: Partial<OrderRecord>): OrderRecord {
   const now = new Date().toISOString();
   const id = overrides.id || `ord_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;

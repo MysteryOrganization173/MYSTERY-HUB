@@ -23,7 +23,7 @@ import { ReferralStore } from '../db/referralStore.js';
 import { ReferralService } from '../services/referralService.js';
 import { OrderRecord, toSafePublicOrder } from '../types/orders.js';
 import { toSafeUserProfile, WaitlistChannel } from '../types/auth.js';
-import { hashPassword, verifyPassword, generateSessionToken } from '../utils/crypto.js';
+import { hashPassword, generateSessionToken } from '../utils/crypto.js';
 import { parseIdentifier, validatePassword } from '../utils/authValidation.js';
 import { requireAuth, optionalAuth } from '../middleware/authMiddleware.js';
 import { loginRateLimiter, signupRateLimiter, waitlistRateLimiter, referralCaptureRateLimiter } from '../middleware/rateLimiter.js';
@@ -38,7 +38,11 @@ import {
   mapToSafeCustomerStatus,
 } from '../services/duplicateOrderProtection.js';
 
+import { accountRouter } from './accountApi.js';
+import { AccountError, identifierConflict, loginAccount } from '../services/accountSecurity.js';
+
 export const apiRouter = Router();
+apiRouter.use('/auth', accountRouter);
 
 // Mount Website Builder endpoints
 apiRouter.use('/websites', websiteRouter);
@@ -1164,7 +1168,10 @@ apiRouter.post('/auth/register', signupRateLimiter, async (req: Request, res: Re
 
     // Create session
     const rawToken = generateSessionToken();
-    const session = await AuthStore.createSession(user.id, rawToken, Boolean(rememberMe));
+    const session = await AuthStore.withLockedUser(user.id, async (current, client) => {
+      if (!current || current.password_hash !== passwordHash || current.status !== 'active') throw new AccountError(401, 'Please log in again to continue.');
+      return AuthStore.createSession(user.id, rawToken, Boolean(rememberMe), client);
+    });
 
     // Mystery Earn: Ensure permanent referral profile is generated
     try {
@@ -1211,7 +1218,9 @@ apiRouter.post('/auth/register', signupRateLimiter, async (req: Request, res: Re
       expiresAt: session.expires_at,
     });
   } catch (err) {
-    console.error('Registration Controller Exception:', err);
+    const conflict = identifierConflict(err);
+    if (err instanceof AccountError) { res.status(err.status).json({ error: err.message }); return; }
+    if (conflict) { res.status(409).json({ error: conflict.message, code: conflict.code }); return; }
     res.status(500).json({ error: 'An unexpected server error occurred creating your account.' });
   }
 });
@@ -1224,52 +1233,15 @@ apiRouter.post('/auth/login', loginRateLimiter, async (req: Request, res: Respon
   try {
     const { identifier, password, rememberMe } = req.body || {};
 
-    if (!identifier || typeof identifier !== 'string' || !password || typeof password !== 'string') {
+    if (!identifier || typeof identifier !== 'string' || identifier.length > 128 || !password || typeof password !== 'string' || password.length > 128) {
       res.status(400).json({ error: 'Please provide both your phone/email and password.' });
       return;
     }
 
-    const cleanIdentifier = identifier.trim();
-    const user = await AuthStore.findUserByIdentifier(cleanIdentifier);
-
-    if (!user) {
-      res.status(401).json({
-        error: 'Invalid credentials. Please check your phone/email and password.',
-      });
-      return;
-    }
-
-    if (user.status === 'disabled') {
-      res.status(403).json({
-        error: 'Your account has been disabled. Please contact support.',
-      });
-      return;
-    }
-
-    // Constant-time scrypt password verification
-    const isValid = await verifyPassword(password, user.password_hash);
-    if (!isValid) {
-      res.status(401).json({
-        error: 'Invalid credentials. Please check your phone/email and password.',
-      });
-      return;
-    }
-
-    // Update last login timestamp
-    await AuthStore.updateUserLastLogin(user.id);
-
-    // Create fresh session
-    const rawToken = generateSessionToken();
-    const session = await AuthStore.createSession(user.id, rawToken, Boolean(rememberMe));
-
-    res.json({
-      success: true,
-      user: toSafeUserProfile(user),
-      token: rawToken,
-      expiresAt: session.expires_at,
-    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await loginAccount(identifier.trim(), password, Boolean(rememberMe)));
   } catch (err) {
-    console.error('Login Controller Exception:', err);
+    if (err instanceof AccountError) { res.status(err.status).json({ error: err.message }); return; }
     res.status(500).json({ error: 'An unexpected server error occurred during login.' });
   }
 });

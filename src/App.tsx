@@ -22,6 +22,7 @@ import { CheckoutModal } from './components/checkout/CheckoutModal';
 import { OrderStatusModal } from './components/checkout/OrderStatusModal';
 import { TemplatePreviewModal } from './components/website/TemplatePreviewModal';
 import { WaitlistModal } from './components/common/WaitlistModal';
+import { AccountControls } from './components/auth/AccountControls';
 import { AuthModal } from './components/auth/AuthModal';
 import { MarketplaceInquiryModal } from './components/marketplace/MarketplaceInquiryModal';
 import { MysteryAiAssistant } from './components/ai/MysteryAiAssistant';
@@ -38,6 +39,7 @@ const AppContent: React.FC = () => {
       <>
         <SEOHead />
         <AdminPage />
+        <AccountControls />
         <ToastContainer />
       </>
     );
@@ -73,6 +75,7 @@ const AppContent: React.FC = () => {
       <TemplatePreviewModal />
       <WaitlistModal />
       <AuthModal />
+      <AccountControls />
       <MarketplaceInquiryModal />
       <ToastContainer />
       <MysteryAiAssistant />

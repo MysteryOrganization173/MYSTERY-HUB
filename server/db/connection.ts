@@ -5,6 +5,7 @@ import { ULTRA_ENQUIRY_SCHEMA } from './websiteUltraSchema.js';
  */
 
 import pg from 'pg';
+import { assertSafeTestDatabase } from '../utils/environment.js';
 
 const { Pool } = pg;
 
@@ -12,6 +13,8 @@ let pool: pg.Pool | null = null;
 let connectionFailed = false;
 
 export function getPool(): pg.Pool | null {
+  // Check before cached-pool reuse and outside the development fallback catch.
+  assertSafeTestDatabase();
   if (connectionFailed) return null;
   if (pool) return pool;
 
@@ -370,6 +373,8 @@ export async function initDatabase(): Promise<void> {
 
     // 2. REQUIRED COLUMN MIGRATIONS ON ORDERS & PRODUCTS (Critical - executed independently)
     const orderMigrations = [
+      { name: 'users.must_change_password', sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;` },
+      { name: 'users.password_changed_at', sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ NULL;` },
       {
         name: 'orders.user_id',
         sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL;`,

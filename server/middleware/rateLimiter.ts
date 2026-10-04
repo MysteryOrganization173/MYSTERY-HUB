@@ -4,6 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { parseIdentifier } from '../utils/authValidation.js';
 
 interface RateLimitOptions {
   windowMs: number;
@@ -35,7 +36,7 @@ export function createRateLimiter(options: RateLimitOptions) {
     }
 
     const ip = options.key?.(req) ||
-      (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ||
+      req.ip ||
       req.socket.remoteAddress ||
       'unknown';
 
@@ -59,11 +60,13 @@ export function createRateLimiter(options: RateLimitOptions) {
   };
 }
 
-// 10 login attempts per 5 minutes per IP
+// 15 login attempts per 5 minutes per normalized account identifier
 export const loginRateLimiter = createRateLimiter({
   windowMs: 5 * 60 * 1000,
   max: 15,
   message: 'Too many login attempts. Please wait a few minutes before trying again.',
+  // Normalize phone variants; do not trust caller-supplied forwarded headers.
+  key: req => { const identifier = parseIdentifier(req.body?.identifier); return identifier ? `login:${identifier.normalized}` : ''; },
 });
 
 // 10 signups per 15 minutes per IP

@@ -14,7 +14,7 @@ const input = { businessName: "Ama's Studio", businessType:'Design', contactName
 let statements: { sql:string; values:any[] }[] = [], leads: any[] = [], site: any, failInsert = false;
 let server: Server, base: string;
 before(async () => {
-  process.env.DATABASE_URL='postgresql://fixture:fixture@127.0.0.1:1/no_connection'; process.env.NODE_ENV='test';
+  process.env.DATABASE_URL='postgresql://fixture.invalid/never-contacted'; process.env.NODE_ENV='test';
   pg.Pool.prototype.query = (async (sql:string, values:any[]=[]) => {
     statements.push({sql,values});
     if (sql.startsWith('INSERT INTO website_ultra_enquiries')) {

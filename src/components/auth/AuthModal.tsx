@@ -1,3 +1,5 @@
+import { BUSINESS_CONFIG } from '../../config/business';
+import { SecurityDialog } from './SecurityDialog';
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { BrandLogo } from '../common/BrandLogo';
@@ -20,6 +22,8 @@ export const AuthModal: React.FC = () => {
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [recovery, setRecovery] = useState(false);
+  const [existingAccount, setExistingAccount] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isAuthModalOpen) return null;
@@ -69,6 +73,7 @@ export const AuthModal: React.FC = () => {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Authentication failed. Please try again.';
+      setExistingAccount(isSignup && (err as { status?: number }).status === 409);
       setErrorMessage(msg);
       showToast(msg, 'warning');
     } finally {
@@ -77,20 +82,7 @@ export const AuthModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-[calc(100vw-1rem)] sm:max-w-md bg-[#0f151b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#0c1116]">
-          <BrandLogo size="sm" />
-          <button
-            onClick={closeAuth}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
-            aria-label="Close modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <SecurityDialog title={recovery ? 'Account recovery' : 'Mystery Hub account'} onClose={() => { setRecovery(false); setPassword(''); closeAuth(); }}>
         {/* Modal Body */}
         <div className="p-6 space-y-6">
           <div>
@@ -132,14 +124,15 @@ export const AuthModal: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {existingAccount && <div className="flex flex-wrap gap-3 text-sm"><button className="text-[#00c365]" onClick={() => { setErrorMessage(null); setPassword(''); setExistingAccount(false); openAuth('login'); }}>Log In Instead</button><button className="text-[#00c365]" onClick={() => { setPassword(''); setRecovery(true); }}>Need help accessing your account?</button></div>}
+          {recovery ? <div className="space-y-4 text-sm"><p>We can help you restore access to your Mystery Hub account.</p><p className="text-slate-400">Contact support for assistance. We will confirm account ownership before an administrator restores access. Never send your password.</p><a className="block text-[#00c365] underline" href={BUSINESS_CONFIG.getGeneralWhatsAppUrl('Hi Mystery Hub, I need help accessing my account.')} target="_blank" rel="noopener noreferrer">Contact support on WhatsApp</a><a className="block text-[#00c365] underline break-words" href={BUSINESS_CONFIG.contact.emailLink}>{BUSINESS_CONFIG.contact.supportEmail}</a><button onClick={() => setRecovery(false)} className="text-[#00c365]">Back to sign in</button></div> : <form onSubmit={handleSubmit} className="space-y-4">
             {isSignup && (
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">Full Name / Business Name</label>
+                <label htmlFor="auth-name" className="text-xs font-semibold text-slate-300">Full Name / Business Name</label>
                 <div className="relative">
                   <UserIcon className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
-                    type="text"
+                    id="auth-name" type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Kwame Asante or Akwaaba Ventures"
@@ -151,13 +144,13 @@ export const AuthModal: React.FC = () => {
             )}
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">
+              <label htmlFor="auth-identifier" className="text-xs font-semibold text-slate-300">
                 Phone Number (Ghana) or Email
               </label>
               <div className="relative">
                 <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
-                  type="text"
+                  id="auth-identifier" type="text"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   placeholder="024 123 4567 or email@domain.com"
@@ -169,11 +162,11 @@ export const AuthModal: React.FC = () => {
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-300">Password</label>
+                <label htmlFor="auth-password" className="text-xs font-semibold text-slate-300">Password</label>
                 {!isSignup && (
                   <button
                     type="button"
-                    onClick={() => showToast('Password reset link will be sent to your number/email in production.', 'info')}
+                    onClick={() => { setPassword(''); setRecovery(true); }}
                     className="text-[11px] text-[#00c365] hover:underline"
                   >
                     Forgot password?
@@ -183,7 +176,7 @@ export const AuthModal: React.FC = () => {
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
-                  type="password"
+                  id="auth-password" type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
@@ -227,7 +220,7 @@ export const AuthModal: React.FC = () => {
                 </span>
               )}
             </button>
-          </form>
+          </form>}
 
           {/* Toggle between Login and Signup */}
           <div className="text-center pt-2 text-xs text-slate-400 border-t border-slate-800">
@@ -262,7 +255,6 @@ export const AuthModal: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </SecurityDialog>
   );
 };

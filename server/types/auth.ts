@@ -18,6 +18,8 @@ export interface UserRecord {
   created_at: string;
   updated_at: string;
   last_login_at: string | null;
+  must_change_password: boolean;
+  password_changed_at: string | null;
 }
 
 export interface SafeUserProfile {
@@ -29,6 +31,8 @@ export interface SafeUserProfile {
   status: UserStatus;
   createdAt: string;
   lastLoginAt: string | null;
+  mustChangePassword: boolean;
+  passwordChangedAt: string | null;
 }
 
 export interface SessionRecord {
@@ -72,5 +76,7 @@ export function toSafeUserProfile(user: UserRecord): SafeUserProfile {
     status: user.status,
     createdAt: user.created_at,
     lastLoginAt: user.last_login_at,
+    mustChangePassword: user.must_change_password === true,
+    passwordChangedAt: user.password_changed_at ?? null,
   };
 }

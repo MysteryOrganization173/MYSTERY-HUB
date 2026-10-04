@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS users (
   last_login_at TIMESTAMP WITH TIME ZONE
 );
 
+-- Non-destructive upgrade for existing accounts. Password hashes are unchanged.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ NULL;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique 
 ON users (LOWER(email)) WHERE email IS NOT NULL AND email != '';
 

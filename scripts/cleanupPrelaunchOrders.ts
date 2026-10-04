@@ -14,13 +14,13 @@
  * 7. Idempotent: Running the script multiple times is completely safe.
  */
 
-import dotenv from 'dotenv';
+import { loadApplicationEnvironment } from '../server/utils/environment.js';
 import { fileURLToPath } from 'url';
 import { OrdersStore } from '../server/db/ordersStore.js';
 import { OrderRecord } from '../server/types/orders.js';
 import { SuccessBizHubClient } from '../server/suppliers/successBizHub/client.js';
 
-dotenv.config();
+loadApplicationEnvironment();
 
 export interface CleanupOptions {
   confirm?: boolean;

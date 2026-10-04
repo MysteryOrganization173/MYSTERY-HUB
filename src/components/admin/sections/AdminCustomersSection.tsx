@@ -1,3 +1,5 @@
+import { SecurityDialog } from '../../auth/SecurityDialog';
+import { AdminCustomerSecurity } from './AdminCustomerSecurity';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { earnMoney } from './AdminEarnUi';
 import type { EarnCustomerSummary } from '../../../../server/types/adminEarn';
@@ -116,6 +118,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
     try {
       const res = await getAdminUserDetailsOnServer(sessionToken, user.id);
       if (res.success && request === detailRequest.current) {
+        setSelectedUser(prev => prev ? { ...prev, ...res.user } : null);
         setUserOrders(res.orders || []);
         setUserWaitlists(res.waitlist || []);
         setEarnSummary(res.earn);
@@ -486,8 +489,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
 
       {/* Customer Details Drawer / Modal */}
       {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-[#0f171d] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+        <SecurityDialog title="Customer account details" wide onClose={() => { detailRequest.current++; setSelectedUser(null); }}>
             <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
               <div className="space-y-0.5">
                 <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
@@ -506,7 +508,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
               </div>
 
               <button
-                onClick={() => setSelectedUser(null)}
+                aria-label="Close customer details" onClick={() => { detailRequest.current++; setSelectedUser(null); }}
                 className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -536,6 +538,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
                 </div>
               </div>
 
+              <AdminCustomerSecurity key={selectedUser.id} user={selectedUser} token={sessionToken} adminId={currentAdminId} onStatusToggle={() => setStatusTargetUser({ id: selectedUser.id, name: selectedUser.name, currentStatus: selectedUser.status })} onUpdate={profile => { setSelectedUser(prev => prev ? { ...prev, ...profile } : null); void fetchUsers(); }} />
               {/* Order History */}
               <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
                 <h4 className="font-bold text-white">Mystery Earn</h4>
@@ -619,14 +622,12 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
                 Close
               </button>
             </div>
-          </div>
-        </div>
+        </SecurityDialog>
       )}
 
       {/* Confirmation Dialog for Disabling/Enabling User */}
       {statusTargetUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md bg-[#0f171d] border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4">
+        <SecurityDialog title="Confirm account status" onClose={() => { if (!isTogglingStatus) setStatusTargetUser(null); }}>
             <div className="flex items-center gap-3">
               <div className={`p-2.5 rounded-xl ${statusTargetUser.currentStatus === 'active' ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
                 <AlertTriangle className="w-5 h-5" />
@@ -665,8 +666,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
                 {isTogglingStatus ? 'Updating...' : statusTargetUser.currentStatus === 'active' ? 'Disable Account' : 'Enable Account'}
               </button>
             </div>
-          </div>
-        </div>
+        </SecurityDialog>
       )}
     </div>
   );
