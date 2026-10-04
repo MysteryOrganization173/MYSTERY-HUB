@@ -1,3 +1,7 @@
+import { MARKETPLACE_LIMITS, duplicateMarketplaceName } from '../../shared/marketplaceLimits.js';
+import { parseJsonPickupLocations, parseJsonVariants } from '../types/marketplace.js';
+import { randomUUID } from 'node:crypto';
+import { MarketplaceControlStore, plainText } from './marketplaceControlStore.js';
 /**
  * Marketplace Data Store
  * Persists and queries marketplace products in PostgreSQL with in-memory fallback.
@@ -22,6 +26,13 @@ import { AdminAuditStore } from './adminAuditStore.js';
 const devMarketplaceStore = new Map<string, MarketplaceProductRecord>();
 
 export interface CreateMarketplaceProductInput {
+  productKind?: import('../types/marketplace.js').MarketplaceProductKind;
+  fulfilmentNote?: string | null;
+  fulfilmentIdentifierLabel?: string | null;
+  fulfilmentIdentifierPlaceholder?: string | null;
+  fulfilmentIdentifierRequired?: boolean;
+  adminNote?: string | null;
+
   slug?: string;
   name: string;
   category: string;
@@ -52,6 +63,13 @@ export interface CreateMarketplaceProductInput {
 }
 
 export interface UpdateMarketplaceProductInput {
+  productKind?: import('../types/marketplace.js').MarketplaceProductKind;
+  fulfilmentNote?: string | null;
+  fulfilmentIdentifierLabel?: string | null;
+  fulfilmentIdentifierPlaceholder?: string | null;
+  fulfilmentIdentifierRequired?: boolean;
+  adminNote?: string | null;
+
   slug?: string;
   name?: string;
   category?: string;
@@ -83,6 +101,31 @@ export interface UpdateMarketplaceProductInput {
 }
 
 export class MarketplaceStore {
+  static assertStorageBounds(record:MarketplaceProductRecord) {
+    plainText(record.name,'Product name',MARKETPLACE_LIMITS.productName,true);
+    plainText(record.availability_label,'Availability label',MARKETPLACE_LIMITS.availabilityLabel);
+    plainText(record.badge,'Badge',MARKETPLACE_LIMITS.badge);
+    for(const location of parseJsonPickupLocations(record.pickup_locations))plainText(location.id,'Pickup location ID',MARKETPLACE_LIMITS.pickupId,true);
+    for(const variant of parseJsonVariants(record.variants))plainText(variant.id,'Option ID',MARKETPLACE_LIMITS.variantId,true);
+  }
+  static async withCategoryLabels<T extends PublicMarketplaceProduct>(products: T[]): Promise<T[]> {
+    const labels = new Map((await MarketplaceControlStore.getCategories()).map(c => [c.slug,c.label]));
+    return products.map(p => ({...p,categoryLabel:labels.get(p.category) || p.categoryLabel}));
+  }
+  static async duplicateProduct(id: string, adminId: string) {
+    const source = await this.getProductById(id);
+    if (!source) throw new Error('Product not found.');
+    const publicData = toAdminMarketplaceProduct(source);
+    const copy = await this.createProduct({...publicData, name: duplicateMarketplaceName(source.name), slug: 'copy-of-' + source.slug, adminNote: source.admin_note, published:false, featured:false, sortOrder:source.sort_order},adminId);
+    await AdminAuditStore.record({adminUserId:adminId,action:'marketplace_product_duplicated',entityType:'marketplace_product',entityId:copy.id,metadata:{sourceId:id}});
+    return copy;
+  }
+  static async restoreProduct(id: string, adminId: string) {
+    const saved = await this.updateProduct(id,{archived:false,published:false},adminId);
+    await AdminAuditStore.record({adminUserId:adminId,action:'marketplace_product_restored',entityType:'marketplace_product',entityId:id,metadata:{published:false}});
+    return saved;
+  }
+
   /**
    * Generates a unique slug ensuring no collision in PostgreSQL or in-memory
    */
@@ -162,7 +205,7 @@ export class MarketplaceStore {
       `;
 
       const res = await pool.query(query, values);
-      return res.rows.map((row) => toPublicMarketplaceProduct(row as MarketplaceProductRecord));
+      return this.withCategoryLabels(res.rows.map((row) => toPublicMarketplaceProduct(row as MarketplaceProductRecord)));
     }
 
     // In-memory fallback
@@ -194,7 +237,7 @@ export class MarketplaceStore {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
-    return items.map(toPublicMarketplaceProduct);
+    return this.withCategoryLabels(items.map(toPublicMarketplaceProduct));
   }
 
   /**
@@ -212,13 +255,13 @@ export class MarketplaceStore {
       `;
       const res = await pool.query(query, [cleanSlug]);
       if (res.rows.length === 0) return null;
-      return toPublicMarketplaceProduct(res.rows[0] as MarketplaceProductRecord);
+      return (await this.withCategoryLabels([toPublicMarketplaceProduct(res.rows[0] as MarketplaceProductRecord)]))[0];
     }
 
     const item = Array.from(devMarketplaceStore.values()).find(
       (p) => p.slug === cleanSlug && p.published && !p.archived
     );
-    return item ? toPublicMarketplaceProduct(item) : null;
+    return item ? (await this.withCategoryLabels([toPublicMarketplaceProduct(item)]))[0] : null;
   }
 
   /**
@@ -266,7 +309,7 @@ export class MarketplaceStore {
       `;
 
       const res = await pool.query(query, values);
-      return res.rows.map((row) => toAdminMarketplaceProduct(row as MarketplaceProductRecord));
+      return this.withCategoryLabels(res.rows.map((row) => toAdminMarketplaceProduct(row as MarketplaceProductRecord)));
     }
 
     // In-memory fallback
@@ -300,7 +343,7 @@ export class MarketplaceStore {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
-    return items.map(toAdminMarketplaceProduct);
+    return this.withCategoryLabels(items.map(toAdminMarketplaceProduct));
   }
 
   /**
@@ -366,7 +409,7 @@ export class MarketplaceStore {
     input: CreateMarketplaceProductInput,
     adminUserId: string
   ): Promise<MarketplaceProductRecord> {
-    const id = `mp_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const id = `mp_${randomUUID()}`;
     const slug = await this.resolveUniqueSlug(input.slug || input.name);
     const nowIso = new Date().toISOString();
 
@@ -378,6 +421,12 @@ export class MarketplaceStore {
         : null;
 
     const record: MarketplaceProductRecord = {
+      product_kind: input.productKind ?? 'physical',
+      fulfilment_note: input.fulfilmentNote ?? null,
+      fulfilment_identifier_label: input.fulfilmentIdentifierLabel ?? null,
+      fulfilment_identifier_placeholder: input.fulfilmentIdentifierPlaceholder ?? null,
+      fulfilment_identifier_required: input.fulfilmentIdentifierRequired ?? false,
+      admin_note: input.adminNote ?? null,
       id,
       slug,
       name: input.name.trim(),
@@ -387,7 +436,7 @@ export class MarketplaceStore {
       price_type: input.priceType,
       price_minor: priceMinor,
       referral_reward_minor: typeof input.referralRewardMinor === 'number' ? Math.max(0, Math.floor(input.referralRewardMinor)) : null,
-      purchase_enabled: input.purchaseEnabled !== false,
+      purchase_enabled: input.fulfilmentMode !== 'inquiry_only' && input.priceType !== 'quote' && input.purchaseEnabled !== false,
       fulfilment_mode: input.fulfilmentMode || 'both',
       pickup_locations: input.pickupLocations && input.pickupLocations.length > 0 ? JSON.stringify(input.pickupLocations) : null,
       delivery_available: input.deliveryAvailable !== false,
@@ -411,6 +460,7 @@ export class MarketplaceStore {
       updated_at: nowIso,
     };
 
+    this.assertStorageBounds(record);
     const pool = getPool();
     if (pool) {
       const insertSql = `
@@ -418,9 +468,9 @@ export class MarketplaceStore {
           id, slug, name, category, tagline, description, price_type, price_minor, referral_reward_minor,
           purchase_enabled, fulfilment_mode, pickup_locations, delivery_available, delivery_note, purchase_note, payment_required_before_delivery, variants,
           availability, availability_label, badge, image_url, image_alt, gallery_urls,
-          highlights, specs, featured, published, archived, sort_order, created_at, updated_at
+          highlights, specs, featured, published, archived, sort_order, created_at, updated_at, product_kind, fulfilment_note, fulfilment_identifier_label, fulfilment_identifier_placeholder, fulfilment_identifier_required, admin_note
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37
         ) RETURNING *;
       `;
       const res = await pool.query(insertSql, [
@@ -455,6 +505,12 @@ export class MarketplaceStore {
         record.sort_order,
         record.created_at,
         record.updated_at,
+        record.product_kind,
+        record.fulfilment_note,
+        record.fulfilment_identifier_label,
+        record.fulfilment_identifier_placeholder,
+        record.fulfilment_identifier_required,
+        record.admin_note,
       ]);
       const saved = res.rows[0] as MarketplaceProductRecord;
 
@@ -513,8 +569,7 @@ export class MarketplaceStore {
     let slug = existing.slug;
     if (input.slug && input.slug !== existing.slug) {
       slug = await this.resolveUniqueSlug(input.slug, id);
-    } else if (input.name && input.name !== existing.name && !input.slug) {
-      slug = await this.resolveUniqueSlug(input.name, id);
+
     }
 
     const priceType = input.priceType !== undefined ? input.priceType : existing.price_type;
@@ -535,6 +590,12 @@ export class MarketplaceStore {
 
     const updatedRecord: MarketplaceProductRecord = {
       ...existing,
+      product_kind: input.productKind !== undefined ? input.productKind : existing.product_kind ?? 'physical',
+      fulfilment_note: input.fulfilmentNote !== undefined ? input.fulfilmentNote : existing.fulfilment_note ?? null,
+      fulfilment_identifier_label: input.fulfilmentIdentifierLabel !== undefined ? input.fulfilmentIdentifierLabel : existing.fulfilment_identifier_label ?? null,
+      fulfilment_identifier_placeholder: input.fulfilmentIdentifierPlaceholder !== undefined ? input.fulfilmentIdentifierPlaceholder : existing.fulfilment_identifier_placeholder ?? null,
+      fulfilment_identifier_required: input.fulfilmentIdentifierRequired !== undefined ? input.fulfilmentIdentifierRequired : existing.fulfilment_identifier_required ?? false,
+      admin_note: input.adminNote !== undefined ? input.adminNote : existing.admin_note ?? null,
       slug,
       name: input.name !== undefined ? input.name.trim() : existing.name,
       category: input.category !== undefined ? input.category.trim() : existing.category,
@@ -543,7 +604,7 @@ export class MarketplaceStore {
       price_type: priceType,
       price_minor: priceMinor,
       referral_reward_minor: referralRewardMinor,
-      purchase_enabled: input.purchaseEnabled !== undefined ? Boolean(input.purchaseEnabled) : (existing.purchase_enabled !== false),
+      purchase_enabled: (input.fulfilmentMode ?? existing.fulfilment_mode) !== 'inquiry_only' && priceType !== 'quote' && (input.purchaseEnabled !== undefined ? Boolean(input.purchaseEnabled) : existing.purchase_enabled !== false),
       fulfilment_mode: input.fulfilmentMode !== undefined ? input.fulfilmentMode : (existing.fulfilment_mode || 'both'),
       pickup_locations: input.pickupLocations !== undefined ? (input.pickupLocations && input.pickupLocations.length > 0 ? JSON.stringify(input.pickupLocations) : null) : existing.pickup_locations,
       delivery_available: input.deliveryAvailable !== undefined ? Boolean(input.deliveryAvailable) : (existing.delivery_available !== false),
@@ -567,6 +628,7 @@ export class MarketplaceStore {
     };
 
     const pool = getPool();
+    this.assertStorageBounds(updatedRecord);
     if (pool) {
       const updateSql = `
         UPDATE marketplace_products SET
@@ -598,7 +660,13 @@ export class MarketplaceStore {
           published = $27,
           archived = $28,
           sort_order = $29,
-          updated_at = $30
+          updated_at = $30,
+          product_kind = $31,
+          fulfilment_note = $32,
+          fulfilment_identifier_label = $33,
+          fulfilment_identifier_placeholder = $34,
+          fulfilment_identifier_required = $35,
+          admin_note = $36
         WHERE id = $1
         RETURNING *;
       `;
@@ -633,6 +701,12 @@ export class MarketplaceStore {
         updatedRecord.archived,
         updatedRecord.sort_order,
         updatedRecord.updated_at,
+        updatedRecord.product_kind,
+        updatedRecord.fulfilment_note,
+        updatedRecord.fulfilment_identifier_label,
+        updatedRecord.fulfilment_identifier_placeholder,
+        updatedRecord.fulfilment_identifier_required,
+        updatedRecord.admin_note,
       ]);
 
       const saved = res.rows[0] as MarketplaceProductRecord;
@@ -750,28 +824,7 @@ export class MarketplaceStore {
     message?: string;
     budget?: string;
   }): Promise<{ id: string; createdAt: string }> {
-    const id = `inq_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
-    const nowIso = new Date().toISOString();
-    const pool = getPool();
-    if (pool) {
-      await pool.query(
-        `INSERT INTO marketplace_inquiries (id, product_id, product_name, customer_name, customer_phone, customer_email, inquiry_type, message, budget, status, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'new', $10);`,
-        [
-          id,
-          payload.productId || null,
-          payload.productName,
-          payload.customerName || null,
-          payload.customerPhone || null,
-          payload.customerEmail || null,
-          payload.inquiryType || 'general',
-          payload.message || null,
-          payload.budget || null,
-          nowIso,
-        ]
-      );
-    }
-    return { id, createdAt: nowIso };
+    return MarketplaceControlStore.createInquiry(payload);
   }
 
   /**

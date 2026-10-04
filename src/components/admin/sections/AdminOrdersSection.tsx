@@ -1,3 +1,4 @@
+import { FULFILMENT_LABELS, FulfilmentMode } from '../../../../shared/marketplacePolicy';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   AdminOrdersResponse,
@@ -899,7 +900,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                       <span>Marketplace Commerce Order Fulfilment</span>
                     </h4>
                     <span className="text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 px-2 py-0.5 rounded uppercase">
-                      {selectedOrder.fulfilment_method === 'delivery' ? 'Doorstep Delivery' : 'Pickup Hub'}
+                      {FULFILMENT_LABELS[(selectedOrder.fulfilment_method || 'pickup') as FulfilmentMode]}
                     </span>
                   </div>
 
@@ -920,7 +921,8 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                     </div>
                   </div>
 
-                  {selectedOrder.fulfilment_method === 'pickup' ? (
+                  {selectedOrder.marketplace_context&&<div className="p-3 rounded-lg border border-slate-700 text-xs space-y-2 break-words"><strong>Order context at purchase</strong><p>Product type: {String(selectedOrder.marketplace_context.productKind || '')}</p>{Boolean(selectedOrder.marketplace_context.identifierValue)&&<p>{String(selectedOrder.marketplace_context.identifierLabel)}: {String(selectedOrder.marketplace_context.identifierValue)}</p>}{Boolean(selectedOrder.marketplace_context.fulfilmentNote)&&<p>{String(selectedOrder.marketplace_context.fulfilmentNote)}</p>}{Boolean(selectedOrder.marketplace_context.purchaseNote)&&<p>{String(selectedOrder.marketplace_context.purchaseNote)}</p>}</div>}
+                  {['pickup','delivery'].includes(selectedOrder.fulfilment_method || 'pickup')&&(selectedOrder.fulfilment_method === 'pickup' ? (
                     <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1 text-xs">
                       <span className="text-[11px] text-slate-400 block font-bold">Pickup Location:</span>
                       <p className="text-white font-medium">{selectedOrder.pickup_location_snapshot || 'Accra Pickup Hub'}</p>
@@ -938,7 +940,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                         <p className="text-amber-300 text-[11px] italic">Note: {selectedOrder.delivery_note}</p>
                       )}
                     </div>
-                  )}
+                  ))}
 
                   {/* Admin Status Update Action */}
                   <div className="pt-2 border-t border-slate-800 space-y-2">
@@ -947,14 +949,14 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                     </span>
                     <div className="flex flex-wrap gap-2">
                       {[
-                        { id: 'awaiting_fulfilment', label: 'Awaiting Dispatch' },
+                        { id: 'awaiting_fulfilment', label: ['digital_delivery','manual_activation'].includes(selectedOrder.fulfilment_method || '') ? 'Awaiting Fulfilment' : 'Awaiting Dispatch' },
                         { id: 'processing', label: 'Processing' },
                         { id: 'ready_for_pickup', label: 'Ready for Pickup' },
                         { id: 'out_for_delivery', label: 'Out for Delivery' },
                         { id: 'completed', label: 'Completed / Delivered' },
                         { id: 'refunded', label: 'Refunded' },
                         { id: 'cancelled', label: 'Cancelled' },
-                      ].map((st) => {
+                      ].filter(st => !['digital_delivery','manual_activation'].includes(selectedOrder.fulfilment_method || '') || !['ready_for_pickup','out_for_delivery'].includes(st.id)).map((st) => {
                         const isCurrent =
                           selectedOrder.marketplace_status === st.id || selectedOrder.status === st.id;
                         return (

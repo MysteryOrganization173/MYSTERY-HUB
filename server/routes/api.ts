@@ -1,3 +1,7 @@
+import { purchasableOptions } from '../../shared/marketplaceVariants.js';
+import { MARKETPLACE_LIMITS, truncateMarketplaceText } from '../../shared/marketplaceLimits.js';
+import { marketplaceFulfilment } from '../services/marketplaceCheckoutPolicy.js';
+import { MarketplaceControlStore, MarketplaceInputError } from '../db/marketplaceControlStore.js';
 /**
  * Production API Routes for Real Payments & Persistent Orders
  */
@@ -18,7 +22,7 @@ import { OrdersStore } from '../db/ordersStore.js';
 import { AuthStore } from '../db/authStore.js';
 import { WaitlistStore } from '../db/waitlistStore.js';
 import { MarketplaceStore } from '../db/marketplaceStore.js';
-import { parseJsonVariants, parseJsonPickupLocations } from '../types/marketplace.js';
+import { parseJsonVariants, parseJsonPickupLocations, hasConfiguredMarketplaceVariants } from '../types/marketplace.js';
 import { ReferralStore } from '../db/referralStore.js';
 import { ReferralService } from '../services/referralService.js';
 import { OrderRecord, toSafePublicOrder } from '../types/orders.js';
@@ -124,7 +128,12 @@ apiRouter.get('/instant-bundles', async (_req: Request, res: Response) => {
 apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: Response) => {
   const reqStart = performance.now();
   try {
-    const { productId, recipientPhone, phone: bodyPhone, customerPhone, customerEmail, customerName, serviceType, network: reqNetwork, amount: reqAmount } = req.body || {};
+    const { productId, recipientPhone, phone: bodyPhone, customerPhone, customerEmail: suppliedCustomerEmail, customerName, serviceType, network: reqNetwork, amount: reqAmount } = req.body || {};
+    const isMarketplace = serviceType === 'marketplace' || (typeof productId === 'string' && productId.startsWith('mp_'));
+    // Temporary compatibility for already-deployed Marketplace checkout clients.
+    // Normalize the legacy email alias here; remove it after those clients retire.
+    // The canonical customerEmail always wins; other services keep their existing contract.
+    const customerEmail = suppliedCustomerEmail ?? (isMarketplace ? req.body?.email : undefined);
 
     if (!productId || typeof productId !== 'string') {
       res.status(400).json({ error: 'Missing or invalid productId parameter.' });
@@ -159,10 +168,6 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
       explicitCode: explicitReferralCode,
     });
 
-    const isMarketplace =
-      serviceType === 'marketplace' ||
-      (typeof productId === 'string' && productId.startsWith('mp_'));
-
     // ==========================================
     // M. MARKETPLACE COMMERCE FLOW
     // ==========================================
@@ -182,6 +187,7 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
         return;
       }
 
+      if(productRecord.availability === 'coming_soon'){res.status(400).json({error:'This product is not yet available for purchase.'});return;}
       if (productRecord.archived) {
         res.status(400).json({ error: 'This product is archived and cannot be purchased.' });
         return;
@@ -203,7 +209,7 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
 
       const variants = parseJsonVariants(productRecord.variants);
       if (req.body?.variantId && typeof req.body.variantId === 'string') {
-        const matchingVar = variants.find((v) => v.id === req.body.variantId && v.active !== false);
+        const matchingVar = purchasableOptions(variants).find((v) => v.id === req.body.variantId);
         if (!matchingVar) {
           res.status(400).json({ error: 'Selected product variant is invalid or inactive.' });
           return;
@@ -211,8 +217,9 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
         authorPriceMinor = matchingVar.priceMinor;
         selectedVariantSnapshot = matchingVar.name;
         selectedVariantId = matchingVar.id;
-      } else if (variants.length > 0) {
-        const activeVariants = variants.filter((v) => v.active !== false);
+      } else if (hasConfiguredMarketplaceVariants(productRecord.variants)) {
+        const activeVariants = purchasableOptions(variants);
+        if(!activeVariants.length){res.status(400).json({error:'No purchasable option is currently available. Please inquire.'});return;}
         if (activeVariants.length > 0 && !req.body?.variantId) {
           res.status(400).json({ error: 'Please select a valid product variant configuration before payment.' });
           return;
@@ -224,57 +231,10 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
         return;
       }
 
-      const reqFulfilmentMethod = req.body?.fulfilmentMethod;
-      if (reqFulfilmentMethod !== 'pickup' && reqFulfilmentMethod !== 'delivery') {
-        res.status(400).json({ error: 'Please choose a valid fulfilment method (pickup or delivery).' });
-        return;
-      }
-
-      const productMode = productRecord.fulfilment_mode || 'both';
-      if (productMode === 'inquiry_only') {
-        res.status(400).json({ error: 'This product is available for inquiry only.' });
-        return;
-      }
-      if (reqFulfilmentMethod === 'pickup' && productMode === 'delivery') {
-        res.status(400).json({ error: 'Pickup is not available for this product.' });
-        return;
-      }
-      if (reqFulfilmentMethod === 'delivery' && (productMode === 'pickup' || productRecord.delivery_available === false)) {
-        res.status(400).json({ error: 'Delivery is not available for this product.' });
-        return;
-      }
-
-      let selectedPickupSnapshot: string | null = null;
-      let selectedPickupId: string | null = null;
-
-      if (reqFulfilmentMethod === 'pickup') {
-        const pickupLocs = parseJsonPickupLocations(productRecord.pickup_locations);
-        const reqLocId = req.body?.pickupLocationId;
-        const targetLoc = pickupLocs.find((loc) => loc.id === reqLocId && loc.active !== false);
-        if (!targetLoc) {
-          res.status(400).json({ error: 'Please select an active, valid pickup location.' });
-          return;
-        }
-        selectedPickupId = targetLoc.id;
-        selectedPickupSnapshot = `${targetLoc.name} (${targetLoc.area}, ${targetLoc.city}${targetLoc.addressOrLandmark ? ` · ${targetLoc.addressOrLandmark}` : ''})`;
-      }
-
-      let deliveryCity: string | null = null;
-      let deliveryArea: string | null = null;
-      let deliveryLandmark: string | null = null;
-      let deliveryNote: string | null = null;
-
-      if (reqFulfilmentMethod === 'delivery') {
-        deliveryCity = typeof req.body?.deliveryCity === 'string' ? req.body.deliveryCity.trim() : null;
-        deliveryArea = typeof req.body?.deliveryArea === 'string' ? req.body.deliveryArea.trim() : null;
-        deliveryLandmark = typeof req.body?.deliveryLandmark === 'string' ? req.body.deliveryLandmark.trim() : null;
-        deliveryNote = typeof req.body?.deliveryNote === 'string' ? req.body.deliveryNote.trim() : null;
-
-        if (!deliveryCity || !deliveryArea) {
-          res.status(400).json({ error: 'Please provide your delivery city and area.' });
-          return;
-        }
-      }
+      let fulfilment;
+      try { fulfilment = marketplaceFulfilment(productRecord,req.body || {}); }
+      catch (err) { if (err instanceof MarketplaceInputError) {res.status(err.status).json({error:err.message});return;} throw err; }
+      const {method:reqFulfilmentMethod,selectedPickupId,selectedPickupSnapshot,deliveryCity,deliveryArea,deliveryLandmark,deliveryNote} = fulfilment;
 
       const timestamp = Date.now();
       const randomHex = Math.floor(100000 + Math.random() * 900000);
@@ -294,8 +254,8 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
         service_type: 'marketplace',
         product_id: productRecord.id,
         product_slug: productRecord.slug,
-        product_name_snapshot: productRecord.name,
-        bundle_size_snapshot: selectedVariantSnapshot || productRecord.availability_label || 'Direct Purchase',
+        product_name_snapshot: truncateMarketplaceText(productRecord.name, MARKETPLACE_LIMITS.orderProductName),
+        bundle_size_snapshot: truncateMarketplaceText(selectedVariantSnapshot || productRecord.availability_label || 'Direct Purchase', MARKETPLACE_LIMITS.orderOptionLabel),
         variant_id: selectedVariantId,
         variant_snapshot: selectedVariantSnapshot,
         amount: authorPriceMinor,
@@ -318,6 +278,7 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
         delivery_area: deliveryArea,
         delivery_landmark: deliveryLandmark,
         delivery_note: deliveryNote,
+        marketplace_context: {...fulfilment.context,variantId:selectedVariantId,variantName:selectedVariantSnapshot,priceMinor:authorPriceMinor,customerContact:{name: typeof customerName === 'string' ? customerName.trim() : req.user?.name || 'Customer',phone:phoneVal.normalized,email:validEmail}},
         marketplace_status: 'pending_payment',
         created_at: nowIso,
         updated_at: nowIso,
@@ -1600,6 +1561,11 @@ apiRouter.get('/referrals/rules', async (_req: Request, res: Response) => {
  * 19. POST /api/marketplace/inquiries
  * Records customer product sourcing & availability inquiries.
  */
+apiRouter.get('/marketplace/categories', async (_req,res) => {
+  try { res.json({success:true,categories:await MarketplaceControlStore.getCategories(true)}); }
+  catch { res.status(500).json({error:'Unable to load categories.'}); }
+});
+
 apiRouter.post('/marketplace/inquiries', async (req: Request, res: Response) => {
   try {
     const { productId, productName, customerName, customerPhone, customerEmail, inquiryType, message, budget } = req.body || {};
@@ -1626,8 +1592,8 @@ apiRouter.post('/marketplace/inquiries', async (req: Request, res: Response) => 
       message: 'Product inquiry recorded successfully.',
     });
   } catch (err) {
+    if (err instanceof MarketplaceInputError) {res.status(err.status).json({error:err.message});return;}
     console.error('Marketplace Inquiry API Exception:', err);
     res.status(500).json({ error: 'Failed to record product inquiry.' });
   }
 });
-
