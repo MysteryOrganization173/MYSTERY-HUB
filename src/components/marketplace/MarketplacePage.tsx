@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../config/business';
-import { MARKETPLACE_CATEGORIES } from '../../data/marketplace';
+import { marketplaceControlRequest, ManagedCategory } from '../../services/marketplaceControls';
 import { MarketplaceCategory, MarketplaceProduct } from '../../types';
 import { getPublicMarketplaceProducts, getMyReferralSummary } from '../../services/apiClient';
 import { buildReferralUrl } from '../../utils/referralUrl';
@@ -9,6 +9,7 @@ import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
 import { OptimizedImage } from '../common/OptimizedImage';
 import { MarketplaceCheckoutModal } from './MarketplaceCheckoutModal';
 import { MarketplaceProductDetailModal } from './MarketplaceProductDetailModal';
+import { useMarketplaceDialog } from './useMarketplaceDialog';
 import {
   Laptop,
   Smartphone,
@@ -39,7 +40,9 @@ import {
 } from 'lucide-react';
 
 export const MarketplacePage: React.FC = () => {
-  const { openMarketplaceInquiry, user, sessionToken, openAuth, showToast } = useApp();
+  const { openMarketplaceInquiry, marketplaceOverlay, openMarketplaceOverlay, closeMarketplaceOverlay, dismissMarketplaceOverlay, user, sessionToken, openAuth, showToast } = useApp();
+  const [categories,setCategories]=useState<ManagedCategory[]>([]);
+  useEffect(()=>{let active=true;marketplaceControlRequest('categories').then(data=>{if(active)setCategories(data.categories);}).catch(()=>{});return()=>{active=false;};},[]);
   const [selectedCategory, setSelectedCategory] = useState<MarketplaceCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -49,7 +52,9 @@ export const MarketplacePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Selected Product for Rich Product Detail View (Drill-down experience)
-  const [selectedProduct, setSelectedProduct] = useState<MarketplaceProduct | null>(null);
+  const selectedProduct = marketplaceOverlay.kind === 'detail' ? marketplaceOverlay.product : null;
+  const setSelectedProduct = (product:MarketplaceProduct|null) => product ? openMarketplaceOverlay('detail',product) : dismissMarketplaceOverlay();
+  useEffect(() => () => dismissMarketplaceOverlay(),[dismissMarketplaceOverlay]);
 
   // Hero image load & error states for smooth reveal
   const [heroImageLoaded, setHeroImageLoaded] = useState(false);
@@ -57,8 +62,9 @@ export const MarketplacePage: React.FC = () => {
 
   // Share & Earn States
   const [referralCode, setReferralCode] = useState<string>('');
-  const [shareModalProduct, setShareModalProduct] = useState<MarketplaceProduct | null>(null);
-  const [checkoutProduct, setCheckoutProduct] = useState<MarketplaceProduct | null>(null);
+  const shareModalProduct = marketplaceOverlay.kind === 'share' ? marketplaceOverlay.product : null;
+  const shareDialogRef = useMarketplaceDialog(!!shareModalProduct,closeMarketplaceOverlay);
+  const checkoutProduct = marketplaceOverlay.kind === 'checkout' ? marketplaceOverlay.product : null;
   const [copiedLink, setCopiedLink] = useState(false);
   const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
 
@@ -106,6 +112,7 @@ export const MarketplacePage: React.FC = () => {
     fetchCatalog();
   }, [fetchCatalog]);
 
+  const openedDeepLink = useRef<string | null>(null);
   // Deep-link landing & spotlight behavior (also auto-opens product detail modal if link points to product)
   useEffect(() => {
     if (loading || products.length === 0) return;
@@ -130,7 +137,8 @@ export const MarketplacePage: React.FC = () => {
         }
       }
 
-      if (targetProduct) {
+      if (targetProduct && openedDeepLink.current !== targetProduct.id) {
+        openedDeepLink.current = targetProduct.id;
         setHighlightedProductId(targetProduct.id);
         setSelectedProduct(targetProduct);
         const timerScroll = setTimeout(() => {
@@ -194,12 +202,12 @@ export const MarketplacePage: React.FC = () => {
   };
 
   const handleOpenShareModal = (p: MarketplaceProduct) => {
-    setShareModalProduct(p);
+    openMarketplaceOverlay('share',p);
     setCopiedLink(false);
   };
 
   const handleCloseShareModal = () => {
-    setShareModalProduct(null);
+    closeMarketplaceOverlay();
     setCopiedLink(false);
   };
 
@@ -382,12 +390,12 @@ export const MarketplacePage: React.FC = () => {
 
             {/* Category Tabs (Smooth mobile horizontal scroll, hidden native scrollbars) */}
             <div className="w-full flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
-              {MARKETPLACE_CATEGORIES.map((cat) => {
-                const isSelected = selectedCategory === cat.id;
+              {[{slug:'all',label:'All Sourced Products'},...categories].map((cat) => {
+                const isSelected = selectedCategory === cat.slug;
                 return (
                   <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
+                    key={cat.slug}
+                    onClick={() => setSelectedCategory(cat.slug)}
                     className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 active:scale-95 ${
                       isSelected
                         ? 'bg-[#00c365] text-black shadow-md font-bold'
@@ -737,14 +745,13 @@ export const MarketplacePage: React.FC = () => {
           ========================================================= */}
       {selectedProduct && (
         <MarketplaceProductDetailModal
+          key={selectedProduct.id}
           product={selectedProduct}
-          onClose={() => setSelectedProduct(null)}
-          onBuyNow={(prod) => {
-            setCheckoutProduct(prod);
-          }}
-          onInquire={(prod) => {
-            openMarketplaceInquiry(prod);
-          }}
+          onClose={dismissMarketplaceOverlay}
+          initialVariantId={marketplaceOverlay.kind !== 'none' ? marketplaceOverlay.variantId : undefined}
+          onVariantChange={id => openMarketplaceOverlay('detail',selectedProduct,id)}
+          onBuyNow={(prod,variantId) => openMarketplaceOverlay('checkout',prod,variantId)}
+          onInquire={openMarketplaceInquiry}
           onShare={(prod) => {
             handleOpenShareModal(prod);
           }}
@@ -766,6 +773,7 @@ export const MarketplacePage: React.FC = () => {
             role="dialog"
             aria-modal="true"
             aria-labelledby="share-modal-title"
+            ref={shareDialogRef} tabIndex={-1}
           >
             {/* Modal Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-[#090d11] shrink-0">
@@ -957,9 +965,13 @@ export const MarketplacePage: React.FC = () => {
           ========================================================= */}
       {checkoutProduct && (
         <MarketplaceCheckoutModal
+          key={checkoutProduct.id}
           product={checkoutProduct}
           referralCode={referralCode}
-          onClose={() => setCheckoutProduct(null)}
+          initialVariantId={marketplaceOverlay.kind !== 'none' ? marketplaceOverlay.variantId : undefined}
+          onClose={closeMarketplaceOverlay}
+          onInquire={openMarketplaceInquiry}
+          onVariantChange={id => openMarketplaceOverlay('checkout',checkoutProduct,id)}
         />
       )}
     </div>

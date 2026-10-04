@@ -1,3 +1,4 @@
+import { MARKETPLACE_FLEXIBILITY_SCHEMA } from './marketplaceFlexibilitySchema.js';
 import { ULTRA_ENQUIRY_SCHEMA } from './websiteUltraSchema.js';
 /**
  * Shared PostgreSQL Connection Pool & Initialization
@@ -565,6 +566,8 @@ export async function initDatabase(): Promise<void> {
         throw new Error(`Database column migration failed for "${mig.name}": ${err instanceof Error ? err.message : String(err)}`);
       }
     }
+
+    await client.query(MARKETPLACE_FLEXIBILITY_SCHEMA);
 
     // 3. INDEX CREATION (Non-critical failures logged as warnings)
     const indexStatements = [

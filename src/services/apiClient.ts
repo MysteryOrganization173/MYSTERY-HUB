@@ -9,6 +9,7 @@ import { SafeUserProfile, WaitlistChannel, AuthSessionResponse, WaitlistRecord, 
 import { MarketplaceProduct } from '../types';
 
 export interface AdminMarketplaceMetrics {
+  needsReview?: number; physical?: number; digital?: number; service?: number; newInquiries?: number;
   total: number;
   published: number;
   drafts: number;
@@ -30,6 +31,21 @@ export interface InitializePaymentRequest {
   serviceType?: 'data' | 'airtime' | 'instant_bundle';
   network?: string;
   amount?: number;
+}
+
+export interface InitializeMarketplacePaymentRequest extends Omit<InitializePaymentRequest, 'serviceType' | 'recipientPhone'> {
+  serviceType: 'marketplace';
+  phone: string;
+  customerEmail: string;
+  productSlug?: string;
+  variantId?: string;
+  fulfilmentMethod: NonNullable<MarketplaceProduct['fulfilmentMode']>;
+  fulfilmentIdentifier?: string;
+  pickupLocationId?: string;
+  deliveryCity?: string;
+  deliveryArea?: string;
+  deliveryLandmark?: string;
+  deliveryNote?: string;
 }
 
 export interface PublicInstantBundle {
@@ -137,7 +153,7 @@ export interface JoinWaitlistResponse {
 }
 
 export async function initializePaymentOnServer(
-  req: InitializePaymentRequest & { referralCode?: string; visitorKey?: string },
+  req: (InitializePaymentRequest | InitializeMarketplacePaymentRequest) & { referralCode?: string; visitorKey?: string },
   sessionToken?: string | null,
   timeoutMs = 35000
 ): Promise<InitializePaymentResponse> {
@@ -841,12 +857,13 @@ export async function getPublicMarketplaceProductBySlug(slug: string): Promise<{
 
 export async function getAdminMarketplaceProducts(
   token: string,
-  params?: { category?: string; status?: string; search?: string }
+  params?: { category?: string; status?: string; search?: string; productKind?: string }
 ): Promise<{ success: boolean; products: MarketplaceProduct[]; metrics: AdminMarketplaceMetrics }> {
   const query = new URLSearchParams();
   if (params?.category && params.category !== 'all') query.set('category', params.category);
   if (params?.status && params.status !== 'all') query.set('status', params.status);
   if (params?.search) query.set('search', params.search);
+  if (params?.productKind) query.set('productKind',params.productKind);
 
   const url = `${API_BASE_URL}/api/admin/marketplace/products${query.toString() ? `?${query.toString()}` : ''}`;
   const res = await fetch(url, {
@@ -896,12 +913,14 @@ export async function updateAdminMarketplaceProduct(
 
 export async function publishAdminMarketplaceProduct(
   token: string,
-  id: string
+  id: string,
+  confirmWarnings = false
 ): Promise<{ success: boolean; product: MarketplaceProduct; message?: string }> {
   const url = `${API_BASE_URL}/api/admin/marketplace/products/${encodeURIComponent(id)}/publish`;
   const res = await fetch(url, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type':'application/json' },
+    body: JSON.stringify({confirmWarnings}),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to publish product.');
@@ -969,23 +988,7 @@ export async function importMarketplaceProductWithAi(
   advertText: string
 ): Promise<{
   success: boolean;
-  extraction: {
-    name: string;
-    category: string;
-    tagline: string;
-    description: string;
-    priceType: 'fixed' | 'starting_at' | 'quote';
-    priceGhc: number | null;
-    availability: 'in_stock' | 'sourcing_on_demand' | 'preorder' | 'out_of_stock';
-    availabilityLabel: string | null;
-    badge: string | null;
-    imageAlt: string;
-    highlights: string[];
-    specs: { label: string; value: string }[];
-    detectedPriceOptions: { label: string; priceGhc: number }[];
-    warnings: string[];
-    sourceNotes: string[];
-  };
+  extraction: import('../../server/services/marketplaceAiImporter').MarketplaceAiExtractionResult;
   message?: string;
 }> {
   const url = `${API_BASE_URL}/api/admin/marketplace/ai-import`;

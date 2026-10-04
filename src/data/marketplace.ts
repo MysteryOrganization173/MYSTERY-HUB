@@ -1,11 +1,12 @@
 /**
- * Marketplace V1 Categories & Client Configuration
+ * Legacy Marketplace Category Fallbacks & Client Configuration
  * Products are stored in PostgreSQL and managed by the owner via Admin.
  * Hardcoded demo products are strictly removed in production.
  */
 
 import { MarketplaceCategory, MarketplaceProduct } from '../types';
 
+// Category APIs are authoritative; this list documents legacy slugs for compatibility only.
 export const MARKETPLACE_CATEGORIES: { id: MarketplaceCategory; label: string; description: string }[] = [
   { id: 'all', label: 'All Sourced Products', description: 'Browse all curated technology hardware, creator tools, and digital solutions.' },
   { id: 'laptops_computers', label: 'Laptops & Computers', description: 'Business ultrabooks, coding workstations, and student laptops.' },

@@ -96,10 +96,11 @@ OS: Windows 11 Installed
       warnings: ['Check 2025 Model claim'],
     });
 
-    assert.strictEqual(sanitized.category, 'laptops_computers', 'Invalid category must fall back to laptops_computers');
+    assert.strictEqual(sanitized.category, null, 'Unsupported category must require admin selection');
     assert.strictEqual(sanitized.priceType, 'starting_at', 'Multiple detected price options force starting_at');
     assert.strictEqual(sanitized.priceGhc, 3700, 'Price must parse string into numeric integer');
-    assert.strictEqual(sanitized.warnings.length, 1, 'Warnings must survive sanitization');
+    assert.ok(sanitized.warnings.includes('Check 2025 Model claim'), 'Warnings must survive sanitization');
+    assert.ok(sanitized.warnings.some(w => w.includes('category')), 'Uncertain category must require review');
   });
 
   test('4. parseSupplierAdvertWithAi returns valid extraction object', async () => {

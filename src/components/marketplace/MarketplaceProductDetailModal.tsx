@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { purchasableOptions, initialMarketplaceOption } from '../../../shared/marketplaceVariants';
+import { useMarketplaceDialog } from './useMarketplaceDialog';
+import { FULFILMENT_LABELS } from '../../../shared/marketplacePolicy';
+import React, { useState } from 'react';
 import { MarketplaceProduct, MarketplacePickupLocation } from '../../types';
 import { OptimizedImage } from '../common/OptimizedImage';
 import { BUSINESS_CONFIG } from '../../config/business';
@@ -29,7 +32,9 @@ import {
 interface MarketplaceProductDetailModalProps {
   product: MarketplaceProduct;
   onClose: () => void;
-  onBuyNow: (product: MarketplaceProduct) => void;
+  initialVariantId?: string;
+  onVariantChange?: (id: string) => void;
+  onBuyNow: (product: MarketplaceProduct, variantId?: string) => void;
   onInquire: (product: MarketplaceProduct) => void;
   onShare: (product: MarketplaceProduct) => void;
   formatGhcReward: (val: number | null | undefined) => string;
@@ -38,33 +43,19 @@ interface MarketplaceProductDetailModalProps {
 export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailModalProps> = ({
   product,
   onClose,
-  onBuyNow,
+  onBuyNow, initialVariantId, onVariantChange,
   onInquire,
   onShare,
   formatGhcReward,
 }) => {
   const [isDescExpanded, setIsDescExpanded] = useState(false);
 
-  // Close on Escape key press
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  // Lock background body scroll while modal is active
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
-
+  const dialogRef = useMarketplaceDialog(true,onClose);
+  const options = purchasableOptions(product.variants);
+  const [selectedVariantId,setSelectedVariantId] = useState(() => initialMarketplaceOption(product.variants || [],initialVariantId));
+  const selectedVariant = options.find(v => v.id === selectedVariantId);
+  const needsOption = options.length > 0 && !selectedVariant;
+  const displayedPrice = selectedVariant ? 'GH₵' + (selectedVariant.priceMinor / 100).toLocaleString('en-US',{maximumFractionDigits:2}) : product.priceDisplay;
   const getCategoryFallbackIcon = (category: string) => {
     switch (category) {
       case 'laptops_computers':
@@ -131,13 +122,14 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
   ).filter((loc) => loc.active !== false);
 
   const allowedFulfilment = product.fulfilmentMode || 'both';
+  const isPhysical = (product.productKind || 'physical') === 'physical';
   const hasPickup =
     allowedFulfilment !== 'delivery' && activePickupLocations.length > 0;
   const hasDelivery =
     allowedFulfilment !== 'pickup' && product.deliveryAvailable !== false;
 
   const isPurchaseSupported =
-    product.purchaseEnabled !== false && product.priceType !== 'quote';
+    product.purchaseEnabled !== false && product.priceType !== 'quote' && product.availability !== 'coming_soon' && (!(product.variants?.length) || options.length > 0) && allowedFulfilment !== 'inquiry_only';
 
   const isLongDescription = (product.description || '').length > 320;
   const displayedDescription =
@@ -149,6 +141,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
     <div
       className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
+      ref={dialogRef} tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="product-detail-title"
@@ -225,14 +218,14 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
             <div className="pt-2 flex flex-wrap items-baseline justify-between gap-3">
               <div>
                 <span className="text-[11px] font-semibold text-slate-400 block">
-                  {product.priceType === 'starting_at'
+                  {selectedVariant ? 'Selected Option Price' : product.priceType === 'starting_at'
                     ? 'Starting Price'
                     : product.priceType === 'quote'
                     ? 'Pricing'
                     : 'Ghana Cedis Price'}
                 </span>
                 <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight tabular-nums">
-                  {product.priceDisplay}
+                  {displayedPrice}
                 </span>
               </div>
 
@@ -242,6 +235,8 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
               </div>
             </div>
           </div>
+
+          {options.length > 0 && <fieldset className="space-y-2"><legend className="font-bold text-sm">Choose an option</legend><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{options.map(option => <button key={option.id} type="button" aria-pressed={selectedVariantId === option.id} onClick={() => {setSelectedVariantId(option.id);onVariantChange?.(option.id);}} className={`rounded-xl border p-3 text-left text-sm ${selectedVariantId === option.id ? 'border-emerald-400 bg-emerald-500/15' : 'border-slate-700 bg-slate-900'}`}><span className="block">{option.name}</span><strong>GH₵{(option.priceMinor/100).toLocaleString()}</strong></button>)}</div>{needsOption && <p className="text-sm text-amber-300">Choose an option before continuing to payment.</p>}</fieldset>}
 
           {/* 3. Share & Earn Opportunity Section (If eligible) */}
           {isEligibleForShare && rewardGhcFormatted && (
@@ -364,6 +359,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
               <span>Fulfilment &amp; Availability</span>
             </h3>
 
+            {isPhysical ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Delivery info */}
               <div className="p-3.5 rounded-xl bg-[#0f151b] border border-slate-800 space-y-1">
@@ -410,6 +406,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
                 )}
               </div>
             </div>
+            ) : <div className="rounded-xl border border-slate-800 p-3 text-xs space-y-2"><strong>{FULFILMENT_LABELS[allowedFulfilment]}</strong>{product.fulfilmentNote&&<p>{product.fulfilmentNote}</p>}{product.fulfilmentIdentifierLabel&&<p>{product.fulfilmentIdentifierRequired?'Required':'Optional'}: {product.fulfilmentIdentifierLabel}</p>}</div>}
 
             {/* Purchase Note if configured */}
             {product.purchaseNote && (
@@ -419,6 +416,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
               </div>
             )}
           </div>
+
 
           {/* Spacing safeguard so bottom content is never hidden behind sticky bar */}
           <div className="h-4" />
@@ -431,11 +429,13 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
               <>
                 <button
                   type="button"
-                  onClick={() => onBuyNow(product)}
+                  disabled={needsOption}
+                  data-marketplace-primary
+                  onClick={() => onBuyNow(product,selectedVariant?.id)}
                   className="flex-1 py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs sm:text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,195,101,0.3)] active:scale-[0.98] cursor-pointer"
                 >
                   <ShoppingBag className="w-4 h-4" />
-                  <span>Buy Now ({product.priceDisplay})</span>
+                  <span>{needsOption ? 'Choose an option' : `Buy Now (${displayedPrice})`}</span>
                 </button>
 
                 <button

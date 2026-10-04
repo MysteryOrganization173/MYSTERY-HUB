@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { MARKETPLACE_LIMITS, truncateMarketplaceText } from '../../../shared/marketplaceLimits';
+import { useMarketplaceDialog } from './useMarketplaceDialog';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { submitMarketplaceInquiry } from '../../services/apiClient';
@@ -22,6 +24,8 @@ const INQUIRY_QUESTIONS = [
 
 export const MarketplaceInquiryModal: React.FC = () => {
   const { marketplaceInquiryProduct, closeMarketplaceInquiry, showToast, user } = useApp();
+  const isPhysical = (marketplaceInquiryProduct?.productKind || 'physical') === 'physical';
+  const inquiryQuestions = isPhysical ? INQUIRY_QUESTIONS : ['Is this still available?', 'How does fulfilment work?', 'What customer details are needed?', 'I have a question'];
 
   const [selectedQuestion, setSelectedQuestion] = useState<string>('Is this still available?');
   const [name, setName] = useState('');
@@ -32,6 +36,17 @@ export const MarketplaceInquiryModal: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const requestGeneration = useRef(0);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    requestGeneration.current++;
+    setIsSubmitting(false);
+    return () => {
+      requestGeneration.current++;
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    };
+  }, [marketplaceInquiryProduct?.id]);
 
   // Prefill signed-in user details
   useEffect(() => {
@@ -47,17 +62,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
     }
   }, [marketplaceInquiryProduct, user]);
 
-  // Escape key handler
-  useEffect(() => {
-    if (!marketplaceInquiryProduct) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeMarketplaceInquiry();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [marketplaceInquiryProduct, closeMarketplaceInquiry]);
+  const dialogRef = useMarketplaceDialog(!!marketplaceInquiryProduct,closeMarketplaceInquiry);
 
   if (!marketplaceInquiryProduct) return null;
 
@@ -67,11 +72,12 @@ export const MarketplaceInquiryModal: React.FC = () => {
     e.preventDefault();
     setSubmitError(null);
 
+    const generation = requestGeneration.current;
     setIsSubmitting(true);
     try {
       await submitMarketplaceInquiry({
         productId: product.id,
-        productName: product.name,
+        productName: truncateMarketplaceText(product.name,MARKETPLACE_LIMITS.inquiryProductName),
         customerName: name.trim() || undefined,
         customerPhone: phone.trim() || undefined,
         customerEmail: email.trim() || undefined,
@@ -80,6 +86,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
         budget: budget.trim() || undefined,
       });
     } catch (err) {
+      if (generation !== requestGeneration.current) return;
       setIsSubmitting(false);
       const errMsg = err instanceof Error ? err.message : 'Failed to record inquiry. Please try again.';
       setSubmitError(errMsg);
@@ -120,7 +127,8 @@ export const MarketplaceInquiryModal: React.FC = () => {
     setIsSubmitted(true);
     showToast(`Inquiry recorded and WhatsApp launched for ${product.name}!`, 'success');
 
-    setTimeout(() => {
+    closeTimer.current = setTimeout(() => {
+      if (generation !== requestGeneration.current) return;
       setIsSubmitted(false);
       closeMarketplaceInquiry();
     }, 2500);
@@ -134,6 +142,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
       <div
         className="relative w-full max-w-lg bg-[#0e141a] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
+        ref={dialogRef} tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="marketplace-inquiry-title"
@@ -214,7 +223,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
                   What would you like to inquire about?
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {INQUIRY_QUESTIONS.map((q) => {
+                  {inquiryQuestions.map((q) => {
                     const isSelected = selectedQuestion === q;
                     return (
                       <button
@@ -298,7 +307,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g. Needed for delivery in East Legon"
+                  placeholder={isPhysical ? 'e.g. Needed for delivery in East Legon' : 'e.g. Subscription duration or service requirements'}
                   className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365] text-xs sm:text-sm resize-none"
                 />
               </div>

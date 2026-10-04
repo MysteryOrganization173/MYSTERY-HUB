@@ -1,7 +1,11 @@
+import { FULFILMENT_LABELS, FULFILMENT_MODES, FulfilmentMode } from '../../../shared/marketplacePolicy';
+import { purchasableOptions, initialMarketplaceOption } from '../../../shared/marketplaceVariants';
+import { MARKETPLACE_LIMITS } from '../../../shared/marketplaceLimits';
+import { useMarketplaceDialog } from './useMarketplaceDialog';
 import React, { useState } from 'react';
 import { MarketplaceProduct, MarketplacePickupLocation, MarketplaceProductVariant } from '../../types';
 import { useApp } from '../../context/AppContext';
-import { API_BASE_URL } from '../../services/apiClient';
+import { initializePaymentOnServer, InitializeMarketplacePaymentRequest } from '../../services/apiClient';
 import {
   X,
   ShoppingBag,
@@ -16,21 +20,25 @@ import {
 
 interface MarketplaceCheckoutModalProps {
   product: MarketplaceProduct;
+  initialVariantId?: string;
+  onInquire?: (product:MarketplaceProduct) => void;
+  onVariantChange?: (id: string) => void;
   referralCode?: string;
   onClose: () => void;
 }
 
 export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> = ({
   product,
-  referralCode,
+  referralCode, initialVariantId, onInquire, onVariantChange,
   onClose,
 }) => {
-  const { user, showToast, openMarketplaceInquiry } = useApp();
+  const { user, sessionToken, showToast, openMarketplaceInquiry } = useApp();
 
   // Variant State
-  const activeVariants = (product.variants || []).filter((v) => v.active !== false);
+  const dialogRef = useMarketplaceDialog(true,onClose);
+  const activeVariants = purchasableOptions(product.variants);
   const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(
-    activeVariants.length > 0 ? activeVariants[0].id : undefined
+    initialMarketplaceOption(product.variants || [],initialVariantId)
   );
 
   const selectedVariant: MarketplaceProductVariant | undefined = activeVariants.find(
@@ -39,19 +47,21 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
 
   // Price Calculation
   const unitPriceGhc = selectedVariant
-    ? selectedVariant.priceGhc
+    ? selectedVariant.priceMinor / 100
     : product.priceGhc ?? (product.priceMinor ? product.priceMinor / 100 : 0);
 
   // Fulfilment Capabilities & Rules
   const allowedFulfilment = product.fulfilmentMode || 'both';
+  const isPhysical = (product.productKind || 'physical') === 'physical';
+  const [fulfilmentIdentifier,setFulfilmentIdentifier]=useState('');
   const activePickupLocations: MarketplacePickupLocation[] = (product.pickupLocations || []).filter(
     (loc) => loc.active !== false
   );
   const hasActivePickup = activePickupLocations.length > 0;
-  const isDeliveryAllowed = allowedFulfilment !== 'pickup' && product.deliveryAvailable !== false;
+  const isDeliveryAllowed = isPhysical && ['delivery','both'].includes(allowedFulfilment) && product.deliveryAvailable !== false;
 
   // Initial Fulfilment Method Selection
-  const initialMethod: 'pickup' | 'delivery' =
+  const initialMethod: FulfilmentMode = !isPhysical ? allowedFulfilment :
     allowedFulfilment === 'pickup'
       ? 'pickup'
       : allowedFulfilment === 'delivery'
@@ -60,7 +70,7 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
       ? 'pickup'
       : 'delivery';
 
-  const [fulfilmentMethod, setFulfilmentMethod] = useState<'pickup' | 'delivery'>(initialMethod);
+  const [fulfilmentMethod, setFulfilmentMethod] = useState<FulfilmentMode>(initialMethod);
 
   // Selected Pickup Location
   const [selectedPickupId, setSelectedPickupId] = useState<string>(
@@ -95,14 +105,16 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
   };
 
   const handleInquireFallback = () => {
-    onClose();
-    openMarketplaceInquiry(product);
+    if(onInquire)onInquire(product);else openMarketplaceInquiry(product);
   };
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
+    if (isDirectPurchaseBlocked || isPickupBlocked) {handleInquireFallback();return;}
+    if (product.fulfilmentIdentifierRequired && !fulfilmentIdentifier.trim()) {setErrorMessage('Please enter '+(product.fulfilmentIdentifierLabel || 'your customer identifier')+'.');return;}
+    if(activeVariants.length && !selectedVariant){setErrorMessage('Choose an option before continuing to payment.');return;}
     // Validation
     if (!customerName.trim()) {
       setErrorMessage('Please enter your full name.');
@@ -144,12 +156,13 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
     setIsSubmitting(true);
 
     try {
-      const payload = {
+      const payload: InitializeMarketplacePaymentRequest & { referralCode?: string } = {
         serviceType: 'marketplace',
         productId: product.id,
         productSlug: product.slug,
         variantId: selectedVariantId,
         fulfilmentMethod,
+        fulfilmentIdentifier:fulfilmentIdentifier.trim() || undefined,
         pickupLocationId: fulfilmentMethod === 'pickup' && selectedPickupLocation ? selectedPickupLocation.id : undefined,
         deliveryCity: fulfilmentMethod === 'delivery' ? deliveryCity.trim() : undefined,
         deliveryArea: fulfilmentMethod === 'delivery' ? deliveryArea.trim() : undefined,
@@ -157,23 +170,11 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
         deliveryNote: fulfilmentMethod === 'delivery' ? deliveryNote.trim() : undefined,
         customerName: customerName.trim(),
         phone: phone.trim(),
-        email: email.trim().toLowerCase(),
+        customerEmail: email.trim().toLowerCase(),
         referralCode: referralCode || undefined,
       };
 
-      const res = await fetch(`${API_BASE_URL}/api/payments/initialize`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to initialize Paystack payment.');
-      }
+      const data = await initializePaymentOnServer(payload, sessionToken);
 
       if (data.authorizationUrl) {
         showToast('Redirecting to Paystack Secure Checkout...', 'info');
@@ -192,7 +193,7 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
 
   // Blocked Checkout State check (e.g. pickup-only with 0 active locations, or inquiry-only)
   const isPickupBlocked = allowedFulfilment === 'pickup' && !hasActivePickup;
-  const isDirectPurchaseBlocked = allowedFulfilment === 'inquiry_only' || (!hasActivePickup && !isDeliveryAllowed);
+  const isDirectPurchaseBlocked = product.purchaseEnabled === false || product.priceType === 'quote' || product.availability === 'coming_soon' || ((product.variants?.length || 0) > 0 && !activeVariants.length) || allowedFulfilment === 'inquiry_only' || !FULFILMENT_MODES[product.productKind || 'physical'].includes(allowedFulfilment) || (isPhysical && !hasActivePickup && !isDeliveryAllowed);
 
   return (
     <div
@@ -202,6 +203,7 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
       <div
         className="relative w-full max-w-xl bg-[#0e141a] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
+        ref={dialogRef} tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="marketplace-checkout-title"
@@ -275,6 +277,7 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
                 {product.categoryLabel}
               </span>
               <h4 className="font-bold text-sm sm:text-base text-white truncate">{product.name}</h4>
+              {selectedVariant&&<p className="text-xs font-semibold text-emerald-300">Selected: {selectedVariant.name}</p>}
               {product.tagline && <p className="text-xs text-slate-400 line-clamp-1">{product.tagline}</p>}
               <div className="pt-1 flex items-baseline justify-between">
                 <span className="text-[11px] text-slate-400">Unit Price</span>
@@ -289,7 +292,7 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
           {activeVariants.length > 0 && (
             <div className="space-y-2">
               <label className="font-bold text-slate-200 block text-xs">
-                Select Option / Configuration:
+                {selectedVariant ? `Selected: ${selectedVariant.name} · Change option` : 'Choose an option'}
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {activeVariants.map((variant) => {
@@ -297,8 +300,9 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
                   return (
                     <button
                       key={variant.id}
+                      aria-pressed={isSelected}
                       type="button"
-                      onClick={() => setSelectedVariantId(variant.id)}
+                      onClick={() => {setSelectedVariantId(variant.id);onVariantChange?.(variant.id);}}
                       className={`p-3 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                         isSelected
                           ? 'bg-[#00c365]/15 border-[#00c365] text-white font-bold'
@@ -307,7 +311,7 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
                     >
                       <span className="truncate">{variant.name}</span>
                       <span className="font-bold text-emerald-400 font-mono text-xs shrink-0">
-                        GH₵{variant.priceGhc.toLocaleString()}
+                        GH₵{(variant.priceMinor / 100).toLocaleString()}
                       </span>
                     </button>
                   );
@@ -316,6 +320,7 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
             </div>
           )}
 
+          {activeVariants.length > 0 && !selectedVariant && <p role="status" className="text-amber-300">Choose an option before continuing to payment.</p>}
           {/* BLOCKED PICKUP / INQUIRY FALLBACK CALLOUT */}
           {(isPickupBlocked || isDirectPurchaseBlocked) && (
             <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 space-y-3 text-xs">
@@ -343,8 +348,56 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
             </div>
           )}
 
-          {/* Fulfilment Method Controls (Rendered when direct purchase is enabled) */}
           {!isDirectPurchaseBlocked && !isPickupBlocked && (
+              <div className="space-y-3 pt-1 border-t border-slate-800">
+                <span className="font-bold text-slate-200 block text-xs">Customer Contact Information:</span>
+
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-300 block text-[11px]">
+                    Full Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="e.g. Kwame Asante"
+                    className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-[#00c365]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-slate-300 block text-[11px]">
+                      Ghanaian Phone Number <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="e.g. 059 206 6298"
+                      className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-[#00c365]"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-slate-300 block text-[11px]">
+                      Email Address (Receipt) <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="e.g. kwame@example.com"
+                      className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-[#00c365]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+          )}
+
+          {/* Fulfilment Method Controls (Rendered when direct purchase is enabled) */}
+          {isPhysical && !isDirectPurchaseBlocked && !isPickupBlocked && (
             <div className="space-y-2.5">
               <label className="font-bold text-slate-200 block text-xs">
                 Fulfilment Method:
@@ -465,6 +518,7 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
                       </label>
                       <input
                         type="text"
+                        maxLength={MARKETPLACE_LIMITS.deliveryArea}
                         value={deliveryArea}
                         onChange={(e) => setDeliveryArea(e.target.value)}
                         placeholder="e.g. East Legon, Spintex, Adum"
@@ -507,6 +561,8 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
             </div>
           )}
 
+          {!isPhysical&&!isDirectPurchaseBlocked&&<div className="rounded-xl border border-slate-700 p-3 space-y-2 text-xs"><strong>{FULFILMENT_LABELS[allowedFulfilment]}</strong>{product.fulfilmentNote&&<p>{product.fulfilmentNote}</p>}<p>Fulfilled by Mystery Hub after successful payment. We never ask for external account passwords or security codes.</p></div>}
+          {product.fulfilmentIdentifierLabel&&!isDirectPurchaseBlocked&&<label className="block text-xs space-y-2">{product.fulfilmentIdentifierLabel}{product.fulfilmentIdentifierRequired?' *':' (optional)'}<input className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3" type="text" maxLength={200} required={product.fulfilmentIdentifierRequired} placeholder={product.fulfilmentIdentifierPlaceholder} value={fulfilmentIdentifier} onChange={e=>setFulfilmentIdentifier(e.target.value)} autoComplete="off" /></label>}
           {/* Purchase Note Banner */}
           {product.purchaseNote && (
             <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2.5">
@@ -518,51 +574,6 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
           {/* Customer Details Form (Only when direct purchase is possible) */}
           {!isDirectPurchaseBlocked && !isPickupBlocked && (
             <>
-              <div className="space-y-3 pt-1 border-t border-slate-800">
-                <span className="font-bold text-slate-200 block text-xs">Customer Contact Information:</span>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-300 block text-[11px]">
-                    Full Name <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="e.g. Kwame Asante"
-                    className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-[#00c365]"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="font-semibold text-slate-300 block text-[11px]">
-                      Ghanaian Phone Number <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="e.g. 059 206 6298"
-                      className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-[#00c365]"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="font-semibold text-slate-300 block text-[11px]">
-                      Email Address (Receipt) <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="e.g. kwame@example.com"
-                      className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-[#00c365]"
-                    />
-                  </div>
-                </div>
-              </div>
-
               {/* Order Summary Breakdown */}
               <div className="p-4 rounded-xl bg-[#090d10] border border-slate-800 space-y-2 text-xs">
                 <span className="font-bold text-white block">Order Summary:</span>
@@ -576,9 +587,9 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
                 </div>
 
                 <div className="flex justify-between text-slate-300">
-                  <span>Fulfilment ({fulfilmentMethod === 'pickup' ? 'Pickup' : 'Delivery'})</span>
+                  <span>Fulfilment ({FULFILMENT_LABELS[fulfilmentMethod]})</span>
                   <span className="font-mono text-emerald-400">
-                    {fulfilmentMethod === 'pickup' ? 'Free Pickup' : 'Local Dispatch'}
+                    {!isPhysical ? 'After Payment' : fulfilmentMethod === 'pickup' ? 'Free Pickup' : 'Local Dispatch'}
                   </span>
                 </div>
 
@@ -593,7 +604,7 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
               {/* CTA Payment Button */}
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || (activeVariants.length > 0 && !selectedVariant)}
                 className="w-full py-3.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs sm:text-sm uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.25)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-50"
               >
                 <CreditCard className="w-4 h-4" />

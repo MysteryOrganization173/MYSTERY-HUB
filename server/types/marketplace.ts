@@ -1,3 +1,4 @@
+import { marketplaceOptionPrice, purchasableOptions } from '../../shared/marketplaceVariants.js';
 /**
  * Marketplace V1 Types & Presentation Utilities
  * Strict typing for PostgreSQL storage and safe customer-facing APIs.
@@ -19,7 +20,8 @@ export type MarketplaceProductCategory =
   | 'creator_tools'
   | 'business_software'
   | 'digital_products'
-  | 'business_essentials';
+  | 'business_essentials'
+  | (string & {});
 
 export interface MarketplaceSpecItem {
   label: string;
@@ -44,9 +46,16 @@ export interface MarketplaceProductVariant {
   active: boolean;
 }
 
-export type MarketplaceFulfilmentMode = 'pickup' | 'delivery' | 'both' | 'inquiry_only';
+export type MarketplaceProductKind = 'physical' | 'digital' | 'service';
+export type MarketplaceFulfilmentMode = 'pickup' | 'delivery' | 'both' | 'digital_delivery' | 'manual_activation' | 'inquiry_only';
 
 export interface MarketplaceProductRecord {
+  product_kind?: MarketplaceProductKind;
+  fulfilment_note?: string | null;
+  fulfilment_identifier_label?: string | null;
+  fulfilment_identifier_placeholder?: string | null;
+  fulfilment_identifier_required?: boolean;
+  admin_note?: string | null;
   id: string;
   slug: string;
   name: string;
@@ -81,6 +90,12 @@ export interface MarketplaceProductRecord {
 }
 
 export interface PublicMarketplaceProduct {
+  productKind?: MarketplaceProductKind;
+  fulfilmentNote?: string;
+  fulfilmentIdentifierLabel?: string;
+  fulfilmentIdentifierPlaceholder?: string;
+  fulfilmentIdentifierRequired?: boolean;
+
   id: string;
   slug: string;
   name: string;
@@ -114,6 +129,8 @@ export interface PublicMarketplaceProduct {
 }
 
 export interface AdminMarketplaceProduct extends PublicMarketplaceProduct {
+  adminNote?: string;
+  readiness?: { blockers: string[]; warnings: string[]; ready: boolean };
   published: boolean;
   archived: boolean;
   sortOrder: number;
@@ -242,6 +259,13 @@ export function parseJsonPickupLocations(raw: string | null | undefined): Market
   return [];
 }
 
+// A malformed configured option list must fail closed, not become a base-price product.
+export function hasConfiguredMarketplaceVariants(raw: string | null | undefined): boolean {
+  if (!raw) return false;
+  try { const value=JSON.parse(raw); return !Array.isArray(value) || value.length > 0; }
+  catch { return true; }
+}
+
 export function parseJsonVariants(raw: string | null | undefined): MarketplaceProductVariant[] {
   if (!raw) return [];
   try {
@@ -265,14 +289,23 @@ export function parseJsonVariants(raw: string | null | undefined): MarketplacePr
  */
 export function toPublicMarketplaceProduct(record: MarketplaceProductRecord): PublicMarketplaceProduct {
   const categoryLabel = CATEGORY_LABELS[record.category] || record.category;
-  const priceDisplay = formatMarketplacePrice(record.price_type, record.price_minor);
-  const priceGhc = record.price_minor !== null ? record.price_minor / 100 : null;
+  const rawOptions = parseJsonVariants(record.variants);
+  const hasOptions = hasConfiguredMarketplaceVariants(record.variants);
+  const priceMinor = record.price_type === 'quote' || (hasOptions && !purchasableOptions(rawOptions).length) ? null : marketplaceOptionPrice(record.price_minor,rawOptions);
+  const priceType = record.price_type === 'quote' ? 'quote' : purchasableOptions(rawOptions).length > 1 ? 'starting_at' : record.price_type;
+  const priceDisplay = formatMarketplacePrice(priceType,priceMinor);
+  const priceGhc = priceMinor !== null ? priceMinor / 100 : null;
 
   const pickupLocations = parseJsonPickupLocations(record.pickup_locations);
-  const variants = parseJsonVariants(record.variants);
-  const purchaseEnabled = record.price_type === 'quote' ? false : (record.purchase_enabled !== false);
+  const variants = rawOptions.map(v => ({...v,priceGhc:v.priceMinor/100}));
+  const purchaseEnabled = record.price_type === 'quote' || record.fulfilment_mode === 'inquiry_only' || record.availability === 'coming_soon' || (hasOptions && !purchasableOptions(rawOptions).length) ? false : (record.purchase_enabled !== false);
 
   return {
+    productKind: record.product_kind || 'physical',
+    fulfilmentNote: record.fulfilment_note || undefined,
+    fulfilmentIdentifierLabel: record.fulfilment_identifier_label || undefined,
+    fulfilmentIdentifierPlaceholder: record.fulfilment_identifier_placeholder || undefined,
+    fulfilmentIdentifierRequired: record.fulfilment_identifier_required === true,
     id: record.id,
     slug: record.slug,
     name: record.name,
@@ -280,8 +313,8 @@ export function toPublicMarketplaceProduct(record: MarketplaceProductRecord): Pu
     categoryLabel,
     tagline: record.tagline || '',
     description: record.description || '',
-    priceType: record.price_type,
-    priceMinor: record.price_minor,
+    priceType,
+    priceMinor,
     priceGhc,
     priceDisplay,
     availability: record.availability,
@@ -313,6 +346,8 @@ export function toAdminMarketplaceProduct(record: MarketplaceProductRecord): Adm
   const pub = toPublicMarketplaceProduct(record);
   return {
     ...pub,
+    priceType:record.price_type,priceMinor:record.price_minor,priceGhc:record.price_minor !== null ? record.price_minor/100 : null,priceDisplay:formatMarketplacePrice(record.price_type,record.price_minor),
+    adminNote: record.admin_note || undefined,
     published: Boolean(record.published),
     archived: Boolean(record.archived),
     sortOrder: record.sort_order || 0,

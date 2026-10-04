@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { MarketplaceOverlay, MarketplaceOverlayKind, transitionMarketplaceOverlay, closeMarketplaceOverlayState } from '../utils/marketplaceOverlay';
 import {
   ActivePage,
   DataBundle,
@@ -83,6 +84,10 @@ interface AppContextType {
   selectedTemplatePreview: WebsiteTemplate | null;
   openTemplatePreview: (template: WebsiteTemplate) => void;
   closeTemplatePreview: () => void;
+  marketplaceOverlay: MarketplaceOverlay;
+  openMarketplaceOverlay: (kind: MarketplaceOverlayKind, product: MarketplaceProduct, variantId?: string) => void;
+  closeMarketplaceOverlay: () => void;
+  dismissMarketplaceOverlay: () => void;
   marketplaceInquiryProduct: MarketplaceProduct | null;
   openMarketplaceInquiry: (product: MarketplaceProduct) => void;
   closeMarketplaceInquiry: () => void;
@@ -201,7 +206,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [sessionToken]);
 
   const [selectedTemplatePreview, setSelectedTemplatePreview] = useState<WebsiteTemplate | null>(null);
-  const [marketplaceInquiryProduct, setMarketplaceInquiryProduct] = useState<MarketplaceProduct | null>(null);
+  const [marketplaceOverlay, setMarketplaceOverlay] = useState<MarketplaceOverlay>({kind:'none'});
+  const marketplaceInquiryProduct = marketplaceOverlay.kind === 'inquiry' ? marketplaceOverlay.product : null;
+  const openMarketplaceOverlay = useCallback((kind:MarketplaceOverlayKind, product:MarketplaceProduct, variantId?:string) => setMarketplaceOverlay(previous => transitionMarketplaceOverlay(previous,kind,product,variantId)),[]);
+  const closeMarketplaceOverlay = useCallback(() => setMarketplaceOverlay(closeMarketplaceOverlayState),[]);
+  const dismissMarketplaceOverlay = useCallback(() => setMarketplaceOverlay({kind:'none'}),[]);
   const [waitlistInfo, setWaitlistInfo] = useState<{ isOpen: boolean; serviceTitle: string }>({
     isOpen: false,
     serviceTitle: '',
@@ -454,11 +463,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const openMarketplaceInquiry = (product: MarketplaceProduct) => {
-    setMarketplaceInquiryProduct(product);
+    openMarketplaceOverlay('inquiry',product);
   };
 
   const closeMarketplaceInquiry = () => {
-    setMarketplaceInquiryProduct(null);
+    closeMarketplaceOverlay();
   };
 
   const openWaitlist = (title: string) => {
@@ -508,6 +517,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         selectedTemplatePreview,
         openTemplatePreview,
         closeTemplatePreview,
+        marketplaceOverlay, openMarketplaceOverlay, closeMarketplaceOverlay, dismissMarketplaceOverlay,
         marketplaceInquiryProduct,
         openMarketplaceInquiry,
         closeMarketplaceInquiry,

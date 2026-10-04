@@ -16,6 +16,7 @@ export type OrderStatus =
   | 'expired';
 
 export interface OrderRecord {
+  marketplace_context?: Record<string, unknown> | null;
   id: string;
   user_id?: string | null;
   public_reference: string;
@@ -48,7 +49,7 @@ export interface OrderRecord {
   failure_reason: string | null;
   manual_review?: boolean;
   admin_note?: string | null;
-  fulfilment_method?: 'pickup' | 'delivery' | null;
+  fulfilment_method?: 'pickup' | 'delivery' | 'digital_delivery' | 'manual_activation' | null;
   pickup_location_id?: string | null;
   pickup_location_snapshot?: string | null;
   delivery_city?: string | null;
@@ -87,7 +88,7 @@ export type SafePublicOrderDetails = Pick<
   service_fee_ghc?: number;
   product_slug?: string | null;
   variant_snapshot?: string | null;
-  fulfilment_method?: 'pickup' | 'delivery' | null;
+  fulfilment_method?: 'pickup' | 'delivery' | 'digital_delivery' | 'manual_activation' | null;
   pickup_location_snapshot?: string | null;
   delivery_city?: string | null;
   delivery_area?: string | null;
@@ -97,6 +98,7 @@ export type SafePublicOrderDetails = Pick<
 };
 
 export interface AdminOrderDetails extends SafePublicOrderDetails {
+  marketplace_context?: Record<string,unknown> | null;
   id: string;
   user_id?: string | null;
   customer_name: string | null;
@@ -129,6 +131,7 @@ export function toAdminOrderDetails(order: OrderRecord): AdminOrderDetails {
   const safe = toSafePublicOrder(order);
   return {
     ...safe,
+    marketplace_context: order.marketplace_context || null,
     id: order.id,
     user_id: order.user_id || null,
     customer_name: order.customer_name || null,

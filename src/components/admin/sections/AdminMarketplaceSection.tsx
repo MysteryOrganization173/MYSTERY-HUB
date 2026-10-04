@@ -1,3 +1,8 @@
+import { MARKETPLACE_LIMITS } from '../../../../shared/marketplaceLimits';
+import { FULFILMENT_MODES, FULFILMENT_LABELS, ProductKind, FulfilmentMode, productReadiness } from '../../../../shared/marketplacePolicy';
+import { marketplaceControlRequest, ManagedCategory } from '../../../services/marketplaceControls';
+import { MarketplaceControlPanels, MarketplacePreviewAction } from './MarketplaceControlPanels';
+import { MarketplaceProductDetailModal } from '../../marketplace/MarketplaceProductDetailModal';
 import React, { useState, useEffect, useCallback } from 'react';
 import { MarketplaceProduct, MarketplaceCategory } from '../../../types';
 import {
@@ -12,7 +17,7 @@ import {
   importMarketplaceProductWithAi,
   AdminMarketplaceMetrics,
 } from '../../../services/apiClient';
-import { MARKETPLACE_CATEGORIES } from '../../../data/marketplace';
+
 import { useApp } from '../../../context/AppContext';
 import {
   Store,
@@ -59,6 +64,18 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [categories,setCategories] = useState<ManagedCategory[]>([]);
+  const [selectedKind,setSelectedKind] = useState('all');
+  const [preview,setPreview] = useState<MarketplaceProduct|null>(null);
+  const loadCategories = useCallback(async()=>{try{const data=await marketplaceControlRequest('categories',sessionToken);setCategories(data.categories);}catch(e){setError(e instanceof Error?e.message:'Unable to load categories.');}},[sessionToken]);
+  useEffect(()=>{loadCategories();},[loadCategories]);
+  const [formKind,setFormKind] = useState<ProductKind|''>('physical');
+  const [formFulfilmentNote,setFormFulfilmentNote] = useState('');
+  const [formIdentifierLabel,setFormIdentifierLabel] = useState('');
+  const [formIdentifierPlaceholder,setFormIdentifierPlaceholder] = useState('');
+  const [formIdentifierRequired,setFormIdentifierRequired] = useState(false);
+  const [formAdminNote,setFormAdminNote] = useState('');
+  const [formVariants,setFormVariants] = useState<Array<{id:string;name:string;priceMinor:number;priceGhc:number;active:boolean}>>([]);
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -76,7 +93,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
   // Form Fields
   const [formName, setFormName] = useState('');
   const [formSlug, setFormSlug] = useState('');
-  const [formCategory, setFormCategory] = useState<string>('laptops_computers');
+  const [formCategory, setFormCategory] = useState<string>('');
   const [formTagline, setFormTagline] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formPriceType, setFormPriceType] = useState<'fixed' | 'starting_at' | 'quote'>('fixed');
@@ -90,7 +107,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
   const [formImageUrl, setFormImageUrl] = useState('');
   const [formImageAlt, setFormImageAlt] = useState('');
   const [formFeatured, setFormFeatured] = useState(false);
-  const [formPublished, setFormPublished] = useState(true);
+  const [formPublished, setFormPublished] = useState(false);
   const [formSortOrder, setFormSortOrder] = useState<number>(0);
   const [formHighlights, setFormHighlights] = useState<string[]>(['']);
   const [formSpecs, setFormSpecs] = useState<Array<{ label: string; value: string }>>([
@@ -99,7 +116,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
 
   // Purchase & Fulfilment Settings
   const [formPurchaseEnabled, setFormPurchaseEnabled] = useState(true);
-  const [formFulfilmentMode, setFormFulfilmentMode] = useState<'pickup' | 'delivery' | 'both' | 'inquiry_only'>('both');
+  const [formFulfilmentMode, setFormFulfilmentMode] = useState<FulfilmentMode>('both');
   const [formDeliveryAvailable, setFormDeliveryAvailable] = useState(true);
   const [formPaymentRequiredBeforeDelivery, setFormPaymentRequiredBeforeDelivery] = useState(false);
   const [formDeliveryNote, setFormDeliveryNote] = useState('');
@@ -123,24 +140,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
   const [aiAdvertInput, setAiAdvertInput] = useState('');
   const [isParsingAi, setIsParsingAi] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [aiExtraction, setAiExtraction] = useState<{
-    name: string;
-    category: string;
-    tagline: string;
-    description: string;
-    priceType: 'fixed' | 'starting_at' | 'quote';
-    priceGhc: number | null;
-    availability: 'in_stock' | 'sourcing_on_demand' | 'preorder' | 'out_of_stock';
-    availabilityLabel: string | null;
-    badge: string | null;
-    imageAlt: string;
-    highlights: string[];
-    specs: { label: string; value: string }[];
-    detectedPriceOptions: { label: string; priceGhc: number }[];
-    detectedPickupLocations?: { city: string; area: string; address: string; landmark?: string; phone?: string }[];
-    warnings: string[];
-    sourceNotes: string[];
-  } | null>(null);
+  const [aiExtraction,setAiExtraction] = useState<import('../../../../server/services/marketplaceAiImporter').MarketplaceAiExtractionResult|null>(null);
   const [showAiOverwriteConfirm, setShowAiOverwriteConfirm] = useState(false);
 
   const fetchProducts = useCallback(async () => {
@@ -148,6 +148,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
     setError(null);
     try {
       const data = await getAdminMarketplaceProducts(sessionToken, {
+        productKind: selectedKind !== 'all' ? selectedKind : undefined,
         category: selectedCategory !== 'all' ? selectedCategory : undefined,
         status: selectedStatus !== 'all' ? selectedStatus : undefined,
         search: searchQuery.trim() || undefined,
@@ -162,7 +163,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
     } finally {
       setLoading(false);
     }
-  }, [sessionToken, selectedCategory, selectedStatus, searchQuery]);
+  }, [sessionToken, selectedCategory, selectedStatus, searchQuery, selectedKind]);
 
   useEffect(() => {
     fetchProducts();
@@ -172,7 +173,8 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
     setEditingProduct(null);
     setFormName('');
     setFormSlug('');
-    setFormCategory('laptops_computers');
+    setFormCategory('');
+    setFormKind('physical');setFormFulfilmentNote('');setFormIdentifierLabel('');setFormIdentifierPlaceholder('');setFormIdentifierRequired(false);setFormAdminNote('');setFormVariants([]);
     setFormTagline('');
     setFormDescription('');
     setFormPriceType('fixed');
@@ -184,7 +186,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
     setFormImageUrl('');
     setFormImageAlt('');
     setFormFeatured(false);
-    setFormPublished(true);
+    setFormPublished(false);
     setFormSortOrder(0);
     setFormHighlights(['']);
     setFormSpecs([{ label: '', value: '' }]);
@@ -206,6 +208,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
 
   const openEditModal = (p: MarketplaceProduct) => {
     setEditingProduct(p);
+    setFormKind(p.productKind || 'physical');setFormFulfilmentNote(p.fulfilmentNote || '');setFormIdentifierLabel(p.fulfilmentIdentifierLabel || '');setFormIdentifierPlaceholder(p.fulfilmentIdentifierPlaceholder || '');setFormIdentifierRequired(!!p.fulfilmentIdentifierRequired);setFormAdminNote(p.adminNote || '');setFormVariants((p.variants || []).map(v=>({...v})));
     setFormName(p.name);
     setFormSlug(p.slug || '');
     setFormCategory(p.category);
@@ -296,13 +299,12 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
   const handleApplyAiExtraction = (overrideConfirmation = false) => {
     if (!aiExtraction) return;
 
-    // Safety check: if editing an existing product and form already contains field values
+    // Confirm before overwriting manually entered draft or existing product fields.
     const hasExistingData = Boolean(
-      editingProduct &&
-        (formName.trim() ||
+      (formName.trim() ||
           formTagline.trim() ||
-          formDescription.trim() ||
-          (formSpecs.length > 0 && formSpecs[0].label.trim()))
+          formDescription.trim() || formPriceGhc || formCategory || formIdentifierLabel || formFulfilmentNote ||
+          formSpecs.some(spec=>spec.label.trim() || spec.value.trim()))
     );
 
     if (hasExistingData && !overrideConfirmation) {
@@ -312,12 +314,19 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
 
     // Apply extracted values to form state
     setFormName(aiExtraction.name);
-    setFormCategory(aiExtraction.category || 'laptops_computers');
+    setFormCategory(aiExtraction.category || '');
+    setFormKind(aiExtraction.productKind || '');
+    setFormFulfilmentMode(aiExtraction.fulfilmentMode || 'inquiry_only');
+    if(!aiExtraction.fulfilmentMode || aiExtraction.fulfilmentMode === 'inquiry_only')setFormPurchaseEnabled(false);
+    setFormPublished(false);
+    setFormIdentifierLabel(aiExtraction.fulfilmentIdentifierLabel || '');setFormIdentifierPlaceholder(aiExtraction.fulfilmentIdentifierPlaceholder || '');setFormIdentifierRequired(aiExtraction.fulfilmentIdentifierRequired);
+    setFormVariants(aiExtraction.detectedPriceOptions.length > 1 ? aiExtraction.detectedPriceOptions.map((v,i)=>({id:`ai_variant_${Date.now()}_${i}`,name:v.label,priceMinor:Math.round(v.priceGhc*100),priceGhc:v.priceGhc,active:true})) : []);
     setFormTagline(aiExtraction.tagline || '');
     setFormDescription(aiExtraction.description || '');
     setFormPriceType(aiExtraction.priceType || 'fixed');
     setFormPriceGhc(aiExtraction.priceGhc !== null ? String(aiExtraction.priceGhc) : '');
 
+    setFormAvailability('check_availability');
     if (aiExtraction.availability) {
       const availMap: Record<string, 'available' | 'check_availability' | 'limited' | 'coming_soon'> = {
         in_stock: 'available',
@@ -325,7 +334,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
         preorder: 'check_availability',
         out_of_stock: 'check_availability',
       };
-      setFormAvailability(availMap[aiExtraction.availability] || 'available');
+      setFormAvailability(availMap[aiExtraction.availability] || 'check_availability');
     }
 
     setFormAvailabilityLabel(aiExtraction.availabilityLabel || '');
@@ -355,20 +364,6 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
       setFormSpecs(newSpecs);
     }
 
-    // Convert AI-detected pickup locations to editable form state
-    if (aiExtraction.detectedPickupLocations && aiExtraction.detectedPickupLocations.length > 0) {
-      const extractedLocs = aiExtraction.detectedPickupLocations.map((loc, idx) => ({
-        id: `loc_ai_${Date.now()}_${idx}`,
-        name: loc.address ? `${loc.city} (${loc.area}) Pickup` : `${loc.city} Pickup Point`,
-        city: loc.city || 'Accra',
-        area: loc.area || 'Accra',
-        addressOrLandmark: loc.address || loc.landmark || '',
-        phone: loc.phone || '',
-        active: true,
-      }));
-      setFormPickupLocations(extractedLocs);
-    }
-
     // NOTE: CRITICAL SAFETY RULE
     // DO NOT wipe or overwrite an existing manually entered formImageUrl!
 
@@ -388,6 +383,9 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
       return;
     }
 
+    const ready=productReadiness({name:formName,category:formCategory,productKind:formKind,priceType:formPriceType,priceMinor:formPriceType==='quote'?null:Math.round(Number(formPriceGhc)*100),purchaseEnabled:formPurchaseEnabled,fulfilmentMode:formFulfilmentMode,pickupLocations:formPickupLocations,deliveryAvailable:formDeliveryAvailable,imageUrl:formImageUrl,imageAlt:formImageAlt,description:formDescription,highlights:formHighlights.filter(Boolean),referralRewardMinor:Number(formReferralRewardGhc)*100,fulfilmentIdentifierLabel:formIdentifierLabel,fulfilmentIdentifierRequired:formIdentifierRequired,fulfilmentNote:formFulfilmentNote,purchaseNote:formPurchaseNote},categories);
+    if(formPublished&&ready.blockers.length){showToast(ready.blockers.join(' '),'warning');return;}
+    if(formPublished&&ready.warnings.length&&!window.confirm('Publish with these warnings?\n'+ready.warnings.join('\n')))return;
     setFormSubmitting(true);
     try {
       const cleanHighlights = formHighlights.map((h) => h.trim()).filter(Boolean);
@@ -396,6 +394,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
         .map((s) => ({ label: s.label.trim(), value: s.value.trim() }));
 
       const payload: Record<string, unknown> = {
+        productKind:formKind,fulfilmentNote:formFulfilmentNote,fulfilmentIdentifierLabel:formIdentifierLabel,fulfilmentIdentifierPlaceholder:formIdentifierPlaceholder,fulfilmentIdentifierRequired:formIdentifierRequired,adminNote:formAdminNote,variants:formVariants,confirmWarnings:formPublished,
         name: formName.trim(),
         slug: formSlug.trim() || undefined,
         category: formCategory,
@@ -414,10 +413,10 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
         featured: formFeatured,
         published: formPublished,
         sortOrder: formSortOrder,
-        purchaseEnabled: formPurchaseEnabled,
+        purchaseEnabled: formPurchaseEnabled && formFulfilmentMode !== 'inquiry_only' && formPriceType !== 'quote',
         fulfilmentMode: formFulfilmentMode,
-        pickupLocations: formPickupLocations,
-        deliveryAvailable: formDeliveryAvailable,
+        pickupLocations: formKind === 'physical' ? formPickupLocations : [],
+        deliveryAvailable: formKind === 'physical' && formDeliveryAvailable,
         paymentRequiredBeforeDelivery: formPaymentRequiredBeforeDelivery,
         deliveryNote: formDeliveryNote.trim() || undefined,
         purchaseNote: formPurchaseNote.trim() || undefined,
@@ -447,7 +446,10 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
         await unpublishAdminMarketplaceProduct(sessionToken, product.id);
         showToast(`"${product.name}" moved to drafts.`, 'info');
       } else {
-        await publishAdminMarketplaceProduct(sessionToken, product.id);
+        const readiness=product.readiness || productReadiness(product,categories);
+        if(readiness.blockers.length){showToast(readiness.blockers.join(' '),'warning');return;}
+        if(readiness.warnings.length&&!window.confirm('Publish with these warnings?\n'+readiness.warnings.join('\n')))return;
+        await publishAdminMarketplaceProduct(sessionToken, product.id, true);
         showToast(`"${product.name}" published live to store!`, 'success');
       }
       fetchProducts();
@@ -486,6 +488,8 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
     }
   };
 
+  const extraAction = async(p:MarketplaceProduct,action:string)=>{try{const result=await marketplaceControlRequest('products/'+p.id+'/'+action,sessionToken,'POST',{});await fetchProducts();if(action==='duplicate')openEditModal(result.product);}catch(e){showToast(e instanceof Error?e.message:'Action failed','warning');}};
+  const readiness=productReadiness({name:formName,category:formCategory,productKind:formKind,priceType:formPriceType,priceMinor:formPriceType==='quote'?null:Math.round(Number(formPriceGhc)*100),purchaseEnabled:formPurchaseEnabled,fulfilmentMode:formFulfilmentMode,pickupLocations:formPickupLocations,deliveryAvailable:formDeliveryAvailable,imageUrl:formImageUrl,imageAlt:formImageAlt,description:formDescription,highlights:formHighlights.filter(Boolean),referralRewardMinor:Number(formReferralRewardGhc)*100,fulfilmentIdentifierLabel:formIdentifierLabel,fulfilmentIdentifierPlaceholder:formIdentifierPlaceholder,fulfilmentIdentifierRequired:formIdentifierRequired,fulfilmentNote:formFulfilmentNote,purchaseNote:formPurchaseNote},categories);
   return (
     <div className="space-y-6 text-slate-100">
       {/* 1. Header & Summary Metrics */}
@@ -496,7 +500,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
             <span>Marketplace Sourcing Catalogue</span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Create, price, and manage quality hardware, creator gear, and software products sourced for Ghanaian customers.
+            Manage physical products, digital subscriptions and services for Ghanaian customers.
           </p>
         </div>
 
@@ -569,8 +573,8 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
               className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00c365]"
             >
               <option value="all">All Categories</option>
-              {MARKETPLACE_CATEGORIES.filter((c) => c.id !== 'all').map((c) => (
-                <option key={c.id} value={c.id}>
+              {categories.map((c) => (
+                <option key={c.slug} value={c.slug}>
                   {c.label}
                 </option>
               ))}
@@ -593,6 +597,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
         </div>
       </div>
 
+      <label className="block text-xs">Product Type<select className="mt-1 w-full sm:w-48 bg-slate-900 p-2 rounded-lg border border-slate-700" value={selectedKind} onChange={e=>setSelectedKind(e.target.value)}><option value="all">All types</option><option value="physical">Physical</option><option value="digital">Digital</option><option value="service">Service</option></select></label>
       {/* 3. Product Listings Table / Cards */}
       {loading ? (
         <div className="p-12 text-center rounded-2xl bg-[#0f171d] border border-slate-800 space-y-3">
@@ -713,9 +718,13 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                         : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                     }`}
                   >
-                    {isArchived ? 'Archived' : isPublished ? 'Live' : 'Draft'}
+                    {isArchived ? 'Archived' : isPublished ? 'Live' : 'Draft'} · {p.readiness?.ready ? 'Ready' : 'Needs Review'}
                   </span>
 
+                  <details className="relative"><summary className="cursor-pointer rounded-lg border border-slate-700 px-3 py-2 text-xs">Actions</summary><div className="flex flex-wrap gap-2 pt-2">
+                  <button type="button" className="px-3 py-2 rounded-lg bg-slate-900 text-xs" onClick={()=>extraAction(p,'duplicate')}>Duplicate</button>
+                  {isArchived&&<button type="button" className="px-3 py-2 rounded-lg bg-slate-900 text-xs" onClick={()=>extraAction(p,'restore')}>Restore to Draft</button>}
+                  <MarketplacePreviewAction product={p} onDraftPreview={()=>setPreview(p)} />
                   {/* Feature Toggle */}
                   <button
                     type="button"
@@ -776,6 +785,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                       <Archive className="w-3.5 h-3.5" />
                     </button>
                   )}
+                  </div></details>
                 </div>
               </div>
             );
@@ -783,10 +793,13 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
         </div>
       )}
 
+      <div className="flex flex-wrap gap-2 text-xs">{[['Archived',metrics.archived],['Needs Review',metrics.needsReview],['Physical',metrics.physical],['Digital',metrics.digital],['Service',metrics.service],['New Inquiries',metrics.newInquiries]].map(([label,value])=><span key={String(label)} className="rounded-lg border border-slate-700 p-2">{label}: {value || 0}</span>)}</div>
+      <MarketplaceControlPanels token={sessionToken} categories={categories} onCategoriesChanged={loadCategories} products={products} onChanged={fetchProducts} />
+      {preview&&<MarketplaceProductDetailModal product={preview} onClose={()=>setPreview(null)} onBuyNow={()=>showToast('Internal draft preview: purchasing is disabled.','info')} onInquire={()=>showToast('Internal draft preview.','info')} onShare={()=>showToast('Drafts cannot be shared publicly.','info')} formatGhcReward={n=>'GH₵'+(n ?? 0).toFixed(2)} />}
       {/* 4. Add / Edit Product Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-          <div className="relative w-full max-w-2xl bg-[#0e141a] border border-slate-700 rounded-2xl shadow-2xl overflow-hidden my-6">
+          <div role="dialog" aria-modal="true" aria-label="Marketplace product editor" className="relative w-full min-w-0 max-w-2xl max-h-[94vh] bg-[#0e141a] border border-slate-700 rounded-2xl shadow-2xl overflow-hidden my-6">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#090d11]">
               <div className="flex items-center gap-2.5">
@@ -800,6 +813,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
 
               <button
                 onClick={() => setIsModalOpen(false)}
+                aria-label="Close product editor"
                 className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -808,6 +822,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
 
             {/* Modal Form */}
             <form onSubmit={handleSaveProduct} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+              <fieldset className="space-y-2"><legend className="font-bold">Product Type</legend><div className="flex flex-wrap gap-2">{(['physical','digital','service'] as const).map(kind=><button key={kind} type="button" aria-pressed={formKind===kind} className="rounded-lg border border-slate-600 px-3 py-2" onClick={()=>{setFormKind(kind);setFormFulfilmentMode(kind==='physical'?'both':kind==='digital'?'digital_delivery':'manual_activation');}}>{kind[0].toUpperCase()+kind.slice(1)}</button>)}</div>{!formKind&&<p className="text-amber-300">Select a product type after reviewing the advert.</p>}</fieldset>
               {/* ✨ Mystery AI Supplier Advert Importer Panel */}
               <div className="p-4 rounded-xl bg-gradient-to-br from-[#0a1713] via-[#0b1418] to-[#0d1217] border border-[#00c365]/35 space-y-3 shadow-md">
                 <div className="flex items-center justify-between">
@@ -832,7 +847,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                     rows={4}
                     value={aiAdvertInput}
                     onChange={(e) => setAiAdvertInput(e.target.value)}
-                    placeholder="Paste the full WhatsApp supplier advert here (e.g. 💻 HP EliteBook 745 G6... Processor, RAM, Storage, Prices...)"
+                    placeholder="Paste the supplier advert, including product details, duration/options and prices..."
                     className="w-full bg-[#070b0e] border border-slate-700/80 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#00c365] font-mono leading-relaxed"
                   />
 
@@ -873,6 +888,8 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                   </div>
                 )}
 
+                {aiExtraction&&<p className="text-xs break-words">Detected type: {aiExtraction.productKind||'Needs selection'} · Category: {categories.find(c=>c.slug===aiExtraction.category)?.label||'Needs selection'} · Suggested fulfilment: {aiExtraction.fulfilmentMode?FULFILMENT_LABELS[aiExtraction.fulfilmentMode]:'Needs review'}</p>}
+                {aiExtraction?.sourceNotes?.length ? <details className="text-xs text-slate-400"><summary>Source notes</summary>{aiExtraction.sourceNotes.map((note,i)=><p key={i}>{note}</p>)}</details> : null}
                 {/* AI Extraction Preview Panel */}
                 {aiExtraction && (
                   <div className="p-3.5 rounded-xl bg-[#080d11] border border-[#00c365]/40 space-y-2.5 mt-2 shadow-inner text-xs">
@@ -903,22 +920,6 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                             <div key={i} className="flex justify-between text-slate-300">
                               <span>• {opt.label}</span>
                               <span className="font-mono text-white font-bold">GH₵{opt.priceGhc.toLocaleString()}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Detected Pickup Locations */}
-                      {aiExtraction.detectedPickupLocations && aiExtraction.detectedPickupLocations.length > 0 && (
-                        <div className="p-2.5 rounded-lg bg-[#0e141a] border border-slate-800 space-y-1 text-[11px]">
-                          <span className="font-bold text-white block flex items-center gap-1">
-                            <MapPin className="w-3.5 h-3.5 text-[#00c365]" />
-                            <span>Detected pickup locations - review before publishing ({aiExtraction.detectedPickupLocations.length}):</span>
-                          </span>
-                          {aiExtraction.detectedPickupLocations.map((loc, i) => (
-                            <div key={i} className="text-slate-300">
-                              • <span className="font-bold text-white">{loc.city}</span> ({loc.area}): {loc.address}{' '}
-                              {loc.landmark ? `[${loc.landmark}]` : ''}
                             </div>
                           ))}
                         </div>
@@ -997,9 +998,10 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                   <input
                     type="text"
                     required
+                    maxLength={MARKETPLACE_LIMITS.productName}
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
-                    placeholder="e.g. Business Productivity Ultrabook (14&quot;)"
+                    placeholder="e.g. Laptop or cloud storage subscription"
                     className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
                   />
                 </div>
@@ -1012,7 +1014,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                     type="text"
                     value={formSlug}
                     onChange={(e) => setFormSlug(e.target.value)}
-                    placeholder="e.g. hp-probook-450-g9"
+                    placeholder="e.g. cloud-storage-200gb"
                     className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365] font-mono text-[11px]"
                   />
                 </div>
@@ -1027,9 +1029,10 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                     onChange={(e) => setFormCategory(e.target.value)}
                     className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-[#00c365]"
                   >
-                    {MARKETPLACE_CATEGORIES.filter((c) => c.id !== 'all').map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.label}
+                    <option value="">Select an active category</option>
+                    {categories.filter(c=>c.active || c.slug === editingProduct?.category).map((c) => (
+                      <option key={c.slug} value={c.slug}>
+                        {c.label}{!c.active ? ' (inactive)' : ''}
                       </option>
                     ))}
                   </select>
@@ -1041,6 +1044,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                   </label>
                   <input
                     type="text"
+                    maxLength={MARKETPLACE_LIMITS.badge}
                     value={formBadge}
                     onChange={(e) => setFormBadge(e.target.value)}
                     placeholder="e.g. Popular for Work, High Performance"
@@ -1056,7 +1060,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                   type="text"
                   value={formTagline}
                   onChange={(e) => setFormTagline(e.target.value)}
-                  placeholder="e.g. Lightweight, all-day battery life for Ghanaian professionals and founders"
+                  placeholder="e.g. A concise, verified benefit of this product"
                   className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3.5 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
                 />
               </div>
@@ -1147,6 +1151,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                   </label>
                   <input
                     type="text"
+                    maxLength={MARKETPLACE_LIMITS.availabilityLabel}
                     value={formAvailabilityLabel}
                     onChange={(e) => setFormAvailabilityLabel(e.target.value)}
                     placeholder="e.g. Inquire for Setup, Ready in Accra"
@@ -1173,7 +1178,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                           setFormImageUrl(e.target.value);
                           setImagePreviewError(false);
                         }}
-                        placeholder="https://res.cloudinary.com/.../laptop.png"
+                        placeholder="https://res.cloudinary.com/.../product.png"
                         className="w-full bg-[#11171d] border border-slate-700 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365] font-mono text-[11px]"
                       />
                     </div>
@@ -1184,7 +1189,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                         type="text"
                         value={formImageAlt}
                         onChange={(e) => setFormImageAlt(e.target.value)}
-                        placeholder="e.g. Silver 14-inch Business Ultrabook front view"
+                        placeholder="e.g. Product name and image description"
                         className="w-full bg-[#11171d] border border-slate-700 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
                       />
                     </div>
@@ -1274,7 +1279,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="font-semibold text-slate-200 block">
-                    Technical Specifications <span className="text-slate-500">(Optional)</span>
+                    Product Specifications <span className="text-slate-500">(Optional)</span>
                   </label>
                   <button
                     type="button"
@@ -1296,7 +1301,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                         updated[i].label = e.target.value;
                         setFormSpecs(updated);
                       }}
-                      placeholder="Label (e.g. RAM)"
+                      placeholder="Label (e.g. Duration or RAM)"
                       className="col-span-5 bg-[#090d10] border border-slate-700/80 rounded-xl px-3 py-1.5 text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
                     />
                     <input
@@ -1307,7 +1312,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                         updated[i].value = e.target.value;
                         setFormSpecs(updated);
                       }}
-                      placeholder="Value (e.g. 16GB DDR4)"
+                      placeholder="Value (e.g. 3 months or 16GB DDR4)"
                       className="col-span-6 bg-[#090d10] border border-slate-700/80 rounded-xl px-3 py-1.5 text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
                     />
                     {formSpecs.length > 1 && (
@@ -1338,13 +1343,14 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                   <label className="flex items-center gap-2.5 p-3 rounded-lg bg-[#0e141a] border border-slate-800 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={formPurchaseEnabled}
+                      disabled={formFulfilmentMode === 'inquiry_only' || formPriceType === 'quote'}
+                      checked={formPurchaseEnabled && formFulfilmentMode !== 'inquiry_only' && formPriceType !== 'quote'}
                       onChange={(e) => setFormPurchaseEnabled(e.target.checked)}
                       className="w-4 h-4 rounded text-[#00c365] bg-slate-900 border-slate-700"
                     />
                     <div>
                       <span className="font-bold text-white block">Direct Purchase Enabled</span>
-                      <span className="text-[10px] text-slate-400">Show "Buy Now" button on product</span>
+                      <span className="text-[10px] text-slate-400">{formFulfilmentMode === 'inquiry_only' || formPriceType === 'quote' ? 'Inquiry required; direct purchase is off' : 'Show "Buy Now" button on product'}</span>
                     </div>
                   </label>
 
@@ -1353,17 +1359,15 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                     <label className="font-semibold text-slate-300 block">Fulfilment Mode</label>
                     <select
                       value={formFulfilmentMode}
-                      onChange={(e) => setFormFulfilmentMode(e.target.value as any)}
+                      onChange={(e) => {const mode=e.target.value as FulfilmentMode;setFormFulfilmentMode(mode);if(mode==='inquiry_only')setFormPurchaseEnabled(false);}}
                       className="w-full bg-[#0e141a] border border-slate-700/80 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#00c365]"
                     >
-                      <option value="both">Pickup + Delivery</option>
-                      <option value="pickup">Pickup Only</option>
-                      <option value="delivery">Delivery Only</option>
-                      <option value="inquiry_only">Inquiry Only</option>
+                      {(FULFILMENT_MODES[formKind || 'physical']).map(mode=><option key={mode} value={mode}>{FULFILMENT_LABELS[mode]}</option>)}
                     </select>
                   </div>
                 </div>
 
+                {formKind === 'physical' && <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Delivery Available Checkbox */}
                   <label className="flex items-center gap-2.5 p-2.5 rounded-lg bg-[#0e141a] border border-slate-800 cursor-pointer">
@@ -1547,8 +1551,14 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                     </div>
                   )}
                 </div>
+                </>}
+                {formKind !== 'physical' && <div className="space-y-3"><label className="block">Fulfilment / service requirements<textarea maxLength={1000} className="w-full min-w-0 bg-slate-900 border border-slate-700 rounded-lg p-2" value={formFulfilmentNote} onChange={e=>setFormFulfilmentNote(e.target.value)} /></label><label className="block">Purchase note<input maxLength={1000} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2" value={formPurchaseNote} onChange={e=>setFormPurchaseNote(e.target.value)} /></label><label className="block">Customer identifier label<input maxLength={100} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2" value={formIdentifierLabel} onChange={e=>setFormIdentifierLabel(e.target.value)} placeholder="Account email or username" /></label><label className="block">Identifier placeholder<input maxLength={150} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2" value={formIdentifierPlaceholder} onChange={e=>setFormIdentifierPlaceholder(e.target.value)} /></label><label className="flex gap-2"><input type="checkbox" checked={formIdentifierRequired} onChange={e=>setFormIdentifierRequired(e.target.checked)} />Identifier required</label><p className="text-slate-400">Never request external passwords, PINs or security codes. Fulfilment remains manual after payment.</p></div>}
               </div>
 
+              <details className="space-y-2"><summary>Variants / Options ({formVariants.length})</summary>{formVariants.map((v,i)=><div key={v.id} className="grid grid-cols-1 sm:grid-cols-[1fr_6rem_auto] gap-2"><input aria-label={`Variant ${i+1} name`} className="min-w-0 bg-slate-900 p-2" maxLength={150} value={v.name} onChange={e=>setFormVariants(formVariants.map((item,j)=>j===i?{...item,name:e.target.value}:item))} /><input aria-label={`Variant ${i+1} price GHS`} className="min-w-0 bg-slate-900 p-2" type="number" min="0.01" step="0.01" value={v.priceGhc} onChange={e=>setFormVariants(formVariants.map((item,j)=>j===i?{...item,priceGhc:Number(e.target.value),priceMinor:Math.round(Number(e.target.value)*100)}:item))} /><button type="button" onClick={()=>setFormVariants(formVariants.filter((_,j)=>j!==i))}>Remove</button></div>)}<button type="button" onClick={()=>setFormVariants([...formVariants,{id:'variant_'+Date.now(),name:'',priceMinor:100,priceGhc:1,active:true}])}>Add Variant</button></details>
+              <label className="block">Priority / Sort position (lower appears first)<input className="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg" type="number" min={0} max={1000000} value={formSortOrder} onChange={e=>setFormSortOrder(Number(e.target.value))} /></label>
+              <label className="block">Internal Admin Note<textarea maxLength={1000} className="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg" value={formAdminNote} onChange={e=>setFormAdminNote(e.target.value)} /></label>
+              <div className="rounded-lg border border-slate-700 p-3 space-y-1" aria-live="polite"><strong>{readiness.ready?'Ready':'Needs Review'}</strong>{readiness.blockers.map(b=><p key={b} className="text-red-300">{b}</p>)}{readiness.warnings.map(w=><p key={w} className="text-amber-300">{w}</p>)}</div>
               {/* Toggles: Featured & Published */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2 border-t border-slate-800">
                 <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[#090d10] border border-slate-800 cursor-pointer">
@@ -1592,7 +1602,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
                   disabled={formSubmitting}
                   className="px-6 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-60"
                 >
-                  {formSubmitting ? 'Saving...' : editingProduct ? 'Update Product' : 'Create Product'}
+                  {formSubmitting ? 'Saving...' : formPublished ? 'Publish' : 'Save Draft'}
                 </button>
               </div>
             </form>

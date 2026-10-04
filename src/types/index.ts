@@ -231,7 +231,8 @@ export type MarketplaceCategory =
   | 'creator_tools'
   | 'business_software'
   | 'digital_products'
-  | 'business_essentials';
+  | 'business_essentials'
+  | (string & {});
 
 export interface MarketplacePickupLocation {
   id: string;
@@ -251,9 +252,17 @@ export interface MarketplaceProductVariant {
   active: boolean;
 }
 
-export type MarketplaceFulfilmentMode = 'pickup' | 'delivery' | 'both' | 'inquiry_only';
+export type MarketplaceProductKind = 'physical' | 'digital' | 'service';
+export type MarketplaceFulfilmentMode = 'pickup' | 'delivery' | 'both' | 'digital_delivery' | 'manual_activation' | 'inquiry_only';
 
 export interface MarketplaceProduct {
+  productKind?: MarketplaceProductKind;
+  fulfilmentNote?: string;
+  fulfilmentIdentifierLabel?: string;
+  fulfilmentIdentifierPlaceholder?: string;
+  fulfilmentIdentifierRequired?: boolean;
+  adminNote?: string;
+  readiness?: { blockers: string[]; warnings: string[]; ready: boolean };
   id: string;
   slug: string;
   name: string;
