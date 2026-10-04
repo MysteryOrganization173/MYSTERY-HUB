@@ -216,6 +216,7 @@ export interface DigitalService {
   iconName: string;
   accentColor: string;
   targetPage?: 'data' | 'website' | 'marketplace' | 'services' | 'about';
+  artworkUrl?: string;
 }
 
 export type ActivePage = 'home' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'orders' | 'admin' | 'earn';

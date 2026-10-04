@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { DIGITAL_SERVICES } from '../../data/services';
+import { DIGITAL_SERVICES, SAMPLE_SERVICE_ARTWORK } from '../../data/services';
+import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
 import {
   Wifi,
   Smartphone,
@@ -268,13 +269,42 @@ export const MoreServicesPage: React.FC = () => {
             const Icon = ICON_MAP[service.iconName] || Zap;
             const isLive = service.status === 'active';
             const isBeta = service.status === 'beta';
+            const artwork = SAMPLE_SERVICE_ARTWORK[service.id];
 
             return (
               <div
                 key={service.id}
-                className="rounded-2xl bg-[#0f151b] border border-slate-800 p-5 flex flex-col justify-between hover:border-slate-700 transition-all duration-200 group shadow-sm hover:shadow-xl relative"
+                className="rounded-2xl bg-[#0f151b] border border-slate-800 p-5 flex flex-col justify-between hover:border-slate-700 transition-all duration-200 group shadow-sm hover:shadow-xl relative overflow-hidden"
               >
-                <div>
+                {/* Absolute Background Artwork Layer (Sample Services Only: ECG, Water, TV) */}
+                {artwork && (
+                  <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl" aria-hidden="true">
+                    {/* Artwork on the right 50-55% */}
+                    <div className="absolute right-0 bottom-0 top-0 w-3/5 lg:w-1/2 flex items-end justify-end overflow-hidden">
+                      <img
+                        src={getCloudinaryUrl(artwork.url, { format: 'auto', quality: 'auto', width: 640 })}
+                        srcSet={getCloudinarySrcSet(artwork.url, [360, 480, 640]) || undefined}
+                        sizes="(max-width: 1024px) 50vw, 380px"
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className={`w-full h-full object-cover ${artwork.objectPosition} ${artwork.opacity} transition-transform duration-500 group-hover:scale-105`}
+                      />
+                    </div>
+
+                    {/* Continuous Text Protection Gradient:
+                        LEFT: near card background (#0f151b 95-100%)
+                        CENTER: medium fade (#0f151b/85 around 60%)
+                        RIGHT: light overlay (#0f151b/15 around 85-100%)
+                    */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#0f151b] from-35% via-[#0f151b]/85 via-65% to-[#0f151b]/15 pointer-events-none" />
+
+                    {/* Subtle bottom grounding gradient behind Notify Me button */}
+                    <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0f151b]/90 via-[#0f151b]/50 to-transparent pointer-events-none" />
+                  </div>
+                )}
+
+                <div className="relative z-10">
                   {/* Top row */}
                   <div className="flex items-center justify-between">
                     <div
@@ -318,7 +348,7 @@ export const MoreServicesPage: React.FC = () => {
                 </div>
 
                 {/* Bottom Action */}
-                <div className="mt-5 pt-3.5 border-t border-slate-800/80">
+                <div className="mt-5 pt-3.5 border-t border-slate-800/80 relative z-10">
                   {service.id === 'srv-rewards' ? (
                     <button
                       onClick={() => setActivePage('earn')}

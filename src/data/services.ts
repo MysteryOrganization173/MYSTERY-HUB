@@ -39,6 +39,7 @@ export const DIGITAL_SERVICES: DigitalService[] = [
     status: 'coming_soon',
     iconName: 'Zap',
     accentColor: '#EF4444',
+    artworkUrl: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1791120377/ChatGPT_Image_Oct_4_2026_01_25_37_PM-1_hc026e.png',
   },
   {
     id: 'srv-water',
@@ -48,6 +49,7 @@ export const DIGITAL_SERVICES: DigitalService[] = [
     status: 'coming_soon',
     iconName: 'Droplet',
     accentColor: '#0EA5E9',
+    artworkUrl: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1791120377/ChatGPT_Image_Oct_4_2026_01_25_42_PM-2_igylic.png',
   },
   {
     id: 'srv-tv',
@@ -57,6 +59,7 @@ export const DIGITAL_SERVICES: DigitalService[] = [
     status: 'coming_soon',
     iconName: 'Tv',
     accentColor: '#8B5CF6',
+    artworkUrl: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1791120377/ChatGPT_Image_Oct_4_2026_01_25_50_PM-3_pnzq7z.png',
   },
   {
     id: 'srv-results',
@@ -113,3 +116,32 @@ export const DIGITAL_SERVICES: DigitalService[] = [
     accentColor: '#F43F5E',
   },
 ];
+
+export interface ServiceArtworkConfig {
+  url: string;
+  alt: string;
+  objectPosition: string;
+  opacity: string;
+}
+
+export const SAMPLE_SERVICE_ARTWORK: Record<string, ServiceArtworkConfig> = {
+  'srv-ecg': {
+    url: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1791120377/ChatGPT_Image_Oct_4_2026_01_25_37_PM-1_hc026e.png',
+    alt: 'ECG electricity meter and mobile power token top-up interface',
+    objectPosition: 'object-[85%_center]',
+    opacity: 'opacity-40 sm:opacity-48',
+  },
+  'srv-water': {
+    url: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1791120377/ChatGPT_Image_Oct_4_2026_01_25_42_PM-2_igylic.png',
+    alt: 'Ghana Water GWCL smart meter and municipal bill payment',
+    objectPosition: 'object-[85%_center]',
+    opacity: 'opacity-40 sm:opacity-48',
+  },
+  'srv-tv': {
+    url: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1791120377/ChatGPT_Image_Oct_4_2026_01_25_50_PM-3_pnzq7z.png',
+    alt: 'DStv, GOtv and StarTimes TV bouquet renewal and entertainment screen',
+    objectPosition: 'object-[85%_center]',
+    opacity: 'opacity-38 sm:opacity-45',
+  },
+};
+
