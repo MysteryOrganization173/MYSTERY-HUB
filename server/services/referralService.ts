@@ -227,6 +227,8 @@ export class ReferralService {
    * ONLY executes for delivered telecom orders or confirmed transactions.
    */
   static async processOrderReward(input: OrderRecord): Promise<RewardLedgerRecord | null> {
+    // AFA V1 does not activate any referral policy, including wildcard rules.
+    if (input.service_type === 'afa') return null;
     // Successful payment is authoritative; a historical paid_at alone is insufficient.
     if (input.status !== 'delivered' || input.payment_status !== 'success' || input.currency !== 'GHS'
       || (input.service_type === 'marketplace' && input.marketplace_status !== 'completed')) return null;

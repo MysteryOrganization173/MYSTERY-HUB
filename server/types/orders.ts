@@ -25,7 +25,7 @@ export interface OrderRecord {
   customer_phone: string;
   recipient_phone: string;
   network: 'mtn' | 'telecel' | 'airteltigo';
-  service_type?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace';
+  service_type?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'afa';
   product_id: string;
   product_name_snapshot: string;
   bundle_size_snapshot: string;
@@ -83,7 +83,8 @@ export type SafePublicOrderDetails = Pick<
   | 'delivered_at'
 > & {
   amount_ghc: number;
-  service_type?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace';
+  manual_review?: boolean;
+  service_type?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'afa';
   face_value_ghc?: number;
   service_fee_ghc?: number;
   product_slug?: string | null;
@@ -98,6 +99,7 @@ export type SafePublicOrderDetails = Pick<
 };
 
 export interface AdminOrderDetails extends SafePublicOrderDetails {
+  afa_registration?: {name:string; region:string; location:string; occupation?:string; maskedIdNumber:string; supplierStatus:string|null; supplierPublicId:string|null; submittedAt:string|null; registeredAt:string|null; createdAt:string; sensitivePayloadPurgedAt:string|null} | null;
   marketplace_context?: Record<string,unknown> | null;
   id: string;
   user_id?: string | null;
@@ -166,6 +168,7 @@ export function toSafePublicOrder(order: OrderRecord): SafePublicOrderDetails {
 
   return {
     public_reference: order.public_reference,
+    ...(order.service_type === 'afa' ? {manual_review:Boolean(order.manual_review)} : {}),
     recipient_phone: order.recipient_phone,
     network: order.network,
     service_type: serviceType,

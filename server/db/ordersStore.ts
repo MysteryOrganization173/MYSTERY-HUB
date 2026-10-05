@@ -4,6 +4,7 @@
  * for local development environments.
  */
 
+import { AfaStore } from './afaStore.js';
 import { getPool, initDatabase } from './connection.js';
 import { OrderRecord, OrderStatus } from '../types/orders.js';
 import {
@@ -315,8 +316,8 @@ export class OrdersStore {
   /**
    * Create a new pending order atomically
    */
-  static async createOrder(order: OrderRecord): Promise<OrderRecord> {
-    const pool = getPool();
+  static async createOrder(order: OrderRecord, client?: PoolClient): Promise<OrderRecord> {
+    const pool = client || getPool();
     if (pool) {
       const query = `
         INSERT INTO orders (
@@ -500,7 +501,7 @@ export class OrdersStore {
     if (pool) {
       const query = `
         SELECT * FROM orders 
-        WHERE user_id = $1 AND status NOT IN ('cancelled', 'expired', 'pending_payment')
+        WHERE user_id = $1 AND (status NOT IN ('cancelled', 'expired', 'pending_payment') OR (service_type = 'afa' AND status = 'pending_payment'))
         ORDER BY created_at DESC
         ${hasLimit ? 'LIMIT $2' : ''};
       `;
@@ -515,7 +516,7 @@ export class OrdersStore {
         ord.user_id === userId &&
         ord.status !== 'cancelled' &&
         ord.status !== 'expired' &&
-        ord.status !== 'pending_payment' &&
+        (ord.status !== 'pending_payment' || ord.service_type === 'afa') &&
         !results.some((r) => r.id === ord.id)
       ) {
         results.push(ord);
@@ -563,9 +564,9 @@ export class OrdersStore {
       const query = `
         UPDATE orders
         SET status = $1, payment_status = $2, failure_reason = $3, payment_closed_at = $4, updated_at = $5
-        WHERE id = $6;
+        WHERE id = $6 ${existing.service_type === 'afa' ? "AND status = 'pending_payment' AND payment_status = 'pending' RETURNING *" : ''};
       `;
-      await pool.query(query, [
+      const result = await pool.query(query, [
         updated.status,
         updated.payment_status,
         updated.failure_reason,
@@ -573,12 +574,16 @@ export class OrdersStore {
         updated.updated_at,
         existing.id,
       ]);
+      if (existing.service_type === 'afa' && !result.rows[0]) { const current=await this.findOrder(ref); return {order:current,cancelled:false,alreadyPaid:current?.payment_status==='success'}; }
     } else {
+      const current = devMemoryStore.get(existing.id);
+      if (existing.service_type === 'afa' && current?.payment_status === 'success') return {order:current,cancelled:false,alreadyPaid:true};
       devMemoryStore.set(existing.id, updated);
       devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
       devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
     }
 
+    await AfaStore.onOrderTerminal(updated);
     return { order: updated, cancelled: true, alreadyPaid: false };
   }
 
@@ -616,9 +621,9 @@ export class OrdersStore {
       const query = `
         UPDATE orders
         SET status = $1, payment_status = $2, failure_reason = $3, payment_closed_at = $4, updated_at = $5
-        WHERE id = $6;
+        WHERE id = $6 ${existing.service_type === 'afa' ? "AND status = 'pending_payment' AND payment_status = 'pending' RETURNING *" : ''};
       `;
-      await pool.query(query, [
+      const result = await pool.query(query, [
         updated.status,
         updated.payment_status,
         updated.failure_reason,
@@ -626,12 +631,16 @@ export class OrdersStore {
         updated.updated_at,
         existing.id,
       ]);
+      if (existing.service_type === 'afa' && !result.rows[0]) { const current=await this.findOrder(ref); return {order:current,expired:false,alreadyPaid:current?.payment_status==='success'}; }
     } else {
+      const current = devMemoryStore.get(existing.id);
+      if (existing.service_type === 'afa' && current?.payment_status === 'success') return {order:current,expired:false,alreadyPaid:true};
       devMemoryStore.set(existing.id, updated);
       devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
       devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
     }
 
+    await AfaStore.onOrderTerminal(updated);
     return { order: updated, expired: true, alreadyPaid: false };
   }
 
@@ -748,9 +757,9 @@ export class OrdersStore {
     if (pool) {
       const query = `
         SELECT * FROM orders
-        WHERE (status IN ('submitted', 'processing') OR (status = 'queued' AND failure_reason = 'supplier_submission_uncertain'))
-          AND supplier_order_id IS NOT NULL
-          AND service_type IN ('data', 'airtime', 'instant_bundle')
+        WHERE (status IN ('submitted', 'processing') OR (status = 'queued' AND (failure_reason = 'supplier_submission_uncertain' OR service_type = 'afa')))
+          AND (supplier_order_id IS NOT NULL OR service_type = 'afa')
+          AND service_type IN ('data', 'airtime', 'instant_bundle', 'afa')
         ORDER BY created_at DESC
         LIMIT $1;
       `;
@@ -764,9 +773,9 @@ export class OrdersStore {
         .filter(
           (o) =>
             (o.status === 'submitted' || o.status === 'processing' ||
-              (o.status === 'queued' && o.failure_reason === 'supplier_submission_uncertain')) &&
-            Boolean(o.supplier_order_id) &&
-            ['data', 'airtime', 'instant_bundle'].includes(o.service_type || '')
+              (o.status === 'queued' && (o.failure_reason === 'supplier_submission_uncertain' || o.service_type === 'afa'))) &&
+            (Boolean(o.supplier_order_id) || o.service_type === 'afa') &&
+            ['data', 'airtime', 'instant_bundle', 'afa'].includes(o.service_type || '')
         )
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, limit);
@@ -928,7 +937,7 @@ export class OrdersStore {
         SELECT * FROM orders
         WHERE status IN ('submitted', 'processing')
           AND supplier_order_id IS NOT NULL
-          AND (service_type IS NULL OR service_type IN ('data', 'airtime', 'instant_bundle'))
+          AND (service_type IS NULL OR service_type IN ('data', 'airtime', 'instant_bundle', 'afa'))
         ORDER BY supplier_last_checked_at ASC NULLS FIRST, created_at ASC
         LIMIT $1;
       `;
@@ -940,7 +949,7 @@ export class OrdersStore {
         if (
           order.supplier_order_id &&
           (order.status === 'submitted' || order.status === 'processing') &&
-          (!order.service_type || ['data', 'airtime', 'instant_bundle'].includes(order.service_type))
+          (!order.service_type || ['data', 'airtime', 'instant_bundle', 'afa'].includes(order.service_type))
         ) {
           active.push(order);
         }
@@ -1070,13 +1079,13 @@ export class OrdersStore {
       supplier_cost_minor: supplierCostMinor,
       supplier_offer_ref: supplierOfferRef,
       supplier_response: rawSupplierResponse ? JSON.stringify(rawSupplierResponse) : existing.supplier_response,
-      submitted_at: nowIso,
+      submitted_at: existing.service_type === 'afa' ? existing.submitted_at || nowIso : nowIso,
       updated_at: nowIso,
       supplier_last_checked_at: nowIso,
       failure_reason: null,
     };
 
-    if (!canAdvanceOrderStatus(existing.status, submittedStatus)) return existing;
+    if (!canAdvanceOrderStatus(existing.status, submittedStatus) && !(existing.service_type === 'afa' && existing.status === submittedStatus && ['submitted','processing'].includes(existing.status))) return existing;
 
     const pool = getPool();
     if (pool) {
@@ -1241,16 +1250,19 @@ export class OrdersStore {
         return false;
       }
 
+      let containsAfa = false;
       // Stable lock order avoids deadlocks between grouped events with overlapping orders.
       for (const update of [...updates].sort((a, b) => a.supplierOrderId.localeCompare(b.supplierOrderId))) {
         const order = await this.findOrderBySupplierOrderId(update.supplierOrderId, client);
         // The webhook may precede persistence of the supplier ID. Let the provider retry.
         if (!order) throw new Error('Supplier webhook order is not yet available.');
+        // The documented data webhook cannot authoritatively update AFA registrations.
+        if (order.service_type === 'afa') { containsAfa = true; continue; }
         const updated = await this.updateOrderStatus(order.id, update.status, update.failureReason,
           update.supplierOrderId, update.response, { client, afterCommit });
         if (!updated) throw new Error('Supplier webhook order update failed.');
       }
-      await this.recordSupplierWebhookEvent(eventId, eventType, payload, client);
+      await this.recordSupplierWebhookEvent(eventId, eventType, containsAfa ? { eventId, eventType, ignoredAfa: true } : payload, client);
       if (client) await client.query('COMMIT');
     } catch (err) {
       if (client) await client.query('ROLLBACK');
@@ -1341,6 +1353,7 @@ export class OrdersStore {
     }
 
     const rewardEffect = async () => {
+      await AfaStore.onOrderTerminal(updated);
       // Preserve existing reward effects, but execute webhook effects only after commit.
       if (updated.status === 'delivered' && existing.status !== 'delivered') {
         try {
@@ -1407,6 +1420,7 @@ export class OrdersStore {
       devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
     }
 
+    await AfaStore.onOrderTerminal(updated);
     return updated;
   }
 

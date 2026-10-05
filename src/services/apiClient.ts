@@ -517,6 +517,7 @@ export interface AdminSystemStatus {
   nodeVersion: string;
   uptimeSeconds: number;
   components: {
+    afa?: {available:boolean;status:string;message:string};
     apiServer: { status: string; label: string };
     database: { status: string; type: string };
     paystack: { status: string; mode: string; currency: string };
@@ -1335,44 +1336,6 @@ export async function getActiveRewardRules(): Promise<RewardRulesResponse> {
   if (!res.ok) throw new Error(data.error || 'Failed to load reward rules.');
   return data;
 }
-
-/**
- * Authoritative AFA Service Configuration from backend
- */
-export interface AfaConfigResponse {
-  success?: boolean;
-  serviceId?: string;
-  title?: string;
-  tagline?: string;
-  retailPriceGhc?: number;
-  retailPricePesewas?: number;
-  available?: boolean;
-  error?: string;
-}
-
-export async function getAfaConfigOnServer(timeoutMs = 8000): Promise<AfaConfigResponse | null> {
-  const url = `${API_BASE_URL}/api/afa/config`;
-  try {
-    const controller = new AbortController();
-    const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
-    const res = await fetch(url, {
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutHandle);
-    if (!res.ok) return null;
-    const contentType = res.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
-
-
-
-
 
 // Admin Mystery Earn: server-derived metrics and bounded read-only inspection.
 export type { EarnOverview, EarnReferrer, EarnDetail, EarnLedgerRow, EarnCustomerSummary } from '../../server/types/adminEarn';

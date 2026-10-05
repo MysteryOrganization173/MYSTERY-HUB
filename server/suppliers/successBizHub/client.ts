@@ -6,6 +6,8 @@
  */
 
 import {
+  SbhAfaRequest,
+  SbhAfaResponse,
   SbhServicesResponse,
   SbhWalletResponse,
   SbhCatalogResponse,
@@ -20,6 +22,8 @@ import {
   SbhOffer,
 } from './types.js';
 
+import { createHash } from 'node:crypto';
+
 interface CacheEntry<T> {
   data: T;
   expiresAt: number;
@@ -28,6 +32,7 @@ interface CacheEntry<T> {
 export class SuccessBizHubClient {
   private static sharedCache = new Map<string, CacheEntry<unknown>>();
   private cache = SuccessBizHubClient.sharedCache;
+  private static afaDiscoveryFlights = new Map<string, Promise<SbhServicesResponse & {success?:boolean}>>();
 
   private getBaseUrl(): string {
     const raw = process.env.SUCCESS_BIZ_HUB_BASE_URL || 'https://api.successbizhub.com/v2';
@@ -67,10 +72,12 @@ export class SuccessBizHubClient {
       body?: unknown;
       skipCache?: boolean;
       cacheTtlMs?: number;
+      privateAfa?: boolean;
     } = {}
   ): Promise<T> {
     const method = options.method || 'GET';
-    const cacheKey = `${method}:${endpoint}`;
+    const identity = options.privateAfa ? `${this.getBaseUrl()}:${createHash('sha256').update(this.getApiKey()).digest('hex')}:` : '';
+    const cacheKey = `${identity}${method}:${endpoint}:${options.cacheTtlMs || 0}`;
 
     // Read cache for GET requests if TTL specified
     if (method === 'GET' && !options.skipCache && options.cacheTtlMs) {
@@ -108,10 +115,11 @@ export class SuccessBizHubClient {
       }
 
       const res = await fetch(url, fetchOptions);
-      clearTimeout(timeoutHandle);
+      if (!options.privateAfa) clearTimeout(timeoutHandle);
 
       let responseJson: unknown = null;
       const text = await res.text();
+      clearTimeout(timeoutHandle);
       try {
         responseJson = JSON.parse(text);
       } catch {
@@ -119,6 +127,12 @@ export class SuccessBizHubClient {
         responseJson = { status: 'error', message: text };
       }
 
+      if (options.privateAfa && (!res.ok || (responseJson as { success?: boolean })?.success !== true)) {
+        // AFA errors may echo identity fields. Never retain raw response/body/message.
+        const nested = (responseJson as { error?: { code?: unknown } })?.error;
+        const code = typeof nested?.code === 'string' && /^[A-Z_]{1,64}$/.test(nested.code) ? nested.code : 'SUPPLIER_ERROR';
+        throw Object.assign(new Error('AFA supplier request failed.'), { statusCode: res.status, code });
+      }
       if (!res.ok) {
         const errorMsg =
           (responseJson as { message?: string; error?: string })?.message ||
@@ -162,6 +176,23 @@ export class SuccessBizHubClient {
       skipCache,
       cacheTtlMs: 300_000,
     });
+  }
+
+  async getAfaServices(): Promise<SbhServicesResponse & { success?: boolean }> {
+    const identity = this.getBaseUrl()+createHash('sha256').update(this.getApiKey()).digest('hex');
+    const pending = SuccessBizHubClient.afaDiscoveryFlights.get(identity);
+    if (pending) return pending;
+    const request = this.request<SbhServicesResponse & {success?:boolean}>('/services', {cacheTtlMs:45_000,privateAfa:true});
+    SuccessBizHubClient.afaDiscoveryFlights.set(identity, request);
+    try { return await request; } finally { SuccessBizHubClient.afaDiscoveryFlights.delete(identity); }
+  }
+  async createAfa(req: SbhAfaRequest): Promise<SbhAfaResponse> {
+    const { name, phone, idNumber, location, region, dateOfBirth, occupation } = req;
+    return this.request('/afa', { method: 'POST', privateAfa: true,
+      body: { name, phone, idNumber, location, region, dateOfBirth, ...(occupation ? { occupation } : {}) } });
+  }
+  async getAfa(identifier: string): Promise<SbhAfaResponse> {
+    return this.request(`/afa/${encodeURIComponent(identifier)}`, { privateAfa: true });
   }
 
   /**

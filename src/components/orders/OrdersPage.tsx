@@ -1,3 +1,4 @@
+import { afaStatusLabel } from '../../../shared/afa';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS } from '../../data/bundles';
@@ -35,6 +36,7 @@ export const OrdersPage: React.FC = () => {
               publicReference: o.public_reference,
               serverReference: o.public_reference,
               serverStatus: o.status,
+              manualReview: o.manual_review,
               serviceType: o.service_type || (o.product_name_snapshot?.toLowerCase().includes('airtime') ? 'airtime' : 'data'),
               bundle: {
                 id: 'server-bundle-' + o.public_reference,
@@ -103,6 +105,8 @@ export const OrdersPage: React.FC = () => {
           publicReference: orderData.public_reference,
           serverReference: orderData.public_reference,
           serverStatus: orderData.status,
+          serviceType: orderData.service_type,
+          manualReview: orderData.manual_review,
           statusMessage:
             orderData.status === 'refund_pending' || orderData.status === 'refunded'
               ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
@@ -215,14 +219,12 @@ export const OrdersPage: React.FC = () => {
             {filteredOrders.map((order) => {
               const net = GHANA_NETWORKS[order.network] || GHANA_NETWORKS['mtn'];
 
-              const isAfa =
-                order.bundle.id === 'bundle-afa-reg' ||
-                order.bundle.dataAmount === 'AFA Registration';
+              const isAfa = order.serviceType === 'afa';
 
-              const statusBadge = isAfa && order.status === 'delivered' ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
-                  <CheckCircle2 className="w-3 h-3" />
-                  Registered
+              const statusBadge = isAfa ? (
+                <span className={`inline-flex items-center gap-1 text-[11px] font-semibold border px-2.5 py-1 rounded-full ${order.serverStatus === 'delivered' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-amber-400 bg-amber-500/10 border-amber-500/20'}`}>
+                  {order.serverStatus === 'delivered' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                  {afaStatusLabel(order.serverStatus, order.manualReview)}
                 </span>
               ) : {
                 verifying: (

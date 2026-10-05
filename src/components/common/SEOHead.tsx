@@ -9,6 +9,7 @@ interface PageMetadata {
 }
 
 const SEO_MAP: Record<string, PageMetadata> = {
+  afa: { title:'MTN AFA Registration — Mystery Hub', description:'Register your MTN number for AFA with secure payment and order tracking.' },
   home: {
     title: 'Mystery Hub — Ghana’s All-in-One Digital Platform | Data & Websites',
     description:
