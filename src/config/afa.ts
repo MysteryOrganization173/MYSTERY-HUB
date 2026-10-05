@@ -16,7 +16,6 @@ export interface AfaConfig {
   serviceId: string;
   title: string;
   tagline: string;
-  retailPriceGhc?: number; // Sourced strictly from authoritative backend config / API
   disclaimer: string;
   privacyStatement: string;
   howItWorks: Array<{
@@ -30,7 +29,6 @@ export const AFA_CONFIG: AfaConfig = {
   serviceId: 'srv-afa',
   title: 'AFA Registration',
   tagline: 'Register your MTN number for eligible AFA offers securely through Mystery Hub.',
-  // retailPriceGhc is populated only from authoritative backend config; no hardcoded GH₵15 or 1500!
   disclaimer:
     'Package information may change. Registration gives access to eligible AFA offers; package purchase and availability remain subject to MTN.',
   privacyStatement:
@@ -49,7 +47,7 @@ export const AFA_CONFIG: AfaConfig = {
     {
       step: 3,
       title: 'Mystery Hub submits registration',
-      desc: 'We verify and submit to MTN.',
+      desc: 'After verified payment, our supplier processes registration.',
     },
     {
       step: 4,
@@ -111,40 +109,3 @@ export const AFA_PACKAGES: AfaPackageInfo[] = [
     dataMb: 100,
   },
 ];
-
-export const GHANA_REGIONS = [
-  'Greater Accra',
-  'Ashanti',
-  'Eastern',
-  'Western',
-  'Central',
-  'Volta',
-  'Northern',
-  'Upper East',
-  'Upper West',
-  'Bono',
-  'Bono East',
-  'Ahafo',
-  'Oti',
-  'Western North',
-  'Savannah',
-  'North East',
-] as const;
-
-export const MTN_PREFIXES = ['024', '054', '055', '059', '025'];
-
-/**
- * Checks whether a phone number starts with a recognized MTN Ghana prefix.
- */
-export function isMtnGhanaNumber(phone: string): boolean {
-  const clean = phone.replace(/\D/g, '');
-  const local = clean.startsWith('233') ? '0' + clean.slice(3) : clean;
-  return MTN_PREFIXES.some((prefix) => local.startsWith(prefix));
-}
-
-/**
- * Validates Ghana Card format: GHA-XXXXXXXXX-X (9 digits middle, 1 check digit)
- */
-export function isValidGhanaCard(card: string): boolean {
-  return /^GHA-\d{9}-\d$/i.test(card.trim());
-}

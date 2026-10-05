@@ -1,3 +1,4 @@
+import { afaStatusLabel } from '../../../../shared/afa';
 import { FULFILMENT_LABELS, FulfilmentMode } from '../../../../shared/marketplacePolicy';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -412,6 +413,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
               className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 focus:border-[#00c365] focus:outline-none"
             >
               <option value="">All Services</option>
+              <option value="afa">AFA Registration</option>
               <option value="marketplace">Marketplace Commerce</option>
               <option value="data">Data Bundles</option>
               <option value="instant_bundle">Instant Bundles</option>
@@ -624,7 +626,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                       </td>
 
                       <td className="py-3 px-4">
-                        {getStatusBadge(order.status)}
+                        {order.service_type === 'afa' ? <span className="text-xs text-amber-300">{afaStatusLabel(order.status,order.manual_review)}</span> : getStatusBadge(order.status)}
                       </td>
 
                       <td className="py-3 px-4">
@@ -700,7 +702,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
 
                   <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
                     <div className="flex items-center gap-1.5">
-                      {getStatusBadge(order.status)}
+                      {order.service_type === 'afa' ? <span className="text-xs text-amber-300">{afaStatusLabel(order.status,order.manual_review)}</span> : getStatusBadge(order.status)}
                       {getPaymentBadge(order.payment_status)}
                     </div>
                     <span className="text-[10px] text-slate-500 font-mono">
@@ -848,7 +850,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
 
                 <div>
                   <span className="text-[11px] text-slate-500 block">Fulfilment Status</span>
-                  <div className="pt-0.5">{getStatusBadge(selectedOrder.status)}</div>
+                  <div className="pt-0.5">{selectedOrder.service_type === 'afa' ? <span className="text-xs text-amber-300">{afaStatusLabel(selectedOrder.status,selectedOrder.manual_review)}</span> : getStatusBadge(selectedOrder.status)}</div>
                 </div>
 
                 <div>
@@ -891,6 +893,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                 </div>
               </div>
 
+              {selectedOrder.service_type === 'afa' && <div className="rounded-xl border border-amber-500/40 p-4 text-xs space-y-2 break-words"><h4 className="font-bold text-amber-300">AFA registration</h4>{selectedOrder.afa_registration && <><p>Legal name: {selectedOrder.afa_registration.name}</p><p>Ghana Card: {selectedOrder.afa_registration.maskedIdNumber}</p><p>Region / location: {selectedOrder.afa_registration.region} / {selectedOrder.afa_registration.location}</p><p>Occupation: {selectedOrder.afa_registration.occupation || 'Not supplied'}</p><p>Supplier ID: {selectedOrder.afa_registration.supplierPublicId || 'Awaiting acknowledgement'}</p><p>Supplier status: {selectedOrder.afa_registration.supplierStatus || 'Not submitted'}</p><p>Identity payload: {selectedOrder.afa_registration.sensitivePayloadPurgedAt ? 'Purged' : 'Encrypted, retained for fulfilment'}</p></>}<p>Uncertain submissions without a supplier ID require support reconciliation. Never resubmit blindly.</p></div>}
               {/* Marketplace Specific Fulfilment Card */}
               {selectedOrder.service_type === 'marketplace' ? (
                 <div className="p-4 rounded-xl bg-slate-900/80 border border-[#00c365]/30 space-y-3">
@@ -985,7 +988,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                       <Radio className="w-3.5 h-3.5 text-sky-400" />
                       <span>Supplier Dispatch Details (Success Biz Hub)</span>
                     </h4>
-                    {selectedOrder.supplier_order_id && (
+                    {(selectedOrder.supplier_order_id || selectedOrder.service_type === 'afa') && (
                       <button
                         onClick={() => handleRefreshSupplierStatus(selectedOrder.public_reference)}
                         disabled={isRefreshingSupplier}

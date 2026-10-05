@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useId } from 'react';
 import { useApp } from '../../context/AppContext';
-import { usePaystack } from '../../hooks/usePaystack';
 import {
   AFA_CONFIG,
   AFA_PACKAGES,
-  GHANA_REGIONS,
-  isMtnGhanaNumber,
-  isValidGhanaCard,
-  AfaConfig,
 } from '../../config/afa';
-import { getAfaConfigOnServer } from '../../services/apiClient';
+import { getAfaConfig, initializeAfaPayment, type AfaConfig } from '../../services/afaApi';
+import { verifyPaymentOnServer } from '../../services/apiClient';
+import { GHANA_REGIONS, validateAfaPayload, afaStatusLabel } from '../../../shared/afa';
+import type { SafePublicOrderDetails } from '../../../server/types/orders';
 import {
   ShieldCheck,
   Smartphone,
@@ -37,6 +35,7 @@ interface AfaFormData {
   town: string;
   occupation: string;
   consent: boolean;
+  customerEmail: string;
 }
 
 const initialFormData: AfaFormData = {
@@ -48,291 +47,87 @@ const initialFormData: AfaFormData = {
   town: '',
   occupation: '',
   consent: false,
+  customerEmail: '',
 };
 
 export const AfaRegistrationPage: React.FC = () => {
-  const { setActivePage, showToast, createOrder, user } = useApp();
-  const { initializeServerPayment } = usePaystack();
-
-  // Authoritative AFA configuration state (sourced from backend API)
-  const [afaConfig, setAfaConfig] = useState<AfaConfig>(AFA_CONFIG);
+  const { setActivePage, showToast, user, sessionToken, openAuth, openAccount } = useApp();
+  const [config, setConfig] = useState<AfaConfig | null>(null);
+  const afaConfig = { ...AFA_CONFIG, ...config };
   const [isPriceLoading, setIsPriceLoading] = useState(true);
-
-  const [formData, setFormData] = useState<AfaFormData>(() => ({
-    ...initialFormData,
-    fullName: user?.name || '',
-    mtnNumber: user?.phone?.startsWith('024') || user?.phone?.startsWith('054') || user?.phone?.startsWith('055') || user?.phone?.startsWith('059') || user?.phone?.startsWith('025')
-      ? user.phone
-      : '',
-  }));
-
+  const [formData, setFormData] = useState<AfaFormData>(initialFormData);
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof AfaFormData, string>>>({});
   const [activePackageTab, setActivePackageTab] = useState<'monthly' | 'weekly'>('monthly');
   const [isPackageAccordionOpen, setIsPackageAccordionOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  // Success view state
-  const [confirmedOrder, setConfirmedOrder] = useState<{
-    orderRef: string;
-    mtnNumber: string;
-    fullName: string;
-    amountGhc: number;
-    submittedAt: string;
-  } | null>(null);
-
-  const fullNameId = useId();
-  const mtnNumberId = useId();
-  const ghanaCardId = useId();
-  const dobId = useId();
-  const regionId = useId();
-  const townId = useId();
-  const occupationId = useId();
-  const consentId = useId();
-
-  // Fetch authoritative AFA retail configuration from backend
+  const [confirmedOrder, setConfirmedOrder] = useState<SafePublicOrderDetails | null>(null);
+  const fullNameId = useId(), mtnNumberId = useId(), ghanaCardId = useId(), dobId = useId();
+  const regionId = useId(), townId = useId(), occupationId = useId(), consentId = useId(), emailId = useId();
+  const fieldIds = { fullName: fullNameId, mtnNumber: mtnNumberId, ghanaCardNumber: ghanaCardId,
+    dateOfBirth: dobId, region: regionId, town: townId, occupation: occupationId, consent: consentId, customerEmail: emailId };
+  const canonicalFields: Record<string, keyof AfaFormData> = {name:'fullName', phone:'mtnNumber', idNumber:'ghanaCardNumber', location:'town',
+    dateOfBirth:'dateOfBirth', region:'region', occupation:'occupation', consent:'consent', customerEmail:'customerEmail'};
   useEffect(() => {
-    let isMounted = true;
-    setIsPriceLoading(true);
-
-    getAfaConfigOnServer()
-      .then((remoteConfig) => {
-        if (!isMounted) return;
-        if (remoteConfig && typeof remoteConfig.retailPriceGhc === 'number') {
-          setAfaConfig((prev) => ({
-            ...prev,
-            retailPriceGhc: remoteConfig.retailPriceGhc,
-          }));
-        }
-      })
-      .catch(() => {
-        // Handled silently; price remains undefined to trigger 'Currently unavailable'
-      })
-      .finally(() => {
-        if (isMounted) setIsPriceLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
+    let active = true;
+    getAfaConfig().then(value => { if (active) setConfig(value); })
+      .catch(() => { if (active) setSubmitError('AFA registration is temporarily unavailable.'); })
+      .finally(() => { if (active) setIsPriceLoading(false); });
+    return () => { active = false; };
   }, []);
-
-  const priceAvailable = typeof afaConfig.retailPriceGhc === 'number' && afaConfig.retailPriceGhc > 0;
-
-  // Helper for Ghana Card formatting
-  const handleGhanaCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-
-    // Auto-prefix GHA- if user starts typing digits
-    if (/^\d/.test(val) && !val.startsWith('GHA-')) {
-      val = 'GHA-' + val;
-    }
-
-    setFormData((prev) => ({ ...prev, ghanaCardNumber: val }));
-
-    if (formErrors.ghanaCardNumber) {
-      setFormErrors((prev) => ({ ...prev, ghanaCardNumber: undefined }));
-    }
-  };
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, '').slice(0, 10);
-    setFormData((prev) => ({ ...prev, mtnNumber: raw }));
-
-    if (formErrors.mtnNumber) {
-      setFormErrors((prev) => ({ ...prev, mtnNumber: undefined }));
-    }
-  };
-
-  const validateForm = (): boolean => {
-    const errors: Partial<Record<keyof AfaFormData, string>> = {};
-
-    if (!formData.fullName.trim() || formData.fullName.trim().length < 3) {
-      errors.fullName = 'Please enter your full legal name as it appears on your Ghana Card.';
-    }
-
-    const cleanPhone = formData.mtnNumber.replace(/\D/g, '');
-    if (!cleanPhone || cleanPhone.length !== 10) {
-      errors.mtnNumber = 'Please enter a valid 10-digit Ghanaian mobile number.';
-    } else if (!isMtnGhanaNumber(cleanPhone)) {
-      errors.mtnNumber = 'AFA is an MTN service. Number must start with 024, 054, 055, 059, or 025.';
-    }
-
-    if (!formData.ghanaCardNumber.trim()) {
-      errors.ghanaCardNumber = 'Ghana Card number is required for MTN AFA verification.';
-    } else if (!isValidGhanaCard(formData.ghanaCardNumber)) {
-      errors.ghanaCardNumber = 'Format must be GHA-XXXXXXXXX-X (e.g. GHA-123456789-0).';
-    }
-
-    if (!formData.dateOfBirth) {
-      errors.dateOfBirth = 'Date of birth is required.';
-    } else {
-      const birthYear = new Date(formData.dateOfBirth).getFullYear();
-      const currentYear = new Date().getFullYear();
-      if (birthYear > currentYear - 15 || birthYear < currentYear - 100) {
-        errors.dateOfBirth = 'Please provide a valid date of birth.';
-      }
-    }
-
-    if (!formData.town.trim()) {
-      errors.town = 'Please specify your town or location.';
-    }
-
-    if (!formData.consent) {
-      errors.consent = 'You must confirm that your details match your Ghana Card.';
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitError(null);
-
-    if (!priceAvailable || !afaConfig.retailPriceGhc) {
-      showToast('Registration fee is currently unavailable. Please try again shortly.', 'warning');
-      return;
-    }
-
-    if (!validateForm()) {
-      showToast('Please correct the highlighted fields.', 'warning');
-      return;
-    }
-
+  useEffect(() => {
+    // Identity stays in form memory and is cleared on account change, including logout.
+    setFormData({ ...initialFormData, fullName:user?.name || '', mtnNumber:user?.phone || '', customerEmail:user?.email || '' });
+    setFormErrors({});
+  }, [user?.id]);
+  useEffect(() => {
+    const first = Object.keys(formErrors)[0] as keyof AfaFormData | undefined;
+    if (first) document.getElementById(fieldIds[first])?.focus();
+  }, [formErrors]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get('reference') || params.get('trxref');
+    if (!reference) return;
+    let active = true;
     setIsSubmitting(true);
-    const feeGhc = afaConfig.retailPriceGhc;
-
+    verifyPaymentOnServer(reference).then(result => {
+      if (!active) return;
+      if (result.order?.service_type === 'afa') setConfirmedOrder(result.order);
+      else setSubmitError('Payment has not been confirmed. Check My Orders before trying again.');
+    }).catch(() => { if (active) setSubmitError('Payment confirmation is pending. Check My Orders before trying again.'); })
+      .finally(() => { if (active) setIsSubmitting(false); });
+    return () => { active = false; };
+  }, []);
+  const priceAvailable = config?.available === true && config.retailPriceGhc !== null && config.retailPriceGhc > 0;
+  const handleGhanaCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, ghanaCardNumber:e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '') }));
+    setFormErrors(prev => ({ ...prev, ghanaCardNumber:undefined }));
+  };
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, mtnNumber:e.target.value }));
+    setFormErrors(prev => ({ ...prev, mtnNumber:undefined }));
+  };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); setSubmitError(null); setFormErrors({});
+    if (!user || !sessionToken) { openAuth('login', 'Sign in to register your MTN number for AFA.', () => document.getElementById(fullNameId)?.focus()); return; }
+    if (user.mustChangePassword) { openAccount(); return; }
+    if (!priceAvailable) { showToast('Registration is currently unavailable.', 'warning'); return; }
     try {
-      const timestamp = Date.now();
-      const randomHex = Math.floor(100000 + Math.random() * 900000);
-      const publicRef = `MH-AFA-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${randomHex}`;
-
-      const paystackInitialized = await new Promise<boolean>((resolve) => {
-        initializeServerPayment({
-          productId: 'srv-afa-registration',
-          recipientPhone: formData.mtnNumber,
-          customerName: formData.fullName,
-          serviceType: 'data',
-          amount: feeGhc,
-          onPaymentReceived: (orderRef) => {
-            createOrder(
-              {
-                id: 'bundle-afa-reg',
-                network: 'mtn',
-                dataAmount: 'AFA Registration',
-                dataBytesValue: 0,
-                validity: 'One-Time Setup',
-                validityCategory: 'Monthly',
-                priceGhc: feeGhc,
-                category: 'Service Registration',
-                description: `MTN AFA Registration for ${formData.mtnNumber}`,
-              },
-              formData.mtnNumber,
-              'paystack',
-              `MH_PAY_AFA_${timestamp}_${randomHex}`,
-              orderRef || publicRef
-            );
-
-            setConfirmedOrder({
-              orderRef: orderRef || publicRef,
-              mtnNumber: formData.mtnNumber,
-              fullName: formData.fullName,
-              amountGhc: feeGhc,
-              submittedAt: new Date().toLocaleDateString('en-GB', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              }),
-            });
-            showToast('AFA registration payment confirmed!', 'success');
-            resolve(true);
-          },
-          onCancel: () => {
-            setIsSubmitting(false);
-            showToast('Registration payment was cancelled.', 'info');
-            resolve(false);
-          },
-          onError: (err) => {
-            console.warn('Paystack AFA initialization notice:', err.message);
-            createOrder(
-              {
-                id: 'bundle-afa-reg',
-                network: 'mtn',
-                dataAmount: 'AFA Registration',
-                dataBytesValue: 0,
-                validity: 'One-Time Setup',
-                validityCategory: 'Monthly',
-                priceGhc: feeGhc,
-                category: 'Service Registration',
-                description: `MTN AFA Registration for ${formData.mtnNumber}`,
-              },
-              formData.mtnNumber,
-              'paystack',
-              `MH_PAY_AFA_${timestamp}_${randomHex}`,
-              publicRef
-            );
-
-            setConfirmedOrder({
-              orderRef: publicRef,
-              mtnNumber: formData.mtnNumber,
-              fullName: formData.fullName,
-              amountGhc: feeGhc,
-              submittedAt: new Date().toLocaleDateString('en-GB', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              }),
-            });
-            showToast('AFA registration received and submitted!', 'success');
-            resolve(true);
-          },
-        }).catch(() => {
-          createOrder(
-            {
-              id: 'bundle-afa-reg',
-              network: 'mtn',
-              dataAmount: 'AFA Registration',
-              dataBytesValue: 0,
-              validity: 'One-Time Setup',
-              validityCategory: 'Monthly',
-              priceGhc: feeGhc,
-              category: 'Service Registration',
-              description: `MTN AFA Registration for ${formData.mtnNumber}`,
-            },
-            formData.mtnNumber,
-            'paystack',
-            `MH_PAY_AFA_${timestamp}_${randomHex}`,
-            publicRef
-          );
-
-          setConfirmedOrder({
-            orderRef: publicRef,
-            mtnNumber: formData.mtnNumber,
-            fullName: formData.fullName,
-            amountGhc: feeGhc,
-            submittedAt: new Date().toLocaleDateString('en-GB', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            }),
-          });
-          resolve(true);
-        });
-      });
-
-      if (!paystackInitialized) {
-        setIsSubmitting(false);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to process registration request.';
-      setSubmitError(msg);
+      const payload = validateAfaPayload({ name:formData.fullName, phone:formData.mtnNumber, idNumber:formData.ghanaCardNumber,
+        dateOfBirth:formData.dateOfBirth, region:formData.region, location:formData.town, occupation:formData.occupation });
+      if (!formData.consent) throw Object.assign(new Error('Please authorize submission of your registration details.'), {field:'consent'});
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.customerEmail.trim()) || formData.customerEmail.trim().length > 254)
+        throw Object.assign(new Error('Enter a valid receipt email.'), {field:'customerEmail'});
+      setIsSubmitting(true);
+      const result = await initializeAfaPayment(payload, formData.consent, formData.customerEmail, sessionToken);
+      if (!result.authorizationUrl) throw new Error('Payment link unavailable. Check My Orders before trying again.');
+      const url = new URL(result.authorizationUrl);
+      if (url.protocol !== 'https:' || url.hostname !== 'checkout.paystack.com') throw new Error('Payment link unavailable. Contact support.');
+      window.location.assign(url.href);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Unable to start AFA registration.');
+      const field = canonicalFields[(err as {field?:string}).field || ''];
+      if (field) setFormErrors({ [field]:err instanceof Error ? err.message : 'Please check this field.' });
       setIsSubmitting(false);
     }
   };
@@ -350,13 +145,13 @@ export const AfaRegistrationPage: React.FC = () => {
 
           <div className="space-y-1.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#00c365]">
-              Registration Submitted
+              {afaStatusLabel(confirmedOrder.status, confirmedOrder.manual_review)}
             </span>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Payment Confirmed
+              {confirmedOrder.status === 'delivered' ? 'Registered' : afaStatusLabel(confirmedOrder.status, confirmedOrder.manual_review)}
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto">
-              Your registration is still being processed. We&apos;ll update this order when registration is confirmed.
+              {confirmedOrder.status === 'delivered' ? 'Your AFA registration is confirmed.' : 'Payment and registration are separate stages. Follow this order for updates.'}
             </p>
           </div>
 
@@ -364,26 +159,22 @@ export const AfaRegistrationPage: React.FC = () => {
           <div className="p-4 rounded-xl bg-[#090d11] border border-slate-800 text-left space-y-3">
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80 text-xs">
               <span className="text-slate-400">Order Reference</span>
-              <span className="font-mono font-bold text-white">{confirmedOrder.orderRef}</span>
+              <span className="font-mono font-bold text-white">{confirmedOrder.public_reference}</span>
             </div>
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80 text-xs">
               <span className="text-slate-400">Status</span>
               <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
                 <Clock className="w-3 h-3" />
-                <span>Submitted · Processing</span>
+                <span>{afaStatusLabel(confirmedOrder.status, confirmedOrder.manual_review)}</span>
               </span>
             </div>
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80 text-xs">
               <span className="text-slate-400">Target Line</span>
-              <span className="font-mono font-bold text-white">{confirmedOrder.mtnNumber}</span>
-            </div>
-            <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80 text-xs">
-              <span className="text-slate-400">Registrant Name</span>
-              <span className="font-medium text-slate-200">{confirmedOrder.fullName}</span>
+              <span className="font-mono font-bold text-white">{confirmedOrder.recipient_phone}</span>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-400">Registration Fee Paid</span>
-              <span className="font-bold text-[#00c365]">GH₵ {confirmedOrder.amountGhc.toFixed(2)}</span>
+              <span className="font-bold text-[#00c365]">GH₵ {confirmedOrder.amount_ghc.toFixed(2)}</span>
             </div>
           </div>
 
@@ -394,14 +185,12 @@ export const AfaRegistrationPage: React.FC = () => {
               <span>What happens next?</span>
             </div>
             <p className="text-slate-300 leading-relaxed text-[11px]">
-              Your registration is still being processed. We&apos;ll update this order when registration is confirmed.
+              {confirmedOrder.status === 'delivered' ? 'Your AFA registration is confirmed.' : 'Payment and registration are separate stages. Follow this order for updates.'}
             </p>
             <p className="text-slate-400 leading-relaxed text-[11px]">
               The registration fee paid to Mystery Hub covers AFA registration only. Future AFA voice/data packages are purchased directly through MTN.
             </p>
-            <p className="text-slate-400 leading-relaxed text-[11px] pt-1.5 border-t border-slate-800/80">
-              You may also receive an MTN confirmation/service message. If you do not, you can use <span className="font-mono font-bold text-emerald-400">*1848#</span> once your Mystery Hub order status shows Registered.
-            </p>
+            {confirmedOrder.status === 'delivered' && <p className="text-slate-400 leading-relaxed text-[11px] pt-1.5 border-t border-slate-800/80">Dial <span className="font-mono font-bold text-emerald-400">*1848#</span> on your registered MTN number for AFA access.</p>}
           </div>
 
           {/* Actions */}
@@ -583,7 +372,7 @@ export const AfaRegistrationPage: React.FC = () => {
           ========================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Form & Actions */}
-        <form onSubmit={handleSubmit} className="lg:col-span-7 space-y-4 sm:space-y-5 text-left">
+        <form aria-label="AFA registration" noValidate onSubmit={handleSubmit} className="lg:col-span-7 space-y-4 sm:space-y-5 text-left">
           {submitError && (
             <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
@@ -609,6 +398,8 @@ export const AfaRegistrationPage: React.FC = () => {
                 </label>
                 <input
                   id={fullNameId}
+                  maxLength={128}
+                  aria-invalid={Boolean(formErrors.fullName)}
                   type="text"
                   required
                   value={formData.fullName}
@@ -638,24 +429,15 @@ export const AfaRegistrationPage: React.FC = () => {
                   <label htmlFor={mtnNumberId} className="block text-xs font-semibold text-slate-300">
                     MTN Number to Register <span className="text-rose-400">*</span>
                   </label>
-                  {formData.mtnNumber.length >= 3 && (
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                        isMtnGhanaNumber(formData.mtnNumber)
-                          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                          : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                      }`}
-                    >
-                      {isMtnGhanaNumber(formData.mtnNumber) ? 'MTN Network Detected' : 'Not an MTN Prefix'}
-                    </span>
-                  )}
+
                 </div>
                 <div className="relative">
                   <input
                     id={mtnNumberId}
+                    aria-invalid={Boolean(formErrors.mtnNumber)}
                     type="tel"
                     required
-                    maxLength={10}
+                    maxLength={32}
                     value={formData.mtnNumber}
                     onChange={handlePhoneChange}
                     placeholder="024 XXX XXXX"
@@ -670,7 +452,7 @@ export const AfaRegistrationPage: React.FC = () => {
                 {formErrors.mtnNumber ? (
                   <p className="text-[11px] text-rose-400">{formErrors.mtnNumber}</p>
                 ) : (
-                  <p className="text-[10px] text-slate-500">Must be an active Ghanaian MTN SIM (024, 054, 055, 059, 025).</p>
+                  <p className="text-[10px] text-slate-500">For MTN numbers only. Number portability means the prefix cannot confirm your network.</p>
                 )}
               </div>
             </div>
@@ -691,6 +473,9 @@ export const AfaRegistrationPage: React.FC = () => {
                 </label>
                 <input
                   id={ghanaCardId}
+                  autoComplete="off"
+                  maxLength={32}
+                  aria-invalid={Boolean(formErrors.ghanaCardNumber)}
                   type="text"
                   required
                   value={formData.ghanaCardNumber}
@@ -722,6 +507,8 @@ export const AfaRegistrationPage: React.FC = () => {
                 </label>
                 <input
                   id={dobId}
+                  max={new Date().toISOString().slice(0,10)}
+                  aria-invalid={Boolean(formErrors.dateOfBirth)}
                   type="date"
                   required
                   value={formData.dateOfBirth}
@@ -780,6 +567,8 @@ export const AfaRegistrationPage: React.FC = () => {
                 </label>
                 <input
                   id={townId}
+                  maxLength={128}
+                  aria-invalid={Boolean(formErrors.town)}
                   type="text"
                   required
                   value={formData.town}
@@ -806,6 +595,8 @@ export const AfaRegistrationPage: React.FC = () => {
                 </label>
                 <input
                   id={occupationId}
+                  maxLength={128}
+                  aria-invalid={Boolean(formErrors.occupation)}
                   type="text"
                   value={formData.occupation}
                   onChange={(e) => setFormData((prev) => ({ ...prev, occupation: e.target.value }))}
@@ -816,6 +607,13 @@ export const AfaRegistrationPage: React.FC = () => {
             </div>
           </div>
 
+          <div className="space-y-1.5">
+            <label htmlFor={emailId} className="block text-xs font-semibold text-slate-300">Receipt email</label>
+            <input id={emailId} type="email" required maxLength={254} autoComplete="email" value={formData.customerEmail}
+              aria-invalid={Boolean(formErrors.customerEmail)} onChange={e => setFormData(prev => ({...prev,customerEmail:e.target.value}))}
+              className="w-full py-3 px-3.5 rounded-xl bg-[#090d11] border border-slate-800 text-xs text-white focus:outline-none focus:border-[#00c365]" />
+            {formErrors.customerEmail && <p className="text-[11px] text-rose-400">{formErrors.customerEmail}</p>}
+          </div>
           {/* PRIVACY & SECURITY REASSURANCE */}
           <div className="p-3.5 sm:p-4 rounded-xl bg-[#090d11] border border-slate-800/90 text-xs text-slate-300 space-y-1.5">
             <div className="flex items-center gap-2 text-white font-bold">
@@ -823,7 +621,7 @@ export const AfaRegistrationPage: React.FC = () => {
               <span>Privacy &amp; Security Commitment</span>
             </div>
             <p className="text-slate-400 leading-relaxed text-[11px]">
-              Registration details are encrypted and handled securely by Mystery Hub. Never share your Ghana Card PIN or account passwords.
+              We encrypt registration details on the server and send them to our supplier. Sensitive identity data is purged after confirmed completion or safe closure; unresolved cases retain encrypted evidence. Never provide a PIN, password, card photo, or selfie.
             </p>
           </div>
 
@@ -920,7 +718,7 @@ export const AfaRegistrationPage: React.FC = () => {
                 <span className="text-[10px] text-slate-500 font-medium">Educational Reference</span>
               </div>
               <p className="text-[11px] text-slate-300 leading-normal">
-                Once your AFA registration is successful, dial <span className="font-mono font-bold text-white">*1848#</span> on your registered MTN number to access eligible AFA offers directly from MTN.
+                Once your AFA registration is successful, your Registered order shows MTN AFA access instructions.
               </p>
               <p className="text-[10px] text-slate-400 leading-normal">
                 The registration fee paid to Mystery Hub covers AFA registration only. Future AFA voice/data packages are purchased directly through MTN.
@@ -936,16 +734,16 @@ export const AfaRegistrationPage: React.FC = () => {
                 <span className="text-[10px] text-slate-400 font-mono">MTN USSD</span>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-xs text-slate-400">Dial:</span>
+                <span className="text-xs text-slate-400">Access:</span>
                 <span className="font-mono text-base font-extrabold text-white bg-slate-900 border border-emerald-500/30 px-2.5 py-0.5 rounded tracking-wider">
-                  *1848#
+                  Available after registration
                 </span>
               </div>
               <p className="text-[11px] text-slate-300 leading-relaxed">
                 Then follow the MTN AFA menu to view or purchase the offers available to your registered number.
               </p>
               <p className="text-[10px] text-slate-400 leading-normal border-t border-slate-800/80 pt-1.5">
-                You may also receive an MTN confirmation/service message. If you do not, you can use <span className="font-mono text-emerald-400 font-semibold">*1848#</span> once your Mystery Hub order status shows Registered.
+                Wait until your order shows Registered before accessing MTN AFA packages.
               </p>
             </div>
 

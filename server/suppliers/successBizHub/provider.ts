@@ -42,6 +42,23 @@ export class SuccessBizHubProvider implements SupplierProvider {
 
   constructor(public readonly client: SuccessBizHubClient = new SuccessBizHubClient()) {}
 
+  async checkAfaAvailable(): Promise<{ available: boolean; status: 'available' | 'unavailable' | 'permission_missing' | 'supplier_error' | 'not_configured' }> {
+    if (!this.client.isConfigured()) return { available: false, status: 'not_configured' };
+    try {
+      const result = await this.client.getAfaServices();
+      const data = result.data as { keyPermissions?: { afa?: boolean }; services?: Array<{ id?: string; keyGranted?: boolean; available?: boolean }> };
+      const service = data?.services?.find(item => item.id === 'afa');
+      const permitted = data?.keyPermissions?.afa === true && service?.keyGranted !== false;
+      if (!permitted) return { available: false, status: 'permission_missing' };
+      const available = service?.available === true;
+      return { available, status: available ? 'available' : 'unavailable' };
+    } catch (err) {
+      return { available: false, status: (err as { statusCode?: number }).statusCode === 403 ? 'permission_missing' : 'supplier_error' };
+    }
+  }
+  async placeAfaRegistration(payload: import('./types.js').SbhAfaRequest) { return this.client.createAfa(payload); }
+  async getAfaStatus(publicId: string) { return this.client.getAfa(publicId); }
+
   /**
    * Status mapping from Success Biz Hub to Mystery Hub domain status
    *

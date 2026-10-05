@@ -47,7 +47,7 @@ export interface OrderRecord {
   id: string; // Local client ID e.g. MH1234567
   publicReference?: string; // Real authoritative backend reference e.g. MH-20260930-592025
   serverReference?: string; // Alias for backward compatibility
-  serviceType?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace';
+  serviceType?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'afa';
   bundle: DataBundle;
   recipientPhone: string;
   network: NetworkId;
@@ -56,6 +56,7 @@ export interface OrderRecord {
   faceValueGhc?: number;
   serviceFeeGhc?: number;
   status: OrderStatus;
+  manualReview?: boolean;
   serverStatus?: string; // Raw backend status e.g. 'refund_pending', 'delivered'
   statusMessage?: string; // Customer-friendly status message (e.g. for refund pending)
   paymentReference?: string;

@@ -58,7 +58,7 @@ interface AppContextType {
   updateOrderStatus: (
     orderId: string,
     status: OrderRecord['status'],
-    extra?: { serverStatus?: string; statusMessage?: string }
+    extra?: { serverStatus?: string; statusMessage?: string; manualReview?: boolean }
   ) => void;
   isAuthModalOpen: boolean;
   authMode: 'login' | 'signup';
@@ -312,8 +312,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateOrderStatus = (
     orderId: string,
     status: OrderRecord['status'],
-    extra?: { serverStatus?: string; statusMessage?: string }
+    extra?: { serverStatus?: string; statusMessage?: string; manualReview?: boolean }
   ) => {
+    // AFA orders opened from the server may not be in the legacy local order list.
+    if (activeOrder?.serviceType === 'afa' && (activeOrder.id === orderId || activeOrder.publicReference === orderId)) {
+      setActiveOrder({...activeOrder,status,manualReview:extra?.manualReview ?? activeOrder.manualReview,serverStatus:extra?.serverStatus || activeOrder.serverStatus,statusMessage:extra?.statusMessage,updatedAt:new Date().toISOString()});
+    }
     setOrders((prev) =>
       prev.map((order) => {
         if (order.id === orderId || (order.publicReference && order.publicReference === orderId)) {
@@ -322,6 +326,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             status,
             serverStatus: extra?.serverStatus || order.serverStatus,
             statusMessage: extra?.statusMessage !== undefined ? extra.statusMessage : order.statusMessage,
+            manualReview: extra?.manualReview ?? order.manualReview,
             updatedAt: new Date().toISOString(),
           };
           if (activeOrder?.id === order.id || (activeOrder?.publicReference && activeOrder.publicReference === orderId)) {

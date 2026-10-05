@@ -42,11 +42,13 @@ import {
   mapToSafeCustomerStatus,
 } from '../services/duplicateOrderProtection.js';
 
+import { afaRouter } from './afaApi.js';
 import { accountRouter } from './accountApi.js';
 import { AccountError, identifierConflict, loginAccount } from '../services/accountSecurity.js';
 
 export const apiRouter = Router();
 apiRouter.use('/auth', accountRouter);
+apiRouter.use('/afa', afaRouter);
 
 // Mount Website Builder endpoints
 apiRouter.use('/websites', websiteRouter);
@@ -126,6 +128,7 @@ apiRouter.get('/instant-bundles', async (_req: Request, res: Response) => {
  * If fulfillment is enabled, performs supplier preflight checks before taking customer payment.
  */
 apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: Response) => {
+  if (req.body?.serviceType === 'afa' || req.body?.productId === 'afa-registration') { res.status(400).json({ error: 'Use the authenticated AFA registration checkout.' }); return; }
   const reqStart = performance.now();
   try {
     const { productId, recipientPhone, phone: bodyPhone, customerPhone, customerEmail: suppliedCustomerEmail, customerName, serviceType, network: reqNetwork, amount: reqAmount } = req.body || {};

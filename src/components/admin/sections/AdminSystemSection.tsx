@@ -125,6 +125,7 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
         </button>
       </div>
 
+      {components.afa && <div className="rounded-xl border border-slate-700 p-4 text-sm"><strong>AFA registration capability</strong><p>{components.afa.status.replaceAll('_',' ')} · {components.afa.message}</p></div>}
       {/* Host Environment Summary */}
       <div className="p-4 rounded-2xl bg-[#0f171d] border border-slate-800/90 flex flex-wrap items-center justify-between gap-4 text-xs">
         <div className="flex items-center gap-2">

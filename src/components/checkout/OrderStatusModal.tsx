@@ -1,3 +1,4 @@
+import { afaStatusLabel } from '../../../shared/afa';
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS } from '../../data/bundles';
@@ -62,7 +63,7 @@ export const OrderStatusModal: React.FC = () => {
             statusMessage = 'Delivery could not be completed. Your payment is being reviewed for refund.';
           } else if (serverStatus === 'failed') {
             mappedStatus = 'failed';
-            statusMessage = 'The mobile network was unable to complete the delivery. Please contact support or retry.';
+            statusMessage = res.order.service_type === 'afa' ? 'Registration needs support review. Do not start another registration until support confirms it is safe.' : 'The mobile network was unable to complete the delivery. Please contact support or retry.';
           } else if (serverStatus === 'pending_payment') {
             mappedStatus = 'verifying';
           }
@@ -70,10 +71,12 @@ export const OrderStatusModal: React.FC = () => {
           if (
             mappedStatus !== activeOrder?.status ||
             serverStatus !== activeOrder?.serverStatus ||
+            res.order.manual_review !== activeOrder?.manualReview ||
             statusMessage !== activeOrder?.statusMessage
           ) {
             updateOrderStatus(activeOrder!.id, mappedStatus, {
               serverStatus,
+              manualReview: res.order.manual_review,
               statusMessage,
             });
           }
@@ -93,6 +96,7 @@ export const OrderStatusModal: React.FC = () => {
     lookupReference,
     activeOrder?.status,
     activeOrder?.serverStatus,
+    activeOrder?.manualReview,
     activeOrder?.statusMessage,
     updateOrderStatus,
   ]);
@@ -152,16 +156,11 @@ export const OrderStatusModal: React.FC = () => {
     },
   }[activeOrder.status];
 
-  const isAfa =
-    activeOrder.bundle.id === 'bundle-afa-reg' ||
-    activeOrder.bundle.dataAmount === 'AFA Registration';
+  const isAfa = activeOrder.serviceType === 'afa';
+  if (isAfa) statusConfig.label = afaStatusLabel(activeOrder.serverStatus, activeOrder.manualReview);
 
   const headingText = isAfa
-    ? activeOrder.status === 'delivered'
-      ? 'AFA REGISTERED'
-      : activeOrder.status === 'failed'
-      ? 'Registration issue'
-      : 'Registration in progress'
+    ? afaStatusLabel(activeOrder.serverStatus, activeOrder.manualReview)
     : activeOrder.status === 'delivered'
     ? 'Order delivered successfully'
     : activeOrder.status === 'verifying'
@@ -177,11 +176,11 @@ export const OrderStatusModal: React.FC = () => {
     : 'Order placed successfully';
 
   const descriptionText = isAfa
-    ? activeOrder.status === 'delivered'
-      ? 'Your MTN number is now registered for eligible AFA offers. Dial *1848# to access the AFA menu.'
+    ? activeOrder.serverStatus === 'delivered'
+      ? 'Your MTN AFA registration is confirmed. MTN packages are purchased separately.'
       : activeOrder.status === 'failed'
       ? activeOrder.statusMessage || 'Registration could not be completed. Please contact support.'
-      : "Your registration is still being processed. We'll update this order when registration is confirmed."
+      : "Payment and registration are separate stages. Follow this order for registration updates; contact support if it needs attention."
     : activeOrder.statusMessage ||
       (isRefundIssue
         ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
@@ -240,8 +239,8 @@ export const OrderStatusModal: React.FC = () => {
           <div className="bg-[#090d10] p-4 rounded-xl border border-slate-800 space-y-2">
             <div className="flex justify-between text-xs text-slate-400 font-medium">
               <span>Order Received</span>
-              <span>Delivery Progress</span>
-              <span>Delivered</span>
+              <span>{isAfa ? 'Registration Progress' : 'Delivery Progress'}</span>
+              <span>{isAfa ? 'Registered' : 'Delivered'}</span>
             </div>
             <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden flex">
               <div
@@ -339,7 +338,7 @@ export const OrderStatusModal: React.FC = () => {
           </div>
 
           {/* AFA USSD Card when Registered (Requirement 7 & 4) */}
-          {isAfa && activeOrder.status === 'delivered' && (
+          {isAfa && activeOrder.serverStatus === 'delivered' && (
             <div className="bg-[#090d10] p-4 rounded-xl border border-emerald-500/30 text-left space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
@@ -373,7 +372,7 @@ export const OrderStatusModal: React.FC = () => {
                 Your registration is still being processed. We&apos;ll update this order when registration is confirmed.
               </p>
               <p className="text-[10px] text-slate-400 leading-normal">
-                You may also receive an MTN confirmation/service message. If you do not, you can use <span className="font-mono text-emerald-400 font-semibold">*1848#</span> once your Mystery Hub order status shows Registered.
+                Wait until your order shows Registered before accessing MTN AFA packages.
               </p>
               <p className="text-[10px] text-slate-500 pt-1 border-t border-slate-800/80">
                 The registration fee paid to Mystery Hub covers AFA registration only. Future AFA voice/data packages are purchased directly through MTN.
