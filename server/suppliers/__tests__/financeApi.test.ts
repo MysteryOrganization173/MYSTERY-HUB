@@ -48,3 +48,19 @@ test('Marketplace Wallet unsupported; no debit',async()=>{await seed();assert.eq
 test('Admin withdrawal mutation requires RBAC and confirmation',async()=>{assert.equal((await request('/api/admin/finance/withdrawals/unknown','POST',{action:'paid'})).status,403);assert.equal((await request('/api/admin/finance/withdrawals/unknown','POST',{action:'paid'},'admin-token')).status,400);});
 test('client checkout explicitly sends Wallet and a stable request ID',()=>{const modal=readFileSync('src/components/checkout/CheckoutModal.tsx','utf8'),client=readFileSync('src/services/financeApi.ts','utf8');assert.ok(modal.includes('walletRequest.current!.id'));assert.ok(client.includes("paymentMethod:'wallet'"));assert.ok(modal.includes("'payments/initialize'"));assert.ok(!client.includes('PAYSTACK_SECRET'));});
 test('customer confirmation explains withdrawal fee and irreversible transfer',()=>{const panel=readFileSync('src/components/finance/FinancialPanel.tsx','utf8');assert.ok(panel.includes('cannot be withdrawn back to Mobile Money'));assert.ok(panel.includes('Processing fee'));assert.ok(panel.includes('You receive'));assert.ok(panel.includes('I confirm'));});
+
+test('Financial Control Room loading endpoints return JSON before the storefront fallback',async()=>{
+  await seed();
+  const paths=['/control','/withdrawals?offset=0','/operations?offset=0','/customers/owner'];
+  const fallbackServer=express();fallbackServer.use('/api/admin',adminRouter);
+  fallbackServer.use((_req,res)=>res.type('html').send('<!doctype html><html>Storefront fallback</html>'));
+  const listener=await new Promise<Server>(resolve=>{const s=fallbackServer.listen(0,'127.0.0.1',()=>resolve(s));});
+  try {
+    const origin=`http://127.0.0.1:${(listener.address() as AddressInfo).port}`;
+    const responses=await Promise.all(paths.map(path=>fetchOriginal(origin+'/api/admin/finance'+path,{headers:{Authorization:'Bearer admin-token'}})));
+    for(const response of responses){assert.equal(response.status,200);assert.match(response.headers.get('content-type')||'',/^application\/json/);assert.equal(response.headers.get('cache-control'),'no-store');}
+    const [control,queue,operations,customer]=await Promise.all(responses.map(response=>response.json()));
+    assert.equal(control.settings.withdrawalMinimumMinor,500);assert.equal(control.settings.withdrawalFeeBps,300);assert.deepEqual(control.economics.map((policy:any)=>policy.service),['data','airtime','afa']);assert.ok(Array.isArray(control.definitions));
+    assert.deepEqual(queue,[]);assert.ok(operations.length>0);assert.equal(customer.walletMinor,10000);assert.ok(Array.isArray(customer.earnLedger));
+  } finally {await new Promise<void>(resolve=>listener.close(()=>resolve()));}
+});

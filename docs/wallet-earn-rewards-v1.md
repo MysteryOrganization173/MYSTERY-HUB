@@ -98,6 +98,10 @@ Implementation checkpoint notes. This branch is for founder review; these notes 
 
 ## Implementation manifest
 
+### Local Admin preview loading incident
+
+The previously running isolated preview on port 4201 retained its pre-Wallet backend router while Vite served the updated frontend. Authenticated GET requests to `/api/admin/finance/control`, `/withdrawals`, `/operations` and `/customers/:id` fell through to the storefront fallback and returned status 200 with `text/html`. Parsing that document as JSON caused the observed `Unexpected token '<'` error. The committed API mounts and frontend paths were already correct; restarting that isolated preview loads the current routes. No financial architecture or Website Builder source changes are required. A regression test places the real Admin router before an HTML fallback and verifies JSON responses and the settings, queue, operations and customer payloads. Restart local backend processes after adding server routes; frontend hot reload alone does not refresh their imported routers.
+
 The checkpoint includes the scoped paths listed by its commit. Financial core lives in `shared/money.ts`, `server/db/financeSchema.ts`, `server/db/financeStore.ts`, `server/services/financeService.ts`, `server/services/referralEconomics.ts`, and `server/routes/financeApi.ts`; frontend financial surfaces and regression fixtures are included alongside the existing order/referral/AFA integration points.
 
 - `docs/wallet-earn-rewards-v1.md`
