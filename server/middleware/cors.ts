@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 
-const ALLOWED_ORIGINS = [
+export const ALLOWED_ORIGINS = [
   'https://mysteryhub.netlify.app',
   'https://mysterybundlehub.com',
   'https://www.mysterybundlehub.com',

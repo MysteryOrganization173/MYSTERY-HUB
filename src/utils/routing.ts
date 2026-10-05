@@ -9,6 +9,7 @@ export const ROUTE_PATH_MAP: Record<ActivePage, string> = {
   website: '/website-builder',
   marketplace: '/marketplace',
   services: '/services',
+  afa: '/afa',
   about: '/about',
   orders: '/orders',
   admin: '/admin',
@@ -88,6 +89,7 @@ export function getPageFromPath(rawPath: string | null | undefined): ActivePage 
     return 'home';
   }
 
+  if (normalized === '/afa' || normalized === '/afa/index.html') return 'afa';
   // Core product routes and aliases
   if (normalized === '/data' || normalized === '/data/index.html') {
     return 'data';

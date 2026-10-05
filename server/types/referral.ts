@@ -10,6 +10,7 @@ export type RewardServiceType =
   | 'airtime'
   | 'instant_bundle'
   | 'marketplace'
+  | 'afa'
   | 'website_builder'
   | 'manual_adjustment';
 

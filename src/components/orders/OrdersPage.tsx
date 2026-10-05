@@ -1,3 +1,4 @@
+import { afaStatusLabel } from '../../../shared/afa';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS } from '../../data/bundles';
@@ -34,6 +35,7 @@ export const OrdersPage: React.FC = () => {
               publicReference: o.public_reference,
               serverReference: o.public_reference,
               serverStatus: o.status,
+              manualReview: o.manual_review,
               serviceType: o.service_type || (o.product_name_snapshot?.toLowerCase().includes('airtime') ? 'airtime' : 'data'),
               bundle: {
                 id: 'server-bundle-' + o.public_reference,
@@ -101,7 +103,9 @@ export const OrdersPage: React.FC = () => {
           id: orderData.public_reference,
           publicReference: orderData.public_reference,
           serverReference: orderData.public_reference,
+          serviceType: orderData.service_type,
           serverStatus: orderData.status,
+          manualReview: orderData.manual_review,
           statusMessage:
             orderData.status === 'refund_pending' || orderData.status === 'refunded'
               ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
@@ -283,7 +287,7 @@ export const OrdersPage: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-white text-base group-hover:text-[#00c365] transition-colors">
-                          {isInstantBundle && instantInfo
+                          {order.serviceType === 'afa' ? 'AFA Registration' : isInstantBundle && instantInfo
                             ? `${instantInfo.formattedAmount} ${instantInfo.categoryLabel} ⚡`
                             : isAirtime
                             ? order.bundle.dataAmount
@@ -331,7 +335,7 @@ export const OrdersPage: React.FC = () => {
                       <div className="text-sm font-extrabold text-white tabular-nums">
                         GH₵{order.amountGhc.toFixed(2)}
                       </div>
-                      <div className="mt-1">{statusBadge}</div>
+                      <div className="mt-1">{order.serviceType === 'afa' ? <span className="text-xs text-emerald-300">{afaStatusLabel(order.serverStatus,order.manualReview)}</span> : statusBadge}</div>
                     </div>
                     <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-[#00c365] group-hover:translate-x-1 transition-all" />
                   </div>

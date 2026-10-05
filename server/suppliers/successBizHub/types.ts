@@ -13,6 +13,10 @@ export interface SbhServiceItem {
   [key: string]: unknown;
 }
 
+export type SbhAfaRequest = import('../../../shared/afa.js').AfaPayload;
+export interface SbhAfaData { publicId: string; status: string; phone: string; priceMinor: string | number }
+export interface SbhAfaResponse { success: boolean; data?: SbhAfaData; error?: { code: string; message: string } }
+
 export interface SbhServicesResponse {
   status: string;
   data: SbhServiceItem[] | { services?: SbhServiceItem[] };

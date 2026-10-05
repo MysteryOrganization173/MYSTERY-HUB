@@ -1,3 +1,4 @@
+import { afaStatusLabel } from '../../../shared/afa';
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS } from '../../data/bundles';
@@ -70,11 +71,12 @@ export const OrderStatusModal: React.FC = () => {
           if (
             mappedStatus !== activeOrder?.status ||
             serverStatus !== activeOrder?.serverStatus ||
-            statusMessage !== activeOrder?.statusMessage
+            statusMessage !== activeOrder?.statusMessage || res.order.manual_review !== activeOrder?.manualReview
           ) {
             updateOrderStatus(activeOrder!.id, mappedStatus, {
               serverStatus,
               statusMessage,
+              manualReview:res.order.manual_review,
             });
           }
         }
@@ -99,6 +101,7 @@ export const OrderStatusModal: React.FC = () => {
 
   if (!isStatusModalOpen || !activeOrder) return null;
 
+  const isAfa = activeOrder.serviceType === 'afa';
   const currentNetwork = GHANA_NETWORKS[activeOrder.network];
   const displayRef = activeOrder.publicReference || activeOrder.id;
   const isRefundIssue = activeOrder.serverStatus === 'refund_pending' || activeOrder.serverStatus === 'refunded';
@@ -151,6 +154,8 @@ export const OrderStatusModal: React.FC = () => {
       step: 0,
     },
   }[activeOrder.status];
+
+  if (isAfa) statusConfig.label = afaStatusLabel(activeOrder.serverStatus,activeOrder.manualReview);
 
   const headingText =
     activeOrder.status === 'delivered'
@@ -215,10 +220,10 @@ export const OrderStatusModal: React.FC = () => {
           {/* Heading */}
           <div>
             <h3 className="text-2xl font-bold text-white tracking-tight">
-              {headingText}
+              {isAfa ? afaStatusLabel(activeOrder.serverStatus,activeOrder.manualReview) : headingText}
             </h3>
             <p className="text-xs text-slate-400 mt-2 max-w-sm mx-auto leading-relaxed">
-              {descriptionText}
+              {isAfa ? activeOrder.serverStatus === 'delivered' ? 'Your MTN AFA registration is confirmed.' : 'Payment and registration are separate stages. Follow this order for registration updates; contact support if it needs attention.' : descriptionText}
             </p>
           </div>
 
@@ -226,8 +231,8 @@ export const OrderStatusModal: React.FC = () => {
           <div className="bg-[#090d10] p-4 rounded-xl border border-slate-800 space-y-2">
             <div className="flex justify-between text-xs text-slate-400 font-medium">
               <span>Order Received</span>
-              <span>Delivery Progress</span>
-              <span>Delivered</span>
+              <span>{isAfa ? 'Registration Progress' : 'Delivery Progress'}</span>
+              <span>{isAfa ? 'Registered' : 'Delivered'}</span>
             </div>
             <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden flex">
               <div
@@ -284,6 +289,7 @@ export const OrderStatusModal: React.FC = () => {
                   ) {
                     return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount}`;
                   }
+                  if (isAfa) return 'MTN AFA Registration';
                   return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount} Data`;
                 })()}
               </div>

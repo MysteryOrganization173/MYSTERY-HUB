@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { getAfaConfig } from '../../services/afaApi';
 import { useApp } from '../../context/AppContext';
 import { DIGITAL_SERVICES, SAMPLE_SERVICE_ARTWORK } from '../../data/services';
 import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
@@ -41,6 +42,8 @@ export const MoreServicesPage: React.FC = () => {
   const { setActivePage, openWaitlist } = useApp();
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [afaAvailable, setAfaAvailable] = useState(false);
+  useEffect(() => {let active=true;getAfaConfig().then(config=>{if(active)setAfaAvailable(config.available);}).catch(()=>{});return()=>{active=false;};},[]);
 
   const categories = ['all', 'Connectivity', 'Utilities', 'Digital Presence', 'Education', 'Business Services', 'Productivity', 'Fintech Utility', 'Rewards'];
 
@@ -185,14 +188,19 @@ export const MoreServicesPage: React.FC = () => {
         <div className="block sm:hidden space-y-2.5">
           {filteredServices.map((service) => {
             const Icon = ICON_MAP[service.iconName] || Zap;
-            const isLive = service.status === 'active';
+            const isAfa = service.id === 'srv-afa';
+            const isLive = isAfa ? afaAvailable : service.status === 'active';
             const isBeta = service.status === 'beta';
 
             return (
               <div
                 key={service.id}
+                role={isAfa ? 'button' : undefined}
+                tabIndex={isAfa ? 0 : undefined}
+                onKeyDown={isAfa ? e => {if(e.key === 'Enter' || e.key === ' ') {e.preventDefault();setActivePage('afa');}} : undefined}
                 onClick={() => {
-                  if (service.id === 'srv-rewards') {
+                  if (isAfa) {setActivePage('afa');}
+                  else if (service.id === 'srv-rewards') {
                     setActivePage('earn');
                   } else if ((isLive || isBeta) && service.targetPage) {
                     setActivePage(service.targetPage);
@@ -236,12 +244,10 @@ export const MoreServicesPage: React.FC = () => {
                       Beta
                     </span>
                   ) : (
-                    <span className="text-[9px] font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded uppercase">
-                      Soon
-                    </span>
+                    <span className="text-[9px] font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded uppercase">{isAfa ? 'Unavailable' : 'Soon'}</span>
                   )}
 
-                  {isLive || isBeta ? (
+                  {isLive || isBeta || isAfa ? (
                     <ArrowRight className="w-4 h-4 text-slate-400" />
                   ) : (
                     <button
@@ -267,7 +273,8 @@ export const MoreServicesPage: React.FC = () => {
         <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
           {filteredServices.map((service) => {
             const Icon = ICON_MAP[service.iconName] || Zap;
-            const isLive = service.status === 'active';
+            const isAfa = service.id === 'srv-afa';
+            const isLive = isAfa ? afaAvailable : service.status === 'active';
             const isBeta = service.status === 'beta';
             const artwork = SAMPLE_SERVICE_ARTWORK[service.id];
 
@@ -327,9 +334,7 @@ export const MoreServicesPage: React.FC = () => {
                         Beta Preview
                       </span>
                     ) : (
-                      <span className="text-[10px] font-bold text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                        Coming Soon
-                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-full uppercase tracking-wider">{isAfa ? 'Unavailable' : 'Coming Soon'}</span>
                     )}
                   </div>
 
@@ -349,7 +354,7 @@ export const MoreServicesPage: React.FC = () => {
 
                 {/* Bottom Action */}
                 <div className="mt-5 pt-3.5 border-t border-slate-800/80 relative z-10">
-                  {service.id === 'srv-rewards' ? (
+                  {isAfa ? (<button onClick={() => setActivePage('afa')} className="w-full rounded-xl border border-amber-500 px-4 py-2.5 text-xs font-semibold text-amber-300">View AFA Registration</button>) : service.id === 'srv-rewards' ? (
                     <button
                       onClick={() => setActivePage('earn')}
                       className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-[#00c365] font-semibold text-xs border border-[#00c365]/30 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"

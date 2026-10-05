@@ -1,3 +1,5 @@
+import { AfaStore } from '../db/afaStore.js';
+import { AfaService } from '../services/afaService.js';
 import { adminMarketplaceRouter } from './adminMarketplaceApi.js';
 import { WebsiteUltraStore } from '../db/websiteUltraStore.js';
 /**
@@ -193,7 +195,7 @@ adminRouter.get('/orders/:reference', async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      order: toAdminOrderDetails(order),
+      order: { ...toAdminOrderDetails(order), ...(order.service_type === 'afa' ? { afa_registration: await AfaStore.operationalDetails(order.id) } : {}) },
     });
   } catch (err) {
     console.error('[Admin API] Get order error:', err);
@@ -229,7 +231,7 @@ adminRouter.post('/orders/:reference/refresh', async (req: Request, res: Respons
 
     res.json({
       success: true,
-      order: toAdminOrderDetails(refreshed),
+      order: { ...toAdminOrderDetails(refreshed), ...(refreshed.service_type === 'afa' ? { afa_registration: await AfaStore.operationalDetails(refreshed.id) } : {}) },
       message: 'Order status refreshed from supplier.',
     });
   } catch (err) {
@@ -307,6 +309,7 @@ adminRouter.patch('/orders/:reference/status', async (req: Request, res: Respons
       return;
     }
 
+    if (order.service_type === 'afa' && (marketplaceStatus || !['refund_pending','refunded','cancelled','failed'].includes(targetStatus))) { res.status(400).json({error:'AFA completion requires a confirmed supplier registered status. Use supplier refresh.'}); return; }
     let updated: OrderRecord | null = null;
     if (order.service_type === 'marketplace' || marketplaceStatus) {
       updated = await OrdersStore.updateMarketplaceStatus(order.id, targetStatus, adminNote);
@@ -763,6 +766,7 @@ adminRouter.get('/system', async (_req: Request, res: Response) => {
         nodeVersion: process.version,
         uptimeSeconds: Math.floor(process.uptime()),
         components: {
+          afa: await AfaService.publicConfig(),
           apiServer: { status: 'healthy', label: 'Online' },
           database: {
             status: dbConnected ? 'connected' : 'fallback',

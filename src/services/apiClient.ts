@@ -517,6 +517,7 @@ export interface AdminSystemStatus {
   nodeVersion: string;
   uptimeSeconds: number;
   components: {
+    afa?: {available:boolean;status:string;message:string};
     apiServer: { status: string; label: string };
     database: { status: string; type: string };
     paystack: { status: string; mode: string; currency: string };

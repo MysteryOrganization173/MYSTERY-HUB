@@ -1,6 +1,7 @@
 import { DigitalService } from '../types';
 
 export const DIGITAL_SERVICES: DigitalService[] = [
+  {id:'srv-afa',title:'MTN AFA Registration',category:'Connectivity',description:'Register your MTN number for AFA. View the registration fee, requirements and package information.',status:'active',iconName:'Smartphone',accentColor:'#F59E0B',targetPage:'afa'},
   {
     id: 'srv-data',
     title: 'High-Speed Data Bundles',

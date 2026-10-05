@@ -4,6 +4,8 @@
  * Serves as the single source of truth for both Paystack Webhooks and Verify API.
  */
 
+import { AfaStore } from '../db/afaStore.js';
+import { AfaService } from './afaService.js';
 import { OrdersStore } from '../db/ordersStore.js';
 import { OrderRecord, OrderStatus } from '../types/orders.js';
 import { SuccessBizHubProvider } from '../suppliers/successBizHub/provider.js';
@@ -321,6 +323,8 @@ export class FulfilmentService {
       // Already claimed or moved beyond 'paid' status by concurrent request
       return { order: paidOrder, alreadyHandled: true };
     }
+
+    if (claimedOrder.service_type === 'afa') return { order: await AfaService.submit(claimedOrder), alreadyHandled: false };
 
     // Step 3: Safety check: Is live fulfilment enabled?
     const isFulfillmentEnabled = this.provider.client.isFulfillmentEnabled();
@@ -659,6 +663,7 @@ export class FulfilmentService {
    * Can be forced by Admin manual refresh.
    */
   static async refreshOrderStatusIfDue(order: OrderRecord, force = false): Promise<OrderRecord> {
+    if (order.service_type === 'afa') return AfaService.refresh(order);
     const uncertainWithId = order.status === 'queued' && order.failure_reason === 'supplier_submission_uncertain';
     if (!order.supplier_order_id || (order.status !== 'submitted' && order.status !== 'processing' && !uncertainWithId)) {
       return order;
@@ -730,6 +735,7 @@ export class FulfilmentService {
     let scanned = 0;
     let updatedCount = 0;
     try {
+      await AfaStore.reconcileTerminalPayloads();
       const activeOrders = await OrdersStore.getActiveSupplierOrders(limit);
       scanned = activeOrders.length;
       for (const order of activeOrders) {
