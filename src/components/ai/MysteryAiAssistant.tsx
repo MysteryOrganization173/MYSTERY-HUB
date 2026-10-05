@@ -14,10 +14,6 @@ import {
   RotateCcw,
   ArrowRight,
   Sparkles,
-  Wifi,
-  Globe,
-  Grid2X2,
-  Clock,
   ExternalLink,
 } from 'lucide-react';
 
@@ -287,94 +283,43 @@ export const MysteryAiAssistant: React.FC = () => {
           aria-modal="true"
           className="pointer-events-auto mb-3 w-[calc(100vw-1.5rem)] sm:w-96 md:w-[420px] max-w-[calc(100vw-1.5rem)] h-[520px] max-h-[78vh] bg-[#0c1217] border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-200"
         >
-          {/* Header */}
+          {/* Clean, Premium Header */}
           <div className="px-4 py-3 bg-[#090e13] border-b border-slate-800 flex items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-2.5">
               <MysteryAiIcon size="md" active={isTyping} className="shrink-0" />
               <div className="leading-tight">
-                <div className="flex items-center gap-1.5">
-                  <h3 className="font-bold text-sm text-white">Mystery AI</h3>
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#00c365] animate-pulse" title="Online" />
-                  <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">Assistant</span>
-                </div>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[10px] text-slate-400">Viewing:</span>
-                  <span className="text-[10px] font-semibold text-[#00c365] bg-[#00c365]/10 px-1.5 py-0.2 rounded border border-[#00c365]/20">
-                    {getPageDisplayName(activePage)}
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-sm text-white tracking-tight">Mystery AI</h3>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#00c365]/10 border border-[#00c365]/20 text-[10px] font-medium text-[#00c365]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00c365] animate-pulse" />
+                    Online
                   </span>
                 </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">Customer Guide & Support</p>
               </div>
             </div>
 
             <div className="flex items-center gap-1">
               <button
                 onClick={handleClearHistory}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
                 title="Reset conversation"
                 aria-label="Reset conversation"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+                onClick={() => {
+                  closeMysteryAi();
+                  setIsOpen(false);
+                }}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
                 title="Close chat"
                 aria-label="Close chat"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-          </div>
-
-          {/* Quick Page Jump Bar */}
-          <div className="px-3 py-1.5 bg-[#080c10] border-b border-slate-800/80 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-[11px] shrink-0">
-            <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold shrink-0">
-              Jump:
-            </span>
-            <button
-              onClick={() => handleQuickActionClick('data')}
-              className={`px-2 py-0.5 rounded border transition-colors flex items-center gap-1 shrink-0 ${
-                activePage === 'data'
-                  ? 'bg-[#00c365]/20 text-[#00c365] border-[#00c365]/40 font-bold'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              <Wifi className="w-3 h-3" />
-              <span>Data</span>
-            </button>
-            <button
-              onClick={() => handleQuickActionClick('website')}
-              className={`px-2 py-0.5 rounded border transition-colors flex items-center gap-1 shrink-0 ${
-                activePage === 'website'
-                  ? 'bg-[#00c365]/20 text-[#00c365] border-[#00c365]/40 font-bold'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              <Globe className="w-3 h-3" />
-              <span>Websites</span>
-            </button>
-            <button
-              onClick={() => handleQuickActionClick('orders')}
-              className={`px-2 py-0.5 rounded border transition-colors flex items-center gap-1 shrink-0 ${
-                activePage === 'orders'
-                  ? 'bg-[#00c365]/20 text-[#00c365] border-[#00c365]/40 font-bold'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              <Clock className="w-3 h-3" />
-              <span>Orders</span>
-            </button>
-            <button
-              onClick={() => handleQuickActionClick('services')}
-              className={`px-2 py-0.5 rounded border transition-colors flex items-center gap-1 shrink-0 ${
-                activePage === 'services'
-                  ? 'bg-[#00c365]/20 text-[#00c365] border-[#00c365]/40 font-bold'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              <Grid2X2 className="w-3 h-3" />
-              <span>Services</span>
-            </button>
           </div>
 
           {/* Messages Scroll Area */}
@@ -433,28 +378,27 @@ export const MysteryAiAssistant: React.FC = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Programmatically Detected Page Suggested Questions */}
-          <div className="p-2.5 bg-[#0a0f13] border-t border-slate-800/80">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5 px-1 flex items-center justify-between">
-              <span className="flex items-center gap-1">
+          {/* Suggested Questions */}
+          {suggestedQuestions.length > 0 && (
+            <div className="px-3.5 py-2.5 bg-[#090d12] border-t border-slate-800/80 shrink-0">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5 px-0.5 flex items-center gap-1.5">
                 <Sparkles className="w-3 h-3 text-[#00c365]" />
-                <span>Suggested for {getPageDisplayName(activePage)}</span>
-              </span>
-              <span className="text-[9px] text-[#00c365] font-medium">Auto-detected</span>
+                <span>Suggested Questions</span>
+              </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+                {suggestedQuestions.map((sq) => (
+                  <button
+                    key={sq.id}
+                    onClick={() => handleSendMessage(sq.text)}
+                    disabled={isTyping}
+                    className="px-2.5 py-1 rounded-lg bg-[#121921] hover:bg-[#1a2530] text-slate-300 hover:text-white border border-slate-800/90 hover:border-[#00c365]/40 text-[11px] whitespace-nowrap transition-colors shrink-0 disabled:opacity-50 cursor-pointer"
+                  >
+                    {sq.text}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-              {suggestedQuestions.map((sq) => (
-                <button
-                  key={sq.id}
-                  onClick={() => handleSendMessage(sq.text)}
-                  disabled={isTyping}
-                  className="px-2.5 py-1 rounded-lg bg-[#131b22] hover:bg-[#1a2530] text-slate-300 hover:text-white border border-slate-800 hover:border-[#00c365]/40 text-[11px] whitespace-nowrap transition-colors shrink-0 disabled:opacity-50 cursor-pointer"
-                >
-                  {sq.text}
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
 
           {/* Input Footer */}
           <form

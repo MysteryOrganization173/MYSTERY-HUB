@@ -1,6 +1,7 @@
 import React from 'react';
 import { DataBundle } from '../../types';
 import { GHANA_NETWORKS } from '../../data/bundles';
+import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { ArrowRight } from 'lucide-react';
 
 interface CompactBundleRowProps {
@@ -35,15 +36,7 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
     >
       {/* Left: Network logo & Data Details */}
       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center font-extrabold text-xs shrink-0 shadow-sm"
-          style={{
-            backgroundColor: network.brandColor,
-            color: bundle.network === 'mtn' ? '#000' : '#fff',
-          }}
-        >
-          {bundle.network === 'mtn' ? 'MTN' : bundle.network === 'telecel' ? 't' : 'AT'}
-        </div>
+        <NetworkBrandBadge network={bundle.network} size="sm" />
 
         <div className="min-w-0 flex-1">
           {/* Top Line: Size + Single Dominant Badge */}

@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { DataBundle } from '../../types';
 import { GHANA_NETWORKS } from '../../data/bundles';
+import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { ArrowRight, CheckCircle2, Zap } from 'lucide-react';
 
 interface BundleCardProps {
@@ -45,14 +46,7 @@ export const BundleCard: React.FC<BundleCardProps> = ({
       {/* ROW 1: Network badge + Data Amount + Promo Tag + Price */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0 flex-wrap sm:flex-nowrap">
-          {/* Network indicator dot & code */}
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-300 shrink-0">
-            <span
-              className="w-2 h-2 rounded-full shrink-0"
-              style={{ backgroundColor: network.brandColor }}
-            />
-            {bundle.network === 'mtn' ? 'MTN' : bundle.network === 'telecel' ? 'Telecel' : 'AT'}
-          </span>
+          <NetworkBrandBadge network={bundle.network} size="xs" />
 
           {/* Amount */}
           <span className="text-base sm:text-lg font-black text-white tracking-tight group-hover:text-[#00c365] transition-colors shrink-0">

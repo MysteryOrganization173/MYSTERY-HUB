@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { PublicInstantBundle } from '../../services/apiClient';
 import { GHANA_NETWORKS } from '../../data/bundles';
+import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
 import { ArrowRight, Zap, AlertCircle, ShieldAlert } from 'lucide-react';
 
@@ -82,15 +83,7 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({
       {/* 1. Header: Network & Instant Badge */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <div
-            className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-sm"
-            style={{
-              backgroundColor: network.brandColor,
-              color: product.network === 'mtn' ? '#000' : '#fff',
-            }}
-          >
-            {product.network === 'mtn' ? 'MTN' : product.network === 'telecel' ? 'Telecel' : 'AT'}
-          </div>
+          <NetworkBrandBadge network={product.network} size="sm" />
           <div className="min-w-0">
             <span className="text-xs font-bold text-slate-200 block truncate">
               {network.name}

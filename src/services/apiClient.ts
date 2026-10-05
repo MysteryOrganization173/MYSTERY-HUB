@@ -1336,6 +1336,39 @@ export async function getActiveRewardRules(): Promise<RewardRulesResponse> {
   return data;
 }
 
+/**
+ * Authoritative AFA Service Configuration from backend
+ */
+export interface AfaConfigResponse {
+  success?: boolean;
+  serviceId?: string;
+  title?: string;
+  tagline?: string;
+  retailPriceGhc?: number;
+  retailPricePesewas?: number;
+  available?: boolean;
+  error?: string;
+}
+
+export async function getAfaConfigOnServer(timeoutMs = 8000): Promise<AfaConfigResponse | null> {
+  const url = `${API_BASE_URL}/api/afa/config`;
+  try {
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+    const res = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutHandle);
+    if (!res.ok) return null;
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 
 
 

@@ -4,6 +4,7 @@ import { GHANA_NETWORKS } from '../../data/bundles';
 import { lookupOrderOnServer, getAccountOrdersOnServer } from '../../services/apiClient';
 import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
 import { OrderRecord } from '../../types';
+import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { Clock, Search, ArrowRight, CheckCircle2, RefreshCw, AlertTriangle, Smartphone, ShieldCheck } from 'lucide-react';
 
 export const OrdersPage: React.FC = () => {
@@ -214,7 +215,16 @@ export const OrdersPage: React.FC = () => {
             {filteredOrders.map((order) => {
               const net = GHANA_NETWORKS[order.network] || GHANA_NETWORKS['mtn'];
 
-              const statusBadge = {
+              const isAfa =
+                order.bundle.id === 'bundle-afa-reg' ||
+                order.bundle.dataAmount === 'AFA Registration';
+
+              const statusBadge = isAfa && order.status === 'delivered' ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Registered
+                </span>
+              ) : {
                 verifying: (
                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-full animate-pulse">
                     <RefreshCw className="w-3 h-3 animate-spin" />
@@ -270,20 +280,14 @@ export const OrdersPage: React.FC = () => {
                   className="p-4 sm:p-5 rounded-2xl bg-[#0f151b] border border-slate-800 hover:border-[#00c365]/40 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer group shadow-sm"
                 >
                   <div className="flex items-center gap-3.5">
-                    <div
-                      className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-sm"
-                      style={{
-                        backgroundColor: net.brandColor,
-                        color: order.network === 'mtn' ? '#000' : '#fff',
-                      }}
-                    >
-                      {order.network === 'mtn' ? 'MTN' : order.network === 'telecel' ? 'Telecel' : 'AT'}
-                    </div>
+                    <NetworkBrandBadge network={order.network} size="md" />
 
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-white text-base group-hover:text-[#00c365] transition-colors">
-                          {isInstantBundle && instantInfo
+                          {isAfa
+                            ? 'AFA Registration'
+                            : isInstantBundle && instantInfo
                             ? `${instantInfo.formattedAmount} ${instantInfo.categoryLabel} ⚡`
                             : isAirtime
                             ? order.bundle.dataAmount

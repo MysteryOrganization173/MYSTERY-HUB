@@ -152,26 +152,40 @@ export const OrderStatusModal: React.FC = () => {
     },
   }[activeOrder.status];
 
-  const headingText =
-    activeOrder.status === 'delivered'
-      ? 'Order delivered successfully'
-      : activeOrder.status === 'verifying'
-      ? 'Confirming your payment'
-      : activeOrder.status === 'processing'
-      ? 'Your order is being processed'
-      : activeOrder.status === 'placed'
-      ? 'Order placed successfully'
-      : isRefundIssue
-      ? 'Refund in progress'
-      : activeOrder.status === 'failed'
-      ? 'Delivery issue'
-      : 'Order placed successfully';
+  const isAfa =
+    activeOrder.bundle.id === 'bundle-afa-reg' ||
+    activeOrder.bundle.dataAmount === 'AFA Registration';
 
-  const descriptionText =
-    activeOrder.statusMessage ||
-    (isRefundIssue
-      ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
-      : statusConfig.description);
+  const headingText = isAfa
+    ? activeOrder.status === 'delivered'
+      ? 'AFA REGISTERED'
+      : activeOrder.status === 'failed'
+      ? 'Registration issue'
+      : 'Registration in progress'
+    : activeOrder.status === 'delivered'
+    ? 'Order delivered successfully'
+    : activeOrder.status === 'verifying'
+    ? 'Confirming your payment'
+    : activeOrder.status === 'processing'
+    ? 'Your order is being processed'
+    : activeOrder.status === 'placed'
+    ? 'Order placed successfully'
+    : isRefundIssue
+    ? 'Refund in progress'
+    : activeOrder.status === 'failed'
+    ? 'Delivery issue'
+    : 'Order placed successfully';
+
+  const descriptionText = isAfa
+    ? activeOrder.status === 'delivered'
+      ? 'Your MTN number is now registered for eligible AFA offers. Dial *1848# to access the AFA menu.'
+      : activeOrder.status === 'failed'
+      ? activeOrder.statusMessage || 'Registration could not be completed. Please contact support.'
+      : "Your registration is still being processed. We'll update this order when registration is confirmed."
+    : activeOrder.statusMessage ||
+      (isRefundIssue
+        ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
+        : statusConfig.description);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -278,6 +292,9 @@ export const OrderStatusModal: React.FC = () => {
                     });
                     return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${info.formattedAmount} ${info.categoryLabel} ⚡`;
                   }
+                  if (isAfa) {
+                    return 'MTN AFA Registration';
+                  }
                   if (
                     activeOrder.serviceType === 'airtime' ||
                     (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('airtime-'))
@@ -304,19 +321,62 @@ export const OrderStatusModal: React.FC = () => {
             </div>
 
             {activeOrder.paymentReference && (
-              <div className="col-span-2 bg-[#0a0e12] p-3 rounded-xl border border-slate-800 flex items-center justify-between">
-                <div>
-                  <div className="text-[11px] text-slate-400">Paystack Reference</div>
-                  <div className="font-mono text-xs text-slate-300 mt-0.5 truncate max-w-xs">
-                    {activeOrder.paymentReference}
+              <div className="col-span-2 bg-[#090d11]/80 px-3.5 py-2.5 rounded-xl border border-slate-800/80 flex items-center justify-between text-left">
+                <div className="min-w-0 pr-2">
+                  <div className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">Payment Details</div>
+                  <div className="font-mono text-[11px] text-slate-400 mt-0.5 truncate" title={`Paystack Reference: ${activeOrder.paymentReference}`}>
+                    Paystack Ref: {activeOrder.paymentReference}
                   </div>
                 </div>
-                <span className="text-[10px] text-[#00c365] bg-[#00c365]/10 px-2 py-0.5 rounded font-semibold shrink-0">
-                  Verified Payment
+                <span className="text-[10px] text-emerald-400/90 bg-emerald-500/10 px-2 py-0.5 rounded font-medium shrink-0 border border-emerald-500/20">
+                  Verified
                 </span>
               </div>
             )}
           </div>
+
+          {/* AFA USSD Card when Registered (Requirement 7 & 4) */}
+          {isAfa && activeOrder.status === 'delivered' && (
+            <div className="bg-[#090d10] p-4 rounded-xl border border-emerald-500/30 text-left space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                  AFTER REGISTRATION
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">MTN USSD</span>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-xs text-slate-300">Dial:</span>
+                <span className="font-mono text-base font-extrabold text-white bg-slate-900 border border-emerald-500/30 px-2.5 py-0.5 rounded tracking-wider">
+                  *1848#
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Then follow the MTN AFA menu to view or purchase the offers available to your registered number.
+              </p>
+              <p className="text-[10px] text-slate-400 leading-normal border-t border-slate-800/80 pt-1.5">
+                The registration fee paid to Mystery Hub covers AFA registration only. Future AFA voice/data packages are purchased directly through MTN.
+              </p>
+            </div>
+          )}
+
+          {/* AFA Guidance when still in progress (Requirement 8 & 6) */}
+          {isAfa && activeOrder.status !== 'delivered' && activeOrder.status !== 'failed' && (
+            <div className="bg-[#090d10] p-3.5 sm:p-4 rounded-xl border border-slate-800 text-left space-y-1.5">
+              <div className="flex items-center gap-1.5 text-amber-400 text-xs font-semibold">
+                <Clock className="w-3.5 h-3.5" />
+                <span>Registration Status: In Progress</span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Your registration is still being processed. We&apos;ll update this order when registration is confirmed.
+              </p>
+              <p className="text-[10px] text-slate-400 leading-normal">
+                You may also receive an MTN confirmation/service message. If you do not, you can use <span className="font-mono text-emerald-400 font-semibold">*1848#</span> once your Mystery Hub order status shows Registered.
+              </p>
+              <p className="text-[10px] text-slate-500 pt-1 border-t border-slate-800/80">
+                The registration fee paid to Mystery Hub covers AFA registration only. Future AFA voice/data packages are purchased directly through MTN.
+              </p>
+            </div>
+          )}
 
           {/* Development Status Simulator (only visible in dev mode) */}
           {import.meta.env.DEV && (

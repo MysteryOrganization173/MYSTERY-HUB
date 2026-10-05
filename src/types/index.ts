@@ -215,11 +215,11 @@ export interface DigitalService {
   status: ServiceStatus;
   iconName: string;
   accentColor: string;
-  targetPage?: 'data' | 'website' | 'marketplace' | 'services' | 'about';
+  targetPage?: 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'afa';
   artworkUrl?: string;
 }
 
-export type ActivePage = 'home' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'orders' | 'admin' | 'earn';
+export type ActivePage = 'home' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'orders' | 'admin' | 'earn' | 'afa';
 
 export type MarketplaceAvailability = 'available' | 'check_availability' | 'limited' | 'coming_soon';
 

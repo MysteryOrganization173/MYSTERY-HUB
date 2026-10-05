@@ -32,6 +32,16 @@ export const DIGITAL_SERVICES: DigitalService[] = [
     targetPage: 'data',
   },
   {
+    id: 'srv-afa',
+    title: 'AFA Registration',
+    category: 'Connectivity',
+    description: 'Register your MTN number for eligible AFA offers securely through Mystery Hub.',
+    status: 'active',
+    iconName: 'Smartphone',
+    accentColor: '#00C365',
+    targetPage: 'afa',
+  },
+  {
     id: 'srv-ecg',
     title: 'ECG Prepaid & Postpaid Bills',
     category: 'Utilities',
