@@ -123,7 +123,7 @@ export const TemplateCardPreview: React.FC<TemplateCardPreviewProps> = ({
             {/* URL Pill */}
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#121921] border border-slate-800 text-[9px] font-mono text-slate-300 truncate max-w-[150px] sm:max-w-[180px]">
               <span className="w-1 h-1 rounded-full bg-[#00c365]" />
-              <span className="truncate">{domainSlug}.mysteryhub.site</span>
+              <span className="truncate">/sites/{domainSlug}</span>
             </div>
 
             {/* Tier Badge */}
@@ -160,7 +160,9 @@ export const TemplateCardPreview: React.FC<TemplateCardPreviewProps> = ({
               <div className="relative z-10 px-2.5 py-1.5 rounded-lg bg-slate-900/90 border border-emerald-500/30 flex items-center justify-between shadow-xs">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-xs bg-[#00c365]" />
-                  <span className="text-[9px] font-mono text-emerald-400 font-bold tracking-tight">HEADER</span>
+                  <span className="text-[9px] font-mono text-emerald-400 font-bold tracking-tight">
+                    {t.demoBusinessName || 'My Business'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-4 h-1 rounded-full bg-slate-700" />

@@ -481,13 +481,13 @@ export const TemplatePreviewModal: React.FC = () => {
                 }}
               >
                 <span style={{ color: palette.secondary }} className="font-bold shrink-0">
-                  https://
+                  /sites/
                 </span>
                 <span
                   className="truncate font-semibold"
                   style={{ color: isDarkBackground ? '#f8fafc' : '#0f172a' }}
                 >
-                  {siteSlug}.mysteryhub.site
+                  {siteSlug}
                 </span>
               </div>
 
