@@ -1,3 +1,5 @@
+import { WebsiteSettingsControls } from './WebsiteSettingsControls';
+import { trackWebsiteEvent } from '../../utils/websiteAnalytics';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { TEMPLATE_CATEGORIES, WEBSITE_TEMPLATES, orderedWebsiteTemplates } from '../../data/templates';
@@ -59,6 +61,8 @@ export const WebsiteBuilderPage: React.FC = () => {
   const [siteFetchError, setSiteFetchError] = useState<string | null>(null);
   const [actionLoadingSiteId, setActionLoadingSiteId] = useState<string | null>(null);
   const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
+
+  useEffect(() => { trackWebsiteEvent('website_builder_viewed', {source:'builder'}, sessionToken || undefined); }, [sessionToken]);
 
   // Load authenticated user's sites
   useEffect(() => {
@@ -152,6 +156,7 @@ export const WebsiteBuilderPage: React.FC = () => {
 
   const handleCreateSite = async (templateId: string, templateName?: string) => {
     const doCreate = async (token: string) => {
+      trackWebsiteEvent('website_build_started', {templateId,source:'builder'}, token);
       try {
         const res = await createWebsiteOnServer(token, {
           templateId,
@@ -270,7 +275,7 @@ export const WebsiteBuilderPage: React.FC = () => {
         onClose={closeWebsiteEditor}
         onSiteUpdated={(updated) => {
           setMySites((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-          openWebsiteEditor(updated);
+
         }}
         showToast={showToast}
       />
@@ -691,9 +696,7 @@ export const WebsiteBuilderPage: React.FC = () => {
                       <p className="text-white font-semibold">
                         {activeBaseTemplate?.title || 'Custom Layout'}
                       </p>
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Future Change Template workflow: Choose New Template → Preview → Preserve compatible business details → Confirm Change.
-                      </p>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">Change your layout while keeping your site address, business details and media library.</p>
                     </div>
 
                     <div className="space-y-1">
@@ -706,15 +709,8 @@ export const WebsiteBuilderPage: React.FC = () => {
                       </p>
                     </div>
 
-                    <div className="sm:col-span-2 pt-2.5 border-t border-slate-800/60 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-300 font-semibold">Danger Zone (Future Action)</span>
-                        <span className="text-slate-600 font-mono">Free Tier (1 of 1 site)</span>
-                      </div>
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Website Settings → Danger Zone → Delete Website will be available with a verified confirmation step. Backend deletion is already supported.
-                      </p>
-                    </div>
+                    <WebsiteSettingsControls site={activeSite} token={sessionToken!} onUpdated={updated=>{setMySites([updated]);showToast('Template changed successfully.','success');}} onDeleted={()=>{setMySites([]);showToast('Website deleted. You can create a new Free website.','success');}} />
+
                   </div>
                 )}
               </div>
@@ -896,7 +892,7 @@ export const WebsiteBuilderPage: React.FC = () => {
               </h2>
               <p className="text-xs text-slate-400 mt-1">
                 {activeSite
-                  ? 'Preview design layouts and sections. Safe template switching will be supported in a future update.'
+                  ? 'Preview design layouts and sections. Change your template from Website Settings.'
                   : 'Click "Preview" to test on any device or "Use" to create your free website immediately.'}
               </p>
             </div>

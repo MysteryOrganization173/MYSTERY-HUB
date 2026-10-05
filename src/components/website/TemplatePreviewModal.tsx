@@ -1,3 +1,4 @@
+import { trackWebsiteEvent } from '../../utils/websiteAnalytics';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { createWebsiteOnServer } from '../../services/apiClient';
@@ -43,6 +44,9 @@ export const TemplatePreviewModal: React.FC = () => {
   const [copiedLink, setCopiedLink] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(()=>{if(selectedTemplatePreview)trackWebsiteEvent('website_template_previewed',{templateId:selectedTemplatePreview.id,source:'builder'},sessionToken || undefined);},[selectedTemplatePreview?.id]);
 
   // Sync mobile screen detection
   useEffect(() => {
@@ -131,7 +135,7 @@ export const TemplatePreviewModal: React.FC = () => {
   // Handle postMessage from isolated iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'MYSTERYHUB_TEMPLATE_CTA') {
+      if (event.origin === window.location.origin && event.source === iframeRef.current?.contentWindow && event.data?.type === 'MYSTERYHUB_TEMPLATE_CTA') {
         handleStartBuilding();
       }
     };
@@ -171,6 +175,7 @@ export const TemplatePreviewModal: React.FC = () => {
     handleClose();
 
     const doCreate = async (token: string) => {
+      trackWebsiteEvent('website_build_started',{templateId:t.id,source:'builder'},token);
       try {
         const res = await createWebsiteOnServer(token, {
           templateId: t.id,
@@ -522,6 +527,7 @@ export const TemplatePreviewModal: React.FC = () => {
                 }}
               >
                 <iframe
+                  ref={iframeRef}
                   key={`${t.id}-${deviceView}-${iframeKey}`}
                   src={`/?isolated_template_preview=${encodeURIComponent(t.id)}`}
                   title={`${t.title} ${deviceView} preview`}

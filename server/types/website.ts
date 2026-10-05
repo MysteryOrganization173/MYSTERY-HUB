@@ -74,6 +74,7 @@ export interface CreateWebsiteInput {
 }
 
 export interface UpdateWebsiteInput {
+  expectedUpdatedAt?: string;
   name?: string;
   content?: Partial<SiteContent>;
   settings?: Partial<SiteSettings>;
@@ -204,14 +205,9 @@ export function sanitizeColor(color: unknown, fallback = '#00c365'): string {
 export function sanitizeUrl(url: unknown): string {
   if (typeof url !== 'string') return '';
   const trimmed = url.trim();
-  if (
-    trimmed.startsWith('https://') ||
-    trimmed.startsWith('http://') ||
-    trimmed.startsWith('tel:') ||
-    trimmed.startsWith('mailto:') ||
-    trimmed.startsWith('/')
-  ) {
-    return trimmed.slice(0, 500);
-  }
+  if (trimmed.length > 500 || /[<>\s\\]/.test(trimmed)) return '';
+  if (/^\/(?!\/)/.test(trimmed) || /^#[a-zA-Z0-9_-]+$/.test(trimmed)) return trimmed;
+  if (/^tel:\+?\d{7,15}$/.test(trimmed) || /^mailto:[^@]+@[^@]+\.[^@]+$/.test(trimmed)) return trimmed;
+  try { const parsed = new URL(trimmed); if (['http:','https:'].includes(parsed.protocol) && !parsed.username && !parsed.password) return parsed.href; } catch {}
   return '';
 }

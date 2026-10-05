@@ -1,3 +1,5 @@
+import { WebsiteImageField } from './WebsiteImageField';
+import { trackWebsiteEvent } from '../../../utils/websiteAnalytics';
 import React, { useState, useEffect, useRef } from 'react';
 import { WebsiteSiteRecord, SiteContent, SiteSettings, WebsiteTemplate } from '../../../types';
 import { updateWebsiteOnServer, publishWebsiteOnServer, unpublishWebsiteOnServer } from '../../../services/apiClient';
@@ -52,10 +54,19 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const { openMysteryAi } = useApp();
   const [currentSite, setCurrentSite] = useState<WebsiteSiteRecord>(initialSite);
 
+  useEffect(() => { trackWebsiteEvent('website_editor_opened', { siteId:initialSite.id, templateId:initialSite.template_id, source:'editor' }, sessionToken); }, [initialSite.id, sessionToken]);
+
   // Form State
   const [siteName, setSiteName] = useState(initialSite.name);
   const [content, setContent] = useState<SiteContent>(initialSite.content_json);
   const [settings, setSettings] = useState<SiteSettings>(initialSite.settings_json);
+
+  const draftRef = useRef({name:siteName,content,settings});
+  draftRef.current = {name:siteName,content,settings};
+  const serverSiteRef = useRef(currentSite);
+  const editVersion = useRef(0), savedVersion = useRef(0);
+  const savingJob = useRef<Promise<WebsiteSiteRecord | null> | null>(null);
+  const failedSaveVersion = useRef<number | null>(null);
 
   // Status & Dirty Tracking
   const [isDirty, setIsDirty] = useState(false);
@@ -116,6 +127,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
   // Mark dirty on any edit
   const markDirty = () => {
+    editVersion.current++;
     setIsDirty(true);
     setSaveStatusText('unsaved');
   };
@@ -147,58 +159,46 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     return () => observer.disconnect();
   }, [previewDevice, activeTab]);
 
-  // Explicit Save Handler
-  const handleSaveDraft = async () => {
-    if (isSaving) return;
-    setIsSaving(true);
-    setSaveStatusText('saving');
-
-    try {
-      const res = await updateWebsiteOnServer(sessionToken, currentSite.id, {
-        name: siteName,
-        content,
-        settings,
-      });
-
-      if (res.success && res.site) {
-        setCurrentSite(res.site);
-        onSiteUpdated(res.site);
-        setIsDirty(false);
-        setSaveStatusText('saved');
-        showToast('Changes saved successfully.', 'success');
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Failed to save changes.', 'warning');
-      setSaveStatusText('unsaved');
-    } finally {
-      setIsSaving(false);
-    }
+  // A completed save only acknowledges the snapshot it sent, not edits made during the request.
+  const handleSaveDraft = async (): Promise<WebsiteSiteRecord | null> => {
+    if (savingJob.current) return savingJob.current;
+    const version=editVersion.current, snapshot=draftRef.current;
+    setIsSaving(true);setSaveStatusText('saving');
+    const job=(async()=>{
+      try {
+        const res=await updateWebsiteOnServer(sessionToken,currentSite.id,{...snapshot,expectedUpdatedAt:serverSiteRef.current.updated_at});
+        failedSaveVersion.current=null;
+        serverSiteRef.current=res.site;setCurrentSite(res.site);onSiteUpdated(res.site);savedVersion.current=version;
+        const unchanged=editVersion.current===version;
+        setIsDirty(!unchanged);setSaveStatusText(unchanged?'saved':'unsaved');
+        if(unchanged){setSiteName(res.site.name);setContent(res.site.content_json);setSettings(res.site.settings_json);}
+        return res.site;
+      } catch(err:any) {failedSaveVersion.current=version;showToast(err.message || 'Failed to save changes.','warning');setSaveStatusText('unsaved');return null;}
+      finally {setIsSaving(false);savingJob.current=null;}
+    })();
+    savingJob.current=job;return job;
   };
 
   // Debounced Autosave (2.5 seconds of inactivity)
   useEffect(() => {
-    if (!isDirty) return;
+    // Retry on a new edit or explicit Save, instead of repeating failed requests/toasts.
+    if (!isDirty || isSaving || isPublishing || failedSaveVersion.current===editVersion.current) return;
     const timer = setTimeout(() => {
       handleSaveDraft();
     }, 2500);
     return () => clearTimeout(timer);
-  }, [isDirty, siteName, content, settings]);
+  }, [isDirty, siteName, content, settings, isSaving, isPublishing]);
 
   // Publish / Unpublish Handlers
   const handlePublish = async () => {
     setIsPublishing(true);
     try {
-      // Save current changes first if dirty
-      if (isDirty) {
-        await updateWebsiteOnServer(sessionToken, currentSite.id, {
-          name: siteName,
-          content,
-          settings,
-        });
-      }
+      if (savingJob.current && !(await savingJob.current)) throw new Error('Save failed. Publishing was stopped.');
+      if (editVersion.current !== savedVersion.current && !(await handleSaveDraft())) throw new Error('Save failed. Publishing was stopped.');
 
       const res = await publishWebsiteOnServer(sessionToken, currentSite.id);
       if (res.success && res.site) {
+        serverSiteRef.current=res.site;
         setCurrentSite(res.site);
         onSiteUpdated(res.site);
         setIsDirty(false);
@@ -217,6 +217,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     try {
       const res = await unpublishWebsiteOnServer(sessionToken, currentSite.id);
       if (res.success && res.site) {
+        serverSiteRef.current=res.site;
         setCurrentSite(res.site);
         onSiteUpdated(res.site);
         showToast('Website unpublished (reverted to draft mode).', 'info');
@@ -675,7 +676,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
           </div>
 
           {/* Form Content Area */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+          <div inert={isPublishing} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
             {/* First-Use Onboarding Guidance Card */}
             {showOnboarding && (
               <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0c1824] to-[#0d141b] border border-[#00c365]/35 shadow-xl relative animate-in fade-in slide-in-from-top-2 text-left">
@@ -1013,24 +1014,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     )}
                   </div>
 
-                  {/* Image URL Input */}
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-300 block">Image URL</label>
-                    <input
-                      type="url"
-                      value={content.heroImage}
-                      maxLength={500}
-                      onChange={(e) => {
-                        setContent({ ...content, heroImage: e.target.value });
-                        markDirty();
-                      }}
-                      placeholder="https://..."
-                      className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#00c365]"
-                    />
-                    <p className="text-[11px] text-slate-500">
-                      Paste a direct image URL. Direct file upload will be integrated in an upcoming update.
-                    </p>
-                  </div>
+                  <WebsiteImageField label="Hero / Cover Image" value={content.heroImage} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,heroImage:url});markDirty();}} />
                 </div>
 
                 {/* Brand Logo Asset Container */}
@@ -1064,23 +1048,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     </div>
                   )}
 
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-300 block">Image URL</label>
-                    <input
-                      type="url"
-                      value={content.logoUrl || ''}
-                      maxLength={500}
-                      onChange={(e) => {
-                        setContent({ ...content, logoUrl: e.target.value });
-                        markDirty();
-                      }}
-                      placeholder="https://..."
-                      className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#00c365]"
-                    />
-                    <p className="text-[11px] text-slate-500">
-                      Paste a direct link to a transparent PNG or JPG logo.
-                    </p>
-                  </div>
+                  <WebsiteImageField label="Brand Logo" value={content.logoUrl || ''} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,logoUrl:url});markDirty();}} />
                 </div>
               </div>
             )}
@@ -1089,6 +1057,9 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             {activeSection === 'sections' && (
               <div className="animate-in fade-in">
                 <WebsiteSectionsControl
+                  templateId={currentSite.template_id}
+                  siteId={currentSite.id}
+                  token={sessionToken}
                   content={content}
                   onChange={(next) => {
                     setContent(next);

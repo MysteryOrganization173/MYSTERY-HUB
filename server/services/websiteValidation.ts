@@ -1,4 +1,5 @@
 import { SECTION_REGISTRY, sectionEligible, resolveWebsitePlan, type WebsiteComposition, type WebsiteSectionType, type SectionData, type UltraEnquiryInput } from '../../src/config/websiteBuilder.js';
+import { sanitizeUrl } from '../types/website.js';
 export class WebsiteInputError extends Error {}
 function fail(message: string): never { throw new WebsiteInputError(message); }
 function object(value: unknown): Record<string, unknown> {
@@ -37,7 +38,13 @@ export function validateWebsiteComposition(value: unknown, userId: string): Webs
     const rawData = object(section.data); keys(rawData, ['heading', 'body', 'image', 'alt', 'ctaLabel', 'ctaUrl', 'items']);
     const data: SectionData = {};
     for (const key of ['heading', 'body', 'alt', 'ctaLabel'] as const) if (rawData[key] !== undefined) data[key] = safeWebsiteText(rawData[key], key === 'body' ? 2000 : 150);
-    for (const key of ['image', 'ctaUrl'] as const) if (rawData[key] !== undefined) data[key] = safeWebsiteUrl(rawData[key]);
+    if (rawData.image !== undefined) data.image = safeWebsiteUrl(rawData.image);
+    if (rawData.ctaUrl !== undefined) {
+      const raw = safeWebsiteText(rawData.ctaUrl, 500);
+      const result = sanitizeUrl(raw);
+      if (raw && !result) fail('Invalid CTA destination.');
+      data.ctaUrl = result;
+    }
     if (rawData.items !== undefined) {
       if (!Array.isArray(rawData.items) || rawData.items.length > 30) fail('Invalid section items.');
       data.items = rawData.items.map(rawItem => {
@@ -51,6 +58,48 @@ export function validateWebsiteComposition(value: unknown, userId: string): Webs
   for (const type of ['header', 'footer'] as const) if (sections.filter(s => s.type === type).length !== 1 || !sections.find(s => s.type === type)?.enabled) fail('One enabled header and footer are required.');
   if (sections[0].type !== 'header' || sections.at(-1)?.type !== 'footer') fail('Header must be first and footer last.');
   return { version: 1, sections };
+}
+/** Validate only supplied fields, so historical contact snapshots can still be read/edited. */
+export function validateWebsiteContentPatch(value: unknown): void {
+  if (value === undefined) return;
+  const content = object(value);
+  keys(content, ['composition','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','social','items','stats','features']);
+  const limits = { businessName:100, tagline:150, aboutText:2000, location:150, phone:30, whatsapp:30, email:100, ctaLabel:50 };
+  for (const [key, max] of Object.entries(limits)) if (content[key] !== undefined) safeWebsiteText(content[key], max);
+  for (const key of ['phone','whatsapp']) {
+    const value = content[key];
+    if (value && (typeof value !== 'string' || !/^\+?[\d ()-]+$/.test(value) || value.replace(/\D/g,'').length < 7 || value.replace(/\D/g,'').length > 15)) fail('Enter a valid contact phone number.');
+  }
+  if (content.email && (typeof content.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(content.email))) fail('Enter a valid email address.');
+  for (const key of ['heroImage','logoUrl','ctaTarget']) if (content[key] !== undefined) {
+    const raw = safeWebsiteText(content[key],500);
+    if (raw && !sanitizeUrl(raw)) fail('Invalid image or CTA URL.');
+    if (key !== 'ctaTarget' && raw && !/^https?:\/\//i.test(raw) && !/^\/(?!\/)/.test(raw)) fail('Invalid image URL.');
+  }
+  if (content.social !== undefined) {
+    const social = object(content.social); keys(social,['instagram','facebook','tiktok']);
+    for (const [key,value] of Object.entries(social)) {
+      const raw = safeWebsiteText(value,key === 'facebook' ? 100 : 50);
+      if (raw && !/^[a-zA-Z0-9_.@-]+$/.test(raw) && !/^https?:\/\//.test(raw)) fail('Use a social username or a full URL.');
+      if (/^https?:/.test(raw) && !sanitizeUrl(raw)) fail('Invalid social URL.');
+    }
+  }
+  if (content.stats !== undefined) {
+    if (!Array.isArray(content.stats) || content.stats.length > 8) fail('Too many statistics.');
+    for (const raw of content.stats) { const stat = object(raw); keys(stat,['label','value']); safeWebsiteText(stat.label,50); safeWebsiteText(stat.value,50); }
+  }
+  if (content.features !== undefined) {
+    if (!Array.isArray(content.features) || content.features.length > 10) fail('Too many features.');
+    content.features.forEach(value => safeWebsiteText(value,80));
+  }
+  if (content.items !== undefined) {
+    if (!Array.isArray(content.items) || content.items.length > 50) fail('Too many business items.');
+    for (const raw of content.items) {
+      const item = object(raw); keys(item,['id','name','price','category','network','desc','tag','image']);
+      for (const [key,max] of Object.entries({ id:64,name:100,price:40,category:50,network:50,desc:300,tag:40 })) if (item[key] !== undefined) safeWebsiteText(item[key],max);
+      if (item.image !== undefined) { const url = safeWebsiteText(item.image,500); if (url && (!sanitizeUrl(url) || !/^https?:\/\//.test(url))) fail('Invalid item image.'); }
+    }
+  }
 }
 export function validateUltraEnquiry(value: unknown): UltraEnquiryInput {
   const input = object(value); keys(input, ['businessName', 'businessType', 'contactName', 'phone', 'email', 'existingDomain', 'estimatedPages', 'featuresRequirements', 'preferredStyle', 'referenceWebsite', 'projectNotes']);

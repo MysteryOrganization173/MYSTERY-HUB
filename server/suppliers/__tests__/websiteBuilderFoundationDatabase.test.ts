@@ -9,6 +9,7 @@ import { WebsiteUltraStore } from '../../db/websiteUltraStore.js';
 import { ultraRouter } from '../../routes/websiteUltraApi.js';
 import { WebsiteStore } from '../../db/websiteStore.js';
 const originalQuery = pg.Pool.prototype.query;
+const originalConnect = pg.Pool.prototype.connect;
 const oldUrl = process.env.DATABASE_URL;
 const input = { businessName: "Ama's Studio", businessType:'Design', contactName:'Ama', phone:'0241111111', existingDomain:'no', estimatedPages:2, featuresRequirements:'Gallery', preferredStyle:'Clean', projectNotes:'Launch soon' };
 let statements: { sql:string; values:any[] }[] = [], leads: any[] = [], site: any, failInsert = false;
@@ -17,6 +18,7 @@ before(async () => {
   process.env.DATABASE_URL='postgresql://fixture.invalid/never-contacted'; process.env.NODE_ENV='test';
   pg.Pool.prototype.query = (async (sql:string, values:any[]=[]) => {
     statements.push({sql,values});
+    if (['BEGIN','COMMIT','ROLLBACK'].includes(sql) || sql.includes('pg_advisory_xact_lock')) return {rows:[]};
     if (sql.startsWith('INSERT INTO website_ultra_enquiries')) {
       if (failInsert) throw new Error('Fixture write failed');
       leads.push({id:values[0],reference:values[1],user_id:values[2],brief:JSON.parse(values[3]),status:values[4],created_at:values[5]});return {rows:[]};
@@ -27,10 +29,11 @@ before(async () => {
     if (sql.includes('UPDATE website_sites')) {site.content_json=JSON.parse(values[1]);return {rows:[]};}
     throw new Error(`Unexpected query: ${sql}`);
   }) as any;
+  pg.Pool.prototype.connect = (async function(this:pg.Pool){return {query:this.query.bind(this),release(){}};}) as any;
   const app=express();app.use(express.json());app.use('/ultra',ultraRouter);
   server=await new Promise<Server>(resolve=>{const running=app.listen(0,'127.0.0.1',()=>resolve(running));});base=`http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
-after(async()=>{pg.Pool.prototype.query=originalQuery;if(oldUrl===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=oldUrl;await new Promise<void>(resolve=>server.close(()=>resolve()));});
+after(async()=>{pg.Pool.prototype.connect=originalConnect;pg.Pool.prototype.query=originalQuery;if(oldUrl===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=oldUrl;await new Promise<void>(resolve=>server.close(()=>resolve()));});
 beforeEach(()=>{statements=[];leads=[];failInsert=false;site={id:'site-db',user_id:'owner',name:'Studio',template_id:'tmpl-start-blank',slug:'studio',status:'draft',content_json:{businessName:'Studio'},settings_json:{primaryColor:'#000000',accentColor:'#00c365'},created_at:new Date().toISOString(),updated_at:new Date().toISOString(),published_at:null};});
 test('PostgreSQL enquiry insert parameterizes contacts and stores exact sanitized brief',async()=>{const record=await WebsiteUltraStore.create(input,'owner');const saved=await WebsiteUltraStore.list(25,0);assert.equal(saved.total,1);assert.equal(saved.enquiries[0].reference,record.reference);assert.equal(saved.enquiries[0].user_id,'owner');assert.equal(saved.enquiries[0].brief.businessName,"Ama's Studio");assert.ok(!statements[0].sql.includes("Ama's"));assert.ok(statements[0].sql.includes('$6'));});
 test('database listing passes bounded pagination as parameters',async()=>{await WebsiteUltraStore.create(input);await WebsiteUltraStore.list(10,20);const select=statements.find(s=>s.sql.includes('ORDER BY'));assert.deepEqual(select?.values,[10,20]);});

@@ -44,6 +44,14 @@ export function createWebsiteComposition(types: WebsiteSectionType[] = ['header'
 export function sectionEligible(type: WebsiteSectionType, variant: string, _plan: WebsitePlan): boolean {
   return (SECTION_REGISTRY[type].variants as readonly string[]).includes(variant);
 }
+/** Active legacy item controls reflect fields those existing renderers actually support. */
+export function websiteTemplateItemFields(templateId: string): ('name'|'price'|'category'|'tag'|'image'|'desc')[] {
+  if (templateId === 'tmpl-vortex-tech') return ['name','category','desc'];
+  if (templateId === 'tmpl-lens-creative') return ['name','category','desc','image'];
+  if (templateId === 'tmpl-akwaaba-hotel') return ['name','price','desc','image'];
+  if (['tmpl-accra-build','tmpl-glow-salon','tmpl-goldcoast-realty'].includes(templateId)) return ['name','price','category','desc','image'];
+  return ['name','price','category','tag','desc','image'];
+}
 export interface StructuredWebsiteBrief {
   identity: { businessName: string; businessType: string; location?: string; description: string };
   brand: { primaryColor: string; accentColor: string; designSystemId: string };

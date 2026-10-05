@@ -31,6 +31,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
   });
 
   const handleAddToCart = (productName: string) => {
+    if (template.siteContent) { onCtaClick?.(); return; }
     setCartCount((prev) => prev + 1);
     setNotification(`Added "${productName}" to cart!`);
     setTimeout(() => setNotification(null), 3000);
@@ -39,7 +40,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
   return (
     <div className="bg-[#f8fafc] text-slate-900 font-sans min-h-full">
       {/* Top E-Commerce Announcement Bar */}
-      <div className="bg-[#2563eb] text-white text-xs px-4 py-2 text-center font-bold tracking-wide flex items-center justify-center gap-2">
+      <div className="bg-[var(--website-accent,#2563eb)] text-white text-xs px-4 py-2 text-center font-bold tracking-wide flex items-center justify-center gap-2">
         <Flame className="w-3.5 h-3.5 text-amber-300" />
         <span>⚡ Flash Sale: Same-Day Delivery in Accra on all orders placed before 3:00 PM!</span>
       </div>
@@ -47,7 +48,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
       {/* Navigation */}
       <nav className="bg-white border-b border-slate-200 px-4 sm:px-8 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#2563eb] text-white flex items-center justify-center font-black">
+          <div className="w-9 h-9 rounded-xl bg-[var(--website-accent,#2563eb)] text-white flex items-center justify-center font-black">
             GH
           </div>
           <div>
@@ -75,19 +76,19 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
           <button
             onClick={onCtaClick}
             className="relative p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors cursor-pointer"
-            title="Cart"
+            title={template.siteContent ? 'Contact this business' : 'Cart'}
           >
             <ShoppingBag className="w-4 h-4" />
             <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#ef4444] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-              {cartCount}
+              {template.siteContent ? <Phone className="w-3 h-3" /> : cartCount}
             </span>
           </button>
 
           <button
             onClick={onCtaClick}
-            className="px-3.5 py-2 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-bold text-xs transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-[var(--website-accent,#2563eb)] hover:bg-[#1d4ed8] text-white font-bold text-xs transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
           >
-            <span>Checkout</span>
+            <span>{template.siteContent?.ctaLabel || (template.siteContent ? 'Contact' : 'Checkout')}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -120,7 +121,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
           <div className="pt-2 flex flex-wrap gap-2.5">
             <a
               href="#products"
-              className="px-5 py-2.5 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-2"
+              className="px-5 py-2.5 rounded-xl bg-[var(--website-accent,#2563eb)] hover:bg-[#1d4ed8] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-2"
             >
               <span>Browse Catalog</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -140,7 +141,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
       <div className="bg-white border-b border-slate-200 py-4 px-6 sm:px-12">
         <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
           <div className="flex items-center gap-2.5">
-            <Truck className="w-5 h-5 text-[#2563eb] shrink-0" />
+            <Truck className="w-5 h-5 text-[var(--website-accent,#2563eb)] shrink-0" />
             <div>
               <div className="font-bold text-slate-800">Same-Day Dispatch</div>
               <div className="text-[10px] text-slate-500">Across Greater Accra</div>
@@ -154,7 +155,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
             </div>
           </div>
           <div className="flex items-center gap-2.5">
-            <Check className="w-5 h-5 text-[#2563eb] shrink-0" />
+            <Check className="w-5 h-5 text-[var(--website-accent,#2563eb)] shrink-0" />
             <div>
               <div className="font-bold text-slate-800">Pay on Delivery</div>
               <div className="text-[10px] text-slate-500">MoMo or Cash in Accra</div>
@@ -183,13 +184,13 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-            {['All', 'Laptops', 'Audio', 'Accessories'].map((cat) => (
+            {(template.siteContent ? ['All', ...new Set(products.map(item=>item.category).filter((category):category is string=>Boolean(category) && category!=='All'))] : ['All', 'Laptops', 'Audio', 'Accessories']).map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
                 className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   activeCategory === cat
-                    ? 'bg-[#2563eb] text-white'
+                    ? 'bg-[var(--website-accent,#2563eb)] text-white'
                     : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
                 }`}
               >
@@ -229,7 +230,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
                     <Star className="w-3.5 h-3.5 fill-current" />
                     <span className="text-[11px] text-slate-500 font-semibold ml-1">(48)</span>
                   </div>
-                  <h3 className="font-bold text-sm text-slate-900 group-hover:text-[#2563eb] transition-colors">
+                  <h3 className="font-bold text-sm text-slate-900 group-hover:text-[var(--website-accent,#2563eb)] transition-colors">
                     {p.name}
                   </h3>
                   <div className="font-extrabold text-base text-slate-900">
@@ -244,10 +245,10 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
               <div className="p-4 pt-0 space-y-2">
                 <button
                   onClick={() => handleAddToCart(p.name)}
-                  className="w-full py-2.5 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+                  className="w-full py-2.5 rounded-xl bg-[var(--website-accent,#2563eb)] hover:bg-[#1d4ed8] text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
                 >
                   <ShoppingBag className="w-3.5 h-3.5" />
-                  <span>Add to Bag</span>
+                  <span>{template.siteContent ? 'Enquire' : 'Add to Bag'}</span>
                 </button>
               </div>
             </div>

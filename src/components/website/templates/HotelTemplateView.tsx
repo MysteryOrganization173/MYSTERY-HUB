@@ -25,55 +25,56 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
 
   const handleBooking = (e: React.FormEvent) => {
     e.preventDefault();
+    if (template.siteContent) { onCtaClick?.(); return; }
     setBooked(true);
     setTimeout(() => setBooked(false), 5000);
   };
 
   return (
-    <div className="bg-[#f8f6f0] text-[#192b23] font-sans min-h-full">
+    <div className="bg-[var(--website-background,#f8f6f0)] text-[#192b23] font-sans min-h-full">
       {/* Top Banner */}
-      <div className="bg-[#132e23] text-[#f8f6f0] text-xs px-4 py-2 text-center tracking-wider flex items-center justify-center gap-2">
-        <Palmtree className="w-3.5 h-3.5 text-[#10b981]" />
+      <div className="bg-[var(--website-primary,#132e23)] text-[var(--website-background,#f8f6f0)] text-xs px-4 py-2 text-center tracking-wider flex items-center justify-center gap-2">
+        <Palmtree className="w-3.5 h-3.5 text-[var(--website-accent,#10b981)]" />
         <span>Where the Volta River Meets the Atlantic · Private Eco Chalets in Ada Foah</span>
       </div>
 
       {/* Navigation */}
       <nav className="bg-white/95 backdrop-blur-md border-b border-[#e8e5dc] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[#132e23] text-[#10b981] flex items-center justify-center font-bold">
+          <div className="w-9 h-9 rounded-full bg-[var(--website-primary,#132e23)] text-[var(--website-accent,#10b981)] flex items-center justify-center font-bold">
             <Palmtree className="w-5 h-5" />
           </div>
           <div>
-            <span className="font-extrabold text-base tracking-tight text-[#132e23] block leading-none font-serif">
+            <span className="font-extrabold text-base tracking-tight text-[var(--website-primary,#132e23)] block leading-none font-serif">
               {template.demoBusinessName}
             </span>
-            <span className="text-[10px] text-[#10b981] uppercase tracking-widest font-bold block mt-0.5">
+            <span className="text-[10px] text-[var(--website-accent,#10b981)] uppercase tracking-widest font-bold block mt-0.5">
               Eco-Resort & Beachfront Villas
             </span>
           </div>
         </div>
 
         <div className="hidden md:flex items-center gap-6 text-xs font-semibold text-[#687e74] uppercase tracking-wider">
-          <a href="#suites" className="hover:text-[#132e23] transition-colors">
+          <a href="#suites" className="hover:text-[var(--website-primary,#132e23)] transition-colors">
             Villas & Suites
           </a>
-          <a href="#experiences" className="hover:text-[#132e23] transition-colors">
+          <a href="#experiences" className="hover:text-[var(--website-primary,#132e23)] transition-colors">
             Experiences
           </a>
-          <a href="#reserve" className="hover:text-[#132e23] transition-colors">
+          <a href="#reserve" className="hover:text-[var(--website-primary,#132e23)] transition-colors">
             Book Stay
           </a>
-          <a href="#location" className="hover:text-[#132e23] transition-colors">
+          <a href="#location" className="hover:text-[var(--website-primary,#132e23)] transition-colors">
             Ada Location
           </a>
         </div>
 
         <button
           onClick={onCtaClick}
-          className="px-4 py-2 rounded-full bg-[#132e23] hover:bg-[#1f4838] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+          className="px-4 py-2 rounded-full bg-[var(--website-primary,#132e23)] hover:bg-[#1f4838] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
         >
-          <Calendar className="w-3.5 h-3.5 text-[#10b981]" />
-          <span>Check Availability</span>
+          <Calendar className="w-3.5 h-3.5 text-[var(--website-accent,#10b981)]" />
+          <span>{template.siteContent?.ctaLabel || 'Check Availability'}</span>
         </button>
       </nav>
 
@@ -81,8 +82,8 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       <div className="relative py-16 sm:py-24 px-6 sm:px-12 bg-gradient-to-r from-[#0d1e17] via-[#143025] to-[#0b1812] text-white overflow-hidden">
         <SafeImage className="absolute inset-0 opacity-45  " src={template.heroImage || 'https://images.unsplash.com/photo-1566073771259-6a8506099945'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-3xl space-y-5">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#10b981]/20 border border-[#10b981]/40 text-[#a7f3d0] text-xs font-semibold uppercase tracking-wider">
-            <Compass className="w-3.5 h-3.5 text-[#10b981]" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#10b981)]/20 border border-[var(--website-accent,#10b981)]/40 text-[#a7f3d0] text-xs font-semibold uppercase tracking-wider">
+            <Compass className="w-3.5 h-3.5 text-[var(--website-accent,#10b981)]" />
             <span>Ada Foah Estuary Sanctuary</span>
           </div>
 
@@ -97,7 +98,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
           <div className="pt-2 flex flex-wrap gap-3">
             <a
               href="#reserve"
-              className="px-6 py-3 rounded-full bg-[#10b981] hover:bg-[#059669] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2"
+              className="px-6 py-3 rounded-full bg-[var(--website-accent,#10b981)] hover:bg-[#059669] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2"
             >
               <span>Reserve Eco Chalet</span>
               <ArrowRight className="w-4 h-4" />
@@ -140,7 +141,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                 <input
                   type="date"
                   defaultValue="2026-10-10"
-                  className="w-full bg-[#f8f6f0] border border-[#e8e5dc] rounded-xl p-2.5 text-[#192b23] focus:outline-none"
+                  className="w-full bg-[var(--website-background,#f8f6f0)] border border-[#e8e5dc] rounded-xl p-2.5 text-[#192b23] focus:outline-none"
                   required
                 />
               </div>
@@ -151,7 +152,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                 <input
                   type="date"
                   defaultValue="2026-10-12"
-                  className="w-full bg-[#f8f6f0] border border-[#e8e5dc] rounded-xl p-2.5 text-[#192b23] focus:outline-none"
+                  className="w-full bg-[var(--website-background,#f8f6f0)] border border-[#e8e5dc] rounded-xl p-2.5 text-[#192b23] focus:outline-none"
                   required
                 />
               </div>
@@ -159,7 +160,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                 <label className="block text-[10px] font-bold text-[#687e74] uppercase mb-1">
                   Guests
                 </label>
-                <select className="w-full bg-[#f8f6f0] border border-[#e8e5dc] rounded-xl p-2.5 text-[#192b23] focus:outline-none">
+                <select className="w-full bg-[var(--website-background,#f8f6f0)] border border-[#e8e5dc] rounded-xl p-2.5 text-[#192b23] focus:outline-none">
                   <option>2 Adults (Couples Getaway)</option>
                   <option>4 Adults (Family Chalet)</option>
                   <option>Private Group Booking</option>
@@ -168,9 +169,9 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
               <div className="flex items-end">
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-xl bg-[#132e23] hover:bg-[#10b981] hover:text-black text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+                  className="w-full py-3 rounded-xl bg-[var(--website-primary,#132e23)] hover:bg-[var(--website-accent,#10b981)] hover:text-black text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
                 >
-                  Confirm Stay Dates
+                  {template.siteContent ? 'Enquire About Stay Dates' : 'Confirm Stay Dates'}
                 </button>
               </div>
             </form>
@@ -181,10 +182,10 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       {/* Chalets & Suites Showcase */}
       <div id="suites" className="py-14 px-4 sm:px-12 max-w-5xl mx-auto space-y-8">
         <div className="text-center max-w-md mx-auto space-y-2">
-          <span className="text-xs uppercase tracking-widest text-[#10b981] font-bold">
+          <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#10b981)] font-bold">
             Private Eco Sanctuary
           </span>
-          <h2 className="text-2xl sm:text-3xl font-serif text-[#132e23]">
+          <h2 className="text-2xl sm:text-3xl font-serif text-[var(--website-primary,#132e23)]">
             Oceanfront Villas & River Chalets
           </h2>
         </div>
@@ -203,13 +204,13 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                       alt={suite.name}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute bottom-3 right-3 bg-[#132e23] text-white px-3 py-1 rounded-full text-xs font-bold">
+                    <div className="absolute bottom-3 right-3 bg-[var(--website-primary,#132e23)] text-white px-3 py-1 rounded-full text-xs font-bold">
                       {suite.price}
                     </div>
                   </div>
                 )}
                 <div className="p-6 space-y-2">
-                  <h3 className="font-bold text-lg text-[#132e23] font-serif">{suite.name}</h3>
+                  <h3 className="font-bold text-lg text-[var(--website-primary,#132e23)] font-serif">{suite.name}</h3>
                   <p className="text-xs text-[#687e74] leading-relaxed">{suite.desc}</p>
                 </div>
               </div>
@@ -219,7 +220,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                   {suite.specs?.map((s, i) => (
                     <span
                       key={i}
-                      className="text-[10px] bg-[#f8f6f0] text-[#192b23] px-2.5 py-0.5 rounded-full font-medium"
+                      className="text-[10px] bg-[var(--website-background,#f8f6f0)] text-[#192b23] px-2.5 py-0.5 rounded-full font-medium"
                     >
                       {s}
                     </span>
@@ -227,7 +228,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                 </div>
                 <button
                   onClick={onCtaClick}
-                  className="w-full py-2.5 rounded-xl bg-[#132e23] hover:bg-[#10b981] hover:text-black text-white text-xs font-bold text-center block transition-colors cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-[var(--website-primary,#132e23)] hover:bg-[var(--website-accent,#10b981)] hover:text-black text-white text-xs font-bold text-center block transition-colors cursor-pointer"
                 >
                   Book This Suite
                 </button>

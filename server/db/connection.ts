@@ -1,3 +1,4 @@
+import { WEBSITE_FREE_SCHEMA } from './websiteFreeSchema.js';
 import { AFA_SCHEMA } from './afaSchema.js';
 import { MARKETPLACE_FLEXIBILITY_SCHEMA } from './marketplaceFlexibilitySchema.js';
 import { ULTRA_ENQUIRY_SCHEMA } from './websiteUltraSchema.js';
@@ -363,6 +364,7 @@ export async function initDatabase(): Promise<void> {
       referrer_user_id VARCHAR(64) NOT NULL REFERENCES users(id), order_id VARCHAR(64) NOT NULL REFERENCES orders(id),
       reason VARCHAR(32) NOT NULL DEFAULT 'profile_suspended', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (referrer_user_id, order_id));` });
+    baseTables.push({ name: 'website_free_media_analytics', sql: WEBSITE_FREE_SCHEMA });
     baseTables.push({ name: 'website_ultra_enquiries', sql: ULTRA_ENQUIRY_SCHEMA });
     for (const table of baseTables) {
       try {

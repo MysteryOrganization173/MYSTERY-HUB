@@ -1,4 +1,10 @@
 import { WebsiteInputError } from '../services/websiteValidation.js';
+import { websiteMediaRouter, websiteActionsRouter, websiteFreeHandler } from './websiteFreeApi.js';
+import { WebsiteAssetStore } from '../db/websiteAssetStore.js';
+import { WebsiteAnalyticsStore } from '../db/websiteAnalyticsStore.js';
+import { withWebsiteLock } from '../db/websiteTransaction.js';
+import { WebsiteOperationError } from '../services/websiteCloudinary.js';
+import { createRateLimiter } from '../middleware/rateLimiter.js';
 import { resolveWebsitePlan, showWebsiteAttribution } from '../../src/config/websiteBuilder.js';
 import { ultraRouter } from './websiteUltraApi.js';
 /**
@@ -13,6 +19,8 @@ import { PublicWebsiteSite, sanitizeString, isValidTemplateId } from '../types/w
 
 export const websiteRouter = Router();
 websiteRouter.use("/ultra", ultraRouter);
+websiteRouter.use('/:siteId/assets', websiteMediaRouter);
+websiteRouter.use(websiteActionsRouter);
 
 /**
  * 1. POST /api/websites
@@ -37,12 +45,14 @@ websiteRouter.post('/', requireAuth, async (req: Request, res: Response) => {
       settings,
     });
 
+    if (!result.alreadyExists) await WebsiteAnalyticsStore.action('website_created', user.id, result.site.id, result.site.template_id);
     res.status(result.alreadyExists ? 200 : 201).json({
       success: true,
       site: result.site,
       alreadyExists: Boolean(result.alreadyExists),
     });
   } catch (err) {
+    if (err instanceof WebsiteOperationError) { res.status(err.status).json({ error: err.message }); return; }
     if (err instanceof WebsiteInputError) { res.status(400).json({ error: err.message }); return; }
     console.error('[Website API] Error creating site:', err);
     res.status(500).json({ error: 'Failed to create website project.' });
@@ -97,12 +107,14 @@ websiteRouter.get('/:id', requireAuth, async (req: Request, res: Response) => {
 websiteRouter.patch('/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     const user = req.user!;
-    const { name, content, settings } = req.body || {};
+    const { name, content, settings, expectedUpdatedAt } = req.body || {};
+    if (req.body?.templateId !== undefined || req.body?.template_id !== undefined) throw new WebsiteInputError('Use the confirmed Change Template action.');
 
     const updated = await WebsiteStore.updateSite(req.params.id, user.id, {
       name,
       content,
       settings,
+      expectedUpdatedAt,
     });
 
     if (!updated) {
@@ -112,6 +124,7 @@ websiteRouter.patch('/:id', requireAuth, async (req: Request, res: Response) => 
 
     res.json({ success: true, site: updated });
   } catch (err: any) {
+    if (err instanceof WebsiteOperationError) { res.status(err.status).json({ error: err.message }); return; }
     if (err instanceof WebsiteInputError) { res.status(400).json({ error: err.message }); return; }
     if (err.message && err.message.includes('Forbidden')) {
       res.status(403).json({ error: err.message });
@@ -136,6 +149,7 @@ websiteRouter.post('/:id/publish', requireAuth, async (req: Request, res: Respon
       return;
     }
 
+    await WebsiteAnalyticsStore.action('website_published', user.id, published.id, published.template_id);
     res.json({
       success: true,
       site: published,
@@ -165,6 +179,7 @@ websiteRouter.post('/:id/unpublish', requireAuth, async (req: Request, res: Resp
       return;
     }
 
+    await WebsiteAnalyticsStore.action('website_unpublished', user.id, unpublished.id, unpublished.template_id);
     res.json({ success: true, site: unpublished });
   } catch (err: any) {
     if (err.message && err.message.includes('Forbidden')) {
@@ -181,33 +196,20 @@ websiteRouter.post('/:id/unpublish', requireAuth, async (req: Request, res: Resp
  * Permanently deletes a website project with ownership check.
  * Releases the 1-site free limit immediately.
  */
-websiteRouter.delete('/:id', requireAuth, async (req: Request, res: Response) => {
-  try {
-    const user = req.user!;
-    const site = await WebsiteStore.findSiteById(req.params.id);
-
-    if (!site) {
-      res.status(404).json({ error: 'Website project not found.' });
-      return;
-    }
-
-    if (site.user_id !== user.id) {
-      res.status(403).json({ error: 'Forbidden: You do not own this website.' });
-      return;
-    }
-
-    await WebsiteStore.deleteSite(req.params.id, user.id);
-
-    res.json({ success: true, message: 'Website deleted successfully.' });
-  } catch (err: any) {
-    if (err.message && err.message.includes('Forbidden')) {
-      res.status(403).json({ error: err.message });
-      return;
-    }
-    console.error('[Website API] Error deleting site:', err);
-    res.status(500).json({ error: 'Failed to delete website project.' });
-  }
-});
+websiteRouter.delete('/:id', requireAuth, createRateLimiter({windowMs:60_000,max:5,key:req=>req.user!.id}), websiteFreeHandler(async (req, res) => {
+  const userId = req.user!.id;
+  const { site, assetIds } = await withWebsiteLock(userId, async () => {
+    const site = await WebsiteAssetStore.ownedSite(req.params.id, userId);
+    if (typeof req.body?.confirmation !== 'string' || ![site.name, site.slug].includes(req.body.confirmation)) throw new WebsiteOperationError('Type the website name or slug to confirm deletion.');
+    const assetIds = (await WebsiteAssetStore.forSite(site.id)).map(asset => asset.id);
+    await WebsiteStore.deleteSite(site.id, userId);
+    return { site, assetIds };
+  });
+  // Database commit precedes remote destruction. Failed provider cleanup keeps durable tombstones.
+  const cleanup = await Promise.all(assetIds.map(id => WebsiteAssetStore.cleanup(id)));
+  await WebsiteAnalyticsStore.action('website_deleted', userId, site.id, site.template_id);
+  res.json({success:true,message:'Website deleted successfully.',cleanupPending:cleanup.some(success=>!success)});
+}));
 
 /**
  * 7. GET /api/public/sites/:slug

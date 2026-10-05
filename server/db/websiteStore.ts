@@ -1,4 +1,4 @@
-import { validateWebsiteComposition } from '../services/websiteValidation.js';
+import { validateWebsiteComposition, validateWebsiteContentPatch } from '../services/websiteValidation.js';
 import { resolveWebsitePlan, WEBSITE_PLANS, createWebsiteComposition } from '../../src/config/websiteBuilder.js';
 /**
  * Website Builder Data Store
@@ -6,7 +6,11 @@ import { resolveWebsitePlan, WEBSITE_PLANS, createWebsiteComposition } from '../
  * Strictly enforces server-side ownership, slug uniqueness, and free-tier limits.
  */
 
-import { getPool } from './connection.js';
+import { websiteDatabase, withWebsiteLock, websiteTransactionClient } from './websiteTransaction.js';
+import { WebsiteAssetStore } from './websiteAssetStore.js';
+import { WebsiteOperationError } from '../services/websiteCloudinary.js';
+import { migrateWebsiteTemplate } from '../../src/utils/websiteTemplateMigration.js';
+import { AdminAuditStore } from './adminAuditStore.js';
 import {
   WebsiteSiteRecord,
   WebsiteSiteStatus,
@@ -38,11 +42,11 @@ export class WebsiteStore {
    * Find all active sites owned by a specific user
    */
   static async findSitesByUserId(userId: string): Promise<WebsiteSiteRecord[]> {
-    const pool = getPool();
+    const pool = websiteDatabase();
     if (!pool) {
       return Array.from(devWebsiteStore.values())
         .filter((s) => s.user_id === userId && s.status !== 'archived')
-        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).map(s => structuredClone(s));
     }
 
     const res = await pool.query<WebsiteSiteRecord>(
@@ -57,10 +61,10 @@ export class WebsiteStore {
    * Find a site by ID
    */
   static async findSiteById(id: string): Promise<WebsiteSiteRecord | null> {
-    const pool = getPool();
+    const pool = websiteDatabase();
     if (!pool) {
       const site = devWebsiteStore.get(id);
-      return site && site.status !== 'archived' ? { ...site } : null;
+      return site && site.status !== 'archived' ? structuredClone(site) : null;
     }
 
     const res = await pool.query<WebsiteSiteRecord>(
@@ -77,11 +81,11 @@ export class WebsiteStore {
    */
   static async findPublishedSiteBySlug(slug: string): Promise<WebsiteSiteRecord | null> {
     const cleanSlug = slug.toLowerCase().trim();
-    const pool = getPool();
+    const pool = websiteDatabase();
     if (!pool) {
       for (const s of devWebsiteStore.values()) {
         if (s.slug === cleanSlug && s.status === 'published') {
-          return { ...s };
+          return structuredClone(s);
         }
       }
       return null;
@@ -101,7 +105,7 @@ export class WebsiteStore {
    */
   static async isSlugTaken(slug: string, excludeSiteId?: string): Promise<boolean> {
     const cleanSlug = slug.toLowerCase().trim();
-    const pool = getPool();
+    const pool = websiteDatabase();
     if (!pool) {
       for (const s of devWebsiteStore.values()) {
         if (s.slug === cleanSlug && s.status !== 'archived' && s.id !== excludeSiteId) {
@@ -146,10 +150,14 @@ export class WebsiteStore {
    * Create a new website project
    * Enforces 1 active site limit for free tier
    */
-  static async createSite(
+  static async createSite(userId: string, input: CreateWebsiteInput) {
+    return withWebsiteLock(userId, () => this.createSiteLocked(userId, input));
+  }
+  private static async createSiteLocked(
     userId: string,
     input: CreateWebsiteInput
   ): Promise<{ site: WebsiteSiteRecord; alreadyExists?: boolean }> {
+    validateWebsiteContentPatch(input.content);
     // 1. Enforce 1 active site limit per user for V1
     const existingSites = await this.findSitesByUserId(userId);
     if (existingSites.length >= WEBSITE_PLANS[resolveWebsitePlan(userId)].maxSites) {
@@ -166,6 +174,7 @@ export class WebsiteStore {
       throw new Error(`Invalid or unknown templateId: "${templateId}".`);
     }
 
+    const demoPhone = (templateDef.hoursOrContact || '').split('·')[0].trim();
     const defaultBusinessName = templateDef.demoBusinessName || 'My Business Website';
     const name = sanitizeString(input.name || defaultBusinessName, 128);
 
@@ -181,8 +190,8 @@ export class WebsiteStore {
         2000
       ),
       location: sanitizeString(input.content?.location || templateDef.location || (templateId === 'tmpl-start-blank' ? '' : 'Accra, Ghana'), 150),
-      phone: sanitizeString(input.content?.phone || templateDef.hoursOrContact || '', 30),
-      whatsapp: sanitizeString(input.content?.whatsapp || input.content?.phone || templateDef.hoursOrContact || '', 30),
+      phone: sanitizeString(input.content?.phone || demoPhone || '', 30),
+      whatsapp: sanitizeString(input.content?.whatsapp || input.content?.phone || demoPhone || '', 30),
       email: sanitizeString(input.content?.email || '', 100),
       heroImage: sanitizeUrl(input.content?.heroImage || templateDef.heroImage || ''),
       logoUrl: sanitizeUrl(input.content?.logoUrl || ''),
@@ -190,7 +199,7 @@ export class WebsiteStore {
         input.content?.ctaLabel || (templateDef.id === 'tmpl-data-reseller' ? 'Buy Data' : templateDef.id === 'tmpl-start-blank' ? 'Contact us' : 'Order via WhatsApp'),
         50
       ),
-      ctaTarget: sanitizeUrl(input.content?.ctaTarget || input.content?.whatsapp || templateDef.hoursOrContact || ''),
+      ctaTarget: sanitizeUrl(input.content?.ctaTarget || input.content?.whatsapp || demoPhone || ''),
       social: {
         instagram: sanitizeString(input.content?.social?.instagram || '', 50),
         facebook: sanitizeString(input.content?.social?.facebook || '', 100),
@@ -230,9 +239,10 @@ export class WebsiteStore {
       published_at: null,
     };
 
-    const pool = getPool();
+    await WebsiteAssetStore.validateReferences(id, userId, initialContent);
+    const pool = websiteDatabase();
     if (!pool) {
-      devWebsiteStore.set(id, { ...siteRecord });
+      devWebsiteStore.set(id, structuredClone(siteRecord));
       return { site: siteRecord };
     }
 
@@ -262,11 +272,15 @@ export class WebsiteStore {
    * Update an existing site
    * Enforces server-side ownership (user_id)
    */
-  static async updateSite(
+  static async updateSite(id: string, userId: string, input: UpdateWebsiteInput) {
+    return withWebsiteLock(userId, () => this.updateSiteLocked(id, userId, input));
+  }
+  private static async updateSiteLocked(
     id: string,
     userId: string,
     input: UpdateWebsiteInput
   ): Promise<WebsiteSiteRecord | null> {
+    validateWebsiteContentPatch(input.content);
     const existing = await this.findSiteById(id);
     if (!existing) return null;
 
@@ -275,7 +289,9 @@ export class WebsiteStore {
       throw new Error('Forbidden: You do not own this website.');
     }
 
-    const now = new Date().toISOString();
+    if (input.expectedUpdatedAt !== undefined && input.expectedUpdatedAt !== existing.updated_at) throw new WebsiteOperationError('Your website changed in another session. Reload before saving.', 409);
+
+    const now = new Date(Math.max(Date.now(), Date.parse(existing.updated_at) + 1)).toISOString();
     const updatedName = input.name !== undefined ? sanitizeString(input.name, 128) : existing.name;
 
     const mergedContent: SiteContent = {
@@ -347,6 +363,8 @@ export class WebsiteStore {
         : {}),
     };
 
+    await WebsiteAssetStore.validateReferences(id, userId, mergedContent);
+
     const mergedSettings: SiteSettings = {
       ...existing.settings_json,
       ...(input.settings
@@ -383,9 +401,9 @@ export class WebsiteStore {
       updated_at: now,
     };
 
-    const pool = getPool();
+    const pool = websiteDatabase();
     if (!pool) {
-      devWebsiteStore.set(id, { ...updatedRecord });
+      devWebsiteStore.set(id, structuredClone(updatedRecord));
       return updatedRecord;
     }
 
@@ -410,7 +428,10 @@ export class WebsiteStore {
    * Publish a website
    * Enforces server-side ownership
    */
-  static async publishSite(id: string, userId: string): Promise<WebsiteSiteRecord | null> {
+  static async publishSite(id: string, userId: string) {
+    return withWebsiteLock(userId, () => this.publishSiteLocked(id, userId));
+  }
+  private static async publishSiteLocked(id: string, userId: string): Promise<WebsiteSiteRecord | null> {
     const existing = await this.findSiteById(id);
     if (!existing) return null;
 
@@ -418,7 +439,7 @@ export class WebsiteStore {
       throw new Error('Forbidden: You do not own this website.');
     }
 
-    const now = new Date().toISOString();
+    const now = new Date(Math.max(Date.now(), Date.parse(existing.updated_at) + 1)).toISOString();
     const updatedRecord: WebsiteSiteRecord = {
       ...existing,
       status: 'published',
@@ -426,9 +447,9 @@ export class WebsiteStore {
       updated_at: now,
     };
 
-    const pool = getPool();
+    const pool = websiteDatabase();
     if (!pool) {
-      devWebsiteStore.set(id, { ...updatedRecord });
+      devWebsiteStore.set(id, structuredClone(updatedRecord));
       return updatedRecord;
     }
 
@@ -446,7 +467,10 @@ export class WebsiteStore {
    * Unpublish a website (return to draft)
    * Enforces server-side ownership
    */
-  static async unpublishSite(id: string, userId: string): Promise<WebsiteSiteRecord | null> {
+  static async unpublishSite(id: string, userId: string) {
+    return withWebsiteLock(userId, () => this.unpublishSiteLocked(id, userId));
+  }
+  private static async unpublishSiteLocked(id: string, userId: string): Promise<WebsiteSiteRecord | null> {
     const existing = await this.findSiteById(id);
     if (!existing) return null;
 
@@ -454,16 +478,16 @@ export class WebsiteStore {
       throw new Error('Forbidden: You do not own this website.');
     }
 
-    const now = new Date().toISOString();
+    const now = new Date(Math.max(Date.now(), Date.parse(existing.updated_at) + 1)).toISOString();
     const updatedRecord: WebsiteSiteRecord = {
       ...existing,
       status: 'draft',
       updated_at: now,
     };
 
-    const pool = getPool();
+    const pool = websiteDatabase();
     if (!pool) {
-      devWebsiteStore.set(id, { ...updatedRecord });
+      devWebsiteStore.set(id, structuredClone(updatedRecord));
       return updatedRecord;
     }
 
@@ -481,7 +505,10 @@ export class WebsiteStore {
    * Delete a site permanently with ownership check.
    * Releases user's one-site free limit.
    */
-  static async deleteSite(id: string, userId: string): Promise<boolean> {
+  static async deleteSite(id: string, userId: string) {
+    return withWebsiteLock(userId, () => this.deleteSiteLocked(id, userId));
+  }
+  private static async deleteSiteLocked(id: string, userId: string): Promise<boolean> {
     const existing = await this.findSiteById(id);
     if (!existing) {
       return false;
@@ -491,7 +518,8 @@ export class WebsiteStore {
       throw new Error('Forbidden: You do not own this website.');
     }
 
-    const pool = getPool();
+    await WebsiteAssetStore.detachSite(id);
+    const pool = websiteDatabase();
     if (!pool) {
       devWebsiteStore.delete(id);
       return true;
@@ -503,6 +531,38 @@ export class WebsiteStore {
     );
 
     return true;
+  }
+
+  static async changeTemplate(id: string, userId: string, targetTemplateId: string, expectedUpdatedAt?: string) {
+    return withWebsiteLock(userId, async () => {
+      const existing = await WebsiteAssetStore.ownedSite(id, userId);
+      if (!isValidTemplateId(targetTemplateId) || targetTemplateId === existing.template_id) throw new WebsiteOperationError('Choose a different valid template.');
+      if (expectedUpdatedAt && expectedUpdatedAt !== existing.updated_at) throw new WebsiteOperationError('Your website changed. Reload before changing template.', 409);
+      const content = migrateWebsiteTemplate(existing.content_json, existing.template_id, targetTemplateId);
+      content.composition = validateWebsiteComposition(content.composition, userId);
+      await WebsiteAssetStore.validateReferences(id, userId, content);
+      const updated = { ...existing, template_id: targetTemplateId, content_json: content, updated_at: new Date(Math.max(Date.now(), Date.parse(existing.updated_at) + 1)).toISOString() };
+      const db = websiteDatabase();
+      if (db) await db.query('UPDATE website_sites SET template_id=$1, content_json=$2, updated_at=$3 WHERE id=$4 AND user_id=$5', [targetTemplateId, JSON.stringify(content), updated.updated_at, id, userId]);
+      else devWebsiteStore.set(id, structuredClone(updated));
+      return updated;
+    });
+  }
+  static async allSites(): Promise<WebsiteSiteRecord[]> {
+    const db = websiteDatabase();
+    return db ? (await db.query("SELECT * FROM website_sites WHERE status != 'archived' ORDER BY created_at DESC")).rows.map(row => this.normalizeRecord(row)) : [...devWebsiteStore.values()].filter(s => s.status !== 'archived').map(s => structuredClone(s));
+  }
+  static async forceUnpublish(id: string, adminId: string, confirmation: string) {
+    const site = await this.findSiteById(id);
+    if (!site) throw new WebsiteOperationError('Website not found.', 404);
+    return withWebsiteLock(site.user_id, async () => {
+      const current = await this.findSiteById(id);
+      if (!current) throw new WebsiteOperationError('Website not found.', 404);
+      if (confirmation !== current.slug) throw new WebsiteOperationError('Type the website slug to confirm.');
+      const result = await this.unpublishSite(id, current.user_id);
+      await AdminAuditStore.record({ adminUserId: adminId, action: 'website_admin_unpublished', entityType: 'website', entityId: id, metadata: { previousStatus: current.status } }, websiteTransactionClient());
+      return result;
+    });
   }
 
   /**

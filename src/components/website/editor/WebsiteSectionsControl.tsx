@@ -1,3 +1,5 @@
+import { WebsiteImageField } from './WebsiteImageField';
+import { WebsiteTemplateItemsControl } from './WebsiteTemplateItemsControl';
 import React, { useState } from 'react';
 import type { SiteContent } from '../../../types/index.js';
 import {
@@ -20,8 +22,14 @@ import {
 export function WebsiteSectionsControl({
   content,
   onChange,
+  siteId,
+  token,
+  templateId,
 }: {
   content: SiteContent;
+  siteId: string;
+  token: string;
+  templateId: string;
   onChange: (content: SiteContent) => void;
 }) {
   const [adding, setAdding] = useState<WebsiteSectionType>('about');
@@ -62,6 +70,7 @@ export function WebsiteSectionsControl({
           >
             Enable Custom Sections Layout
           </button>
+          {templateId !== 'tmpl-data-reseller' && <WebsiteTemplateItemsControl items={content.items || []} onChange={items=>onChange({...content,items})} siteId={siteId} token={token} templateId={templateId} />}
         </div>
       ) : (
         <div className="space-y-3">
@@ -208,16 +217,7 @@ export function WebsiteSectionsControl({
 
                       {/* Image fields */}
                       <div className="space-y-1.5 p-3 rounded-xl bg-[#090f14] border border-slate-800/80">
-                        <label className="text-[11px] font-semibold text-slate-300 block">
-                          Section Image URL (Optional)
-                        </label>
-                        <input
-                          className="bg-[#111922] border border-slate-800 rounded-xl w-full px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00c365]"
-                          placeholder="https://..."
-                          maxLength={500}
-                          value={s.data.image || ''}
-                          onChange={(e) => change({ data: { ...s.data, image: e.target.value } })}
-                        />
+                        <WebsiteImageField label={SECTION_REGISTRY[s.type].label + ' image'} value={s.data.image || ''} siteId={siteId} token={token} onChange={url=>change({data:{...s.data,image:url}})} />
 
                         <label className="text-[11px] font-semibold text-slate-400 block pt-1">
                           Image Alt Description
@@ -229,6 +229,11 @@ export function WebsiteSectionsControl({
                           value={s.data.alt || ''}
                           onChange={(e) => change({ data: { ...s.data, alt: e.target.value } })}
                         />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <label className="text-xs text-slate-400">Section CTA label<input maxLength={150} value={s.data.ctaLabel || ''} onChange={e=>change({data:{...s.data,ctaLabel:e.target.value}})} className="block w-full bg-slate-900 border border-slate-800 p-2 rounded-lg text-white" /></label>
+                        <label className="text-xs text-slate-400">Section CTA destination<input maxLength={500} value={s.data.ctaUrl || ''} onChange={e=>change({data:{...s.data,ctaUrl:e.target.value}})} placeholder="https://… or #section" className="block w-full bg-slate-900 border border-slate-800 p-2 rounded-lg text-white" /></label>
                       </div>
 
                       {/* Section Items / Cards (for lists, menu items, gallery entries) */}
@@ -284,7 +289,7 @@ export function WebsiteSectionsControl({
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {(['title', 'price'] as const).map((field) => (
+                              {(['title', 'price'] as const).filter(field=>s.type!=='faq' || field==='title').map((field) => (
                                 <label key={field} className="space-y-1 block">
                                   <span className="text-[10px] uppercase font-semibold text-slate-400 block">
                                     {field === 'title' ? 'Item Title' : 'Price (GH₵)'}
@@ -331,27 +336,7 @@ export function WebsiteSectionsControl({
                               />
                             </label>
 
-                            <label className="space-y-1 block">
-                              <span className="text-[10px] uppercase font-semibold text-slate-400 block">
-                                Image URL (Optional)
-                              </span>
-                              <input
-                                className="bg-[#111922] border border-slate-800 rounded-lg w-full px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#00c365]"
-                                maxLength={500}
-                                placeholder="https://..."
-                                value={item.image || ''}
-                                onChange={(e) =>
-                                  change({
-                                    data: {
-                                      ...s.data,
-                                      items: (s.data.items || []).map((x, n) =>
-                                        n === itemIndex ? { ...x, image: e.target.value } : x
-                                      ),
-                                    },
-                                  })
-                                }
-                              />
-                            </label>
+                            {s.type!=='faq' && <WebsiteImageField label={'Item ' + (itemIndex + 1) + ' image'} value={item.image || ''} siteId={siteId} token={token} onChange={url=>change({data:{...s.data,items:(s.data.items || []).map((x,n)=>n===itemIndex?{...x,image:url}:x)}})} />}
                           </div>
                         ))}
                       </div>

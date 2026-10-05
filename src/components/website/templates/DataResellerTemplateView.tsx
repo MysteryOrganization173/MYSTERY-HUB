@@ -94,6 +94,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
 
   // Convert template.items to typed ResellerPackage records
   const allPackages = useMemo<ResellerPackage[]>(() => {
+    if (template.siteContent && template.items?.length === 0) return [];
     if (!template.items || template.items.length === 0) {
       // Sensible sample demonstration packages
       return [
@@ -111,7 +112,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
     }
 
     return template.items.map((item, idx) => {
-      const priceClean = (item.price || '').replace(/[^0-9.]/g, '') || '15.00';
+      const priceClean = (item.price || '').replace(/[^0-9.]/g, '') || (template.siteContent ? '' : '15.00');
       return {
         id: item.id || `item-${idx}`,
         name: item.name,
@@ -144,7 +145,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
     }
   }, [selectedNetwork, currentNetworkPackages]);
 
-  const cleanWhatsappNumber = whatsapp.replace(/\D/g, '');
+  const cleanWhatsappNumber = whatsapp.replace(/\D/g, '').replace(/^0/, '233');
 
   const handleOrderViaWhatsapp = () => {
     if (onCtaClick) {

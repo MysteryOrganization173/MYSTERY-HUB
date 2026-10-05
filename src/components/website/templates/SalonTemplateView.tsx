@@ -28,14 +28,15 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
 
   const handleBooking = (e: React.FormEvent) => {
     e.preventDefault();
+    if (template.siteContent) { onCtaClick?.(); return; }
     setBookingConfirmed(true);
     setTimeout(() => setBookingConfirmed(false), 5000);
   };
 
   return (
-    <div className="bg-[#fff9fa] text-[#2e1020] font-sans min-h-full">
+    <div className="bg-[var(--website-background,#fff9fa)] text-[#2e1020] font-sans min-h-full">
       {/* Top Rose Gold Announcement */}
-      <div className="bg-[#ec4899] text-white text-xs px-4 py-2 text-center tracking-wider font-semibold flex items-center justify-center gap-2">
+      <div className="bg-[var(--website-accent,#ec4899)] text-white text-xs px-4 py-2 text-center tracking-wider font-semibold flex items-center justify-center gap-2">
         <Sparkles className="w-3.5 h-3.5" />
         <span>Luxury Bridal & Grooming Packages Now Booking for December in East Legon</span>
       </div>
@@ -43,40 +44,40 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       {/* Navigation */}
       <nav className="bg-white/95 backdrop-blur-md border-b border-[#fae3ec] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[#fdf2f6] border border-[#ec4899]/30 text-[#ec4899] flex items-center justify-center">
+          <div className="w-9 h-9 rounded-full bg-[#fdf2f6] border border-[var(--website-accent,#ec4899)]/30 text-[var(--website-accent,#ec4899)] flex items-center justify-center">
             <Scissors className="w-5 h-5" />
           </div>
           <div>
-            <span className="font-bold text-base sm:text-lg tracking-tight text-[#3b1828] block leading-none font-serif">
+            <span className="font-bold text-base sm:text-lg tracking-tight text-[var(--website-primary,#3b1828)] block leading-none font-serif">
               {template.demoBusinessName}
             </span>
-            <span className="text-[10px] text-[#ec4899] uppercase tracking-widest font-semibold block mt-0.5">
+            <span className="text-[10px] text-[var(--website-accent,#ec4899)] uppercase tracking-widest font-semibold block mt-0.5">
               Hair · Barbershop · Esthetics
             </span>
           </div>
         </div>
 
         <div className="hidden md:flex items-center gap-6 text-xs font-semibold tracking-wider text-[#836574]">
-          <a href="#services" className="hover:text-[#ec4899] transition-colors">
+          <a href="#services" className="hover:text-[var(--website-accent,#ec4899)] transition-colors">
             Services & Rates
           </a>
-          <a href="#stylists" className="hover:text-[#ec4899] transition-colors">
+          <a href="#stylists" className="hover:text-[var(--website-accent,#ec4899)] transition-colors">
             Our Stylists
           </a>
-          <a href="#book" className="hover:text-[#ec4899] transition-colors">
+          <a href="#book" className="hover:text-[var(--website-accent,#ec4899)] transition-colors">
             Book Appointment
           </a>
-          <a href="#salon-info" className="hover:text-[#ec4899] transition-colors">
+          <a href="#salon-info" className="hover:text-[var(--website-accent,#ec4899)] transition-colors">
             Location
           </a>
         </div>
 
         <button
           onClick={onCtaClick}
-          className="px-4 py-2 rounded-full bg-[#ec4899] hover:bg-[#db2777] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+          className="px-4 py-2 rounded-full bg-[var(--website-accent,#ec4899)] hover:bg-[#db2777] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
         >
           <Calendar className="w-3.5 h-3.5" />
-          <span>Book Session</span>
+          <span>{template.siteContent?.ctaLabel || 'Book Session'}</span>
         </button>
       </nav>
 
@@ -85,7 +86,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
         <SafeImage className="absolute inset-0 opacity-45   " src={template.heroImage || 'https://images.unsplash.com/photo-1560066984-138dadb4c035'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-2xl space-y-5">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-[#fbcfe8] text-xs font-semibold uppercase tracking-wider">
-            <Heart className="w-3.5 h-3.5 text-[#ec4899]" />
+            <Heart className="w-3.5 h-3.5 text-[var(--website-accent,#ec4899)]" />
             <span>Accra’s Premier Luxury Studio</span>
           </div>
 
@@ -100,7 +101,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
           <div className="pt-2 flex flex-wrap gap-3">
             <a
               href="#book"
-              className="px-6 py-3 rounded-full bg-[#ec4899] hover:bg-[#db2777] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2"
+              className="px-6 py-3 rounded-full bg-[var(--website-accent,#ec4899)] hover:bg-[#db2777] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2"
             >
               <span>Schedule Your Glow Up</span>
             </a>
@@ -129,10 +130,10 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       {/* Services & Treatment Menu */}
       <div id="services" className="py-14 px-4 sm:px-12 max-w-5xl mx-auto space-y-8">
         <div className="text-center max-w-md mx-auto space-y-2">
-          <span className="text-xs uppercase tracking-widest text-[#ec4899] font-bold">
+          <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#ec4899)] font-bold">
             Transparent Pricing in Ghana Cedis
           </span>
-          <h2 className="text-2xl sm:text-3xl font-serif text-[#3b1828]">
+          <h2 className="text-2xl sm:text-3xl font-serif text-[var(--website-primary,#3b1828)]">
             Luxury Hair & Grooming Menu
           </h2>
           <p className="text-xs text-[#836574]">
@@ -160,10 +161,10 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                   </div>
                 )}
                 <div className="p-5 space-y-2">
-                  <span className="text-[10px] font-bold text-[#ec4899] uppercase tracking-wider">
+                  <span className="text-[10px] font-bold text-[var(--website-accent,#ec4899)] uppercase tracking-wider">
                     {item.category}
                   </span>
-                  <h3 className="font-bold text-base text-[#3b1828] font-serif">{item.name}</h3>
+                  <h3 className="font-bold text-base text-[var(--website-primary,#3b1828)] font-serif">{item.name}</h3>
                   <p className="text-xs text-[#836574] leading-relaxed">{item.desc}</p>
                 </div>
               </div>
@@ -182,7 +183,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                 <a
                   href="#book"
                   onClick={() => setSelectedService(item.name)}
-                  className="w-full py-2 rounded-xl bg-[#fdf2f6] hover:bg-[#ec4899] hover:text-white text-[#ec4899] text-xs font-bold text-center block transition-colors cursor-pointer"
+                  className="w-full py-2 rounded-xl bg-[#fdf2f6] hover:bg-[var(--website-accent,#ec4899)] hover:text-white text-[var(--website-accent,#ec4899)] text-xs font-bold text-center block transition-colors cursor-pointer"
                 >
                   Book This Treatment
                 </a>
@@ -196,10 +197,10 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       <div id="book" className="py-14 px-4 sm:px-12 bg-[#fdf2f6] border-y border-[#fae3ec]">
         <div className="max-w-2xl mx-auto bg-white rounded-3xl p-6 sm:p-10 shadow-lg border border-[#f5d0e0] space-y-6">
           <div className="text-center space-y-1">
-            <span className="text-xs font-bold text-[#ec4899] uppercase tracking-widest">
-              Online Appointment System
+            <span className="text-xs font-bold text-[var(--website-accent,#ec4899)] uppercase tracking-widest">
+              {template.siteContent ? 'Appointment Enquiry' : 'Online Appointment System'}
             </span>
-            <h3 className="text-2xl font-serif text-[#3b1828]">Book Your Glow Session</h3>
+            <h3 className="text-2xl font-serif text-[var(--website-primary,#3b1828)]">Book Your Glow Session</h3>
             <p className="text-xs text-[#836574]">
               Select your master stylist and preferred time slot in East Legon.
             </p>
@@ -207,10 +208,10 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
 
           {bookingConfirmed ? (
             <div className="p-6 rounded-2xl bg-pink-50 border border-pink-200 text-center space-y-2">
-              <div className="w-10 h-10 rounded-full bg-[#ec4899] text-white flex items-center justify-center mx-auto">
+              <div className="w-10 h-10 rounded-full bg-[var(--website-accent,#ec4899)] text-white flex items-center justify-center mx-auto">
                 <Check className="w-5 h-5" />
               </div>
-              <h4 className="font-bold text-[#3b1828] text-base">Booking Request Submitted!</h4>
+              <h4 className="font-bold text-[var(--website-primary,#3b1828)] text-base">Booking Request Submitted!</h4>
               <p className="text-xs text-[#836574]">
                 Your session with {selectedStylist} for {selectedService} is recorded. We have sent confirmation to your WhatsApp.
               </p>
@@ -224,7 +225,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                 <select
                   value={selectedService}
                   onChange={(e) => setSelectedService(e.target.value)}
-                  className="w-full bg-[#fff9fa] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[#3b1828] focus:outline-none focus:border-[#ec4899]"
+                  className="w-full bg-[var(--website-background,#fff9fa)] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[var(--website-primary,#3b1828)] focus:outline-none focus:border-[var(--website-accent,#ec4899)]"
                 >
                   {services.map((s) => (
                     <option key={s.id} value={s.name}>
@@ -242,7 +243,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                   <select
                     value={selectedStylist}
                     onChange={(e) => setSelectedStylist(e.target.value)}
-                    className="w-full bg-[#fff9fa] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[#3b1828] focus:outline-none focus:border-[#ec4899]"
+                    className="w-full bg-[var(--website-background,#fff9fa)] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[var(--website-primary,#3b1828)] focus:outline-none focus:border-[var(--website-accent,#ec4899)]"
                   >
                     <option value="Abena - Braiding Artisan">Abena (Senior Braiding Specialist)</option>
                     <option value="Kweku - Master Barber">Kweku (Master Barber & Fades)</option>
@@ -257,7 +258,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                   <input
                     type="datetime-local"
                     defaultValue="2026-10-03T11:00"
-                    className="w-full bg-[#fff9fa] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[#3b1828] focus:outline-none focus:border-[#ec4899]"
+                    className="w-full bg-[var(--website-background,#fff9fa)] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[var(--website-primary,#3b1828)] focus:outline-none focus:border-[var(--website-accent,#ec4899)]"
                     required
                   />
                 </div>
@@ -267,23 +268,23 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                 <input
                   type="text"
                   placeholder="Your Full Name"
-                  className="w-full bg-[#fff9fa] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[#3b1828] focus:outline-none focus:border-[#ec4899]"
+                  className="w-full bg-[var(--website-background,#fff9fa)] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[var(--website-primary,#3b1828)] focus:outline-none focus:border-[var(--website-accent,#ec4899)]"
                   required
                 />
                 <input
                   type="tel"
                   placeholder="Ghana WhatsApp Number"
-                  className="w-full bg-[#fff9fa] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[#3b1828] focus:outline-none focus:border-[#ec4899]"
+                  className="w-full bg-[var(--website-background,#fff9fa)] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[var(--website-primary,#3b1828)] focus:outline-none focus:border-[var(--website-accent,#ec4899)]"
                   required
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3.5 rounded-xl bg-[#ec4899] hover:bg-[#db2777] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 rounded-xl bg-[var(--website-accent,#ec4899)] hover:bg-[#db2777] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Calendar className="w-4 h-4" />
-                <span>Confirm Appointment via WhatsApp Booking</span>
+                <span>{template.siteContent ? 'Contact to Arrange Appointment' : 'Confirm Appointment via WhatsApp Booking'}</span>
               </button>
             </form>
           )}

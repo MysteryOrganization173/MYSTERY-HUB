@@ -123,11 +123,13 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (template.siteContent) { onCtaClick?.(); return; }
     setFormSubmitted(true);
     setTimeout(() => setFormSubmitted(false), 5000);
   };
 
   const handleAddToCart = (name: string) => {
+    if (template.siteContent) { onCtaClick?.(); return; }
     setCartCount((prev) => prev + 1);
     setNotification(`Added "${name}" to cart!`);
     setTimeout(() => setNotification(null), 3000);

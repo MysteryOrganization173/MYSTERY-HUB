@@ -1,4 +1,5 @@
 import { SectionSiteRenderer } from '../components/website/SectionSiteRenderer.js';
+import { SiteContactDetails, websiteContactTarget } from '../components/website/SiteContactDetails.js';
 /**
  * Shared Template & Site Rendering Utilities
  * Ensures Editor Preview, Template Preview, and Published Live Sites
@@ -49,10 +50,10 @@ export function mergeSiteWithTemplate(
     ...baseTemplate,
     composition: content?.composition ?? baseTemplate.composition,
     siteContent: content,
-    demoBusinessName: content?.businessName || baseTemplate.demoBusinessName,
-    demoHeroTagline: content?.tagline || baseTemplate.demoHeroTagline,
-    demoSubtext: content?.aboutText || baseTemplate.demoSubtext,
-    location: content?.location || baseTemplate.location,
+    demoBusinessName: content?.businessName ?? baseTemplate.demoBusinessName,
+    demoHeroTagline: content?.tagline ?? baseTemplate.demoHeroTagline,
+    demoSubtext: content?.aboutText ?? baseTemplate.demoSubtext,
+    location: content?.location ?? baseTemplate.location,
     hoursOrContact: content?.whatsapp || content?.phone || content?.email || baseTemplate.hoursOrContact,
     heroImage: content?.heroImage || baseTemplate.heroImage,
     accentColor,
@@ -63,9 +64,9 @@ export function mergeSiteWithTemplate(
       accent: accentColor,
       background: backgroundColor,
     },
-    items: content?.items && content.items.length > 0 ? content.items : baseTemplate.items,
-    stats: content?.stats && content.stats.length > 0 ? content.stats : baseTemplate.stats,
-    features: content?.features && content.features.length > 0 ? content.features : baseTemplate.features,
+    items: content?.items ?? baseTemplate.items,
+    stats: content?.stats ?? baseTemplate.stats,
+    features: content?.features ?? baseTemplate.features,
   };
 }
 
@@ -89,6 +90,12 @@ export function renderTemplateLayout(
     isMobileView?: boolean;
   }
 ): React.ReactElement {
+  const legacy = renderLegacyLayout(template, { ...options, onCtaClick: options?.onCtaClick || (template.siteContent && template.layoutType !== 'reseller' ? () => { window.location.assign(websiteContactTarget(template.siteContent)); } : undefined) });
+  if (template.composition) return legacy;
+  const variables = { '--website-primary':template.colorScheme?.primary, '--website-accent':template.accentColor, '--website-background':template.colorScheme?.background } as React.CSSProperties;
+  return <div style={variables}>{legacy}<SiteContactDetails template={template} /></div>;
+}
+function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: () => void; isMobileView?: boolean }): React.ReactElement {
   if (template.composition) return <SectionSiteRenderer template={template} onCtaClick={options?.onCtaClick} />;
   const layout = (template.layoutType || template.category || '').toLowerCase();
   const { onCtaClick, isMobileView } = options || {};

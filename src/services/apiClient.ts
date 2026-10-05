@@ -1078,6 +1078,7 @@ export async function updateWebsiteOnServer(
   token: string,
   id: string,
   input: {
+    expectedUpdatedAt?: string;
     name?: string;
     content?: Partial<SiteContent>;
     settings?: Partial<SiteSettings>;
@@ -1147,7 +1148,8 @@ export async function getPublicSiteBySlug(
 
 export async function deleteWebsiteOnServer(
   token: string,
-  id: string
+  id: string,
+  confirmation: string
 ): Promise<{ success: boolean; message?: string }> {
   const url = `${API_BASE_URL}/api/websites/${encodeURIComponent(id)}`;
   const res = await fetch(url, {
@@ -1156,12 +1158,52 @@ export async function deleteWebsiteOnServer(
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
+    body: JSON.stringify({ confirmation }),
   });
 
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to delete website.');
   return data;
 }
+
+import type { WebsiteAsset, WebsiteUploadIntent } from '../config/websiteMedia';
+import type { WebsiteAnalyticsInput, WebsiteAdminSummary } from '../config/websiteAnalytics';
+/** Uses the same API base/session contract as the existing website methods. */
+async function websiteFreeRequest<T>(path: string, token?: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}/api/${path}`, { method, headers: { 'Content-Type':'application/json', ...(token ? { Authorization:`Bearer ${token}` } : {}) }, ...(body === undefined ? {} : { body:JSON.stringify(body) }), signal });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) { const error: ApiError = new Error(data.error || 'Website service is unavailable. Please retry.'); error.status=response.status; throw error; }
+  return data;
+}
+const assetPath = (siteId: string) => `websites/${encodeURIComponent(siteId)}/assets`;
+export function listWebsiteAssets(token: string, siteId: string) { return websiteFreeRequest<{success:true;assets:WebsiteAsset[];configured:boolean;limits:{maxAssets:number;maxBytes:number}}>(assetPath(siteId),token); }
+export function requestWebsiteUpload(token: string, siteId: string, file: File) { return websiteFreeRequest<{success:true;intent:WebsiteUploadIntent}>(`${assetPath(siteId)}/upload-intent`,token,'POST',{filename:file.name,mime:file.type,bytes:file.size}); }
+export function finalizeWebsiteUpload(token: string, siteId: string, assetId: string, signal?: AbortSignal) { return websiteFreeRequest<{success:true;asset:WebsiteAsset}>(`${assetPath(siteId)}/${encodeURIComponent(assetId)}/finalize`,token,'POST',{},signal); }
+export function deleteWebsiteAsset(token: string, siteId: string, assetId: string) { return websiteFreeRequest<{success:true;cleanupPending:boolean}>(`${assetPath(siteId)}/${encodeURIComponent(assetId)}`,token,'DELETE'); }
+/** Direct signed binary upload. Only progress is trusted; the server independently inspects the resource. */
+export function uploadWebsiteImage(intent: WebsiteUploadIntent, file: File, onProgress: (percent:number)=>void, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve,reject) => {
+    if (!/^https:\/\/api\.cloudinary\.com\/v1_1\/[a-zA-Z0-9_-]+\/image\/upload$/.test(intent.uploadUrl)) { reject(new Error('Invalid image upload destination.')); return; }
+    const request = new XMLHttpRequest();
+    const abort=()=>request.abort();
+    if(signal.aborted) { reject(new Error('Upload cancelled.')); return; }
+    signal.addEventListener('abort',abort,{once:true});
+    const finish=(error?:Error)=>{signal.removeEventListener('abort',abort);error ? reject(error) : resolve();};
+    request.open('POST',intent.uploadUrl); request.timeout=120_000;
+    request.upload.onprogress=event=>{if(event.lengthComputable)onProgress(Math.round(event.loaded/event.total*100));};
+    request.onerror=()=>finish(new Error('Upload connection lost. Please try again.'));
+    request.ontimeout=()=>finish(new Error('Image upload timed out. Please try again.'));
+    request.onabort=()=>finish(new Error('Upload cancelled.'));
+    request.onload=()=>finish(request.status>=200 && request.status<300 ? undefined : new Error('The image provider rejected this upload. Use a JPEG, PNG or WebP within the size limit.'));
+    const data=new FormData(); data.append('file',file); data.append('api_key',intent.apiKey); data.append('signature',intent.signature);
+    for(const [key,value] of Object.entries(intent.parameters)) data.append(key,value);
+    request.send(data);
+  });
+}
+export function changeWebsiteTemplate(token: string, id: string, targetTemplateId: string, expectedUpdatedAt: string) { return websiteFreeRequest<{success:true;site:WebsiteSiteRecord}>(`websites/${encodeURIComponent(id)}/change-template`,token,'POST',{targetTemplateId,confirmed:true,expectedUpdatedAt}); }
+export function recordWebsiteAnalytics(input: WebsiteAnalyticsInput, token?: string) { return websiteFreeRequest<{success:true}>('websites/analytics',token,'POST',input); }
+export function getAdminWebsiteSummary(token: string, filters: {range:string;search?:string;status?:string;template?:string;offset?:number}) { return websiteFreeRequest<WebsiteAdminSummary>(`admin/website-builder?${new URLSearchParams(Object.entries(filters).map(([key,value])=>[key,String(value)]))}`,token); }
+export function forceUnpublishWebsite(token: string, id: string, confirmation: string) { return websiteFreeRequest<{success:true}>(`admin/website-builder/${encodeURIComponent(id)}/force-unpublish`,token,'POST',{confirmation}); }
 
 // ==========================================
 // MYSTERY EARN: REFERRAL API CLIENT

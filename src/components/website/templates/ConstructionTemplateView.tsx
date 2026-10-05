@@ -21,7 +21,7 @@ interface TemplateViewProps {
 }
 
 export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
-  const [activeTab, setActiveTab] = useState<'All' | 'Commercial' | 'Residential' | 'Industrial'>('All');
+  const [activeTab, setActiveTab] = useState<string>('All');
   const [quoteSubmitted, setQuoteSubmitted] = useState<boolean>(false);
 
   const projects = template.items || [];
@@ -32,17 +32,18 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
 
   const handleQuoteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (template.siteContent) { onCtaClick?.(); return; }
     setQuoteSubmitted(true);
     setTimeout(() => setQuoteSubmitted(false), 5000);
   };
 
   return (
-    <div className="bg-[#0b1118] text-slate-100 font-sans min-h-full">
+    <div className="bg-[var(--website-background,#0b1118)] text-slate-100 font-sans min-h-full">
       {/* Heavy Engineering Utility Top Bar */}
       <div className="bg-[#070b10] border-b border-slate-800 px-4 sm:px-8 py-2 text-xs flex flex-col sm:flex-row items-center justify-between gap-2 text-slate-400">
         <div className="flex items-center gap-4 text-[11px]">
           <span className="flex items-center gap-1.5 text-slate-300">
-            <MapPin className="w-3.5 h-3.5 text-[#f97316]" />
+            <MapPin className="w-3.5 h-3.5 text-[var(--website-accent,#f97316)]" />
             <span>Industrial Area, Tema & Airport Residential, Accra</span>
           </span>
           <span className="hidden md:inline-flex items-center gap-1 text-slate-400">
@@ -51,7 +52,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
           </span>
         </div>
         <div className="flex items-center gap-3 text-[11px]">
-          <span className="text-[#f97316] font-bold">ISO 9001:2015 Certified</span>
+          <span className="text-[var(--website-accent,#f97316)] font-bold">ISO 9001:2015 Certified</span>
           <span className="text-slate-600">|</span>
           <span className="text-slate-300">Class D1K1 Certified Contractor</span>
         </div>
@@ -60,40 +61,40 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
       {/* Navigation */}
       <nav className="bg-[#0e1620]/95 backdrop-blur-md border-b border-slate-800/90 px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-[#f97316] text-black flex items-center justify-center font-black text-xl tracking-tighter">
+          <div className="w-10 h-10 rounded-lg bg-[var(--website-accent,#f97316)] text-black flex items-center justify-center font-black text-xl tracking-tighter">
             <HardHat className="w-6 h-6 text-black" />
           </div>
           <div>
             <span className="font-black text-base sm:text-lg tracking-tight text-white block uppercase leading-none">
               {template.demoBusinessName}
             </span>
-            <span className="text-[10px] text-[#f97316] uppercase tracking-widest font-mono font-bold block mt-0.5">
+            <span className="text-[10px] text-[var(--website-accent,#f97316)] uppercase tracking-widest font-mono font-bold block mt-0.5">
               Civil & Structural Engineers Ghana
             </span>
           </div>
         </div>
 
         <div className="hidden lg:flex items-center gap-6 text-xs font-bold uppercase tracking-wider text-slate-300">
-          <a href="#projects" className="hover:text-[#f97316] transition-colors">
+          <a href="#projects" className="hover:text-[var(--website-accent,#f97316)] transition-colors">
             Projects Portfolio
           </a>
-          <a href="#capabilities" className="hover:text-[#f97316] transition-colors">
+          <a href="#capabilities" className="hover:text-[var(--website-accent,#f97316)] transition-colors">
             Capabilities
           </a>
-          <a href="#quote" className="hover:text-[#f97316] transition-colors">
+          <a href="#quote" className="hover:text-[var(--website-accent,#f97316)] transition-colors">
             Tender Estimate
           </a>
-          <a href="#safety" className="hover:text-[#f97316] transition-colors">
+          <a href="#safety" className="hover:text-[var(--website-accent,#f97316)] transition-colors">
             Safety ISO
           </a>
         </div>
 
         <button
           onClick={onCtaClick}
-          className="px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(249,115,22,0.3)] flex items-center gap-1.5 cursor-pointer"
+          className="px-4 py-2 rounded-lg bg-[var(--website-accent,#f97316)] hover:bg-[#ea580c] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(249,115,22,0.3)] flex items-center gap-1.5 cursor-pointer"
         >
           <FileText className="w-3.5 h-3.5" />
-          <span>Request Tender Consultation</span>
+          <span>{template.siteContent?.ctaLabel || 'Request Tender Consultation'}</span>
         </button>
       </nav>
 
@@ -104,7 +105,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293708_1px,transparent_1px),linear-gradient(to_bottom,#1f293708_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
 
         <div className="relative max-w-3xl space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#f97316]/15 border border-[#f97316]/40 text-[#f97316] text-xs font-mono font-bold uppercase tracking-wider">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[var(--website-accent,#f97316)]/15 border border-[var(--website-accent,#f97316)]/40 text-[var(--website-accent,#f97316)] text-xs font-mono font-bold uppercase tracking-wider">
             <Building2 className="w-3.5 h-3.5" />
             <span>Heavy Civil & Commercial Engineering</span>
           </div>
@@ -120,9 +121,9 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
           <div className="pt-2 flex flex-wrap items-center gap-3">
             <a
               href="#quote"
-              className="px-6 py-3.5 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-black font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2"
+              className="px-6 py-3.5 rounded-lg bg-[var(--website-accent,#f97316)] hover:bg-[#ea580c] text-black font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2"
             >
-              <span>Instant Tender Cost Calculator</span>
+              <span>{template.siteContent ? 'Request a Project Estimate' : 'Instant Tender Cost Calculator'}</span>
               <ArrowRight className="w-4 h-4" />
             </a>
             <a
@@ -137,7 +138,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
           <div className="pt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-slate-800 max-w-2xl">
             {template.stats?.map((stat, idx) => (
               <div key={idx} className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/80">
-                <div className="text-2xl font-black text-[#f97316] font-mono">{stat.value}</div>
+                <div className="text-2xl font-black text-[var(--website-accent,#f97316)] font-mono">{stat.value}</div>
                 <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mt-1">
                   {stat.label}
                 </div>
@@ -151,7 +152,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
       <div id="projects" className="py-16 px-4 sm:px-12 max-w-6xl mx-auto space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <span className="text-xs uppercase tracking-widest text-[#f97316] font-mono font-bold block">
+            <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#f97316)] font-mono font-bold block">
               Proven Track Record
             </span>
             <h2 className="text-2xl sm:text-3xl font-black uppercase text-white mt-1">
@@ -161,13 +162,13 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
 
           {/* Category Tabs */}
           <div className="flex items-center gap-2 flex-wrap">
-            {(['All', 'Commercial', 'Residential', 'Industrial'] as const).map((cat) => (
+            {(template.siteContent ? ['All', ...new Set(projects.map(item=>item.category).filter((category):category is string=>Boolean(category) && category!=='All'))] : ['All', 'Commercial', 'Residential', 'Industrial']).map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveTab(cat)}
                 className={`px-3.5 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                   activeTab === cat
-                    ? 'bg-[#f97316] text-black shadow'
+                    ? 'bg-[var(--website-accent,#f97316)] text-black shadow'
                     : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
                 }`}
               >
@@ -182,7 +183,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
           {filteredProjects.map((p) => (
             <div
               key={p.id}
-              className="bg-[#101822] rounded-xl border border-slate-800 overflow-hidden shadow-lg hover:border-[#f97316]/50 transition-colors flex flex-col justify-between group"
+              className="bg-[#101822] rounded-xl border border-slate-800 overflow-hidden shadow-lg hover:border-[var(--website-accent,#f97316)]/50 transition-colors flex flex-col justify-between group"
             >
               <div>
                 {p.image && (
@@ -192,13 +193,13 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
                       alt={p.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
-                    <div className="absolute top-2.5 right-2.5 bg-black/80 px-2 py-0.5 rounded text-[10px] font-mono text-[#f97316] font-bold border border-[#f97316]/30">
+                    <div className="absolute top-2.5 right-2.5 bg-black/80 px-2 py-0.5 rounded text-[10px] font-mono text-[var(--website-accent,#f97316)] font-bold border border-[var(--website-accent,#f97316)]/30">
                       {p.price}
                     </div>
                   </div>
                 )}
                 <div className="p-5 space-y-2">
-                  <div className="text-[10px] font-mono uppercase text-[#f97316] font-bold">
+                  <div className="text-[10px] font-mono uppercase text-[var(--website-accent,#f97316)] font-bold">
                     {p.category} Construction
                   </div>
                   <h3 className="font-bold text-base text-white">{p.name}</h3>
@@ -227,7 +228,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
       <div id="capabilities" className="py-14 px-4 sm:px-12 bg-[#080d13] border-y border-slate-800">
         <div className="max-w-6xl mx-auto space-y-8">
           <div className="text-center max-w-xl mx-auto space-y-1">
-            <span className="text-xs font-mono font-bold text-[#f97316] uppercase">
+            <span className="text-xs font-mono font-bold text-[var(--website-accent,#f97316)] uppercase">
               Technical Capabilities
             </span>
             <h3 className="text-2xl font-black uppercase text-white">Full-Spectrum Contracting</h3>
@@ -261,9 +262,9 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
             ].map((cap, i) => (
               <div
                 key={i}
-                className="p-5 bg-[#0f1722] rounded-xl border border-slate-800 space-y-3 hover:border-[#f97316]/40 transition-colors"
+                className="p-5 bg-[#0f1722] rounded-xl border border-slate-800 space-y-3 hover:border-[var(--website-accent,#f97316)]/40 transition-colors"
               >
-                <div className="w-10 h-10 rounded-lg bg-[#f97316]/10 text-[#f97316] flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-[var(--website-accent,#f97316)]/10 text-[var(--website-accent,#f97316)] flex items-center justify-center">
                   <cap.icon className="w-5 h-5" />
                 </div>
                 <h4 className="font-bold text-sm text-white">{cap.title}</h4>
@@ -278,7 +279,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
       <div id="quote" className="py-16 px-4 sm:px-12 max-w-4xl mx-auto">
         <div className="bg-[#111923] border border-slate-800 rounded-2xl p-6 sm:p-10 shadow-2xl space-y-6">
           <div className="space-y-1">
-            <span className="text-xs font-mono font-bold text-[#f97316] uppercase">
+            <span className="text-xs font-mono font-bold text-[var(--website-accent,#f97316)] uppercase">
               Tender Intake Portal
             </span>
             <h3 className="text-2xl font-black uppercase text-white">
@@ -304,7 +305,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
                     Project Type
                   </label>
-                  <select className="w-full bg-[#0b1118] border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#f97316]">
+                  <select className="w-full bg-[var(--website-background,#0b1118)] border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[var(--website-accent,#f97316)]">
                     <option>Commercial Multi-Storey Building</option>
                     <option>Residential Estate / Luxury Villa</option>
                     <option>Industrial Warehouse / Logistics Yard</option>
@@ -318,7 +319,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
                   <input
                     type="text"
                     placeholder="e.g. Airport Residential, Accra"
-                    className="w-full bg-[#0b1118] border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#f97316]"
+                    className="w-full bg-[var(--website-background,#0b1118)] border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[var(--website-accent,#f97316)]"
                     required
                   />
                 </div>
@@ -332,7 +333,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
                   <input
                     type="text"
                     placeholder="Full Name / Company Name"
-                    className="w-full bg-[#0b1118] border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#f97316]"
+                    className="w-full bg-[var(--website-background,#0b1118)] border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[var(--website-accent,#f97316)]"
                     required
                   />
                 </div>
@@ -343,7 +344,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
                   <input
                     type="tel"
                     placeholder="e.g. +233 24 000 0000"
-                    className="w-full bg-[#0b1118] border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#f97316]"
+                    className="w-full bg-[var(--website-background,#0b1118)] border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[var(--website-accent,#f97316)]"
                     required
                   />
                 </div>
@@ -351,10 +352,10 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
 
               <button
                 type="submit"
-                className="w-full py-3.5 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-black font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 rounded-lg bg-[var(--website-accent,#f97316)] hover:bg-[#ea580c] text-black font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 <HardHat className="w-4 h-4 text-black" />
-                <span>Submit Tender Intake for Certified BOQ</span>
+                <span>{template.siteContent ? 'Contact About Your Project' : 'Submit Tender Intake for Certified BOQ'}</span>
               </button>
             </form>
           )}

@@ -27,7 +27,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
   const [reservationTime, setReservationTime] = useState<string>('19:30');
   const [isBooked, setIsBooked] = useState<boolean>(false);
 
-  const categories = ['All', 'Main Grills', 'Soups & Swallows', 'Beverages'];
+  const categories = template.siteContent ? ['All', ...new Set((template.items || []).map(item=>item.category).filter((category):category is string=>Boolean(category) && category!=='All'))] : ['All', 'Main Grills', 'Soups & Swallows', 'Beverages'];
   const menuItems = template.items || [];
 
   const filteredItems = menuItems.filter((item) => {
@@ -37,26 +37,27 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
   const handleBookTable = (e: React.FormEvent) => {
     e.preventDefault();
+    if (template.siteContent) { onCtaClick?.(); return; }
     setIsBooked(true);
     setTimeout(() => setIsBooked(false), 5000);
   };
 
   return (
-    <div className="bg-[#fcf9f5] text-[#1c1917] font-serif min-h-full">
+    <div className="bg-[var(--website-background,#fcf9f5)] text-[#1c1917] font-serif min-h-full">
       {/* Editorial Announcement Bar */}
-      <div className="bg-[#7a1c28] text-[#fcf9f5] px-4 py-2 text-center text-xs tracking-wider uppercase font-sans flex items-center justify-center gap-2">
-        <Sparkles className="w-3.5 h-3.5 text-[#c99a45]" />
+      <div className="bg-[var(--website-primary,#7a1c28)] text-[var(--website-background,#fcf9f5)] px-4 py-2 text-center text-xs tracking-wider uppercase font-sans flex items-center justify-center gap-2">
+        <Sparkles className="w-3.5 h-3.5 text-[var(--website-accent,#c99a45)]" />
         <span>Weekend Live Jazz & Osu Night Market Grills · Reserve Early</span>
       </div>
 
       {/* Restaurant Navigation */}
-      <nav className="bg-[#fcf9f5]/95 backdrop-blur-md border-b border-[#f3ece2] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30 font-sans">
+      <nav className="bg-[var(--website-background,#fcf9f5)]/95 backdrop-blur-md border-b border-[#f3ece2] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30 font-sans">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[#7a1c28] text-[#c99a45] flex items-center justify-center font-serif text-lg font-bold">
+          <div className="w-9 h-9 rounded-full bg-[var(--website-primary,#7a1c28)] text-[var(--website-accent,#c99a45)] flex items-center justify-center font-serif text-lg font-bold">
             G
           </div>
           <div>
-            <span className="font-bold text-base sm:text-lg tracking-wide text-[#7a1c28] font-serif block leading-none">
+            <span className="font-bold text-base sm:text-lg tracking-wide text-[var(--website-primary,#7a1c28)] font-serif block leading-none">
               {template.demoBusinessName}
             </span>
             <span className="text-[10px] text-[#78716c] uppercase tracking-widest block mt-0.5">
@@ -66,39 +67,39 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
         </div>
 
         <div className="hidden md:flex items-center gap-6 text-xs font-semibold uppercase tracking-wider text-[#78716c]">
-          <a href="#menu" className="hover:text-[#7a1c28] transition-colors">
+          <a href="#menu" className="hover:text-[var(--website-primary,#7a1c28)] transition-colors">
             Our Menu
           </a>
-          <a href="#story" className="hover:text-[#7a1c28] transition-colors">
+          <a href="#story" className="hover:text-[var(--website-primary,#7a1c28)] transition-colors">
             Chef’s Craft
           </a>
-          <a href="#reserve" className="hover:text-[#7a1c28] transition-colors">
+          <a href="#reserve" className="hover:text-[var(--website-primary,#7a1c28)] transition-colors">
             Reservations
           </a>
-          <a href="#location" className="hover:text-[#7a1c28] transition-colors">
+          <a href="#location" className="hover:text-[var(--website-primary,#7a1c28)] transition-colors">
             Find Us
           </a>
         </div>
 
         <button
           onClick={onCtaClick}
-          className="px-4 py-2 rounded-full bg-[#7a1c28] hover:bg-[#5d151e] text-[#fcf9f5] text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer font-sans"
+          className="px-4 py-2 rounded-full bg-[var(--website-primary,#7a1c28)] hover:bg-[#5d151e] text-[var(--website-background,#fcf9f5)] text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer font-sans"
         >
-          <Calendar className="w-3.5 h-3.5 text-[#c99a45]" />
-          <span>Reserve Table</span>
+          <Calendar className="w-3.5 h-3.5 text-[var(--website-accent,#c99a45)]" />
+          <span>{template.siteContent?.ctaLabel || 'Reserve Table'}</span>
         </button>
       </nav>
 
       {/* Hero Section */}
-      <div className="relative py-14 sm:py-20 px-6 sm:px-12 bg-gradient-to-br from-[#2a0e14] via-[#3b151d] to-[#1c090d] text-[#fcf9f5] overflow-hidden">
+      <div className="relative py-14 sm:py-20 px-6 sm:px-12 bg-gradient-to-br from-[#2a0e14] via-[#3b151d] to-[#1c090d] text-[var(--website-background,#fcf9f5)] overflow-hidden">
         <SafeImage className="absolute inset-0 opacity-45   " src={template.heroImage || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-3xl space-y-5">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#c99a45]/20 border border-[#c99a45]/40 text-[#c99a45] text-xs font-sans font-semibold tracking-wider uppercase">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#c99a45)]/20 border border-[var(--website-accent,#c99a45)]/40 text-[var(--website-accent,#c99a45)] text-xs font-sans font-semibold tracking-wider uppercase">
             <Utensils className="w-3.5 h-3.5" />
             <span>Modern Ghanaian Gastronomy</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-normal tracking-tight leading-[1.15] text-[#fcf9f5]">
+          <h1 className="text-3xl sm:text-5xl font-normal tracking-tight leading-[1.15] text-[var(--website-background,#fcf9f5)]">
             {template.demoHeroTagline}
           </h1>
 
@@ -109,7 +110,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
           <div className="pt-2 flex flex-wrap items-center gap-3 font-sans">
             <a
               href="#reserve"
-              className="px-6 py-3 rounded-full bg-[#c99a45] hover:bg-[#b58735] text-[#1c1917] font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2"
+              className="px-6 py-3 rounded-full bg-[var(--website-accent,#c99a45)] hover:bg-[#b58735] text-[#1c1917] font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2"
             >
               <span>Book an Evening Table</span>
             </a>
@@ -125,7 +126,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
           <div className="pt-6 grid grid-cols-3 gap-4 border-t border-white/15 max-w-md font-sans">
             {template.stats?.map((stat, i) => (
               <div key={i}>
-                <div className="text-xl font-bold text-[#c99a45] font-serif">{stat.value}</div>
+                <div className="text-xl font-bold text-[var(--website-accent,#c99a45)] font-serif">{stat.value}</div>
                 <div className="text-[11px] text-slate-300 uppercase tracking-wider mt-0.5">
                   {stat.label}
                 </div>
@@ -138,10 +139,10 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
       {/* Interactive Food Menu Section */}
       <div id="menu" className="py-14 px-4 sm:px-12 max-w-5xl mx-auto space-y-8 font-sans">
         <div className="text-center max-w-lg mx-auto space-y-2">
-          <span className="text-xs uppercase tracking-widest text-[#c99a45] font-bold">
+          <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#c99a45)] font-bold">
             Curated Culinary Selection
           </span>
-          <h2 className="text-2xl sm:text-3xl font-serif text-[#7a1c28]">
+          <h2 className="text-2xl sm:text-3xl font-serif text-[var(--website-primary,#7a1c28)]">
             Crafted with Fresh Ghanaian Produce
           </h2>
           <p className="text-xs text-[#78716c]">
@@ -157,8 +158,8 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
               onClick={() => setActiveCategory(cat)}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider transition-all cursor-pointer ${
                 activeCategory === cat
-                  ? 'bg-[#7a1c28] text-white shadow-sm'
-                  : 'bg-white border border-[#f3ece2] text-[#78716c] hover:border-[#7a1c28]'
+                  ? 'bg-[var(--website-primary,#7a1c28)] text-white shadow-sm'
+                  : 'bg-white border border-[#f3ece2] text-[#78716c] hover:border-[var(--website-primary,#7a1c28)]'
               }`}
             >
               {cat}
@@ -185,7 +186,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
               <div className="flex-1 space-y-1">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="font-bold text-sm text-[#1c1917] font-serif">{item.name}</h3>
-                  <span className="font-bold text-xs text-[#7a1c28] shrink-0 font-sans">
+                  <span className="font-bold text-xs text-[var(--website-primary,#7a1c28)] shrink-0 font-sans">
                     {item.price}
                   </span>
                 </div>
@@ -193,7 +194,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
                   {item.desc}
                 </p>
                 {item.tag && (
-                  <span className="inline-block text-[10px] font-bold text-[#c99a45] bg-[#c99a45]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  <span className="inline-block text-[10px] font-bold text-[var(--website-accent,#c99a45)] bg-[var(--website-accent,#c99a45)]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
                     {item.tag}
                   </span>
                 )}
@@ -207,12 +208,12 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <div id="reserve" className="py-12 px-4 sm:px-12 bg-[#f3ece2]/60 border-y border-[#e7ded1] font-sans">
         <div className="max-w-3xl mx-auto bg-white rounded-3xl p-6 sm:p-10 shadow-lg border border-[#e2d5c3] space-y-6">
           <div className="text-center space-y-1">
-            <span className="text-xs font-bold text-[#7a1c28] uppercase tracking-widest">
-              Instant Online Booking
+            <span className="text-xs font-bold text-[var(--website-primary,#7a1c28)] uppercase tracking-widest">
+              {template.siteContent ? 'Reservation Enquiry' : 'Instant Online Booking'}
             </span>
             <h3 className="text-2xl font-serif text-[#1c1917]">Reserve Your Table in Osu</h3>
             <p className="text-xs text-[#78716c]">
-              No deposit required for parties under 8 guests. Instant SMS & WhatsApp confirmation.
+              {template.siteContent ? 'Contact the business to confirm availability and arrange your reservation.' : 'No deposit required for parties under 8 guests. Instant SMS & WhatsApp confirmation.'}
             </p>
           </div>
 
@@ -237,7 +238,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
                     type="date"
                     value={reservationDate}
                     onChange={(e) => setReservationDate(e.target.value)}
-                    className="w-full bg-[#fcf9f5] border border-[#e7ded1] rounded-xl px-3 py-2 text-xs text-[#1c1917] focus:outline-none focus:border-[#7a1c28]"
+                    className="w-full bg-[var(--website-background,#fcf9f5)] border border-[#e7ded1] rounded-xl px-3 py-2 text-xs text-[#1c1917] focus:outline-none focus:border-[var(--website-primary,#7a1c28)]"
                     required
                   />
                 </div>
@@ -248,7 +249,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
                   <select
                     value={reservationTime}
                     onChange={(e) => setReservationTime(e.target.value)}
-                    className="w-full bg-[#fcf9f5] border border-[#e7ded1] rounded-xl px-3 py-2 text-xs text-[#1c1917] focus:outline-none focus:border-[#7a1c28]"
+                    className="w-full bg-[var(--website-background,#fcf9f5)] border border-[#e7ded1] rounded-xl px-3 py-2 text-xs text-[#1c1917] focus:outline-none focus:border-[var(--website-primary,#7a1c28)]"
                   >
                     <option value="12:30">12:30 PM (Lunch)</option>
                     <option value="14:00">2:00 PM (Afternoon)</option>
@@ -264,7 +265,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
                   <select
                     value={selectedPartySize}
                     onChange={(e) => setSelectedPartySize(Number(e.target.value))}
-                    className="w-full bg-[#fcf9f5] border border-[#e7ded1] rounded-xl px-3 py-2 text-xs text-[#1c1917] focus:outline-none focus:border-[#7a1c28]"
+                    className="w-full bg-[var(--website-background,#fcf9f5)] border border-[#e7ded1] rounded-xl px-3 py-2 text-xs text-[#1c1917] focus:outline-none focus:border-[var(--website-primary,#7a1c28)]"
                   >
                     <option value={1}>1 Guest (Solo)</option>
                     <option value={2}>2 Guests (Couple)</option>
@@ -279,23 +280,23 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
                 <input
                   type="text"
                   placeholder="Your Full Name"
-                  className="w-full bg-[#fcf9f5] border border-[#e7ded1] rounded-xl px-3.5 py-2.5 text-xs text-[#1c1917] focus:outline-none focus:border-[#7a1c28]"
+                  className="w-full bg-[var(--website-background,#fcf9f5)] border border-[#e7ded1] rounded-xl px-3.5 py-2.5 text-xs text-[#1c1917] focus:outline-none focus:border-[var(--website-primary,#7a1c28)]"
                   required
                 />
                 <input
                   type="tel"
                   placeholder="WhatsApp Mobile (+233 24 000 0000)"
-                  className="w-full bg-[#fcf9f5] border border-[#e7ded1] rounded-xl px-3.5 py-2.5 text-xs text-[#1c1917] focus:outline-none focus:border-[#7a1c28]"
+                  className="w-full bg-[var(--website-background,#fcf9f5)] border border-[#e7ded1] rounded-xl px-3.5 py-2.5 text-xs text-[#1c1917] focus:outline-none focus:border-[var(--website-primary,#7a1c28)]"
                   required
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3.5 rounded-xl bg-[#7a1c28] hover:bg-[#5d151e] text-[#fcf9f5] font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 rounded-xl bg-[var(--website-primary,#7a1c28)] hover:bg-[#5d151e] text-[var(--website-background,#fcf9f5)] font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Calendar className="w-4 h-4 text-[#c99a45]" />
-                <span>Confirm Reservation (Instant WhatsApp Confirmation)</span>
+                <Calendar className="w-4 h-4 text-[var(--website-accent,#c99a45)]" />
+                <span>{template.siteContent ? 'Contact to Arrange Reservation' : 'Confirm Reservation (Instant WhatsApp Confirmation)'}</span>
               </button>
             </form>
           )}
@@ -303,10 +304,10 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
       </div>
 
       {/* Location & Contact Footer */}
-      <footer id="location" className="bg-[#1c1917] text-[#fcf9f5] py-10 px-6 sm:px-12 font-sans text-xs">
+      <footer id="location" className="bg-[#1c1917] text-[var(--website-background,#fcf9f5)] py-10 px-6 sm:px-12 font-sans text-xs">
         <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <h4 className="font-serif font-bold text-base text-[#c99a45]">
+            <h4 className="font-serif font-bold text-base text-[var(--website-accent,#c99a45)]">
               {template.demoBusinessName}
             </h4>
             <p className="text-slate-400 text-xs leading-relaxed">

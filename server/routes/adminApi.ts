@@ -2,6 +2,7 @@ import { AfaStore } from '../db/afaStore.js';
 import { AfaService } from '../services/afaService.js';
 import { adminMarketplaceRouter } from './adminMarketplaceApi.js';
 import { WebsiteUltraStore } from '../db/websiteUltraStore.js';
+import { adminWebsiteRouter } from './websiteFreeApi.js';
 /**
  * Production Admin V1 API Routes
  * Strict RBAC enforcement: Requires active session with role === 'admin'.
@@ -37,6 +38,7 @@ export const adminRouter = Router();
 
 // Apply strict admin authentication and authorization to all admin routes
 adminRouter.use(requireAdmin);
+adminRouter.use('/website-builder', adminWebsiteRouter);
 adminRouter.use(adminAccountRouter);
 adminRouter.use('/marketplace', adminMarketplaceRouter);
 adminRouter.use('/referrals', adminEarnRouter);

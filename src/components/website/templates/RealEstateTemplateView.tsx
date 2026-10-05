@@ -34,16 +34,17 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
   const handleTourSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (template.siteContent) { onCtaClick?.(); return; }
     setTourScheduled(true);
     setTimeout(() => setTourScheduled(false), 5000);
   };
 
   return (
-    <div className="bg-[#f8fafc] text-slate-900 font-sans min-h-full">
+    <div className="bg-[var(--website-background,#f8fafc)] text-slate-900 font-sans min-h-full">
       {/* Top Gold Coast Prestige Banner */}
-      <div className="bg-[#0f172a] text-slate-300 text-xs px-4 py-2 flex items-center justify-between border-b border-slate-800">
+      <div className="bg-[var(--website-primary,#0f172a)] text-slate-300 text-xs px-4 py-2 flex items-center justify-between border-b border-slate-800">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#0ea5e9]" />
+          <span className="w-2 h-2 rounded-full bg-[var(--website-accent,#0ea5e9)]" />
           <span>Exclusive Developer Listings in Greater Accra & Aburi Hills</span>
         </div>
         <div className="hidden sm:flex items-center gap-4 text-[11px]">
@@ -56,40 +57,40 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
       {/* Navigation */}
       <nav className="bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[#0f172a] text-[#0ea5e9] flex items-center justify-center font-bold">
+          <div className="w-9 h-9 rounded-lg bg-[var(--website-primary,#0f172a)] text-[var(--website-accent,#0ea5e9)] flex items-center justify-center font-bold">
             <Building className="w-5 h-5" />
           </div>
           <div>
-            <span className="font-extrabold text-base tracking-tight text-[#0f172a] block leading-none">
+            <span className="font-extrabold text-base tracking-tight text-[var(--website-primary,#0f172a)] block leading-none">
               {template.demoBusinessName}
             </span>
-            <span className="text-[10px] text-[#0ea5e9] uppercase tracking-widest font-bold block mt-0.5">
+            <span className="text-[10px] text-[var(--website-accent,#0ea5e9)] uppercase tracking-widest font-bold block mt-0.5">
               Luxury Property & Estates Ghana
             </span>
           </div>
         </div>
 
         <div className="hidden lg:flex items-center gap-6 text-xs font-bold text-slate-600 uppercase tracking-wider">
-          <a href="#search" className="hover:text-[#0ea5e9] transition-colors">
+          <a href="#search" className="hover:text-[var(--website-accent,#0ea5e9)] transition-colors">
             Property Search
           </a>
-          <a href="#featured" className="hover:text-[#0ea5e9] transition-colors">
+          <a href="#featured" className="hover:text-[var(--website-accent,#0ea5e9)] transition-colors">
             Featured Homes
           </a>
-          <a href="#tour" className="hover:text-[#0ea5e9] transition-colors">
+          <a href="#tour" className="hover:text-[var(--website-accent,#0ea5e9)] transition-colors">
             Schedule Tour
           </a>
-          <a href="#contact" className="hover:text-[#0ea5e9] transition-colors">
+          <a href="#contact" className="hover:text-[var(--website-accent,#0ea5e9)] transition-colors">
             Advisors
           </a>
         </div>
 
         <button
           onClick={onCtaClick}
-          className="px-4 py-2 rounded-xl bg-[#0f172a] hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+          className="px-4 py-2 rounded-xl bg-[var(--website-primary,#0f172a)] hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
         >
-          <Calendar className="w-3.5 h-3.5 text-[#0ea5e9]" />
-          <span>Book Private Tour</span>
+          <Calendar className="w-3.5 h-3.5 text-[var(--website-accent,#0ea5e9)]" />
+          <span>{template.siteContent?.ctaLabel || 'Book Private Tour'}</span>
         </button>
       </nav>
 
@@ -97,7 +98,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <div className="relative py-14 sm:py-20 px-6 sm:px-12 bg-gradient-to-r from-[#0c131f] via-[#111e31] to-[#0a101b] text-white overflow-hidden">
         <SafeImage className="absolute inset-0 opacity-45  " src={template.heroImage || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-4xl mx-auto space-y-6 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#0ea5e9]/20 border border-[#0ea5e9]/40 text-[#38bdf8] text-xs font-semibold uppercase tracking-wider">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#0ea5e9)]/20 border border-[var(--website-accent,#0ea5e9)]/40 text-[#38bdf8] text-xs font-semibold uppercase tracking-wider">
             <span>Prime Real Estate in Ghana</span>
           </div>
 
@@ -158,7 +159,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
             <div className="flex items-end">
               <button
                 type="button"
-                className="w-full py-2.5 rounded-lg bg-[#0ea5e9] hover:bg-[#0284c7] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                className="w-full py-2.5 rounded-lg bg-[var(--website-accent,#0ea5e9)] hover:bg-[#0284c7] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Search className="w-4 h-4" />
                 <span>Search Listings</span>
@@ -172,23 +173,23 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <div id="featured" className="py-14 px-4 sm:px-12 max-w-6xl mx-auto space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <span className="text-xs uppercase tracking-widest text-[#0ea5e9] font-bold block">
+            <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#0ea5e9)] font-bold block">
               Curated Portfolio
             </span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-[#0f172a] mt-1">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-[var(--website-primary,#0f172a)] mt-1">
               Featured Luxury Residences
             </h2>
           </div>
 
           <div className="flex items-center gap-2">
-            {['All', 'For Sale', 'For Rent'].map((type) => (
+            {(template.siteContent ? ['All', ...new Set(listings.map(item=>item.category).filter((category):category is string=>Boolean(category) && category!=='All'))] : ['All', 'For Sale', 'For Rent']).map((type) => (
               <button
                 key={type}
                 onClick={() => setPropertyType(type)}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                   propertyType === type
-                    ? 'bg-[#0f172a] text-white'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:border-[#0ea5e9]'
+                    ? 'bg-[var(--website-primary,#0f172a)] text-white'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:border-[var(--website-accent,#0ea5e9)]'
                 }`}
               >
                 {type}
@@ -211,16 +212,16 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
                       alt={prop.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
-                    <div className="absolute top-3 left-3 bg-[#0f172a]/90 backdrop-blur-sm px-2.5 py-1 rounded-md text-[10px] font-bold text-white uppercase tracking-wider">
+                    <div className="absolute top-3 left-3 bg-[var(--website-primary,#0f172a)]/90 backdrop-blur-sm px-2.5 py-1 rounded-md text-[10px] font-bold text-white uppercase tracking-wider">
                       {prop.category}
                     </div>
-                    <div className="absolute bottom-3 right-3 bg-[#0ea5e9] text-white px-3 py-1 rounded-lg text-xs font-black shadow-md">
+                    <div className="absolute bottom-3 right-3 bg-[var(--website-accent,#0ea5e9)] text-white px-3 py-1 rounded-lg text-xs font-black shadow-md">
                       {prop.price}
                     </div>
                   </div>
                 )}
                 <div className="p-5 space-y-2">
-                  <h3 className="font-bold text-base text-[#0f172a]">{prop.name}</h3>
+                  <h3 className="font-bold text-base text-[var(--website-primary,#0f172a)]">{prop.name}</h3>
                   <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">
                     {prop.desc}
                   </p>
@@ -231,22 +232,22 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
                 {/* Bed/Bath/SqFt Metrics */}
                 <div className="grid grid-cols-3 gap-2 py-2 border-y border-slate-100 text-center text-slate-600 text-xs font-semibold">
                   <span className="flex items-center justify-center gap-1">
-                    <Bed className="w-3.5 h-3.5 text-[#0ea5e9]" />
+                    <Bed className="w-3.5 h-3.5 text-[var(--website-accent,#0ea5e9)]" />
                     <span>{prop.specs?.[0] || '4 Beds'}</span>
                   </span>
                   <span className="flex items-center justify-center gap-1">
-                    <Bath className="w-3.5 h-3.5 text-[#0ea5e9]" />
+                    <Bath className="w-3.5 h-3.5 text-[var(--website-accent,#0ea5e9)]" />
                     <span>{prop.specs?.[1] || '4 Baths'}</span>
                   </span>
                   <span className="flex items-center justify-center gap-1">
-                    <Maximize2 className="w-3.5 h-3.5 text-[#0ea5e9]" />
+                    <Maximize2 className="w-3.5 h-3.5 text-[var(--website-accent,#0ea5e9)]" />
                     <span>{prop.specs?.[2] || '420 m²'}</span>
                   </span>
                 </div>
 
                 <a
                   href="#tour"
-                  className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-[#0ea5e9] hover:text-white text-[#0f172a] text-xs font-bold text-center block transition-colors cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-[var(--website-accent,#0ea5e9)] hover:text-white text-[var(--website-primary,#0f172a)] text-xs font-bold text-center block transition-colors cursor-pointer"
                 >
                   Schedule Private Tour
                 </a>
@@ -260,10 +261,10 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <div id="tour" className="py-14 px-4 sm:px-12 bg-slate-100 border-t border-slate-200">
         <div className="max-w-2xl mx-auto bg-white rounded-3xl p-6 sm:p-10 shadow-lg border border-slate-200 space-y-6">
           <div className="text-center space-y-1">
-            <span className="text-xs font-bold text-[#0ea5e9] uppercase tracking-widest">
+            <span className="text-xs font-bold text-[var(--website-accent,#0ea5e9)] uppercase tracking-widest">
               VIP Buyer Concierge
             </span>
-            <h3 className="text-2xl font-extrabold text-[#0f172a]">Schedule a Viewing</h3>
+            <h3 className="text-2xl font-extrabold text-[var(--website-primary,#0f172a)]">Schedule a Viewing</h3>
             <p className="text-xs text-slate-500">
               Our licensed broker will accompany you for an in-person or virtual walkthrough.
             </p>
@@ -284,7 +285,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
                   <label className="block text-xs font-bold text-slate-600 uppercase mb-1">
                     Property of Interest
                   </label>
-                  <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-[#0ea5e9]">
+                  <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-[var(--website-accent,#0ea5e9)]">
                     {listings.map((l) => (
                       <option key={l.id}>{l.name} ({l.price})</option>
                     ))}
@@ -297,7 +298,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
                   <input
                     type="date"
                     defaultValue="2026-10-05"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-[#0ea5e9]"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-[var(--website-accent,#0ea5e9)]"
                     required
                   />
                 </div>
@@ -307,22 +308,22 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
                 <input
                   type="text"
                   placeholder="Full Name"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-[#0ea5e9]"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-[var(--website-accent,#0ea5e9)]"
                   required
                 />
                 <input
                   type="tel"
                   placeholder="WhatsApp Mobile (+233 24 000 0000)"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-[#0ea5e9]"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-[var(--website-accent,#0ea5e9)]"
                   required
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3.5 rounded-xl bg-[#0f172a] hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 rounded-xl bg-[var(--website-primary,#0f172a)] hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Calendar className="w-4 h-4 text-[#0ea5e9]" />
+                <Calendar className="w-4 h-4 text-[var(--website-accent,#0ea5e9)]" />
                 <span>Confirm Private Walkthrough</span>
               </button>
             </form>
@@ -331,7 +332,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
       </div>
 
       {/* Footer */}
-      <footer id="contact" className="bg-[#0f172a] text-slate-400 py-10 px-6 sm:px-12 text-xs">
+      <footer id="contact" className="bg-[var(--website-primary,#0f172a)] text-slate-400 py-10 px-6 sm:px-12 text-xs">
         <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="space-y-2">
             <h4 className="font-bold text-white text-base">

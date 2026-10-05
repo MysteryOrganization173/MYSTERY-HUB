@@ -1,3 +1,4 @@
+import { AdminWebsiteBuilderSection } from './sections/AdminWebsiteBuilderSection';
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AdminLoginCard } from './AdminLoginCard';
@@ -23,7 +24,7 @@ import {
   Radio,
 } from 'lucide-react';
 
-export type AdminTab = 'overview' | 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system' | 'earn';
+export type AdminTab = 'overview' | 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system' | 'earn' | 'websites';
 
 export const AdminPage: React.FC = () => {
   const { user, sessionToken, logoutUser, setActivePage } = useApp();
@@ -145,6 +146,8 @@ export const AdminPage: React.FC = () => {
                 <span>Orders</span>
               </button>
 
+              <button onClick={()=>setActiveTab('websites')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold ${activeTab==='websites'?'bg-[#00c365] text-black':'text-slate-400 hover:bg-slate-900'}`}><Store className="w-4 h-4" /><span>Website Builder</span></button>
+
               <button
                 onClick={() => setActiveTab('marketplace')}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
@@ -233,6 +236,8 @@ export const AdminPage: React.FC = () => {
               <span>Orders</span>
             </button>
 
+            <button onClick={()=>setActiveTab('websites')} className={`px-3 py-2 rounded-xl shrink-0 text-xs ${activeTab==='websites'?'bg-[#00c365] text-black':'bg-slate-900 text-slate-400'}`}>Websites</button>
+
             <button
               onClick={() => setActiveTab('marketplace')}
               className={`px-3 py-2 rounded-xl shrink-0 flex items-center gap-1.5 font-semibold transition-colors ${
@@ -308,6 +313,7 @@ export const AdminPage: React.FC = () => {
                 onOpenEarn={id => { setEarnUserId(id); setActiveTab('earn'); }}
               />
             )}
+            {activeTab === 'websites' && <AdminWebsiteBuilderSection sessionToken={sessionToken} />}
             {activeTab === 'system' && (
               <AdminSystemSection sessionToken={sessionToken} />
             )}

@@ -24,12 +24,13 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
   const handleSchedule = (e: React.FormEvent) => {
     e.preventDefault();
+    if (template.siteContent) { onCtaClick?.(); return; }
     setScheduled(true);
     setTimeout(() => setScheduled(false), 5000);
   };
 
   return (
-    <div className="bg-[#070a0f] text-slate-100 font-sans min-h-full">
+    <div className="bg-[var(--website-background,#070a0f)] text-slate-100 font-sans min-h-full">
       {/* Top Cyber Line */}
       <div className="bg-[#0f141c] border-b border-slate-800/80 px-4 sm:px-8 py-2 text-xs flex items-center justify-between text-slate-400 font-mono">
         <div className="flex items-center gap-2">
@@ -42,7 +43,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
       {/* Navigation */}
       <nav className="bg-[#090d14]/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#8b5cf6] to-[#06b6d4] p-0.5 flex items-center justify-center font-black">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[var(--website-accent,#8b5cf6)] to-[#06b6d4] p-0.5 flex items-center justify-center font-black">
             <Cpu className="w-5 h-5 text-black" />
           </div>
           <div>
@@ -69,18 +70,18 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
         <button
           onClick={onCtaClick}
-          className="px-4 py-2 rounded-xl bg-[#8b5cf6] hover:bg-[#7c3aed] text-white font-mono font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(139,92,246,0.3)] flex items-center gap-1.5 cursor-pointer"
+          className="px-4 py-2 rounded-xl bg-[var(--website-accent,#8b5cf6)] hover:bg-[#7c3aed] text-white font-mono font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(139,92,246,0.3)] flex items-center gap-1.5 cursor-pointer"
         >
           <Calendar className="w-3.5 h-3.5" />
-          <span>Book Discovery Call</span>
+          <span>{template.siteContent?.ctaLabel || 'Book Discovery Call'}</span>
         </button>
       </nav>
 
       {/* Hero Section */}
-      <div className="relative py-16 sm:py-24 px-6 sm:px-12 bg-gradient-to-b from-[#090d14] via-[#0d131f] to-[#070a0f] border-b border-slate-800 overflow-hidden">
+      <div className="relative py-16 sm:py-24 px-6 sm:px-12 bg-gradient-to-b from-[#090d14] via-[#0d131f] to-[var(--website-background,#070a0f)] border-b border-slate-800 overflow-hidden">
         <SafeImage className="absolute inset-0 opacity-40  " src={template.heroImage || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-3xl space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#8b5cf6]/15 border border-[#8b5cf6]/40 text-[#c084fc] text-xs font-mono font-bold uppercase tracking-wider">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#8b5cf6)]/15 border border-[var(--website-accent,#8b5cf6)]/40 text-[#c084fc] text-xs font-mono font-bold uppercase tracking-wider">
             <Zap className="w-3.5 h-3.5 text-[#06b6d4]" />
             <span>Mission-Critical African Enterprise Engineering</span>
           </div>
@@ -126,7 +127,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
       {/* Case Studies / Solutions Showcase */}
       <div id="solutions" className="py-16 px-4 sm:px-12 max-w-6xl mx-auto space-y-8 font-mono">
         <div className="space-y-1">
-          <span className="text-xs uppercase text-[#8b5cf6] tracking-widest font-bold">
+          <span className="text-xs uppercase text-[var(--website-accent,#8b5cf6)] tracking-widest font-bold">
             Flagship Systems
           </span>
           <h2 className="text-2xl sm:text-3xl font-black text-white">Engineered for Scale</h2>
@@ -136,7 +137,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
           {products.map((item) => (
             <div
               key={item.id}
-              className="bg-[#0f141c] rounded-2xl border border-slate-800 p-6 space-y-4 hover:border-[#8b5cf6]/50 transition-colors"
+              className="bg-[#0f141c] rounded-2xl border border-slate-800 p-6 space-y-4 hover:border-[var(--website-accent,#8b5cf6)]/50 transition-colors"
             >
               <div className="flex items-center justify-between text-xs font-mono">
                 <span className="text-[#06b6d4] font-bold">{item.category}</span>
@@ -187,18 +188,18 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
                 <input
                   type="text"
                   placeholder="CTO / Lead Engineer Name"
-                  className="w-full bg-[#070a0f] border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#8b5cf6]"
+                  className="w-full bg-[var(--website-background,#070a0f)] border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[var(--website-accent,#8b5cf6)]"
                   required
                 />
                 <input
                   type="email"
                   placeholder="Enterprise Work Email"
-                  className="w-full bg-[#070a0f] border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#8b5cf6]"
+                  className="w-full bg-[var(--website-background,#070a0f)] border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[var(--website-accent,#8b5cf6)]"
                   required
                 />
               </div>
 
-              <select className="w-full bg-[#070a0f] border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#8b5cf6]">
+              <select className="w-full bg-[var(--website-background,#070a0f)] border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[var(--website-accent,#8b5cf6)]">
                 <option>Fintech API Switch & MoMo Settlement Rails</option>
                 <option>Cloud Infrastructure Migration & DevSecOps</option>
                 <option>Enterprise Microservices Architecture</option>
@@ -206,10 +207,10 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
               <button
                 type="submit"
-                className="w-full py-3.5 rounded-xl bg-[#8b5cf6] hover:bg-[#7c3aed] text-white font-mono font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 rounded-xl bg-[var(--website-accent,#8b5cf6)] hover:bg-[#7c3aed] text-white font-mono font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Calendar className="w-4 h-4" />
-                <span>Confirm Architecture Session</span>
+                <span>{template.siteContent ? 'Contact to Arrange a Session' : 'Confirm Architecture Session'}</span>
               </button>
             </form>
           )}
