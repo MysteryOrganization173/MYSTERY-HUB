@@ -295,6 +295,9 @@ export const OrderStatusModal: React.FC = () => {
                   if (isAfa) {
                     return 'MTN AFA Registration';
                   }
+                  if (activeOrder.serviceType === 'marketplace' || (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('marketplace-'))) {
+                    return activeOrder.bundle.description || activeOrder.bundle.dataAmount || 'Marketplace Item';
+                  }
                   if (
                     activeOrder.serviceType === 'airtime' ||
                     (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('airtime-'))

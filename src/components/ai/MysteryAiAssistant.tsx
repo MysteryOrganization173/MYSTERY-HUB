@@ -272,7 +272,7 @@ export const MysteryAiAssistant: React.FC = () => {
       className={`fixed ${isInsideEditor ? 'z-[55]' : 'z-40'} ${
         isInsideEditor
           ? 'bottom-4 right-3 sm:bottom-6 sm:right-6'
-          : 'bottom-20 right-3 sm:bottom-6 sm:right-6'
+          : 'bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] right-3 sm:bottom-6 sm:right-6'
       } pointer-events-none max-w-[calc(100vw-1.5rem)]`}
     >
       {/* Floating Chat Panel */}
@@ -281,7 +281,7 @@ export const MysteryAiAssistant: React.FC = () => {
           role="dialog"
           aria-label="Mystery AI Assistant"
           aria-modal="true"
-          className="pointer-events-auto mb-3 w-[calc(100vw-1.5rem)] sm:w-96 md:w-[420px] max-w-[calc(100vw-1.5rem)] h-[520px] max-h-[78vh] bg-[#0c1217] border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-200"
+          className="pointer-events-auto mb-3 w-[calc(100vw-1.5rem)] sm:w-96 md:w-[420px] max-w-[calc(100vw-1.5rem)] h-[500px] max-h-[calc(100vh-8.5rem)] sm:max-h-[520px] bg-[#0c1217] border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-200"
         >
           {/* Clean, Premium Header */}
           <div className="px-4 py-3 bg-[#090e13] border-b border-slate-800 flex items-center justify-between gap-3 shrink-0">
@@ -380,18 +380,18 @@ export const MysteryAiAssistant: React.FC = () => {
 
           {/* Suggested Questions */}
           {suggestedQuestions.length > 0 && (
-            <div className="px-3.5 py-2.5 bg-[#090d12] border-t border-slate-800/80 shrink-0">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5 px-0.5 flex items-center gap-1.5">
+            <div className="px-3.5 py-2 bg-[#090d12] border-t border-slate-800/80 shrink-0">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1 px-0.5 flex items-center gap-1.5">
                 <Sparkles className="w-3 h-3 text-[#00c365]" />
                 <span>Suggested Questions</span>
               </div>
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+              <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 no-scrollbar">
                 {suggestedQuestions.map((sq) => (
                   <button
                     key={sq.id}
                     onClick={() => handleSendMessage(sq.text)}
                     disabled={isTyping}
-                    className="px-2.5 py-1 rounded-lg bg-[#121921] hover:bg-[#1a2530] text-slate-300 hover:text-white border border-slate-800/90 hover:border-[#00c365]/40 text-[11px] whitespace-nowrap transition-colors shrink-0 disabled:opacity-50 cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg bg-[#121921] hover:bg-[#1a2530] text-slate-300 hover:text-white border border-slate-800/90 hover:border-[#00c365]/40 text-[11px] whitespace-nowrap transition-colors shrink-0 disabled:opacity-50 cursor-pointer shadow-2xs"
                   >
                     {sq.text}
                   </button>
@@ -406,7 +406,7 @@ export const MysteryAiAssistant: React.FC = () => {
               e.preventDefault();
               handleSendMessage();
             }}
-            className="p-3 bg-[#090e13] border-t border-slate-800 flex items-center gap-2 shrink-0"
+            className="p-2.5 sm:p-3 bg-[#090e13] border-t border-slate-800 flex items-center gap-2 shrink-0"
           >
             <input
               ref={inputRef}

@@ -5,8 +5,10 @@ import { SafePublicOrderDetails } from '../../../server/types/orders';
 import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
 import {
   Wifi,
+  Smartphone,
   Globe,
   ShoppingBag,
+  Gift,
   Grid2X2,
   Zap,
   ArrowRight,
@@ -116,68 +118,91 @@ export const MemberHome: React.FC = () => {
       title: 'Data Bundles',
       desc: 'MTN, Telecel & AT',
       icon: Wifi,
-      image:
-        'https://res.cloudinary.com/da6oeat7m/image/upload/v1790888903/ChatGPT_Image_Oct_1_2026_09_04_50_PM-1_wam5ps.png',
       accentText: 'text-amber-400',
       accentBg: 'bg-amber-400/10 group-hover:bg-amber-400/15',
-      accentBorder: 'border-amber-400/20 group-hover:border-amber-400/45',
-      cardBorder: 'border border-amber-500/15 hover:border-amber-400/40',
-      badgeAccent: 'text-amber-400 border-amber-500/20 bg-amber-500/10',
-      glowAccent: 'shadow-amber-500/5 hover:shadow-amber-500/10',
-      objectPosition: '50% 30%',
+      accentBorder: 'border-amber-400/25 group-hover:border-amber-400/50',
+      cardBorder: 'border border-amber-500/20 hover:border-amber-400/50',
+      badgeAccent: 'text-amber-400 border-amber-500/30 bg-amber-500/10',
       action: () => openDataPage('data'),
+      tag: 'Live',
+    },
+    {
+      id: 'airtime',
+      title: 'Airtime Top-Up',
+      desc: 'Instant recharge',
+      icon: Smartphone,
+      accentText: 'text-emerald-400',
+      accentBg: 'bg-emerald-400/10 group-hover:bg-emerald-400/15',
+      accentBorder: 'border-emerald-400/25 group-hover:border-emerald-400/50',
+      cardBorder: 'border border-emerald-500/20 hover:border-emerald-400/50',
+      badgeAccent: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10',
+      action: () => openDataPage('airtime'),
+      tag: 'Live',
+    },
+    {
+      id: 'afa',
+      title: 'AFA Registration',
+      desc: 'Agent & member ID',
+      icon: ShieldCheck,
+      accentText: 'text-teal-400',
+      accentBg: 'bg-teal-400/10 group-hover:bg-teal-400/15',
+      accentBorder: 'border-teal-400/25 group-hover:border-teal-400/50',
+      cardBorder: 'border border-teal-500/20 hover:border-teal-400/50',
+      badgeAccent: 'text-teal-400 border-teal-500/30 bg-teal-500/10',
+      action: () => setActivePage('afa'),
       tag: 'Live',
     },
     {
       id: 'website',
       title: 'Website Builder',
-      desc: 'For Ghanaian businesses',
+      desc: 'No-code business sites',
       icon: Globe,
-      image:
-        'https://res.cloudinary.com/da6oeat7m/image/upload/v1790888916/ChatGPT_Image_Oct_1_2026_09_05_01_PM-2_gqtzsj.png',
       accentText: 'text-sky-400',
       accentBg: 'bg-sky-400/10 group-hover:bg-sky-400/15',
-      accentBorder: 'border-sky-400/20 group-hover:border-sky-400/45',
-      cardBorder: 'border border-sky-500/15 hover:border-sky-400/40',
-      badgeAccent: 'text-sky-400 border-sky-500/20 bg-sky-500/10',
-      glowAccent: 'shadow-sky-500/5 hover:shadow-sky-500/10',
-      objectPosition: '50% 50%',
+      accentBorder: 'border-sky-400/25 group-hover:border-sky-400/50',
+      cardBorder: 'border border-sky-500/20 hover:border-sky-400/50',
+      badgeAccent: 'text-sky-400 border-sky-500/30 bg-sky-500/10',
       action: () => setActivePage('website'),
       tag: 'Beta',
     },
     {
       id: 'marketplace',
-      title: 'Tech Marketplace',
-      desc: 'Laptops, tools & more',
+      title: 'Marketplace',
+      desc: 'Phones, POS & Tech',
       icon: ShoppingBag,
-      image:
-        'https://res.cloudinary.com/da6oeat7m/image/upload/v1790888926/ChatGPT_Image_Oct_1_2026_09_05_06_PM-3_kgmhjj.png',
       accentText: 'text-[#00c365]',
       accentBg: 'bg-[#00c365]/10 group-hover:bg-[#00c365]/15',
-      accentBorder: 'border-[#00c365]/20 group-hover:border-[#00c365]/45',
-      cardBorder: 'border border-emerald-500/15 hover:border-emerald-400/40',
-      badgeAccent: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10',
-      glowAccent: 'shadow-[#00c365]/5 hover:shadow-[#00c365]/10',
-      objectPosition: '50% 45%',
+      accentBorder: 'border-[#00c365]/25 group-hover:border-[#00c365]/50',
+      cardBorder: 'border border-emerald-500/20 hover:border-emerald-400/50',
+      badgeAccent: 'text-[#00c365] border-emerald-500/30 bg-emerald-500/10',
       action: () => setActivePage('marketplace'),
       tag: 'New',
     },
     {
+      id: 'earn',
+      title: 'Mystery Earn',
+      desc: 'Lifetime rewards',
+      icon: Gift,
+      accentText: 'text-yellow-400',
+      accentBg: 'bg-yellow-400/10 group-hover:bg-yellow-400/15',
+      accentBorder: 'border-yellow-400/25 group-hover:border-yellow-400/50',
+      cardBorder: 'border border-yellow-500/20 hover:border-yellow-400/50',
+      badgeAccent: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10',
+      action: () => setActivePage('earn'),
+      tag: 'Live',
+    },
+    {
       id: 'services',
-      title: 'More Utilities',
-      desc: 'Bills, utilities & more',
+      title: 'More Services',
+      desc: 'Utilities & bills',
       icon: Grid2X2,
-      image:
-        'https://res.cloudinary.com/da6oeat7m/image/upload/v1790888944/ChatGPT_Image_Oct_1_2026_09_05_09_PM-4_aiazfw.png',
       accentText: 'text-purple-400',
       accentBg: 'bg-purple-400/10 group-hover:bg-purple-400/15',
-      accentBorder: 'border-purple-400/20 group-hover:border-purple-400/45',
-      cardBorder: 'border border-purple-500/15 hover:border-purple-400/40',
-      badgeAccent: 'text-purple-400 border-purple-500/20 bg-purple-500/10',
-      glowAccent: 'shadow-purple-500/5 hover:shadow-purple-500/10',
-      objectPosition: '50% 50%',
+      accentBorder: 'border-purple-400/25 group-hover:border-purple-400/50',
+      cardBorder: 'border border-purple-500/20 hover:border-purple-400/50',
+      badgeAccent: 'text-purple-400 border-purple-500/30 bg-purple-500/10',
       action: () => setActivePage('services'),
-      tag: 'Coming Soon',
+      tag: 'Expanding',
     },
   ];
 
@@ -264,66 +289,76 @@ export const MemberHome: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 p-2 sm:p-3 rounded-2xl bg-[#0c1217]/90 border border-slate-800/90 backdrop-blur-md shadow-xl">
-          {quickServices.map((s) => {
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-2 sm:gap-2.5 p-2 sm:p-3 rounded-2xl bg-[#0c1217]/95 border border-slate-800/90 backdrop-blur-md shadow-xl">
+          {quickServices.map((s, idx) => {
             const Icon = s.icon;
+            const isLastOnMobileOdd = idx === 6;
+
             return (
               <button
                 key={s.id}
                 onClick={s.action}
-                className={`relative p-3 sm:p-4 rounded-xl bg-[#0b0f13]/95 text-left transition-all duration-300 group flex flex-col justify-between cursor-pointer overflow-hidden active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365]/50 shadow-md ${s.cardBorder} ${s.glowAccent}`}
+                className={`relative p-2.5 sm:p-3 rounded-xl bg-[#090e12] text-left transition-all duration-200 group cursor-pointer overflow-hidden active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365]/50 shadow-sm ${s.cardBorder} ${
+                  isLastOnMobileOdd
+                    ? 'col-span-2 sm:col-span-1 flex flex-row sm:flex-col items-center sm:items-stretch justify-between'
+                    : 'flex flex-col justify-between'
+                }`}
               >
-                {/* Cinematic Background Image with Cloudinary Optimization */}
-                <img
-                  src={getCloudinaryUrl(s.image, { width: 480, crop: 'fill', gravity: 'center' })}
-                  srcSet={getCloudinarySrcSet(s.image, [320, 480, 640], { crop: 'fill', gravity: 'center' })}
-                  sizes="(max-width: 640px) 50vw, 25vw"
-                  alt={s.title}
-                  loading="lazy"
-                  decoding="async"
-                  onLoad={() => setLoadedImages((prev) => ({ ...prev, [s.id]: true }))}
-                  className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 ease-out transform scale-100 group-hover:scale-[1.03] z-0 ${
-                    loadedImages[s.id] ? 'opacity-[0.52] group-hover:opacity-[0.68]' : 'opacity-0'
-                  }`}
-                  style={{ objectPosition: s.objectPosition }}
-                />
+                {/* Header Row: Icon + Status Badge */}
+                <div className={`flex items-center justify-between w-full gap-1.5 ${isLastOnMobileOdd ? 'sm:flex hidden' : 'flex'}`}>
+                  <div
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg border flex items-center justify-center transition-all duration-200 shadow-xs ${s.accentBg} ${s.accentBorder} ${s.accentText}`}
+                  >
+                    <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  </div>
 
-                {/* Layered Gradient Overlay System */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#060a0f] via-[#060a0f]/85 to-[#060a0f]/20 transition-all duration-300 z-10" />
-                <div className="absolute inset-0 bg-[#060a0f]/12 group-hover:bg-[#060a0f]/6 transition-all duration-300 z-5" />
+                  <span
+                    className={`text-[8.5px] font-bold tracking-wide uppercase border px-1.5 py-0.5 rounded-md whitespace-nowrap ${s.badgeAccent}`}
+                  >
+                    {s.tag}
+                  </span>
+                </div>
 
-                {/* Interactive Content */}
-                <div className="relative z-20 flex flex-col justify-between h-full w-full">
-                  <div className="flex items-center justify-between w-full gap-2">
+                {/* Mobile-only horizontal layout for 7th spanning item */}
+                {isLastOnMobileOdd && (
+                  <div className="flex sm:hidden items-center gap-2.5 min-w-0">
                     <div
-                      className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center backdrop-blur-md transition-all duration-300 shadow-sm ${s.accentBg} ${s.accentBorder} ${s.accentText}`}
+                      className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all duration-200 shadow-xs shrink-0 ${s.accentBg} ${s.accentBorder} ${s.accentText}`}
                     >
-                      <Icon className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                      <Icon className="w-3.5 h-3.5" />
                     </div>
-
-                    <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-                      <span
-                        className={`text-[8.5px] sm:text-[9.5px] font-extrabold tracking-wide uppercase backdrop-blur-md border px-1.5 sm:px-2 py-0.5 rounded-md transition-all duration-300 shadow-sm whitespace-nowrap ${s.badgeAccent}`}
-                      >
-                        {s.tag}
-                      </span>
-                      <div
-                        className={`w-5 h-5 rounded-lg backdrop-blur-md bg-white/5 border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transform translate-x-1 group-hover:translate-x-0 transition-all duration-300 ${s.accentText}`}
-                      >
-                        <ArrowRight className="w-3 h-3" />
+                    <div className="min-w-0">
+                      <div className="font-bold text-xs text-white group-hover:text-[#00c365] transition-colors tracking-tight truncate">
+                        {s.title}
+                      </div>
+                      <div className="text-[10.5px] text-slate-400 truncate font-normal">
+                        {s.desc}
                       </div>
                     </div>
                   </div>
+                )}
 
-                  <div className="mt-5 sm:mt-6">
-                    <div className="font-bold text-xs sm:text-sm text-white group-hover:text-white transition-colors tracking-tight">
-                      {s.title}
-                    </div>
-                    <div className="text-[10px] sm:text-xs text-slate-300 truncate mt-0.5 font-medium">
-                      {s.desc}
-                    </div>
+                {/* Typography: Title + Subtitle (standard view) */}
+                <div className={`mt-2.5 sm:mt-3 ${isLastOnMobileOdd ? 'hidden sm:block' : 'block'}`}>
+                  <div className="font-bold text-xs text-white group-hover:text-[#00c365] transition-colors tracking-tight truncate">
+                    {s.title}
+                  </div>
+                  <div className="text-[10.5px] text-slate-400 truncate mt-0.5 font-normal">
+                    {s.desc}
                   </div>
                 </div>
+
+                {/* Mobile-only badge/action indicator for 7th spanning item */}
+                {isLastOnMobileOdd && (
+                  <div className="flex sm:hidden items-center gap-1.5 shrink-0">
+                    <span
+                      className={`text-[8.5px] font-bold tracking-wide uppercase border px-1.5 py-0.5 rounded-md whitespace-nowrap ${s.badgeAccent}`}
+                    >
+                      {s.tag}
+                    </span>
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#00c365] group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                )}
               </button>
             );
           })}

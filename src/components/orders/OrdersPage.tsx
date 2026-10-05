@@ -5,7 +5,7 @@ import { lookupOrderOnServer, getAccountOrdersOnServer } from '../../services/ap
 import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
 import { OrderRecord } from '../../types';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
-import { Clock, Search, ArrowRight, CheckCircle2, RefreshCw, AlertTriangle, Smartphone, ShieldCheck } from 'lucide-react';
+import { Clock, Search, ArrowRight, CheckCircle2, RefreshCw, AlertTriangle, Smartphone, ShieldCheck, ShoppingBag, X } from 'lucide-react';
 
 export const OrdersPage: React.FC = () => {
   const { orders: localOrders, openOrderStatus, setActivePage, showToast, user, sessionToken } = useApp();
@@ -264,6 +264,9 @@ export const OrdersPage: React.FC = () => {
               const isAirtime =
                 order.serviceType === 'airtime' ||
                 (order.bundle.id && order.bundle.id.startsWith('airtime-'));
+              const isMarketplace =
+                order.serviceType === 'marketplace' ||
+                (order.bundle.id && order.bundle.id.startsWith('marketplace-'));
               const instantInfo = isInstantBundle
                 ? getInstantBundlePresentation({
                     category: order.bundle.category,
@@ -277,27 +280,35 @@ export const OrdersPage: React.FC = () => {
                 <div
                   key={order.id}
                   onClick={() => openOrderStatus(order)}
-                  className="p-4 sm:p-5 rounded-2xl bg-[#0f151b] border border-slate-800 hover:border-[#00c365]/40 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer group shadow-sm"
+                  className="p-4 sm:p-5 rounded-2xl bg-[#0f151b] border border-slate-800 hover:border-[#00c365]/40 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 sm:gap-4 cursor-pointer group shadow-sm"
                 >
-                  <div className="flex items-center gap-3.5">
-                    <NetworkBrandBadge network={order.network} size="md" />
+                  <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
+                    {isMarketplace ? (
+                      <div className="w-8 h-8 rounded-lg bg-[#00c365]/15 border border-[#00c365]/30 text-[#00c365] flex items-center justify-center shrink-0 shadow-sm">
+                        <ShoppingBag className="w-4 h-4" />
+                      </div>
+                    ) : (
+                      <NetworkBrandBadge network={order.network} size="md" />
+                    )}
 
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-white text-base group-hover:text-[#00c365] transition-colors">
+                        <span className="font-bold text-white text-sm sm:text-base group-hover:text-[#00c365] transition-colors truncate max-w-[240px] sm:max-w-none">
                           {isAfa
                             ? 'AFA Registration'
+                            : isMarketplace
+                            ? order.bundle.description || order.bundle.dataAmount || 'Marketplace Item'
                             : isInstantBundle && instantInfo
                             ? `${instantInfo.formattedAmount} ${instantInfo.categoryLabel} ⚡`
                             : isAirtime
                             ? order.bundle.dataAmount
                             : `${order.bundle.dataAmount} Data Bundle`}
                         </span>
-                        <span className="font-mono text-xs text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded truncate max-w-[150px] sm:max-w-none">
+                        <span className="font-mono text-[11px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded truncate max-w-[130px] sm:max-w-none">
                           #{order.publicReference || order.id}
                         </span>
                       </div>
-                      <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <div className="text-[11px] sm:text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-x-2.5 sm:gap-x-3 gap-y-1">
                         <span>Recipient: {order.recipientPhone}</span>
                         <span>·</span>
                         <span>
@@ -330,32 +341,52 @@ export const OrdersPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80">
-                    <div className="text-right">
-                      <div className="text-sm font-extrabold text-white tabular-nums">
+                  <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-800/80 shrink-0">
+                    <div className="text-left sm:text-right">
+                      <div className="text-sm sm:text-base font-extrabold text-white tabular-nums">
                         GH₵{order.amountGhc.toFixed(2)}
                       </div>
                       <div className="mt-1">{statusBadge}</div>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-[#00c365] group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-[#00c365] group-hover:translate-x-1 transition-all shrink-0" />
                   </div>
                 </div>
               );
             })}
           </div>
-        ) : (
-          <div className="text-center py-16 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-4">
-            <Smartphone className="w-10 h-10 text-slate-500 mx-auto" />
-            <h3 className="text-lg font-bold text-white">No orders found</h3>
-            <p className="text-xs text-slate-400 max-w-sm mx-auto">
-              You haven&apos;t placed any data orders yet or your search filter didn&apos;t match.
+        ) : searchQuery.trim() ? (
+          <div className="text-center py-12 px-4 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-3 max-w-md mx-auto shadow-sm">
+            <Search className="w-8 h-8 text-slate-500 mx-auto" />
+            <h3 className="text-base font-bold text-white">No matching orders</h3>
+            <p className="text-xs text-slate-400">
+              No orders matched &ldquo;{searchQuery}&rdquo;. Check the reference or phone number.
             </p>
-            <button
-              onClick={() => setActivePage('data')}
-              className="px-5 py-2.5 rounded-xl bg-[#00c365] text-black font-bold text-xs uppercase tracking-wider cursor-pointer"
-            >
-              Browse Data Bundles
-            </button>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Clear Filter</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-14 px-4 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-3.5 max-w-md mx-auto shadow-sm">
+            <Smartphone className="w-9 h-9 text-slate-500 mx-auto" />
+            <h3 className="text-base sm:text-lg font-bold text-white">No orders found</h3>
+            <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
+              You haven&apos;t placed any orders yet. Buy data, airtime, or marketplace products to track them here.
+            </p>
+            <div className="pt-1">
+              <button
+                onClick={() => setActivePage('data')}
+                className="px-5 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-95"
+              >
+                Browse Data Bundles
+              </button>
+            </div>
           </div>
         )}
       </div>

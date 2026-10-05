@@ -38,7 +38,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 export const MoreServicesPage: React.FC = () => {
-  const { setActivePage, openWaitlist } = useApp();
+  const { setActivePage, openWaitlist, openDataPage } = useApp();
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -181,212 +181,220 @@ export const MoreServicesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 1. Mobile Compact Horizontal Rows (< sm viewports) */}
-        <div className="block sm:hidden space-y-2.5">
-          {filteredServices.map((service) => {
-            const Icon = ICON_MAP[service.iconName] || Zap;
-            const isLive = service.status === 'active';
-            const isBeta = service.status === 'beta';
-
-            return (
-              <div
-                key={service.id}
+        {/* Empty State when search/category filter yields no results */}
+        {filteredServices.length === 0 ? (
+          <div className="text-center py-12 px-4 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-3 max-w-md mx-auto shadow-sm">
+            <Search className="w-8 h-8 text-slate-500 mx-auto" />
+            <h3 className="text-sm font-bold text-white">No services found</h3>
+            <p className="text-xs text-slate-400">
+              No digital utilities matched your current search or category filter.
+            </p>
+            <div className="pt-1">
+              <button
+                type="button"
                 onClick={() => {
-                  if (service.id === 'srv-rewards') {
-                    setActivePage('earn');
-                  } else if ((isLive || isBeta) && service.targetPage) {
-                    setActivePage(service.targetPage);
-                  } else if (!isLive && !isBeta) {
-                    openWaitlist(service.title);
-                  }
+                  setFilterCategory('all');
+                  setSearchQuery('');
                 }}
-                className="p-3 rounded-xl bg-[#0f151b] border border-slate-800/90 hover:border-slate-700 transition-all flex items-center justify-between gap-3 shadow-sm cursor-pointer active:bg-slate-900"
+                className="px-4 py-2 rounded-xl bg-[#00c365] text-black font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
               >
-                {/* Left side: Icon + Content */}
-                <div className="flex items-center gap-3 min-w-0">
+                <span>Reset Filters</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* 1. Mobile Compact Horizontal Rows (< sm viewports) */}
+            <div className="block sm:hidden space-y-2.5">
+              {filteredServices.map((service) => {
+                const Icon = ICON_MAP[service.iconName] || Zap;
+                const isLive = service.status === 'active';
+                const isBeta = service.status === 'beta';
+
+                return (
                   <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 shadow-sm"
-                    style={{
-                      backgroundColor: `${service.accentColor}15`,
-                      borderColor: `${service.accentColor}40`,
-                      color: service.accentColor,
-                    }}
-                  >
-                    <Icon className="w-5 h-5" />
-                  </div>
-
-                  <div className="min-w-0 space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-xs text-white truncate">{service.title}</h3>
-                    </div>
-                    <p className="text-[11px] text-slate-400 line-clamp-2 leading-tight">
-                      {service.description}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Right side: Badge + Action */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {isLive ? (
-                    <span className="text-[9px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-2 py-0.5 rounded uppercase">
-                      Live
-                    </span>
-                  ) : isBeta ? (
-                    <span className="text-[9px] font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded uppercase">
-                      Beta
-                    </span>
-                  ) : (
-                    <span className="text-[9px] font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded uppercase">
-                      Soon
-                    </span>
-                  )}
-
-                  {isLive || isBeta ? (
-                    <ArrowRight className="w-4 h-4 text-slate-400" />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
+                    key={service.id}
+                    onClick={() => {
+                      if (service.id === 'srv-rewards') {
+                        setActivePage('earn');
+                      } else if ((isLive || isBeta) && service.targetPage) {
+                        setActivePage(service.targetPage);
+                      } else if (!isLive && !isBeta) {
                         openWaitlist(service.title);
-                      }}
-                      className="p-1 text-slate-400 hover:text-[#00c365] cursor-pointer"
-                      title="Notify Me"
-                      aria-label={`Notify me when ${service.title} launches`}
-                    >
-                      <Bell className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                      }
+                    }}
+                    className="p-3 rounded-xl bg-[#0f151b] border border-slate-800/90 hover:border-slate-700 transition-all flex items-center justify-between gap-3 shadow-sm cursor-pointer active:bg-slate-900"
+                  >
+                    {/* Left side: Icon + Content */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 shadow-sm"
+                        style={{
+                          backgroundColor: `${service.accentColor}15`,
+                          borderColor: `${service.accentColor}40`,
+                          color: service.accentColor,
+                        }}
+                      >
+                        <Icon className="w-5 h-5" />
+                      </div>
 
-        {/* 2. Tablet & Desktop Grid (sm and lg viewports) */}
-        <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
-          {filteredServices.map((service) => {
-            const Icon = ICON_MAP[service.iconName] || Zap;
-            const isLive = service.status === 'active';
-            const isBeta = service.status === 'beta';
-            const artwork = SAMPLE_SERVICE_ARTWORK[service.id];
-
-            return (
-              <div
-                key={service.id}
-                className="rounded-2xl bg-[#0f151b] border border-slate-800 p-5 flex flex-col justify-between hover:border-slate-700 transition-all duration-200 group shadow-sm hover:shadow-xl relative overflow-hidden"
-              >
-                {/* Absolute Background Artwork Layer (Sample Services Only: ECG, Water, TV) */}
-                {artwork && (
-                  <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl" aria-hidden="true">
-                    {/* Artwork on the right 50-55% */}
-                    <div className="absolute right-0 bottom-0 top-0 w-3/4 sm:w-3/5 lg:w-[55%] flex items-end justify-end overflow-hidden">
-                      <img
-                        src={getCloudinaryUrl(artwork.url, { format: 'auto', quality: 'auto', width: 640 })}
-                        srcSet={getCloudinarySrcSet(artwork.url, [360, 480, 640]) || undefined}
-                        sizes="(max-width: 1024px) 55vw, 420px"
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        className={`w-full h-full object-cover ${artwork.objectPosition} ${artwork.opacity} transition-transform duration-500 group-hover:scale-105`}
-                      />
+                      <div className="min-w-0 space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-xs text-white truncate">{service.title}</h3>
+                        </div>
+                        <p className="text-[11px] text-slate-400 line-clamp-2 leading-tight">
+                          {service.description}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Directional Text Protection Gradient:
-                        LEFT: strong dark protection (90-95%)
-                        CENTER: medium fade (50-65%)
-                        RIGHT: light overlay only (10-20%) so artwork is clearly recognized
-                    */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#0f151b] from-25% via-[#0f151b]/65 via-50% to-[#0f151b]/10 pointer-events-none" />
+                    {/* Right side: Badge + Action */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isLive ? (
+                        <span className="text-[9px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-2 py-0.5 rounded uppercase">
+                          Live
+                        </span>
+                      ) : isBeta ? (
+                        <span className="text-[9px] font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded uppercase">
+                          Beta
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded uppercase">
+                          Soon
+                        </span>
+                      )}
 
-                    {/* Subtle bottom grounding gradient behind Notify Me button */}
-                    <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[#0f151b]/85 via-transparent to-transparent pointer-events-none" />
+                      {isLive || isBeta ? (
+                        <ArrowRight className="w-4 h-4 text-slate-400" />
+                      ) : (
+                        <span className="p-1 text-slate-400 group-hover:text-[#00c365]">
+                          <Bell className="w-4 h-4" />
+                        </span>
+                      )}
+                    </div>
                   </div>
-                )}
+                );
+              })}
+            </div>
 
-                <div className="relative z-10">
-                  {/* Top row */}
-                  <div className="flex items-center justify-between">
-                    <div
-                      className="w-11 h-11 rounded-xl flex items-center justify-center border shadow-sm"
-                      style={{
-                        backgroundColor: `${service.accentColor}15`,
-                        borderColor: `${service.accentColor}40`,
-                        color: service.accentColor,
-                      }}
-                    >
-                      <Icon className="w-5 h-5" />
-                    </div>
+            {/* 2. Tablet & Desktop Grid (sm and lg viewports) */}
+            <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
+              {filteredServices.map((service) => {
+                const Icon = ICON_MAP[service.iconName] || Zap;
+                const isLive = service.status === 'active';
+                const isBeta = service.status === 'beta';
+                const artwork = SAMPLE_SERVICE_ARTWORK[service.id];
 
-                    {isLive ? (
-                      <span className="text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                        Active Live
-                      </span>
-                    ) : isBeta ? (
-                      <span className="text-[10px] font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                        Beta Preview
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-bold text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                        Coming Soon
-                      </span>
+                return (
+                  <div
+                    key={service.id}
+                    className="rounded-2xl bg-[#0f151b] border border-slate-800 p-5 flex flex-col justify-between hover:border-slate-700 transition-all duration-200 group shadow-sm hover:shadow-xl relative overflow-hidden"
+                  >
+                    {/* Absolute Background Artwork Layer (Sample Services Only: ECG, Water, TV) */}
+                    {artwork && (
+                      <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl" aria-hidden="true">
+                        <div className="absolute right-0 bottom-0 top-0 w-3/4 sm:w-3/5 lg:w-[55%] flex items-end justify-end overflow-hidden">
+                          <img
+                            src={getCloudinaryUrl(artwork.url, { format: 'auto', quality: 'auto', width: 640 })}
+                            srcSet={getCloudinarySrcSet(artwork.url, [360, 480, 640]) || undefined}
+                            sizes="(max-width: 1024px) 55vw, 420px"
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            className={`w-full h-full object-cover ${artwork.objectPosition} ${artwork.opacity} transition-transform duration-500 group-hover:scale-105`}
+                          />
+                        </div>
+
+                        <div className="absolute inset-0 bg-gradient-to-r from-[#0f151b] from-25% via-[#0f151b]/65 via-50% to-[#0f151b]/10 pointer-events-none" />
+                        <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[#0f151b]/85 via-transparent to-transparent pointer-events-none" />
+                      </div>
                     )}
-                  </div>
 
-                  {/* Title & Category */}
-                  <div className="mt-3.5 space-y-1">
-                    <span className="text-[11px] font-medium text-slate-400">
-                      {service.category}
-                    </span>
-                    <h3 className="font-bold text-base text-white group-hover:text-[#00c365] transition-colors">
-                      {service.title}
-                    </h3>
-                    <p className="text-xs text-slate-400 leading-relaxed pt-1 line-clamp-3">
-                      {service.description}
-                    </p>
-                  </div>
-                </div>
+                    <div className="relative z-10">
+                      {/* Top row */}
+                      <div className="flex items-center justify-between">
+                        <div
+                          className="w-11 h-11 rounded-xl flex items-center justify-center border shadow-sm"
+                          style={{
+                            backgroundColor: `${service.accentColor}15`,
+                            borderColor: `${service.accentColor}40`,
+                            color: service.accentColor,
+                          }}
+                        >
+                          <Icon className="w-5 h-5" />
+                        </div>
 
-                {/* Bottom Action */}
-                <div className="mt-5 pt-3.5 border-t border-slate-800/80 relative z-10">
-                  {service.id === 'srv-rewards' ? (
-                    <button
-                      onClick={() => setActivePage('earn')}
-                      className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-[#00c365] font-semibold text-xs border border-[#00c365]/30 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Gift className="w-3.5 h-3.5" />
-                      <span>Learn About Mystery Earn</span>
-                    </button>
-                  ) : isLive ? (
-                    <button
-                      onClick={() => service.targetPage && setActivePage(service.targetPage)}
-                      className="w-full py-2.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
-                    >
-                      <span>Access Now</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  ) : isBeta ? (
-                    <button
-                      onClick={() => service.targetPage && setActivePage(service.targetPage)}
-                      className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider border border-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <span>{service.id === 'srv-website' ? 'Explore Templates' : 'Preview Feature'}</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => openWaitlist(service.title)}
-                      className="w-full py-2.5 px-4 rounded-xl bg-slate-900/80 hover:bg-[#00c365]/10 hover:border-[#00c365]/40 text-slate-300 hover:text-[#00c365] font-semibold text-xs border border-slate-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Bell className="w-3.5 h-3.5" />
-                      <span>Notify Me at Launch</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                        {isLive ? (
+                          <span className="text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                            Live
+                          </span>
+                        ) : isBeta ? (
+                          <span className="text-[10px] font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                            Beta
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                            Coming Soon
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Title & Category */}
+                      <div className="mt-3.5 space-y-1">
+                        <span className="text-[11px] font-medium text-slate-400">
+                          {service.category}
+                        </span>
+                        <h3 className="font-bold text-base text-white group-hover:text-[#00c365] transition-colors leading-snug">
+                          {service.title}
+                        </h3>
+                        <p className="text-xs text-slate-400 leading-relaxed pt-1 line-clamp-3">
+                          {service.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Bottom Action */}
+                    <div className="mt-5 pt-3.5 border-t border-slate-800/80 relative z-10">
+                      {service.id === 'srv-rewards' ? (
+                        <button
+                          onClick={() => setActivePage('earn')}
+                          className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-[#00c365] font-semibold text-xs border border-[#00c365]/30 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Gift className="w-3.5 h-3.5" />
+                          <span>Learn About Mystery Earn</span>
+                        </button>
+                      ) : isLive ? (
+                        <button
+                          onClick={() => service.targetPage && setActivePage(service.targetPage)}
+                          className="w-full py-2.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                        >
+                          <span>Access Now</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : isBeta ? (
+                        <button
+                          onClick={() => service.targetPage && setActivePage(service.targetPage)}
+                          className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider border border-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <span>{service.id === 'srv-website' ? 'Explore Templates' : 'Preview Feature'}</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => openWaitlist(service.title)}
+                          className="w-full py-2.5 px-4 rounded-xl bg-slate-900/80 hover:bg-[#00c365]/10 hover:border-[#00c365]/40 text-slate-300 hover:text-[#00c365] font-semibold text-xs border border-slate-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Bell className="w-3.5 h-3.5" />
+                          <span>Notify Me at Launch</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

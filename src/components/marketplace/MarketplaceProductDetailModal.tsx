@@ -419,12 +419,12 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
 
 
           {/* Spacing safeguard so bottom content is never hidden behind sticky bar */}
-          <div className="h-4" />
+          <div className="h-16 sm:h-20" />
         </div>
 
         {/* 7. Sticky Bottom Action Bar (Reachable at all scroll positions) */}
-        <div className="sticky bottom-0 left-0 right-0 z-20 bg-[#090e13]/95 backdrop-blur-md border-t border-slate-800/90 p-3.5 sm:p-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] shadow-2xl">
-          <div className="flex items-center gap-2.5 max-w-2xl mx-auto">
+        <div className="sticky bottom-0 left-0 right-0 z-20 bg-[#090e13]/95 backdrop-blur-md border-t border-slate-800/90 p-3 sm:p-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] shadow-2xl">
+          <div className="flex items-center gap-2 sm:gap-2.5 max-w-2xl mx-auto">
             {isPurchaseSupported ? (
               <>
                 <button
@@ -432,16 +432,16 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
                   disabled={needsOption}
                   data-marketplace-primary
                   onClick={() => onBuyNow(product,selectedVariant?.id)}
-                  className="flex-1 py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs sm:text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,195,101,0.3)] active:scale-[0.98] cursor-pointer"
+                  className="flex-1 py-3 px-3 sm:px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs sm:text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 sm:gap-2 shadow-[0_0_20px_rgba(0,195,101,0.3)] active:scale-[0.98] cursor-pointer min-w-0"
                 >
-                  <ShoppingBag className="w-4 h-4" />
-                  <span>{needsOption ? 'Choose an option' : `Buy Now (${displayedPrice})`}</span>
+                  <ShoppingBag className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{needsOption ? 'Choose an option' : `Buy Now (${displayedPrice})`}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => onInquire(product)}
-                  className="py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/90 font-bold text-xs sm:text-sm uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
+                  className="py-3 px-3 sm:px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/90 font-bold text-xs sm:text-sm uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] shrink-0"
                 >
                   <FileQuestion className="w-4 h-4 text-slate-400" />
                   <span>Inquire</span>
@@ -453,8 +453,8 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
                 onClick={() => onInquire(product)}
                 className="w-full py-3.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs sm:text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,195,101,0.3)] cursor-pointer active:scale-[0.98]"
               >
-                <FileQuestion className="w-4 h-4" />
-                <span>Inquire &amp; Request Sourcing Quote</span>
+                <FileQuestion className="w-4 h-4 shrink-0" />
+                <span className="truncate">Inquire &amp; Request Sourcing Quote</span>
               </button>
             )}
 

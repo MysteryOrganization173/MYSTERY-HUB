@@ -348,53 +348,53 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
             </div>
             {refreshError && <p role="status" className="text-xs text-amber-300">{refreshError}</p>}
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
               {/* Stat 1: Clicks */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 shadow-sm space-y-1.5 text-left">
+              <div className="p-3.5 sm:p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 shadow-sm space-y-1.5 text-left">
                 <div className="flex items-center justify-between text-slate-400">
                   <span className="text-xs font-semibold">Unique Visitors</span>
-                  <MousePointerClick className="w-4 h-4 text-slate-400" />
+                  <MousePointerClick className="w-4 h-4 text-slate-400 shrink-0" />
                 </div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight truncate">
                   {summary?.uniqueVisitorsCount != null ? summary.uniqueVisitorsCount.toLocaleString() : '—'}
                 </div>
-                <p className="text-[11px] text-slate-400">Distinct browsers that opened your referral links</p>
+                <p className="text-[11px] text-slate-400 leading-snug">Distinct browsers that opened your referral links</p>
               </div>
 
               {/* Stat 2: Referred Customers */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 shadow-sm space-y-1.5 text-left">
+              <div className="p-3.5 sm:p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 shadow-sm space-y-1.5 text-left">
                 <div className="flex items-center justify-between text-slate-400">
                   <span className="text-xs font-semibold">People Referred</span>
-                  <Users className="w-4 h-4 text-[#00c365]" />
+                  <Users className="w-4 h-4 text-[#00c365] shrink-0" />
                 </div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight truncate">
                   {summary ? summary.referredCustomersCount.toLocaleString() : '0'}
                 </div>
-                <p className="text-[11px] text-slate-400">Bound lifetime customers</p>
+                <p className="text-[11px] text-slate-400 leading-snug">Bound lifetime customers</p>
               </div>
 
               {/* Stat 3: Pending Rewards */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 shadow-sm space-y-1.5 text-left">
+              <div className="p-3.5 sm:p-5 rounded-2xl bg-[#0b1015] border border-slate-800/80 shadow-sm space-y-1.5 text-left">
                 <div className="flex items-center justify-between text-slate-400">
                   <span className="text-xs font-semibold">Pending Rewards</span>
-                  <Clock className="w-4 h-4 text-amber-400" />
+                  <Clock className="w-4 h-4 text-amber-400 shrink-0" />
                 </div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-amber-400 tracking-tight">
+                <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-amber-400 tracking-tight truncate">
                   GH₵{summary ? summary.pendingRewardsGhc.toFixed(2) : '0.00'}
                 </div>
-                <p className="text-[11px] text-slate-400">Awaiting order verification</p>
+                <p className="text-[11px] text-slate-400 leading-snug">Awaiting order verification</p>
               </div>
 
               {/* Stat 4: Total Approved Earned */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-[#0b1015] border border-[#00c365]/30 bg-gradient-to-br from-[#0b1015] to-[#0c1813] shadow-sm space-y-1.5 text-left">
+              <div className="p-3.5 sm:p-5 rounded-2xl bg-[#0b1015] border border-[#00c365]/30 bg-gradient-to-br from-[#0b1015] to-[#0c1813] shadow-sm space-y-1.5 text-left">
                 <div className="flex items-center justify-between text-[#00c365]">
                   <span className="text-xs font-semibold">Total Earned</span>
-                  <Award className="w-4 h-4 text-[#00c365]" />
+                  <Award className="w-4 h-4 text-[#00c365] shrink-0" />
                 </div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-[#00c365] tracking-tight">
+                <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-[#00c365] tracking-tight truncate">
                   GH₵{summary ? summary.approvedRewardsGhc.toFixed(2) : '0.00'}
                 </div>
-                <p className="text-[11px] text-slate-400">Approved lifetime rewards</p>
+                <p className="text-[11px] text-slate-400 leading-snug">Approved lifetime rewards</p>
               </div>
             </div>
           </div>
