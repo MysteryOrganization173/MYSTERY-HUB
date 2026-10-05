@@ -1,3 +1,4 @@
+import { dataDeliveryNote } from '../../utils/dataPurchasePresentation';
 import { WalletPaymentChoice } from '../finance/WalletPaymentChoice';
 import { walletCheckout } from '../../services/financeApi';
 import { getStoredReferralCode, getOrGenerateVisitorKey } from '../../utils/referralCapture';
@@ -42,6 +43,8 @@ export const CheckoutModal: React.FC = () => {
   const { initializeServerPayment, isInitializing, loadingPhase, isConfigured } = usePaystack();
 
   const [phone, setPhone] = useState('');
+  const [reviewingData, setReviewingData] = useState(false);
+  const submissionPending = useRef(false);
   const [paymentMethod,setPaymentMethod]=useState<'paystack'|'wallet'>('paystack');
   const [walletBusy,setWalletBusy]=useState(false);
   const walletRequest=useRef<{fingerprint:string;id:string}|null>(null);
@@ -81,6 +84,7 @@ export const CheckoutModal: React.FC = () => {
 
   useEffect(() => {
     if (checkoutBundle) {
+      setReviewingData(false);
       setPaymentMethod('paystack');
       walletRequest.current=null;
       const initial = checkoutInitialPhone !== undefined ? checkoutInitialPhone : (user?.phone || '');
@@ -135,6 +139,7 @@ export const CheckoutModal: React.FC = () => {
         isFlexi: checkoutBundle.isFlexi,
       })
     : null;
+  const isRegularData = !isAirtime && !isInstantBundle;
   const faceValue = checkoutBundle.faceValueGhc ?? checkoutBundle.priceGhc;
   const serviceFee =
     checkoutBundle.serviceFeeGhc ??
@@ -234,7 +239,7 @@ export const CheckoutModal: React.FC = () => {
     setActiveMtnConflict(null);
     setServerError('');
 
-    initializeServerPayment({
+    return initializeServerPayment({
       productId: checkoutBundle.id,
       recipientPhone: phone.trim(),
       customerEmail: user?.email || undefined,
@@ -331,23 +336,32 @@ export const CheckoutModal: React.FC = () => {
         }
 
         setServerError(err.message || 'Payment initiation failed. Please try again.');
-        showToast(err.message || 'Payment initiation failed', 'warning');
       },
     });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(paymentMethod!=='wallet'){submitPayment();return;}
+    if (submissionPending.current || isInitializing || walletBusy) return;
+    if (isRegularData && !reviewingData) {
+      if (phone.replace(/\D/g, '').length < 10) {
+        setPhoneError('Enter the recipient’s Ghana phone number before reviewing.');
+        phoneInputRef.current?.focus();
+        return;
+      }
+      setReviewingData(true);
+      return;
+    }
+    if(paymentMethod!=='wallet'){submissionPending.current=true;try{await submitPayment();}finally{submissionPending.current=false;}return;}
     if(walletBusy||!sessionToken)return;
-    setWalletBusy(true);setServerError('');
+    submissionPending.current=true;setWalletBusy(true);setServerError('');
     try {
       const body={productId:checkoutBundle.id,recipientPhone:phone.trim(),customerEmail:user?.email,customerName:user?.name,serviceType:isAirtime?'airtime':'data',network:checkoutBundle.network,amount:faceValue,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()};
       const fingerprint=JSON.stringify(body);if(walletRequest.current?.fingerprint!==fingerprint)walletRequest.current={fingerprint,id:crypto.randomUUID()};
       const result=await walletCheckout(sessionToken,'payments/initialize',{...body,requestId:walletRequest.current!.id});
       createOrder({...checkoutBundle,priceGhc:result.amountPesewas/100},phone.trim(),'wallet',result.reference,result.orderRef);
       closeCheckout();setActivePage('orders');showToast('Wallet payment confirmed. Check My Orders for fulfilment status.','success');
-    }catch(error){setServerError((error as Error).message);}finally{setWalletBusy(false);}
+    }catch(error){setServerError((error as Error).message);}finally{submissionPending.current=false;setWalletBusy(false);}
   };
 
   const handleViewInstantBundles = () => {
@@ -378,7 +392,7 @@ export const CheckoutModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div role="dialog" aria-modal="true" aria-label="Review your purchase" className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full max-w-[calc(100vw-1rem)] sm:max-w-lg bg-[#0f151b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 max-h-[94dvh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-3.5 border-b border-slate-800 bg-[#0c1116] shrink-0">
@@ -404,7 +418,7 @@ export const CheckoutModal: React.FC = () => {
           <button
             type="button"
             onClick={closeCheckout}
-            className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0 ml-2"
+            className="w-11 h-11 flex items-center justify-center rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0 ml-2"
             aria-label="Close checkout"
           >
             <X className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -413,10 +427,10 @@ export const CheckoutModal: React.FC = () => {
 
         {/* Scrollable Body */}
         <form onSubmit={handleSubmit} className="overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4 flex-1 overscroll-contain">
-          {!isInstantBundle&&<WalletPaymentChoice amountMinor={Math.round(totalAmount*100)} value={paymentMethod} onChange={setPaymentMethod}/>}
+          {!isInstantBundle&&<fieldset disabled={walletBusy||isInitializing}><WalletPaymentChoice amountMinor={Math.round(totalAmount*100)} value={paymentMethod} onChange={setPaymentMethod}/></fieldset>}
           {walletBusy&&<p role="status" className="text-sm text-[#00c365]">Confirming Wallet payment…</p>}
           {/* 1. Bundle / Airtime Summary Card */}
-          <div className="p-3 sm:p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3">
+          <div hidden={isRegularData&&reviewingData} className="p-3 sm:p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div
                 className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-sm"
@@ -674,6 +688,7 @@ export const CheckoutModal: React.FC = () => {
           {serverError && (
             <div
               ref={serverErrorRef}
+              role="alert"
               className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5 animate-in fade-in"
             >
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
@@ -684,7 +699,8 @@ export const CheckoutModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setServerError('')}
-                className="text-slate-400 hover:text-white text-xs cursor-pointer"
+                aria-label="Dismiss payment error"
+                className="min-w-11 min-h-11 text-slate-400 hover:text-white text-xs cursor-pointer"
               >
                 ✕
               </button>
@@ -702,7 +718,7 @@ export const CheckoutModal: React.FC = () => {
           )}
 
           {/* 2. Recipient Phone Input */}
-          <div className="space-y-1.5">
+          <div hidden={isRegularData&&reviewingData} className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label htmlFor="checkout-phone" className="text-xs font-semibold text-slate-200">
                 Recipient Phone Number (Ghana)
@@ -720,11 +736,16 @@ export const CheckoutModal: React.FC = () => {
                 ref={phoneInputRef}
                 id="checkout-phone"
                 type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                disabled={walletBusy||isInitializing}
+                aria-invalid={Boolean(phoneError)}
+                aria-describedby="checkout-phone-help"
                 value={phone}
                 onChange={handlePhoneChange}
                 placeholder="e.g. 024 XXX XXXX"
                 required
-                className="w-full bg-[#0a0e12] border border-slate-700 rounded-xl px-4 py-2.5 sm:py-3 text-white text-sm sm:text-base tracking-wide focus:outline-none focus:border-[#00c365] focus:ring-1 focus:ring-[#00c365] transition-colors"
+                className="w-full bg-[#0a0e12] border border-slate-700 rounded-xl pl-4 pr-20 py-2.5 sm:py-3 text-white text-sm sm:text-base tracking-wide focus:outline-none focus:border-[#00c365] focus:ring-1 focus:ring-[#00c365] transition-colors"
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 bg-slate-800 px-2 py-1 rounded">
                 +233
@@ -732,19 +753,19 @@ export const CheckoutModal: React.FC = () => {
             </div>
 
             {phoneError ? (
-              <p className="text-xs text-rose-400 flex items-center gap-1 mt-1">
+              <p id="checkout-phone-help" role="alert" className="text-xs text-rose-400 flex items-center gap-1 mt-1">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>{phoneError}</span>
               </p>
             ) : (
-              <p className="text-[11px] text-slate-400">
-                Please double-check the recipient number. Data is credited directly after payment authorization.
+              <p id="checkout-phone-help" className="text-[11px] text-slate-400">
+                Check the recipient carefully. Delivery starts after payment is verified.
               </p>
             )}
           </div>
 
           {/* 3. Network Notice (if required) */}
-          {checkoutBundle.network === 'mtn' && !activeMtnConflict && (
+          {checkoutBundle.network === 'mtn' && !activeMtnConflict && !reviewingData && (
             <div className="p-2.5 sm:p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300 flex items-start gap-2">
               <Info className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
               <span>
@@ -794,20 +815,25 @@ export const CheckoutModal: React.FC = () => {
               </>
             ) : (
               <>
-                <div className="flex items-center justify-between text-slate-400">
-                  <span>Data Subtotal</span>
-                  <span className="text-white tabular-nums font-medium">GH₵{checkoutBundle.priceGhc.toFixed(2)}</span>
+                {reviewingData && <div className="space-y-3 pb-3 border-b border-slate-800">
+                  <h4 className="text-base font-semibold text-white">Confirm your order</h4>
+                  <dl className="space-y-2">
+                    <div className="flex justify-between gap-3"><dt className="text-slate-400">Network</dt><dd className="font-semibold text-white">{currentNetwork.name}</dd></div>
+                    <div className="flex justify-between gap-3"><dt className="text-slate-400">Bundle</dt><dd className="font-semibold text-white">{checkoutBundle.dataAmount} · {checkoutBundle.validity}</dd></div>
+                    <div className="flex justify-between gap-3"><dt className="text-slate-400">Recipient</dt><dd className="font-mono text-base text-white break-all text-right min-w-0">{phone}</dd></div>
+                  </dl>
+                  <p className="text-slate-400 leading-relaxed">{dataDeliveryNote(checkoutBundle.network)}</p>
+                  <div className="flex flex-wrap gap-3">
+                    <button type="button" disabled={isInitializing||walletBusy} className="min-h-11 text-[#00c365] font-semibold underline" onClick={()=>{setReviewingData(false);setTimeout(()=>phoneInputRef.current?.focus(),0);}}>Edit recipient</button>
+                    <button type="button" disabled={isInitializing||walletBusy} className="min-h-11 text-slate-300 underline" onClick={closeCheckout}>Change package</button>
+                  </div>
+                </div>}
+                <div className="flex items-center justify-between gap-3 py-2 text-white">
+                  <span className="font-semibold">Total</span>
+                  <span className="text-[#00c365] text-2xl tabular-nums font-extrabold">GH₵{checkoutBundle.priceGhc.toFixed(2)}</span>
                 </div>
-                <div className="flex items-center justify-between text-slate-400">
-                  <span>Service & Delivery Fee</span>
-                  <span className="text-emerald-400 font-medium">FREE</span>
-                </div>
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-sm font-bold text-white">
-                  <span>Total Amount</span>
-                  <span className="text-[#00c365] text-base tabular-nums font-black">
-                    GH₵{checkoutBundle.priceGhc.toFixed(2)}
-                  </span>
-                </div>
+                <p className="text-slate-400">No hidden Mystery Hub checkout fee.</p>
+                <p className="text-slate-300 leading-relaxed">Check the recipient before paying. Fulfilled wrong-number orders may not be reversible. Keep your reference to Track Order; delivery may take longer when the network is busy.</p>
               </>
             )}
           </div>
@@ -822,25 +848,28 @@ export const CheckoutModal: React.FC = () => {
           <button
             type="submit"
             disabled={walletBusy || isInitializing}
+            aria-busy={walletBusy||isInitializing}
             className="w-full py-3.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-sm tracking-wide transition-all shadow-[0_0_20px_rgba(0,195,101,0.3)] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
           >
-            {isInitializing ? (
+            {walletBusy || isInitializing ? (
               <span className="flex items-center gap-2">
                 <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                {loadingPhase === 'opening'
+                {walletBusy ? 'Confirming Wallet payment…' : loadingPhase === 'opening'
                   ? 'Opening Paystack...'
                   : isSlowPreparation
                   ? 'Still preparing your checkout...'
-                  : 'Preparing secure checkout...'}
+                  : 'Connecting securely…'}
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                {paymentMethod==='wallet'?'Pay with Mystery Wallet':'Proceed to Secure Payment'}
+                {isRegularData&&!reviewingData?'Review order':paymentMethod==='wallet'?'Pay with Mystery Wallet':serverError?'Retry payment connection':'Continue to payment'}
                 <ArrowRight className="w-4 h-4" />
               </span>
             )}
           </button>
 
+          {isInitializing&&<p role="status" className="text-xs text-center text-slate-300">Your checkout is being prepared. Please wait and avoid starting another payment.</p>}
+          {serverError&&<p className="text-xs text-slate-400">If payment was deducted, check Track Order before retrying. You can edit the recipient or contact support.</p>}
           {/* 7. WhatsApp Help */}
           <div className="text-center pt-0.5">
             <a

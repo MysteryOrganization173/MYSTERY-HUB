@@ -61,8 +61,8 @@ describe('Mystery Hub Mobile Bundle Card Compression Verification', () => {
       'Card must display direct SIM credit status'
     );
     assert.ok(
-      cardCode.includes('Instant Delivery'),
-      'Card must display instant delivery for AT'
+      cardCode.includes('dataDeliveryNote(bundle.network)'),
+      'Card must use the centrally configured delivery information'
     );
   });
 });

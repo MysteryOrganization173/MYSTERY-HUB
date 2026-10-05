@@ -1,3 +1,4 @@
+import { dataOrderPresentation, maskDataRecipient } from '../../utils/dataPurchasePresentation';
 import { afaStatusLabel } from '../../../shared/afa';
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
@@ -105,6 +106,8 @@ export const OrderStatusModal: React.FC = () => {
 
   const currentNetwork = GHANA_NETWORKS[activeOrder.network];
   const displayRef = activeOrder.publicReference || activeOrder.id;
+  const isDataOrder = activeOrder.serviceType === 'data' || (!activeOrder.serviceType && !/^(airtime|instant|marketplace)/.test(activeOrder.bundle.id));
+  const dataView = dataOrderPresentation(activeOrder.serverStatus, activeOrder.manualReview);
   const isRefundIssue = activeOrder.serverStatus === 'refund_pending' || activeOrder.serverStatus === 'refunded';
 
   const handleCopyOrderId = () => {
@@ -159,7 +162,7 @@ export const OrderStatusModal: React.FC = () => {
   const isAfa = activeOrder.serviceType === 'afa';
   if (isAfa) statusConfig.label = afaStatusLabel(activeOrder.serverStatus, activeOrder.manualReview);
 
-  const headingText = isAfa
+  const headingText = isDataOrder ? dataView.title : isAfa
     ? afaStatusLabel(activeOrder.serverStatus, activeOrder.manualReview)
     : activeOrder.status === 'delivered'
     ? 'Order delivered successfully'
@@ -175,7 +178,7 @@ export const OrderStatusModal: React.FC = () => {
     ? 'Delivery issue'
     : 'Order placed successfully';
 
-  const descriptionText = isAfa
+  const descriptionText = isDataOrder ? dataView.next : isAfa
     ? activeOrder.serverStatus === 'delivered'
       ? 'Your MTN AFA registration is confirmed. MTN packages are purchased separately.'
       : activeOrder.status === 'failed'
@@ -187,8 +190,8 @@ export const OrderStatusModal: React.FC = () => {
         : statusConfig.description);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-[calc(100vw-1rem)] sm:max-w-lg bg-[#0f151b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col">
+    <div role="dialog" aria-modal="true" aria-label="Order status and receipt" className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-[calc(100vw-1rem)] sm:max-w-lg bg-[#0f151b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 max-h-[94dvh] flex flex-col">
         {/* Header with Close */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#0c1116]">
           <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -196,14 +199,14 @@ export const OrderStatusModal: React.FC = () => {
           </span>
           <button
             onClick={closeOrderStatus}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
             aria-label="Close status"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 text-center space-y-6">
+        <div className="overflow-y-auto p-4 sm:p-6 text-center space-y-4 overscroll-contain">
           {/* Animated Central Icon */}
           <div className="flex justify-center">
             {activeOrder.status === 'delivered' ? (
@@ -235,8 +238,13 @@ export const OrderStatusModal: React.FC = () => {
             </p>
           </div>
 
-          {/* Live Progress Bar */}
-          <div className="bg-[#090d10] p-4 rounded-xl border border-slate-800 space-y-2">
+          {/* Only verified server states advance the Data journey; no percentage estimates. */}
+          {isDataOrder ? <div className="border-y border-slate-800 py-3 text-left space-y-3" aria-label="Order journey">
+            <p role="status" className="text-sm font-semibold text-white">Current status: {dataView.label}</p>
+            <ol className="grid grid-cols-3 gap-2 text-xs">
+              {[['Payment confirmed',dataView.paymentConfirmed],['Processing',dataView.processing||dataView.delivered],['Delivered',dataView.delivered]].map(([label,complete])=><li key={String(label)} className={complete?'text-[#00c365]':'text-slate-400'}><span aria-hidden="true">{complete?'✓':'○'} </span>{label}<span className="sr-only">{complete?' — confirmed':' — not confirmed'}</span></li>)}
+            </ol>
+          </div> : <div className="bg-[#090d10] p-4 rounded-xl border border-slate-800 space-y-2">
             <div className="flex justify-between text-xs text-slate-400 font-medium">
               <span>Order Received</span>
               <span>{isAfa ? 'Registration Progress' : 'Delivery Progress'}</span>
@@ -257,17 +265,20 @@ export const OrderStatusModal: React.FC = () => {
             </div>
           </div>
 
+          }
+
           {/* Key Information Grid */}
           <div className="grid grid-cols-2 gap-3 text-left">
             <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
               <div className="text-[11px] text-slate-400">Order Reference</div>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="font-mono text-sm font-semibold text-white truncate max-w-[140px] sm:max-w-none">
+                <span className="font-mono text-xs sm:text-sm font-semibold text-white break-all min-w-0">
                   #{displayRef}
                 </span>
                 <button
                   onClick={handleCopyOrderId}
-                  className="text-slate-400 hover:text-white shrink-0 cursor-pointer"
+                  aria-label="Copy order reference"
+                  className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-white shrink-0 cursor-pointer"
                   title="Copy Reference"
                 >
                   {copied ? <Check className="w-3.5 h-3.5 text-[#00c365]" /> : <Copy className="w-3.5 h-3.5" />}
@@ -277,7 +288,7 @@ export const OrderStatusModal: React.FC = () => {
 
             <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
               <div className="text-[11px] text-slate-400">Product</div>
-              <div className="font-semibold text-sm text-white truncate mt-0.5">
+              <div className="font-semibold text-sm text-white break-words mt-0.5">
                 {(() => {
                   const isInst =
                     activeOrder.serviceType === 'instant_bundle' ||
@@ -311,12 +322,12 @@ export const OrderStatusModal: React.FC = () => {
             <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
               <div className="text-[11px] text-slate-400">Recipient Phone</div>
               <div className="font-medium text-sm text-white mt-0.5">
-                {activeOrder.recipientPhone}
+                {isDataOrder ? maskDataRecipient(activeOrder.recipientPhone) : activeOrder.recipientPhone}
               </div>
             </div>
 
             <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
-              <div className="text-[11px] text-slate-400">Amount Paid</div>
+              <div className="text-[11px] text-slate-400">{isDataOrder&&!dataView.paymentConfirmed?'Order Total':'Amount Paid'}</div>
               <div className="font-bold text-sm text-[#00c365] mt-0.5 tabular-nums">
                 GH₵{activeOrder.amountGhc.toFixed(2)}
               </div>
@@ -327,11 +338,11 @@ export const OrderStatusModal: React.FC = () => {
                 <div className="min-w-0 pr-2">
                   <div className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">Payment Details</div>
                   <div className="font-mono text-[11px] text-slate-400 mt-0.5 truncate" title={`Paystack Reference: ${activeOrder.paymentReference}`}>
-                    Paystack Ref: {activeOrder.paymentReference}
+                    {activeOrder.paymentMethod==='wallet'?'Wallet':'Payment'} Ref: {activeOrder.paymentReference}
                   </div>
                 </div>
-                <span className="text-[10px] text-emerald-400/90 bg-emerald-500/10 px-2 py-0.5 rounded font-medium shrink-0 border border-emerald-500/20">
-                  Verified
+                <span className={`max-w-[45%] text-right text-[10px] px-2 py-0.5 rounded font-medium shrink-0 border ${isDataOrder&&!dataView.paymentConfirmed?'text-amber-300 bg-amber-500/10 border-amber-500/20':'text-emerald-400/90 bg-emerald-500/10 border-emerald-500/20'}`}>
+                  {isDataOrder ? dataView.paymentConfirmed?'Confirmed':'Awaiting confirmation' : 'Verified'}
                 </span>
               </div>
             )}
@@ -452,7 +463,7 @@ export const OrderStatusModal: React.FC = () => {
               }}
               className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-colors cursor-pointer"
             >
-              View All Orders
+              Track Order
             </button>
             <button
               onClick={() => {

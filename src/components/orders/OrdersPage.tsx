@@ -1,3 +1,4 @@
+import { dataOrderPresentation, maskDataRecipient } from '../../utils/dataPurchasePresentation';
 import { afaStatusLabel } from '../../../shared/afa';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
@@ -194,6 +195,7 @@ export const OrdersPage: React.FC = () => {
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
+              aria-label="Order reference or saved recipient phone"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by Order ID (e.g. MH-20260929-123456) or recipient phone..."
@@ -212,6 +214,7 @@ export const OrdersPage: React.FC = () => {
             )}
           </button>
         </form>
+        <p className="text-xs text-slate-400">Enter your Mystery Hub reference to check the latest server status. A phone-number search filters orders already shown here.</p>
 
         {/* Orders List */}
         {filteredOrders.length > 0 ? (
@@ -281,8 +284,10 @@ export const OrdersPage: React.FC = () => {
               return (
                 <div
                   key={order.id}
+                  role="button" tabIndex={0} aria-label={`Track order ${order.publicReference||order.id}`}
+                  onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openOrderStatus(order);}}}
                   onClick={() => openOrderStatus(order)}
-                  className="p-4 sm:p-5 rounded-2xl bg-[#0f151b] border border-slate-800 hover:border-[#00c365]/40 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 sm:gap-4 cursor-pointer group shadow-sm"
+                  className="p-4 sm:p-5 rounded-2xl bg-[#0f151b] border border-slate-800 hover:border-[#00c365]/40 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 sm:gap-4 cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365]"
                 >
                   <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
                     {isMarketplace ? (
@@ -306,12 +311,12 @@ export const OrdersPage: React.FC = () => {
                             ? order.bundle.dataAmount
                             : `${order.bundle.dataAmount} Data Bundle`}
                         </span>
-                        <span className="font-mono text-[11px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded truncate max-w-[130px] sm:max-w-none">
+                        <span className="font-mono text-[11px] text-slate-300 break-all">
                           #{order.publicReference || order.id}
                         </span>
                       </div>
                       <div className="text-[11px] sm:text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-x-2.5 sm:gap-x-3 gap-y-1">
-                        <span>Recipient: {order.recipientPhone}</span>
+                        <span>Recipient: {order.serviceType==='data'?maskDataRecipient(order.recipientPhone):order.recipientPhone}</span>
                         <span>·</span>
                         <span>
                           {new Date(order.createdAt).toLocaleDateString()}{' '}
@@ -340,6 +345,7 @@ export const OrdersPage: React.FC = () => {
                           </>
                         )}
                       </div>
+                      {order.serviceType==='data'&&<p className="text-xs text-slate-400 mt-2 leading-relaxed">{dataOrderPresentation(order.serverStatus,order.manualReview).next}</p>}
                     </div>
                   </div>
 
@@ -348,7 +354,7 @@ export const OrdersPage: React.FC = () => {
                       <div className="text-sm sm:text-base font-extrabold text-white tabular-nums">
                         GH₵{order.amountGhc.toFixed(2)}
                       </div>
-                      <div className="mt-1">{statusBadge}</div>
+                      <div className="mt-1">{order.serviceType==='data'?<span className="text-xs font-semibold text-slate-200">{dataOrderPresentation(order.serverStatus,order.manualReview).label}</span>:statusBadge}</div>
                     </div>
                     <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-[#00c365] group-hover:translate-x-1 transition-all shrink-0" />
                   </div>

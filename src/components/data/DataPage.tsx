@@ -1095,8 +1095,9 @@ export const DataPage: React.FC = () => {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    aria-label="Search data bundles by size, price or network"
                     placeholder="Search size..."
-                    className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
+                    className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl pl-8 pr-3 min-h-11 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
                   />
                 </div>
 
@@ -1105,8 +1106,10 @@ export const DataPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleSetViewMode('compact')}
+                    aria-pressed={viewMode==='compact'}
+                    aria-label="Compact bundle view"
                     title="Compact View (fast browsing)"
-                    className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1 ${
+                    className={`min-w-11 min-h-11 p-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1 ${
                       viewMode === 'compact'
                         ? 'bg-[#00c365] text-black font-bold shadow-sm'
                         : 'text-slate-400 hover:text-white'
@@ -1118,8 +1121,10 @@ export const DataPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleSetViewMode('cards')}
+                    aria-pressed={viewMode==='cards'}
+                    aria-label="Bundle card view"
                     title="Card View (detailed cards)"
-                    className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1 ${
+                    className={`min-w-11 min-h-11 p-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1 ${
                       viewMode === 'cards'
                         ? 'bg-[#00c365] text-black font-bold shadow-sm'
                         : 'text-slate-400 hover:text-white'

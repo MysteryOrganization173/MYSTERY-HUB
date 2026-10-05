@@ -1,3 +1,4 @@
+import { dataDeliveryNote } from '../../utils/dataPurchasePresentation';
 import React from 'react';
 import { DataBundle } from '../../types';
 import { GHANA_NETWORKS } from '../../data/bundles';
@@ -40,7 +41,7 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
 
         <div className="min-w-0 flex-1">
           {/* Top Line: Size + Single Dominant Badge */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <span className="font-extrabold text-base sm:text-lg text-white tracking-tight group-hover:text-[#00c365] transition-colors shrink-0">
               {bundle.dataAmount}
             </span>
@@ -61,14 +62,8 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
             ) : null}
           </div>
 
-          {/* Description line: secondary info gracefully truncated */}
-          <p className="text-[11px] text-slate-400 truncate mt-0.5">
-            {isAirtelTigo
-              ? bundle.isBestValue
-                ? 'Best Value · Instant direct delivery to AT'
-                : 'Instant direct delivery to your AT number'
-              : bundle.description || 'Direct SIM credit'}
-          </p>
+          <p className="text-[11px] text-slate-300 mt-0.5">{network.name} · {bundle.validity}</p>
+          <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{dataDeliveryNote(bundle.network)}</p>
         </div>
       </div>
 
@@ -76,14 +71,14 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <div className="text-right">
           <div className="text-[10px] text-slate-400 font-medium hidden xs:block">Price</div>
-          <div className="text-sm sm:text-base md:text-lg font-extrabold text-white tabular-nums tracking-tight">
+          <div className="text-lg sm:text-xl font-extrabold text-white tabular-nums tracking-tight">
             GH₵{bundle.priceGhc.toFixed(2)}
           </div>
         </div>
 
         <span
           aria-hidden="true"
-          className="h-9 px-3 sm:px-4 rounded-xl bg-[#00c365] group-hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_12px_rgba(0,195,101,0.2)] group-hover:shadow-[0_0_16px_rgba(0,195,101,0.35)] flex items-center justify-center gap-1 shrink-0"
+          className="min-h-11 px-3 sm:px-4 rounded-xl bg-[#00c365] group-hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1 shrink-0"
         >
           <span>Buy</span>
           <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />

@@ -1,8 +1,9 @@
+import { dataDeliveryNote } from '../../utils/dataPurchasePresentation';
 import React, { useRef } from 'react';
 import { DataBundle } from '../../types';
 import { GHANA_NETWORKS } from '../../data/bundles';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
-import { ArrowRight, CheckCircle2, Zap } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 interface BundleCardProps {
   bundle: DataBundle;
@@ -37,9 +38,9 @@ export const BundleCard: React.FC<BundleCardProps> = ({
   return (
     <div
       onClick={handleCardClick}
-      className={`relative rounded-2xl bg-[#0f151b] border transition-all duration-200 p-3 sm:p-4 flex flex-col justify-between group hover:-translate-y-0.5 hover:shadow-xl cursor-pointer ${
+      className={`relative rounded-2xl bg-[#0f151b] border transition-all duration-200 p-3 sm:p-4 flex flex-col justify-between group hover:border-[#00c365]/40 cursor-pointer ${
         featured || bundle.isBestValue
-          ? 'border-[#00c365]/60 shadow-[0_0_20px_rgba(0,195,101,0.12)]'
+          ? 'border-[#00c365]/60'
           : 'border-slate-800 hover:border-slate-700'
       }`}
     >
@@ -68,25 +69,16 @@ export const BundleCard: React.FC<BundleCardProps> = ({
 
         {/* Price prominently at top right */}
         <div className="text-right shrink-0">
-          <span className="text-base sm:text-lg font-extrabold text-white tabular-nums tracking-tight">
+          <span className="text-xl font-extrabold text-white tabular-nums tracking-tight">
             GH₵{bundle.priceGhc.toFixed(2)}
           </span>
         </div>
       </div>
 
-      {/* ROW 2: Short delivery & status line */}
-      <div className="my-2">
-        {bundle.network === 'airteltigo' ? (
-          <div className="flex items-center gap-1 text-[11px] text-amber-300 font-medium">
-            <Zap className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
-            <span className="truncate">Instant Delivery · Direct SIM Credit</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1 text-[11px] text-slate-400">
-            <CheckCircle2 className="w-3 h-3 text-[#00c365] shrink-0" />
-            <span className="truncate">In Stock · Direct SIM Credit</span>
-          </div>
-        )}
+      {/* ROW 2: Existing validity and centrally configured delivery information */}
+      <div className="my-2 text-[11px] leading-relaxed">
+        <p className="text-slate-300">{network.name} · {bundle.validity}</p>
+        <p className="text-slate-400">{dataDeliveryNote(bundle.network)} · Direct SIM Credit</p>
       </div>
 
       {/* ROW 3: Compact Recipient Input + Action CTA in one unified row */}
@@ -96,6 +88,7 @@ export const BundleCard: React.FC<BundleCardProps> = ({
             ref={phoneInputRef}
             id={`card-phone-${bundle.id}`}
             type="tel"
+            inputMode="tel"
             value={recipientPhone}
             aria-label="Recipient phone number"
             onChange={(e) => {
@@ -103,7 +96,7 @@ export const BundleCard: React.FC<BundleCardProps> = ({
               onPhoneChange?.(val);
             }}
             placeholder="024 XXX XXXX"
-            className="w-full bg-[#0a0e12] border border-slate-700/80 rounded-xl px-2.5 py-1.5 sm:py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365] focus:ring-1 focus:ring-[#00c365] transition-colors"
+            className="w-full bg-[#0a0e12] border border-slate-700/80 rounded-xl px-2.5 min-h-11 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365] focus:ring-1 focus:ring-[#00c365] transition-colors"
           />
         </div>
 
@@ -111,11 +104,9 @@ export const BundleCard: React.FC<BundleCardProps> = ({
           type="button"
           onClick={handleReviewOrder}
           aria-label={`Review order for ${bundle.dataAmount} ${bundle.network.toUpperCase()} bundle`}
-          className="shrink-0 py-1.5 sm:py-2 px-2.5 sm:px-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs tracking-wider transition-all shadow-[0_0_12px_rgba(0,195,101,0.2)] active:scale-[0.98] flex items-center justify-center gap-1 cursor-pointer"
+          className="shrink-0 min-h-11 py-2 px-2.5 sm:px-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs tracking-wider transition-all active:scale-[0.98] flex items-center justify-center gap-1 cursor-pointer"
         >
-          <span className="inline min-[360px]:hidden">Buy</span>
-          <span className="hidden min-[360px]:inline min-[480px]:hidden">Review</span>
-          <span className="hidden min-[480px]:inline">Review Order</span>
+          <span>Buy</span>
           <ArrowRight className="w-3.5 h-3.5 shrink-0" />
         </button>
       </div>

@@ -314,8 +314,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     status: OrderRecord['status'],
     extra?: { serverStatus?: string; statusMessage?: string; manualReview?: boolean }
   ) => {
-    // AFA orders opened from the server may not be in the legacy local order list.
-    if (activeOrder?.serviceType === 'afa' && (activeOrder.id === orderId || activeOrder.publicReference === orderId)) {
+    // Server-loaded Data and AFA orders may not be in the legacy local list.
+    if (activeOrder && ['afa', 'data'].includes(activeOrder.serviceType || '') && (activeOrder.id === orderId || activeOrder.publicReference === orderId)) {
       setActiveOrder({...activeOrder,status,manualReview:extra?.manualReview ?? activeOrder.manualReview,serverStatus:extra?.serverStatus || activeOrder.serverStatus,statusMessage:extra?.statusMessage,updatedAt:new Date().toISOString()});
     }
     setOrders((prev) =>
