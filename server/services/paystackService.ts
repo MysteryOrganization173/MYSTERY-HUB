@@ -12,6 +12,7 @@ export interface PaystackInitializeParams {
   reference: string;
   callbackUrl?: string;
   metadata?: Record<string, unknown>;
+  channels?: string[];
 }
 
 export interface PaystackInitializeResult {
@@ -24,6 +25,8 @@ export interface PaystackInitializeResult {
 }
 
 export interface PaystackVerifyResult {
+  isTestMode?: boolean;
+  metadata?: Record<string, unknown>;
   reference?: string;
   isSimulated?: boolean;
   isVerified: boolean;
@@ -84,6 +87,7 @@ export class PaystackServerService {
           reference: params.reference,
           callback_url: params.callbackUrl,
           metadata: params.metadata,
+          ...(params.channels ? { channels: params.channels } : {}),
         }),
       });
 
@@ -172,6 +176,7 @@ export class PaystackServerService {
           gateway_response?: string;
           paid_at?: string;
           reference?: string;
+          metadata?: Record<string, unknown>;
         };
       };
 
@@ -190,7 +195,9 @@ export class PaystackServerService {
 
       return {
         isVerified: isSuccess,
+        isTestMode: secretKey.startsWith('sk_test_'),
         reference: tx.reference,
+        metadata: tx.metadata,
         status: isSuccess ? 'success' : (tx.status as PaystackVerifyResult['status']),
         amountPesewas: tx.amount,
         currency: tx.currency,

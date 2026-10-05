@@ -5,6 +5,9 @@
  */
 
 import { ReferralStore } from '../db/referralStore.js';
+import { economicsPolicy, computeEconomicReward } from './referralEconomics.js';
+import { FinanceService } from './financeService.js';
+import { percentMinor } from '../../shared/money.js';
 import { OrdersStore } from '../db/ordersStore.js';
 import { AdminAuditStore } from '../db/adminAuditStore.js';
 import { MarketplaceStore } from '../db/marketplaceStore.js';
@@ -227,8 +230,9 @@ export class ReferralService {
    * ONLY executes for delivered telecom orders or confirmed transactions.
    */
   static async processOrderReward(input: OrderRecord): Promise<RewardLedgerRecord | null> {
-    // AFA V1 does not activate any referral policy, including wildcard rules.
-    if (input.service_type === 'afa') return null;
+    // AFA requires a separately enabled economic policy. A wildcard cannot silently enable it.
+    const economy = await economicsPolicy(input.service_type || 'data');
+    if (input.service_type === 'afa' && !economy?.enabled) return null;
     // Successful payment is authoritative; a historical paid_at alone is insufficient.
     if (input.status !== 'delivered' || input.payment_status !== 'success' || input.currency !== 'GHS'
       || (input.service_type === 'marketplace' && input.marketplace_status !== 'completed')) return null;
@@ -272,9 +276,15 @@ export class ReferralService {
       if (!amount) {
         rule = await ReferralStore.findMatchingRule(service, order.network, order.product_id, purchaseStage, client, at);
         if (!rule) return null;
+        if (service === 'afa' && rule.service_type !== 'afa') return null;
         if (rule.reward_type === 'fixed_minor' && rule.reward_minor != null) amount = rule.reward_minor;
-        else if (rule.reward_type === 'percent_bps' && rule.reward_percent_bps != null) amount = Math.round(order.amount * rule.reward_percent_bps / 10_000);
+        else if (rule.reward_type === 'percent_bps' && rule.reward_percent_bps != null) amount = percentMinor(order.amount,rule.reward_percent_bps);
       }
+      if(amount>order.amount)return null;
+      const economics=computeEconomicReward(order,rule,amount,economy);
+      // Marketplace retains the already reviewed product/rule economics in this pass.
+      if(service==='marketplace')economics.amount=amount;
+      amount=economics.amount;
       if (!Number.isSafeInteger(amount) || amount <= 0) return null;
       if (amount > order.amount) {
         console.warn(`[Referral Reward] Configured reward exceeds the customer charge for ${order.public_reference}; reward not issued.`);
@@ -291,7 +301,7 @@ export class ReferralService {
         reason: `Reward for delivered ${service} order ${order.public_reference} (${rewardStage})`,
         idempotency_key: service === 'marketplace' && !rule ? `marketplace_reward:${order.id}:${amount}` : `order_reward:${order.id}:${rule!.id}`,
         reversal_of_id: null, approved_at: now, rejected_at: null, reversed_at: null,
-        metadata_json: { order_amount_minor: order.amount, product_id: order.product_id,
+        metadata_json: { ...economics.snapshot, order_amount_minor: order.amount, product_id: order.product_id,
           purchase_stage: purchaseStage, reward_stage: rewardStage, rule_purchase_stage: rule?.purchase_stage || 'any',
           rule_type: rule?.reward_type || 'fixed_minor',
           rule_value: rule ? (rule.reward_type === 'fixed_minor' ? rule.reward_minor : rule.reward_percent_bps) : amount },
@@ -316,7 +326,7 @@ export class ReferralService {
 
     for (const record of records) {
       if (record.status === 'approved' || record.status === 'pending') {
-        const updated = await ReferralStore.reverseLedgerEntry(record.id, reason);
+        const updated = await FinanceService.reverseReward(record, reason);
         if (updated) {
           reversed.push(updated);
           await AdminAuditStore.record({

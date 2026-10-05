@@ -5,6 +5,7 @@
  */
 
 import { AfaStore } from './afaStore.js';
+import { FinanceService } from '../services/financeService.js';
 import { getPool, initDatabase } from './connection.js';
 import { OrderRecord, OrderStatus } from '../types/orders.js';
 import {
@@ -43,6 +44,14 @@ async function acquireLock(key: string): Promise<() => void> {
 }
 
 export class OrdersStore {
+  static async getWalletRecoveryOrders(limit=50):Promise<OrderRecord[]> {
+    const pool=getPool();
+    if(pool)return (await pool.query<OrderRecord>(`SELECT o.* FROM orders o WHERE o.payment_provider='wallet' AND o.user_id IS NOT NULL
+      AND (o.status='paid' OR (o.status='refunded' AND COALESCE(o.manual_review,FALSE)=FALSE
+      AND NOT EXISTS(SELECT 1 FROM finance_operations f WHERE f.user_id=o.user_id AND f.idempotency_key='refund:' || o.id)))
+      ORDER BY o.updated_at LIMIT $1`,[limit])).rows;
+    return this.adminDevOrders().filter(o=>o.payment_provider==='wallet'&&o.user_id&&(o.status==='paid'||o.status==='refunded'&&!o.manual_review)).slice(0,limit);
+  }
   static adminDevOrders() { return [...new Map([...devMemoryStore.values()].map(order => [order.id, order])).values()]; }
   /**
    * Initializes database table if PostgreSQL is configured
@@ -1354,6 +1363,7 @@ export class OrdersStore {
 
     const rewardEffect = async () => {
       await AfaStore.onOrderTerminal(updated);
+      await FinanceService.refund(updated);
       // Preserve existing reward effects, but execute webhook effects only after commit.
       if (updated.status === 'delivered' && existing.status !== 'delivered') {
         try {

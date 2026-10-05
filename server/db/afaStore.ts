@@ -18,7 +18,7 @@ const locks = new Map<string, Promise<void>>();
 export class AfaDuplicateError extends Error { constructor() { super('This number already has an active or completed AFA registration through Mystery Hub. Contact support if you need help.'); } }
 export class AfaStore {
   static clearTestStore() { if (process.env.NODE_ENV !== 'test') throw new Error('Test only'); memory.clear(); locks.clear(); }
-  static async create(order: OrderRecord, payload: AfaPayload): Promise<void> {
+  static async create(order: OrderRecord, payload: AfaPayload, transactionClient?: import('pg').PoolClient): Promise<void> {
     const record: AfaRecord = { id: randomUUID(), order_id: order.id, phone: order.recipient_phone,
       masked_id_number: `GHA-******${payload.idNumber.slice(10)}`, encrypted_payload: encryptAfaPayload(order.id, payload),
       operational_details: { name: payload.name, region: payload.region, location: payload.location, ...(payload.occupation ? { occupation: payload.occupation } : {}) },
@@ -26,9 +26,9 @@ export class AfaStore {
       sensitive_payload_purged_at: null, created_at: order.created_at, updated_at: order.created_at };
     const pool = getPool();
     if (pool) {
-      const client = await pool.connect();
+      const client = transactionClient || await pool.connect();
       try {
-        await client.query('BEGIN');
+        if (!transactionClient) await client.query('BEGIN');
         await client.query("SELECT pg_advisory_xact_lock(hashtext('afa_' || $1))", [record.phone]);
         // Also clean terminal payloads after a crash between order transition and purge.
         await client.query(`UPDATE afa_registrations a SET purchase_blocked=FALSE, encrypted_payload=NULL,
@@ -41,8 +41,8 @@ export class AfaStore {
         await OrdersStore.createOrder(order, client);
         await client.query(`INSERT INTO afa_registrations(id,order_id,phone,masked_id_number,encrypted_payload,operational_details,created_at,updated_at)
           VALUES($1,$2,$3,$4,$5,$6,$7,$7)`, [record.id,order.id,record.phone,record.masked_id_number,record.encrypted_payload,JSON.stringify(record.operational_details),record.created_at]);
-        await client.query('COMMIT');
-      } catch (err) { await client.query('ROLLBACK'); throw err; } finally { client.release(); }
+        if (!transactionClient) await client.query('COMMIT');
+      } catch (err) { if (!transactionClient) await client.query('ROLLBACK'); throw err; } finally { if (!transactionClient) client.release(); }
       return;
     }
     while (locks.has(record.phone)) await locks.get(record.phone);

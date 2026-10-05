@@ -2,7 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {adminEarnRequest,type AdminEarnRule,type AdminEarnPolicy} from '../../../services/apiClient';
 import {AdminEarnDialog,earnButton,earnInput,earnMoney} from './AdminEarnUi';
 
-const services=['data','airtime','instant_bundle','marketplace','website_builder','all'];
+const services=['data','airtime','afa','instant_bundle','marketplace','website_builder','all'];
 const blank={service_type:'data',network:'',product_key:'',purchase_stage:'any',reward_type:'fixed_minor',value:'0.00',enabled:false,starts_at:'',ends_at:''};
 const datetime=(value:string|null|undefined)=>value?new Date(value).toISOString().slice(0,-1):'';
 export const AdminEarnRules:React.FC<{sessionToken:string;refreshKey?:number}> = ({sessionToken,refreshKey})=>{

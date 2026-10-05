@@ -1,6 +1,6 @@
 /**
  * Airtime Fulfilment & Integration Test Suite
- * Validates live airtime pricing, 2% service fee calculation, network ordering,
+ * Validates live airtime pricing, 0% service fee calculation, network ordering,
  * Success Biz Hub v2 airtime API contract (POST /v2/airtime and GET /v2/airtime/:identifier),
  * safe non-hardcoded supplier cost storage, and error/idempotency protection.
  */
@@ -18,38 +18,38 @@ async function runAirtimeTests() {
   let passed = 0;
   process.env.SUCCESS_BIZ_HUB_API_KEY = 'sbh_test_key_12345';
 
-  // 1. Server-authoritative 2% Airtime Fee Calculations
+  // 1. Server-authoritative 0% Airtime Fee Calculations
   {
-    assert.strictEqual(AIRTIME_SERVICE_FEE_PERCENT, 2, 'Default service fee should be 2%');
+    assert.strictEqual(AIRTIME_SERVICE_FEE_PERCENT, 0, 'Default service fee should be 0%');
 
     // Example 1: GH₵10 Airtime
     const calc10 = calculateAirtimeOrder(10);
     assert.strictEqual(calc10.faceValueGhc, 10);
     assert.strictEqual(calc10.faceValuePesewas, 1000);
-    assert.strictEqual(calc10.serviceFeeGhc, 0.20);
-    assert.strictEqual(calc10.serviceFeePesewas, 20);
-    assert.strictEqual(calc10.totalGhc, 10.20);
-    assert.strictEqual(calc10.totalPesewas, 1020);
+    assert.strictEqual(calc10.serviceFeeGhc, 0);
+    assert.strictEqual(calc10.serviceFeePesewas, 0);
+    assert.strictEqual(calc10.totalGhc, 10);
+    assert.strictEqual(calc10.totalPesewas, 1000);
     assert.strictEqual(calc10.amountMajor, '10', 'Supplier amountMajor should be "10"');
 
     // Example 2: GH₵50 Airtime
     const calc50 = calculateAirtimeOrder(50);
     assert.strictEqual(calc50.faceValueGhc, 50);
     assert.strictEqual(calc50.faceValuePesewas, 5000);
-    assert.strictEqual(calc50.serviceFeeGhc, 1.00);
-    assert.strictEqual(calc50.serviceFeePesewas, 100);
-    assert.strictEqual(calc50.totalGhc, 51.00);
-    assert.strictEqual(calc50.totalPesewas, 5100);
+    assert.strictEqual(calc50.serviceFeeGhc, 0);
+    assert.strictEqual(calc50.serviceFeePesewas, 0);
+    assert.strictEqual(calc50.totalGhc, 50);
+    assert.strictEqual(calc50.totalPesewas, 5000);
     assert.strictEqual(calc50.amountMajor, '50');
 
     // Example 3: Fractional face value GH₵12.50
     const calc1250 = calculateAirtimeOrder(12.50);
     assert.strictEqual(calc1250.faceValueGhc, 12.50);
     assert.strictEqual(calc1250.faceValuePesewas, 1250);
-    assert.strictEqual(calc1250.serviceFeePesewas, 25);
-    assert.strictEqual(calc1250.serviceFeeGhc, 0.25);
-    assert.strictEqual(calc1250.totalPesewas, 1275);
-    assert.strictEqual(calc1250.totalGhc, 12.75);
+    assert.strictEqual(calc1250.serviceFeePesewas, 0);
+    assert.strictEqual(calc1250.serviceFeeGhc, 0);
+    assert.strictEqual(calc1250.totalPesewas, 1250);
+    assert.strictEqual(calc1250.totalGhc, 12.50);
     assert.strictEqual(calc1250.amountMajor, '12.50');
 
     console.log('✓ 1. Server-authoritative Airtime fee & pesewa calculations passed');

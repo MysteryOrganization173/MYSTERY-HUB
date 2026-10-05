@@ -5,6 +5,7 @@
  */
 
 import { AfaStore } from '../db/afaStore.js';
+import { FinanceService } from './financeService.js';
 import { AfaService } from './afaService.js';
 import { OrdersStore } from '../db/ordersStore.js';
 import { OrderRecord, OrderStatus } from '../types/orders.js';
@@ -735,6 +736,7 @@ export class FulfilmentService {
     let scanned = 0;
     let updatedCount = 0;
     try {
+      await FinanceService.reconcileWalletOrders();
       await AfaStore.reconcileTerminalPayloads();
       const activeOrders = await OrdersStore.getActiveSupplierOrders(limit);
       scanned = activeOrders.length;

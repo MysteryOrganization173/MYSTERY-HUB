@@ -1,3 +1,4 @@
+import {AdminFinanceSection} from './sections/AdminFinanceSection';
 import { AdminWebsiteBuilderSection } from './sections/AdminWebsiteBuilderSection';
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
@@ -24,7 +25,7 @@ import {
   Radio,
 } from 'lucide-react';
 
-export type AdminTab = 'overview' | 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system' | 'earn' | 'websites';
+export type AdminTab = 'finance' | 'overview' | 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system' | 'earn' | 'websites';
 
 export const AdminPage: React.FC = () => {
   const { user, sessionToken, logoutUser, setActivePage } = useApp();
@@ -146,6 +147,7 @@ export const AdminPage: React.FC = () => {
                 <span>Orders</span>
               </button>
 
+              <button onClick={()=>setActiveTab('finance')} className="w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#00c365]">Financial Control Room</button>
               <button onClick={()=>setActiveTab('websites')} className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold ${activeTab==='websites'?'bg-[#00c365] text-black':'text-slate-400 hover:bg-slate-900'}`}><Store className="w-4 h-4" /><span>Website Builder</span></button>
 
               <button
@@ -211,6 +213,7 @@ export const AdminPage: React.FC = () => {
 
           {/* Mobile / Tablet Horizontal Navigation Tabs */}
           <div className="lg:hidden col-span-1 flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            <button onClick={()=>setActiveTab('finance')} className="shrink-0 rounded-xl bg-slate-900 px-3 py-2 text-[#00c365]">Finances</button>
             <button onClick={() => { setEarnUserId(null); setActiveTab('earn'); }} className={`min-h-10 px-3 py-2 rounded-xl shrink-0 text-xs font-semibold ${activeTab === 'earn' ? 'bg-[#00c365] text-black' : 'bg-slate-900 border border-slate-800 text-slate-400'}`}>Mystery Earn</button>
             <button
               onClick={() => setActiveTab('overview')}
@@ -289,6 +292,7 @@ export const AdminPage: React.FC = () => {
 
           {/* Active Tab Workspace (lg:col-span-9) */}
           <main className="col-span-1 lg:col-span-9">
+            {activeTab==='finance'&&<AdminFinanceSection sessionToken={sessionToken}/>}
             {activeTab === 'earn' && <AdminMysteryEarnSection sessionToken={sessionToken} initialReferrerId={earnUserId} onOpenCustomer={id => { setCustomerUserId(id); setActiveTab('customers'); }} />}
             {activeTab === 'overview' && (
               <AdminOverviewSection

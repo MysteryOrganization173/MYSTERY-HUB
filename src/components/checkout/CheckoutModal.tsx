@@ -1,3 +1,6 @@
+import { WalletPaymentChoice } from '../finance/WalletPaymentChoice';
+import { walletCheckout } from '../../services/financeApi';
+import { getStoredReferralCode, getOrGenerateVisitorKey } from '../../utils/referralCapture';
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { NetworkId } from '../../types';
@@ -33,10 +36,15 @@ export const CheckoutModal: React.FC = () => {
     user,
     openOrderStatus,
     openDataPage,
+    sessionToken,
+    setActivePage,
   } = useApp();
   const { initializeServerPayment, isInitializing, loadingPhase, isConfigured } = usePaystack();
 
   const [phone, setPhone] = useState('');
+  const [paymentMethod,setPaymentMethod]=useState<'paystack'|'wallet'>('paystack');
+  const [walletBusy,setWalletBusy]=useState(false);
+  const walletRequest=useRef<{fingerprint:string;id:string}|null>(null);
   const [detectedNet, setDetectedNet] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState('');
   const [serverError, setServerError] = useState('');
@@ -73,6 +81,8 @@ export const CheckoutModal: React.FC = () => {
 
   useEffect(() => {
     if (checkoutBundle) {
+      setPaymentMethod('paystack');
+      walletRequest.current=null;
       const initial = checkoutInitialPhone !== undefined ? checkoutInitialPhone : (user?.phone || '');
       setPhone(initial);
       setPhoneError('');
@@ -129,7 +139,7 @@ export const CheckoutModal: React.FC = () => {
   const serviceFee =
     checkoutBundle.serviceFeeGhc ??
     (isAirtime
-      ? Number((faceValue * 0.02).toFixed(2))
+      ? 0
       : isInstantBundle
       ? Number((Math.ceil((Math.round(faceValue * 100) + 10) / 0.98) / 100 - faceValue).toFixed(2))
       : 0);
@@ -326,9 +336,18 @@ export const CheckoutModal: React.FC = () => {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    submitPayment();
+    if(paymentMethod!=='wallet'){submitPayment();return;}
+    if(walletBusy||!sessionToken)return;
+    setWalletBusy(true);setServerError('');
+    try {
+      const body={productId:checkoutBundle.id,recipientPhone:phone.trim(),customerEmail:user?.email,customerName:user?.name,serviceType:isAirtime?'airtime':'data',network:checkoutBundle.network,amount:faceValue,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()};
+      const fingerprint=JSON.stringify(body);if(walletRequest.current?.fingerprint!==fingerprint)walletRequest.current={fingerprint,id:crypto.randomUUID()};
+      const result=await walletCheckout(sessionToken,'payments/initialize',{...body,requestId:walletRequest.current!.id});
+      createOrder({...checkoutBundle,priceGhc:result.amountPesewas/100},phone.trim(),'wallet',result.reference,result.orderRef);
+      closeCheckout();setActivePage('orders');showToast('Wallet payment confirmed. Check My Orders for fulfilment status.','success');
+    }catch(error){setServerError((error as Error).message);}finally{setWalletBusy(false);}
   };
 
   const handleViewInstantBundles = () => {
@@ -376,7 +395,7 @@ export const CheckoutModal: React.FC = () => {
                   : 'Data Bundle Checkout'}
               </h3>
               <p className="text-[11px] sm:text-xs text-slate-400 truncate">
-                {isInstantBundle
+                {paymentMethod==='wallet'?'Direct SIM delivery · Mystery Wallet':isInstantBundle
                   ? 'Direct automated instant delivery via Paystack'
                   : 'Direct SIM delivery via Paystack'}
               </p>
@@ -394,6 +413,8 @@ export const CheckoutModal: React.FC = () => {
 
         {/* Scrollable Body */}
         <form onSubmit={handleSubmit} className="overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4 flex-1 overscroll-contain">
+          {!isInstantBundle&&<WalletPaymentChoice amountMinor={Math.round(totalAmount*100)} value={paymentMethod} onChange={setPaymentMethod}/>}
+          {walletBusy&&<p role="status" className="text-sm text-[#00c365]">Confirming Wallet payment…</p>}
           {/* 1. Bundle / Airtime Summary Card */}
           <div className="p-3 sm:p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
@@ -761,7 +782,7 @@ export const CheckoutModal: React.FC = () => {
                   <span className="text-white tabular-nums font-medium">GH₵{faceValue.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between text-slate-400">
-                  <span>Service Fee (2%)</span>
+                  <span>Service Fee (0%)</span>
                   <span className="text-slate-300 tabular-nums font-medium">GH₵{serviceFee.toFixed(2)}</span>
                 </div>
                 <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-sm font-bold text-white">
@@ -794,13 +815,13 @@ export const CheckoutModal: React.FC = () => {
           {/* 5. Simple Security Line */}
           <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400 text-center">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>Secure checkout powered by Paystack.</span>
+            <span>{paymentMethod==='wallet'?'Wallet payment verified by Mystery Hub.':'Secure checkout powered by Paystack.'}</span>
           </div>
 
           {/* 6. Proceed to Secure Payment CTA */}
           <button
             type="submit"
-            disabled={isInitializing}
+            disabled={walletBusy || isInitializing}
             className="w-full py-3.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-sm tracking-wide transition-all shadow-[0_0_20px_rgba(0,195,101,0.3)] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
           >
             {isInitializing ? (
@@ -814,7 +835,7 @@ export const CheckoutModal: React.FC = () => {
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                Proceed to Secure Payment
+                {paymentMethod==='wallet'?'Pay with Mystery Wallet':'Proceed to Secure Payment'}
                 <ArrowRight className="w-4 h-4" />
               </span>
             )}

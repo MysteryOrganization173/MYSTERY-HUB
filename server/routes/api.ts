@@ -1,4 +1,8 @@
 import { purchasableOptions } from '../../shared/marketplaceVariants.js';
+import { financeRouter } from './financeApi.js';
+import { FinanceService } from '../services/financeService.js';
+import { FinanceError, FinanceStore } from '../db/financeStore.js';
+import { createRateLimiter } from '../middleware/rateLimiter.js';
 import { MARKETPLACE_LIMITS, truncateMarketplaceText } from '../../shared/marketplaceLimits.js';
 import { marketplaceFulfilment } from '../services/marketplaceCheckoutPolicy.js';
 import { MarketplaceControlStore, MarketplaceInputError } from '../db/marketplaceControlStore.js';
@@ -48,6 +52,7 @@ import { AccountError, identifierConflict, loginAccount } from '../services/acco
 
 export const apiRouter = Router();
 apiRouter.use('/auth', accountRouter);
+apiRouter.use('/finance', financeRouter);
 apiRouter.use('/afa', afaRouter);
 
 // Mount Website Builder endpoints
@@ -127,7 +132,8 @@ apiRouter.get('/instant-bundles', async (_req: Request, res: Response) => {
  * Authoritative price is loaded from the catalog — browser input price is ignored.
  * If fulfillment is enabled, performs supplier preflight checks before taking customer payment.
  */
-apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: Response) => {
+const walletCheckoutLimiter=createRateLimiter({windowMs:60_000,max:10});
+apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.paymentMethod==='wallet'?walletCheckoutLimiter(req,res,next):next(), async (req: Request, res: Response) => {
   if (req.body?.serviceType === 'afa' || req.body?.productId === 'afa-registration') { res.status(400).json({ error: 'Use the authenticated AFA registration checkout.' }); return; }
   const reqStart = performance.now();
   try {
@@ -143,6 +149,19 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
       return;
     }
 
+    if (req.body.paymentMethod === 'wallet') {
+      if (!req.user) {res.status(401).json({error:'Sign in to use Mystery Wallet.'});return;}
+      if (isMarketplace || serviceType === 'instant_bundle' || productId.startsWith('instant-')) {res.status(400).json({error:'Wallet supports Data, Airtime and AFA in V1.'});return;}
+      const old = await FinanceStore.transaction(req.user.id,tx=>tx.find('purchase:'+req.body.requestId));
+      if (old) {
+        const normalized=validateAndNormalizeGhanaPhone(recipientPhone || bodyPhone || customerPhone).normalized;
+        if(old.payload.productId!==productId || old.payload.recipient!==normalized){res.status(409).json({error:'Checkout request details changed.'});return;}
+        const existing=(await OrdersStore.findOrder(old.payload.orderId))!;
+        if((serviceType&&serviceType!==existing.service_type)||(existing.service_type==='airtime'&&((reqNetwork&&String(reqNetwork).toLowerCase()!==existing.network)||(reqAmount!==undefined&&calculateAirtimeOrder(Number(reqAmount)).faceValuePesewas!==existing.face_value_minor)))) {res.status(409).json({error:'Checkout request details changed.'});return;}
+        const paid=await FinanceService.recoverPurchase(req.user.id,old.payload.orderId);
+        res.json({success:true,paymentMethod:'wallet',orderRef:paid!.public_reference,reference:paid!.payment_reference,status:paid!.status,amountPesewas:paid!.amount});return;
+      }
+    }
     const rawPhone = recipientPhone || bodyPhone || customerPhone;
     const phoneVal = validateAndNormalizeGhanaPhone(rawPhone);
     if (!phoneVal.isValid || !phoneVal.normalized) {
@@ -658,6 +677,10 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
       };
 
       const dbStart = performance.now();
+      if (req.body.paymentMethod === 'wallet') {
+        const paid = await FinanceService.payOrder(newOrder, req.body.requestId);
+        res.json({success:true,paymentMethod:'wallet',orderRef:paid.public_reference,reference:paid.payment_reference,status:paid.status,amountPesewas:paid.amount});return;
+      }
       const createResult = await OrdersStore.createOrderWithMtnDuplicateCheck(newOrder);
       const dbMs = Math.round(performance.now() - dbStart);
       console.info(`[Checkout Timing] databaseInsert=${dbMs}ms`);
@@ -822,6 +845,10 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
     };
 
     const dbStart = performance.now();
+      if (req.body.paymentMethod === 'wallet') {
+        const paid = await FinanceService.payOrder(newOrder, req.body.requestId);
+        res.json({success:true,paymentMethod:'wallet',orderRef:paid.public_reference,reference:paid.payment_reference,status:paid.status,amountPesewas:paid.amount});return;
+      }
     const createResult = await OrdersStore.createOrderWithMtnDuplicateCheck(newOrder);
     const dbMs = Math.round(performance.now() - dbStart);
     console.info(`[Checkout Timing] databaseInsert=${dbMs}ms`);
@@ -875,6 +902,7 @@ apiRouter.post('/payments/initialize', optionalAuth, async (req: Request, res: R
       isSimulated: paystackRes.isSimulated || false,
     });
   } catch (err) {
+    if(err instanceof FinanceError){res.status(err.status).json({error:err.message});return;}
     console.error('Payment Initialize Controller Exception:', err);
     res.status(500).json({ error: 'An unexpected server error occurred initializing payment.' });
   }
@@ -1035,6 +1063,10 @@ export async function handlePaystackWebhook(req: Request, res: Response): Promis
       const currency = data.currency;
 
       if (paymentRef) {
+        if (typeof paymentRef === 'string' && paymentRef.startsWith('MH-WALLET-') && !paymentRef.startsWith('MH_WALLET_ORDER_')) {
+          if (!isValidSignature) {res.status(401).json({error:'Invalid signature.'});return;}
+          await FinanceService.verifyTopup(paymentRef);res.status(200).json({status:'success'});return;
+        }
         const order = await OrdersStore.findOrder(paymentRef);
         if (order) {
           // Idempotent update & centralized fulfillment

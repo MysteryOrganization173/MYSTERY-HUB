@@ -193,7 +193,7 @@ test('browser AFA checkout contract reaches encrypted order and Paystack receipt
   let body:any;
   globalThis.fetch=async(url,options)=>{body=JSON.parse(options!.body as string);return originalFetch(base+new URL(String(url),base).pathname,options);};
   const result=await initializeAfaPayment(payload,true,'browser-receipt@example.test','customer-token');
-  assert.deepEqual(body,{...payload,consent:true,customerEmail:'browser-receipt@example.test'});
+  assert.deepEqual(body,{...payload,consent:true,customerEmail:'browser-receipt@example.test',referralCode:null,visitorKey:''});
   const order=(await OrdersStore.findOrder(result.orderRef))!;
   assert.equal(order.service_type,'afa');assert.equal(order.amount,2500);assert.equal(order.customer_email,'browser-receipt@example.test');
   assert.equal(initialization.email,'browser-receipt@example.test');assert.deepEqual(await AfaStore.payload(order.id),payload);assert.equal(posts,0);

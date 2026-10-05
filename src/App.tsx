@@ -1,3 +1,4 @@
+import { WalletPage } from './components/finance/FinancialPanel';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -63,6 +64,7 @@ const AppContent: React.FC = () => {
         {activePage === 'about' && <AboutPage />}
         {activePage === 'orders' && <OrdersPage />}
         {activePage === 'earn' && <MysteryEarnPage />}
+        {activePage === 'wallet' && <WalletPage />}
       </main>
 
       {/* Footer */}

@@ -208,6 +208,7 @@ export const MemberHome: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-6 space-y-6">
+      <button onClick={()=>setActivePage('wallet')} className="m-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm font-semibold text-[#00c365]">Open Mystery Wallet</button>
       {/* 1. Header Greeting Panel */}
       <div className="relative rounded-2xl sm:rounded-3xl bg-[#090d11] border border-slate-800/90 overflow-hidden p-5 sm:p-7 shadow-xl group">
         {/* Background Artwork Layer */}

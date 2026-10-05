@@ -186,9 +186,9 @@ async function runCheckoutPerformanceTests() {
   {
     const calc = calculateAirtimeOrder(10);
     assert.strictEqual(calc.faceValueGhc, 10);
-    assert.strictEqual(calc.serviceFeeGhc, 0.2);
-    assert.strictEqual(calc.totalGhc, 10.2);
-    assert.strictEqual(calc.totalPesewas, 1020);
+    assert.strictEqual(calc.serviceFeeGhc, 0);
+    assert.strictEqual(calc.totalGhc, 10);
+    assert.strictEqual(calc.totalPesewas, 1000);
 
     const airtimePreflight = await FulfilmentService.preflightCheckAirtime('telecel', 1000, '0201234567');
     assert.strictEqual(airtimePreflight.allowed, true);

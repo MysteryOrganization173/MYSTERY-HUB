@@ -510,7 +510,7 @@ export function getGroundedLocalResponse(
   ) {
     return {
       reply:
-        "Airtime Top-Up is live on Mystery Hub! ⚡\n1. Go to our Data & Airtime page and select 'Airtime Top-Up'.\n2. Choose your network (MTN, AirtelTigo, or Telecel).\n3. Enter your phone number and amount (GH₵1.00 – GH₵1,000.00).\n4. Pay via Mobile Money or Card. A transparent 2% service fee applies, and your airtime is credited directly to your SIM immediately!",
+        "Airtime Top-Up is live on Mystery Hub! ⚡\n1. Go to our Data & Airtime page and select 'Airtime Top-Up'.\n2. Choose your network (MTN, AirtelTigo, or Telecel).\n3. Enter your phone number and amount (GH₵1.00 – GH₵1,000.00).\n4. Pay via Mobile Money or Card. There is no checkout surcharge, and your airtime is credited directly to your SIM immediately!",
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Top Up Airtime Now' },
     };
   }

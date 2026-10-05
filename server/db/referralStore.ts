@@ -331,8 +331,8 @@ export class ReferralStore {
     return devReferralClicks.filter((c) => c.referrer_user_id === referrerUserId).length;
   }
 
-  static async countUniqueVisitorsByReferrer(referrerUserId: string): Promise<number> {
-    const pool = getPool();
+  static async countUniqueVisitorsByReferrer(referrerUserId: string, client?: PoolClient): Promise<number> {
+    const pool = client || getPool();
     if (pool) {
       const result = await pool.query<{ count: string }>(`
         SELECT COUNT(DISTINCT visitor_key) AS count FROM referral_clicks
@@ -1002,8 +1002,8 @@ export class ReferralStore {
     return { record: { ...record }, alreadyExisted: false };
   }
 
-  static async findLedgerById(id: string): Promise<RewardLedgerRecord | null> {
-    const pool = getPool();
+  static async findLedgerById(id: string, client?: PoolClient): Promise<RewardLedgerRecord | null> {
+    const pool = client || getPool();
     if (pool) {
       const res = await pool.query<RewardLedgerRecord>(
         `SELECT * FROM reward_ledger WHERE id = $1 LIMIT 1;`,
@@ -1073,14 +1073,15 @@ export class ReferralStore {
    */
   static async reverseLedgerEntry(
     ledgerId: string,
-    reason: string
+    reason: string,
+    transactionClient?: PoolClient
   ): Promise<RewardLedgerRecord | null> {
-    const existing = await this.findLedgerById(ledgerId);
+    const existing = await this.findLedgerById(ledgerId,transactionClient);
     if (!existing) return null;
     if (existing.status === 'reversed') return existing;
 
     const nowIso = new Date().toISOString();
-    const pool = getPool();
+    const pool = transactionClient || getPool();
 
     if (pool) {
       const res = await pool.query<RewardLedgerRecord>(

@@ -1,4 +1,5 @@
 import { AfaStore } from '../db/afaStore.js';
+import { adminFinanceRouter } from './financeApi.js';
 import { AfaService } from '../services/afaService.js';
 import { adminMarketplaceRouter } from './adminMarketplaceApi.js';
 import { WebsiteUltraStore } from '../db/websiteUltraStore.js';
@@ -38,6 +39,7 @@ export const adminRouter = Router();
 
 // Apply strict admin authentication and authorization to all admin routes
 adminRouter.use(requireAdmin);
+adminRouter.use('/finance', adminFinanceRouter);
 adminRouter.use('/website-builder', adminWebsiteRouter);
 adminRouter.use(adminAccountRouter);
 adminRouter.use('/marketplace', adminMarketplaceRouter);

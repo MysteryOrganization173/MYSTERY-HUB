@@ -41,7 +41,7 @@ export interface DataBundle {
 
 export type OrderStatus = 'placed' | 'verifying' | 'processing' | 'delivered' | 'failed';
 
-export type PaymentMethod = 'paystack' | 'momo' | 'card' | 'bank';
+export type PaymentMethod = 'wallet' | 'paystack' | 'momo' | 'card' | 'bank';
 
 export interface OrderRecord {
   id: string; // Local client ID e.g. MH1234567
@@ -216,11 +216,11 @@ export interface DigitalService {
   status: ServiceStatus;
   iconName: string;
   accentColor: string;
-  targetPage?: 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'afa';
+  targetPage?: 'wallet' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'afa';
   artworkUrl?: string;
 }
 
-export type ActivePage = 'home' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'orders' | 'admin' | 'earn' | 'afa';
+export type ActivePage = 'wallet' | 'home' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'orders' | 'admin' | 'earn' | 'afa';
 
 export type MarketplaceAvailability = 'available' | 'check_availability' | 'limited' | 'coming_soon';
 

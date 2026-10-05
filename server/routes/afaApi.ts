@@ -1,4 +1,7 @@
 import { Router } from 'express';
+import { FinanceService } from '../services/financeService.js';
+import { FinanceStore, FinanceError } from '../db/financeStore.js';
+import { ReferralService } from '../services/referralService.js';
 import { randomUUID } from 'node:crypto';
 import { ALLOWED_ORIGINS } from '../middleware/cors.js';
 import { requireAuth } from '../middleware/authMiddleware.js';
@@ -25,6 +28,11 @@ afaRouter.post('/payments/initialize', requireAuth, createRateLimiter({windowMs:
     if (!req.body || Array.isArray(req.body) || Buffer.byteLength(JSON.stringify(req.body)) > 8192) { res.status(413).json({error:'Registration request is too large.'}); return; }
     if (req.body.consent !== true) { res.status(400).json({error:'Please authorize submission of your registration details.',field:'consent'}); return; }
     const payload = validateAfaPayload(req.body);
+    if(req.body.paymentMethod==='wallet') {
+      const old=await FinanceStore.transaction(req.user!.id,tx=>tx.find(`purchase:${req.body.requestId}`));
+      if(old) {if(old.payload.recipient!==validateAndNormalizeGhanaPhone(payload.phone).normalized||old.payload.service!=='afa')throw new FinanceError('Checkout request details changed.',409);
+        const paid=await FinanceService.recoverPurchase(req.user!.id,old.payload.orderId);res.json({success:true,paymentMethod:'wallet',orderRef:paid.public_reference,reference:paid.payment_reference,status:paid.status,amountPesewas:paid.amount});return;}
+    }
     const email = typeof req.body.customerEmail === 'string' ? req.body.customerEmail.trim().toLowerCase() : '';
     if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { res.status(400).json({error:'Enter a valid receipt email.',field:'customerEmail'}); return; }
     const config = await AfaService.publicConfig();
@@ -40,6 +48,12 @@ afaRouter.post('/payments/initialize', requireAuth, createRateLimiter({windowMs:
       status:'pending_payment',payment_provider:'paystack',payment_reference:reference,payment_status:'pending',supplier_provider:'success_biz_hub',
       supplier_order_id:null,supplier_response:null,supplier_cost_minor:null,supplier_offer_ref:null,supplier_last_checked_at:null,failure_reason:null,
       created_at:now,updated_at:now,paid_at:null,submitted_at:null,delivered_at:null};
+    const referral=await ReferralService.resolveReferralContextForOrder({userId:req.user!.id,visitorKey:req.body.visitorKey,explicitCode:req.body.referralCode});
+    Object.assign(order,{referrer_user_id:referral.referrerUserId,referral_attribution_id:referral.attributionId,referral_code:referral.referralCode});
+    if(req.body.paymentMethod==='wallet') {
+      const paid=await FinanceService.payOrder(order,req.body.requestId,(tx,record)=>AfaStore.create(record,payload,tx.client));
+      res.json({success:true,paymentMethod:'wallet',orderRef:paid.public_reference,reference:paid.payment_reference,status:paid.status,amountPesewas:paid.amount});return;
+    }
     await AfaStore.create(order, payload); orderId=id;
     // Only safe order context enters payment metadata. Identity fields remain encrypted in the AFA store.
     const payment = await PaystackServerService.initializeTransaction({email,amountPesewas:order.amount,reference,
@@ -47,6 +61,7 @@ afaRouter.post('/payments/initialize', requireAuth, createRateLimiter({windowMs:
     if (!payment.success) { await OrdersStore.cancelOrder(id,'afa_payment_initialization_failed'); res.status(503).json({error:'Unable to start payment. Please try again later.'}); return; }
     res.json({success:true,orderRef:publicRef,reference,authorizationUrl:payment.authorizationUrl,accessCode:payment.accessCode,amountPesewas:order.amount,amountGhc:order.amount/100,currency:'GHS',isSimulated:payment.isSimulated || false});
   } catch (err) {
+    if (err instanceof FinanceError) {res.status(err.status).json({error:err.message});return;}
     if (err instanceof AfaValidationError) { res.status(400).json({error:err.message,field:err.field}); return; }
     if (err instanceof AfaDuplicateError || (err as {code?:string}).code === '23505') { res.status(409).json({error:new AfaDuplicateError().message}); return; }
     if (orderId) await OrdersStore.cancelOrder(orderId,'afa_payment_initialization_failed').catch(() => {});

@@ -139,6 +139,14 @@ export const Footer: React.FC = () => {
                 </li>
                 <li>
                   <button
+                    onClick={() => setActivePage('wallet')}
+                    className="hover:text-white transition-colors text-left py-0.5 cursor-pointer block"
+                  >
+                    Mystery Wallet
+                  </button>
+                </li>
+                <li>
+                  <button
                     onClick={() => setActivePage('services')}
                     className="text-slate-400 hover:text-white transition-colors text-left py-0.5 cursor-pointer block"
                   >
@@ -219,14 +227,7 @@ export const Footer: React.FC = () => {
                     DStv & GOtv Pay
                   </button>
                 </li>
-                <li>
-                  <button
-                    onClick={() => setActivePage('services')}
-                    className="hover:text-white transition-colors text-left py-0.5 cursor-pointer block"
-                  >
-                    Digital Wallet
-                  </button>
-                </li>
+
               </ul>
             </div>
           </div>

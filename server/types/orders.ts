@@ -37,7 +37,7 @@ export interface OrderRecord {
   service_fee_minor?: number | null; // Service fee in pesewas (e.g. 20 for GH₵0.20)
   currency: 'GHS';
   status: OrderStatus;
-  payment_provider: 'paystack';
+  payment_provider: 'paystack' | 'wallet';
   payment_reference: string;
   payment_status: 'pending' | 'success' | 'failed' | 'cancelled' | 'expired';
   supplier_provider: string | null;

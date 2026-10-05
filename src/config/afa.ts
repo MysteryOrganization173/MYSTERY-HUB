@@ -42,7 +42,7 @@ export const AFA_CONFIG: AfaConfig = {
     {
       step: 2,
       title: 'Pay securely',
-      desc: 'Pay registration fee via Paystack.',
+      desc: 'Pay registration fee via Paystack or Mystery Wallet.',
     },
     {
       step: 3,

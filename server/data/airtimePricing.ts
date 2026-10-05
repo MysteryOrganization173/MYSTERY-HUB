@@ -3,14 +3,8 @@
  * Controls the single source of truth for Airtime calculations and service fees.
  */
 
-export const AIRTIME_SERVICE_FEE_PERCENT = (() => {
-  const raw = process.env.AIRTIME_SERVICE_FEE_PERCENT;
-  if (raw) {
-    const parsed = parseFloat(raw);
-    if (!isNaN(parsed) && parsed >= 0) return parsed;
-  }
-  return 2; // Default 2%
-})();
+// Advertised Airtime face value equals checkout price for every payment method.
+export const AIRTIME_SERVICE_FEE_PERCENT = 0;
 
 export interface AirtimeCalculation {
   faceValueGhc: number;

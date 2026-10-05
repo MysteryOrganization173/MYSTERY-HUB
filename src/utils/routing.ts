@@ -5,6 +5,7 @@ import { ActivePage } from '../types';
  */
 export const ROUTE_PATH_MAP: Record<ActivePage, string> = {
   home: '/',
+  wallet: '/wallet',
   data: '/data',
   website: '/website-builder',
   marketplace: '/marketplace',
@@ -83,6 +84,7 @@ export function normalizePathname(rawPath: string | null | undefined): string {
  */
 export function getPageFromPath(rawPath: string | null | undefined): ActivePage {
   const normalized = normalizePathname(rawPath);
+  if (normalized === '/wallet') return 'wallet';
 
   // Exact root or direct index.html
   if (normalized === '/' || normalized === '/index.html') {

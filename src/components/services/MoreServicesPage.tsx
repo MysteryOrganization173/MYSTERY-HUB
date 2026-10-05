@@ -62,6 +62,7 @@ export const MoreServicesPage: React.FC = () => {
   return (
     <div className="py-4 sm:py-8 lg:py-10 text-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5 sm:space-y-8 lg:space-y-10">
+        <button onClick={()=>setActivePage('wallet')} className="w-full rounded-2xl border border-emerald-600/30 bg-emerald-500/10 p-4 text-left"><span className="font-bold text-white">Mystery Wallet</span><p className="text-sm text-slate-400">Add money and spend instantly on Data, Airtime and AFA.</p></button>
         {/* Compact Hero Section */}
         <div className="relative rounded-2xl sm:rounded-3xl bg-[#070b0e] border border-slate-800/80 p-4 sm:p-8 lg:p-10 overflow-hidden shadow-2xl">
           {/* Backdrop Artwork Layer */}

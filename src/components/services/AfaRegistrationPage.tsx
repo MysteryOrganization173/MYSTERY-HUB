@@ -1,3 +1,6 @@
+import { WalletPaymentChoice } from '../finance/WalletPaymentChoice';
+import { walletCheckout } from '../../services/financeApi';
+import { getStoredReferralCode,getOrGenerateVisitorKey } from '../../utils/referralCapture';
 import React, { useState, useEffect, useId } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
@@ -107,6 +110,8 @@ export const AfaRegistrationPage: React.FC = () => {
     setFormData(prev => ({ ...prev, mtnNumber:e.target.value }));
     setFormErrors(prev => ({ ...prev, mtnNumber:undefined }));
   };
+  const [paymentMethod,setPaymentMethod]=React.useState<'paystack'|'wallet'>('paystack');
+  const requestKey=React.useRef<string>('');
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitError(null); setFormErrors({});
     if (!user || !sessionToken) { openAuth('login', 'Sign in to register your MTN number for AFA.', () => document.getElementById(fullNameId)?.focus()); return; }
@@ -119,6 +124,11 @@ export const AfaRegistrationPage: React.FC = () => {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.customerEmail.trim()) || formData.customerEmail.trim().length > 254)
         throw Object.assign(new Error('Enter a valid receipt email.'), {field:'customerEmail'});
       setIsSubmitting(true);
+      if(paymentMethod==='wallet') {
+        requestKey.current ||= crypto.randomUUID();
+        const result=await walletCheckout(sessionToken,'afa/payments/initialize',{...payload,consent:true,customerEmail:formData.customerEmail,requestId:requestKey.current,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()});
+        window.location.assign('/orders');return;
+      }
       const result = await initializeAfaPayment(payload, formData.consent, formData.customerEmail, sessionToken);
       if (!result.authorizationUrl) throw new Error('Payment link unavailable. Check My Orders before trying again.');
       const url = new URL(result.authorizationUrl);
@@ -246,7 +256,7 @@ export const AfaRegistrationPage: React.FC = () => {
         </div>
         <div className="flex items-center justify-between">
           <span className="text-slate-400">Payment Processor</span>
-          <span className="font-medium text-slate-200">Paystack (MoMo / Card)</span>
+          <span className="font-medium text-slate-200">{paymentMethod==='wallet'?'Mystery Wallet':'Paystack (MoMo / Card)'}</span>
         </div>
 
         <div className="pt-2.5 border-t border-slate-800/80 flex items-baseline justify-between">
@@ -311,7 +321,7 @@ export const AfaRegistrationPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-1.5 text-slate-300">
               <Lock className="w-4 h-4 text-[#00c365]" />
-              <span>Secure Paystack payment</span>
+              <span>{paymentMethod==='wallet'?'Secure Wallet payment':'Secure Paystack payment'}</span>
             </div>
           </div>
 
@@ -373,6 +383,7 @@ export const AfaRegistrationPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Form & Actions */}
         <form aria-label="AFA registration" noValidate onSubmit={handleSubmit} className="lg:col-span-7 space-y-4 sm:space-y-5 text-left">
+          <WalletPaymentChoice amountMinor={config?.retailPriceMinor || 0} value={paymentMethod} onChange={setPaymentMethod}/>
           {submitError && (
             <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
@@ -682,7 +693,7 @@ export const AfaRegistrationPage: React.FC = () => {
                 <span>Registration Currently Unavailable</span>
               ) : (
                 <>
-                  <span>Pay &amp; Submit Registration · GH₵ {afaConfig.retailPriceGhc!.toFixed(2)}</span>
+                  <span>{paymentMethod==='wallet'?'Pay with Mystery Wallet':'Pay & Submit Registration'} · GH₵ {afaConfig.retailPriceGhc!.toFixed(2)}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -692,7 +703,7 @@ export const AfaRegistrationPage: React.FC = () => {
             <div className="pt-2.5 text-center space-y-1">
               <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
                 <Lock className="w-3 h-3 text-[#00c365]" />
-                <span>Secure payment via Paystack</span>
+                <span>{paymentMethod==='wallet'?'Secure Mystery Wallet payment':'Secure payment via Paystack'}</span>
               </p>
               <p className="text-[10px] text-slate-500">
                 Registration details are encrypted and handled securely by Mystery Hub.

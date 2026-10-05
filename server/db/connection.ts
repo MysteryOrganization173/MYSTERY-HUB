@@ -1,4 +1,5 @@
 import { WEBSITE_FREE_SCHEMA } from './websiteFreeSchema.js';
+import { FINANCE_SCHEMA } from './financeSchema.js';
 import { AFA_SCHEMA } from './afaSchema.js';
 import { MARKETPLACE_FLEXIBILITY_SCHEMA } from './marketplaceFlexibilitySchema.js';
 import { ULTRA_ENQUIRY_SCHEMA } from './websiteUltraSchema.js';
@@ -572,6 +573,7 @@ export async function initDatabase(): Promise<void> {
 
     await client.query(MARKETPLACE_FLEXIBILITY_SCHEMA);
     await client.query(AFA_SCHEMA);
+    await client.query(FINANCE_SCHEMA);
 
     // 3. INDEX CREATION (Non-critical failures logged as warnings)
     const indexStatements = [

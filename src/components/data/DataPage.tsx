@@ -106,7 +106,7 @@ export const DataPage: React.FC = () => {
   // Authoritative client fee calculation (2%)
   const airtimeCalculation = useMemo(() => {
     const faceValue = airtimeFaceValueNum;
-    const serviceFee = Number((Math.round(faceValue * 100 * 0.02) / 100).toFixed(2));
+    const serviceFee = 0;
     const total = Number((Math.round((faceValue + serviceFee) * 100) / 100).toFixed(2));
     return {
       faceValue,

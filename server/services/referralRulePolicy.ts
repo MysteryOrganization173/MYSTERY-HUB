@@ -2,7 +2,7 @@ import type { ReferralRewardRuleRecord, PurchaseStage } from '../types/referral.
 
 export class ReferralRuleValidationError extends Error {}
 const stages: PurchaseStage[] = ['any', 'acquisition', 'recurring'];
-const services = ['all', 'data', 'airtime', 'instant_bundle', 'marketplace', 'website_builder', 'manual_adjustment'];
+const services = ['all', 'data', 'airtime', 'afa', 'instant_bundle', 'marketplace', 'website_builder', 'manual_adjustment'];
 
 /** Normalizes only supported admin fields; preserves dormant multi-level values on updates. */
 export function validateReferralRule(input: Record<string, unknown>, existing?: ReferralRewardRuleRecord) {

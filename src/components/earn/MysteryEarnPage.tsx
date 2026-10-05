@@ -1,3 +1,4 @@
+import { FinancialPanel } from '../finance/FinancialPanel';
 import React, { useState, useEffect, useRef } from 'react';
 import { describeReferralReward } from '../../utils/referralRewardCopy';
 import { createEarnDashboardRefresh } from '../../utils/earnDashboardRefresh';
@@ -336,6 +337,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
             </div>
           </div>
 
+          <FinancialPanel mode="earn" />
           {/* 2. Real Referral Statistics */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">

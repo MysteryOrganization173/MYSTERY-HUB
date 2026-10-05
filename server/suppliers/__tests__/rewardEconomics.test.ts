@@ -18,7 +18,8 @@ function order(extra: Partial<OrderRecord> = {}): OrderRecord {
     network: 'mtn', service_type: 'data', product_id: 'data-product', product_name_snapshot: 'Data', bundle_size_snapshot: '1GB',
     amount: 1000, currency: 'GHS', status: 'delivered', payment_provider: 'paystack', payment_reference: `pay_${id}`,
     payment_status: 'success', supplier_provider: null, supplier_order_id: null, supplier_response: null,
-    supplier_cost_minor: null, supplier_offer_ref: null, supplier_last_checked_at: null, failure_reason: null,
+    supplier_cost_minor: 100, // Known synthetic supplier cost for margin-safe qualifications.
+    supplier_offer_ref: null, supplier_last_checked_at: null, failure_reason: null,
     paid_at: at, submitted_at: at, delivered_at: at, created_at: at, updated_at: at, ...extra };
 }
 async function pay(extra: Partial<OrderRecord> = {}) {
