@@ -1,9 +1,10 @@
-import { WebsiteSectionsControl } from './WebsiteSectionsControl.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { WebsiteSiteRecord, SiteContent, SiteSettings, WebsiteTemplate } from '../../../types';
 import { updateWebsiteOnServer, publishWebsiteOnServer, unpublishWebsiteOnServer } from '../../../services/apiClient';
 import { getTemplateById, mergeSiteWithTemplate, renderTemplateLayout } from '../../../utils/templateRendererUtils';
 import { useApp } from '../../../context/AppContext';
+import { WebsiteSectionsControl } from './WebsiteSectionsControl';
+import { SafeImage } from '../SafeImage';
 import {
   ArrowLeft,
   Save,
@@ -29,6 +30,8 @@ import {
   Edit2,
   Layers,
   X,
+  ImageIcon,
+  Info,
 } from 'lucide-react';
 
 interface WebsiteEditorProps {
@@ -97,9 +100,9 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const baseTemplate = getTemplateById(currentSite.template_id);
   const isDataReseller = currentSite.template_id === 'tmpl-data-reseller';
 
-  // Active accordion section
+  // Active editor section
   const [activeSection, setActiveSection] = useState<
-    'business' | 'contact' | 'branding' | 'bundles' | 'cta' | 'social'
+    'business' | 'contact' | 'branding' | 'sections' | 'bundles' | 'cta' | 'social'
   >('business');
 
   // Bundle editing state (for Data Reseller)
@@ -216,7 +219,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
       if (res.success && res.site) {
         setCurrentSite(res.site);
         onSiteUpdated(res.site);
-        showToast('Website unpublished (reverted to draft).', 'info');
+        showToast('Website unpublished (reverted to draft mode).', 'info');
       }
     } catch (err: any) {
       showToast(err.message || 'Failed to unpublish website.', 'warning');
@@ -237,18 +240,15 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
   // Compute live scaling factors for preview canvas
   const availableWidth = canvasDimensions.width || 800;
-  const availableHeight = canvasDimensions.height || 600;
   const isMobileScreen = availableWidth < 640;
   const isSmallScreen = availableWidth < 768;
   const targetWidth = previewDevice === 'mobile' ? 375 : previewDevice === 'tablet' ? 768 : 1280;
-  const paddingX = (previewDevice === 'desktop' || previewDevice === 'tablet') ? (isMobileScreen ? 8 : 16) : 16;
+  const paddingX =
+    previewDevice === 'desktop' || previewDevice === 'tablet' ? (isMobileScreen ? 8 : 16) : 16;
   const usableWidth = Math.max(280, availableWidth - paddingX);
 
-  // Responsive scaling:
-  // 1. Mobile preview on a mobile screen: fill width naturally with scale = 1 for native readability
-  // 2. Tablet (768px) & Desktop (1280px) on phone/small screen: DO NOT crush into tiny postcard! Keep scale = 1 for horizontal panning & provide private Full Preview modal
-  // 3. Wide preview on large desktop: scale gracefully to fit container if needed
-  const isWidePreviewOnSmallScreen = (previewDevice === 'tablet' || previewDevice === 'desktop') && isSmallScreen;
+  const isWidePreviewOnSmallScreen =
+    (previewDevice === 'tablet' || previewDevice === 'desktop') && isSmallScreen;
   const effectiveCanvasWidth =
     previewDevice === 'mobile' && isMobileScreen
       ? Math.min(usableWidth, 420)
@@ -288,7 +288,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
             <div className="min-w-0 flex flex-col justify-center">
               <div className="flex items-center gap-1.5">
-                <h2 className="font-bold text-xs sm:text-sm text-white truncate max-w-[130px]">
+                <h2 className="font-bold text-xs text-white truncate max-w-[130px]">
                   {content.businessName || siteName}
                 </h2>
                 <span
@@ -315,7 +315,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                   </span>
                 )}
                 {saveStatusText === 'unsaved' && (
-                  <span className="text-amber-300">Unsaved changes</span>
+                  <span className="text-amber-300 font-medium">Unsaved changes</span>
                 )}
                 <span className="text-slate-600">·</span>
                 <span className="truncate max-w-[90px] text-slate-400">{baseTemplate.title}</span>
@@ -388,7 +388,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             </button>
           </div>
 
-          {/* [Publish] */}
+          {/* [Publish / Update] */}
           <div className="flex items-center gap-1 shrink-0">
             {currentSite.status === 'published' ? (
               <div className="flex items-center gap-1">
@@ -480,7 +480,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 </span>
               )}
               {saveStatusText === 'unsaved' && (
-                <span className="text-amber-300">Unsaved changes</span>
+                <span className="text-amber-300 font-medium">Unsaved changes</span>
               )}
             </div>
           </div>
@@ -579,13 +579,13 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
           }`}
         >
           {/* Navigation Category Tabs */}
-          <div className="p-3 border-b border-slate-800/80 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0 bg-[#070c10]">
+          <div className="p-2.5 sm:p-3 border-b border-slate-800/80 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden shrink-0 bg-[#070c10]">
             <button
               type="button"
               onClick={() => setActiveSection('business')}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
                 activeSection === 'business'
-                  ? 'bg-[#00c365] text-black font-bold'
+                  ? 'bg-[#00c365] text-black font-bold shadow-sm'
                   : 'text-slate-400 hover:text-white bg-slate-900/60'
               }`}
             >
@@ -598,7 +598,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               onClick={() => setActiveSection('contact')}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
                 activeSection === 'contact'
-                  ? 'bg-[#00c365] text-black font-bold'
+                  ? 'bg-[#00c365] text-black font-bold shadow-sm'
                   : 'text-slate-400 hover:text-white bg-slate-900/60'
               }`}
             >
@@ -611,12 +611,25 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               onClick={() => setActiveSection('branding')}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
                 activeSection === 'branding'
-                  ? 'bg-[#00c365] text-black font-bold'
+                  ? 'bg-[#00c365] text-black font-bold shadow-sm'
                   : 'text-slate-400 hover:text-white bg-slate-900/60'
               }`}
             >
               <Palette className="w-3.5 h-3.5" />
               <span>Branding</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveSection('sections')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
+                activeSection === 'sections'
+                  ? 'bg-[#00c365] text-black font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-white bg-slate-900/60'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Sections</span>
             </button>
 
             {isDataReseller && (
@@ -625,7 +638,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 onClick={() => setActiveSection('bundles')}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
                   activeSection === 'bundles'
-                    ? 'bg-[#00c365] text-black font-bold'
+                    ? 'bg-[#00c365] text-black font-bold shadow-sm'
                     : 'text-slate-400 hover:text-white bg-slate-900/60'
                 }`}
               >
@@ -639,7 +652,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               onClick={() => setActiveSection('cta')}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
                 activeSection === 'cta'
-                  ? 'bg-[#00c365] text-black font-bold'
+                  ? 'bg-[#00c365] text-black font-bold shadow-sm'
                   : 'text-slate-400 hover:text-white bg-slate-900/60'
               }`}
             >
@@ -652,7 +665,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               onClick={() => setActiveSection('social')}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
                 activeSection === 'social'
-                  ? 'bg-[#00c365] text-black font-bold'
+                  ? 'bg-[#00c365] text-black font-bold shadow-sm'
                   : 'text-slate-400 hover:text-white bg-slate-900/60'
               }`}
             >
@@ -663,7 +676,6 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
           {/* Form Content Area */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-            <WebsiteSectionsControl content={content} onChange={next => { setContent(next); markDirty(); }} />
             {/* First-Use Onboarding Guidance Card */}
             {showOnboarding && (
               <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0c1824] to-[#0d141b] border border-[#00c365]/35 shadow-xl relative animate-in fade-in slide-in-from-top-2 text-left">
@@ -685,9 +697,10 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
                 <ol className="space-y-1.5 text-xs text-slate-300 ml-1 mb-3.5 list-decimal list-inside">
                   <li>Add your business details</li>
-                  <li>Replace images and colours</li>
-                  <li>Preview your website</li>
-                  <li>Publish when you're ready</li>
+                  <li>Update your WhatsApp & contact numbers</li>
+                  <li>Adjust branding colours and imagery</li>
+                  <li>Preview your website across devices</li>
+                  <li>Publish whenever you are ready</li>
                 </ol>
 
                 <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80">
@@ -722,12 +735,12 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 <div>
                   <h3 className="font-bold text-sm text-white">Business Details</h3>
                   <p className="text-xs text-slate-400">
-                    The core identity shown across your hero and navigation.
+                    The core identity shown across your hero banner, navigation, and footer.
                   </p>
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-slate-300">Business Name</label>
+                  <label className="text-xs font-semibold text-slate-300 block">Business Name</label>
                   <input
                     type="text"
                     value={content.businessName}
@@ -736,13 +749,16 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                       setContent({ ...content, businessName: e.target.value });
                       markDirty();
                     }}
-                    placeholder={isDataReseller ? 'e.g. QuickByte Data' : 'e.g. Accra Fresh Buka'}
+                    placeholder={isDataReseller ? 'e.g. QuickByte Data' : 'e.g. Gold Coast Kitchen'}
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
+                  <p className="text-[11px] text-slate-500">
+                    The official name of your business, store, or enterprise.
+                  </p>
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-slate-300">Hero Tagline</label>
+                  <label className="text-xs font-semibold text-slate-300 block">Hero Tagline</label>
                   <input
                     type="text"
                     value={content.tagline}
@@ -758,10 +774,15 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     }
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
+                  <p className="text-[11px] text-slate-500">
+                    A catchy headline displayed prominently at the top of your homepage.
+                  </p>
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-slate-300">About / Short Description</label>
+                  <label className="text-xs font-semibold text-slate-300 block">
+                    About / Short Description
+                  </label>
                   <textarea
                     rows={4}
                     value={content.aboutText}
@@ -772,15 +793,20 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     }}
                     placeholder={
                       isDataReseller
-                        ? 'e.g. Buy MTN, Telecel and AirtelTigo bundles from one simple storefront. Choose your package, enter the recipient number and place your order through WhatsApp.'
-                        : 'Describe your story, specialities, or mission...'
+                        ? 'e.g. Buy MTN, Telecel and AT bundles from one simple storefront. Choose your package, enter recipient phone number, and place your order through WhatsApp.'
+                        : 'Describe your story, specialities, offerings, or mission...'
                     }
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl p-3 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365] leading-relaxed resize-none"
                   />
+                  <p className="text-[11px] text-slate-500">
+                    Tell your visitors what you offer, where you deliver, and why they should choose you.
+                  </p>
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-slate-300">Location & Operating Hours</label>
+                  <label className="text-xs font-semibold text-slate-300 block">
+                    Location & Operating Hours
+                  </label>
                   <input
                     type="text"
                     value={content.location}
@@ -796,6 +822,9 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     }
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
+                  <p className="text-[11px] text-slate-500">
+                    Physical location or delivery regions, plus operating schedule.
+                  </p>
                 </div>
               </div>
             )}
@@ -804,14 +833,17 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             {activeSection === 'contact' && (
               <div className="space-y-4 animate-in fade-in">
                 <div>
-                  <h3 className="font-bold text-sm text-white">Contact Channels</h3>
+                  <h3 className="font-bold text-sm text-white">Contact & Communication</h3>
                   <p className="text-xs text-slate-400">
-                    How customers reach your business directly from your website.
+                    Configure direct customer contact channels for your website.
                   </p>
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-slate-300">WhatsApp Number</label>
+                  <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                    <span>WhatsApp Number</span>
+                    <span className="text-[10px] text-[#00c365] font-bold">Primary for Orders</span>
+                  </label>
                   <input
                     type="tel"
                     value={content.whatsapp}
@@ -823,13 +855,13 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     placeholder="e.g. +233 24 123 4567"
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
-                  <p className="text-[11px] text-slate-400">
-                    Used for one-tap WhatsApp customer order routing.
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Powers direct one-tap customer orders & chat inquiries from your website button.
                   </p>
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-slate-300">Phone Call Number</label>
+                  <label className="text-xs font-semibold text-slate-300 block">Phone Call Number</label>
                   <input
                     type="tel"
                     value={content.phone}
@@ -841,10 +873,13 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     placeholder="e.g. +233 30 222 8899"
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
+                  <p className="text-[11px] text-slate-500">
+                    Direct phone number for voice customer support calls.
+                  </p>
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-slate-300">Customer Email</label>
+                  <label className="text-xs font-semibold text-slate-300 block">Customer Email</label>
                   <input
                     type="email"
                     value={content.email}
@@ -856,115 +891,214 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     placeholder="e.g. orders@mybusiness.com"
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
+                  <p className="text-[11px] text-slate-500">
+                    Official email address for customer inquiries and quotes.
+                  </p>
                 </div>
               </div>
             )}
 
             {/* 3. BRANDING SECTION */}
             {activeSection === 'branding' && (
-              <div className="space-y-4 animate-in fade-in">
+              <div className="space-y-5 animate-in fade-in">
                 <div>
-                  <h3 className="font-bold text-sm text-white">Visual Branding</h3>
+                  <h3 className="font-bold text-sm text-white">Branding & Imagery</h3>
                   <p className="text-xs text-slate-400">
-                    Colors and imagery matching your brand identity.
+                    Customize brand colors and imagery to match your enterprise identity.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5 text-left">
-                    <label className="text-xs font-semibold text-slate-300">Primary Color</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={settings.primaryColor}
-                        onChange={(e) => {
-                          setSettings({ ...settings, primaryColor: e.target.value });
-                          markDirty();
-                        }}
-                        className="w-9 h-9 rounded-lg border border-slate-700 bg-transparent cursor-pointer p-0"
-                      />
-                      <input
-                        type="text"
-                        value={settings.primaryColor}
-                        onChange={(e) => {
-                          setSettings({ ...settings, primaryColor: e.target.value });
-                          markDirty();
-                        }}
-                        className="w-full bg-[#111922] border border-slate-800 rounded-xl px-2.5 py-2 text-xs font-mono text-white"
-                      />
+                {/* Brand Colors Grid */}
+                <div className="p-3.5 rounded-2xl bg-[#090f15] border border-slate-800/80 space-y-3">
+                  <span className="text-xs font-bold text-white block">Brand Colors</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5 text-left">
+                      <label className="text-[11px] font-semibold text-slate-300 block">
+                        Primary Color
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={settings.primaryColor}
+                          onChange={(e) => {
+                            setSettings({ ...settings, primaryColor: e.target.value });
+                            markDirty();
+                          }}
+                          className="w-8 h-8 rounded-lg border border-slate-700 bg-transparent cursor-pointer p-0 shrink-0"
+                        />
+                        <input
+                          type="text"
+                          value={settings.primaryColor}
+                          onChange={(e) => {
+                            setSettings({ ...settings, primaryColor: e.target.value });
+                            markDirty();
+                          }}
+                          className="w-full bg-[#111922] border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-[#00c365]"
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-1.5 text-left">
-                    <label className="text-xs font-semibold text-slate-300">Accent Color</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={settings.accentColor}
-                        onChange={(e) => {
-                          setSettings({ ...settings, accentColor: e.target.value });
-                          markDirty();
-                        }}
-                        className="w-9 h-9 rounded-lg border border-slate-700 bg-transparent cursor-pointer p-0"
-                      />
-                      <input
-                        type="text"
-                        value={settings.accentColor}
-                        onChange={(e) => {
-                          setSettings({ ...settings, accentColor: e.target.value });
-                          markDirty();
-                        }}
-                        className="w-full bg-[#111922] border border-slate-800 rounded-xl px-2.5 py-2 text-xs font-mono text-white"
-                      />
+                    <div className="space-y-1.5 text-left">
+                      <label className="text-[11px] font-semibold text-slate-300 block">
+                        Accent Color
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={settings.accentColor}
+                          onChange={(e) => {
+                            setSettings({ ...settings, accentColor: e.target.value });
+                            markDirty();
+                          }}
+                          className="w-8 h-8 rounded-lg border border-slate-700 bg-transparent cursor-pointer p-0 shrink-0"
+                        />
+                        <input
+                          type="text"
+                          value={settings.accentColor}
+                          onChange={(e) => {
+                            setSettings({ ...settings, accentColor: e.target.value });
+                            markDirty();
+                          }}
+                          className="w-full bg-[#111922] border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-[#00c365]"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-slate-300">Hero Banner Image URL</label>
-                  <input
-                    type="url"
-                    value={content.heroImage}
-                    maxLength={500}
-                    onChange={(e) => {
-                      setContent({ ...content, heroImage: e.target.value });
-                      markDirty();
-                    }}
-                    placeholder="https://..."
-                    className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#00c365]"
-                  />
-                  {content.heroImage && (
-                    <div className="relative h-28 rounded-xl overflow-hidden border border-slate-800 mt-2">
-                      <img
+                {/* Hero / Cover Image Asset Container */}
+                <div className="p-3.5 rounded-2xl bg-[#090f15] border border-slate-800/80 space-y-3 text-left">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white block">Hero / Cover Image</span>
+                    {content.heroImage && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setContent({ ...content, heroImage: '' });
+                          markDirty();
+                        }}
+                        className="text-[11px] text-rose-400 hover:underline cursor-pointer"
+                      >
+                        Reset to default
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Image Preview Box */}
+                  <div className="relative h-32 rounded-xl overflow-hidden border border-slate-800 bg-[#060a0e] flex items-center justify-center">
+                    {content.heroImage ? (
+                      <SafeImage
                         src={content.heroImage}
-                        alt="Hero preview"
+                        alt="Hero banner preview"
                         className="w-full h-full object-cover"
+                      />
+                    ) : baseTemplate.heroImage ? (
+                      <div className="relative w-full h-full">
+                        <SafeImage
+                          src={baseTemplate.heroImage}
+                          alt="Template default banner"
+                          className="w-full h-full object-cover opacity-60"
+                        />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <span className="text-[11px] text-slate-300 font-semibold bg-black/60 px-2.5 py-1 rounded-full border border-slate-700">
+                            Using template default artwork
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center p-3 text-slate-500 space-y-1">
+                        <ImageIcon className="w-6 h-6 mx-auto opacity-50" />
+                        <span className="text-xs block">No custom image set</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Image URL Input */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-slate-300 block">Image URL</label>
+                    <input
+                      type="url"
+                      value={content.heroImage}
+                      maxLength={500}
+                      onChange={(e) => {
+                        setContent({ ...content, heroImage: e.target.value });
+                        markDirty();
+                      }}
+                      placeholder="https://..."
+                      className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#00c365]"
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      Paste a direct image URL. Direct file upload will be integrated in an upcoming update.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Brand Logo Asset Container */}
+                <div className="p-3.5 rounded-2xl bg-[#090f15] border border-slate-800/80 space-y-3 text-left">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white block">Brand Logo (Optional)</span>
+                    {content.logoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setContent({ ...content, logoUrl: '' });
+                          markDirty();
+                        }}
+                        className="text-[11px] text-rose-400 hover:underline cursor-pointer"
+                      >
+                        Clear logo
+                      </button>
+                    )}
+                  </div>
+
+                  {content.logoUrl && (
+                    <div className="h-16 rounded-xl border border-slate-800 bg-[#060a0e] flex items-center justify-center p-2">
+                      <img
+                        src={content.logoUrl}
+                        alt="Brand logo"
+                        className="max-h-full max-w-full object-contain"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
                       />
                     </div>
                   )}
-                </div>
 
-                <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-slate-300">Brand Logo URL (Optional)</label>
-                  <input
-                    type="url"
-                    value={content.logoUrl || ''}
-                    maxLength={500}
-                    onChange={(e) => {
-                      setContent({ ...content, logoUrl: e.target.value });
-                      markDirty();
-                    }}
-                    placeholder="https://..."
-                    className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#00c365]"
-                  />
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-slate-300 block">Image URL</label>
+                    <input
+                      type="url"
+                      value={content.logoUrl || ''}
+                      maxLength={500}
+                      onChange={(e) => {
+                        setContent({ ...content, logoUrl: e.target.value });
+                        markDirty();
+                      }}
+                      placeholder="https://..."
+                      className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#00c365]"
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      Paste a direct link to a transparent PNG or JPG logo.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* BUNDLES SECTION (FOR DATA RESELLER STOREFRONT) */}
+            {/* 4. SECTIONS TAB */}
+            {activeSection === 'sections' && (
+              <div className="animate-in fade-in">
+                <WebsiteSectionsControl
+                  content={content}
+                  onChange={(next) => {
+                    setContent(next);
+                    markDirty();
+                  }}
+                />
+              </div>
+            )}
+
+            {/* 5. BUNDLES SECTION (FOR DATA RESELLER STOREFRONT) */}
             {isDataReseller && activeSection === 'bundles' && (
               <div className="space-y-5 animate-in fade-in">
                 <div className="flex items-center justify-between">
@@ -1233,7 +1367,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               </div>
             )}
 
-            {/* 4. CALL TO ACTION SECTION */}
+            {/* 6. CALL TO ACTION SECTION */}
             {activeSection === 'cta' && (
               <div className="space-y-4 animate-in fade-in">
                 <div>
@@ -1244,7 +1378,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-slate-300">Button Label</label>
+                  <label className="text-xs font-semibold text-slate-300 block">Button Label</label>
                   <input
                     type="text"
                     value={content.ctaLabel}
@@ -1258,10 +1392,13 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     }
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
+                  <p className="text-[11px] text-slate-500">
+                    Text displayed on the main action button in your header and hero banner.
+                  </p>
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-slate-300">Button Action / WhatsApp Target</label>
+                  <label className="text-xs font-semibold text-slate-300 block">Button Action / WhatsApp Target</label>
                   <input
                     type="text"
                     value={content.ctaTarget}
@@ -1274,13 +1411,13 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
                   <p className="text-[11px] text-slate-400">
-                    Leave blank to automatically route to your WhatsApp number.
+                    Leave blank to automatically route to your WhatsApp contact number.
                   </p>
                 </div>
               </div>
             )}
 
-            {/* 5. SOCIAL MEDIA SECTION */}
+            {/* 7. SOCIAL MEDIA SECTION */}
             {activeSection === 'social' && (
               <div className="space-y-4 animate-in fade-in">
                 <div>
@@ -1291,7 +1428,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-slate-300">Instagram Handle / URL</label>
+                  <label className="text-xs font-semibold text-slate-300 block">Instagram Handle / URL</label>
                   <input
                     type="text"
                     value={content.social?.instagram || ''}
@@ -1303,13 +1440,13 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                       });
                       markDirty();
                     }}
-                    placeholder="e.g. @accrabuka or https://instagram.com/..."
+                    placeholder="e.g. @mybusiness or https://instagram.com/..."
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-slate-300">Facebook Page URL</label>
+                  <label className="text-xs font-semibold text-slate-300 block">Facebook Page URL</label>
                   <input
                     type="text"
                     value={content.social?.facebook || ''}
@@ -1321,13 +1458,13 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                       });
                       markDirty();
                     }}
-                    placeholder="e.g. https://facebook.com/accrabuka"
+                    placeholder="e.g. https://facebook.com/mybusiness"
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-slate-300">TikTok Handle</label>
+                  <label className="text-xs font-semibold text-slate-300 block">TikTok Handle</label>
                   <input
                     type="text"
                     value={content.social?.tiktok || ''}
@@ -1339,7 +1476,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                       });
                       markDirty();
                     }}
-                    placeholder="e.g. @accrabuka"
+                    placeholder="e.g. @mybusiness"
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
                 </div>
@@ -1459,7 +1596,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 transformOrigin: 'top center',
               }}
             >
-              {/* Fake Browser URL Bar */}
+              {/* Browser Mock Header */}
               <div className="bg-[#0f1722] border-b border-slate-800 px-3 py-1.5 flex items-center justify-between text-[11px] text-slate-400 select-none">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-rose-500/80" />
@@ -1467,7 +1604,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                   <span className="w-2 h-2 rounded-full bg-emerald-500/80" />
                 </div>
                 <div className="bg-black/60 px-3 py-0.5 rounded-lg border border-slate-800 text-[10px] font-mono text-slate-300 truncate max-w-[200px] sm:max-w-xs">
-                  https://mysteryhub.gh/sites/{currentSite.slug}
+                  /sites/{currentSite.slug}
                 </div>
                 <div className="text-[10px] text-emerald-400 font-semibold">
                   {previewDevice === 'mobile' ? '375px' : previewDevice === 'tablet' ? '768px' : '1280px'}
@@ -1496,7 +1633,6 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
       {/* =========================================================
           PRIVATE FULL PREVIEW OVERLAY
-          Renders in-memory previewTemplate directly with no public network request
           ========================================================= */}
       {isPrivateFullPreviewOpen && (
         <div className="fixed inset-0 z-[100] bg-[#060a0e] text-slate-100 flex flex-col font-sans overflow-hidden animate-in fade-in duration-200">
