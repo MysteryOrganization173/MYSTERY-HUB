@@ -32,6 +32,7 @@ import {
 export const DataPage: React.FC = () => {
   const {
     openCheckout,
+    setActivePage,
     showToast,
     openWaitlist,
     dataProductMode,
@@ -502,6 +503,9 @@ export const DataPage: React.FC = () => {
         </div>
 
         {/* Network Selection Banner */}
+        <button type="button" onClick={() => setActivePage('afa')} className="text-sm text-emerald-300 underline underline-offset-4">
+          MTN AFA registration · View details and availability
+        </button>
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">

@@ -225,6 +225,7 @@ export const OrderStatusModal: React.FC = () => {
             <p className="text-xs text-slate-400 mt-2 max-w-sm mx-auto leading-relaxed">
               {isAfa ? activeOrder.serverStatus === 'delivered' ? 'Your MTN AFA registration is confirmed.' : 'Payment and registration are separate stages. Follow this order for registration updates; contact support if it needs attention.' : descriptionText}
             </p>
+            {isAfa && activeOrder.serverStatus === 'delivered' && <p className="text-xs text-slate-300 mt-2">Dial *1848# on your registered MTN number for AFA access. MTN packages are purchased separately.</p>}
           </div>
 
           {/* Live Progress Bar */}

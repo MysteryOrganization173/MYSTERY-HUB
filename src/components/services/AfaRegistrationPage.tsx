@@ -74,6 +74,7 @@ export const AfaRegistrationPage:React.FC = () => {
       <h2 className="text-xl font-bold">{confirmed.status==='delivered'?'Registered':confirmed.paid_at?'Payment Confirmed':afaStatusLabel(confirmed.status,confirmed.manual_review)}</h2>
       <p>Status: {afaStatusLabel(confirmed.status,confirmed.manual_review)}</p><p className="break-all">Order: {confirmed.public_reference}</p>
       <p>{confirmed.status==='delivered'?'Your AFA registration is confirmed.':'Payment confirmation does not mean registration is complete. Follow the order for updates.'}</p>
+      {confirmed.status==='delivered' && <p>Dial *1848# on your registered MTN number for AFA access. Any MTN voice/data package is purchased separately.</p>}
       <div className="flex flex-wrap gap-3"><button onClick={viewOrder} className="rounded-lg border p-3">VIEW ORDER</button><button onClick={() => setActivePage('orders')} className="rounded-lg border p-3">VIEW MY ORDERS</button></div>
     </div>}
     {registering && user && !confirmed && <form onSubmit={submit} className="rounded-2xl border border-slate-700 p-4 sm:p-6 space-y-5" aria-label="AFA registration" noValidate>

@@ -65,6 +65,7 @@ test('encryption rejects tampered ciphertext',()=>{const v=JSON.parse(encryptAfa
 test('missing encryption key fails closed',async()=>{delete process.env.AFA_PII_ENCRYPTION_KEY;assert.throws(()=>encryptAfaPayload('one',payload));assert.equal((await AfaService.publicConfig()).available,false);});
 for(const value of ['15.5','GH₵15',-1,NaN,Infinity,Number.MAX_SAFE_INTEGER+1,null])test(`invalid cost ${String(value)} never rounds into a charge`,()=>assert.equal(parseAfaPriceMinor(value),null));
 test('supplier pesewas remain pesewas',()=>assert.equal(parseAfaPriceMinor('1500'),1500));
+test('supplier cost respects PostgreSQL INTEGER boundaries',()=>{assert.equal(parseAfaPriceMinor(2_147_483_647),2_147_483_647);assert.equal(parseAfaPriceMinor(2_147_483_648),null);assert.equal(parseAfaPriceMinor('2147483648'),null);});
 for(const value of ['','0','-1','1.5','abc'])test(`invalid retail configuration ${value} blocks availability`,async()=>{process.env.AFA_RETAIL_PRICE_MINOR=value;assert.equal((await AfaService.publicConfig()).available,false);});
 test('disabled AFA blocks availability',async()=>{process.env.AFA_SERVICE_ENABLED='false';assert.equal((await AfaService.publicConfig()).available,false);});
 
@@ -129,3 +130,53 @@ for(const statusCode of [403,429])test(`supplier HTTP ${statusCode} creates refu
 test('phone mismatch does not record successful registration timestamp',async()=>{const order=await saved('queued');const response=reply();response.data.phone='0201234567';await AfaService.applySupplierResult(order,response);assert.equal((await AfaStore.find(order.id))!.registered_at,null);assert.ok((await AfaStore.find(order.id))!.encrypted_payload);});
 test('AFA info form clears identity fields when the signed-in account changes',()=>{const code=source('src/components/services/AfaRegistrationPage.tsx');assert.match(code,/\[user\?\.id\]/);assert.match(code,/idNumber:'',dateOfBirth:''/);});
 test('background active-order query includes incomplete AFA publicId persistence',async()=>{const order=await saved('queued');await AfaStore.supplierState(order.id,'AFA_FIXTURE','processing');assert.ok((await OrdersStore.getActiveSupplierOrders()).some(o=>o.id===order.id));});
+
+for (const status of ['failed','refunded','cancelled','expired'] as const) test(`uncertain ${status} closure retains evidence and blocks another registration`,async()=>{
+  const order=await saved('queued');await AfaStore.claimSubmission(order.id);
+  await OrdersStore.updateOrderStatus(order.id,status);await AfaStore.reconcileTerminalPayloads();
+  const record=(await AfaStore.find(order.id))!;
+  assert.ok(record.encrypted_payload);assert.equal(record.purchase_blocked,true);
+  await assert.rejects(AfaStore.create(fixture(),payload),/active or completed/);
+  assert.equal(posts,0);
+});
+test('admin refund of an uncertain POST cannot permit repurchase or destroy evidence',async()=>{
+  const order=await saved('queued');await AfaStore.claimSubmission(order.id);
+  const response=await request(`/admin/orders/${order.public_reference}/status`,'PATCH',{status:'refunded'},'admin-token');
+  assert.equal(response.status,200);await AfaStore.reconcileTerminalPayloads();
+  assert.ok((await AfaStore.find(order.id))!.encrypted_payload);
+  assert.equal((await checkout()).status,409);assert.equal(initialization,null);assert.equal(posts,0);
+});
+test('processing supplier registration remains reserved after local refund',async()=>{
+  const order=await saved('queued');await AfaStore.claimSubmission(order.id);await AfaService.applySupplierResult(order,reply('processing'));
+  await OrdersStore.updateOrderStatus(order.id,'refunded',undefined,undefined,undefined,{explicitReversal:true});
+  await AfaStore.reconcileTerminalPayloads();assert.ok((await AfaStore.find(order.id))!.encrypted_payload);
+  await assert.rejects(AfaStore.create(fixture(),payload),/active or completed/);
+});
+test('registered supplier reservation survives refund and missed-purge crash cleanup',async()=>{
+  const order=await saved('queued');await AfaStore.claimSubmission(order.id);await AfaStore.supplierState(order.id,'AFA_FIXTURE','registered');
+  await OrdersStore.createOrder({...order,status:'refunded'});await AfaStore.reconcileTerminalPayloads();
+  assert.equal((await AfaStore.find(order.id))!.encrypted_payload,null);
+  await assert.rejects(AfaStore.create(fixture(),payload),/active or completed/);
+});
+test('confirmed supplier rejection permits safe purge and repurchase after refund',async()=>{
+  const order=await saved('queued');await AfaStore.claimSubmission(order.id);await AfaService.applySupplierResult(order,reply('rejected'));
+  await OrdersStore.updateOrderStatus(order.id,'refunded');await AfaStore.reconcileTerminalPayloads();
+  assert.equal((await AfaStore.find(order.id))!.encrypted_payload,null);await AfaStore.create(fixture(),payload);
+});
+test('purge rechecks the latch when a caller tries to release an uncertain phone',async()=>{
+  const order=await saved('queued');await AfaStore.claimSubmission(order.id);await AfaStore.purge(order.id,true);
+  assert.ok((await AfaStore.find(order.id))!.encrypted_payload);assert.equal((await AfaStore.find(order.id))!.purchase_blocked,true);
+});
+test('Data discovery links to AFA without a hardcoded registration price or availability',()=>{
+  assert.match(source('src/components/data/DataPage.tsx'),/setActivePage\('afa'\)[\s\S]*View details and availability/);
+});
+test('USSD access guidance is shown only after supplier-confirmed registration',()=>{
+  assert.match(source('src/components/services/AfaRegistrationPage.tsx'),/confirmed.status==='delivered' && <p>Dial \*1848#/);
+  assert.match(source('src/components/checkout/OrderStatusModal.tsx'),/isAfa && activeOrder.serverStatus === 'delivered' && <p[^>]*>Dial \*1848#/);
+});
+for(const mismatch of ['reference','currency'] as const)test(`AFA payment ${mismatch} mismatch never dispatches`,async()=>{
+  const order=await saved();liveMockMode();
+  PaystackServerService.verifyTransaction=async reference=>({reference:mismatch==='reference'?'other-reference':reference,isVerified:true,status:'success',amountPesewas:2500,currency:mismatch==='currency'?'USD':'GHS'});
+  assert.equal((await request(`/payments/verify/${order.payment_reference}`)).status,400);
+  assert.equal(posts,0);assert.equal((await OrdersStore.findOrder(order.id))!.payment_status,'pending');
+});

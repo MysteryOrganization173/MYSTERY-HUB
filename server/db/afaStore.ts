@@ -33,7 +33,9 @@ export class AfaStore {
         // Also clean terminal payloads after a crash between order transition and purge.
         await client.query(`UPDATE afa_registrations a SET purchase_blocked=FALSE, encrypted_payload=NULL,
           sensitive_payload_purged_at=COALESCE(a.sensitive_payload_purged_at,NOW()), updated_at=NOW()
-          FROM orders o WHERE a.order_id=o.id AND a.phone=$1 AND o.status IN ('failed','refunded','cancelled','expired')`, [record.phone]);
+          FROM orders o WHERE a.order_id=o.id AND a.phone=$1 AND o.status IN ('failed','refunded','cancelled','expired')
+          AND (a.submission_attempted_at IS NULL AND a.supplier_public_id IS NULL
+            OR a.supplier_status IN ('failed','rejected','cancelled'))`, [record.phone]);
         const duplicate = await client.query('SELECT order_id FROM afa_registrations WHERE phone=$1 AND purchase_blocked=TRUE LIMIT 1', [record.phone]);
         if (duplicate.rows.length) throw new AfaDuplicateError();
         await OrdersStore.createOrder(order, client);
@@ -49,7 +51,7 @@ export class AfaStore {
       for (const previous of memory.values()) {
         if (previous.phone !== record.phone) continue;
         const previousOrder = await OrdersStore.findOrder(previous.order_id);
-        if (previousOrder && ['failed','refunded','cancelled','expired'].includes(previousOrder.status)) await this.purge(previous.order_id, true);
+        if (previousOrder) await this.onOrderTerminal(previousOrder);
         if (previous.purchase_blocked) throw new AfaDuplicateError();
       }
       await OrdersStore.createOrder(order); memory.set(order.id, record);
@@ -100,22 +102,35 @@ export class AfaStore {
   static async purge(orderId: string, releasePhone = false) {
     const pool = getPool(), now = new Date().toISOString();
     if (pool) await pool.query(`UPDATE afa_registrations SET encrypted_payload=NULL,purchase_blocked=CASE WHEN $2 THEN FALSE ELSE purchase_blocked END,
-      sensitive_payload_purged_at=COALESCE(sensitive_payload_purged_at,NOW()),updated_at=NOW() WHERE order_id=$1`, [orderId,releasePhone]);
-    else { const record = memory.get(orderId); if (record) { record.encrypted_payload=null; record.sensitive_payload_purged_at ||= now; if (releasePhone) record.purchase_blocked=false; record.updated_at=now; } }
+      sensitive_payload_purged_at=COALESCE(sensitive_payload_purged_at,NOW()),updated_at=NOW() WHERE order_id=$1
+      AND (NOT $2 OR submission_attempted_at IS NULL AND supplier_public_id IS NULL
+        OR supplier_status IN ('failed','rejected','cancelled'))`, [orderId,releasePhone]);
+    else { const record = memory.get(orderId); if (record && (!releasePhone || (!record.submission_attempted_at && !record.supplier_public_id)
+      || ['failed','rejected','cancelled'].includes(record.supplier_status || ''))) { record.encrypted_payload=null; record.sensitive_payload_purged_at ||= now; if (releasePhone) record.purchase_blocked=false; record.updated_at=now; } }
   }
   static async onOrderTerminal(order: OrderRecord) {
     if (order.service_type !== 'afa') return;
     if (order.status === 'delivered') await this.purge(order.id);
-    if (['failed','refunded','cancelled','expired'].includes(order.status)) await this.purge(order.id, true);
+    if (['failed','refunded','cancelled','expired'].includes(order.status)) {
+      const record = await this.find(order.id);
+      // Financial/local closure does not prove that a non-idempotent supplier POST failed.
+      // Preserve evidence and the phone reservation while supplier acceptance is unresolved.
+      if (record?.supplier_status === 'registered') await this.purge(order.id);
+      else if (record && ((!record.submission_attempted_at && !record.supplier_public_id)
+        || ['failed','rejected','cancelled'].includes(record.supplier_status || ''))) await this.purge(order.id, true);
+    }
   }
   /** Repeatable cleanup also covers a process crash after a terminal order write. */
   static async reconcileTerminalPayloads() {
     const pool = getPool();
     if (pool) await pool.query(`UPDATE afa_registrations a SET encrypted_payload=NULL,
-      purchase_blocked=CASE WHEN o.status='delivered' THEN a.purchase_blocked ELSE FALSE END,
+      purchase_blocked=CASE WHEN o.status='delivered' OR a.supplier_status='registered' THEN a.purchase_blocked ELSE FALSE END,
       sensitive_payload_purged_at=COALESCE(a.sensitive_payload_purged_at,NOW()),updated_at=NOW()
       FROM orders o WHERE o.id=a.order_id AND a.encrypted_payload IS NOT NULL
-      AND o.status IN ('delivered','failed','refunded','cancelled','expired')`);
+      AND o.status IN ('delivered','failed','refunded','cancelled','expired')
+      AND (o.status='delivered' OR a.supplier_status='registered'
+        OR a.submission_attempted_at IS NULL AND a.supplier_public_id IS NULL
+        OR a.supplier_status IN ('failed','rejected','cancelled'))`);
     else for (const record of memory.values()) { const order=await OrdersStore.findOrder(record.order_id); if(order) await this.onOrderTerminal(order); }
   }
 }

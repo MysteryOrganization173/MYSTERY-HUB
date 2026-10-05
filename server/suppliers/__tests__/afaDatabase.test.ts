@@ -27,3 +27,20 @@ test('supplier identifier is stored with bounded parameters rather than interpol
 test('purge erases ciphertext and preserves completed duplicate block by default',async()=>{await AfaStore.purge(order.id);assert.match(statements[0].sql,/encrypted_payload=NULL/);assert.deepEqual(statements[0].values,[order.id,false]);});
 test('crash cleanup only targets terminal orders with retained ciphertext',async()=>{await AfaStore.reconcileTerminalPayloads();assert.match(statements[0].sql,/encrypted_payload IS NOT NULL/);assert.match(statements[0].sql,/'delivered','failed','refunded','cancelled','expired'/);assert.ok(!statements[0].sql.includes("'refund_pending'"));});
 test('schema.sql and repeatable initialization agree; unique phone and supplier IDs are indexed',()=>{const schema=readFileSync(new URL('../../db/schema.sql',import.meta.url),'utf8');assert.ok(schema.includes(AFA_SCHEMA.trim()));assert.match(AFA_SCHEMA,/order_id VARCHAR\(64\) NOT NULL UNIQUE REFERENCES orders/);assert.match(AFA_SCHEMA,/WHERE purchase_blocked = TRUE/);assert.match(AFA_SCHEMA,/supplier_public_id VARCHAR\(64\)/);assert.doesNotMatch(AFA_SCHEMA,/DROP |ALTER TABLE users|date_of_birth/i);});
+test('PostgreSQL repurchase cleanup never releases an unresolved attempted submission',async()=>{
+  await AfaStore.create(order,payload);
+  const sql=statements.find(s=>s.sql.startsWith('UPDATE afa_registrations a SET purchase_blocked'))!.sql;
+  assert.match(sql,/a.submission_attempted_at IS NULL AND a.supplier_public_id IS NULL/);
+  assert.match(sql,/a.supplier_status IN \('failed','rejected','cancelled'\)/);
+});
+test('PostgreSQL terminal reconciliation protects registered and unresolved reservations',async()=>{
+  await AfaStore.reconcileTerminalPayloads();const sql=statements[0].sql;
+  assert.match(sql,/o.status='delivered' OR a.supplier_status='registered' THEN a.purchase_blocked/);
+  assert.match(sql,/a.submission_attempted_at IS NULL AND a.supplier_public_id IS NULL/);
+  assert.match(sql,/a.supplier_status IN \('failed','rejected','cancelled'\)/);
+});
+test('PostgreSQL release-and-purge atomically rechecks supplier acceptance',async()=>{
+  await AfaStore.purge(order.id,true);const sql=statements[0].sql;
+  assert.match(sql,/NOT \$2 OR submission_attempted_at IS NULL AND supplier_public_id IS NULL/);
+  assert.match(sql,/supplier_status IN \('failed','rejected','cancelled'\)/);
+});

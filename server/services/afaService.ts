@@ -4,7 +4,8 @@ import type { SbhAfaResponse } from '../suppliers/successBizHub/types.js';
 export function parseAfaPriceMinor(value:unknown):number|null {
   if (typeof value !== 'number' && (typeof value !== 'string' || !/^\d+$/.test(value.trim()))) return null;
   const number = Number(value);
-  return Number.isSafeInteger(number) && number >= 0 ? number : null;
+  // orders.supplier_cost_minor is a PostgreSQL INTEGER. Reject overflow before binding.
+  return Number.isSafeInteger(number) && number >= 0 && number <= 2_147_483_647 ? number : null;
 }
 import { AfaStore } from '../db/afaStore.js';
 import { OrdersStore } from '../db/ordersStore.js';
