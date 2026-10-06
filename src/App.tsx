@@ -48,13 +48,14 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b0f12] text-slate-100 flex flex-col font-sans selection:bg-[#00c365] selection:text-black">
+    <div className="mh-app min-h-screen bg-[#0b0f12] text-slate-100 flex flex-col font-sans selection:bg-[#00c365] selection:text-black">
       <SEOHead />
       {/* 3-zone Header Contract */}
+      <a href="#main-content" className="fixed -top-20 left-4 focus:top-3 z-[120] mh-button">Skip to content</a>
       <Navbar />
 
       {/* Main Content Area */}
-      <main className="flex-1">
+      <main id="main-content" tabIndex={-1} className="flex-1 min-w-0">
         {activePage === 'home' && <HomePage />}
         {activePage === 'data' && <DataPage />}
         {activePage === 'website' && <WebsiteBuilderPage />}

@@ -14,15 +14,19 @@ export const OrdersPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchingServer, setIsSearchingServer] = useState(false);
   const [serverOrders, setServerOrders] = useState<OrderRecord[]>([]);
+  const [accountLoading,setAccountLoading]=useState(false),[accountError,setAccountError]=useState(''),[refresh,setRefresh]=useState(0);
 
   // Fetch account-linked orders when authenticated
   useEffect(() => {
     if (!user || !sessionToken) {
       setServerOrders([]);
+      setAccountLoading(false);
+      setAccountError('');
       return;
     }
 
     let isMounted = true;
+    setAccountLoading(true);setAccountError('');
     getAccountOrdersOnServer(sessionToken, 50)
       .then((res) => {
         if (isMounted && res.success && Array.isArray(res.orders)) {
@@ -63,14 +67,13 @@ export const OrdersPage: React.FC = () => {
           setServerOrders(mapped);
         }
       })
-      .catch(() => {
-        // Fallback silently to local orders if request fails
-      });
+      .catch(() => {if(isMounted)setAccountError('We couldn’t load your account orders. Saved orders on this device are still shown.');})
+      .finally(()=>{if(isMounted)setAccountLoading(false);});
 
     return () => {
       isMounted = false;
     };
-  }, [user, sessionToken]);
+  }, [user, sessionToken, refresh]);
 
   // Combine server orders with local orders without duplicates
   const allOrders = React.useMemo(() => {
@@ -179,7 +182,7 @@ export const OrdersPage: React.FC = () => {
             <p className="text-xs text-slate-400 mt-1">
               {user
                 ? 'Your purchases linked to this Mystery Hub account.'
-                : 'Track real-time bundle delivery and view transaction receipts.'}
+                : 'Check delivery progress and view your order details.'}
             </p>
           </div>
 
@@ -216,8 +219,9 @@ export const OrdersPage: React.FC = () => {
             )}
           </button>
         </form>
-        <p className="text-xs text-slate-400">Enter your Mystery Hub reference to check the latest server status. A phone-number search filters orders already shown here.</p>
+        <p className="text-xs text-slate-400">Enter your Mystery Hub reference to check the latest status. A phone-number search filters orders already shown here.</p>
 
+<div aria-live="polite">{accountLoading&&<p className="text-sm text-slate-400">Loading your account orders…</p>}{accountError&&<div className="mh-surface text-sm"><p role="alert" className="text-amber-300">{accountError}</p><button className="mh-button-secondary mt-3" onClick={()=>setRefresh(x=>x+1)}>Try again</button></div>}</div>
         {/* Orders List */}
         {filteredOrders.length > 0 ? (
           <div className="space-y-3">

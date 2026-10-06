@@ -38,7 +38,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       {/* Top Rose Gold Announcement */}
       <div className="bg-[var(--website-accent,#ec4899)] text-white text-xs px-4 py-2 text-center tracking-wider font-semibold flex items-center justify-center gap-2">
         <Sparkles className="w-3.5 h-3.5" />
-        <span>Luxury Bridal & Grooming Packages Now Booking for December in East Legon</span>
+        <span>{template.location}</span>
       </div>
 
       {/* Navigation */}
@@ -198,7 +198,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
         <div className="max-w-2xl mx-auto bg-white rounded-3xl p-6 sm:p-10 shadow-lg border border-[#f5d0e0] space-y-6">
           <div className="text-center space-y-1">
             <span className="text-xs font-bold text-[var(--website-accent,#ec4899)] uppercase tracking-widest">
-              {template.siteContent ? 'Appointment Enquiry' : 'Online Appointment System'}
+              {template.siteContent ? 'Appointment Enquiry' : 'Appointment enquiry'}
             </span>
             <h3 className="text-2xl font-serif text-[var(--website-primary,#3b1828)]">Book Your Glow Session</h3>
             <p className="text-xs text-[#836574]">
@@ -211,7 +211,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
               <div className="w-10 h-10 rounded-full bg-[var(--website-accent,#ec4899)] text-white flex items-center justify-center mx-auto">
                 <Check className="w-5 h-5" />
               </div>
-              <h4 className="font-bold text-[var(--website-primary,#3b1828)] text-base">Booking Request Submitted!</h4>
+              <h4 className="font-bold text-[var(--website-primary,#3b1828)] text-base">Example appointment</h4>
               <p className="text-xs text-[#836574]">
                 Your session with {selectedStylist} for {selectedService} is recorded. We have sent confirmation to your WhatsApp.
               </p>
@@ -284,7 +284,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                 className="w-full py-3.5 rounded-xl bg-[var(--website-accent,#ec4899)] hover:bg-[#db2777] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Calendar className="w-4 h-4" />
-                <span>{template.siteContent ? 'Contact to Arrange Appointment' : 'Confirm Appointment via WhatsApp Booking'}</span>
+                <span>{template.siteContent ? 'Contact to Arrange Appointment' : 'Preview appointment enquiry'}</span>
               </button>
             </form>
           )}

@@ -44,17 +44,17 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
         <div className="flex items-center gap-4 text-[11px]">
           <span className="flex items-center gap-1.5 text-slate-300">
             <MapPin className="w-3.5 h-3.5 text-[var(--website-accent,#f97316)]" />
-            <span>Industrial Area, Tema & Airport Residential, Accra</span>
+            <span>{template.location}</span>
           </span>
           <span className="hidden md:inline-flex items-center gap-1 text-slate-400">
             <Clock className="w-3.5 h-3.5 text-slate-500" />
-            <span>Mon - Fri: 7:30 AM - 5:30 PM</span>
+            <span>Contact for opening hours</span>
           </span>
         </div>
         <div className="flex items-center gap-3 text-[11px]">
-          <span className="text-[var(--website-accent,#f97316)] font-bold">ISO 9001:2015 Certified</span>
+          <span className="text-[var(--website-accent,#f97316)] font-bold">Project enquiries welcome</span>
           <span className="text-slate-600">|</span>
-          <span className="text-slate-300">Class D1K1 Certified Contractor</span>
+          <span className="text-slate-300">Discuss your requirements</span>
         </div>
       </div>
 
@@ -85,7 +85,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
             Tender Estimate
           </a>
           <a href="#safety" className="hover:text-[var(--website-accent,#f97316)] transition-colors">
-            Safety ISO
+            Capabilities
           </a>
         </div>
 
@@ -130,7 +130,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
               href="#projects"
               className="px-6 py-3.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider border border-slate-700 transition-all flex items-center gap-2"
             >
-              <span>View Completed Developments</span>
+              <span>View projects</span>
             </a>
           </div>
 
@@ -153,10 +153,10 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#f97316)] font-mono font-bold block">
-              Proven Track Record
+              Project portfolio
             </span>
             <h2 className="text-2xl sm:text-3xl font-black uppercase text-white mt-1">
-              Landmark Developments in Ghana
+              Our projects
             </h2>
           </div>
 

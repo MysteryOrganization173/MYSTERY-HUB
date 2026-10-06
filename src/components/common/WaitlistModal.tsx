@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { X, Bell, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react';
 import { joinWaitlistOnServer } from '../../services/apiClient';
@@ -11,6 +12,15 @@ export const WaitlistModal: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [alreadyJoined, setAlreadyJoined] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const dialogRef = useDialogFocus(waitlistInfo.isOpen, () => { if (!isSubmitting) closeWaitlist(); });
+
+  useEffect(() => {
+    setIsSubmitted(false);
+    setAlreadyJoined(false);
+    setContact('');
+    setErrorMessage(null);
+  }, [waitlistInfo.isOpen, waitlistInfo.serviceTitle]);
 
   if (!waitlistInfo.isOpen) return null;
 
@@ -42,17 +52,12 @@ export const WaitlistModal: React.FC = () => {
       setIsSubmitted(true);
       showToast(
         res.alreadyJoined
-          ? `You're already on the priority list for ${waitlistInfo.serviceTitle}!`
+          ? `You're already on the launch list for ${waitlistInfo.serviceTitle}!`
           : `You're registered for ${waitlistInfo.serviceTitle} launch updates!`,
         'success'
       );
 
-      setTimeout(() => {
-        setIsSubmitted(false);
-        setAlreadyJoined(false);
-        setContact('');
-        closeWaitlist();
-      }, 2500);
+
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to join waitlist. Please try again.';
       setErrorMessage(msg);
@@ -63,16 +68,16 @@ export const WaitlistModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-[calc(100vw-1rem)] sm:max-w-md bg-[#0f151b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Service launch updates" className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-[calc(100vw-1rem)] sm:max-w-md max-h-[90dvh] overflow-y-auto bg-[#0f151b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#0c1116]">
           <div className="flex items-center gap-2">
             <Bell className="w-4 h-4 text-[#00c365]" />
-            <span className="text-xs font-semibold text-slate-300">Early Access Notification</span>
+            <span className="text-xs font-semibold text-slate-300">Coming soon · Get updates</span>
           </div>
           <button
-            onClick={closeWaitlist}
+            aria-label="Close launch updates" disabled={isSubmitting} onClick={closeWaitlist}
             className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -86,7 +91,7 @@ export const WaitlistModal: React.FC = () => {
                 <CheckCircle2 className="w-7 h-7" />
               </div>
               <h4 className="font-bold text-lg text-white">
-                {alreadyJoined ? 'Already on VIP List!' : "You're On The VIP List!"}
+                {alreadyJoined ? 'Already on the list' : "You're on the launch list"}
               </h4>
               <p className="text-xs text-slate-400 max-w-xs mx-auto">
                 {alreadyJoined
@@ -94,6 +99,7 @@ export const WaitlistModal: React.FC = () => {
                   : `We will notify you via ${channel} as soon as `}
                 <span className="text-white font-medium">{waitlistInfo.serviceTitle}</span> goes live in Ghana.
               </p>
+              <button type="button" onClick={closeWaitlist} className="mh-button w-full">Done</button>
             </div>
           ) : (
             <>
@@ -105,7 +111,7 @@ export const WaitlistModal: React.FC = () => {
                   Get notified when {waitlistInfo.serviceTitle} launches
                 </h3>
                 <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                  We are finalizing direct connections with Ghanaian utility services. Join the early-access list to be notified the moment this service goes live.
+                  This service is being prepared. Join the launch list for availability updates.
                 </p>
               </div>
 

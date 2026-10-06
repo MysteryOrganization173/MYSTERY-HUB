@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ActivePage } from '../../types';
 import { MysteryAiIcon } from './MysteryAiIcon';
+import {AssistantText} from './AssistantText';
+import {useDialogFocus} from '../../hooks/useDialogFocus';
 import { AiRequestGate } from '../../utils/aiRequestGate';
 import {
   ChatMessage,
@@ -107,7 +109,7 @@ export const MysteryAiAssistant: React.FC = () => {
 
   const getPageGreeting = (page: ActivePage): string => {
     if (isInsideEditor) {
-      return "Hi 👋 I'm Mystery AI. I see you're building your website! Need help adding packages, editing text and colours, or publishing your live site?";
+      return "Building your website? I can guide you through the editor.";
     }
     switch (page) {
       case 'data':
@@ -122,7 +124,7 @@ export const MysteryAiAssistant: React.FC = () => {
         return "Hi 👋 I'm Mystery AI. Want to learn more about Mystery Hub's mission and who we serve in Ghana?";
       case 'home':
       default:
-        return "Hi 👋 I'm Mystery AI, your guide to Mystery Hub. What would you like to know about our data bundles or website builder?";
+        return "Hi, I’m Mystery AI. What would you like help with?";
     }
   };
 
@@ -175,19 +177,6 @@ export const MysteryAiAssistant: React.FC = () => {
       setIsExpandedPrompt(false);
       setTimeout(() => inputRef.current?.focus(), 150);
     }
-  }, [isOpen]);
-
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        cancelPending();
-        closeMysteryAi();
-        setIsOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
   const handleToggle = () => {
@@ -269,6 +258,14 @@ export const MysteryAiAssistant: React.FC = () => {
     : getSuggestedQuestionsForPage(activePage);
 
   useEffect(() => { if (isAnyModalActive) cancelPending(); }, [isAnyModalActive]);
+  const dialogRef = useDialogFocus(isOpen && !isAnyModalActive, ()=>{cancelPending();closeMysteryAi();setIsOpen(false);});
+  const [viewport, setViewport] = useState({height:window.visualViewport?.height||window.innerHeight,top:window.visualViewport?.offsetTop||0});
+  useEffect(()=>{
+    if(!isOpen)return;
+    const update=()=>setViewport({height:window.visualViewport?.height||window.innerHeight,top:window.visualViewport?.offsetTop||0});
+    update(); window.visualViewport?.addEventListener('resize',update);window.visualViewport?.addEventListener('scroll',update);window.addEventListener('resize',update);
+    return()=>{window.visualViewport?.removeEventListener('resize',update);window.visualViewport?.removeEventListener('scroll',update);window.removeEventListener('resize',update);};
+  },[isOpen]);
 
   if (isAnyModalActive) {
     return null;
@@ -276,19 +273,20 @@ export const MysteryAiAssistant: React.FC = () => {
 
   return (
     <div
-      className={`fixed ${isInsideEditor ? 'z-[55]' : 'z-40'} ${
-        isInsideEditor
-          ? 'bottom-4 right-3 sm:bottom-6 sm:right-6'
-          : 'bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] right-3 sm:bottom-6 sm:right-6'
-      } pointer-events-none max-w-[calc(100vw-1.5rem)]`}
+      style={isOpen?{height:viewport.height,top:viewport.top}:undefined}
+      className={isOpen?'fixed inset-x-0 z-[80] bg-black/60 flex flex-col items-end justify-end p-3 sm:p-6 pb-[calc(.75rem+env(safe-area-inset-bottom,0px))]':`fixed ${isInsideEditor?'z-[55] bottom-4':'z-40 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]'} right-3 sm:bottom-6 sm:right-6 pointer-events-none max-w-[calc(100vw-1.5rem)]`}
+
     >
       {/* Floating Chat Panel */}
       {isOpen && (
         <div
+          ref={dialogRef}
+          tabIndex={-1}
           role="dialog"
           aria-label="Mystery AI Assistant"
           aria-modal="true"
-          className="pointer-events-auto mb-3 w-[calc(100vw-1.5rem)] sm:w-96 md:w-[420px] max-w-[calc(100vw-1.5rem)] h-[500px] max-h-[calc(100vh-8.5rem)] sm:max-h-[520px] bg-[#0c1217] border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-200"
+          style={{maxHeight:Math.max(160,viewport.height-88)}}
+          className="pointer-events-auto mb-3 w-[calc(100vw-1.5rem)] sm:w-96 md:w-[420px] max-w-[calc(100vw-1.5rem)] h-[min(620px,calc(100dvh-5.5rem))] max-h-full sm:h-[560px] bg-[#0c1217] border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-200"
         >
           {/* Clean, Premium Header */}
           <div className="px-4 py-3 bg-[#090e13] border-b border-slate-800 flex items-center justify-between gap-3 shrink-0">
@@ -301,14 +299,14 @@ export const MysteryAiAssistant: React.FC = () => {
                     Guide
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">Customer Guide & Support</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Your guide to Mystery Hub</p>
               </div>
             </div>
 
             <div className="flex items-center gap-1">
               <button
                 onClick={handleClearHistory}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
                 title="Reset conversation"
                 aria-label="Reset conversation"
               >
@@ -320,7 +318,7 @@ export const MysteryAiAssistant: React.FC = () => {
                   closeMysteryAi();
                   setIsOpen(false);
                 }}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
                 title="Close chat"
                 aria-label="Close chat"
               >
@@ -330,7 +328,7 @@ export const MysteryAiAssistant: React.FC = () => {
           </div>
 
           {/* Messages Scroll Area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs sm:text-sm">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
             {messages.map((msg) => {
               const isAssistant = msg.role === 'assistant';
               return (
@@ -339,13 +337,13 @@ export const MysteryAiAssistant: React.FC = () => {
                   className={`flex flex-col ${isAssistant ? 'items-start' : 'items-end'}`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 shadow-sm leading-relaxed whitespace-pre-wrap ${
+                    className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 shadow-sm leading-relaxed whitespace-pre-wrap ${
                       isAssistant
                         ? 'bg-[#141b22] text-slate-200 border border-slate-800 rounded-tl-sm'
                         : 'bg-[#00c365] text-black font-semibold rounded-tr-sm'
                     }`}
                   >
-                    {msg.content}
+                    {isAssistant?<AssistantText text={msg.content}/>:msg.content}
 
                     {/* Actionable Redirection Button */}
                     {msg.quickAction && (
@@ -388,7 +386,7 @@ export const MysteryAiAssistant: React.FC = () => {
           {/* Suggested Questions */}
           {suggestedQuestions.length > 0 && (
             <div className="px-3.5 py-2 bg-[#090d12] border-t border-slate-800/80 shrink-0">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1 px-0.5 flex items-center gap-1.5">
+              <div className="text-xs font-medium text-slate-400 mb-1 px-0.5 flex items-center gap-1.5">
                 <Sparkles className="w-3 h-3 text-[#00c365]" />
                 <span>Suggested Questions</span>
               </div>
@@ -398,7 +396,7 @@ export const MysteryAiAssistant: React.FC = () => {
                     key={sq.id}
                     onClick={() => handleSendMessage(sq.text)}
                     disabled={isTyping}
-                    className="px-2.5 py-1 rounded-lg bg-[#121921] hover:bg-[#1a2530] text-slate-300 hover:text-white border border-slate-800/90 hover:border-[#00c365]/40 text-[11px] whitespace-nowrap transition-colors shrink-0 disabled:opacity-50 cursor-pointer shadow-2xs"
+                    className="px-2.5 py-1 rounded-lg bg-[#121921] hover:bg-[#1a2530] text-slate-300 hover:text-white border border-slate-800/90 hover:border-[#00c365]/40 text-xs min-h-11 whitespace-nowrap transition-colors shrink-0 disabled:opacity-50 cursor-pointer shadow-2xs"
                   >
                     {sq.text}
                   </button>
@@ -424,6 +422,8 @@ export const MysteryAiAssistant: React.FC = () => {
           >
             <input
               ref={inputRef}
+              aria-label="Message Mystery AI"
+              data-autofocus
               type="text"
               maxLength={2000}
               value={inputValue}
@@ -434,7 +434,7 @@ export const MysteryAiAssistant: React.FC = () => {
             <button
               type="submit"
               disabled={!inputValue.trim() || isTyping}
-              className="w-8 h-8 rounded-xl bg-[#00c365] hover:bg-[#00e575] disabled:opacity-40 text-black flex items-center justify-center transition-all cursor-pointer shrink-0"
+              className="w-11 h-11 rounded-xl bg-[#00c365] hover:bg-[#00e575] disabled:opacity-40 text-black flex items-center justify-center transition-all cursor-pointer shrink-0"
               aria-label="Send message"
             >
               <Send className="w-3.5 h-3.5" />
@@ -453,11 +453,11 @@ export const MysteryAiAssistant: React.FC = () => {
               isInsideEditor ? 'max-w-[280px] sm:max-w-none' : 'hidden sm:flex'
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-[#00c365] animate-pulse shrink-0" />
+            <span className="w-2 h-2 rounded-full bg-[#00c365] shrink-0" />
             <span className="truncate">
               {isInsideEditor
                 ? 'Need help building your site? Ask Mystery AI'
-                : 'Have a question? Ask Mystery AI'}
+                : 'Ask Mystery AI'}
             </span>
             <button
               onClick={(e) => {

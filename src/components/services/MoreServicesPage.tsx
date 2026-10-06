@@ -334,15 +334,15 @@ export const MoreServicesPage: React.FC = () => {
                         </div>
 
                         {isLive ? (
-                          <span className="text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                          <span className="text-xs font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-2.5 py-1 rounded-full uppercase tracking-wider">
                             Live
                           </span>
                         ) : isBeta ? (
-                          <span className="text-[10px] font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                          <span className="text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2.5 py-1 rounded-full uppercase tracking-wider">
                             Beta
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                          <span className="text-xs font-bold text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-full uppercase tracking-wider">
                             {isAfa ? 'Unavailable' : 'Coming Soon'}
                           </span>
                         )}

@@ -8,11 +8,13 @@ export const ToastContainer: React.FC = () => {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-20 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-2">
+    <div className="fixed top-20 inset-x-3 sm:left-auto sm:right-4 z-[110] flex flex-col gap-2 sm:max-w-sm pointer-events-none">
       {toasts.map((toast) => {
         return (
           <div
             key={toast.id}
+            role="status"
+            aria-live="polite"
             className="pointer-events-auto flex items-start gap-3 p-3.5 rounded-xl bg-[#121920] border border-slate-700/80 shadow-2xl text-white text-xs sm:text-sm animate-in fade-in slide-in-from-top-2 duration-200"
           >
             {toast.type === 'success' && (
@@ -27,7 +29,7 @@ export const ToastContainer: React.FC = () => {
             <div className="flex-1 font-medium leading-relaxed">{toast.message}</div>
             <button
               onClick={() => removeToast(toast.id)}
-              className="text-slate-400 hover:text-white p-0.5"
+              className="text-slate-400 hover:text-white min-w-11 min-h-11 flex items-center justify-center"
               aria-label="Dismiss toast"
             >
               <X className="w-4 h-4" />

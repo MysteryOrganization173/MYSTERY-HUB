@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { dataOrderPresentation, maskDataRecipient } from '../../utils/dataPurchasePresentation';
 import { afaStatusLabel } from '../../../shared/afa';
 import React, { useEffect, useState } from 'react';
@@ -102,6 +103,8 @@ export const OrderStatusModal: React.FC = () => {
     updateOrderStatus,
   ]);
 
+  const dialogRef = useDialogFocus(isStatusModalOpen && !!activeOrder, closeOrderStatus);
+
   if (!isStatusModalOpen || !activeOrder) return null;
 
   const currentNetwork = GHANA_NETWORKS[activeOrder.network];
@@ -190,7 +193,7 @@ export const OrderStatusModal: React.FC = () => {
         : statusConfig.description);
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Order status and receipt" className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Order status and receipt" className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full max-w-[calc(100vw-1rem)] sm:max-w-lg bg-[#0f151b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 max-h-[94dvh] flex flex-col">
         {/* Header with Close */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#0c1116]">
@@ -267,10 +270,33 @@ export const OrderStatusModal: React.FC = () => {
 
           }
 
+          {/* Buttons */}
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <button
+              onClick={() => {
+                closeOrderStatus();
+                setActivePage('orders');
+              }}
+              className="mh-button py-3 px-4"
+            >
+              Track Order
+            </button>
+            <button
+              onClick={() => {
+                closeOrderStatus();
+                setActivePage('home');
+              }}
+              className="mh-button-secondary py-3 px-4 flex items-center justify-center gap-1.5"
+            >
+              <span>Back to Home</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
           {/* Key Information Grid */}
           <div className="grid grid-cols-2 gap-3 text-left">
-            <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
-              <div className="text-[11px] text-slate-400">Order Reference</div>
+            <div className="col-span-2 bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
+              <div className="text-xs text-slate-400">Order Reference</div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="font-mono text-xs sm:text-sm font-semibold text-white break-all min-w-0">
                   #{displayRef}
@@ -287,7 +313,7 @@ export const OrderStatusModal: React.FC = () => {
             </div>
 
             <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
-              <div className="text-[11px] text-slate-400">Product</div>
+              <div className="text-xs text-slate-400">Product</div>
               <div className="font-semibold text-sm text-white break-words mt-0.5">
                 {(() => {
                   const isInst =
@@ -320,14 +346,14 @@ export const OrderStatusModal: React.FC = () => {
             </div>
 
             <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
-              <div className="text-[11px] text-slate-400">Recipient Phone</div>
+              <div className="text-xs text-slate-400">Recipient Phone</div>
               <div className="font-medium text-sm text-white mt-0.5">
                 {isDataOrder ? maskDataRecipient(activeOrder.recipientPhone) : activeOrder.recipientPhone}
               </div>
             </div>
 
             <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
-              <div className="text-[11px] text-slate-400">{isDataOrder&&!dataView.paymentConfirmed?'Order Total':'Amount Paid'}</div>
+              <div className="text-xs text-slate-400">{isDataOrder&&!dataView.paymentConfirmed?'Order Total':'Amount Paid'}</div>
               <div className="font-bold text-sm text-[#00c365] mt-0.5 tabular-nums">
                 GH₵{activeOrder.amountGhc.toFixed(2)}
               </div>
@@ -453,29 +479,6 @@ export const OrderStatusModal: React.FC = () => {
               </button>
             </div>
           )}
-
-          {/* Buttons */}
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <button
-              onClick={() => {
-                closeOrderStatus();
-                setActivePage('orders');
-              }}
-              className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-colors cursor-pointer"
-            >
-              Track Order
-            </button>
-            <button
-              onClick={() => {
-                closeOrderStatus();
-                setActivePage('home');
-              }}
-              className="py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span>Back to Home</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
 
           {/* WhatsApp Support Assistance */}
           <div className="pt-2">

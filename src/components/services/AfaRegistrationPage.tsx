@@ -154,7 +154,7 @@ export const AfaRegistrationPage: React.FC = () => {
           </div>
 
           <div className="space-y-1.5">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#00c365]">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#00c365]">
               {afaStatusLabel(confirmedOrder.status, confirmedOrder.manual_review)}
             </span>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
@@ -173,7 +173,7 @@ export const AfaRegistrationPage: React.FC = () => {
             </div>
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80 text-xs">
               <span className="text-slate-400">Status</span>
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
                 <Clock className="w-3 h-3" />
                 <span>{afaStatusLabel(confirmedOrder.status, confirmedOrder.manual_review)}</span>
               </span>
@@ -194,13 +194,13 @@ export const AfaRegistrationPage: React.FC = () => {
               <Clock className="w-4 h-4 shrink-0" />
               <span>What happens next?</span>
             </div>
-            <p className="text-slate-300 leading-relaxed text-[11px]">
+            <p className="text-slate-300 leading-relaxed text-xs">
               {confirmedOrder.status === 'delivered' ? 'Your AFA registration is confirmed.' : 'Payment and registration are separate stages. Follow this order for updates.'}
             </p>
-            <p className="text-slate-400 leading-relaxed text-[11px]">
+            <p className="text-slate-400 leading-relaxed text-xs">
               The registration fee paid to Mystery Hub covers AFA registration only. Future AFA voice/data packages are purchased directly through MTN.
             </p>
-            {confirmedOrder.status === 'delivered' && <p className="text-slate-400 leading-relaxed text-[11px] pt-1.5 border-t border-slate-800/80">Dial <span className="font-mono font-bold text-emerald-400">*1848#</span> on your registered MTN number for AFA access.</p>}
+            {confirmedOrder.status === 'delivered' && <p className="text-slate-400 leading-relaxed text-xs pt-1.5 border-t border-slate-800/80">Dial <span className="font-mono font-bold text-emerald-400">*1848#</span> on your registered MTN number for AFA access.</p>}
           </div>
 
           {/* Actions */}
@@ -279,7 +279,7 @@ export const AfaRegistrationPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="p-2.5 rounded-xl bg-[#090d11] border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2">
+      <div className="p-2.5 rounded-xl bg-[#090d11] border border-slate-800 text-xs text-slate-400 flex items-start gap-2">
         <Lock className="w-3.5 h-3.5 text-[#00c365] shrink-0 mt-0.5" />
         <span>Registration details are encrypted and handled securely by Mystery Hub.</span>
       </div>
@@ -351,7 +351,7 @@ export const AfaRegistrationPage: React.FC = () => {
           ========================================================= */}
       <section className="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-[#0d1217] border border-slate-800/80 text-left space-y-2.5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-1.5 border-b border-slate-800/60">
-          <h2 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
+          <h2 className="text-xs sm:text-xs font-bold uppercase tracking-wider text-slate-400">
             How AFA Registration Works
           </h2>
           <span className="text-[10px] text-slate-400">
@@ -367,9 +367,9 @@ export const AfaRegistrationPage: React.FC = () => {
                 <span className="w-5 h-5 rounded-full bg-[#00c365]/20 text-[#00c365] text-[10px] font-black flex items-center justify-center shrink-0">
                   {step.step}
                 </span>
-                <h3 className="font-bold text-[11px] sm:text-xs text-white leading-tight">{step.title}</h3>
+                <h3 className="font-bold text-xs sm:text-xs text-white leading-tight">{step.title}</h3>
               </div>
-              <p className="text-[10px] sm:text-[11px] text-slate-400 leading-normal pl-7">
+              <p className="text-[10px] sm:text-xs text-slate-400 leading-normal pl-7">
                 {step.desc}
               </p>
             </div>
@@ -428,7 +428,7 @@ export const AfaRegistrationPage: React.FC = () => {
                   }`}
                 />
                 {formErrors.fullName ? (
-                  <p className="text-[11px] text-rose-400">{formErrors.fullName}</p>
+                  <p className="text-xs text-rose-400">{formErrors.fullName}</p>
                 ) : (
                   <p className="text-[10px] text-slate-500">Provide your full legal name as shown on your Ghana Card.</p>
                 )}
@@ -461,7 +461,7 @@ export const AfaRegistrationPage: React.FC = () => {
                   <Smartphone className="w-4 h-4 text-slate-500 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
                 {formErrors.mtnNumber ? (
-                  <p className="text-[11px] text-rose-400">{formErrors.mtnNumber}</p>
+                  <p className="text-xs text-rose-400">{formErrors.mtnNumber}</p>
                 ) : (
                   <p className="text-[10px] text-slate-500">For MTN numbers only. Number portability means the prefix cannot confirm your network.</p>
                 )}
@@ -536,7 +536,7 @@ export const AfaRegistrationPage: React.FC = () => {
                   }`}
                 />
                 {formErrors.dateOfBirth ? (
-                  <p className="text-[11px] text-rose-400">{formErrors.dateOfBirth}</p>
+                  <p className="text-xs text-rose-400">{formErrors.dateOfBirth}</p>
                 ) : (
                   <p className="text-[10px] text-slate-500">Must match the date of birth on your Ghana Card.</p>
                 )}
@@ -596,7 +596,7 @@ export const AfaRegistrationPage: React.FC = () => {
                       : 'border-slate-800 focus:border-[#00c365]'
                   }`}
                 />
-                {formErrors.town && <p className="text-[11px] text-rose-400">{formErrors.town}</p>}
+                {formErrors.town && <p className="text-xs text-rose-400">{formErrors.town}</p>}
               </div>
 
               {/* Occupation (Optional) */}
@@ -623,7 +623,7 @@ export const AfaRegistrationPage: React.FC = () => {
             <input id={emailId} type="email" required maxLength={254} autoComplete="email" value={formData.customerEmail}
               aria-invalid={Boolean(formErrors.customerEmail)} onChange={e => setFormData(prev => ({...prev,customerEmail:e.target.value}))}
               className="w-full py-3 px-3.5 rounded-xl bg-[#090d11] border border-slate-800 text-xs text-white focus:outline-none focus:border-[#00c365]" />
-            {formErrors.customerEmail && <p className="text-[11px] text-rose-400">{formErrors.customerEmail}</p>}
+            {formErrors.customerEmail && <p className="text-xs text-rose-400">{formErrors.customerEmail}</p>}
           </div>
           {/* PRIVACY & SECURITY REASSURANCE */}
           <div className="p-3.5 sm:p-4 rounded-xl bg-[#090d11] border border-slate-800/90 text-xs text-slate-300 space-y-1.5">
@@ -631,7 +631,7 @@ export const AfaRegistrationPage: React.FC = () => {
               <Lock className="w-3.5 h-3.5 text-[#00c365]" />
               <span>Privacy &amp; Security Commitment</span>
             </div>
-            <p className="text-slate-400 leading-relaxed text-[11px]">
+            <p className="text-slate-400 leading-relaxed text-xs">
               We encrypt registration details on the server and send them to our supplier. Sensitive identity data is purged after confirmed completion or safe closure; unresolved cases retain encrypted evidence. Never provide a PIN, password, card photo, or selfie.
             </p>
           </div>
@@ -659,7 +659,7 @@ export const AfaRegistrationPage: React.FC = () => {
               </span>
             </label>
             {formErrors.consent && (
-              <p className="text-[11px] text-rose-400 pl-1">{formErrors.consent}</p>
+              <p className="text-xs text-rose-400 pl-1">{formErrors.consent}</p>
             )}
           </div>
 
@@ -693,7 +693,7 @@ export const AfaRegistrationPage: React.FC = () => {
                 <span>Registration Currently Unavailable</span>
               ) : (
                 <>
-                  <span>{paymentMethod==='wallet'?'Pay with Mystery Wallet':'Pay & Submit Registration'} · GH₵ {afaConfig.retailPriceGhc!.toFixed(2)}</span>
+                  <span>{paymentMethod==='wallet'?'Pay with Mystery Wallet':'Pay for registration'} · GH₵ {afaConfig.retailPriceGhc!.toFixed(2)}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -701,7 +701,7 @@ export const AfaRegistrationPage: React.FC = () => {
 
             {/* Customer-Safe Security Notice */}
             <div className="pt-2.5 text-center space-y-1">
-              <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
+              <p className="text-xs text-slate-400 flex items-center justify-center gap-1.5">
                 <Lock className="w-3 h-3 text-[#00c365]" />
                 <span>{paymentMethod==='wallet'?'Secure Mystery Wallet payment':'Secure payment via Paystack'}</span>
               </p>
@@ -728,7 +728,7 @@ export const AfaRegistrationPage: React.FC = () => {
                 </h4>
                 <span className="text-[10px] text-slate-500 font-medium">Educational Reference</span>
               </div>
-              <p className="text-[11px] text-slate-300 leading-normal">
+              <p className="text-xs text-slate-300 leading-normal">
                 Once your AFA registration is successful, your Registered order shows MTN AFA access instructions.
               </p>
               <p className="text-[10px] text-slate-400 leading-normal">
@@ -750,7 +750,7 @@ export const AfaRegistrationPage: React.FC = () => {
                   Available after registration
                 </span>
               </div>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Then follow the MTN AFA menu to view or purchase the offers available to your registered number.
               </p>
               <p className="text-[10px] text-slate-400 leading-normal border-t border-slate-800/80 pt-1.5">
@@ -812,7 +812,7 @@ export const AfaRegistrationPage: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-slate-300 pt-1 border-t border-slate-800/50">
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-slate-300 pt-1 border-t border-slate-800/50">
                       <div className="flex items-center gap-1.5">
                         <PhoneCall className="w-3 h-3 text-[#00c365] shrink-0" />
                         <span>{pkg.onNetMins} mins on-net</span>

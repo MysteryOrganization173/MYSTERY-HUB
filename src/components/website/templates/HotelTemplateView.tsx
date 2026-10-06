@@ -35,7 +35,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       {/* Top Banner */}
       <div className="bg-[var(--website-primary,#132e23)] text-[var(--website-background,#f8f6f0)] text-xs px-4 py-2 text-center tracking-wider flex items-center justify-center gap-2">
         <Palmtree className="w-3.5 h-3.5 text-[var(--website-accent,#10b981)]" />
-        <span>Where the Volta River Meets the Atlantic · Private Eco Chalets in Ada Foah</span>
+        <span>{template.location}</span>
       </div>
 
       {/* Navigation */}
@@ -171,7 +171,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                   type="submit"
                   className="w-full py-3 rounded-xl bg-[var(--website-primary,#132e23)] hover:bg-[var(--website-accent,#10b981)] hover:text-black text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
                 >
-                  {template.siteContent ? 'Enquire About Stay Dates' : 'Confirm Stay Dates'}
+                  {template.siteContent ? 'Enquire About Stay Dates' : 'Preview stay enquiry'}
                 </button>
               </div>
             </form>

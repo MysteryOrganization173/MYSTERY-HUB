@@ -63,6 +63,12 @@ export const WebsiteBuilderPage: React.FC = () => {
   const [actionLoadingSiteId, setActionLoadingSiteId] = useState<string | null>(null);
   const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
   const [changeTarget,setChangeTarget]=useState('');
+  const [dashboardTab, setDashboardTab] = useState('Overview');
+  const openPricing = () => { setDashboardTab('Bundles & Pricing'); closeWebsiteEditor(); requestAnimationFrame(() => document.getElementById('website-business-dashboard')?.scrollIntoView({block:'start'})); };
+  const updateSite = (updated: WebsiteSiteRecord) => {
+    setMySites(prev => prev.map(site => site.id === updated.id ? updated : site));
+    if (activeEditorSite?.id === updated.id && activeEditorSite.template_id !== updated.template_id) openWebsiteEditor(updated);
+  };
 
   useEffect(() => { trackWebsiteEvent('website_builder_viewed', {source:'builder'}, sessionToken || undefined); }, [sessionToken]);
 
@@ -163,15 +169,15 @@ export const WebsiteBuilderPage: React.FC = () => {
       try {
         const res = await createWebsiteOnServer(token, {
           templateId,
-          name: templateName || 'My Business Website',
+          name: 'My Business',
         });
 
         if (res.success && res.site) {
           if (res.alreadyExists) {
-            showToast('Opening your active website project.', 'info');
+            showToast('Opening your website.', 'info');
           } else {
             setMySites([res.site]);
-            showToast('Free website project initialized! Customise your details.', 'success');
+            showToast('Your website is ready to personalise.', 'success');
           }
           openWebsiteEditor(res.site);
         }
@@ -273,13 +279,12 @@ export const WebsiteBuilderPage: React.FC = () => {
   if (activeEditorSite && sessionToken) {
     return (
       <WebsiteEditor
+        key={`${activeEditorSite.id}:${activeEditorSite.template_id}`}
         site={activeEditorSite}
+        onOpenPricing={openPricing}
         sessionToken={sessionToken}
         onClose={closeWebsiteEditor}
-        onSiteUpdated={(updated) => {
-          setMySites((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-
-        }}
+        onSiteUpdated={updateSite}
         showToast={showToast}
       />
     );
@@ -306,7 +311,7 @@ export const WebsiteBuilderPage: React.FC = () => {
   return (
     <div className="py-6 sm:py-10 text-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
-        {activeSite&&sessionToken&&<WebsiteBusinessDashboard site={activeSite} token={sessionToken} onEdit={()=>openWebsiteEditor(activeSite)} onSettings={()=>setShowSettingsDrawer(true)}/>}
+        {activeSite&&sessionToken&&<WebsiteBusinessDashboard site={activeSite} token={sessionToken} requestedTab={dashboardTab} onTabChange={setDashboardTab} onEdit={()=>openWebsiteEditor(activeSite)} onSettings={()=>{setShowSettingsDrawer(true);requestAnimationFrame(()=>document.getElementById('website-settings')?.scrollIntoView({block:'start'}));}}/>}
         {activeSite&&sessionToken&&changeTarget&&<WebsiteSettingsControls site={activeSite} token={sessionToken} requestedTemplateId={changeTarget} selectionOnly onClosed={()=>setChangeTarget('')} onDeleted={()=>setMySites([])} onUpdated={updated=>{setMySites([updated]);setChangeTarget('');openWebsiteEditor(updated);}}/>}
         {/* =========================================================
             LOADING / ERROR STATE FOR AUTHENTICATED USERS
@@ -314,7 +319,7 @@ export const WebsiteBuilderPage: React.FC = () => {
         {user && isLoadingSites && (
           <div className="p-8 rounded-3xl bg-[#0d141b] border border-slate-800 text-center space-y-3 animate-pulse">
             <RefreshCw className="w-6 h-6 text-[#00c365] animate-spin mx-auto" />
-            <p className="text-sm font-semibold text-slate-300">Loading your website dashboard...</p>
+            <p className="text-sm font-semibold text-slate-300">Loading your website…</p>
           </div>
         )}
 
@@ -677,7 +682,7 @@ export const WebsiteBuilderPage: React.FC = () => {
               </div>
 
               {/* Collapsible Website Settings & Project Info Strip */}
-              <div className="pt-2 border-t border-slate-800/80">
+              <div id="website-settings" className="pt-2 border-t border-slate-800/80 scroll-mt-24">
                 <button
                   type="button"
                   onClick={() => setShowSettingsDrawer((prev) => !prev)}
@@ -714,7 +719,7 @@ export const WebsiteBuilderPage: React.FC = () => {
                       </p>
                     </div>
 
-                    <WebsiteSettingsControls site={activeSite} token={sessionToken!} onUpdated={updated=>{setMySites([updated]);showToast('Template changed successfully.','success');}} onDeleted={()=>{setMySites([]);showToast('Website deleted. You can create a new Free website.','success');}} />
+                    <WebsiteSettingsControls site={activeSite} token={sessionToken!} onUpdated={updated=>{updateSite(updated);setDashboardTab('Overview');showToast('Your design has been changed.','success');}} onDeleted={()=>{setMySites([]);showToast('Website deleted. You can create a new Free website.','success');}} />
 
                   </div>
                 )}

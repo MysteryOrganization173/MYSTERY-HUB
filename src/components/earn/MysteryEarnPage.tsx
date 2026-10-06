@@ -341,11 +341,11 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
           {/* 2. Real Referral Statistics */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Performance Metrics</h2>
+              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Your referrals</h2>
               <button type="button" disabled={isRefreshing} onClick={() => void refreshDashboard.current?.()}
                 className="text-xs text-[#00c365] disabled:opacity-50">{isRefreshing ? 'Refreshing…' : 'Refresh'}</button>
               {isLoadingDashboard && (
-                <span className="text-[11px] text-[#00c365] animate-pulse font-medium">Syncing live ledger...</span>
+                <span className="text-[11px] text-[#00c365] animate-pulse font-medium">Updating rewards…</span>
               )}
             </div>
             {refreshError && <p role="status" className="text-xs text-amber-300">{refreshError}</p>}
@@ -360,7 +360,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                 <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight truncate">
                   {summary?.uniqueVisitorsCount != null ? summary.uniqueVisitorsCount.toLocaleString() : '—'}
                 </div>
-                <p className="text-[11px] text-slate-400 leading-snug">Distinct browsers that opened your referral links</p>
+                <p className="text-xs text-slate-400 leading-snug">Distinct browsers that opened your referral links</p>
               </div>
 
               {/* Stat 2: Referred Customers */}
@@ -370,9 +370,9 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                   <Users className="w-4 h-4 text-[#00c365] shrink-0" />
                 </div>
                 <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight truncate">
-                  {summary ? summary.referredCustomersCount.toLocaleString() : '0'}
+                  {summary ? summary.referredCustomersCount.toLocaleString() : '—'}
                 </div>
-                <p className="text-[11px] text-slate-400 leading-snug">Bound lifetime customers</p>
+                <p className="text-xs text-slate-400 leading-snug">Customers linked to your referral</p>
               </div>
 
               {/* Stat 3: Pending Rewards */}
@@ -382,9 +382,9 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                   <Clock className="w-4 h-4 text-amber-400 shrink-0" />
                 </div>
                 <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-amber-400 tracking-tight truncate">
-                  GH₵{summary ? summary.pendingRewardsGhc.toFixed(2) : '0.00'}
+                  GH₵{summary ? summary.pendingRewardsGhc.toFixed(2) : '—'}
                 </div>
-                <p className="text-[11px] text-slate-400 leading-snug">Awaiting order verification</p>
+                <p className="text-xs text-slate-400 leading-snug">Awaiting order verification</p>
               </div>
 
               {/* Stat 4: Total Approved Earned */}
@@ -396,7 +396,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                 <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-[#00c365] tracking-tight truncate">
                   GH₵{summary ? summary.approvedRewardsGhc.toFixed(2) : '0.00'}
                 </div>
-                <p className="text-[11px] text-slate-400 leading-snug">Approved lifetime rewards</p>
+                <p className="text-xs text-slate-400 leading-snug">Approved lifetime rewards</p>
               </div>
             </div>
           </div>
@@ -595,7 +595,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
           {/* 4. Recent Reward Activity Ledger */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Reward Ledger Activity</h2>
+              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Reward history</h2>
               <span className="text-[11px] text-slate-500 font-medium">Immutable Record</span>
             </div>
 
@@ -703,7 +703,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
               Rewards vary by eligible product and order value. When a referred customer completes a qualifying purchase, your reward is credited automatically.
             </p>
             <p className="text-[11px] text-slate-400">
-              Every reward credited to your account is tracked with full transaction details in your Reward Ledger Activity above.
+              Every reward credited to your account is tracked with full transaction details in your Reward history above.
             </p>
           </div>
         </div>

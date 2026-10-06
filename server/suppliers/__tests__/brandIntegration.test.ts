@@ -3,7 +3,7 @@
  * Validates:
  * - Official Cloudinary brand mark configuration
  * - Delivery URL helper transformations (f_auto, q_auto, responsive widths)
- * - Distinct separation between Mystery Hub corporate M and Mystery AI butterfly emblem
+ * - Distinct separation between Mystery Hub corporate mark and Mystery AI signal emblem
  * - PWA manifest.json icons & browser metadata
  */
 
@@ -35,7 +35,7 @@ describe('Mystery Hub Brand Asset & Logo Integration', () => {
     assert.ok(url256.includes('f_auto,q_auto,w_256'));
   });
 
-  test('3. Mystery AI preserves its distinct AI/butterfly emblem identity', () => {
+  test('3. Mystery AI uses a distinct scalable signal emblem', () => {
     const mysteryAiIconPath = path.resolve(
       process.cwd(),
       'src/components/ai/MysteryAiIcon.tsx'
@@ -49,8 +49,8 @@ describe('Mystery Hub Brand Asset & Logo Integration', () => {
     );
     // Must retain its distinct emblem artwork
     assert.ok(
-      content.includes('ChatGPT_Image_Sep_30_2026_05_59_10_PM_klrk81.png'),
-      'Mystery AI must retain its distinct butterfly emblem'
+      content.includes('<svg viewBox="0 0 48 48"') && content.includes('aria-hidden="true"') && !content.includes('<img'),
+      'Mystery AI must use its dedicated decorative vector emblem without an image request'
     );
   });
 

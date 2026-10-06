@@ -25,7 +25,7 @@ export const Footer: React.FC = () => {
           <div className="lg:col-span-2 space-y-3 text-left">
             <BrandLogo size="md" />
             <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-sm">
-              Your Digital World. One Hub. Mystery Hub empowers individuals, creators, and businesses in Ghana with reliable data, professional websites, tech marketplace sourcing, and everyday digital utilities.
+              Your Digital World. One Hub. Mystery Hub empowers individuals, creators, and businesses in Ghana with reliable data, professional websites, marketplace products and digital services. More utilities are coming soon.
             </p>
 
             {/* Direct Contact Links */}
@@ -82,7 +82,7 @@ export const Footer: React.FC = () => {
 
             <div className="flex items-center gap-2 text-xs text-slate-500 pt-0.5">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Secure MoMo Checkout & Direct Fulfillment</span>
+              <span>Secure checkout · Orders you can track</span>
             </div>
           </div>
 
@@ -262,7 +262,7 @@ export const Footer: React.FC = () => {
           <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
             <span>Crafted with</span>
             <Heart className="w-3 h-3 text-red-500 fill-red-500 inline mx-0.5" />
-            <span>for Ghana · Since 2024</span>
+            <span>for Ghana</span>
           </div>
         </div>
       </div>

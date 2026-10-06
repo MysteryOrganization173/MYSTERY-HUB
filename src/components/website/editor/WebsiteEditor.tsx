@@ -1,4 +1,4 @@
-import { WebsiteImageField } from './WebsiteImageField';
+import { WebsiteImageLibrary, WebsiteImageField } from './WebsiteImageField';
 import { trackWebsiteEvent } from '../../../utils/websiteAnalytics';
 import React, { useState, useEffect, useRef } from 'react';
 import { WebsiteSiteRecord, SiteContent, SiteSettings, WebsiteTemplate } from '../../../types';
@@ -36,6 +36,7 @@ interface WebsiteEditorProps {
   site: WebsiteSiteRecord;
   sessionToken: string;
   onClose: () => void;
+  onOpenPricing?: () => void;
   onSiteUpdated: (updatedSite: WebsiteSiteRecord) => void;
   showToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
 }
@@ -44,10 +45,12 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   site: initialSite,
   sessionToken,
   onClose,
+  onOpenPricing,
   onSiteUpdated,
   showToast,
 }) => {
   const { openMysteryAi } = useApp();
+  const [mediaOpen, setMediaOpen] = useState(false);
   const [currentSite, setCurrentSite] = useState<WebsiteSiteRecord>(initialSite);
 
   useEffect(() => { trackWebsiteEvent('website_editor_opened', { siteId:initialSite.id, templateId:initialSite.template_id, source:'editor' }, sessionToken); }, [initialSite.id, sessionToken]);
@@ -109,8 +112,17 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
   // Active editor section
   const [activeSection, setActiveSection] = useState<
-    'business' | 'contact' | 'branding' | 'sections' | 'bundles' | 'cta' | 'social'
+    'business' | 'contact' | 'branding' | 'media' | 'sections' | 'bundles' | 'cta' | 'social'
   >('business');
+
+  // Template identity changes must discard old template-specific controls and draft state.
+  useEffect(() => {
+    setCurrentSite(initialSite); setSiteName(initialSite.name);
+    setContent(initialSite.content_json); setSettings(initialSite.settings_json);
+    serverSiteRef.current = initialSite;
+    editVersion.current = 0; savedVersion.current = 0; failedSaveVersion.current = null;
+    setIsDirty(false); setSaveStatusText('saved'); setActiveSection('business');
+  }, [initialSite.id, initialSite.template_id]);
 
   // Mark dirty on any edit
   const markDirty = () => {
@@ -190,7 +202,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         onSiteUpdated(res.site);
         setIsDirty(false);
         setSaveStatusText('saved');
-        showToast(`Your website is now LIVE at /sites/${res.site.slug}!`, 'success');
+        showToast(`Your website is live.`, 'success');
       }
     } catch (err: any) {
       showToast(err.message || 'Failed to publish website.', 'warning');
@@ -207,7 +219,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         serverSiteRef.current=res.site;
         setCurrentSite(res.site);
         onSiteUpdated(res.site);
-        showToast('Website unpublished (reverted to draft mode).', 'info');
+        showToast('Your website is now a draft.', 'info');
       }
     } catch (err: any) {
       showToast(err.message || 'Failed to unpublish website.', 'warning');
@@ -248,6 +260,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-[#080d11] text-slate-100 flex flex-col font-sans overflow-hidden">
+      {mediaOpen && <WebsiteImageLibrary siteId={currentSite.id} token={sessionToken} onClose={()=>setMediaOpen(false)} onChoose={url=>{setContent({...content,heroImage:url});markDirty();setMediaOpen(false);}} />}
       {/* =========================================================
           TOP ACTION BAR — MOBILE ONLY (< sm)
           Two-level compact toolbar
@@ -267,7 +280,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                   onClose();
                 }
               }}
-              className="w-9 h-9 -ml-1 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 active:bg-slate-700 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              className="w-11 h-11 -ml-1 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 active:bg-slate-700 flex items-center justify-center transition-colors cursor-pointer shrink-0"
               title="Back to Dashboard"
               aria-label="Back to Dashboard"
             >
@@ -318,7 +331,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                   href={`/sites/${currentSite.slug}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-8 h-8 rounded-lg bg-slate-800 text-emerald-400 flex items-center justify-center border border-slate-700 active:scale-95"
+                  className="w-11 h-11 rounded-lg bg-slate-800 text-emerald-400 flex items-center justify-center border border-slate-700 active:scale-95"
                   title="View Live Site"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -326,7 +339,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 <button
                   type="button"
                   onClick={handleCopyLink}
-                  className="w-8 h-8 rounded-lg bg-slate-800 text-slate-200 flex items-center justify-center border border-slate-700 active:scale-95 cursor-pointer"
+                  className="w-11 h-11 rounded-lg bg-slate-800 text-slate-200 flex items-center justify-center border border-slate-700 active:scale-95 cursor-pointer"
                   title="Copy Link"
                 >
                   <Copy className="w-3.5 h-3.5" />
@@ -338,7 +351,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 type="button"
                 onClick={handleSaveDraft}
                 disabled={isSaving}
-                className="w-8 h-8 rounded-lg bg-slate-800 text-slate-200 flex items-center justify-center border border-slate-700 active:scale-95 cursor-pointer disabled:opacity-50"
+                className="w-11 h-11 rounded-lg bg-slate-800 text-slate-200 flex items-center justify-center border border-slate-700 active:scale-95 cursor-pointer disabled:opacity-50"
                 title="Save Draft"
               >
                 <Save className="w-3.5 h-3.5" />
@@ -348,13 +361,13 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         </div>
 
         {/* ROW 2: Edit/Preview Switcher + Obvious Publish CTA */}
-        <div className="h-11 px-3 flex items-center justify-between gap-2">
+        <div className="min-h-14 px-3 flex items-center justify-between gap-2">
           {/* [Edit] [Preview] */}
           <div className="flex items-center bg-[#070c10] border border-slate-800 rounded-xl p-0.5 shrink-0">
             <button
               type="button"
               onClick={() => setActiveTab('edit')}
-              className={`h-7 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`min-h-11 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'edit'
                   ? 'bg-[#00c365] text-black shadow-sm'
                   : 'text-slate-400 hover:text-white'
@@ -365,7 +378,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('preview')}
-              className={`h-7 px-3 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+              className={`min-h-11 px-3 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
                 activeTab === 'preview'
                   ? 'bg-[#00c365] text-black shadow-sm'
                   : 'text-slate-400 hover:text-white'
@@ -384,7 +397,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                   type="button"
                   onClick={handlePublish}
                   disabled={isPublishing}
-                  className="h-8 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs border border-emerald-500/40 flex items-center gap-1 cursor-pointer"
+                  className="min-h-11 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs border border-emerald-500/40 flex items-center gap-1 cursor-pointer"
                 >
                   <RefreshCw className={`w-3 h-3 ${isPublishing ? 'animate-spin' : ''}`} />
                   <span>Update</span>
@@ -404,7 +417,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 type="button"
                 onClick={handlePublish}
                 disabled={isPublishing}
-                className="h-8 px-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider shadow-[0_0_12px_rgba(0,195,101,0.3)] flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
+                className="min-h-11 px-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider shadow-[0_0_12px_rgba(0,195,101,0.3)] flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
               >
                 <Globe className="w-3.5 h-3.5" />
                 <span>Publish</span>
@@ -607,6 +620,8 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               <span>Branding</span>
             </button>
 
+            <button type="button" onClick={()=>setActiveSection('media')} className={`min-h-11 px-3 rounded-xl text-sm whitespace-nowrap ${activeSection==='media'?'bg-[#00c365] text-black':'bg-slate-900 text-slate-300'}`}><ImageIcon className="inline w-4 h-4 mr-2"/>Images &amp; Media</button>
+
             <button
               type="button"
               onClick={() => setActiveSection('sections')}
@@ -631,7 +646,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
-                <span>Bundles</span>
+                <span>Bundles &amp; Pricing</span>
               </button>
             )}
 
@@ -886,13 +901,21 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               </div>
             )}
 
+            {activeSection === 'media' && <section className="space-y-5">
+              <div><h3 className="text-lg font-semibold">Images &amp; Media</h3><p className="text-sm text-slate-400 mt-2">Upload once, reuse across your website. Choose your cover image and logo here.</p></div>
+              <WebsiteImageField label="Cover image" value={content.heroImage} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,heroImage:url});markDirty();}} />
+              <WebsiteImageField label="Business logo" value={content.logoUrl||''} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,logoUrl:url});markDirty();}} />
+              <button type="button" className="mh-button-secondary" onClick={()=>setMediaOpen(true)}>Open media library for cover image</button>
+              <p className="text-sm text-slate-400">Images used on a published website are public. Keep identity documents and private photos out of your library.</p>
+            </section>}
+
             {/* 3. BRANDING SECTION */}
             {activeSection === 'branding' && (
               <div className="space-y-5 animate-in fade-in">
                 <div>
                   <h3 className="font-bold text-sm text-white">Branding & Imagery</h3>
                   <p className="text-xs text-slate-400">
-                    Customize brand colors and imagery to match your enterprise identity.
+                    Choose colours and images that feel like your business.
                   </p>
                 </div>
 
@@ -1058,9 +1081,9 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
             {/* Managed bundle prices are authoritative business settings, not template content. */}
             {isDataReseller && activeSection === 'bundles' && <div className="space-y-4">
-              <h3 className="font-bold text-white">Managed bundles & pricing</h3>
-              <p className="text-sm text-slate-400">Mystery Hub supplies the available data catalog. Configure bundle availability and selling prices in your business dashboard's Bundles & Pricing area. Template item prices do not control paid checkout.</p>
-              <button type="button" className="min-h-11 px-4 py-3 rounded-xl bg-emerald-500 text-black font-bold" onClick={onClose}>Back to business dashboard</button>
+              <h3 className="font-bold text-white">Your bundles & pricing</h3>
+              <p className="text-sm text-slate-400">Choose which bundles appear on your store and set your selling prices. Your work here will be saved before opening pricing.</p>
+              <button type="button" className="min-h-11 px-4 py-3 rounded-xl bg-emerald-500 text-black font-bold" disabled={isSaving||isPublishing} onClick={async()=>{if(isDirty && !(await handleSaveDraft()))return;(onOpenPricing||onClose)();}}>Open Bundles &amp; Pricing</button>
             </div>}
 
             {/* 6. CALL TO ACTION SECTION */}

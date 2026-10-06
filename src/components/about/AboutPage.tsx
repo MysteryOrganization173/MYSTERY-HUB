@@ -88,13 +88,13 @@ export const AboutPage: React.FC = () => {
                 onClick={() => openWaitlist('Mystery Hub VIP Updates')}
                 className="px-6 py-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
               >
-                Join Our Journey
+                Get platform updates
               </button>
               <button
                 onClick={() => setActivePage('data')}
                 className="px-6 py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 backdrop-blur-sm transition-colors cursor-pointer"
               >
-                Explore Live Data Offers
+                Explore available services
               </button>
             </div>
           </div>
@@ -151,13 +151,13 @@ export const AboutPage: React.FC = () => {
               onClick={() => openWaitlist('Mystery Hub VIP Updates')}
               className="w-full py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
             >
-              Join Our Journey
+              Get platform updates
             </button>
             <button
               onClick={() => setActivePage('data')}
               className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-800 transition-colors cursor-pointer"
             >
-              Explore Live Data Offers
+              Explore available services
             </button>
           </div>
         </div>

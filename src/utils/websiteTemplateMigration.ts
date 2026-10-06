@@ -9,15 +9,14 @@ export function migrateWebsiteTemplate(content: SiteContent, fromId: string, tar
   const itemsType: WebsiteSectionType = ['restaurant','ecommerce','fashion','reseller'].includes(target.layoutType || '') ? 'products' : target.layoutType === 'portfolio' ? 'gallery' : 'services';
   const composition = structuredClone(target.composition || createWebsiteComposition(['header','hero',itemsType,'about','contact','location','footer']));
   const compatible = from?.layoutType === target.layoutType;
-  // The existing website store persists the editable item vocabulary, not demo-only
-  // specs/ratings. Target defaults must use that same contract so the next full save works.
-  const items=(compatible ? content.items : target.items)?.map(({specs:_specs,rating:_rating,...item})=>structuredClone(item));
-  const stats=compatible ? content.stats : (target.stats || []).slice(0,8).map(stat=>({label:stat.label.replace(/[<>]/g,'').slice(0,50).trim(),value:stat.value.replace(/[<>]/g,'').slice(0,50).trim()}));
-  const migrated = { ...content, items:items || [], stats, features: compatible ? content.features : [...target.features], composition };
+  // A new layout must not turn its demonstration catalogue or statistics into owner content.
+  const items=(compatible ? content.items : [])?.map(({specs:_specs,rating:_rating,...item})=>structuredClone(item));
+  const migrated = { ...content, items:items || [], stats:content.stats || [], features: compatible ? content.features : [], composition };
   for (const section of composition.sections) {
     const source = content.composition?.sections.find(s => s.type === section.type);
     if (!source) continue;
     section.data = structuredClone(source.data);
+    if(!compatible && (from?.layoutType==='reseller'||target.layoutType==='reseller') && ['products','services','gallery'].includes(section.type)) delete section.data.items;
     section.enabled = SECTION_REGISTRY[section.type].required ? true : source.enabled;
     if ((SECTION_REGISTRY[section.type].variants as readonly string[]).includes(source.variant)) section.variant = source.variant;
   }

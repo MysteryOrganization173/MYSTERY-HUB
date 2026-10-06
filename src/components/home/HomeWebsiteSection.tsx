@@ -54,15 +54,15 @@ export const HomeWebsiteSection: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 pt-2 text-xs text-slate-300">
           <div className="p-3.5 sm:p-4 rounded-xl bg-[#0e141a] border border-slate-800/80 flex items-center gap-3">
             <Smartphone className="w-4 h-4 sm:w-5 sm:h-5 text-[#00c365] shrink-0" />
-            <span>100% Mobile responsive on all Ghana smartphone devices</span>
+            <span>Designed for phones, tablets and desktop</span>
           </div>
           <div className="p-3.5 sm:p-4 rounded-xl bg-[#0e141a] border border-slate-800/80 flex items-center gap-3">
             <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 shrink-0" />
-            <span>Direct WhatsApp order notifications for your customers</span>
+            <span>WhatsApp contact links for your customers</span>
           </div>
           <div className="p-3.5 sm:p-4 rounded-xl bg-[#0e141a] border border-slate-800/80 flex items-center gap-3">
             <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-sky-400 shrink-0" />
-            <span>Built-in MoMo payments, SEO meta-tags & instant previews</span>
+            <span>Managed data checkout on reseller stores</span>
           </div>
         </div>
       </div>

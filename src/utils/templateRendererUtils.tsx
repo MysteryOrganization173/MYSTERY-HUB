@@ -54,7 +54,7 @@ export function mergeSiteWithTemplate(
     demoHeroTagline: content?.tagline ?? baseTemplate.demoHeroTagline,
     demoSubtext: content?.aboutText ?? baseTemplate.demoSubtext,
     location: content?.location ?? baseTemplate.location,
-    hoursOrContact: content?.whatsapp || content?.phone || content?.email || baseTemplate.hoursOrContact,
+    hoursOrContact: content ? content.whatsapp || content.phone || content.email || '' : baseTemplate.hoursOrContact,
     heroImage: content?.heroImage || baseTemplate.heroImage,
     accentColor,
     colorScheme: {
@@ -64,9 +64,9 @@ export function mergeSiteWithTemplate(
       accent: accentColor,
       background: backgroundColor,
     },
-    items: content?.items ?? baseTemplate.items,
-    stats: content?.stats ?? baseTemplate.stats,
-    features: content?.features ?? baseTemplate.features,
+    items: content ? content.items ?? [] : baseTemplate.items,
+    stats: content ? content.stats ?? [] : baseTemplate.stats,
+    features: content ? content.features ?? [] : baseTemplate.features,
   };
 }
 

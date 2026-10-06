@@ -1231,6 +1231,7 @@ export const DataPage: React.FC = () => {
                 <button
                   key={cat.id}
                   type="button"
+                  aria-pressed={selectedFaqCategory === cat.id}
                   onClick={() => setSelectedFaqCategory(cat.id as any)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                     selectedFaqCategory === cat.id
@@ -1259,6 +1260,7 @@ export const DataPage: React.FC = () => {
                 >
                   <button
                     type="button"
+                    aria-expanded={isOpen}
                     onClick={() => setOpenFaqId(isOpen ? null : faq.id)}
                     className="w-full text-left p-4 sm:p-5 flex items-center justify-between gap-4 cursor-pointer"
                   >
@@ -1290,7 +1292,7 @@ export const DataPage: React.FC = () => {
               <div>
                 <h4 className="font-bold text-sm text-white">Still have questions about an order?</h4>
                 <p className="text-xs text-slate-400">
-                  Ask Mystery AI in the bottom right corner or contact our official 24/7 WhatsApp helpdesk.
+                  Track your purchase in Orders, or contact our WhatsApp support team. Mystery AI can help with general service questions.
                 </p>
               </div>
             </div>

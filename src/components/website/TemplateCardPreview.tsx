@@ -90,7 +90,7 @@ export const TemplateCardPreview: React.FC<TemplateCardPreviewProps> = ({
   };
 
   // Determine concise badge text
-  const primaryBadge = t.badgeText || (t.isFreeTier ? 'Free' : 'Pro');
+  const primaryBadge = t.isFreeTier ? 'Free design' : 'Design preview';
   const secondaryBadge = t.id === 'tmpl-data-reseller'
     ? 'Great for resellers'
     : t.id === 'tmpl-start-blank'
@@ -100,7 +100,7 @@ export const TemplateCardPreview: React.FC<TemplateCardPreviewProps> = ({
   return (
     <div
       onClick={isStartBlank ? (onUseTemplate || onPreview) : onPreview}
-      className={`group rounded-2xl bg-[#0e141a] border overflow-hidden transition-all duration-300 flex flex-col justify-between shadow-sm hover:shadow-2xl hover:-translate-y-1 cursor-pointer ${
+      className={`group rounded-2xl bg-[#0e141a] border overflow-hidden transition-all duration-300 flex flex-col justify-between shadow-sm hover:shadow-2xl hover:-translate-y-0.5 cursor-pointer ${
         isStartBlank
           ? 'border-emerald-500/40 hover:border-[#00c365] bg-gradient-to-b from-[#0a1510] to-[#0a1118]'
           : 'border-slate-800 hover:border-[#00c365]/60'
@@ -320,7 +320,7 @@ export const TemplateCardPreview: React.FC<TemplateCardPreviewProps> = ({
                   <span>Preview</span>
                 </div>
                 <div className="px-2 py-0.5 rounded-md bg-white/15 backdrop-blur-xs text-[8px] font-medium text-white border border-white/15">
-                  <span>WhatsApp MoMo</span>
+                  <span>Sample layout</span>
                 </div>
               </div>
 
@@ -357,7 +357,7 @@ export const TemplateCardPreview: React.FC<TemplateCardPreviewProps> = ({
           <div className="flex items-center gap-2 text-[11px] text-slate-400 pt-0.5">
             <span className="inline-flex items-center gap-1 text-[#00c365] font-semibold">
               <CheckCircle2 className="w-3 h-3" />
-              <span>Free tier</span>
+              <span>Free design</span>
             </span>
             <span aria-hidden="true" className="text-slate-600">·</span>
             <span className="text-slate-300 truncate">

@@ -16,6 +16,7 @@ import {
   Clock,
   ExternalLink,
   Gift,
+  Wallet,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -70,7 +71,9 @@ export const Navbar: React.FC = () => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     const q = searchQuery.toLowerCase();
-    if (q.includes('earn') || q.includes('referral') || q.includes('reward') || q.includes('affiliate') || q.includes('share')) {
+    if (q.includes('wallet') || q.includes('top up')) {
+      setActivePage('wallet');
+    } else if (q.includes('earn') || q.includes('referral') || q.includes('reward') || q.includes('affiliate') || q.includes('share')) {
       setActivePage('earn');
     } else if (q.includes('data') || q.includes('mtn') || q.includes('telecel') || q.includes('bundle') || q.includes('airteltigo')) {
       setActivePage('data');
@@ -106,7 +109,7 @@ export const Navbar: React.FC = () => {
         </a>
 
         {/* Zone 2: Navigation Links (Desktop) */}
-        <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-slate-300">
+        <nav className="hidden xl:flex items-center gap-5 text-sm font-medium text-slate-300">
           {navLinks.map((link) => {
             const isActive = activePage === link.id;
             return (
@@ -117,7 +120,8 @@ export const Navbar: React.FC = () => {
                   e.preventDefault();
                   handleNavClick(link.id);
                 }}
-                className={`transition-colors py-1 relative whitespace-nowrap cursor-pointer ${
+                aria-current={isActive?'page':undefined}
+                className={`transition-colors min-h-11 flex items-center relative whitespace-nowrap cursor-pointer ${
                   isActive ? 'text-white font-semibold' : 'text-slate-300 hover:text-white'
                 }`}
               >
@@ -165,6 +169,7 @@ export const Navbar: React.FC = () => {
             )}
           </div>
 
+          {user&&<button onClick={()=>handleNavClick('wallet')} className="min-h-11 min-w-11 flex items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800" aria-label="Mystery Wallet" title="Mystery Wallet"><Wallet className="w-4 h-4"/></button>}
           {/* Mystery Earn Shortcut */}
           <button
             onClick={() => handleNavClick('earn')}
@@ -174,7 +179,7 @@ export const Navbar: React.FC = () => {
           >
             <Gift className="w-4 h-4 text-[#00c365]" />
             <span className="absolute top-1.5 right-1.5 flex h-2 w-2" aria-hidden="true">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 motion-reduce:hidden" />
+
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00c365]" />
             </span>
           </button>
@@ -289,7 +294,7 @@ export const Navbar: React.FC = () => {
           {/* Mobile Menu Hamburger */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-slate-400 hover:text-white rounded-lg focus:outline-none cursor-pointer"
+            className="xl:hidden p-2 text-slate-400 hover:text-white rounded-lg focus:outline-none cursor-pointer"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -299,7 +304,7 @@ export const Navbar: React.FC = () => {
 
       {/* Mobile Dropdown Menu Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#0c1116] border-b border-slate-800 px-4 pt-3 pb-5 space-y-3">
+        <div className="xl:hidden bg-[#0c1116] border-b border-slate-800 px-4 pt-3 pb-5 space-y-3">
           {user && (
             <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">

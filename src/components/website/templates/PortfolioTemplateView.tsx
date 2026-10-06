@@ -40,9 +40,9 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
       <div className="bg-black/90 border-b border-[#27272a] px-4 sm:px-8 py-2 text-xs flex items-center justify-between text-zinc-400">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[var(--website-accent,#00c365)] animate-pulse" />
-          <span>Currently Accepting Q4 Commercial & Editorial Commissions</span>
+          <span>Project enquiries</span>
         </div>
-        <div className="text-[11px] text-zinc-500 font-mono">Accra · London · Lagos</div>
+        <div className="text-[11px] text-zinc-500 font-mono">{template.location}</div>
       </div>
 
       {/* Navigation */}

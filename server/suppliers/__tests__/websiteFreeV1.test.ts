@@ -221,7 +221,7 @@ test('published restaurant uses contact enquiries without promising automatic bo
   const html=renderToStaticMarkup(renderTemplateLayout(mergeSiteWithTemplate(template,{businessName:'Fixture cafe',whatsapp:'0240000000'})));
   assert.ok(html.includes('Contact to Arrange Reservation'));assert.ok(html.includes('confirm availability'));
   assert.ok(!html.includes('Instant Online Booking'));assert.ok(!html.includes('Instant SMS'));assert.ok(!html.includes('Instant WhatsApp Confirmation'));
-  assert.ok(renderToStaticMarkup(renderTemplateLayout(template)).includes('Instant Online Booking'));
+  assert.ok(!renderToStaticMarkup(renderTemplateLayout(template)).includes('Instant Online Booking'));
 });
 
 for(const template of WEBSITE_TEMPLATES.filter(template=>template.id!=='tmpl-start-blank'))test(`change to ${template.id} permits the editor's next full save and publish`,async()=>{

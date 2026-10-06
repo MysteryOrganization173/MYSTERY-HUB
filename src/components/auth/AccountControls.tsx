@@ -45,7 +45,7 @@ function MyAccount() {
       <label className="block text-sm">Full Name<input required minLength={2} maxLength={128} className={accountInput} value={name} onChange={e => setName(e.target.value)} autoComplete="name" /></label>
       <label className="block text-sm">Account email<input type="email" maxLength={128} className={accountInput} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></label>
       <label className="block text-sm">Account phone<input type="tel" maxLength={32} className={accountInput} value={phone} onChange={e => setPhone(e.target.value)} autoComplete="tel" /></label>
-      <p className="text-xs text-slate-400">Keep at least one sign-in detail. Adding both helps you avoid creating another account. These contacts have not been verified by email or SMS.</p>
+      <p className="text-xs text-slate-400">Keep at least one sign-in detail. Email is useful for receipts and Wallet top-ups; adding it does not replace your phone sign-in. These contacts have not been verified by email or SMS.</p>
       {identifiersChanged && <label className="block text-sm">Confirm current password<input type="password" required maxLength={128} autoComplete="current-password" className={accountInput} value={currentPassword} onChange={e => setPassword(e.target.value)} /></label>}
       <p className="break-words text-sm">Referral Code: <span className="font-mono">{code ?? 'Unavailable'}</span></p>
       <p className="text-sm">Member Since: {new Date(user!.createdAt).toLocaleDateString()}</p>

@@ -9,6 +9,8 @@ interface PageMetadata {
 }
 
 const SEO_MAP: Record<string, PageMetadata> = {
+  wallet: {title:'Mystery Wallet — Mystery Hub',description:'Top up your Wallet and use your available balance for supported Mystery Hub purchases.'},
+  earn: {title:'Mystery Earn — Mystery Hub',description:'Invite people to Mystery Hub and earn rewards from qualifying purchases.'},
   afa: { title:'MTN AFA Registration — Mystery Hub', description:'Register your MTN number for AFA with secure payment and order tracking.' },
   home: {
     title: 'Mystery Hub — Ghana’s All-in-One Digital Platform | Data & Websites',
@@ -18,12 +20,12 @@ const SEO_MAP: Record<string, PageMetadata> = {
   data: {
     title: 'Buy Data Bundles (MTN, Telecel, AirtelTigo) — Mystery Hub Ghana',
     description:
-      'Fast, reliable data bundles for MTN, Telecel, and AirtelTigo. 1GB to 30GB non-expiring Jumbo packages with secure Mobile Money checkout.',
+      'Fast, reliable data bundles for MTN, Telecel, and AirtelTigo. Choose from the current MTN, Telecel and AirtelTigo catalog with clear prices and secure Mobile Money checkout.',
   },
   website: {
     title: 'Website Builder for Ghanaian Businesses — Mystery Hub',
     description:
-      'Explore mobile-responsive website templates handcrafted for chop bars, salons, construction firms, boutiques, and churches in Ghana. With native WhatsApp & MoMo support.',
+      'Explore mobile-responsive website templates handcrafted for chop bars, salons, construction firms, boutiques, and churches in Ghana. Publish your website free, add your images and manage supported reseller stores.',
   },
   marketplace: {
     title: 'Digital Marketplace & Tech Hardware — Mystery Hub Ghana',

@@ -45,12 +45,12 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <div className="bg-[var(--website-primary,#0f172a)] text-slate-300 text-xs px-4 py-2 flex items-center justify-between border-b border-slate-800">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[var(--website-accent,#0ea5e9)]" />
-          <span>Exclusive Developer Listings in Greater Accra & Aburi Hills</span>
+          <span>{template.location}</span>
         </div>
         <div className="hidden sm:flex items-center gap-4 text-[11px]">
-          <span>Titled Properties Only</span>
+          <span>Confirm property documents</span>
           <span>·</span>
-          <span>USD & GHS Accepted</span>
+          <span>Enquire for terms</span>
         </div>
       </div>
 
@@ -273,7 +273,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
           {tourScheduled ? (
             <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-center space-y-2">
               <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto" />
-              <h4 className="font-bold text-emerald-900 text-base">Viewing Booked!</h4>
+              <h4 className="font-bold text-emerald-900 text-base">Example viewing</h4>
               <p className="text-xs text-emerald-700">
                 Our lead property advisor has reached out via WhatsApp to confirm the security gate pass for Cantonments.
               </p>

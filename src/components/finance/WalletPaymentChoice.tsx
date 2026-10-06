@@ -1,15 +1,43 @@
-import React,{useState,useEffect} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {useApp} from '../../context/AppContext';
 import {financeRequest} from '../../services/financeApi';
 import {formatGhs} from '../../../shared/money';
-export const WalletPaymentChoice:React.FC<{amountMinor:number;value:'paystack'|'wallet';onChange:(value:'paystack'|'wallet')=>void}>=({amountMinor,value,onChange})=>{
-  const {sessionToken,setActivePage,closeCheckout}=useApp();const [balance,setBalance]=useState<number|null>(null),[restricted,setRestricted]=useState(false);
-  useEffect(()=>{let live=true;setBalance(null);setRestricted(false);if(sessionToken)financeRequest(sessionToken).then(data=>{if(live){setBalance(data.walletMinor);setRestricted(data.restricted);}}).catch(()=>{});return()=>{live=false;};},[sessionToken]);
-  if(!sessionToken)return null;
-  const sufficient=balance!==null&&balance>=amountMinor&&!restricted;
-  return <fieldset className="rounded-xl border border-slate-700 p-3 text-sm space-y-3"><legend className="px-1 text-slate-300">Payment method</legend>
-    <label className="flex gap-2"><input type="radio" name="payment-method" checked={value==='paystack'} onChange={()=>onChange('paystack')}/>Paystack · existing external payment methods</label>
-    <label className="flex gap-2"><input type="radio" name="payment-method" checked={value==='wallet'} disabled={!sufficient} onChange={()=>onChange('wallet')}/>Mystery Wallet · {balance===null?'Balance unavailable':`Balance ${formatGhs(balance)}`} {sufficient?'· Pay instantly':''}</label>
-    {balance!==null&&!sufficient&&<p className="text-slate-400">{restricted?'Wallet needs reconciliation.':`You need ${formatGhs(Math.max(0,amountMinor-balance))} more. No split payments.`} <button type="button" className="text-[#00c365]" onClick={()=>{closeCheckout();setActivePage('wallet');}}>Add Money</button> or use Paystack.</p>}
+import {preferredPaymentMethod} from '../../utils/checkoutPresentation';
+
+export const WalletPaymentChoice: React.FC<{
+  amountMinor: number; value: 'paystack' | 'wallet'; onChange: (value: 'paystack' | 'wallet') => void;
+}> = ({amountMinor, value, onChange}) => {
+  const {sessionToken, setActivePage, closeCheckout} = useApp();
+  const [balance, setBalance] = useState<number | null>(null);
+  const [restricted, setRestricted] = useState(false);
+  const [balanceFailed,setBalanceFailed]=useState(false);
+  const touched = useRef(false);
+  useEffect(() => {
+    let live = true;
+    touched.current = false; setBalance(null); setRestricted(false); setBalanceFailed(false);
+    if (sessionToken) financeRequest(sessionToken).then(data => {
+      if (live) { setBalance(data.walletMinor); setRestricted(data.restricted); }
+    }).catch(() => {if(live)setBalanceFailed(true);});
+    return () => { live = false; };
+  }, [sessionToken]);
+  const preferred = preferredPaymentMethod(Boolean(sessionToken), balance, amountMinor, restricted);
+  useEffect(() => {
+    if (!touched.current || value === 'wallet' && preferred !== 'wallet') onChange(preferred);
+  }, [preferred, value, onChange]);
+  if (!sessionToken) return null;
+  const choose = (next: 'wallet' | 'paystack') => { touched.current = true; onChange(next); };
+  return <fieldset className="space-y-2 text-sm">
+    <legend className="mb-2 text-slate-300">Pay with</legend>
+    <div className="grid sm:grid-cols-2 gap-2">
+      <label className={`flex items-center gap-3 min-h-14 rounded-xl px-3 py-3 border ${value==='wallet'?'border-emerald-500/60 bg-emerald-500/10':'border-slate-700 bg-slate-900/40'}`}>
+        <input type="radio" name="payment-method" checked={value==='wallet'} disabled={preferred!=='wallet'} onChange={()=>choose('wallet')}/>
+        <span>Mystery Wallet<span className="block text-xs text-slate-400">{balance===null?balanceFailed?'Balance unavailable · use Mobile Money':'Checking balance…':formatGhs(balance)+' available'}</span></span>
+      </label>
+      <label className={`flex items-center gap-3 min-h-14 rounded-xl px-3 py-3 border ${value==='paystack'?'border-emerald-500/60 bg-emerald-500/10':'border-slate-700 bg-slate-900/40'}`}>
+        <input type="radio" name="payment-method" checked={value==='paystack'} onChange={()=>choose('paystack')}/>
+        <span>Mobile Money<span className="block text-xs text-slate-400">Or card at secure checkout</span></span>
+      </label>
+    </div>
+    {balance!==null&&preferred!=='wallet'&&<p className="text-slate-400 leading-relaxed">{restricted?'Wallet payments are temporarily unavailable.':`You need ${formatGhs(Math.max(0,amountMinor-balance))} more to pay with Wallet.`} <button type="button" className="min-h-11 text-emerald-400 underline" onClick={()=>{closeCheckout();setActivePage('wallet');}}>Top Up Wallet</button></p>}
   </fieldset>;
 };

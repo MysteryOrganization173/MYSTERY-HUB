@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { getCloudinaryUrl, getCloudinarySrcSet, CloudinaryOptions } from '../../utils/cloudinary';
 
 export interface OptimizedImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src' | 'placeholder'> {
@@ -32,6 +32,8 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+
+  useEffect(() => { setIsLoaded(false); setHasError(false); }, [src]);
 
   if (!src || hasError) {
     return (

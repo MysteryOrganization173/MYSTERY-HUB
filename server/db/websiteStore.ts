@@ -174,7 +174,8 @@ export class WebsiteStore {
       throw new Error(`Invalid or unknown templateId: "${templateId}".`);
     }
 
-    const demoPhone = (templateDef.hoursOrContact || '').split('·')[0].trim();
+    // Template demos are illustrative. New websites must not inherit demo contacts or claims.
+    const demoPhone = '';
     const defaultBusinessName = templateDef.demoBusinessName || 'My Business Website';
     const name = sanitizeString(input.name || defaultBusinessName, 128);
 
@@ -184,12 +185,12 @@ export class WebsiteStore {
     const initialContent: SiteContent = {
       ...(input.content?.composition !== undefined ? { composition: validateWebsiteComposition(input.content.composition, userId) } : templateId === "tmpl-start-blank" ? { composition: createWebsiteComposition() } : {}),
       businessName: sanitizeString(input.content?.businessName || name, 100),
-      tagline: sanitizeString(input.content?.tagline || templateDef.demoHeroTagline || '', 150),
+      tagline: sanitizeString(input.content?.tagline || 'Welcome to our business', 150),
       aboutText: sanitizeString(
-        input.content?.aboutText || templateDef.demoSubtext || '',
+        input.content?.aboutText || '',
         2000
       ),
-      location: sanitizeString(input.content?.location || templateDef.location || (templateId === 'tmpl-start-blank' ? '' : 'Accra, Ghana'), 150),
+      location: sanitizeString(input.content?.location || '', 150),
       phone: sanitizeString(input.content?.phone || demoPhone || '', 30),
       whatsapp: sanitizeString(input.content?.whatsapp || input.content?.phone || demoPhone || '', 30),
       email: sanitizeString(input.content?.email || '', 100),
@@ -205,16 +206,9 @@ export class WebsiteStore {
         facebook: sanitizeString(input.content?.social?.facebook || '', 100),
         tiktok: sanitizeString(input.content?.social?.tiktok || '', 50),
       },
-      items: sanitizeTemplateItems(input.content?.items && input.content.items.length > 0 ? input.content.items : templateDef.items),
-      stats: Array.isArray(input.content?.stats && input.content.stats.length > 0 ? input.content.stats.slice(0, 8).map(s => ({ label: sanitizeString(s.label, 50), value: sanitizeString(s.value, 50) })) : templateDef.stats)
-        ? (input.content?.stats || templateDef.stats || []).slice(0, 8).map((s) => ({
-            label: sanitizeString(s.label, 50),
-            value: sanitizeString(s.value, 50),
-          }))
-        : [],
-      features: Array.isArray(input.content?.features && input.content.features.length > 0 ? input.content.features.slice(0, 10).map(f => sanitizeString(f, 80)) : templateDef.features)
-        ? (input.content?.features || templateDef.features || []).slice(0, 10).map((f) => sanitizeString(f, 80))
-        : [],
+      items: sanitizeTemplateItems(input.content?.items ?? []),
+      stats: (input.content?.stats || []).slice(0, 8).map(s => ({label:sanitizeString(s.label,50),value:sanitizeString(s.value,50)})),
+      features: (input.content?.features || []).slice(0, 10).map(f => sanitizeString(f,80)),
     };
 
     const initialSettings: SiteSettings = {

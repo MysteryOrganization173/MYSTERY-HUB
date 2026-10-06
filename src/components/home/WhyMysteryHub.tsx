@@ -9,7 +9,7 @@ export const WhyMysteryHub: React.FC = () => {
     {
       icon: Zap,
       title: 'Reliable Automated Delivery',
-      desc: 'Fast automated delivery directly to your SIM promptly after Mobile Money payment authorization.',
+      desc: 'Delivery starts after confirmed payment. Timing depends on the selected service and network.',
       accent: 'text-[#00c365] bg-[#00c365]/10',
     },
     {
@@ -43,7 +43,7 @@ export const WhyMysteryHub: React.FC = () => {
             Built for Speed, Reliability, & Everyday Value
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-            We are engineering Ghana’s primary digital utility platform to bridge the gap between everyday consumers and essential digital tools.
+            Everyday services with clear prices, visible order progress and support when you need it.
           </p>
         </div>
 
@@ -70,7 +70,7 @@ export const WhyMysteryHub: React.FC = () => {
         <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#0c1613] via-[#09110e] to-[#0c1613] border border-[#00c365]/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
           <div>
             <h3 className="font-bold text-sm sm:text-base text-white">Ready to experience reliable Ghana digital services?</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Top up your mobile bundle or create your business website in under 3 minutes.</p>
+            <p className="text-xs text-slate-400 mt-0.5">Choose a bundle or start a free business website when you’re ready.</p>
           </div>
           <button
             onClick={() => setActivePage('data')}

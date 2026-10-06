@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../../services/apiClient.js';
+import {useDialogFocus} from '../../hooks/useDialogFocus';
 import React, { useState, useEffect } from 'react';
 import { ULTRA_SERVICE, type UltraEnquiryInput } from '../../config/websiteBuilder.js';
 import { SafeImage } from './SafeImage.js';
@@ -80,6 +81,7 @@ export function WebsitePlansAndUltra({
   const ultraArtworkUrl = getCloudinaryUrl(ULTRA_TIER_ARTWORK, { format: 'auto', quality: 'auto', width: 1200 });
   const ultraArtworkSrcSet = getCloudinarySrcSet(ULTRA_TIER_ARTWORK, [480, 800, 1200]);
 
+  const dialogRef=useDialogFocus(isUltraModalOpen,()=>{if(!busy)setIsUltraModalOpen(false);});
   // Close modal on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -343,10 +345,10 @@ export function WebsitePlansAndUltra({
               <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#09100d]/90 via-[#09100d]/50 to-transparent pointer-events-none" />
             </div>
 
-            {/* Most Popular Badge — Classic overlapping badge (half inside / half above the card edge) */}
+            {/* Coming soon Badge — Classic overlapping badge (half inside / half above the card edge) */}
             <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
               <span className="inline-flex items-center px-3.5 py-1 rounded-full bg-[#00c365] text-black text-[10px] font-black uppercase tracking-wider shadow-md border border-[#00e575]">
-                Most Popular
+                Coming soon
               </span>
             </div>
 
@@ -639,7 +641,7 @@ export function WebsitePlansAndUltra({
           ========================================================= */}
       {isUltraModalOpen && (
         <div
-          role="dialog"
+          ref={dialogRef} tabIndex={-1} role="dialog"
           aria-modal="true"
           aria-labelledby="ultra-modal-title"
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200"

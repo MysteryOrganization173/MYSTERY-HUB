@@ -8,7 +8,7 @@ export const BUSINESS_CONFIG = {
   brandName: 'Mystery Hub',
   tagline: 'Everything Digital. One Trusted Place.',
   legalName: 'Mystery Hub Digital (Ghana)',
-  domain: 'mysteryhub.site',
+  domain: 'mysterybundlehub.com',
   country: 'Ghana',
   currency: 'GHS',
   currencySymbol: 'GH₵',

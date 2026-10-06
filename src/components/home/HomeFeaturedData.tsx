@@ -51,7 +51,7 @@ export const HomeFeaturedData: React.FC = () => {
               Popular Data Bundles
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 max-w-lg">
-              Reliable 4G/5G data packages with fast Mobile Money delivery to your phone.
+              Choose a network and bundle. Review the total and recipient before you pay.
             </p>
           </div>
 

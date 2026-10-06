@@ -313,7 +313,7 @@ export const MarketplacePage: React.FC = () => {
 
           {/* Hero Foreground Content */}
           <div className="relative z-10 w-full max-w-xl lg:max-w-2xl p-4 sm:p-7 lg:p-9 space-y-2 sm:space-y-3.5 text-left">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#111e18]/90 border border-[#00c365]/30 text-[10px] sm:text-xs font-semibold text-[#00c365] backdrop-blur-sm">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#111e18]/90 border border-[#00c365]/30 text-xs sm:text-xs font-semibold text-[#00c365] backdrop-blur-sm">
               <Sparkles className="w-3 h-3" />
               <span>Tech &amp; Digital Marketplace</span>
             </div>
@@ -460,7 +460,7 @@ export const MarketplacePage: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <span className="inline-block text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="inline-block text-xs font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                 New products are being added
               </span>
               <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
@@ -595,14 +595,14 @@ export const MarketplacePage: React.FC = () => {
 
                       {/* Small Status Badge on Image */}
                       <span
-                        className={`absolute top-2 left-2 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-md backdrop-blur-md border shadow-sm ${availabilityBadge.style}`}
+                        className={`absolute top-2 left-2 text-[9px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-md backdrop-blur-md border shadow-sm ${availabilityBadge.style}`}
                       >
                         {p.availabilityLabel || availabilityBadge.label}
                       </span>
 
                       {/* Clean 1-Line Compact Promo Badge (No multiline marketing overlays on cards) */}
                       {compactBadge && (
-                        <span className="absolute top-2 right-2 text-[9px] sm:text-[10px] font-bold text-white bg-black/85 backdrop-blur-md border border-slate-700/80 px-1.5 sm:px-2 py-0.5 rounded-md shadow-sm truncate max-w-[55%]">
+                        <span className="absolute top-2 right-2 text-[9px] sm:text-xs font-bold text-white bg-black/85 backdrop-blur-md border border-slate-700/80 px-1.5 sm:px-2 py-0.5 rounded-md shadow-sm truncate max-w-[55%]">
                           {compactBadge}
                         </span>
                       )}
@@ -611,7 +611,7 @@ export const MarketplacePage: React.FC = () => {
                     {/* Compact Card Content */}
                     <div className="p-2.5 sm:p-3.5 space-y-1 text-left flex-1 flex flex-col justify-between">
                       <div className="space-y-0.5">
-                        <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 truncate">
+                        <div className="text-xs sm:text-[11px] font-semibold text-slate-400 truncate">
                           {p.categoryLabel}
                         </div>
 
@@ -647,7 +647,7 @@ export const MarketplacePage: React.FC = () => {
                         <Share2 className="w-2.5 h-2.5 text-amber-400/80 group-hover/badge:translate-x-0.5 transition-transform shrink-0" />
                       </button>
                     ) : (
-                      <div className="text-[10px] sm:text-[11px] text-slate-500 flex items-center justify-between font-medium group-hover:text-slate-400 transition-colors pt-0.5 border-t border-slate-800/60">
+                      <div className="text-xs sm:text-[11px] text-slate-500 flex items-center justify-between font-medium group-hover:text-slate-400 transition-colors pt-0.5 border-t border-slate-800/60">
                         <span>Details</span>
                         <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                       </div>
@@ -679,7 +679,7 @@ export const MarketplacePage: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-[11px] sm:text-xs text-slate-300 leading-snug">
-                  Price drops, new product finds, and sourcing updates on WhatsApp.
+                  Ask about available products and sourcing on WhatsApp.
                 </p>
               </div>
             </div>
@@ -703,7 +703,7 @@ export const MarketplacePage: React.FC = () => {
           <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#0e161c] via-[#091014] to-[#070b0e] border border-slate-800 p-4 sm:p-6 space-y-3">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
               <div className="space-y-1 max-w-2xl text-left">
-                <span className="text-[10px] sm:text-xs font-bold text-[#00c365] uppercase tracking-wider">
+                <span className="text-xs sm:text-xs font-bold text-[#00c365] uppercase tracking-wider">
                   Custom Tech Sourcing Service
                 </span>
                 <h3 className="text-base sm:text-xl font-bold text-white tracking-tight">
@@ -782,7 +782,7 @@ export const MarketplacePage: React.FC = () => {
                   <Gift className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[10px] text-[#00c365] uppercase tracking-wider font-bold block">
+                  <span className="text-xs text-[#00c365] uppercase tracking-wider font-bold block">
                     Mystery Earn · Share &amp; Earn
                   </span>
                   <h3 id="share-modal-title" className="text-sm sm:text-base font-bold text-white">
@@ -816,7 +816,7 @@ export const MarketplacePage: React.FC = () => {
                   )}
                 </div>
                 <div className="min-w-0 flex-1 space-y-0.5">
-                  <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">
+                  <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider block">
                     {shareModalProduct.categoryLabel}
                   </span>
                   <h4 className="font-bold text-sm text-white truncate">{shareModalProduct.name}</h4>

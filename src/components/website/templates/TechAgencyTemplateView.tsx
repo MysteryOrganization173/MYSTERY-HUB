@@ -34,10 +34,10 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
       {/* Top Cyber Line */}
       <div className="bg-[#0f141c] border-b border-slate-800/80 px-4 sm:px-8 py-2 text-xs flex items-center justify-between text-slate-400 font-mono">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#06b6d4] animate-ping" />
-          <span className="text-slate-300">System Status: All African Telecom & Bank Switches Operational</span>
+          <span className="w-2 h-2 rounded-full bg-[#06b6d4] " />
+          <span className="text-slate-300">{template.demoBusinessName}</span>
         </div>
-        <div className="text-[11px] text-cyan-400">Stanbic Heights, Airport City</div>
+        <div className="text-[11px] text-cyan-400">{template.location}</div>
       </div>
 
       {/* Navigation */}
@@ -61,7 +61,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
             Architecture
           </a>
           <a href="#metrics" className="hover:text-[#06b6d4] transition-colors">
-            SLA Metrics
+            Highlights
           </a>
           <a href="#discovery" className="hover:text-[#06b6d4] transition-colors">
             Discovery Call
@@ -170,16 +170,16 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
             </span>
             <h3 className="text-2xl font-black text-white">Schedule 30-Min Technical Discovery</h3>
             <p className="text-xs text-slate-400 font-sans">
-              Meet with our Principal Solutions Architect to review your fintech or cloud pipeline.
+              Contact us to discuss your project and arrange a conversation.
             </p>
           </div>
 
           {scheduled ? (
             <div className="p-6 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 text-center space-y-2">
               <CheckCircle className="w-10 h-10 text-cyan-400 mx-auto" />
-              <h4 className="font-bold text-cyan-300 text-base">Discovery Call Scheduled</h4>
+              <h4 className="font-bold text-cyan-300 text-base">Example conversation</h4>
               <p className="text-xs text-slate-300 font-sans">
-                Calendar invite dispatched. Our technical lead will connect with your engineering team.
+                Preview only. No invitation has been sent.
               </p>
             </div>
           ) : (
@@ -225,7 +225,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
               {template.demoBusinessName}
             </h4>
             <p className="text-xs text-slate-400 leading-relaxed font-sans">
-              Deploying enterprise-grade digital rails and software platforms across Ghana and West Africa.
+              {template.demoSubtext}
             </p>
           </div>
           <div className="space-y-2">

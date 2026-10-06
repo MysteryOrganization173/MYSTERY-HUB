@@ -1,3 +1,4 @@
+import {useDialogFocus} from '../../hooks/useDialogFocus';
 import { WebsiteSettingsControls } from './WebsiteSettingsControls';
 import type { WebsiteSiteRecord } from '../../types';
 import { trackWebsiteEvent } from '../../utils/websiteAnalytics';
@@ -110,16 +111,7 @@ export const TemplatePreviewModal: React.FC = () => {
     }
   }, [closeTemplatePreview]);
 
-  // Escape key listener to close modal
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && selectedTemplatePreview) {
-        handleClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedTemplatePreview, handleClose]);
+  const dialogRef=useDialogFocus(!!selectedTemplatePreview,handleClose);
 
   // Track canvas container dimensions for responsive scaling calculations
   useEffect(() => {
@@ -296,7 +288,7 @@ export const TemplatePreviewModal: React.FC = () => {
   const frameRenderedWidth = targetWidth * scale;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-3 md:p-5 bg-black/95 backdrop-blur-md animate-in fade-in duration-200 overflow-hidden">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Website template preview" className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-3 md:p-5 bg-black/95 backdrop-blur-md animate-in fade-in duration-200 overflow-hidden">
       {/* Dynamic Ambient Background Glow customized to template colors */}
       <div
         className="absolute inset-0 pointer-events-none opacity-20 blur-[140px] transition-colors duration-500"
@@ -308,6 +300,7 @@ export const TemplatePreviewModal: React.FC = () => {
       {/* Main Modal Container: Full Screen on Mobile, Windowed on Desktop */}
       <div className="relative w-full h-[100dvh] sm:h-[95vh] sm:max-w-7xl bg-[#0a0f14] border-0 sm:border border-slate-800 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 z-10">
         
+        <p className="px-4 py-2 text-xs text-slate-300 bg-slate-900">Design preview · Sample content and interactions. Reservations and purchases are not submitted.</p>
         {/* =========================================================
             TOP CONTROL BAR: Clean, Aggressively Simplified
             - Mobile: [ Back ]  Template Name  [ Share ] [ Use ]

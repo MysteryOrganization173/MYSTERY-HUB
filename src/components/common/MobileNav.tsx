@@ -4,7 +4,7 @@ import { ActivePage } from '../../types';
 import { Home, Wifi, Globe, ShoppingBag, Clock } from 'lucide-react';
 
 export const MobileNav: React.FC = () => {
-  const { activePage, setActivePage, orders } = useApp();
+  const { activePage, setActivePage, orders, activeEditorSite, isMysteryAiOpen, isCheckoutOpen, isStatusModalOpen, isAuthModalOpen, selectedTemplatePreview, marketplaceInquiryProduct, waitlistInfo, isAccountOpen } = useApp();
 
   const navItems: { id: ActivePage; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'home', label: 'Home', icon: Home },
@@ -13,6 +13,8 @@ export const MobileNav: React.FC = () => {
     { id: 'marketplace', label: 'Marketplace', icon: ShoppingBag },
     { id: 'orders', label: 'Orders', icon: Clock },
   ];
+
+  if (activeEditorSite || isMysteryAiOpen || isCheckoutOpen || isStatusModalOpen || isAuthModalOpen || selectedTemplatePreview || marketplaceInquiryProduct || waitlistInfo.isOpen || isAccountOpen) return null;
 
   return (
     <nav
@@ -27,6 +29,7 @@ export const MobileNav: React.FC = () => {
             <a
               key={item.id}
               href={ROUTE_PATH_MAP[item.id]}
+              aria-current={isActive ? "page" : undefined}
               onClick={(e) => {
                 e.preventDefault();
                 setActivePage(item.id);
@@ -41,7 +44,7 @@ export const MobileNav: React.FC = () => {
                 <Icon className="w-5 h-5" />
               </div>
               <span
-                className={`text-[10px] font-medium tracking-tight mt-0.5 ${
+                className={`text-[11px] font-medium tracking-tight mt-0.5 ${
                   isActive ? 'text-[#00c365] font-semibold' : 'text-slate-400'
                 }`}
               >

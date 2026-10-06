@@ -83,7 +83,7 @@ export const QuickServicesBar: React.FC = () => {
     {
       id: 'earn',
       title: 'Mystery Earn',
-      desc: 'Lifetime referrals',
+      desc: 'Qualifying purchase rewards',
       icon: Gift,
       accentText: 'text-yellow-400',
       accentBg: 'bg-yellow-400/10 group-hover:bg-yellow-400/15',

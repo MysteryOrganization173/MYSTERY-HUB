@@ -63,8 +63,7 @@ export const Hero: React.FC = () => {
         {/* Right Edge Soft Feather: Eliminates any hard frame boundaries */}
         <div className="hidden sm:block absolute top-0 bottom-0 right-0 w-24 sm:w-36 bg-gradient-to-l from-[#070b0e]/50 to-transparent pointer-events-none" />
 
-        {/* Mystery Hub Signature Emerald Glow Ambient Bleed */}
-        <div className="absolute top-1/4 right-1/4 w-[450px] h-[350px] bg-[#00c365]/10 rounded-full blur-[100px] pointer-events-none mix-blend-screen" />
+
       </div>
 
       {/* Hero Foreground Content */}
@@ -74,7 +73,7 @@ export const Hero: React.FC = () => {
           <div className="lg:col-span-7 space-y-4 sm:space-y-6 text-left max-w-2xl">
             {/* Pill Header Badge */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#11181e]/90 border border-slate-700/60 backdrop-blur-sm shadow-inner">
-              <span className="w-2 h-2 rounded-full bg-[#00c365] animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-[#00c365]" />
               <span className="text-xs font-medium text-slate-300 tracking-wide">
                 Ghana&apos;s Digital Utility Platform
               </span>
@@ -82,15 +81,15 @@ export const Hero: React.FC = () => {
 
             {/* Main Headline */}
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.15] sm:leading-[1.1]">
-              Your All-in-One <br />
+              Everything digital. <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E575] via-[#00c365] to-[#34d399]">
-                Digital Solution
+                One trusted place.
               </span>
             </h1>
 
             {/* Subtitle */}
             <p className="text-sm sm:text-lg text-slate-300 max-w-xl leading-relaxed">
-              Buy data, create your own website, and access essential digital services — all in one place. Simple. Fast. Reliable.
+              Buy data and airtime, manage your Wallet, earn from referrals and build your business online. Made for everyday life in Ghana.
             </p>
 
             {/* Primary & Secondary Action CTAs */}
@@ -101,7 +100,7 @@ export const Hero: React.FC = () => {
                   e.preventDefault();
                   setActivePage('website');
                 }}
-                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-sm tracking-wide transition-all shadow-[0_0_25px_rgba(0,195,101,0.35)] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
+                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-sm tracking-wide transition-all shadow-sm active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
               >
                 <span>Create Your Website</span>
                 <ArrowRight className="w-4 h-4" />
@@ -132,7 +131,7 @@ export const Hero: React.FC = () => {
               </div>
               <div className="flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4 text-[#00c365]" />
-                <span>Website Builder Beta</span>
+                <span>Build and publish for free</span>
               </div>
             </div>
           </div>

@@ -47,7 +47,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
       {/* Editorial Announcement Bar */}
       <div className="bg-[var(--website-primary,#7a1c28)] text-[var(--website-background,#fcf9f5)] px-4 py-2 text-center text-xs tracking-wider uppercase font-sans flex items-center justify-center gap-2">
         <Sparkles className="w-3.5 h-3.5 text-[var(--website-accent,#c99a45)]" />
-        <span>Weekend Live Jazz & Osu Night Market Grills · Reserve Early</span>
+        <span>{template.location}</span>
       </div>
 
       {/* Restaurant Navigation */}
@@ -209,11 +209,11 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
         <div className="max-w-3xl mx-auto bg-white rounded-3xl p-6 sm:p-10 shadow-lg border border-[#e2d5c3] space-y-6">
           <div className="text-center space-y-1">
             <span className="text-xs font-bold text-[var(--website-primary,#7a1c28)] uppercase tracking-widest">
-              {template.siteContent ? 'Reservation Enquiry' : 'Instant Online Booking'}
+              {template.siteContent ? 'Reservation Enquiry' : 'Reservation enquiry'}
             </span>
             <h3 className="text-2xl font-serif text-[#1c1917]">Reserve Your Table in Osu</h3>
             <p className="text-xs text-[#78716c]">
-              {template.siteContent ? 'Contact the business to confirm availability and arrange your reservation.' : 'No deposit required for parties under 8 guests. Instant SMS & WhatsApp confirmation.'}
+              {template.siteContent ? 'Contact the business to confirm availability and arrange your reservation.' : 'Contact the business to arrange a reservation. No booking is made on this page.'}
             </p>
           </div>
 
@@ -222,7 +222,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
               <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto">
                 <Check className="w-5 h-5" />
               </div>
-              <h4 className="font-bold text-emerald-800 text-base">Table Reservation Confirmed!</h4>
+              <h4 className="font-bold text-emerald-800 text-base">Example reservation</h4>
               <p className="text-xs text-emerald-700">
                 We have reserved a table for {selectedPartySize} on {reservationDate} at {reservationTime}. See you in Osu!
               </p>
@@ -296,7 +296,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
                 className="w-full py-3.5 rounded-xl bg-[var(--website-primary,#7a1c28)] hover:bg-[#5d151e] text-[var(--website-background,#fcf9f5)] font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Calendar className="w-4 h-4 text-[var(--website-accent,#c99a45)]" />
-                <span>{template.siteContent ? 'Contact to Arrange Reservation' : 'Confirm Reservation (Instant WhatsApp Confirmation)'}</span>
+                <span>{template.siteContent ? 'Contact to Arrange Reservation' : 'Preview reservation enquiry'}</span>
               </button>
             </form>
           )}
@@ -311,7 +311,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
               {template.demoBusinessName}
             </h4>
             <p className="text-slate-400 text-xs leading-relaxed">
-              Authentic Ghanaian heritage dishes reimagined with fresh coastal produce in the heart of Osu.
+              {template.demoSubtext}
             </p>
           </div>
           <div className="space-y-2">
@@ -332,7 +332,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
             <div className="pt-1">
               <span className="inline-flex items-center gap-1.5 text-emerald-400 font-semibold text-xs">
                 <Check className="w-3.5 h-3.5" />
-                <span>MoMo & Cashless Accepted</span>
+                <span>Contact for payment arrangements</span>
               </span>
             </div>
           </div>

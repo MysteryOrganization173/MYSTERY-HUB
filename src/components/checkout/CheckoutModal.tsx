@@ -1,3 +1,4 @@
+import {useDialogFocus} from '../../hooks/useDialogFocus';
 import {commercialRequest} from '../../services/commercialApi';
 import { dataDeliveryNote } from '../../utils/dataPurchasePresentation';
 import { WalletPaymentChoice } from '../finance/WalletPaymentChoice';
@@ -49,8 +50,7 @@ export const CheckoutModal: React.FC = () => {
   const [quoteError,setQuoteError]=useState('');
   const [quoteRefresh,setQuoteRefresh]=useState(0);
   const directRequest=useRef(crypto.randomUUID());
-  useEffect(()=>{if(!isCheckoutOpen||!checkoutBundle||checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data'||checkoutBundle.id.startsWith('instant-')||checkoutBundle.id.startsWith('airtime-')){setCommercial(null);return;}let active=true;setCommercial(null);setQuoteError('');setReviewingData(false);commercialRequest('commercial/quote/'+encodeURIComponent(checkoutBundle.id),sessionToken).then(r=>{if(active)setCommercial(r);}).catch(e=>{if(active)setQuoteError(e.message);});return()=>{active=false;};},[isCheckoutOpen,checkoutBundle?.id,sessionToken,quoteRefresh,user?.phone]);
-  const [reviewingData, setReviewingData] = useState(false);
+  useEffect(()=>{if(!isCheckoutOpen||!checkoutBundle||checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data'||checkoutBundle.id.startsWith('instant-')||checkoutBundle.id.startsWith('airtime-')){setCommercial(null);return;}let active=true;setCommercial(null);setQuoteError('');commercialRequest('commercial/quote/'+encodeURIComponent(checkoutBundle.id),sessionToken).then(r=>{if(active)setCommercial(r);}).catch(e=>{if(active)setQuoteError(e.message);});return()=>{active=false;};},[isCheckoutOpen,checkoutBundle?.id,sessionToken,quoteRefresh,user?.phone]);
   const submissionPending = useRef(false);
   const [paymentMethod,setPaymentMethod]=useState<'paystack'|'wallet'>('paystack');
   const [walletBusy,setWalletBusy]=useState(false);
@@ -93,7 +93,7 @@ export const CheckoutModal: React.FC = () => {
     if (isCheckoutOpen && checkoutBundle) {
       setReceiptEmail(user?.email||'');
       directRequest.current=crypto.randomUUID();
-      setReviewingData(false);
+      
       setPaymentMethod('paystack');
       walletRequest.current=null;
       const initial = checkoutInitialPhone !== undefined ? checkoutInitialPhone : (user?.phone || '');
@@ -134,6 +134,7 @@ export const CheckoutModal: React.FC = () => {
     }
   }, [serverError]);
 
+  const dialogRef = useDialogFocus(isCheckoutOpen, () => { if (!isInitializing && !walletBusy) closeCheckout(); });
   if (!isCheckoutOpen || !checkoutBundle) return null;
 
   const currentNetwork = GHANA_NETWORKS[checkoutBundle.network];
@@ -272,7 +273,7 @@ export const CheckoutModal: React.FC = () => {
         };
         const newOrder = createOrder(orderToCreate, phone.trim(), 'paystack', reference, orderRef);
         closeCheckout();
-        showToast(`Payment received! Order #${orderRef}. Verifying payment...`, 'success');
+        showToast(`Payment received. Checking your order…`, 'success');
         openOrderStatus(newOrder);
       },
       onCancel: (orderRef) => {
@@ -354,15 +355,10 @@ export const CheckoutModal: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submissionPending.current || isInitializing || walletBusy) return;
-    if(isRegularData&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(receiptEmail.trim())){setServerError('Enter a valid receipt email before reviewing checkout.');return;}
-    if (isRegularData && !reviewingData) {
-      if (phone.replace(/\D/g, '').length < 10) {
-        setPhoneError('Enter the recipient’s Ghana phone number before reviewing.');
-        phoneInputRef.current?.focus();
-        return;
-      }
-      setReviewingData(true);
-      return;
+    if(isRegularData&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(receiptEmail.trim())){setServerError('Enter a valid receipt email before paying.');return;}
+    if (phone.replace(/\D/g, '').length < 10) {
+      setPhoneError('Enter the recipient’s Ghana phone number before paying.');
+      phoneInputRef.current?.focus(); return;
     }
     if(paymentMethod!=='wallet'){submissionPending.current=true;try{await submitPayment();}finally{submissionPending.current=false;}return;}
     if(walletBusy||!sessionToken)return;
@@ -373,7 +369,7 @@ export const CheckoutModal: React.FC = () => {
       const fingerprint=JSON.stringify(body);if(walletRequest.current?.fingerprint!==fingerprint)walletRequest.current={fingerprint,id:crypto.randomUUID()};
       const result=await walletCheckout(sessionToken,'payments/initialize',{...body,requestId:walletRequest.current!.id,...(isRegularData&&commercial?{expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:{})});
       createOrder({...checkoutBundle,priceGhc:result.amountPesewas/100},phone.trim(),'wallet',result.reference,result.orderRef);
-      closeCheckout();setActivePage('orders');showToast('Wallet payment confirmed. Check My Orders for fulfilment status.','success');
+      closeCheckout();setActivePage('orders');showToast('Order placed. Track delivery in My Orders.','success');
     }catch(error){setServerError((error as Error).message);}finally{submissionPending.current=false;setWalletBusy(false);}
   };
 
@@ -405,13 +401,8 @@ export const CheckoutModal: React.FC = () => {
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Review your purchase" className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Review your purchase" className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full max-w-[calc(100vw-1rem)] sm:max-w-lg bg-[#0f151b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 max-h-[94dvh] flex flex-col">
-        {isRegularData&&<div className="p-3 text-sm border-b border-slate-800">
-          {commercial?<><p>Regular price: GH₵{(commercial.regularMinor/100).toFixed(2)}</p>{commercial.discountMinor>0&&<p className="text-emerald-400">Welcome offer: -GH₵{(commercial.discountMinor/100).toFixed(2)}</p>}<p>Total: GH₵{(commercial.totalMinor/100).toFixed(2)}</p>{commercial.offer.state==='phone_required'&&<p>Add a unique Ghana phone in My Account to qualify.</p>}{commercial.offer.state==='reserved'&&<p>Welcome offer reserved for an existing order. Check Orders before retrying.</p>}</>:<p role="status">{quoteError||'Loading current price...'}</p>}
-          <button type="button" disabled={isInitializing||walletBusy} onClick={()=>setQuoteRefresh(x=>x+1)} className="underline text-emerald-400">Refresh price and eligibility</button>
-          <label className="block mt-2">Receipt email<input type="email" value={receiptEmail} onChange={e=>setReceiptEmail(e.target.value)} maxLength={128} className="w-full mt-1 p-2 rounded bg-slate-950 border border-slate-700" required/></label>
-        </div>}
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-3.5 border-b border-slate-800 bg-[#0c1116] shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -427,9 +418,7 @@ export const CheckoutModal: React.FC = () => {
                   : 'Data Bundle Checkout'}
               </h3>
               <p className="text-[11px] sm:text-xs text-slate-400 truncate">
-                {paymentMethod==='wallet'?'Direct SIM delivery · Mystery Wallet':isInstantBundle
-                  ? 'Direct automated instant delivery via Paystack'
-                  : 'Direct SIM delivery via Paystack'}
+                Direct to your recipient’s SIM
               </p>
             </div>
           </div>
@@ -446,9 +435,9 @@ export const CheckoutModal: React.FC = () => {
         {/* Scrollable Body */}
         <form onSubmit={handleSubmit} className="overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4 flex-1 overscroll-contain">
           {!isInstantBundle&&<fieldset disabled={walletBusy||isInitializing}><WalletPaymentChoice amountMinor={Math.round(totalAmount*100)} value={paymentMethod} onChange={setPaymentMethod}/></fieldset>}
-          {walletBusy&&<p role="status" className="text-sm text-[#00c365]">Confirming Wallet payment…</p>}
+          {walletBusy&&<p role="status" className="text-sm text-[#00c365]">Placing your order…</p>}
           {/* 1. Bundle / Airtime Summary Card */}
-          <div hidden={isRegularData&&reviewingData} className="p-3 sm:p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3">
+          <div className="p-3 sm:p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div
                 className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-sm"
@@ -662,9 +651,9 @@ export const CheckoutModal: React.FC = () => {
                   {preflightIssue.code === 'SUPPLIER_WALLET_LOW' && (
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={(event) => {
                         setPreflightIssue(null);
-                        submitPayment();
+                        (event.currentTarget.form)?.requestSubmit();
                       }}
                       className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-semibold border border-amber-500/30 transition-all cursor-pointer flex items-center justify-center gap-1"
                     >
@@ -735,8 +724,13 @@ export const CheckoutModal: React.FC = () => {
             </div>
           )}
 
+        {isRegularData&&<div className="space-y-2 text-sm">
+          {commercial?<>{commercial.discountMinor>0&&<p className="text-emerald-400">Welcome offer: -GH₵{(commercial.discountMinor/100).toFixed(2)}</p>}{commercial.offer.state==='phone_required'&&<p>Add your Ghana phone in My Account to check your welcome offer.</p>}{commercial.offer.state==='reserved'&&<p>Welcome offer reserved for an existing order. Check Orders before retrying.</p>}</>:<p role="status">{quoteError||'Loading current price...'}</p>}
+          <button type="button" disabled={isInitializing||walletBusy} onClick={()=>setQuoteRefresh(x=>x+1)} className="underline text-emerald-400">Refresh price</button>
+          <label className="block mt-2">Receipt email<input type="email" value={receiptEmail} onChange={e=>setReceiptEmail(e.target.value)} maxLength={128} className="w-full mt-1 p-2 rounded bg-slate-950 border border-slate-700" disabled={walletBusy||isInitializing} required/></label>
+        </div>}
           {/* 2. Recipient Phone Input */}
-          <div hidden={isRegularData&&reviewingData} className="space-y-1.5">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label htmlFor="checkout-phone" className="text-xs font-semibold text-slate-200">
                 Recipient Phone Number (Ghana)
@@ -783,7 +777,7 @@ export const CheckoutModal: React.FC = () => {
           </div>
 
           {/* 3. Network Notice (if required) */}
-          {checkoutBundle.network === 'mtn' && !activeMtnConflict && !reviewingData && (
+          {checkoutBundle.network === 'mtn' && !activeMtnConflict && (
             <div className="p-2.5 sm:p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300 flex items-start gap-2">
               <Info className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
               <span>
@@ -802,8 +796,8 @@ export const CheckoutModal: React.FC = () => {
                 </div>
                 <div className="flex items-center justify-between text-slate-400">
                   <div className="flex items-center gap-1">
-                    <span>Payment processing</span>
-                    <span className="text-[10px] text-slate-500">(gateway + dispatch)</span>
+                    <span>Checkout fee</span>
+                    <span className="text-[10px] text-slate-500"></span>
                   </div>
                   <span className="text-slate-300 tabular-nums font-medium">GH₵{serviceFee.toFixed(2)}</span>
                 </div>
@@ -817,7 +811,7 @@ export const CheckoutModal: React.FC = () => {
             ) : isAirtime ? (
               <>
                 <div className="flex items-center justify-between text-slate-400">
-                  <span>Airtime Value (Face Value)</span>
+                  <span>Airtime value</span>
                   <span className="text-white tabular-nums font-medium">GH₵{faceValue.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between text-slate-400">
@@ -833,7 +827,7 @@ export const CheckoutModal: React.FC = () => {
               </>
             ) : (
               <>
-                {reviewingData && <div className="space-y-3 pb-3 border-b border-slate-800">
+                {<div className="space-y-3 pb-3 border-b border-slate-800">
                   <h4 className="text-base font-semibold text-white">Confirm your order</h4>
                   <dl className="space-y-2">
                     <div className="flex justify-between gap-3"><dt className="text-slate-400">Network</dt><dd className="font-semibold text-white">{currentNetwork.name}</dd></div>
@@ -842,7 +836,7 @@ export const CheckoutModal: React.FC = () => {
                   </dl>
                   <p className="text-slate-400 leading-relaxed">{dataDeliveryNote(checkoutBundle.network)}</p>
                   <div className="flex flex-wrap gap-3">
-                    <button type="button" disabled={isInitializing||walletBusy} className="min-h-11 text-[#00c365] font-semibold underline" onClick={()=>{setReviewingData(false);setTimeout(()=>phoneInputRef.current?.focus(),0);}}>Edit recipient</button>
+                    <button type="button" disabled={isInitializing||walletBusy} className="min-h-11 text-[#00c365] font-semibold underline" onClick={()=>phoneInputRef.current?.focus()}>Edit recipient</button>
                     <button type="button" disabled={isInitializing||walletBusy} className="min-h-11 text-slate-300 underline" onClick={closeCheckout}>Change package</button>
                   </div>
                 </div>}
@@ -851,7 +845,7 @@ export const CheckoutModal: React.FC = () => {
                   <span className="text-[#00c365] text-2xl tabular-nums font-extrabold">GH₵{totalAmount.toFixed(2)}</span>
                 </div>
                 <p className="text-slate-400">No hidden Mystery Hub checkout fee.</p>
-                <p className="text-slate-300 leading-relaxed">Check the recipient before paying. Fulfilled wrong-number orders may not be reversible. Keep your reference to Track Order; delivery may take longer when the network is busy.</p>
+                <p className="text-slate-300 leading-relaxed">Check the recipient before paying. Delivered orders sent to the wrong number may not be reversible. Keep your reference to Track Order; delivery may take longer when the network is busy.</p>
               </>
             )}
           </div>
@@ -865,22 +859,22 @@ export const CheckoutModal: React.FC = () => {
           {/* 6. Proceed to Secure Payment CTA */}
           <button
             type="submit"
-            disabled={walletBusy || isInitializing}
+            disabled={walletBusy || isInitializing || isRegularData && !commercial}
             aria-busy={walletBusy||isInitializing}
             className="w-full py-3.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-sm tracking-wide transition-all shadow-[0_0_20px_rgba(0,195,101,0.3)] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
           >
             {walletBusy || isInitializing ? (
               <span className="flex items-center gap-2">
                 <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                {walletBusy ? 'Confirming Wallet payment…' : loadingPhase === 'opening'
-                  ? 'Opening Paystack...'
+                {walletBusy ? 'Placing your order…' : loadingPhase === 'opening'
+                  ? 'Opening secure checkout…'
                   : isSlowPreparation
                   ? 'Still preparing your checkout...'
-                  : 'Connecting securely…'}
+                  : 'Preparing checkout…'}
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                {isRegularData&&!reviewingData?'Review order':paymentMethod==='wallet'?'Pay with Mystery Wallet':serverError?'Retry payment connection':'Continue to payment'}
+                {`Pay GH₵${totalAmount.toFixed(2)}`}
                 <ArrowRight className="w-4 h-4" />
               </span>
             )}

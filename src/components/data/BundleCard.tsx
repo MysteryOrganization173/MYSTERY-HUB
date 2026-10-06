@@ -76,7 +76,7 @@ export const BundleCard: React.FC<BundleCardProps> = ({
       </div>
 
       {/* ROW 2: Existing validity and centrally configured delivery information */}
-      <div className="my-2 text-[11px] leading-relaxed">
+      <div className="my-2 text-xs leading-relaxed">
         <p className="text-slate-300">{network.name} · {bundle.validity}</p>
         <p className="text-slate-400">{dataDeliveryNote(bundle.network)} · Direct SIM Credit</p>
       </div>
