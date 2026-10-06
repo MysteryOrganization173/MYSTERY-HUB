@@ -1,3 +1,4 @@
+import { CommercialService } from '../services/commercialService.js';
 import { WebsiteBusinessService } from '../services/websiteBusinessService.js';
 /**
  * Database Orders Store
@@ -348,12 +349,12 @@ export class OrdersStore {
           supplier_last_checked_at, failure_reason, created_at, updated_at,
           paid_at, submitted_at, delivered_at, referrer_user_id, referral_attribution_id, referral_code,
           product_slug, variant_id, variant_snapshot, fulfilment_method, pickup_location_id,
-          pickup_location_snapshot, delivery_city, delivery_area, delivery_landmark, delivery_note, marketplace_status, marketplace_context, store_context
+          pickup_location_snapshot, delivery_city, delivery_area, delivery_landmark, delivery_note, marketplace_status, marketplace_context, store_context, commercial_context
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
           $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
           $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38,
-          $39, $40, $41, $42, $43, $44, $45, $46, $47, $48
+          $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49
         ) RETURNING *;
       `;
       const values = [
@@ -405,6 +406,7 @@ export class OrdersStore {
         order.marketplace_status ?? null,
         order.marketplace_context ? JSON.stringify(order.marketplace_context) : null,
         order.store_context ? JSON.stringify(order.store_context) : null,
+        order.commercial_context ? JSON.stringify(order.commercial_context) : null,
       ];
       await pool.query(query, values);
       return order;
@@ -733,6 +735,7 @@ export class OrdersStore {
       for (const order of candidates) {
         try {
           const txRes = await PaystackServerService.verifyTransaction(order.payment_reference);
+          await CommercialService.paymentFailed(order,txRes);
 
           if (txRes.status === 'success') {
             const validationError = validateOrderPayment(order, txRes);
@@ -1377,6 +1380,7 @@ export class OrdersStore {
     const rewardEffect = async () => {
       await AfaStore.onOrderTerminal(updated);
       await FinanceService.refund(updated);
+      try {await CommercialService.sync(updated);} catch {console.warn('[Welcome] Durable order awaiting promotion reconciliation');}
       try {await WebsiteBusinessService.syncOrder(updated);} catch {console.warn('[Store earnings] Durable order awaiting financial reconciliation');}
       // Preserve existing reward effects, but execute webhook effects only after commit.
       if (updated.status === 'delivered' && existing.status !== 'delivered') {

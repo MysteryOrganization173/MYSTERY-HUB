@@ -16,6 +16,7 @@ export type OrderStatus =
   | 'expired';
 
 export interface OrderRecord {
+  commercial_context?: import('../../shared/directPricing.js').CommercialSnapshot | null;
   store_context?: import('../../shared/storeEconomics.js').StoreSnapshot | null;
   marketplace_context?: Record<string, unknown> | null;
   id: string;
@@ -83,6 +84,7 @@ export type SafePublicOrderDetails = Pick<
   | 'paid_at'
   | 'delivered_at'
 > & {
+  commercial_pricing?: {regularMinor:number;discountMinor:number;paidMinor:number};
   amount_ghc: number;
   manual_review?: boolean;
   service_type?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'afa';
@@ -169,13 +171,14 @@ export function toSafePublicOrder(order: OrderRecord): SafePublicOrderDetails {
 
   return {
     public_reference: order.public_reference,
-    ...(order.service_type === 'afa' || order.store_context ? {manual_review:Boolean(order.manual_review)} : {}),
+    ...(order.service_type === 'afa' || order.store_context || order.commercial_context ? {manual_review:Boolean(order.manual_review)} : {}),
     recipient_phone: order.recipient_phone,
     network: order.network,
     service_type: serviceType,
     product_name_snapshot: order.product_name_snapshot,
     bundle_size_snapshot: order.bundle_size_snapshot,
     amount: order.amount,
+    ...(order.commercial_context?{commercial_pricing:{regularMinor:order.commercial_context.regularMinor,discountMinor:order.commercial_context.discountMinor,paidMinor:order.commercial_context.paidMinor}}:{}),
     currency: order.currency,
     status: order.status,
     created_at: order.created_at,

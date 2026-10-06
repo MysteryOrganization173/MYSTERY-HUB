@@ -7,7 +7,7 @@ import { getPool } from './connection.js';
 import type { PoolClient } from 'pg';
 import { UserRecord, SessionRecord, UserRole, UserStatus } from '../types/auth.js';
 import { hashSessionToken } from '../utils/crypto.js';
-import { getGhanaPhoneLookupVariants } from '../utils/phone.js';
+import { getGhanaPhoneLookupVariants, canonicalGhanaPhone } from '../utils/phone.js';
 
 // In-memory fallback stores
 const devUsersStore = new Map<string, UserRecord>();
@@ -54,7 +54,7 @@ export class AuthStore {
     for (const other of devUsersStore.values()) {
       if (other.id === user.id) continue;
       for (const field of ['email', 'phone'] as const) {
-        if (user[field] && other[field] === user[field]) {
+        if (user[field] && (field==='phone'?canonicalGhanaPhone(other.phone||'')===canonicalGhanaPhone(user.phone||''):other[field]===user[field])) {
           throw Object.assign(new Error('Identifier conflict'), { code: '23505', constraint: `idx_users_${field}_unique` });
         }
       }
@@ -80,7 +80,7 @@ export class AuthStore {
       id: params.id,
       name: params.name.trim(),
       email: params.email ? params.email.trim().toLowerCase() : null,
-      phone: params.phone ? params.phone.trim() : null,
+      phone: params.phone ? canonicalGhanaPhone(params.phone) : null,
       password_hash: params.passwordHash,
       role: params.role || 'customer',
       status: params.status || 'active',
@@ -113,6 +113,7 @@ export class AuthStore {
       return res.rows[0] as UserRecord;
     }
 
+    for(const other of devUsersStore.values())if(record.phone&&canonicalGhanaPhone(other.phone||'')===record.phone||record.email&&other.email===record.email)throw Object.assign(new Error('Identifier conflict'),{code:'23505',constraint:'users_phone_identity_unique'});
     devUsersStore.set(record.id, record);
     return record;
   }
@@ -161,17 +162,14 @@ export class AuthStore {
     if (phoneVariants.length === 0) return null;
 
     if (pool) {
-      const query = `SELECT * FROM users WHERE phone = ANY($1) LIMIT 1;`;
-      const res = await pool.query(query, [phoneVariants]);
-      if (res.rows.length > 0) return res.rows[0] as UserRecord;
+      const query = `SELECT * FROM users WHERE phone = ANY($1) OR mystery_canonical_phone(phone)=$2;`;
+      const res = await pool.query(query, [phoneVariants,canonicalGhanaPhone(clean)]);
+      if (res.rows.length === 1) return res.rows[0] as UserRecord;
       return null;
     }
 
-    for (const u of devUsersStore.values()) {
-      if (u.phone && phoneVariants.includes(u.phone)) {
-        return u;
-      }
-    }
+    const matches=[...devUsersStore.values()].filter(u=>u.phone&&canonicalGhanaPhone(clean)!==null&&canonicalGhanaPhone(u.phone)===canonicalGhanaPhone(clean));
+    if(matches.length===1)return matches[0];
     return null;
   }
 

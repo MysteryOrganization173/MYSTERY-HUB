@@ -1,3 +1,4 @@
+import { CommercialService } from './commercialService.js';
 import { WebsiteBusinessService } from './websiteBusinessService.js';
 /**
  * Centralized Fulfilment Service
@@ -320,6 +321,7 @@ export class FulfilmentService {
     }
 
     await WebsiteBusinessService.syncOrder(paidOrder);
+    if(!await CommercialService.allowPaid(paidOrder)){const review=await OrdersStore.updateOrderReview(paidOrder.id,true,'Released welcome payment received late; reconcile before dispatch.');return {order:review,alreadyHandled:true};}
     if(paidOrder.store_context && paidOrder.manual_review)return {order:paidOrder,alreadyHandled:true};
 
     // Step 2: Atomically claim order for supplier dispatch (paid -> queued ONLY)
@@ -758,6 +760,7 @@ export class FulfilmentService {
     try {
       await FinanceService.reconcileWalletOrders();
       await WebsiteBusinessService.recoverEffects();
+      await CommercialService.recover();
       await AfaStore.reconcileTerminalPayloads();
       const activeOrders = await OrdersStore.getActiveSupplierOrders(limit);
       scanned = activeOrders.length;

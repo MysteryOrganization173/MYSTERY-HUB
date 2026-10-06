@@ -16,10 +16,10 @@ async function runMysteryAiTests() {
   // 1. Dynamic context builder contains current live product data and correct prices
   {
     const instruction = buildMysteryAiSystemInstruction();
-    assert.ok(instruction.includes('GH₵4.99'), 'Must include MTN 1GB rate (GH₵4.99)');
+    assert.ok(instruction.includes('GH₵5.49'), 'Must include MTN 1GB rate (GH₵5.49)');
     assert.ok(instruction.includes('GH₵23.99'), 'Must include MTN 5GB rate (GH₵23.99)');
-    assert.ok(instruction.includes('GH₵46.99'), 'Must include MTN 10GB rate (GH₵46.99)');
-    assert.ok(instruction.includes('GH₵4.79'), 'Must include AT 1GB rate (GH₵4.79)');
+    assert.ok(instruction.includes('GH₵44.99'), 'Must include MTN 10GB rate (GH₵44.99)');
+    assert.ok(instruction.includes('GH₵4.99'), 'Must include AT 1GB rate (GH₵4.99)');
     assert.ok(instruction.includes('GH₵44.99'), 'Must include Telecel 10GB rate (GH₵44.99)');
 
     console.log('✓ 1. Dynamic context builder derives current live prices from catalog');
@@ -108,7 +108,7 @@ async function runMysteryAiTests() {
   // 5. Emergency local fallback response verification
   {
     const priceResponse = getGroundedLocalResponse('How much is 1GB?', 'data');
-    assert.ok(priceResponse.reply.includes('4.99'), 'Fallback must report MTN 1GB as GH₵4.99');
+    assert.ok(priceResponse.reply.includes('5.49'), 'Fallback must report MTN 1GB as GH₵5.49');
     assert.strictEqual(
       priceResponse.reply.toLowerCase().includes('7 days'),
       false,

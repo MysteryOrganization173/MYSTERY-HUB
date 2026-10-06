@@ -18,6 +18,7 @@ export const AuthModal: React.FC = () => {
   } = useApp();
 
   const [name, setName] = useState('');
+  const [signupEmail,setSignupEmail]=useState('');
   const [identifier, setIdentifier] = useState(''); // phone or email
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -51,6 +52,8 @@ export const AuthModal: React.FC = () => {
         const res = await registerOnServer({
           name: name.trim(),
           identifier: identifier.trim(),
+          phone: identifier.trim(),
+          email: signupEmail.trim() || undefined,
           password,
           rememberMe,
         });
@@ -145,7 +148,7 @@ export const AuthModal: React.FC = () => {
 
             <div className="space-y-1.5">
               <label htmlFor="auth-identifier" className="text-xs font-semibold text-slate-300">
-                Phone Number (Ghana) or Email
+                {isSignup?'Ghana Phone Number (required)':'Phone Number (Ghana) or Email'}
               </label>
               <div className="relative">
                 <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -153,13 +156,14 @@ export const AuthModal: React.FC = () => {
                   id="auth-identifier" type="text"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="024 123 4567 or email@domain.com"
+                  placeholder={isSignup?'024 123 4567':'024 123 4567 or email@domain.com'}
                   required
                   className="w-full bg-[#0a0e12] border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#00c365]"
                 />
               </div>
             </div>
 
+            {isSignup&&<label className="block text-xs text-slate-300">Email (optional)<input type="email" value={signupEmail} onChange={e=>setSignupEmail(e.target.value)} maxLength={128} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0a0e12] p-3"/><span className="block mt-2 text-slate-400">Phone uniqueness is required; phone ownership is not verified by SMS.</span></label>}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label htmlFor="auth-password" className="text-xs font-semibold text-slate-300">Password</label>

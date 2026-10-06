@@ -29,12 +29,13 @@ export class WebsiteBusinessService {
     if(!site||!userId&&site.status!=='published')throw new FinanceError('Store not found.',404);
     if(site.template_id!=='tmpl-data-reseller')return {version:'empty',products:[],managed:false};
     const [policy,costs,prices]=await Promise.all([currentPolicy(),wholesale(),priceConfig(site.id)]);
+    const commercial=userId?await FinanceStore.readConfig('direct-pricing'):null;
     const products=Object.values(AUTHORITATIVE_PRODUCTS).filter(product=>product.isActive).flatMap(product=>{
       const cost=costs[product.id],price=prices.products[product.id];
       const floor=cost&&policy.enabled?minimumStorePrice(cost.wholesaleMinor,policy):null;
       const eligible=!!(policy.enabled&&cost?.enabled&&price?.enabled&&floor!==null&&price.retailMinor>=floor);
       if(!userId&&!eligible)return [];
-      return [{id:product.id,network:product.network,networkName:product.networkName,dataAmount:product.dataAmount,validity:product.validity,description:product.description,retailMinor:price?.retailMinor||0,enabled:price?.enabled||false,...(userId?{wholesaleMinor:cost?.wholesaleMinor??null,minimumMinor:floor,recommendedMinor:product.amountPesewas,estimatedMinor:eligible?price.retailMinor-cost.wholesaleMinor-storeReserve(price.retailMinor,policy):null,eligible,configured:!!cost?.enabled}: {})}];
+      return [{id:product.id,network:product.network,networkName:product.networkName,dataAmount:product.dataAmount,validity:product.validity,description:product.description,retailMinor:price?.retailMinor||0,enabled:price?.enabled||false,...(userId?{wholesaleMinor:cost?.wholesaleMinor??null,minimumMinor:floor,recommendedMinor:Math.max(floor??0,commercial?.products?.[product.id]?.recommendedMinor??commercial?.products?.[product.id]?.retailMinor??product.amountPesewas),estimatedMinor:eligible?price.retailMinor-cost.wholesaleMinor-storeReserve(price.retailMinor,policy):null,eligible,configured:!!cost?.enabled}: {})}];
     });
     return {managed:true,version:prices.version,products,...(userId?{policy}:{})};
   }
@@ -70,7 +71,7 @@ export class WebsiteBusinessService {
     const policy:StorePolicy={enabled:input.enabled,reserveBps:Number(input.reserveBps),reserveFixedMinor:moneyMinor(input.reserveFixedMinor,true),withdrawalMinimumMinor:moneyMinor(input.withdrawalMinimumMinor),withdrawalFeeBps:Number(input.withdrawalFeeBps),version:randomUUID()};
     // Zero processing reserve is not a safe implicit assumption about external fees.
     if(policy.enabled&&policy.reserveBps===0&&policy.reserveFixedMinor===0)throw new FinanceError('Configure a conservative payment-processing reserve before enabling stores.');
-    return FinanceStore.transaction(adminId,async tx=>{await configLock(tx,true);if((await currentPolicy(tx)).version!==input.expectedVersion)throw new FinanceError('Policy changed. Refresh.',409);await tx.saveConfig('store-policy',policy);await tx.audit(adminId,'store_policy_changed','store-policy',{...policy});return policy;});
+    return FinanceStore.transaction(adminId,async tx=>{await configLock(tx,true);const previous=await currentPolicy(tx);if(previous.version!==input.expectedVersion)throw new FinanceError('Policy changed. Refresh.',409);await tx.saveConfig('store-policy',policy);await tx.audit(adminId,'store_policy_changed','store-policy',{previous,next:policy});return policy;});
   }
   static async saveWholesale(adminId:string,input:Record<string,unknown>) {
     exact(input,['confirmed','productId','expectedVersion','wholesaleMinor','enabled']);
@@ -80,7 +81,7 @@ export class WebsiteBusinessService {
     const cost=resolved.resolved?.supplierCostMinor;
     if(input.enabled&&(!Number.isSafeInteger(cost)||Number(cost)<=0||amount<Number(cost)))throw new FinanceError('Wholesale must cover the current authoritative supplier cost.');
     return FinanceStore.transaction(adminId,async tx=>{await configLock(tx,true);const costs=await wholesale(tx);if((costs[product.id]?.version||'empty')!==input.expectedVersion)throw new FinanceError('Wholesale changed. Refresh.',409);
-      const row:Wholesale={enabled:input.enabled as boolean,wholesaleMinor:amount,version:randomUUID(),updatedAt:new Date().toISOString(),actorId:adminId,supplierCostMinor:cost??0};costs[product.id]=row;await tx.saveConfig('store-wholesale',costs);await tx.audit(adminId,'store_wholesale_changed',product.id,row as any);return row;});
+      const previous=costs[product.id]||null;const row:Wholesale={enabled:input.enabled as boolean,wholesaleMinor:amount,version:randomUUID(),updatedAt:new Date().toISOString(),actorId:adminId,supplierCostMinor:cost??0};costs[product.id]=row;await tx.saveConfig('store-wholesale',costs);await tx.audit(adminId,'store_wholesale_changed',product.id,{previous,next:row});return row;});
   }
   static async initialize(siteId:string,input:Record<string,unknown>,customerId?:string) {
     if(process.env.NODE_ENV==='production'&&!process.env.PAYSTACK_SECRET_KEY?.trim().startsWith('sk_live_'))throw new FinanceError('Live managed checkout is unavailable.',503);

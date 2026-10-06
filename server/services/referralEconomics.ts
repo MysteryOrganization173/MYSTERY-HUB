@@ -18,7 +18,10 @@ export async function saveEconomicsPolicy(adminId:string,input:Record<string,unk
 export function computeEconomicReward(order:OrderRecord,rule:ReferralRewardRuleRecord|null,requested:number,policy?:EconomicsPolicy) {
   const rawCost=order.supplier_cost_minor??(order.service_type==='afa'?policy?.supplierCostMinor:null)??null;
   const cost=Number.isSafeInteger(rawCost)&&rawCost!>=0?rawCost:null;
-  const reserve=policy?.enabled?policy.reserveMinor+percentMinor(order.amount,policy.reserveBps):0;
+  // New direct orders preserve the processing reserve quoted at checkout. Legacy
+  // orders and other services retain their existing reward-policy behavior.
+  const quotedReserve=!order.store_context?order.commercial_context?.reserveMinor:null;
+  const reserve=quotedReserve??(policy?.enabled?policy.reserveMinor+percentMinor(order.amount,policy.reserveBps):0);
   const margin=cost==null?null:Math.max(0,order.amount-cost-reserve);
   // The 50/10 fixed rules remain compatible, capped to known commercial margin.
   // Missing cost fails closed for new Data/Airtime/AFA rewards. Historical facts

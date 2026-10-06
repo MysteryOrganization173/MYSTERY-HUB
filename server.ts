@@ -1,3 +1,4 @@
+import { CommercialService } from './server/services/commercialService.js';
 import { corsMiddleware } from './server/middleware/cors.js';
 import express from 'express';
 import { loadApplicationEnvironment } from './server/utils/environment.js';
@@ -112,7 +113,7 @@ app.post('/api/mystery-ai/chat', async (req, res) => {
       return;
     }
 
-    const systemInstruction = buildMysteryAiSystemInstruction(sanitizedEditorContext);
+    const systemInstruction = buildMysteryAiSystemInstruction(sanitizedEditorContext,(await CommercialService.catalog()).products);
     const pageContext = sanitizedEditorContext
       ? `[Customer is currently in the Website Editor editing "${sanitizedEditorContext.templateName}" in section "${sanitizedEditorContext.activeEditorSection}"]`
       : activePage

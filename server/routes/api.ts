@@ -1,3 +1,5 @@
+import { commercialRouter } from './commercialApi.js';
+import { CommercialService } from '../services/commercialService.js';
 import { WebsiteBusinessService } from '../services/websiteBusinessService.js';
 import { purchasableOptions } from '../../shared/marketplaceVariants.js';
 import { financeRouter } from './financeApi.js';
@@ -33,7 +35,7 @@ import { ReferralService } from '../services/referralService.js';
 import { OrderRecord, toSafePublicOrder } from '../types/orders.js';
 import { toSafeUserProfile, WaitlistChannel } from '../types/auth.js';
 import { hashPassword, generateSessionToken } from '../utils/crypto.js';
-import { parseIdentifier, validatePassword } from '../utils/authValidation.js';
+import { parseIdentifier, validatePassword, normalizeGhanaPhoneIdentifier, normalizeEmail } from '../utils/authValidation.js';
 import { requireAuth, optionalAuth } from '../middleware/authMiddleware.js';
 import { loginRateLimiter, signupRateLimiter, waitlistRateLimiter, referralCaptureRateLimiter } from '../middleware/rateLimiter.js';
 import { PaystackServerService } from '../services/paystackService.js';
@@ -54,6 +56,7 @@ import { AccountError, identifierConflict, loginAccount } from '../services/acco
 export const apiRouter = Router();
 apiRouter.use('/auth', accountRouter);
 apiRouter.use('/finance', financeRouter);
+apiRouter.use('/commercial',commercialRouter);
 apiRouter.use('/afa', afaRouter);
 
 // Mount Website Builder endpoints
@@ -744,7 +747,7 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
     // B. DATA BUNDLE FLOW
     // ==========================================
     // 3. Load authoritative product from server catalog
-    const product = getAuthoritativeProduct(productId);
+    const product = (await CommercialService.catalog()).products.find(p=>p.id===getAuthoritativeProduct(productId)?.id);
     if (!product) {
       res.status(404).json({ error: 'Selected bundle product is currently unavailable or inactive.' });
       return;
@@ -806,6 +809,8 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
     const publicRef = `MH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${randomHex}`;
     const paymentRef = `MH_PAY_${product.network.toUpperCase()}_${timestamp}_${randomHex}`;
 
+    const receiptEmail=normalizeEmail(customerEmail||req.user?.email);
+    if(!receiptEmail){res.status(400).json({error:'Enter a valid receipt email for this checkout. Account email remains optional.'});return;}
     const nowIso = new Date().toISOString();
 
     // 6. Create pending order in DB atomically with race-condition check
@@ -814,7 +819,7 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
       user_id: req.user?.id || null,
       public_reference: publicRef,
       customer_name: typeof customerName === 'string' ? customerName.trim() : (req.user?.name || null),
-      customer_email: validEmail,
+      customer_email: receiptEmail,
       customer_phone: phoneVal.normalized,
       recipient_phone: phoneVal.normalized,
       network: product.network,
@@ -845,63 +850,11 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
       referral_code: referralContext.referralCode,
     };
 
-    const dbStart = performance.now();
-      if (req.body.paymentMethod === 'wallet') {
-        const paid = await FinanceService.payOrder(newOrder, req.body.requestId);
-        res.json({success:true,paymentMethod:'wallet',orderRef:paid.public_reference,reference:paid.payment_reference,status:paid.status,amountPesewas:paid.amount});return;
-      }
-    const createResult = await OrdersStore.createOrderWithMtnDuplicateCheck(newOrder);
-    const dbMs = Math.round(performance.now() - dbStart);
-    console.info(`[Checkout Timing] databaseInsert=${dbMs}ms`);
-
-    if (!createResult.success) {
-      console.info(`[Checkout Timing] total=${Math.round(performance.now() - reqStart)}ms`);
-      res.status(409).json({
-        code: ACTIVE_MTN_ORDER_CODE,
-        message: ACTIVE_MTN_ORDER_MESSAGE,
-        existingOrderReference: createResult.existingOrder.public_reference,
-        existingOrderStatus: mapToSafeCustomerStatus(createResult.existingOrder.status),
-      });
-      return;
-    }
-
-    // 7. Initialize Paystack transaction on the server
-    const paystackStart = performance.now();
-    const paystackRes = await PaystackServerService.initializeTransaction({
-      email: validEmail,
-      amountPesewas: product.amountPesewas,
-      reference: paymentRef,
-      metadata: {
-        public_reference: publicRef,
-        recipient_phone: phoneVal.normalized,
-        network: product.network,
-        service_type: 'data',
-        product_id: product.id,
-        product_name: product.dataAmount,
-      },
-    });
-    const paystackMs = Math.round(performance.now() - paystackStart);
-    console.info(`[Checkout Timing] paystackInit=${paystackMs}ms`);
-
-    const totalMs = Math.round(performance.now() - reqStart);
-    console.info(`[Checkout Timing] total=${totalMs}ms`);
-
-    if (!paystackRes.success) {
-      res.status(500).json({ error: paystackRes.error || 'Failed to initialize payment with Paystack.' });
-      return;
-    }
-
-    res.json({
-      success: true,
-      orderRef: publicRef,
-      reference: paymentRef,
-      accessCode: paystackRes.accessCode,
-      authorizationUrl: paystackRes.authorizationUrl,
-      amountGhc: product.priceGhc,
-      amountPesewas: product.amountPesewas,
-      currency: 'GHS',
-      isSimulated: paystackRes.isSimulated || false,
-    });
+    const result = await CommercialService.initialize(newOrder,req.body);
+    if(result.payment_provider==='wallet') {res.json({success:true,paymentMethod:'wallet',orderRef:result.public_reference,reference:result.payment_reference,status:result.status,amountPesewas:result.amount});return;}
+    const checkout=(result as any).checkout;
+    if(!checkout){res.status(409).json({error:'Existing payment initialization is uncertain. Reconcile the existing order before retrying.',orderRef:result.public_reference});return;}
+    res.json({success:true,orderRef:result.public_reference,reference:result.payment_reference,accessCode:checkout.accessCode,authorizationUrl:checkout.authorizationUrl,amountGhc:result.amount/100,amountPesewas:result.amount,currency:'GHS',isSimulated:checkout.isSimulated||false});
   } catch (err) {
     if(err instanceof FinanceError){res.status(err.status).json({error:err.message});return;}
     console.error('Payment Initialize Controller Exception:', err);
@@ -930,10 +883,12 @@ apiRouter.get('/payments/verify/:reference', async (req: Request, res: Response)
 
     // If already marked paid or beyond, return safe details immediately
     if (order.status !== 'pending_payment' && order.payment_status === 'success') {
+      let confirmedOrder=order;
+      if(order.commercial_context){await CommercialService.sync(order);if(order.status==='paid'&&!order.manual_review){const recovered=await FulfilmentService.processPaidOrder(order.payment_reference,order.paid_at!,'Direct payment recovery');confirmedOrder=recovered.order||order;}}
       if(order.store_context){await WebsiteBusinessService.syncOrder(order);if(order.status==='paid')await FulfilmentService.processPaidOrder(order.payment_reference,order.paid_at!,'Managed store payment recovery');}
       res.json({
         verified: true,
-        order: toSafePublicOrder(order),
+        order: toSafePublicOrder(confirmedOrder),
         message: 'Payment verified.',
       });
       return;
@@ -963,6 +918,7 @@ apiRouter.get('/payments/verify/:reference', async (req: Request, res: Response)
         message: 'Payment verified successfully.',
       });
     } else {
+      await CommercialService.paymentFailed(order,verifyResult);
       res.json({
         verified: false,
         order: toSafePublicOrder(order),
@@ -1116,7 +1072,7 @@ export const handleSuccessBizHubWebhook = SuccessBizHubWebhookHandler.handle.bin
  */
 apiRouter.post('/auth/register', signupRateLimiter, async (req: Request, res: Response) => {
   try {
-    const { name, identifier, password, rememberMe } = req.body || {};
+    const { name, identifier, phone, email, password, rememberMe } = req.body || {};
 
     if (!name || typeof name !== 'string' || name.trim().length < 2) {
       res.status(400).json({ error: 'Please enter a valid full name or business name (at least 2 characters).' });
@@ -1128,10 +1084,12 @@ apiRouter.post('/auth/register', signupRateLimiter, async (req: Request, res: Re
       return;
     }
 
-    const parsedId = parseIdentifier(identifier);
-    if (!parsedId) {
+    const accountPhone=normalizeGhanaPhoneIdentifier(phone ?? identifier);
+    const accountEmail=email?normalizeEmail(email):typeof identifier==='string'&&identifier.includes('@')?normalizeEmail(identifier):null;
+    const parsedId=accountPhone?{type:'phone',normalized:accountPhone}:null;
+    if (!parsedId || email&&!accountEmail) {
       res.status(400).json({
-        error: 'Please enter a valid Ghana phone number (e.g. 0241234567) or email address.',
+        error: 'A valid Ghana phone number is required. Email is optional.',
       });
       return;
     }
@@ -1143,7 +1101,7 @@ apiRouter.post('/auth/register', signupRateLimiter, async (req: Request, res: Re
     }
 
     // Check if account with this identifier already exists
-    const existing = await AuthStore.findUserByIdentifier(parsedId.normalized);
+    const existing = await AuthStore.findUserByIdentifier(parsedId.normalized) || (accountEmail?await AuthStore.findUserByIdentifier(accountEmail):null);
     if (existing) {
       res.status(409).json({
         error: 'An account with this email or phone number already exists. Please log in.',
@@ -1158,8 +1116,8 @@ apiRouter.post('/auth/register', signupRateLimiter, async (req: Request, res: Re
     const user = await AuthStore.createUser({
       id: userId,
       name: name.trim(),
-      email: parsedId.type === 'email' ? parsedId.normalized : null,
-      phone: parsedId.type === 'phone' ? parsedId.normalized : null,
+      email: accountEmail,
+      phone: accountPhone,
       passwordHash,
       role: 'customer',
       status: 'active',

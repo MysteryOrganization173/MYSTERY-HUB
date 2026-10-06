@@ -38,6 +38,7 @@ declare global {
 }
 
 export interface ServerPaystackOptions {
+  commercial?:{requestId:string;expectedTotalMinor:number;expectedRegularMinor:number;pricingRevision:string;promotionRevision:string};
   store?: {siteId:string;requestId:string;expectedMinor:number};
   onOrderCreated?: (orderRef:string) => void;
   productId: string;
@@ -114,6 +115,7 @@ export function usePaystack() {
       const sessionToken = getActiveSessionToken();
       const initRes = options.store ? await initializeStorePayment(options.store.siteId,options.store.requestId,options.productId,options.recipientPhone,options.customerEmail||'',sessionToken||undefined) : await initializePaymentOnServer(
         {
+          ...options.commercial,
           productId: options.productId,
           recipientPhone: options.recipientPhone,
           customerEmail: options.customerEmail,
@@ -131,6 +133,7 @@ export function usePaystack() {
 
       const { orderRef, reference, accessCode, isSimulated } = initRes;
       options.onOrderCreated?.(orderRef);
+      if(options.commercial&&initRes.amountPesewas!==options.commercial.expectedTotalMinor)throw new Error('Price changed. Refresh and review before paying.');
       if(options.store&&initRes.amountPesewas!==options.store.expectedMinor)throw new Error('This bundle price changed. Refresh the storefront and review the current total before paying. No payment was opened.');
 
       if (!accessCode) {

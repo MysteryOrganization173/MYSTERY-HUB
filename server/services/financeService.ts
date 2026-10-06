@@ -86,12 +86,13 @@ export class FinanceService {
       } else throw new FinanceError('Invalid withdrawal transition.',409);
       await tx.audit(adminId,`withdrawal_${row.state}`,row.id,{requested_minor:row.amount_minor,fee_minor:row.payload.feeMinor,net_minor:row.payload.netMinor});return row;});
   }
-  static async payOrder(order:OrderRecord,requestId:unknown,create?:(tx:FinanceTx,paid:OrderRecord)=>Promise<void>) {
+  static async payOrder(order:OrderRecord,requestId:unknown,create?:(tx:FinanceTx,paid:OrderRecord)=>Promise<void>,prepare?:(tx:FinanceTx)=>Promise<OrderRecord>) {
     moneyMinor(order.amount);if(order.currency!=='GHS')throw new FinanceError('Invalid currency.');
     if(!order.user_id||!['data','airtime','afa'].includes(order.service_type||''))throw new FinanceError('Wallet is available for signed-in Data, Airtime and AFA purchases.');
     const key=`purchase:${operationKey(requestId)}`;
     const paid=await FinanceStore.transaction(order.user_id,async tx=>{
       const old=await tx.find(key);if(old){if(old.payload.productId!==order.product_id||old.payload.recipient!==order.recipient_phone||old.amount_minor!==order.amount||old.payload.service!==order.service_type)throw new FinanceError('Checkout request details changed.',409);return (await OrdersStore.findOrder(old.payload.orderId,tx.client))!;}
+      if(prepare)order=await prepare(tx);
       const account=await tx.account();if(account.restricted||account.wallet_minor<order.amount)throw new FinanceError('Insufficient Wallet balance. Add Money or use Paystack.',409);
       const record={...order,payment_provider:'wallet' as const,payment_reference:`MH_WALLET_ORDER_${randomUUID()}`,status:'paid' as const,payment_status:'success' as const,paid_at:new Date().toISOString()};
       const row=await tx.create('purchase',key,order.amount,{orderId:order.id,productId:order.product_id,recipient:order.recipient_phone,service:order.service_type});

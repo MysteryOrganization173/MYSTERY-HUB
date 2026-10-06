@@ -43,7 +43,7 @@ async function restored() { const result = await (await reset()).json(); const a
 test('1 existing customer login still works', async () => { assert.equal((await login()).status, 200); });
 test('2 incorrect password fails', async () => { assert.equal((await login(undefined, 'WrongPassword')).status, 401); });
 test('3 disabled customer cannot log in', async () => { await AuthStore.updateUserStatus('customer', 'disabled'); assert.equal((await login()).status, 403); });
-test('4 duplicate email signup returns friendly conflict', async () => { assert.equal((await request('/auth/register', 'POST', { name: 'New', identifier: 'CUSTOMER@example.com', password: 'newPassword123' })).status, 409); });
+test('4 duplicate email signup returns friendly conflict', async () => { assert.equal((await request('/auth/register', 'POST', { name: 'New', identifier: 'CUSTOMER@example.com', phone:'0249988776', password: 'newPassword123' })).status, 409); });
 test('5 duplicate phone signup returns conflict', async () => { assert.equal((await request('/auth/register', 'POST', { name: 'New', identifier: '0241234567', password: 'newPassword123' })).status, 409); });
 test('6 Ghana phone variants authenticate the same customer', async () => { for (const id of ['0241234567', '233241234567', '+233 24 123 4567']) assert.equal((await (await login(id)).json()).user.id, 'phone'); });
 test('7 admin resets customer with no-store response', async () => { const res = await reset(); assert.equal(res.status, 200); assert.equal(res.headers.get('cache-control'), 'no-store'); assert.ok((await res.json()).temporaryPassword); });

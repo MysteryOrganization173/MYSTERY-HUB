@@ -38,6 +38,7 @@ export const OrdersPage: React.FC = () => {
               serverReference: o.public_reference,
               serverStatus: o.status,
               manualReview: o.manual_review,
+              commercialPricing: o.commercial_pricing,
               serviceType: o.service_type || (o.product_name_snapshot?.toLowerCase().includes('airtime') ? 'airtime' : 'data'),
               bundle: {
                 id: 'server-bundle-' + o.public_reference,
@@ -108,6 +109,7 @@ export const OrdersPage: React.FC = () => {
           serverStatus: orderData.status,
           serviceType: orderData.service_type,
           manualReview: orderData.manual_review,
+          commercialPricing: orderData.commercial_pricing,
           statusMessage:
             orderData.status === 'refund_pending' || orderData.status === 'refunded'
               ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
@@ -354,6 +356,7 @@ export const OrdersPage: React.FC = () => {
                       <div className="text-sm sm:text-base font-extrabold text-white tabular-nums">
                         GH₵{order.amountGhc.toFixed(2)}
                       </div>
+                      {Boolean(order.commercialPricing?.discountMinor)&&<p className="text-xs text-emerald-300">Welcome saving GH₵{(order.commercialPricing!.discountMinor/100).toFixed(2)} from GH₵{(order.commercialPricing!.regularMinor/100).toFixed(2)}</p>}
                       <div className="mt-1">{order.serviceType==='data'?<span className="text-xs font-semibold text-slate-200">{dataOrderPresentation(order.serverStatus,order.manualReview).label}</span>:statusBadge}</div>
                     </div>
                     <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-[#00c365] group-hover:translate-x-1 transition-all shrink-0" />

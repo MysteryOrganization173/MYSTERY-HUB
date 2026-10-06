@@ -16,19 +16,19 @@ async function runStorefrontTests() {
   // 1. MTN Express retail prices
   {
     const mtnExpected: Record<string, number> = {
-      '1GB': 4.99,
-      '2GB': 9.99,
+      '1GB': 5.49,
+      '2GB': 10.49,
       '3GB': 14.99,
       '4GB': 19.49,
       '5GB': 23.99,
       '6GB': 28.49,
-      '8GB': 37.99,
-      '10GB': 46.99,
-      '15GB': 69.99,
-      '20GB': 92.99,
-      '25GB': 114.99,
-      '30GB': 137.99,
-      '40GB': 182.99,
+      '8GB': 36.99,
+      '10GB': 44.99,
+      '15GB': 66.99,
+      '20GB': 88.99,
+      '25GB': 110.99,
+      '30GB': 132.99,
+      '40GB': 176.99,
     };
 
     for (const [size, price] of Object.entries(mtnExpected)) {
@@ -79,11 +79,11 @@ async function runStorefrontTests() {
   // 3. AirtelTigo retail prices
   {
     const atExpected: Record<string, number> = {
-      '1GB': 4.79,
-      '2GB': 8.99,
-      '3GB': 13.49,
-      '4GB': 17.99,
-      '5GB': 22.49,
+      '1GB': 4.99,
+      '2GB': 9.49,
+      '3GB': 13.99,
+      '4GB': 18.49,
+      '5GB': 22.99,
     };
 
     for (const [size, price] of Object.entries(atExpected)) {
@@ -107,11 +107,11 @@ async function runStorefrontTests() {
   {
     const telExpected: Record<string, number> = {
       '10GB': 44.99,
-      '15GB': 63.99,
-      '20GB': 83.99,
-      '25GB': 103.99,
-      '30GB': 123.99,
-      '40GB': 164.99,
+      '15GB': 66.99,
+      '20GB': 88.99,
+      '25GB': 110.99,
+      '30GB': 122.99,
+      '40GB': 163.99,
       '50GB': 203.99,
       '100GB': 399.99,
     };
@@ -171,7 +171,7 @@ async function runStorefrontTests() {
 
     const frontendMtn1 = DATA_BUNDLES.find((b) => b.id === 'mtn-1gb');
     assert.ok(frontendMtn1);
-    assert.strictEqual(frontendMtn1.priceGhc, 4.99);
+    assert.strictEqual(frontendMtn1.priceGhc, 5.49);
 
     console.log('✓ 7. Clean bundle metadata without confusing primary validity labels verified');
     passed++;

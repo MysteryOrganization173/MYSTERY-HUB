@@ -1,3 +1,4 @@
+import { DIRECT_RETAIL_MINOR } from '../../shared/directPricing';
 import { DataBundle, NetworkId, NetworkInfo } from '../types';
 
 export const GHANA_NETWORKS: Record<NetworkId, NetworkInfo> = {
@@ -48,7 +49,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 1024,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 4.99,
+    priceGhc: DIRECT_RETAIL_MINOR['mtn-1gb'] / 100,
     isPopular: true,
     description: 'Fast 4G/5G data for regular social & browsing',
   },
@@ -59,7 +60,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 2048,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 9.99,
+    priceGhc: DIRECT_RETAIL_MINOR['mtn-2gb'] / 100,
     description: 'Essential data for social apps & messaging',
   },
   {
@@ -69,7 +70,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 3072,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 14.99,
+    priceGhc: DIRECT_RETAIL_MINOR['mtn-3gb'] / 100,
     isPopular: true,
     description: 'Great for weekly streaming, TikTok, and browsing',
   },
@@ -80,7 +81,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 4096,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 19.49,
+    priceGhc: DIRECT_RETAIL_MINOR['mtn-4gb'] / 100,
     description: 'Comfortable allocation for daily video & social media',
   },
   {
@@ -90,7 +91,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 5120,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 23.99,
+    priceGhc: DIRECT_RETAIL_MINOR['mtn-5gb'] / 100,
     isPopular: true,
     isBestValue: true,
     description: 'Our most chosen student and work bundle',
@@ -102,7 +103,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 6144,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 28.49,
+    priceGhc: DIRECT_RETAIL_MINOR['mtn-6gb'] / 100,
     description: 'Smooth streaming, calls, and daily downloads',
   },
   {
@@ -112,7 +113,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 8192,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 37.99,
+    priceGhc: DIRECT_RETAIL_MINOR['mtn-8gb'] / 100,
     description: 'Generous data volume for active social & work use',
   },
   {
@@ -122,7 +123,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 10240,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 46.99,
+    priceGhc: DIRECT_RETAIL_MINOR['mtn-10gb'] / 100,
     isPopular: true,
     isBestValue: true,
     description: 'Heavy browsing, YouTube, gaming, and remote work',
@@ -134,7 +135,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 15360,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 69.99,
+    priceGhc: DIRECT_RETAIL_MINOR['mtn-15gb'] / 100,
     description: 'High capacity monthly allocation for power users',
   },
   {
@@ -144,7 +145,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 20480,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 92.99,
+    priceGhc: DIRECT_RETAIL_MINOR['mtn-20gb'] / 100,
     description: 'Heavy monthly streaming & hotspot bundle',
   },
   {
@@ -154,7 +155,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 25600,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 114.99,
+    priceGhc: DIRECT_RETAIL_MINOR['mtn-25gb'] / 100,
     description: 'Power user bundle for home and office sharing',
   },
   {
@@ -164,7 +165,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 30720,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 137.99,
+    priceGhc: DIRECT_RETAIL_MINOR['mtn-30gb'] / 100,
     description: 'High volume data bundle for creators and families',
   },
   {
@@ -174,7 +175,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 40960,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 182.99,
+    priceGhc: DIRECT_RETAIL_MINOR['mtn-40gb'] / 100,
     description: 'Maximum capacity MTN data bundle',
   },
 
@@ -188,7 +189,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 1024,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 4.79,
+    priceGhc: DIRECT_RETAIL_MINOR['at-1gb'] / 100,
     isPopular: true,
     description: 'Instant direct delivery to your AT number.',
   },
@@ -199,7 +200,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 2048,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 8.99,
+    priceGhc: DIRECT_RETAIL_MINOR['at-2gb'] / 100,
     description: 'Instant direct delivery to your AT number.',
   },
   {
@@ -209,7 +210,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 3072,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 13.49,
+    priceGhc: DIRECT_RETAIL_MINOR['at-3gb'] / 100,
     isPopular: true,
     description: 'Instant direct delivery to your AT number.',
   },
@@ -220,7 +221,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 4096,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 17.99,
+    priceGhc: DIRECT_RETAIL_MINOR['at-4gb'] / 100,
     description: 'Instant direct delivery to your AT number.',
   },
   {
@@ -230,7 +231,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 5120,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 22.49,
+    priceGhc: DIRECT_RETAIL_MINOR['at-5gb'] / 100,
     isPopular: true,
     isBestValue: true,
     description: 'Instant direct delivery to your AT number.',
@@ -246,7 +247,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 10240,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 44.99,
+    priceGhc: DIRECT_RETAIL_MINOR['telecel-10gb'] / 100,
     isPopular: true,
     description: 'Stream seamlessly across your devices on Telecel 4G',
   },
@@ -257,7 +258,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 15360,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 63.99,
+    priceGhc: DIRECT_RETAIL_MINOR['telecel-15gb'] / 100,
     description: 'Reliable Telecel connectivity for remote work & study',
   },
   {
@@ -267,7 +268,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 20480,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 83.99,
+    priceGhc: DIRECT_RETAIL_MINOR['telecel-20gb'] / 100,
     isBestValue: true,
     description: 'Pro monthly bundle for home office and creators',
   },
@@ -278,7 +279,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 25600,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 103.99,
+    priceGhc: DIRECT_RETAIL_MINOR['telecel-25gb'] / 100,
     description: 'Heavy monthly allocation for multi-device hotspots',
   },
   {
@@ -288,7 +289,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 30720,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 123.99,
+    priceGhc: DIRECT_RETAIL_MINOR['telecel-30gb'] / 100,
     description: 'High capacity Telecel data allocation',
   },
   {
@@ -298,7 +299,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 40960,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 164.99,
+    priceGhc: DIRECT_RETAIL_MINOR['telecel-40gb'] / 100,
     description: 'Extensive data capacity for families and developers',
   },
   {
@@ -308,7 +309,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 51200,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 203.99,
+    priceGhc: DIRECT_RETAIL_MINOR['telecel-50gb'] / 100,
     description: 'Super high capacity Telecel package',
   },
   {
@@ -318,7 +319,7 @@ export const DATA_BUNDLES: DataBundle[] = [
     dataBytesValue: 102400,
     validity: 'Direct Credit',
     validityCategory: 'Monthly',
-    priceGhc: 399.99,
+    priceGhc: DIRECT_RETAIL_MINOR['telecel-100gb'] / 100,
     isBestValue: true,
     description: 'Ultimate 100GB Telecel monthly connectivity bundle',
   },

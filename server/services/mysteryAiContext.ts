@@ -4,20 +4,20 @@
  * real delivery conditions, and active services without exposing internal supplier plumbing.
  */
 
-import { AUTHORITATIVE_PRODUCTS } from '../data/productCatalog.js';
+import { AUTHORITATIVE_PRODUCTS, type AuthoritativeProduct } from '../data/productCatalog.js';
 
-export function buildMysteryAiSystemInstruction(editorContext?: any): string {
-  const mtnProducts = Object.values(AUTHORITATIVE_PRODUCTS)
+export function buildMysteryAiSystemInstruction(editorContext?: any, products:AuthoritativeProduct[]=Object.values(AUTHORITATIVE_PRODUCTS)): string {
+  const mtnProducts = products
     .filter((p) => p.network === 'mtn' && p.isActive)
     .map((p) => `${p.dataAmount} (GH₵${p.priceGhc.toFixed(2)})`)
     .join(', ');
 
-  const atProducts = Object.values(AUTHORITATIVE_PRODUCTS)
+  const atProducts = products
     .filter((p) => p.network === 'airteltigo' && p.isActive)
     .map((p) => `${p.dataAmount} (GH₵${p.priceGhc.toFixed(2)})`)
     .join(', ');
 
-  const telecelProducts = Object.values(AUTHORITATIVE_PRODUCTS)
+  const telecelProducts = products
     .filter((p) => p.network === 'telecel' && p.isActive)
     .map((p) => `${p.dataAmount} (GH₵${p.priceGhc.toFixed(2)})`)
     .join(', ');
@@ -37,9 +37,9 @@ CURRENT MYSTERY HUB SERVICES & STATUS:
    - Networks: MTN Ghana (Express Data), AirtelTigo (AT iShare), and Telecel Ghana.
    - Payment: Ghana Mobile Money (MTN MoMo, AT Money, Telecel Cash), Card (Visa/Mastercard), and Bank/GhanaQR via Paystack.
    - Authoritative Live Package Rates:
-     * MTN Express: ${mtnProducts || '1GB GH₵4.99, 2GB GH₵9.99, 5GB GH₵23.99, 10GB GH₵46.99, up to 40GB GH₵182.99'}
-     * AirtelTigo: ${atProducts || '1GB GH₵4.79, 2GB GH₵8.99, 3GB GH₵13.49, 4GB GH₵17.99, 5GB GH₵22.49'}
-     * Telecel: ${telecelProducts || '10GB GH₵44.99, 15GB GH₵63.99, 20GB GH₵83.99, up to 100GB GH₵399.99'}
+     * MTN Express: ${mtnProducts || 'No direct packages currently available'}
+     * AirtelTigo: ${atProducts || 'No direct packages currently available'}
+     * Telecel: ${telecelProducts || 'No direct packages currently available'}
    - Delivery Knowledge & Expectations:
      * AirtelTigo (AT iShare): INSTANT DELIVERY. AT orders are fulfilled immediately with instant direct delivery to the customer's AT number.
      * MTN Orders: Fast under normal conditions, but NOT instant. Subject to telecom network processing conditions and possible delays. Many orders complete within roughly 15–45 minutes, but network conditions can sometimes cause longer processing, in exceptional cases up to 48 hours.

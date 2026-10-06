@@ -16,6 +16,7 @@ export interface PaystackInitializeParams {
 }
 
 export interface PaystackInitializeResult {
+  definitiveFailure?: boolean;
   success: boolean;
   authorizationUrl?: string;
   accessCode?: string;
@@ -106,6 +107,8 @@ export class PaystackServerService {
         return {
           success: false,
           reference: params.reference,
+          // Timeout, conflict and rate-limit responses remain uncertain.
+          definitiveFailure: [400,401,403,404,422].includes(response.status),
           error: data.message || 'Unable to initialize transaction with Paystack.',
         };
       }

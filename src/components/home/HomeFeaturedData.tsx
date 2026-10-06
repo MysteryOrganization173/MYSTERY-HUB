@@ -1,3 +1,5 @@
+import {useDirectCatalog} from '../../hooks/useDirectCatalog';
+import {WelcomeOfferNotice} from '../data/WelcomeOfferNotice';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DATA_BUNDLES, GHANA_NETWORKS } from '../../data/bundles';
@@ -7,6 +9,7 @@ import { getInstantBundlesOnServer } from '../../services/apiClient';
 import { ArrowRight, Wifi, Zap } from 'lucide-react';
 
 export const HomeFeaturedData: React.FC = () => {
+  const DATA_BUNDLES=useDirectCatalog();
   const { setActivePage, openCheckout, openDataPage } = useApp();
   const [selectedNetwork, setSelectedNetwork] = useState<NetworkId>('mtn');
   const [homeQuickBuyPhone, setHomeQuickBuyPhone] = useState('');
@@ -36,6 +39,7 @@ export const HomeFeaturedData: React.FC = () => {
   return (
     <section className="pt-1 pb-6 sm:pt-3 sm:pb-10 lg:pt-4 lg:pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
+        <WelcomeOfferNotice/>
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 sm:gap-4">
           <div className="space-y-1 sm:space-y-2">

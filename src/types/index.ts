@@ -52,6 +52,7 @@ export interface OrderRecord {
   recipientPhone: string;
   network: NetworkId;
   paymentMethod: PaymentMethod;
+  commercialPricing?: {regularMinor:number;discountMinor:number;paidMinor:number};
   amountGhc: number;
   faceValueGhc?: number;
   serviceFeeGhc?: number;

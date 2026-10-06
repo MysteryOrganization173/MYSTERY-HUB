@@ -1,3 +1,4 @@
+import {commercialRequest} from '../../services/commercialApi';
 import { dataDeliveryNote } from '../../utils/dataPurchasePresentation';
 import { WalletPaymentChoice } from '../finance/WalletPaymentChoice';
 import { walletCheckout } from '../../services/financeApi';
@@ -43,6 +44,12 @@ export const CheckoutModal: React.FC = () => {
   const { initializeServerPayment, isInitializing, loadingPhase, isConfigured } = usePaystack();
 
   const [phone, setPhone] = useState('');
+  const [receiptEmail,setReceiptEmail]=useState('');
+  const [commercial,setCommercial]=useState<any>(null);
+  const [quoteError,setQuoteError]=useState('');
+  const [quoteRefresh,setQuoteRefresh]=useState(0);
+  const directRequest=useRef(crypto.randomUUID());
+  useEffect(()=>{if(!isCheckoutOpen||!checkoutBundle||checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data'||checkoutBundle.id.startsWith('instant-')||checkoutBundle.id.startsWith('airtime-')){setCommercial(null);return;}let active=true;setCommercial(null);setQuoteError('');setReviewingData(false);commercialRequest('commercial/quote/'+encodeURIComponent(checkoutBundle.id),sessionToken).then(r=>{if(active)setCommercial(r);}).catch(e=>{if(active)setQuoteError(e.message);});return()=>{active=false;};},[isCheckoutOpen,checkoutBundle?.id,sessionToken,quoteRefresh,user?.phone]);
   const [reviewingData, setReviewingData] = useState(false);
   const submissionPending = useRef(false);
   const [paymentMethod,setPaymentMethod]=useState<'paystack'|'wallet'>('paystack');
@@ -83,7 +90,9 @@ export const CheckoutModal: React.FC = () => {
   }, [isInitializing]);
 
   useEffect(() => {
-    if (checkoutBundle) {
+    if (isCheckoutOpen && checkoutBundle) {
+      setReceiptEmail(user?.email||'');
+      directRequest.current=crypto.randomUUID();
       setReviewingData(false);
       setPaymentMethod('paystack');
       walletRequest.current=null;
@@ -94,7 +103,7 @@ export const CheckoutModal: React.FC = () => {
       setActiveMtnConflict(null);
       setPreflightIssue(null);
     }
-  }, [checkoutBundle, checkoutInitialPhone, user?.phone]);
+  }, [isCheckoutOpen,checkoutBundle, checkoutInitialPhone, user?.phone]);
 
   useEffect(() => {
     const net = detectGhanaNetwork(phone);
@@ -151,7 +160,7 @@ export const CheckoutModal: React.FC = () => {
   const totalAmount =
     isAirtime || isInstantBundle
       ? Number((faceValue + serviceFee).toFixed(2))
-      : checkoutBundle.priceGhc;
+      : commercial?.totalMinor/100 || checkoutBundle.priceGhc;
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -239,10 +248,12 @@ export const CheckoutModal: React.FC = () => {
     setActiveMtnConflict(null);
     setServerError('');
 
+    if(isRegularData&&!commercial){setServerError('Refresh the current price before paying.');return;}
     return initializeServerPayment({
+      commercial:isRegularData?{requestId:directRequest.current,expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:undefined,
       productId: checkoutBundle.id,
       recipientPhone: phone.trim(),
-      customerEmail: user?.email || undefined,
+      customerEmail: receiptEmail || user?.email || undefined,
       customerName: user?.name || undefined,
       serviceType: isInstantBundle ? 'instant_bundle' : isAirtime ? 'airtime' : 'data',
       network: checkoutBundle.network,
@@ -343,6 +354,7 @@ export const CheckoutModal: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submissionPending.current || isInitializing || walletBusy) return;
+    if(isRegularData&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(receiptEmail.trim())){setServerError('Enter a valid receipt email before reviewing checkout.');return;}
     if (isRegularData && !reviewingData) {
       if (phone.replace(/\D/g, '').length < 10) {
         setPhoneError('Enter the recipient’s Ghana phone number before reviewing.');
@@ -354,11 +366,12 @@ export const CheckoutModal: React.FC = () => {
     }
     if(paymentMethod!=='wallet'){submissionPending.current=true;try{await submitPayment();}finally{submissionPending.current=false;}return;}
     if(walletBusy||!sessionToken)return;
+    if(isRegularData&&!commercial){setServerError('Refresh the current price before paying.');return;}
     submissionPending.current=true;setWalletBusy(true);setServerError('');
     try {
-      const body={productId:checkoutBundle.id,recipientPhone:phone.trim(),customerEmail:user?.email,customerName:user?.name,serviceType:isAirtime?'airtime':'data',network:checkoutBundle.network,amount:faceValue,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()};
+      const body={productId:checkoutBundle.id,recipientPhone:phone.trim(),customerEmail:receiptEmail||user?.email,customerName:user?.name,serviceType:isAirtime?'airtime':'data',network:checkoutBundle.network,amount:faceValue,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()};
       const fingerprint=JSON.stringify(body);if(walletRequest.current?.fingerprint!==fingerprint)walletRequest.current={fingerprint,id:crypto.randomUUID()};
-      const result=await walletCheckout(sessionToken,'payments/initialize',{...body,requestId:walletRequest.current!.id});
+      const result=await walletCheckout(sessionToken,'payments/initialize',{...body,requestId:walletRequest.current!.id,...(isRegularData&&commercial?{expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:{})});
       createOrder({...checkoutBundle,priceGhc:result.amountPesewas/100},phone.trim(),'wallet',result.reference,result.orderRef);
       closeCheckout();setActivePage('orders');showToast('Wallet payment confirmed. Check My Orders for fulfilment status.','success');
     }catch(error){setServerError((error as Error).message);}finally{submissionPending.current=false;setWalletBusy(false);}
@@ -394,6 +407,11 @@ export const CheckoutModal: React.FC = () => {
   return (
     <div role="dialog" aria-modal="true" aria-label="Review your purchase" className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full max-w-[calc(100vw-1rem)] sm:max-w-lg bg-[#0f151b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 max-h-[94dvh] flex flex-col">
+        {isRegularData&&<div className="p-3 text-sm border-b border-slate-800">
+          {commercial?<><p>Regular price: GH₵{(commercial.regularMinor/100).toFixed(2)}</p>{commercial.discountMinor>0&&<p className="text-emerald-400">Welcome offer: -GH₵{(commercial.discountMinor/100).toFixed(2)}</p>}<p>Total: GH₵{(commercial.totalMinor/100).toFixed(2)}</p>{commercial.offer.state==='phone_required'&&<p>Add a unique Ghana phone in My Account to qualify.</p>}{commercial.offer.state==='reserved'&&<p>Welcome offer reserved for an existing order. Check Orders before retrying.</p>}</>:<p role="status">{quoteError||'Loading current price...'}</p>}
+          <button type="button" disabled={isInitializing||walletBusy} onClick={()=>setQuoteRefresh(x=>x+1)} className="underline text-emerald-400">Refresh price and eligibility</button>
+          <label className="block mt-2">Receipt email<input type="email" value={receiptEmail} onChange={e=>setReceiptEmail(e.target.value)} maxLength={128} className="w-full mt-1 p-2 rounded bg-slate-950 border border-slate-700" required/></label>
+        </div>}
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-3.5 border-b border-slate-800 bg-[#0c1116] shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -830,7 +848,7 @@ export const CheckoutModal: React.FC = () => {
                 </div>}
                 <div className="flex items-center justify-between gap-3 py-2 text-white">
                   <span className="font-semibold">Total</span>
-                  <span className="text-[#00c365] text-2xl tabular-nums font-extrabold">GH₵{checkoutBundle.priceGhc.toFixed(2)}</span>
+                  <span className="text-[#00c365] text-2xl tabular-nums font-extrabold">GH₵{totalAmount.toFixed(2)}</span>
                 </div>
                 <p className="text-slate-400">No hidden Mystery Hub checkout fee.</p>
                 <p className="text-slate-300 leading-relaxed">Check the recipient before paying. Fulfilled wrong-number orders may not be reversible. Keep your reference to Track Order; delivery may take longer when the network is busy.</p>

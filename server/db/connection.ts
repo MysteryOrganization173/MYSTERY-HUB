@@ -1,3 +1,4 @@
+import { COMMERCIAL_SCHEMA } from './commercialSchema.js';
 import { WEBSITE_BUSINESS_SCHEMA } from './websiteBusinessSchema.js';
 import { WEBSITE_FREE_SCHEMA } from './websiteFreeSchema.js';
 import { FINANCE_SCHEMA } from './financeSchema.js';
@@ -576,6 +577,7 @@ export async function initDatabase(): Promise<void> {
     await client.query(AFA_SCHEMA);
     await client.query(FINANCE_SCHEMA);
     await client.query(WEBSITE_BUSINESS_SCHEMA);
+    await client.query(COMMERCIAL_SCHEMA);
 
     // 3. INDEX CREATION (Non-critical failures logged as warnings)
     const indexStatements = [

@@ -24,6 +24,11 @@ const rawBaseUrl =
 export const API_BASE_URL = typeof rawBaseUrl === 'string' ? rawBaseUrl.replace(/\/$/, '') : '';
 
 export interface InitializePaymentRequest {
+  requestId?:string;
+  expectedTotalMinor?:number;
+  expectedRegularMinor?:number;
+  pricingRevision?:string;
+  promotionRevision?:string;
   productId: string;
   recipientPhone: string;
   customerEmail?: string;
@@ -114,6 +119,8 @@ export interface LookupOrderResponse {
 }
 
 export interface RegisterRequest {
+  phone?:string;
+  email?:string;
   name: string;
   identifier: string;
   password: string;

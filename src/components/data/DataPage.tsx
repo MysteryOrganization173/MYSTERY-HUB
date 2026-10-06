@@ -1,3 +1,5 @@
+import {useDirectCatalog} from '../../hooks/useDirectCatalog';
+import {WelcomeOfferNotice} from './WelcomeOfferNotice';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DATA_BUNDLES, GHANA_NETWORKS, detectGhanaNetwork } from '../../data/bundles';
@@ -30,6 +32,7 @@ import {
 } from 'lucide-react';
 
 export const DataPage: React.FC = () => {
+  const DATA_BUNDLES=useDirectCatalog();
   const {
     openCheckout,
     showToast,
@@ -313,7 +316,7 @@ export const DataPage: React.FC = () => {
       }
       return true;
     });
-  }, [activeNetwork, sizeFilter, searchQuery]);
+  }, [activeNetwork, sizeFilter, searchQuery, DATA_BUNDLES]);
 
   const handleAirtimeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -363,6 +366,7 @@ export const DataPage: React.FC = () => {
 
   return (
     <div className="py-4 sm:py-8 text-slate-100">
+      <WelcomeOfferNotice/>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
         {/* Page Hero Section */}
         <div className="relative rounded-3xl bg-[#091014] border border-slate-800/80 p-3.5 sm:p-6 lg:p-10 overflow-hidden shadow-2xl">
@@ -469,11 +473,12 @@ export const DataPage: React.FC = () => {
                   <div className="flex items-center gap-2.5 shrink-0">
                     <div className="text-right">
                       <div className="text-[10px] text-slate-400 font-medium">Price</div>
-                      <div className="text-sm sm:text-base font-extrabold text-[#00c365] tabular-nums">GH₵4.99</div>
+                      <div className="text-sm sm:text-base font-extrabold text-[#00c365] tabular-nums">GH₵{DATA_BUNDLES.find(b=>b.id==='mtn-1gb')?.priceGhc.toFixed(2) ?? 'Unavailable'}</div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => openCheckout(DATA_BUNDLES[0])}
+                      disabled={!DATA_BUNDLES.some(b=>b.id==='mtn-1gb')}
+                      onClick={() => {const bundle=DATA_BUNDLES.find(b=>b.id==='mtn-1gb');if(bundle)openCheckout(bundle);}}
                       className="py-1.5 px-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
                     >
                       Buy Now
@@ -488,10 +493,11 @@ export const DataPage: React.FC = () => {
                   </div>
                   <div className="text-2xl font-bold text-white">1GB</div>
                   <div className="text-xs text-slate-400">MTN Express · Direct SIM Credit</div>
-                  <div className="text-xl font-extrabold text-[#00c365]">GH₵4.99</div>
+                  <div className="text-xl font-extrabold text-[#00c365]">GH₵{DATA_BUNDLES.find(b=>b.id==='mtn-1gb')?.priceGhc.toFixed(2) ?? 'Unavailable'}</div>
                   <button
                     type="button"
-                    onClick={() => openCheckout(DATA_BUNDLES[0])}
+                    disabled={!DATA_BUNDLES.some(b=>b.id==='mtn-1gb')}
+                      onClick={() => {const bundle=DATA_BUNDLES.find(b=>b.id==='mtn-1gb');if(bundle)openCheckout(bundle);}}
                     className="w-full py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
                   >
                     Buy Now
