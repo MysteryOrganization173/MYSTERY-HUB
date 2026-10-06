@@ -11,6 +11,7 @@ interface RateLimitOptions {
   max: number;
   message?: string;
   key?: (req: Request) => string;
+  enforceInTests?: boolean;
 }
 
 export function createRateLimiter(options: RateLimitOptions) {
@@ -31,7 +32,7 @@ export function createRateLimiter(options: RateLimitOptions) {
 
   return (req: Request, res: Response, next: NextFunction): void => {
     // In test environment, bypass rate limiting
-    if (process.env.NODE_ENV === 'test') {
+    if (process.env.NODE_ENV === 'test' && !options.enforceInTests) {
       return next();
     }
 

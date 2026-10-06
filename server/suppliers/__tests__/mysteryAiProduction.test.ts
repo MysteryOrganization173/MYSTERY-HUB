@@ -108,22 +108,22 @@ async function runMysteryAiTests() {
   // 5. Emergency local fallback response verification
   {
     const priceResponse = getGroundedLocalResponse('How much is 1GB?', 'data');
-    assert.ok(priceResponse.reply.includes('5.49'), 'Fallback must report MTN 1GB as GH₵5.49');
+    assert.ok(priceResponse?.reply.includes('current network, bundle and checkout prices'), 'Offline fallback must direct customers to live prices instead of seed prices');
     assert.strictEqual(
-      priceResponse.reply.toLowerCase().includes('7 days'),
+      priceResponse!.reply.toLowerCase().includes('7 days'),
       false,
       'Fallback must not include stale 7-day wording'
     );
 
     const speedResponse = getGroundedLocalResponse('How fast is delivery?', 'data');
-    assert.ok(speedResponse.reply.includes('Instant Delivery'), 'Fallback must describe AirtelTigo as Instant Delivery');
-    assert.ok(speedResponse.reply.includes('15–45 minutes'), 'Fallback must state MTN typical 15-45 minutes');
-    assert.ok(speedResponse.reply.includes('48 hours'), 'Fallback must state MTN exceptional 48 hours');
+    assert.ok(speedResponse!.reply.includes('Instant Delivery'), 'Fallback must describe AirtelTigo as Instant Delivery');
+    assert.ok(speedResponse!.reply.includes('15–45 minutes'), 'Fallback must state MTN typical 15-45 minutes');
+    assert.ok(speedResponse!.reply.includes('48 hours'), 'Fallback must state MTN exceptional 48 hours');
 
     const identityResponse = getGroundedLocalResponse('Who are you?', 'home');
-    assert.ok(identityResponse.reply.includes('Mystery AI'));
+    assert.ok(identityResponse!.reply.includes('Mystery AI'));
     assert.ok(
-      identityResponse.reply.indexOf('AirtelTigo') < identityResponse.reply.indexOf('Telecel'),
+      identityResponse!.reply.indexOf('AirtelTigo') < identityResponse!.reply.indexOf('Telecel'),
       'Identity reply must list networks in order MTN -> AirtelTigo -> Telecel'
     );
 

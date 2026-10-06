@@ -1,12 +1,13 @@
 import { ActivePage, SafeEditorAiContext } from '../types';
-import { DATA_BUNDLES, GHANA_NETWORKS } from '../data/bundles';
 import { API_BASE_URL } from './apiClient';
+import { AIRTIME_SERVICE_FEE_PERCENT } from '../../server/data/airtimePricing';
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  source?: 'scripted' | 'gemini';
   quickAction?: {
     type: 'navigate';
     targetPage: ActivePage;
@@ -89,7 +90,7 @@ export function resolveInstantBuilderHelp(
   ) {
     return {
       reply:
-        "Open the **Branding** tab in the editor. Paste your image link into the **Hero Banner Image URL** field to update the hero background. You can also paste an optional **Brand Logo URL**.",
+        "Open the **Branding** tab in the editor. Choose **Upload Image / Media Library** to upload or select your hero image or logo. If uploads are not configured, use only the image options currently available in the editor.",
     };
   }
 
@@ -265,70 +266,47 @@ export async function sendMysteryAiMessage(
   userMessage: string,
   activePage: ActivePage,
   history: ChatMessage[],
-  editorContext?: SafeEditorAiContext | null
-): Promise<{ reply: string; quickAction?: ChatMessage['quickAction'] }> {
-  // 1. Instant deterministic resolver for known builder questions (0ms latency, guaranteed accurate)
+  editorContext?: SafeEditorAiContext | null,
+  signal?: AbortSignal
+): Promise<{ reply: string; quickAction?: ChatMessage['quickAction']; source: 'scripted' | 'gemini' }> {
+  if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
   if (editorContext?.experienceMode === 'website_editor' || activePage === 'website') {
-    const instantHelp = resolveInstantBuilderHelp(userMessage, editorContext);
-    if (instantHelp) {
-      if (import.meta.env.DEV) {
-        console.log('[Mystery AI] source=deterministic_builder_help');
-      }
-      return instantHelp;
-    }
+    const help = resolveInstantBuilderHelp(userMessage, editorContext);
+    if (help) return { ...help, source: 'scripted' };
   }
-
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s safety timeout
-
+  const abort = () => controller.abort();
+  signal?.addEventListener('abort', abort, { once: true });
+  const timeout = setTimeout(abort, 12000);
   try {
-    const url = `${API_BASE_URL}/api/mystery-ai/chat`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      signal: controller.signal,
+    const res = await fetch(`${API_BASE_URL}/api/mystery-ai/chat`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
       body: JSON.stringify({
-        message: userMessage,
-        activePage,
-        history: history.slice(-8).map((m) => ({ role: m.role, content: m.content })),
+        message: userMessage, activePage,
+        history: history.slice(-8).map(m => ({ role: m.role, content: m.content })),
         editorContext: editorContext || undefined,
       }),
     });
-
-    clearTimeout(timeoutId);
-
+    if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
+    if (res.status === 429) throw new Error('Mystery AI is busy. Please wait a minute and try again.');
+    if (res.status === 400) throw new Error('The message or conversation exceeds chat limits. Shorten your message or reset the conversation and try again.');
     if (res.ok) {
       const data = await res.json();
-      if (data && data.reply && !data.fallback) {
-        if (import.meta.env.DEV) {
-          console.log(`[Mystery AI] source=gemini model=${data.model || 'gemini-3.8-flash'} routing=${data.routingClass || 'simple'} latency=${data.latencyMs || 0}ms`);
-        }
-        return {
-          reply: data.reply,
-          quickAction: inferQuickAction(userMessage, data.reply, activePage),
-        };
-      } else {
-        if (import.meta.env.DEV) {
-          console.log(`[Mystery AI] source=fallback reason=${data?.reason || 'backend_fallback'}`);
-        }
-      }
-    } else {
-      if (import.meta.env.DEV) {
-        console.log(`[Mystery AI] source=fallback reason=http_${res.status}`);
+      if (typeof data.reply === 'string' && data.reply.trim() && !data.fallback) {
+        return { reply: data.reply, quickAction: inferQuickAction(userMessage, data.reply, activePage), source: 'gemini' };
       }
     }
-  } catch (err: unknown) {
-    clearTimeout(timeoutId);
-    const isTimeout = err instanceof Error && err.name === 'AbortError';
-    if (import.meta.env.DEV) {
-      console.log(`[Mystery AI] source=fallback reason=${isTimeout ? 'timeout' : 'network_error'}`);
-    }
+  } catch (error) {
+    if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
+    if (error instanceof Error && (error.message.startsWith('Mystery AI is busy') || error.message.startsWith('The message or conversation'))) throw error;
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', abort);
   }
-
-  // Emergency grounded local response fallback
-  return getGroundedLocalResponse(userMessage, activePage, editorContext);
+  if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
+  const help = getGroundedLocalResponse(userMessage, activePage, editorContext);
+  if (help) return { ...help, source: 'scripted' };
+  throw new Error("Couldn't reach Mystery AI just now. Try again.");
 }
 
 /**
@@ -414,15 +392,17 @@ function inferQuickAction(
 
 /**
  * Emergency local fallback responder
- * Used strictly when backend/Gemini is unreachable, timed out, or quota exceeded.
+ * Used when backend/Gemini is unavailable; explicit quota/validation errors remain failures.
  * Kept concise, grounded in current facts, and free of stale pricing/validity.
  */
 export function getGroundedLocalResponse(
   query: string,
   activePage: ActivePage,
   editorContext?: SafeEditorAiContext | null
-): { reply: string; quickAction?: ChatMessage['quickAction'] } {
+): { reply: string; quickAction?: ChatMessage['quickAction'] } | null {
   const q = query.toLowerCase().trim();
+  if (q.includes('wallet')) return { reply: "Mystery Wallet is live. Sign in, open Wallet and choose Add Money to fund it through Paystack. You can use an available Wallet balance for supported purchases. Funding requires a valid profile email; payment configuration must be available. I cannot access your balance or move money.",quickAction:{type:'navigate',targetPage:'wallet',label:'Open Wallet'}};
+
 
   // 0. If in website editor or on website page, check builder help FIRST
   if (editorContext?.experienceMode === 'website_editor' || activePage === 'website') {
@@ -510,7 +490,7 @@ export function getGroundedLocalResponse(
   ) {
     return {
       reply:
-        "Airtime Top-Up is live on Mystery Hub! ⚡\n1. Go to our Data & Airtime page and select 'Airtime Top-Up'.\n2. Choose your network (MTN, AirtelTigo, or Telecel).\n3. Enter your phone number and amount (GH₵1.00 – GH₵1,000.00).\n4. Pay via Mobile Money or Card. There is no checkout surcharge, and your airtime is credited directly to your SIM immediately!",
+        `Airtime Top-Up is live on Mystery Hub! ⚡\n1. Go to our Data & Airtime page and select 'Airtime Top-Up'.\n2. Choose your network (MTN, AirtelTigo, or Telecel).\n3. Enter your phone number and amount (GH₵1.00 – GH₵1,000.00).\n4. Pay via Mobile Money or Card. The current service fee is ${AIRTIME_SERVICE_FEE_PERCENT}%. Your airtime is credited to the recipient SIM after verified payment and successful fulfilment.`,
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Top Up Airtime Now' },
     };
   }
@@ -522,9 +502,8 @@ export function getGroundedLocalResponse(
     q.includes('purchase data') ||
     q.includes('buy bundle')
   ) {
-    const mtn1 = DATA_BUNDLES.find((b) => b.id === 'mtn-1gb')?.priceGhc || 4.99;
     return {
-      reply: `Buying data takes just 3 simple steps:\n1. Go to our Data page and select your network (MTN, AirtelTigo, or Telecel).\n2. Pick your bundle (e.g. 1GB for GH₵${mtn1.toFixed(2)}).\n3. Enter your recipient phone number and authorize the Mobile Money prompt on your phone.\n\nYour data is credited directly to your SIM!`,
+      reply: `Buying data takes just 3 simple steps:\n1. Go to our Data page and select your network (MTN, AirtelTigo, or Telecel).\n2. Pick your bundle at the live price shown on the Data page.\n3. Enter your recipient phone number and authorize the Mobile Money prompt on your phone.\n\nYour data is credited directly to your SIM!`,
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Buy Data on Data Page' },
     };
   }
@@ -554,13 +533,8 @@ export function getGroundedLocalResponse(
     q.includes('how much') ||
     q.includes('cheap')
   ) {
-    const mtn1 = DATA_BUNDLES.find((b) => b.id === 'mtn-1gb')?.priceGhc || 4.99;
-    const mtn2 = DATA_BUNDLES.find((b) => b.id === 'mtn-2gb')?.priceGhc || 9.99;
-    const mtn5 = DATA_BUNDLES.find((b) => b.id === 'mtn-5gb')?.priceGhc || 23.99;
-    const mtn10 = DATA_BUNDLES.find((b) => b.id === 'mtn-10gb')?.priceGhc || 46.99;
-
     return {
-      reply: `Our current data rates in Ghana include:\n• MTN 1GB: GH₵${mtn1.toFixed(2)}\n• MTN 2GB: GH₵${mtn2.toFixed(2)}\n• MTN 5GB: GH₵${mtn5.toFixed(2)}\n• MTN 10GB: GH₵${mtn10.toFixed(2)}\n\nPackages range up to 40GB for MTN and 100GB for Telecel. Check all live prices on our Data page!`,
+      reply: "Check the Data page for current network, bundle and checkout prices. I cannot confirm live prices while the AI service is unavailable.",
       quickAction: { type: 'navigate', targetPage: 'data', label: '👉 View All Bundle Prices' },
     };
   }
@@ -597,6 +571,7 @@ export function getGroundedLocalResponse(
 
   // 9. Website Builder
   if (
+    q.includes('reseller') ||
     q.includes('website') ||
     q.includes('free website') ||
     q.includes('create a website') ||
@@ -606,7 +581,7 @@ export function getGroundedLocalResponse(
   ) {
     return {
       reply:
-        "Mystery Hub offers an interactive Website Builder designed for Ghanaian businesses — from restaurants and chop bars to salons, churches, and contractors. Sites are mobile-friendly with WhatsApp ordering and MoMo payment integration. You can test live previews on our Website Builder page!",
+        "Mystery Hub offers an interactive Website Builder designed for Ghanaian businesses — from restaurants and chop bars to salons, churches, and contractors. Sites are mobile-friendly. Managed Data Reseller storefronts support Mystery Hub-managed checkout and automatic supplier fulfilment when the store is configured and enabled; other business ordering can use WhatsApp. You can test live previews on our Website Builder page!",
       quickAction: { type: 'navigate', targetPage: 'website', label: '👉 Open Website Builder' },
     };
   }
@@ -621,8 +596,7 @@ export function getGroundedLocalResponse(
     q.includes('waec') ||
     q.includes('dstv') ||
     q.includes('tv') ||
-    q.includes('esim') ||
-    q.includes('wallet')
+    q.includes('esim')
   ) {
     return {
       reply:
@@ -648,35 +622,6 @@ export function getGroundedLocalResponse(
     };
   }
 
-  // Page-specific contextual answers
-  if (activePage === 'data') {
-    return {
-      reply:
-        "You are on our Data page! You can choose between MTN, AirtelTigo, and Telecel, browse in Card or Compact view, and click 'Buy Now' to have data credited to your phone quickly via Mobile Money.",
-      quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Select a Bundle' },
-    };
-  }
-
-  if (activePage === 'website') {
-    return {
-      reply:
-        "You are currently viewing our Website Builder. You can browse industry templates for Construction, Chop Bars & Restaurants, Salons, Churches, and Fashion ateliers, and click 'Interactive Preview' to test how they look on mobile and desktop.",
-      quickAction: { type: 'navigate', targetPage: 'website', label: '👉 Preview Templates' },
-    };
-  }
-
-  if (activePage === 'services') {
-    return {
-      reply:
-        "You are on the More Services page. These utilities (ECG power, Ghana Water, WAEC PINs, etc.) are in active development. Click 'Notify Me at Launch' on any card to get early access.",
-      quickAction: { type: 'navigate', targetPage: 'services', label: '👉 Join Service Waitlist' },
-    };
-  }
-
-  // Default welcoming reply
-  return {
-    reply:
-      "I'm Mystery AI, your guide to Mystery Hub! I can help you with discounted data for MTN, AirtelTigo, or Telecel, guide you in creating a website for your business, or explain our digital services in Ghana. What would you like to explore?",
-    quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Browse Data Bundles' },
-  };
+  // Unmatched questions need a genuine AI response; do not mask an outage with a greeting.
+  return null;
 }

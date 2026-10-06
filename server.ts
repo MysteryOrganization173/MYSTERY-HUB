@@ -1,15 +1,13 @@
-import { CommercialService } from './server/services/commercialService.js';
 import { corsMiddleware } from './server/middleware/cors.js';
 import express from 'express';
 import { loadApplicationEnvironment } from './server/utils/environment.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getGeminiClient } from './server/services/geminiClient.js';
+import { createMysteryAiRouter } from './server/routes/mysteryAiApi.js';
 import { apiRouter, handlePaystackWebhook, handleSuccessBizHubWebhook } from './server/routes/api.js';
 import { adminRouter } from './server/routes/adminApi.js';
 import { initDatabase } from './server/db/connection.js';
 import { bootstrapAdminAccount } from './server/services/adminBootstrap.js';
-import { buildMysteryAiSystemInstruction } from './server/services/mysteryAiContext.js';
 import { OrdersStore } from './server/db/ordersStore.js';
 import { FulfilmentService } from './server/services/fulfilmentService.js';
 
@@ -75,154 +73,8 @@ app.use('/api', apiRouter);
 // Mount Protected Admin V1 API Router
 app.use('/api/admin', adminRouter);
 
-// API endpoint for Mystery AI chat
-app.post('/api/mystery-ai/chat', async (req, res) => {
-  const startTime = Date.now();
-  try {
-    const { message, activePage, history, editorContext } = req.body;
-
-    if (!message || typeof message !== 'string') {
-      res.status(400).json({ error: 'Message is required' });
-      return;
-    }
-
-    // Sanitize safe editor context (no secrets, no auth tokens, strict schema)
-    let sanitizedEditorContext: any = null;
-    if (editorContext && editorContext.experienceMode === 'website_editor') {
-      sanitizedEditorContext = {
-        experienceMode: 'website_editor',
-        templateId: typeof editorContext.templateId === 'string' ? editorContext.templateId.slice(0, 50) : '',
-        templateName: typeof editorContext.templateName === 'string' ? editorContext.templateName.slice(0, 100) : '',
-        siteStatus: editorContext.siteStatus === 'published' ? 'published' : 'draft',
-        activeEditorSection: typeof editorContext.activeEditorSection === 'string' ? editorContext.activeEditorSection.slice(0, 50) : 'General',
-        previewDevice: ['desktop', 'tablet', 'mobile'].includes(editorContext.previewDevice) ? editorContext.previewDevice : 'mobile',
-        hasUnsavedChanges: Boolean(editorContext.hasUnsavedChanges),
-      };
-    }
-
-    const aiClient = getGeminiClient();
-
-    if (!aiClient) {
-      res.json({
-        fallback: true,
-        reply: null,
-        source: 'fallback',
-        reason: 'no_api_key',
-        latencyMs: Date.now() - startTime,
-      });
-      return;
-    }
-
-    const systemInstruction = buildMysteryAiSystemInstruction(sanitizedEditorContext,(await CommercialService.catalog()).products);
-    const pageContext = sanitizedEditorContext
-      ? `[Customer is currently in the Website Editor editing "${sanitizedEditorContext.templateName}" in section "${sanitizedEditorContext.activeEditorSection}"]`
-      : activePage
-      ? `[Customer is currently viewing the "${activePage}" page on Mystery Hub]`
-      : '';
-
-    const formattedHistory = Array.isArray(history)
-      ? history.slice(-8).map((item: { role: string; content: string }) => ({
-          role: item.role === 'user' ? 'user' : 'model',
-          parts: [{ text: item.content }],
-        }))
-      : [];
-
-    const contents = [
-      ...formattedHistory,
-      {
-        role: 'user',
-        parts: [{ text: `${pageContext}\nCustomer Question: ${message}` }],
-      },
-    ];
-
-    // Classify query complexity deterministically
-    const trimmedMessage = message.trim();
-    const wordCount = trimmedMessage.split(/\s+/).filter(Boolean).length;
-    const complexTriggers = [
-      'rewrite', 're-write', 'compose', 'draft a', 'generate copy', 'headline ideas',
-      'recommend a layout', 'structure my', 'compare', 'contrast', 'troubleshoot',
-      'why might', 'explain why', 'critique', 'analyse', 'analyze', 'audit',
-      'suggest a marketing strategy', 'optimise', 'optimize', 'copywriting',
-      'sound premium', 'professional tone', 'persuade'
-    ];
-    const isComplex = wordCount > 25 || complexTriggers.some((t) => trimmedMessage.toLowerCase().includes(t));
-    const routingClass = isComplex ? 'complex' : 'simple';
-
-    // Model sequence and sensible per-model timeouts:
-    // Simple query: Flash Lite first (~3500ms), fallback to Flash (~7000ms)
-    // Complex query: Flash first (~7000ms), fallback to Flash Lite (~3500ms)
-    const candidateModels = isComplex
-      ? [
-          { name: 'gemini-3.8-flash', timeout: 7000 },
-          { name: 'gemini-3.1-flash-lite', timeout: 3500 },
-        ]
-      : [
-          { name: 'gemini-3.1-flash-lite', timeout: 3500 },
-          { name: 'gemini-3.8-flash', timeout: 7000 },
-        ];
-
-    let textResponse: string | null = null;
-    let usedModel: string | null = null;
-
-    for (const { name: modelName, timeout } of candidateModels) {
-      try {
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Timeout calling Gemini model ${modelName} after ${timeout}ms`)), timeout)
-        );
-
-        const generatePromise = aiClient.models.generateContent({
-          model: modelName,
-          contents,
-          config: {
-            systemInstruction,
-            temperature: 0.7,
-            topP: 0.9,
-          },
-        });
-
-        const response = await Promise.race([generatePromise, timeoutPromise]);
-        if (response.text) {
-          textResponse = response.text;
-          usedModel = modelName;
-          break;
-        }
-      } catch (err) {
-        console.warn(`[Mystery AI] Model ${modelName} error or timeout:`, err);
-      }
-    }
-
-    const latencyMs = Date.now() - startTime;
-
-    if (textResponse) {
-      res.json({
-        reply: textResponse,
-        fallback: false,
-        source: 'gemini',
-        model: usedModel,
-        routingClass,
-        latencyMs,
-      });
-    } else {
-      res.json({
-        fallback: true,
-        reply: null,
-        source: 'fallback',
-        reason: 'model_unavailable',
-        routingClass,
-        latencyMs,
-      });
-    }
-  } catch (error) {
-    console.error('Mystery AI Server Error:', error);
-    res.json({
-      fallback: true,
-      reply: null,
-      source: 'fallback',
-      reason: 'server_error',
-      latencyMs: Date.now() - startTime,
-    });
-  }
-});
+// Bounded informational AI endpoint (no account or transaction tools).
+app.use('/api/mystery-ai', createMysteryAiRouter());
 
 // Setup Vite in development or static serving in production
 async function startServer() {

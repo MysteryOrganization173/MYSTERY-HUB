@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ActivePage } from '../../types';
 import { MysteryAiIcon } from './MysteryAiIcon';
+import { AiRequestGate } from '../../utils/aiRequestGate';
 import {
   ChatMessage,
   SuggestedQuestion,
@@ -40,6 +41,14 @@ export const MysteryAiAssistant: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [failure, setFailure] = useState<{query: string; messageId: string; error: string} | null>(null);
+  const requestGate = useRef(new AiRequestGate());
+  const cancelPending = () => {
+    requestGate.current.cancel();
+    setIsTyping(false);
+    setFailure(null);
+  };
+  useEffect(() => () => requestGate.current.cancel(), []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,19 +58,30 @@ export const MysteryAiAssistant: React.FC = () => {
 
   const isInsideEditor = Boolean(activeEditorSite);
 
-  // Sync external open/close from context
+  // If any critical modal or preview dialog is open, step aside to avoid collision
+  const isAnyModalActive =
+    isCheckoutOpen ||
+    isStatusModalOpen ||
+    isAuthModalOpen ||
+    Boolean(selectedTemplatePreview) ||
+    Boolean(marketplaceInquiryProduct) ||
+    Boolean(waitlistInfo?.isOpen);
+
+  const chatAvailable = useRef(false);
+  chatAvailable.current = isMysteryAiOpen && !isAnyModalActive;
+
+  // Cancel both delayed prompts and active requests when context closes the chat.
   useEffect(() => {
-    if (isMysteryAiOpen && !isOpen) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (isMysteryAiOpen) {
       setIsOpen(true);
       setIsExpandedPrompt(false);
-      if (mysteryAiInitialPrompt) {
-        setTimeout(() => {
-          handleSendMessage(mysteryAiInitialPrompt);
-        }, 100);
-      }
-    } else if (!isMysteryAiOpen && isOpen) {
+      if (mysteryAiInitialPrompt) timer = setTimeout(() => handleSendMessage(mysteryAiInitialPrompt), 100);
+    } else {
+      cancelPending();
       setIsOpen(false);
     }
+    return () => { if (timer) clearTimeout(timer); };
   }, [isMysteryAiOpen, mysteryAiInitialPrompt]);
 
   const getPageDisplayName = (page: ActivePage) => {
@@ -161,6 +181,7 @@ export const MysteryAiAssistant: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
+        cancelPending();
         closeMysteryAi();
         setIsOpen(false);
       }
@@ -171,6 +192,7 @@ export const MysteryAiAssistant: React.FC = () => {
 
   const handleToggle = () => {
     if (isOpen) {
+      cancelPending();
       closeMysteryAi();
       setIsOpen(false);
     } else {
@@ -180,51 +202,41 @@ export const MysteryAiAssistant: React.FC = () => {
     }
   };
 
-  const handleSendMessage = async (textToSend?: string) => {
+  const handleSendMessage = async (textToSend?: string, retry = false) => {
     const query = (textToSend || inputValue).trim();
-    if (!query || isTyping) return;
-
+    if (!query || !chatAvailable.current || requestGate.current.busy) return;
+    const request = requestGate.current.begin();
     const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: query,
+      id: retry && failure ? failure.messageId : `user-${Date.now()}`,
+      role: 'user', content: query,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
-
-    setMessages((prev) => [...prev, userMsg]);
+    // History contains prior turns only. The server appends the current question once.
+    const priorHistory = retry ? messages.filter(m => m.id !== userMsg.id) : messages;
+    if (!retry) setMessages(prev => [...prev, userMsg]);
+    setFailure(null);
     setInputValue('');
     setIsTyping(true);
-
     try {
-      const response = await sendMysteryAiMessage(query, activePage, [...messages, userMsg]);
-
-      const aiMsg: ChatMessage = {
-        id: `ai-${Date.now()}`,
-        role: 'assistant',
-        content: response.reply,
+      const response = await sendMysteryAiMessage(query, activePage, priorHistory, undefined, request.signal);
+      if (!requestGate.current.accepts(request)) return;
+      setMessages(prev => [...prev, {
+        id: `ai-${Date.now()}`, role: 'assistant', content: response.reply,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        quickAction: response.quickAction,
-      };
-
-      setMessages((prev) => [...prev, aiMsg]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `ai-err-${Date.now()}`,
-          role: 'assistant',
-          content:
-            "I'm here to help you navigate Mystery Hub in Ghana! How can I assist you with data, websites, or upcoming utilities?",
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Browse Data Offers' },
-        },
-      ]);
+        quickAction: response.quickAction, source: response.source,
+      }]);
+    } catch (error) {
+      if (!requestGate.current.accepts(request)) return;
+      // The service exposes only safe product-facing errors, never provider details.
+      setFailure({query, messageId: userMsg.id, error: error instanceof Error ? error.message : "Couldn't reach Mystery AI just now. Try again."});
     } finally {
-      setIsTyping(false);
+      if (requestGate.current.accepts(request)) setIsTyping(false);
+      requestGate.current.finish(request);
     }
   };
 
   const handleClearHistory = () => {
+    cancelPending();
     setMessages([
       {
         id: `welcome-${activePage}-${Date.now()}`,
@@ -240,6 +252,8 @@ export const MysteryAiAssistant: React.FC = () => {
     // Smooth auto-scroll to top and toast feedback
     window.scrollTo({ top: 0, behavior: 'smooth' });
     if (window.innerWidth < 640) {
+      cancelPending();
+      closeMysteryAi();
       setIsOpen(false);
     }
   };
@@ -254,14 +268,7 @@ export const MysteryAiAssistant: React.FC = () => {
       ]
     : getSuggestedQuestionsForPage(activePage);
 
-  // If any critical modal or preview dialog is open, step aside to avoid collision
-  const isAnyModalActive =
-    isCheckoutOpen ||
-    isStatusModalOpen ||
-    isAuthModalOpen ||
-    Boolean(selectedTemplatePreview) ||
-    Boolean(marketplaceInquiryProduct) ||
-    Boolean(waitlistInfo?.isOpen);
+  useEffect(() => { if (isAnyModalActive) cancelPending(); }, [isAnyModalActive]);
 
   if (isAnyModalActive) {
     return null;
@@ -291,8 +298,7 @@ export const MysteryAiAssistant: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-sm text-white tracking-tight">Mystery AI</h3>
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#00c365]/10 border border-[#00c365]/20 text-[10px] font-medium text-[#00c365]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#00c365] animate-pulse" />
-                    Online
+                    Guide
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5">Customer Guide & Support</p>
@@ -310,6 +316,7 @@ export const MysteryAiAssistant: React.FC = () => {
               </button>
               <button
                 onClick={() => {
+                  cancelPending();
                   closeMysteryAi();
                   setIsOpen(false);
                 }}
@@ -357,7 +364,7 @@ export const MysteryAiAssistant: React.FC = () => {
                     )}
                   </div>
                   <span className="text-[10px] text-slate-500 mt-1 px-1">
-                    {msg.timestamp}
+                    {msg.source === 'scripted' ? 'Help guide · ' : msg.source === 'gemini' ? 'AI answer · ' : ''}{msg.timestamp}
                   </span>
                 </div>
               );
@@ -400,6 +407,13 @@ export const MysteryAiAssistant: React.FC = () => {
             </div>
           )}
 
+          {failure && (
+            <div role="alert" className="px-4 py-2 text-xs text-slate-300 border-t border-slate-800">
+              {failure.error}
+              <button type="button" onClick={() => handleSendMessage(failure.query, true)} disabled={isTyping}
+                className="ml-2 underline text-[#00c365] disabled:opacity-50">Retry</button>
+            </div>
+          )}
           {/* Input Footer */}
           <form
             onSubmit={(e) => {
@@ -411,6 +425,7 @@ export const MysteryAiAssistant: React.FC = () => {
             <input
               ref={inputRef}
               type="text"
+              maxLength={2000}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Ask Mystery AI about data, websites, pricing..."
