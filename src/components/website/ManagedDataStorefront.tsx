@@ -1,0 +1,38 @@
+import React,{useEffect,useRef,useState} from 'react';
+import { BundleCard } from '../data/BundleCard';
+import { DataResellerTemplateView } from './templates/DataResellerTemplateView';
+import { usePaystack } from '../../hooks/usePaystack';
+import { websiteBusinessRequest,trackPublicWebsite } from '../../services/websiteBusinessApi';
+import { dataDeliveryNote, dataOrderPresentation } from '../../utils/dataPurchasePresentation';
+import { formatGhs } from '../../../shared/money';
+import type { WebsiteTemplate,DataBundle } from '../../types';
+const control='min-h-11 px-4 py-2 rounded-lg border border-slate-700 disabled:opacity-50';
+export function ManagedDataStorefront({siteId,template}:{siteId:string;template:WebsiteTemplate}) {
+  const [products,setProducts]=useState<any[]>([]),[network,setNetwork]=useState('mtn'),[selected,setSelected]=useState<DataBundle|null>(null),[phone,setPhone]=useState(''),[email,setEmail]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(true),[order,setOrder]=useState<any>(null),[reference,setReference]=useState(''),[busy,setBusy]=useState(false);
+  const requestId=useRef<string|null>(null),guard=useRef(false),dialog=useRef<HTMLDialogElement>(null);
+  const payment=usePaystack();
+  useEffect(()=>{setLoading(true);websiteBusinessRequest(`websites/${siteId}/storefront`).then(data=>setProducts(data.products)).catch(e=>setError(e.message)).finally(()=>setLoading(false));},[siteId]);
+  useEffect(()=>{if(selected)dialog.current?.showModal();},[selected]);
+  const refresh=async(ref=reference)=>{if(!ref)return;try{const result=await websiteBusinessRequest(`websites/${encodeURIComponent(siteId)}/store-orders/${encodeURIComponent(ref)}`);setOrder(result);}catch(e:any){setError(e.message);}};
+  useEffect(()=>{if(!reference)return;void refresh();const timer=setInterval(()=>void refresh(),10000);return()=>clearInterval(timer);},[reference]);
+  const choose=(bundle:DataBundle,recipient?:string)=>{setSelected(bundle);if(recipient)setPhone(recipient);requestId.current=crypto.randomUUID();setError('');trackPublicWebsite(siteId,'product_view');trackPublicWebsite(siteId,'checkout_started');};
+  const checkout=async()=>{
+    if(!selected||guard.current)return;
+    if(!/^(0\d{9}|233\d{9}|\+233\d{9})$/.test(phone.replace(/[\s-]/g,''))){setError('Enter a valid Ghana recipient number.');return;}
+    if(!/^\S+@\S+\.\S+$/.test(email)){setError('Enter a valid email for your receipt.');return;}
+    guard.current=true;setBusy(true);setError('');
+    await payment.initializeServerPayment({store:{siteId,requestId:requestId.current!,expectedMinor:Math.round(selected.priceGhc*100)},productId:selected.id,recipientPhone:phone,customerEmail:email,onOrderCreated:ref=>setReference(ref),onPaymentReceived:(ref)=>{setReference(ref);setSelected(null);guard.current=false;setBusy(false);void refresh(ref);},onCancel:(ref)=>{if(ref){setReference(ref);void refresh(ref);}setBusy(false);guard.current=false;},onError:e=>{if(e.existingOrderReference){setReference(e.existingOrderReference);void refresh(e.existingOrderReference);}setError(e.message);guard.current=false;setBusy(false);}});
+    // Once initialized, retain the request ID while the popup is open or cancelled.
+  };
+  const presentation=order?dataOrderPresentation(order.status,order.manual_review):null;
+  const storefront=<div className="space-y-5 text-white">
+    <h2 className="text-xl font-bold">Buy data from {template.demoBusinessName}</h2><p className="text-sm text-slate-400">Secure checkout powered by Mystery Hub. Your advertised price is the total.</p>
+    <nav aria-label="Store networks" className="flex flex-wrap gap-2">{['mtn','telecel','airteltigo'].map(net=><button key={net} className={`${control} ${network===net?'bg-emerald-500/15 text-emerald-300':''}`} aria-pressed={network===net} onClick={()=>setNetwork(net)}>{net.toUpperCase()}</button>)}</nav>
+    {loading&&<p role="status">Loading available bundles…</p>}{error&&!selected&&<p role="alert" className="text-rose-300">{error}</p>}
+    {!loading&&!products.filter(p=>p.network===network).length&&<p className="text-slate-400">No bundles available on this network right now.</p>}
+    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">{products.filter(p=>p.network===network).map(p=>{const bundle:DataBundle={id:p.id,network:p.network,dataAmount:p.dataAmount,dataBytesValue:0,priceGhc:p.retailMinor/100,validity:p.validity||'',validityCategory:'Monthly',description:p.description,serviceType:'data'};return <BundleCard key={p.id} bundle={bundle} onBuy={(b,options)=>choose(b,options?.recipientPhone)}/>;})}</div>
+    <section className="border-t border-slate-700 pt-5 space-y-3" aria-label="Track store order"><h3 className="font-bold">Track your order</h3><form className="flex flex-wrap gap-2" onSubmit={event=>{event.preventDefault();void refresh();}}><input aria-label="Order reference" value={reference} onChange={event=>{setReference(event.target.value.trim());setOrder(null);}} maxLength={64} placeholder="MH-… order reference" className="min-w-0 flex-1 min-h-11 p-3 bg-slate-900 rounded-lg border border-slate-700"/><button className={control}>Check status</button></form>{order&&<div className="space-y-2 text-sm"><p className="font-bold">{order.network.toUpperCase()} {order.bundle_size_snapshot} · {formatGhs(order.amount)}</p><p>Recipient: {order.recipient_phone}</p><p className="capitalize">{order.status.replace(/_/g,' ')}</p><p className="text-slate-400">{presentation?.next}</p><p className="text-xs break-all">{order.public_reference}</p></div>}</section>
+    {selected&&<dialog ref={dialog} aria-labelledby="store-checkout-title" onCancel={event=>{event.preventDefault();if(!busy)setSelected(null);}} className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-lg max-h-[90dvh] overflow-auto bg-[#0b131a] border border-slate-700 rounded-2xl p-5 text-white backdrop:bg-black/70"><div className="flex justify-between gap-3"><h2 id="store-checkout-title" className="font-bold text-xl">Review your order</h2><button disabled={busy} className={control} onClick={()=>setSelected(null)}>Close</button></div><p className="mt-3 font-semibold">{template.demoBusinessName}</p><p className="text-sm text-slate-400">{selected.network.toUpperCase()} · {selected.dataAmount}</p><p className="text-2xl font-bold my-3">{formatGhs(Math.round(selected.priceGhc*100))} total</p><label className="block text-sm mt-4">Recipient number<input autoFocus type="tel" inputMode="tel" maxLength={16} disabled={busy} value={phone} onChange={event=>{setPhone(event.target.value);requestId.current=crypto.randomUUID();}} className="w-full min-h-11 mt-1 p-3 rounded-lg bg-slate-900 border border-slate-700"/></label><label className="block text-sm mt-4">Receipt email<input type="email" maxLength={254} disabled={busy} value={email} onChange={event=>{setEmail(event.target.value);requestId.current=crypto.randomUUID();}} className="w-full min-h-11 mt-1 p-3 rounded-lg bg-slate-900 border border-slate-700"/></label><p className="text-xs text-slate-400 my-4">{dataDeliveryNote(selected.network)} Check the recipient carefully before paying. Keep your order reference for tracking.</p>{error&&<p role="alert" className="text-rose-300 my-3">{error}</p>}<button className={`${control} w-full bg-emerald-500 text-black font-bold`} disabled={busy} onClick={()=>void checkout()}>{busy?payment.loadingPhase==='opening'?'Opening secure payment…':'Connecting to secure payment…':`Pay ${formatGhs(Math.round(selected.priceGhc*100))}`}</button><button className={`${control} w-full mt-2`} disabled={busy} onClick={()=>setSelected(null)}>Change package</button></dialog>}
+  </div>;
+  return <DataResellerTemplateView template={template} managedCheckout={storefront}/>;
+}

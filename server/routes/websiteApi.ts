@@ -1,3 +1,4 @@
+import { websiteBusinessRouter } from './websiteBusinessApi.js';
 import { WebsiteInputError } from '../services/websiteValidation.js';
 import { websiteMediaRouter, websiteActionsRouter, websiteFreeHandler } from './websiteFreeApi.js';
 import { WebsiteAssetStore } from '../db/websiteAssetStore.js';
@@ -20,6 +21,7 @@ import { PublicWebsiteSite, sanitizeString, isValidTemplateId } from '../types/w
 export const websiteRouter = Router();
 websiteRouter.use("/ultra", ultraRouter);
 websiteRouter.use('/:siteId/assets', websiteMediaRouter);
+websiteRouter.use(websiteBusinessRouter);
 websiteRouter.use(websiteActionsRouter);
 
 /**

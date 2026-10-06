@@ -1,3 +1,4 @@
+import { adminWebsiteBusinessRouter } from './websiteBusinessApi.js';
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { requireAuth, requireAdmin, optionalAuth } from '../middleware/authMiddleware.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
@@ -53,6 +54,7 @@ websiteActionsRouter.post('/:id/change-template',requireAuth,editing,websiteFree
 }));
 export const adminWebsiteRouter=Router();
 adminWebsiteRouter.use(requireAdmin);
+adminWebsiteRouter.use(adminWebsiteBusinessRouter);
 adminWebsiteRouter.get('/',websiteFreeHandler(async(req,res)=>{res.json({success:true,...await WebsiteAnalyticsStore.summary(req.query)});}));
 adminWebsiteRouter.get('/:id',websiteFreeHandler(async(req,res)=>{
   const site=await WebsiteStore.findSiteById(req.params.id);

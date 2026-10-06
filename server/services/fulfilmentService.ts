@@ -1,3 +1,4 @@
+import { WebsiteBusinessService } from './websiteBusinessService.js';
 /**
  * Centralized Fulfilment Service
  * Orchestrates preflight checks and post-payment supplier dispatch for Data Bundles.
@@ -318,6 +319,9 @@ export class FulfilmentService {
       return { order: null, alreadyHandled: false };
     }
 
+    await WebsiteBusinessService.syncOrder(paidOrder);
+    if(paidOrder.store_context && paidOrder.manual_review)return {order:paidOrder,alreadyHandled:true};
+
     // Step 2: Atomically claim order for supplier dispatch (paid -> queued ONLY)
     const claimedOrder = await OrdersStore.claimOrderForSupplierDispatch(paidOrder.id);
     if (!claimedOrder) {
@@ -561,6 +565,8 @@ export class FulfilmentService {
       }
     }
 
+    let storePostStarted=false;
+    let storeSupplierId:string|undefined;
     // 4-Data: Live dispatch to Success Biz Hub Data catalog
     try {
       // 4a. Resolve live supplier package
@@ -582,6 +588,10 @@ export class FulfilmentService {
       }
 
       const { offerSlug, offerId, sizeLabel, supplierCostMinor } = resolution.resolved;
+      if(claimedOrder.store_context && (!Number.isSafeInteger(supplierCostMinor) || supplierCostMinor <= 0 || supplierCostMinor > claimedOrder.store_context.wholesaleMinor)) {
+        const held=await OrdersStore.saveSupplierUncertainSubmission(claimedOrder.id,'Store supplier cost exceeds the economic snapshot; Admin reconciliation required.');
+        return {order:held||claimedOrder,alreadyHandled:false};
+      }
       const offerRef = offerSlug || offerId || 'catalog_offer';
 
       // 4b. Format recipient phone
@@ -597,6 +607,9 @@ export class FulfilmentService {
       else if (offerId) orderPayload.offerId = offerId;
 
       console.info(`[Fulfilment Dispatch] Submitting order ${claimedOrder.public_reference} to Success Biz Hub for ${msisdn} (${sizeLabel})...`);
+      // Persist uncertainty before POST: a process crash cannot leave an apparently safe queued sale.
+      if(claimedOrder.store_context)await OrdersStore.saveSupplierUncertainSubmission(claimedOrder.id,'Managed store dispatch started; acceptance is awaiting confirmation.');
+      storePostStarted=true;
       const response = await this.provider.client.createOrder(orderPayload);
       const data = response.data || {};
       const supplierOrderId = data.publicId || data.id;
@@ -605,6 +618,7 @@ export class FulfilmentService {
         throw new Error('Success Biz Hub did not return an order identifier.');
       }
 
+      if(claimedOrder.store_context){storeSupplierId=String(supplierOrderId);await OrdersStore.updateOrderStatus(claimedOrder.id,'queued',undefined,storeSupplierId);}
       const supplierDomainStatus = this.provider.mapSupplierStatus(data.status);
       const mappedOrderStatus: OrderStatus =
         supplierDomainStatus === 'delivered'
@@ -626,6 +640,11 @@ export class FulfilmentService {
 
       return { order: submittedOrder || claimedOrder, alreadyHandled: false };
     } catch (err: unknown) {
+      if(claimedOrder.store_context&&storePostStarted) {
+        if(storeSupplierId)await OrdersStore.updateOrderStatus(claimedOrder.id,'queued',undefined,storeSupplierId);
+        const held=await OrdersStore.saveSupplierUncertainSubmission(claimedOrder.id,'Managed store supplier acceptance needs reconciliation.');
+        return {order:held||claimedOrder,alreadyHandled:false};
+      }
       const isTimeout = Boolean((err as { isTimeout?: boolean })?.isTimeout);
       const errorMessage = err instanceof Error ? err.message : 'Unknown supplier error';
 
@@ -665,7 +684,7 @@ export class FulfilmentService {
    */
   static async refreshOrderStatusIfDue(order: OrderRecord, force = false): Promise<OrderRecord> {
     if (order.service_type === 'afa') return AfaService.refresh(order);
-    const uncertainWithId = order.status === 'queued' && order.failure_reason === 'supplier_submission_uncertain';
+    const uncertainWithId = order.failure_reason === 'supplier_submission_uncertain' && (order.status === 'queued' || order.store_context && order.manual_review && ['submitted','processing','delivered'].includes(order.status));
     if (!order.supplier_order_id || (order.status !== 'submitted' && order.status !== 'processing' && !uncertainWithId)) {
       return order;
     }
@@ -707,7 +726,7 @@ export class FulfilmentService {
             ? 'processing'
             : 'submitted';
 
-        if (mappedStatus !== order.status) {
+        if (mappedStatus !== order.status || order.store_context && order.manual_review && order.failure_reason === 'supplier_submission_uncertain') {
           const updated = await OrdersStore.updateOrderStatus(
             order.id,
             mappedStatus,
@@ -715,6 +734,7 @@ export class FulfilmentService {
             order.supplier_order_id,
             JSON.stringify(statusRes.rawResponse)
           );
+          if(order.store_context&&order.manual_review&&order.failure_reason==='supplier_submission_uncertain'&&(updated||order).status===mappedStatus)return await OrdersStore.resolveStoreSupplierReview(order.id,order.supplier_order_id)||updated||order;
           return updated || order;
         }
       }
@@ -737,6 +757,7 @@ export class FulfilmentService {
     let updatedCount = 0;
     try {
       await FinanceService.reconcileWalletOrders();
+      await WebsiteBusinessService.recoverEffects();
       await AfaStore.reconcileTerminalPayloads();
       const activeOrders = await OrdersStore.getActiveSupplierOrders(limit);
       scanned = activeOrders.length;

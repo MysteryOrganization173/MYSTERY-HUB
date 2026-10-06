@@ -1,3 +1,5 @@
+import { ManagedDataStorefront } from './ManagedDataStorefront';
+import { trackPublicWebsite, publicWebsiteClickKind } from '../../services/websiteBusinessApi';
 import React, { useState, useEffect } from 'react';
 import { getPublicSiteBySlug } from '../../services/apiClient';
 import { PublicWebsiteSite } from '../../types';
@@ -23,6 +25,7 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
         if (!isMounted) return;
         if (res.success && res.site) {
           setSite(res.site);
+          trackPublicWebsite(res.site.id,'site_view');
           if (res.site.content?.businessName) {
             document.title = `${res.site.content.businessName} · Official Website`;
           }
@@ -87,8 +90,8 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
   return (
     <div className="min-h-screen flex flex-col justify-between bg-white text-slate-900 antialiased selection:bg-[#00c365] selection:text-black">
       {/* Dynamic Website Render */}
-      <div className="flex-1 w-full">
-        {renderTemplateLayout(mergedTemplate)}
+      <div className="flex-1 w-full" onClickCapture={event=>{const target=(event.target as HTMLElement).closest('a,button');if(!target)return;const kind=publicWebsiteClickKind(target);if(kind)trackPublicWebsite(site.id,kind);}}>
+        {site.template_id==='tmpl-data-reseller'?<ManagedDataStorefront siteId={site.id} template={mergedTemplate}/>:renderTemplateLayout(mergedTemplate)}
       </div>
 
       {/* Free Tier Attribution Link (Tasteful, Non-Intrusive) */}

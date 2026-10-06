@@ -1,3 +1,4 @@
+import { WebsiteBusinessDashboard } from './WebsiteBusinessDashboard';
 import { WebsiteSettingsControls } from './WebsiteSettingsControls';
 import { trackWebsiteEvent } from '../../utils/websiteAnalytics';
 import React, { useState, useEffect } from 'react';
@@ -61,6 +62,7 @@ export const WebsiteBuilderPage: React.FC = () => {
   const [siteFetchError, setSiteFetchError] = useState<string | null>(null);
   const [actionLoadingSiteId, setActionLoadingSiteId] = useState<string | null>(null);
   const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
+  const [changeTarget,setChangeTarget]=useState('');
 
   useEffect(() => { trackWebsiteEvent('website_builder_viewed', {source:'builder'}, sessionToken || undefined); }, [sessionToken]);
 
@@ -155,6 +157,7 @@ export const WebsiteBuilderPage: React.FC = () => {
   const displayedTemplates = isFiltering || showAllTemplates ? filteredTemplates : filteredTemplates.slice(0, 6);
 
   const handleCreateSite = async (templateId: string, templateName?: string) => {
+    if(activeSite && activeSite.template_id!==templateId){setChangeTarget(templateId);return;}
     const doCreate = async (token: string) => {
       trackWebsiteEvent('website_build_started', {templateId,source:'builder'}, token);
       try {
@@ -303,6 +306,8 @@ export const WebsiteBuilderPage: React.FC = () => {
   return (
     <div className="py-6 sm:py-10 text-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
+        {activeSite&&sessionToken&&<WebsiteBusinessDashboard site={activeSite} token={sessionToken} onEdit={()=>openWebsiteEditor(activeSite)} onSettings={()=>setShowSettingsDrawer(true)}/>}
+        {activeSite&&sessionToken&&changeTarget&&<WebsiteSettingsControls site={activeSite} token={sessionToken} requestedTemplateId={changeTarget} selectionOnly onClosed={()=>setChangeTarget('')} onDeleted={()=>setMySites([])} onUpdated={updated=>{setMySites([updated]);setChangeTarget('');openWebsiteEditor(updated);}}/>}
         {/* =========================================================
             LOADING / ERROR STATE FOR AUTHENTICATED USERS
             ========================================================= */}

@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { initializePaymentOnServer, verifyPaymentOnServer } from '../services/apiClient';
 import { getActiveSessionToken } from '../utils/authStorage';
+import { initializeStorePayment } from '../services/websiteBusinessApi';
 
 export interface PaystackTransactionResponse {
   reference: string;
@@ -37,6 +38,8 @@ declare global {
 }
 
 export interface ServerPaystackOptions {
+  store?: {siteId:string;requestId:string;expectedMinor:number};
+  onOrderCreated?: (orderRef:string) => void;
   productId: string;
   recipientPhone: string;
   customerEmail?: string;
@@ -109,7 +112,7 @@ export function usePaystack() {
     try {
       // 1. Call Backend to create pending order & initialize Paystack transaction authoritatively
       const sessionToken = getActiveSessionToken();
-      const initRes = await initializePaymentOnServer(
+      const initRes = options.store ? await initializeStorePayment(options.store.siteId,options.store.requestId,options.productId,options.recipientPhone,options.customerEmail||'',sessionToken||undefined) : await initializePaymentOnServer(
         {
           productId: options.productId,
           recipientPhone: options.recipientPhone,
@@ -127,6 +130,8 @@ export function usePaystack() {
       }
 
       const { orderRef, reference, accessCode, isSimulated } = initRes;
+      options.onOrderCreated?.(orderRef);
+      if(options.store&&initRes.amountPesewas!==options.store.expectedMinor)throw new Error('This bundle price changed. Refresh the storefront and review the current total before paying. No payment was opened.');
 
       if (!accessCode) {
         throw new Error('Server did not return a valid Paystack payment access code.');

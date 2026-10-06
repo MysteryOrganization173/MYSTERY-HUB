@@ -14,11 +14,11 @@ export function operationKey(value:unknown) {if(typeof value!=='string'||!/^[-a-
 const confirmation=(value:unknown)=>{if(value!==true)throw new FinanceError('Explicit confirmation is required.');};
 const text=(value:unknown,max=160)=>{if(typeof value!=='string'||!value.trim()||value.length>max||/[\x00-\x1f]/.test(value))throw new FinanceError('Enter a valid reason/name/reference.');return value.trim();};
 const sameAmount=(row:FinanceOperation,amount:number)=>{if(row.amount_minor!==amount)throw new FinanceError('This request ID belongs to a different amount.',409);};
-export const maskWithdrawal=(row:FinanceOperation)=>({...row,payload:{network:row.payload.network,maskedPhone:`******${String(row.payload.phone).slice(-4)}`,feeBps:row.payload.feeBps,feeMinor:row.payload.feeMinor,netMinor:row.payload.netMinor,paidAt:row.payload.paidAt||null,rejectionReason:row.payload.rejectionReason||null}});
+export const maskWithdrawal=(row:FinanceOperation)=>({...row,payload:{source:row.payload.source==='store'?'Store Earnings':'Mystery Earn',network:row.payload.network,maskedPhone:`******${String(row.payload.phone).slice(-4)}`,feeBps:row.payload.feeBps,feeMinor:row.payload.feeMinor,netMinor:row.payload.netMinor,paidAt:row.payload.paidAt||null,rejectionReason:row.payload.rejectionReason||null}});
 export class FinanceService {
   static async config(tx:FinanceTx){return {...FINANCE_DEFAULTS,...await tx.config('settings')};}
   static async summary(userId:string,offset=0) {
-    return FinanceStore.transaction(userId,async tx=>{const account=await tx.account();const earn=await tx.earn();return {walletMinor:account.wallet_minor,restricted:account.restricted,earn,settings:await this.config(tx),ledger:(await tx.ledger()).filter(x=>x.bucket==='wallet').slice(offset,offset+25),withdrawals:(await tx.operations()).filter(x=>x.kind==='withdrawal').slice(offset,offset+25).map(maskWithdrawal),topups:(await tx.operations()).filter(x=>x.kind==='topup').slice(0,10).map(x=>({id:x.id,amountMinor:x.amount_minor,state:x.state,reference:x.payload.reference,createdAt:x.created_at})),achievements:await this.achievementProgress(tx)};});
+    return FinanceStore.transaction(userId,async tx=>{const account=await tx.account();const earn=await tx.earn();return {walletMinor:account.wallet_minor,restricted:account.restricted,earn,settings:await this.config(tx),ledger:(await tx.ledger()).filter(x=>x.bucket==='wallet').slice(offset,offset+25),withdrawals:(await tx.operations()).filter(x=>x.kind==='withdrawal'&&x.payload.source!=='store').slice(offset,offset+25).map(maskWithdrawal),topups:(await tx.operations()).filter(x=>x.kind==='topup').slice(0,10).map(x=>({id:x.id,amountMinor:x.amount_minor,state:x.state,reference:x.payload.reference,createdAt:x.created_at})),achievements:await this.achievementProgress(tx)};});
   }
   static async initializeTopup(user:UserRecord,input:Record<string,unknown>,origin:string) {
     if(process.env.NODE_ENV==='production'&&!process.env.PAYSTACK_SECRET_KEY?.trim().startsWith('sk_live_'))throw new FinanceError('Live Wallet funding is unavailable.',503);
@@ -61,27 +61,27 @@ export class FinanceService {
       const row=await tx.create('transfer',key,amount,{feeMinor:0,irreversible:true});await tx.append(row,'earn',-amount,'Transferred to Mystery Wallet');await tx.append(row,'wallet',amount,'Transferred from Mystery Earn');return row;});
   }
   static async requestWithdrawal(userId:string,input:Record<string,unknown>) {
-    confirmation(input.confirmed);const amount=moneyMinor(input.amountMinor),key=`withdrawal:${operationKey(input.requestId)}`;
+    confirmation(input.confirmed);const source=input.source==='store'?'store':'earn';const amount=moneyMinor(input.amountMinor),key=`${source==='store'?'store-':''}withdrawal:${operationKey(input.requestId)}`;
     const phone=validateAndNormalizeGhanaPhone(input.phone as string);if(!phone.isValid)throw new FinanceError('Enter a valid Ghana Mobile Money number.');
     const network=input.network;if(!['mtn','telecel','airteltigo'].includes(network as string))throw new FinanceError('Select a valid Mobile Money network.');
     const recipient=text(input.recipientName,128);
     return FinanceStore.transaction(userId,async tx=>{const old=await tx.find(key);if(old){sameAmount(old,amount);if(old.payload.phone!==phone.normalized||old.payload.network!==network||old.payload.recipientName!==recipient)throw new FinanceError('Request details changed.',409);return maskWithdrawal(old);}
-      const settings=await this.config(tx),earn=await tx.earn();if(amount<settings.withdrawalMinimumMinor)throw new FinanceError(`Minimum withdrawal is GH₵${(settings.withdrawalMinimumMinor/100).toFixed(2)}.`);
+      const settings=source==='store'?{...FINANCE_DEFAULTS,...await tx.config('store-policy')}:await this.config(tx),earn=source==='store'?await tx.storeEarnings():await tx.earn();if(amount<settings.withdrawalMinimumMinor)throw new FinanceError(`Minimum withdrawal is GH₵${(settings.withdrawalMinimumMinor/100).toFixed(2)}.`);
       if((await tx.account()).restricted||earn.reconciliationRequired||earn.availableMinor<amount)throw new FinanceError('Insufficient available earnings or reconciliation required.',409);
       const fee=percentMinor(amount,settings.withdrawalFeeBps);if(fee>=amount)throw new FinanceError('Withdrawal has no payable amount.');
-      const row=await tx.create('withdrawal',key,amount,{feeBps:settings.withdrawalFeeBps,feeMinor:fee,netMinor:amount-fee,phone:phone.normalized,network,recipientName:recipient},'pending_review');
-      await tx.append(row,'earn',-amount,'Reserved for withdrawal');return maskWithdrawal(row);});
+      const row=await tx.create('withdrawal',key,amount,{source,policyVersion:settings.version||'finance-settings',feeBps:settings.withdrawalFeeBps,feeMinor:fee,netMinor:amount-fee,phone:phone.normalized,network,recipientName:recipient},'pending_review');
+      await tx.append(row,source==='store'?'store':'earn',-amount,'Reserved for withdrawal');return maskWithdrawal(row);});
   }
   static async withdrawalAction(adminId:string,id:string,input:Record<string,unknown>) {
     confirmation(input.confirmed);const found=await FinanceStore.ownerOf(id,'withdrawal');if(!found)throw new FinanceError('Withdrawal not found.',404);
     return FinanceStore.transaction(found.user_id,async tx=>{const row=(await tx.find(found.idempotency_key))!;
       if(input.expectedState!==row.state)throw new FinanceError('Withdrawal state changed. Refresh before acting.',409);
-      const action=input.action;
-      if(action==='approve'&&row.state==='pending_review') {if((await tx.account()).restricted||(await tx.earn()).reconciliationRequired)throw new FinanceError('Earnings require reconciliation.',409);await tx.update(row,'approved');}
+      const action=input.action;const bucket=row.payload.source==='store'?'store':'earn';const earnings=()=>bucket==='store'?tx.storeEarnings():tx.earn();
+      if(action==='approve'&&row.state==='pending_review') {if((await tx.account()).restricted||(await earnings()).reconciliationRequired)throw new FinanceError('Earnings require reconciliation.',409);await tx.update(row,'approved');}
       else if(action==='reject'&&['pending_review','approved'].includes(row.state)) {
-        const reason=text(input.reason);const release=await tx.create('reversal',`withdrawal-release:${row.id}`,row.amount_minor,{withdrawalId:row.id});await tx.append(release,'earn',row.amount_minor,'Withdrawal reservation released');await tx.update(row,'rejected',{...row.payload,rejectionReason:reason});
+        const reason=text(input.reason);const release=await tx.create('reversal',`withdrawal-release:${row.id}`,row.amount_minor,{withdrawalId:row.id});await tx.append(release,bucket,row.amount_minor,'Withdrawal reservation released');await tx.update(row,'rejected',{...row.payload,rejectionReason:reason});
       } else if(action==='paid'&&row.state==='approved') {
-        if((await tx.account()).restricted||(await tx.earn()).reconciliationRequired)throw new FinanceError('Earnings require reconciliation.',409);
+        if((await tx.account()).restricted||(await earnings()).reconciliationRequired)throw new FinanceError('Earnings require reconciliation.',409);
         await tx.update(row,'paid',{...row.payload,paidAt:new Date().toISOString(),paidBy:adminId,payoutReference:text(input.reference,100)});
       } else throw new FinanceError('Invalid withdrawal transition.',409);
       await tx.audit(adminId,`withdrawal_${row.state}`,row.id,{requested_minor:row.amount_minor,fee_minor:row.payload.feeMinor,net_minor:row.payload.netMinor});return row;});

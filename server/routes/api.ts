@@ -1,3 +1,4 @@
+import { WebsiteBusinessService } from '../services/websiteBusinessService.js';
 import { purchasableOptions } from '../../shared/marketplaceVariants.js';
 import { financeRouter } from './financeApi.js';
 import { FinanceService } from '../services/financeService.js';
@@ -929,6 +930,7 @@ apiRouter.get('/payments/verify/:reference', async (req: Request, res: Response)
 
     // If already marked paid or beyond, return safe details immediately
     if (order.status !== 'pending_payment' && order.payment_status === 'success') {
+      if(order.store_context){await WebsiteBusinessService.syncOrder(order);if(order.status==='paid')await FulfilmentService.processPaidOrder(order.payment_reference,order.paid_at!,'Managed store payment recovery');}
       res.json({
         verified: true,
         order: toSafePublicOrder(order),
@@ -1069,10 +1071,11 @@ export async function handlePaystackWebhook(req: Request, res: Response): Promis
         }
         const order = await OrdersStore.findOrder(paymentRef);
         if (order) {
+          if(order.store_context&&!isValidSignature){res.status(401).json({error:'Invalid signature.'});return;}
           // Idempotent update & centralized fulfillment
           const validationError = validateOrderPayment(order, {
             isVerified: data.status === 'success', status: data.status,
-            reference: paymentRef, currency, amountPesewas,
+            reference: paymentRef, currency, amountPesewas, metadata:data.metadata,
           });
           if (!validationError) {
             await FulfilmentService.processPaidOrder(

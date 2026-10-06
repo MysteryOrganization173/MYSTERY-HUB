@@ -16,6 +16,7 @@ export type OrderStatus =
   | 'expired';
 
 export interface OrderRecord {
+  store_context?: import('../../shared/storeEconomics.js').StoreSnapshot | null;
   marketplace_context?: Record<string, unknown> | null;
   id: string;
   user_id?: string | null;
@@ -168,7 +169,7 @@ export function toSafePublicOrder(order: OrderRecord): SafePublicOrderDetails {
 
   return {
     public_reference: order.public_reference,
-    ...(order.service_type === 'afa' ? {manual_review:Boolean(order.manual_review)} : {}),
+    ...(order.service_type === 'afa' || order.store_context ? {manual_review:Boolean(order.manual_review)} : {}),
     recipient_phone: order.recipient_phone,
     network: order.network,
     service_type: serviceType,

@@ -22,6 +22,32 @@ export function validateWebsiteAnalytics(value: unknown): WebsiteAnalyticsInput 
   return input as WebsiteAnalyticsInput;
 }
 export class WebsiteAnalyticsStore {
+  static async ingestPublic(siteId:string,value:unknown) {
+    const events=['site_view','whatsapp_click','call_click','email_click','primary_cta_click','product_view','checkout_started'];
+    const input=value as Record<string,any>;
+    if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['event','visitorId','sessionId'].includes(k))||!events.includes(input.event)||!uuid.test(input.visitorId)||!uuid.test(input.sessionId))throw new WebsiteOperationError('Invalid public event.');
+    const site=await WebsiteStore.findSiteById(siteId);if(!site||site.status!=='published')throw new WebsiteOperationError('Website unavailable.',404);
+    const event=`website_public_${input.event}`,since=new Date(Date.now()-(input.event==='site_view'?86400000:60000)).toISOString();
+    const db=getPool();const row:EventRecord={id:`evt_${randomUUID()}`,event_name:event,user_id:null,visitor_id:input.visitorId,session_id:input.sessionId,entity_type:'website',entity_id:siteId,metadata_json:{},created_at:new Date().toISOString()};
+    if(!db){if(!memory.some(e=>e.entity_id===siteId&&e.event_name===event&&e.session_id===input.sessionId&&e.visitor_id===input.visitorId&&e.created_at>=since))memory.push(row);return;}
+    const client=await db.connect();
+    try{await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`${siteId}:${input.visitorId}:${input.sessionId}:${event}`]);
+      const duplicate=await client.query('SELECT id FROM analytics_events WHERE entity_id=$1 AND event_name=$2 AND visitor_id=$3 AND session_id=$4 AND created_at >= $5 LIMIT 1',[siteId,event,input.visitorId,input.sessionId,since]);
+      if(!duplicate.rows.length)await client.query('INSERT INTO analytics_events(id,event_name,visitor_id,session_id,entity_type,entity_id,metadata_json,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[row.id,event,row.visitor_id,row.session_id,'website',siteId,'{}',row.created_at]);
+      await client.query('COMMIT');
+    }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+  }
+  static async ownerAnalytics(siteId:string,userId:string,range='30') {
+    await WebsiteAssetStore.ownedSite(siteId,userId);
+    if(!['7','30','90','all'].includes(range))throw new WebsiteOperationError('Invalid analytics period.');
+    const since=range==='all'?null:new Date(Date.now()-Number(range)*86400000).toISOString(),db=getPool();
+    const rows:EventRecord[]=db?(await db.query('SELECT * FROM analytics_events WHERE entity_id=$1 AND ($2::timestamptz IS NULL OR created_at >= $2)',[siteId,since])).rows.map(e=>({...e,created_at:new Date(e.created_at).toISOString()})):memory.filter(e=>e.entity_id===siteId&&(!since||e.created_at>=since));
+    const count=(name:string)=>rows.filter(e=>e.event_name===`website_public_${name}`).length;
+    const orderRows=db?(await db.query("SELECT payment_status,status,amount FROM orders WHERE store_context->>'siteId'=$1 AND ($2::timestamptz IS NULL OR created_at >= $2)",[siteId,since])).rows:(await import('./ordersStore.js')).OrdersStore.adminDevOrders().filter(o=>o.store_context?.siteId===siteId&&(!since||o.created_at>=since));
+    const paid=orderRows.filter(o=>o.payment_status==='success'),delivered=paid.filter(o=>o.status==='delivered');
+    const days=new Map<string,number>();for(const e of rows.filter(e=>e.event_name==='website_public_site_view')){const day=e.created_at.slice(0,10);days.set(day,(days.get(day)||0)+1);}
+    return {range,views:count('site_view'),uniqueVisitors:new Set(rows.filter(e=>e.event_name==='website_public_site_view').map(e=>e.visitor_id)).size,whatsappClicks:count('whatsapp_click'),callClicks:count('call_click'),emailClicks:count('email_click'),primaryCtaClicks:count('primary_cta_click'),productViews:count('product_view'),checkoutStarts:count('checkout_started'),paidOrders:paid.length,deliveredOrders:delivered.length,salesMinor:paid.filter(o=>o.status!=='refunded').reduce((total,o)=>total+Number(o.amount),0),conversion:count('checkout_started')?paid.length/count('checkout_started')*100:null,trend:[...days].sort(([a],[b])=>a.localeCompare(b)).map(([day,views])=>({day,views})),activity:rows.filter(e=>!e.event_name.startsWith('website_public_')).sort((a,b)=>b.created_at.localeCompare(a.created_at)).slice(0,15).map(e=>({event:e.event_name,createdAt:e.created_at}))};
+  }
   static clearDevStore() { memory.length = 0; }
   private static async insert(row: EventRecord) {
     const db = getPool();

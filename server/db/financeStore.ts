@@ -6,7 +6,7 @@ import { AdminAuditStore } from './adminAuditStore.js';
 import { MAX_MONEY_MINOR } from '../../shared/money.js';
 
 export interface FinanceOperation { id:string; user_id:string; kind:string; idempotency_key:string; state:string; amount_minor:number; payload:Record<string,any>; created_at:string; updated_at:string }
-export interface FinanceEntry { id:string; user_id:string; operation_id:string; bucket:'wallet'|'earn'; delta_minor:number; balance_after_minor:number|null; description:string; created_at:string }
+export interface FinanceEntry { id:string; user_id:string; operation_id:string; bucket:'wallet'|'earn'|'store'; delta_minor:number; balance_after_minor:number|null; description:string; created_at:string }
 interface Memory { accounts:Record<string,{wallet_minor:number;restricted:boolean}>; operations:FinanceOperation[]; ledger:FinanceEntry[]; config:Record<string,any> }
 let memory:Memory={accounts:{},operations:[],ledger:[],config:{}};
 let tail = Promise.resolve();
@@ -58,11 +58,22 @@ export class FinanceTx {
     const pending=rewards.filter(x=>x.status==='pending').reduce((s,x)=>s+Number(x.amount_minor),0);
     const consumed=-(await this.ledger()).filter(x=>x.bucket==='earn').reduce((s,x)=>s+x.delta_minor,0);
     const operations=await this.operations();
-    const reserved=operations.filter(x=>x.kind==='withdrawal'&&['pending_review','approved'].includes(x.state)).reduce((s,x)=>s+x.amount_minor,0);
-    const withdrawn=operations.filter(x=>x.kind==='withdrawal'&&x.state==='paid').reduce((s,x)=>s+x.amount_minor,0);
+    const reserved=operations.filter(x=>x.kind==='withdrawal'&&x.payload.source!=='store'&&['pending_review','approved'].includes(x.state)).reduce((s,x)=>s+x.amount_minor,0);
+    const withdrawn=operations.filter(x=>x.kind==='withdrawal'&&x.payload.source!=='store'&&x.state==='paid').reduce((s,x)=>s+x.amount_minor,0);
     return {availableMinor:Math.max(0,approved-consumed),pendingMinor:pending,reservedMinor:reserved,lifetimeMinor:rewards.filter(x=>!x.reversal_of_id&&(x.status==='approved'||x.status==='reversed'&&x.approved_at)).reduce((s,x)=>s+Number(x.amount_minor),0),withdrawnMinor:withdrawn,reconciliationRequired:approved<consumed};
   }
-  async append(operation:FinanceOperation,bucket:'wallet'|'earn',delta:number,description:string) {
+  async storeEarnings() {
+    const operations=await this.operations(),ledger=(await this.ledger()).filter(x=>x.bucket==='store');
+    const credited=operations.filter(x=>x.kind==='store_sale'&&x.state==='available'&&x.payload.orderId);
+    const orders=this.client?(await this.client.query('SELECT id,status,manual_review FROM orders WHERE id=ANY($1::text[]) FOR UPDATE',[credited.map(x=>x.payload.orderId)])).rows:(await import('./ordersStore.js')).OrdersStore.adminDevOrders().filter(o=>credited.some(x=>x.payload.orderId===o.id));
+    // Reserve/payout actions lock authoritative orders too. A refund already recorded
+    // cannot race a delayed earning reversal and escape as a new withdrawal.
+    const unresolved=orders.some(o=>o.status!=='delivered'||o.manual_review);
+    const sum=(rows:FinanceOperation[])=>rows.reduce((total,row)=>total+row.amount_minor,0);
+    const available=ledger.reduce((total,row)=>total+row.delta_minor,0);
+    return {availableMinor:Math.max(0,available),pendingMinor:sum(operations.filter(x=>x.kind==='store_sale'&&x.state==='pending')),reservedMinor:sum(operations.filter(x=>x.kind==='withdrawal'&&x.payload.source==='store'&&['pending_review','approved'].includes(x.state))),withdrawnMinor:sum(operations.filter(x=>x.kind==='withdrawal'&&x.payload.source==='store'&&x.state==='paid')),lifetimeMinor:sum(operations.filter(x=>x.kind==='store_sale'&&x.payload.availableAt)),reconciliationRequired:unresolved||available<0||operations.some(x=>x.kind==='store_sale'&&x.state==='manual_review')};
+  }
+  async append(operation:FinanceOperation,bucket:'wallet'|'earn'|'store',delta:number,description:string) {
     if(!Number.isSafeInteger(delta)||delta===0||Math.abs(delta)>MAX_MONEY_MINOR) throw new FinanceError('Invalid ledger movement.');
     const previous=(await this.ledger()).find(x=>x.operation_id===operation.id&&x.bucket===bucket);
     if(previous) return previous;

@@ -1,3 +1,4 @@
+import { WebsiteBusinessService } from '../services/websiteBusinessService.js';
 /**
  * Database Orders Store
  * Production-ready PostgreSQL database abstraction with safe fallback
@@ -44,6 +45,14 @@ async function acquireLock(key: string): Promise<() => void> {
 }
 
 export class OrdersStore {
+  /** Called only after a successful authenticated supplier GET, never a seller request. */
+  static async resolveStoreSupplierReview(orderId:string,supplierId:string):Promise<OrderRecord|null> {
+    const existing=await this.findOrder(orderId);
+    if(!existing?.store_context||existing.supplier_order_id!==supplierId||existing.failure_reason!=='supplier_submission_uncertain'||!['submitted','processing','delivered'].includes(existing.status))return existing;
+    const db=getPool();
+    if(db){const result=await db.query<OrderRecord>("UPDATE orders SET manual_review=FALSE,failure_reason=NULL WHERE id=$1 AND supplier_order_id=$2 AND failure_reason='supplier_submission_uncertain' AND status IN ('submitted','processing','delivered') RETURNING *",[orderId,supplierId]);if(!result.rows[0])return this.findOrder(orderId);await WebsiteBusinessService.syncOrder(result.rows[0]);return result.rows[0];}
+    const updated={...existing,manual_review:false,failure_reason:null};devMemoryStore.set(existing.id,updated);devMemoryStore.set(`payref:${existing.payment_reference}`,updated);devMemoryStore.set(`pubref:${existing.public_reference}`,updated);await WebsiteBusinessService.syncOrder(updated);return updated;
+  }
   static async getWalletRecoveryOrders(limit=50):Promise<OrderRecord[]> {
     const pool=getPool();
     if(pool)return (await pool.query<OrderRecord>(`SELECT o.* FROM orders o WHERE o.payment_provider='wallet' AND o.user_id IS NOT NULL
@@ -339,12 +348,12 @@ export class OrdersStore {
           supplier_last_checked_at, failure_reason, created_at, updated_at,
           paid_at, submitted_at, delivered_at, referrer_user_id, referral_attribution_id, referral_code,
           product_slug, variant_id, variant_snapshot, fulfilment_method, pickup_location_id,
-          pickup_location_snapshot, delivery_city, delivery_area, delivery_landmark, delivery_note, marketplace_status, marketplace_context
+          pickup_location_snapshot, delivery_city, delivery_area, delivery_landmark, delivery_note, marketplace_status, marketplace_context, store_context
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
           $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
           $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38,
-          $39, $40, $41, $42, $43, $44, $45, $46, $47
+          $39, $40, $41, $42, $43, $44, $45, $46, $47, $48
         ) RETURNING *;
       `;
       const values = [
@@ -395,6 +404,7 @@ export class OrdersStore {
         order.delivery_note ?? null,
         order.marketplace_status ?? null,
         order.marketplace_context ? JSON.stringify(order.marketplace_context) : null,
+        order.store_context ? JSON.stringify(order.store_context) : null,
       ];
       await pool.query(query, values);
       return order;
@@ -1092,6 +1102,7 @@ export class OrdersStore {
       updated_at: nowIso,
       supplier_last_checked_at: nowIso,
       failure_reason: null,
+      ...(existing.store_context&&existing.failure_reason==='supplier_submission_uncertain'?{manual_review:false}:{}),
     };
 
     if (!canAdvanceOrderStatus(existing.status, submittedStatus) && !(existing.service_type === 'afa' && existing.status === submittedStatus && ['submitted','processing'].includes(existing.status))) return existing;
@@ -1102,7 +1113,7 @@ export class OrdersStore {
         UPDATE orders
         SET status = $1, supplier_provider = $2, supplier_order_id = $3,
             supplier_cost_minor = $4, supplier_offer_ref = $5, supplier_response = $6,
-            submitted_at = $7, updated_at = $8, supplier_last_checked_at = $9, failure_reason = NULL
+            submitted_at = $7, updated_at = $8, supplier_last_checked_at = $9, manual_review = CASE WHEN store_context IS NOT NULL AND failure_reason='supplier_submission_uncertain' THEN FALSE ELSE manual_review END, failure_reason = NULL
         WHERE id = $10 AND status = $11
         RETURNING *;
       `;
@@ -1128,6 +1139,8 @@ export class OrdersStore {
       devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
       devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
     }
+
+    try {await WebsiteBusinessService.syncOrder(updated);} catch {console.warn('[Store earnings] Durable order awaiting financial reconciliation');}
 
     // Mystery Earn: Trigger reward ledger generation on delivery
     if (updated.status === 'delivered') {
@@ -1364,6 +1377,7 @@ export class OrdersStore {
     const rewardEffect = async () => {
       await AfaStore.onOrderTerminal(updated);
       await FinanceService.refund(updated);
+      try {await WebsiteBusinessService.syncOrder(updated);} catch {console.warn('[Store earnings] Durable order awaiting financial reconciliation');}
       // Preserve existing reward effects, but execute webhook effects only after commit.
       if (updated.status === 'delivered' && existing.status !== 'delivered') {
         try {

@@ -230,6 +230,8 @@ export class ReferralService {
    * ONLY executes for delivered telecom orders or confirmed transactions.
    */
   static async processOrderReward(input: OrderRecord): Promise<RewardLedgerRecord | null> {
+    // Managed storefront earnings already consume the commercial margin; no automatic referral double credit.
+    if(input.store_context)return null;
     // AFA requires a separately enabled economic policy. A wildcard cannot silently enable it.
     const economy = await economicsPolicy(input.service_type || 'data');
     if (input.service_type === 'afa' && !economy?.enabled) return null;

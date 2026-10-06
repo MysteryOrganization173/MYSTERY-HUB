@@ -4,7 +4,7 @@ import type { PaystackVerifyResult } from './paystackService.js';
 /** Shared validation for server verification, signed webhooks and reconciliation. */
 export function validateOrderPayment(
   order: OrderRecord,
-  payment: Pick<PaystackVerifyResult, 'isVerified' | 'status' | 'amountPesewas' | 'currency' | 'reference' | 'isSimulated'>
+  payment: Pick<PaystackVerifyResult, 'isVerified' | 'status' | 'amountPesewas' | 'currency' | 'reference' | 'isSimulated' | 'metadata'>
 ): string | null {
   if (order.payment_provider === 'wallet') return 'wallet_payment_not_external';
   if (!payment.isVerified || payment.status !== 'success') return 'payment_not_successful';
@@ -18,6 +18,10 @@ export function validateOrderPayment(
   if (!devSimulation && (!Number.isSafeInteger(payment.amountPesewas)
     || payment.amountPesewas <= 0 || payment.amountPesewas !== order.amount)) {
     return 'payment_amount_mismatch';
+  }
+  if(order.store_context) {
+    const metadata=payment.metadata;
+    if(!metadata||metadata.purpose!=='website_store_order'||metadata.store_id!==order.store_context.siteId||metadata.order_id!==order.id||metadata.product_id!==order.product_id)return 'store_payment_identity_mismatch';
   }
   return null;
 }

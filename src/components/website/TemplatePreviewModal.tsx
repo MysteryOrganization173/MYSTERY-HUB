@@ -1,3 +1,5 @@
+import { WebsiteSettingsControls } from './WebsiteSettingsControls';
+import type { WebsiteSiteRecord } from '../../types';
 import { trackWebsiteEvent } from '../../utils/websiteAnalytics';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
@@ -42,6 +44,8 @@ export const TemplatePreviewModal: React.FC = () => {
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
   const [iframeKey, setIframeKey] = useState(0);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [changeSite,setChangeSite]=useState<WebsiteSiteRecord|null>(null);
+  const [changeTarget,setChangeTarget]=useState('');
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -144,6 +148,7 @@ export const TemplatePreviewModal: React.FC = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [selectedTemplatePreview]);
 
+  if(changeSite&&sessionToken)return <WebsiteSettingsControls site={changeSite} token={sessionToken} requestedTemplateId={changeTarget} selectionOnly onClosed={()=>setChangeSite(null)} onDeleted={()=>setChangeSite(null)} onUpdated={updated=>{setChangeSite(null);openWebsiteEditor(updated);}}/>;
   if (!selectedTemplatePreview) return null;
 
   const t = selectedTemplatePreview;
@@ -182,6 +187,7 @@ export const TemplatePreviewModal: React.FC = () => {
           name: t.demoBusinessName,
         });
         if (res.success && res.site) {
+          if(res.alreadyExists&&res.site.template_id!==t.id){setChangeSite(res.site);setChangeTarget(t.id);closeTemplatePreview();return;}
           openWebsiteEditor(res.site);
           if (res.alreadyExists) {
             showToast('Opening your active website project.', 'info');

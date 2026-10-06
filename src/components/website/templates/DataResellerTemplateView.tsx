@@ -22,6 +22,7 @@ import { DATA_RESELLER_STARTER_HERO_IMAGE } from '../../../data/templates';
 interface TemplateViewProps {
   template: WebsiteTemplate;
   onCtaClick?: () => void;
+  managedCheckout?: React.ReactNode;
 }
 
 export interface ResellerPackage {
@@ -50,7 +51,7 @@ export function resolveDataResellerHeroImage(heroImage?: string): string {
   return heroImage;
 }
 
-export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
+export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick, managedCheckout }) => {
   const [selectedNetwork, setSelectedNetwork] = useState<'mtn' | 'telecel' | 'at'>('mtn');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [orderNotice, setOrderNotice] = useState<string | null>(null);
@@ -58,7 +59,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
 
   const businessName = template.demoBusinessName || 'QuickByte Data';
   const tagline = template.demoHeroTagline || 'Affordable data. Simple delivery.';
-  const aboutText =
+  const aboutText = managedCheckout ? "Choose your bundle, enter the recipient, and pay securely. Mystery Hub manages delivery and order tracking." :
     template.demoSubtext ||
     'Buy MTN, Telecel and AirtelTigo bundles from one simple storefront. Choose your package, enter the recipient number and place your order through WhatsApp.';
   const location = template.location || 'Accra, Ghana · Available Daily for Direct WhatsApp Orders';
@@ -240,7 +241,8 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           {whatsapp && (
             <button
               type="button"
-              onClick={handleChatWhatsapp}
+              data-website-event="whatsapp_click"
+                  onClick={handleChatWhatsapp}
               className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 bg-[#25D366] hover:bg-[#22c35e] text-white"
             >
               <MessageSquare className="w-3.5 h-3.5 fill-white" />
@@ -344,17 +346,17 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                   <span>Simple Ordering</span>
                 </div>
                 <div className="text-[10px]" style={{ color: p.mutedText }}>
-                  Select & WhatsApp
+                  {managedCheckout?'Select & Pay':'Select & WhatsApp'}
                 </div>
               </div>
 
               <div className="space-y-0.5">
                 <div className="text-xs font-bold text-white flex items-center gap-1">
                   <MessageSquare className="w-3 h-3 text-blue-400" />
-                  <span>Direct Chat</span>
+                  <span>{managedCheckout?"Managed checkout":"Direct Chat"}</span>
                 </div>
                 <div className="text-[10px]" style={{ color: p.mutedText }}>
-                  Prompt WhatsApp
+                  {managedCheckout?'Managed delivery':'Prompt WhatsApp'}
                 </div>
               </div>
             </div>
@@ -363,6 +365,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <button
                 type="button"
+                data-website-primary-cta="true"
                 onClick={scrollToCatalog}
                 className="px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 cursor-pointer active:scale-95 text-white"
                 style={{ backgroundColor: p.accent }}
@@ -374,6 +377,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
               {whatsapp && (
                 <button
                   type="button"
+                  data-website-event="whatsapp_click"
                   onClick={handleChatWhatsapp}
                   className="px-5 py-3 rounded-xl font-semibold text-xs transition-colors flex items-center gap-2 border cursor-pointer hover:bg-white/5"
                   style={{
@@ -395,6 +399,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           3. INTERACTIVE BUNDLE CATALOG
           ========================================================= */}
       <main id="bundle-catalog" className="px-4 sm:px-8 py-6 max-w-6xl mx-auto w-full space-y-8 flex-1 scroll-mt-20">
+        {managedCheckout || <>
         {/* Network Selection Bar */}
         <div
           className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-lg"
@@ -642,6 +647,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             </p>
           </div>
         </div>
+        </>}
       </main>
 
       {/* =========================================================
@@ -669,7 +675,8 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             {whatsapp && (
               <button
                 type="button"
-                onClick={handleChatWhatsapp}
+                data-website-event="whatsapp_click"
+                  onClick={handleChatWhatsapp}
                 className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
               >
                 <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
