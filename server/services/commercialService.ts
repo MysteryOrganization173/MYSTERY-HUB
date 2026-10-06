@@ -5,6 +5,7 @@ import { AUTHORITATIVE_PRODUCTS, getAuthoritativeProduct } from '../data/product
 import { FinanceStore, FinanceError, type FinanceTx } from '../db/financeStore.js';
 import { AuthStore } from '../db/authStore.js';
 import { OrdersStore } from '../db/ordersStore.js';
+import { ReferralStore } from '../db/referralStore.js';
 import { canonicalGhanaPhone } from '../utils/phone.js';
 import { moneyMinor, percentMinor } from '../../shared/money.js';
 import type { OrderRecord } from '../types/orders.js';
@@ -163,7 +164,12 @@ export class CommercialService {
     const products=await Promise.all(Object.values(AUTHORITATIVE_PRODUCTS).map(async p=>{
       const resolved=await FulfilmentService.getProvider().resolvePackage(p.network,p.dataAmount).catch(()=>null),supplierCostMinor=resolved?.resolved?.supplierCostMinor??null;
       const setting=prices.products[p.id],retailMinor=setting?.retailMinor??p.amountPesewas,reserveMinor=prices.reserveConfigured?percentMinor(retailMinor,prices.reserveBps)+prices.reserveFixedMinor:null,discountedMinor=retailMinor-offer.discountMinor;
-      const wholesale=store.wholesale[p.id];return {...p,retailMinor,enabled:setting?.enabled??true,recommendedMinor:setting?.recommendedMinor??null,supplierCostMinor,reserveMinor,spreadMinor:supplierCostMinor===null?null:retailMinor-supplierCostMinor,contributionMinor:supplierCostMinor===null||reserveMinor===null?null:retailMinor-supplierCostMinor-reserveMinor,discountedMinor,promoContributionMinor:supplierCostMinor===null||!prices.reserveConfigured?null:discountedMinor-supplierCostMinor-percentMinor(discountedMinor,prices.reserveBps)-prices.reserveFixedMinor,wholesaleMinor:wholesale?.wholesaleMinor??null,safeResellerFloor:wholesale?minimumFloor(wholesale.wholesaleMinor,store.policy):null,pricePerGb:retailMinor/100/parseFloat(p.dataAmount)};
+      const firstRule=await ReferralStore.findMatchingRule('data',p.network,p.id,'acquisition');
+      const requestedFirstReward=firstRule?.reward_type==='fixed_minor'?firstRule.reward_minor??0:firstRule?.reward_percent_bps!=null?percentMinor(Math.max(0,discountedMinor),firstRule.reward_percent_bps):0;
+      // Estimate for a valid referred first purchase, not a promise of eligibility.
+      const firstReferralRewardMinor=requestedFirstReward<=discountedMinor?requestedFirstReward:0;
+      const promoContributionMinor=supplierCostMinor===null||!prices.reserveConfigured?null:discountedMinor-supplierCostMinor-percentMinor(discountedMinor,prices.reserveBps)-prices.reserveFixedMinor;
+      const wholesale=store.wholesale[p.id];return {...p,retailMinor,enabled:setting?.enabled??true,recommendedMinor:setting?.recommendedMinor??null,supplierCostMinor,reserveMinor,spreadMinor:supplierCostMinor===null?null:retailMinor-supplierCostMinor,contributionMinor:supplierCostMinor===null||reserveMinor===null?null:retailMinor-supplierCostMinor-reserveMinor,discountedMinor,promoContributionMinor,firstReferralRewardMinor,acquisitionContributionMinor:promoContributionMinor===null?null:promoContributionMinor-firstReferralRewardMinor,firstReferralRule:firstRule?{type:firstRule.reward_type,minor:firstRule.reward_minor,bps:firstRule.reward_percent_bps}:null,wholesaleMinor:wholesale?.wholesaleMinor??null,safeResellerFloor:wholesale?minimumFloor(wholesale.wholesaleMinor,store.policy):null,pricePerGb:retailMinor/100/parseFloat(p.dataAmount)};
     }));return {prices,offer,products,audit:(await AdminAuditStore.findRecent(100)).filter(a=>a.action.startsWith('commercial_')||a.action==='store_wholesale_changed'||a.action==='store_policy_changed').slice(0,25)};
   }
   static async save(adminId:string,input:any) {

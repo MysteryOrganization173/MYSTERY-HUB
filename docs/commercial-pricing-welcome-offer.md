@@ -145,3 +145,15 @@ Deferred: real OTP ownership verification, expanded supplier bundle mappings, ad
 - `src/services/apiClient.ts`
 - `src/services/commercialApi.ts` (new)
 - `src/types/index.ts`
+
+## Welcome acquisition plus referral subsidy
+
+The standard Data referral policy remains an explicit operator configuration: 50 pesewas for acquisition and 10 for recurring. It is not an automatic startup seed or fallback payout. Active persisted reward rules and service economics policies remain authoritative; no production policy was inspected or changed during this follow-up.
+
+Ordinary reward calculation uses actual paid revenue, known supplier cost, and the checkout-snapshotted reserve (otherwise the enabled service reserve, otherwise the existing zero-reserve fallback). Rewardable margin is max(0, paid revenue - cost - reserve). A fixed/revenue-percentage rule is capped to that margin; enabled margin-percentage economics instead pays the configured percentage of margin, also capped to margin. There is no automatic nonzero margin percentage. Half-up integer-pesewa rounding remains unchanged.
+
+The first qualifying referred direct Data purchase with an immutable server-created Welcome Offer snapshot now pays its selected active rule's full nominal reward without a margin cap. This deliberately overrides margin-percentage economics only for that acquisition expense. A configured revenue-percentage rule still uses actual discounted paid revenue. Known supplier cost, referrer eligibility, paid delivery, acquisition-stage qualification, valid snapshot arithmetic, the existing customer-charge ceiling, relationship locking and ledger idempotency still apply. Missing cost still fails closed. Guests, reseller orders, other services, normal first orders without Welcome Offer, and recurring purchases do not receive this exception.
+
+For AirtelTigo 1GB with synthetic/reference cost 390, paid revenue 399, explicitly configured reserve 20 and first reward 50 pesewas, post-reward contribution is -61 pesewas. The signed value and acquisition-subsidy calculation mode are recorded in the reward metadata. Unknown reserve produces an unknown contribution estimate, not a claimed profit. Admin shows the estimated eligible first reward and contribution after that reward, warns on negative contribution, and does not block a valid acquisition transaction.
+
+Existing historical ledger amounts remain unchanged. A refund uses existing reward reversal/manual-review protections; a reversed acquisition remains in relationship history, so restoring the Welcome Offer does not authorize another first-referral subsidy. Recurring purchases retain ordinary margin-aware behavior.

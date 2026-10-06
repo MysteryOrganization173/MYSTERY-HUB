@@ -283,7 +283,7 @@ export class ReferralService {
         else if (rule.reward_type === 'percent_bps' && rule.reward_percent_bps != null) amount = percentMinor(order.amount,rule.reward_percent_bps);
       }
       if(amount>order.amount)return null;
-      const economics=computeEconomicReward(order,rule,amount,economy);
+      const economics=computeEconomicReward(order,rule,amount,economy,purchaseStage);
       // Marketplace retains the already reviewed product/rule economics in this pass.
       if(service==='marketplace')economics.amount=amount;
       amount=economics.amount;

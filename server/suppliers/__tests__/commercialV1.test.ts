@@ -11,6 +11,8 @@ import {FinanceService} from '../../services/financeService.js';
 import {AuthStore} from '../../db/authStore.js';
 import {OrdersStore} from '../../db/ordersStore.js';
 import {ReferralStore} from '../../db/referralStore.js';
+import {ReferralService} from '../../services/referralService.js';
+import {STANDARD_DATA_REFERRAL_POLICY} from '../../config/dataReferralRewardPolicy.js';
 import {AdminAuditStore} from '../../db/adminAuditStore.js';
 import {PaystackServerService as P} from '../../services/paystackService.js';
 import {FulfilmentService as F} from '../../services/fulfilmentService.js';
@@ -139,13 +141,16 @@ test('Admin audit records previous/new prices, no account PII',async()=>{
 
 test('discounted payment callback and signed webhook races do not duplicate reservation/redemption',async()=>{
  process.env.PAYSTACK_SECRET_KEY='sk_test_commercial_fixture';process.env.SUCCESS_BIZ_HUB_FULFILLMENT_ENABLED='false';F.processPaidOrder=dispatch;
- const o=await initialize();P.verifyTransaction=async()=>({isVerified:true,status:'success',reference:o.payment_reference,amountPesewas:449,currency:'GHS'});
+ for(const rule of STANDARD_DATA_REFERRAL_POLICY)await ReferralStore.createOrUpdateRule(rule);
+ const o=await C.initialize(order({referrer_user_id:'other'}),input());P.verifyTransaction=async()=>({isVerified:true,status:'success',reference:o.payment_reference,amountPesewas:449,currency:'GHS'});
  const body={event:'charge.success',data:{reference:o.payment_reference,amount:449,currency:'GHS',status:'success'}};
  const hook=()=>originalFetch(base+'/api/webhooks/paystack',{method:'POST',headers:{'Content-Type':'application/json','x-paystack-signature':createHmac('sha512',process.env.PAYSTACK_SECRET_KEY!).update(JSON.stringify(body)).digest('hex')},body:JSON.stringify(body)});
  const responses=await Promise.all([request('payments/verify/'+o.payment_reference),hook(),hook()]);assert.ok(responses.every(r=>r.status===200));
  let current=(await OrdersStore.findOrder(o.id))!;assert.equal(current.payment_status,'success');assert.equal(current.amount,449);
  await OrdersStore.updateOrderStatus(o.id,'delivered');await request('payments/verify/'+o.payment_reference);await hook();current=(await OrdersStore.findOrder(o.id))!;
  assert.equal(current.status,'delivered');const ops=await FinanceStore.transaction('buyer',tx=>tx.operations());assert.equal(ops.filter(x=>x.kind==='welcome').length,1);assert.equal(ops.find(x=>x.kind==='welcome')?.state,'redeemed');
+ await request('payments/verify/'+o.payment_reference);await hook();
+ const rewards=await ReferralStore.findLedgerByOrderId(o.id);assert.equal(rewards.length,1);assert.equal(rewards[0].amount_minor,50);assert.equal(rewards[0].metadata_json?.acquisition_subsidy,true);
 });
 
 test('paid welcome order recovers dispatch after a process interruption',async()=>{
@@ -175,4 +180,74 @@ test('price-only Admin save cannot silently configure zero processing costs',asy
  await C.save('admin',{kind:'pricing',confirmed:true,expectedVersion:'direct-launch-v1',reserveBps:0,reserveFixedMinor:0,products:[{productId:'mtn-1gb',retailMinor:599,recommendedMinor:null,enabled:true}]});
  assert.equal((await C.admin()).prices.reserveConfigured,false);const o=await initialize();assert.equal(o.commercial_context!.reserveMinor,null);
  await FinanceStore.transaction('admin',tx=>tx.saveConfig('economics:data',{enabled:true,reserveMinor:10,reserveBps:200}));assert.equal((await C.admin()).prices.reserveConfigured,true);assert.equal((await C.admin()).prices.reserveFixedMinor,10);
+});
+
+async function acquisitionFixture(referrer:string|null='other') {
+ for(const rule of STANDARD_DATA_REFERRAL_POLICY)await ReferralStore.createOrUpdateRule(rule);
+ await C.save('admin',{kind:'pricing',confirmed:true,expectedVersion:'direct-launch-v1',configureReserve:true,reserveBps:0,reserveFixedMinor:20,products:[]});
+ return C.initialize(order({network:'airteltigo',product_id:'at-1gb',amount:499,supplier_cost_minor:390,referrer_user_id:referrer}),input());
+}
+test('welcome without a referrer remains available despite negative contribution',async()=>{
+ const o=await acquisitionFixture(null);assert.equal(o.amount,399);assert.equal(o.commercial_context!.contributionMinor,-11);
+ await OrdersStore.markOrderPaid(o.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(o.id,'delivered');
+ assert.equal((await ReferralStore.findLedgerByOrderId(o.id)).length,0);assert.equal((await C.quote('at-1gb','buyer')).discountMinor,0);
+});
+test('valid welcome acquisition pays full first reward and snapshots the loss',async()=>{
+ const o=await acquisitionFixture();await OrdersStore.markOrderPaid(o.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(o.id,'delivered');
+ const [reward]=await ReferralStore.findLedgerByOrderId(o.id);assert.equal(reward.amount_minor,50);assert.equal(reward.reward_stage,'acquisition');
+ assert.equal(reward.metadata_json?.contribution_after_reward_minor,-61);assert.equal(reward.metadata_json?.calculation_mode,'welcome_acquisition_subsidy');
+ const current=(await OrdersStore.findOrder(o.id))!;const repeat=await ReferralService.processOrderReward(current);assert.equal(repeat!.id,reward.id);
+ assert.equal((await C.quote('at-1gb','buyer')).totalMinor,499);
+ const second=await C.initialize(order({network:'airteltigo',product_id:'at-1gb',amount:499,supplier_cost_minor:390,referrer_user_id:'other'}),input());
+ assert.equal(second.amount,499);assert.equal(second.commercial_context!.discountMinor,0);
+ await OrdersStore.markOrderPaid(second.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(second.id,'delivered');
+ const [recurring]=await ReferralStore.findLedgerByOrderId(second.id);assert.equal(recurring.amount_minor,10);assert.equal(recurring.reward_stage,'recurring');assert.equal(recurring.metadata_json?.acquisition_subsidy,false);
+});
+test('self-referral cannot receive the acquisition subsidy',async()=>{
+ const o=await acquisitionFixture('buyer');await OrdersStore.markOrderPaid(o.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(o.id,'delivered');
+ assert.equal((await ReferralStore.findLedgerByOrderId(o.id)).length,0);
+});
+test('recurring reward still caps to ordinary margin after a subsidized first order',async()=>{
+ const first=await acquisitionFixture();await OrdersStore.markOrderPaid(first.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(first.id,'delivered');
+ for(const [cost,expected] of [[477,2],[490,0]]) {
+  const next=await C.initialize(order({network:'airteltigo',product_id:'at-1gb',amount:499,supplier_cost_minor:cost,referrer_user_id:'other'}),input());
+  await OrdersStore.markOrderPaid(next.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(next.id,'delivered');
+  assert.equal((await ReferralStore.findLedgerByOrderId(next.id))[0]?.amount_minor??0,expected);
+ }
+});
+test('acquisition refund reverses reward once and restores welcome without another first reward',async()=>{
+ const o=await acquisitionFixture();await OrdersStore.markOrderPaid(o.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(o.id,'delivered');
+ await OrdersStore.updateOrderStatus(o.id,'refunded',undefined,undefined,undefined,{explicitReversal:true});await OrdersStore.updateOrderStatus(o.id,'refunded');
+ const [reward]=await ReferralStore.findLedgerByOrderId(o.id);assert.equal(reward.status,'reversed');assert.equal(reward.amount_minor,50);
+ assert.equal((await C.quote('at-1gb','buyer')).discountMinor,100);
+ const next=await C.initialize(order({network:'airteltigo',product_id:'at-1gb',amount:499,supplier_cost_minor:390,referrer_user_id:'other'}),input());
+ await OrdersStore.markOrderPaid(next.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(next.id,'delivered');
+ assert.equal((await ReferralStore.findLedgerByOrderId(next.id)).length,0);
+});
+test('failed payment releases welcome but never awards first referral',async()=>{
+ const o=await acquisitionFixture();await C.paymentFailed(o,{isVerified:false,status:'failed',reference:o.payment_reference,amountPesewas:399,currency:'GHS'});
+ assert.equal((await ReferralStore.findLedgerByOrderId(o.id)).length,0);assert.equal((await C.quote('at-1gb','buyer')).discountMinor,100);
+});
+test('reseller orders and non-acquisition stages cannot use welcome subsidy',async()=>{
+ const o=await acquisitionFixture();const delivered={...o,status:'delivered',payment_status:'success'} as any;
+ assert.equal(computeEconomicReward(delivered,null,50,undefined,'recurring').amount,0);
+ assert.equal(computeEconomicReward({...delivered,commercial_context:null},null,50,undefined,'acquisition').amount,9);
+ assert.equal(computeEconomicReward({...delivered,supplier_cost_minor:null},null,50,undefined,'acquisition').amount,0);
+ await OrdersStore.createOrder({...delivered,store_context:{siteId:'fixture'}});assert.equal(await ReferralService.processOrderReward({...delivered,store_context:{siteId:'fixture'}}),null);
+});
+test('Admin estimates first referral subsidy from active rules without blocking checkout',async()=>{
+ await acquisitionFixture();const p=(await C.admin()).products.find(p=>p.id==='at-1gb')!;
+ assert.equal(p.firstReferralRewardMinor,50);assert.equal(p.acquisitionContributionMinor,p.promoContributionMinor!-50);assert.ok(p.acquisitionContributionMinor!<0);
+ const source=readFileSync('src/components/admin/sections/AdminCommercialSection.tsx','utf8');assert.ok(source.includes('Promotion plus first referral has negative contribution'));
+});
+test('welcome acquisition honors configured percentage rule without inventing a margin percentage',async()=>{
+ await ReferralStore.createOrUpdateRule({id:'percentage',service_type:'data',purchase_stage:'acquisition',reward_type:'percent_bps',reward_minor:null,reward_percent_bps:1000,enabled:true});
+ const o=await C.initialize(order({network:'airteltigo',product_id:'at-1gb',amount:499,supplier_cost_minor:390,referrer_user_id:'other'}),input());
+ await OrdersStore.markOrderPaid(o.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(o.id,'delivered');
+ assert.equal((await ReferralStore.findLedgerByOrderId(o.id))[0].amount_minor,40); // 10% of actual 399, half up.
+});
+test('margin-percentage policy remains ordinary while welcome acquisition uses its selected rule',async()=>{
+ const o=await acquisitionFixture();const policy={service:'data',enabled:true,version:'fixture',reserveMinor:20,reserveBps:0,supplierCostMinor:null,mode:'margin_percent' as const,marginBps:2000};
+ assert.equal(computeEconomicReward(o,null,50,policy,'acquisition').amount,50);
+ assert.equal(computeEconomicReward({...o,amount:499,commercial_context:null},null,10,policy,'recurring').amount,18); // 20% of 89, half up: existing upward scaling.
 });
