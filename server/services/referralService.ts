@@ -282,13 +282,14 @@ export class ReferralService {
         if (rule.reward_type === 'fixed_minor' && rule.reward_minor != null) amount = rule.reward_minor;
         else if (rule.reward_type === 'percent_bps' && rule.reward_percent_bps != null) amount = percentMinor(order.amount,rule.reward_percent_bps);
       }
-      if(amount>order.amount)return null;
+      const dynamicData=service==='data'&&economy?.enabled&&economy.mode==='stage_margin_percent';
+      if(amount>order.amount&&!dynamicData)return null;
       const economics=computeEconomicReward(order,rule,amount,economy,purchaseStage);
       // Marketplace retains the already reviewed product/rule economics in this pass.
       if(service==='marketplace')economics.amount=amount;
       amount=economics.amount;
       if (!Number.isSafeInteger(amount) || amount <= 0) return null;
-      if (amount > order.amount) {
+      if (amount > order.amount && !(dynamicData&&purchaseStage==='acquisition')) {
         console.warn(`[Referral Reward] Configured reward exceeds the customer charge for ${order.public_reference}; reward not issued.`);
         return null;
       }

@@ -22,7 +22,8 @@ import {canonicalGhanaPhone} from '../../utils/phone.js';
 import {apiRouter,handlePaystackWebhook} from '../../routes/api.js';
 import {adminRouter} from '../../routes/adminApi.js';
 import {validateOrderPayment} from '../../services/paymentValidation.js';
-import {computeEconomicReward} from '../../services/referralEconomics.js';
+import {computeEconomicReward,saveEconomicsPolicy,economicsPolicy} from '../../services/referralEconomics.js';
+import {DATA_MARGIN_POLICY} from '../../../shared/dataReferralPolicy.js';
 import {toSafePublicOrder} from '../../types/orders.js';
 import {COMMERCIAL_SCHEMA} from '../../db/commercialSchema.js';
 
@@ -142,6 +143,7 @@ test('Admin audit records previous/new prices, no account PII',async()=>{
 test('discounted payment callback and signed webhook races do not duplicate reservation/redemption',async()=>{
  process.env.PAYSTACK_SECRET_KEY='sk_test_commercial_fixture';process.env.SUCCESS_BIZ_HUB_FULFILLMENT_ENABLED='false';F.processPaidOrder=dispatch;
  for(const rule of STANDARD_DATA_REFERRAL_POLICY)await ReferralStore.createOrUpdateRule(rule);
+ await dynamicPolicy();
  const o=await C.initialize(order({referrer_user_id:'other'}),input());P.verifyTransaction=async()=>({isVerified:true,status:'success',reference:o.payment_reference,amountPesewas:449,currency:'GHS'});
  const body={event:'charge.success',data:{reference:o.payment_reference,amount:449,currency:'GHS',status:'success'}};
  const hook=()=>originalFetch(base+'/api/webhooks/paystack',{method:'POST',headers:{'Content-Type':'application/json','x-paystack-signature':createHmac('sha512',process.env.PAYSTACK_SECRET_KEY!).update(JSON.stringify(body)).digest('hex')},body:JSON.stringify(body)});
@@ -150,7 +152,7 @@ test('discounted payment callback and signed webhook races do not duplicate rese
  await OrdersStore.updateOrderStatus(o.id,'delivered');await request('payments/verify/'+o.payment_reference);await hook();current=(await OrdersStore.findOrder(o.id))!;
  assert.equal(current.status,'delivered');const ops=await FinanceStore.transaction('buyer',tx=>tx.operations());assert.equal(ops.filter(x=>x.kind==='welcome').length,1);assert.equal(ops.find(x=>x.kind==='welcome')?.state,'redeemed');
  await request('payments/verify/'+o.payment_reference);await hook();
- const rewards=await ReferralStore.findLedgerByOrderId(o.id);assert.equal(rewards.length,1);assert.equal(rewards[0].amount_minor,50);assert.equal(rewards[0].metadata_json?.acquisition_subsidy,true);
+ const rewards=await ReferralStore.findLedgerByOrderId(o.id);assert.equal(rewards.length,1);assert.equal(rewards[0].amount_minor,65);assert.equal(rewards[0].metadata_json?.acquisition_subsidy,true);
 });
 
 test('paid welcome order recovers dispatch after a process interruption',async()=>{
@@ -250,4 +252,67 @@ test('margin-percentage policy remains ordinary while welcome acquisition uses i
  const o=await acquisitionFixture();const policy={service:'data',enabled:true,version:'fixture',reserveMinor:20,reserveBps:0,supplierCostMinor:null,mode:'margin_percent' as const,marginBps:2000};
  assert.equal(computeEconomicReward(o,null,50,policy,'acquisition').amount,50);
  assert.equal(computeEconomicReward({...o,amount:499,commercial_context:null},null,10,policy,'recurring').amount,18); // 20% of 89, half up: existing upward scaling.
+});
+
+async function dynamicPolicy(extra:any={}) {
+ return saveEconomicsPolicy('admin',{service:'data',enabled:true,...DATA_MARGIN_POLICY,marginBps:0,reserveMinor:20,reserveBps:0,reserveConfigured:true,supplierCostMinor:null,confirmed:true,...extra});
+}
+test('dynamic first uses normal economics; recurring scales actual margin beyond old fixed reward',async()=>{
+ const o=await acquisitionFixture();await dynamicPolicy();
+ await OrdersStore.markOrderPaid(o.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(o.id,'delivered');
+ const [first]=await ReferralStore.findLedgerByOrderId(o.id);assert.equal(first.amount_minor,45);assert.equal(first.metadata_json?.reward_basis_minor,499);assert.equal(first.metadata_json?.contribution_after_reward_minor,-56);
+ const next=await C.initialize(order({network:'airteltigo',product_id:'at-1gb',amount:499,supplier_cost_minor:390,referrer_user_id:'other'}),input());
+ assert.equal(next.amount,499);await OrdersStore.markOrderPaid(next.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(next.id,'delivered');
+ const [second]=await ReferralStore.findLedgerByOrderId(next.id);assert.equal(second.amount_minor,18);assert.equal(second.metadata_json?.reward_percent_bps,2000);assert.equal(second.metadata_json?.contribution_after_reward_minor,71);
+});
+for(const [product,retail,cost,first,recurring] of [['mtn-1gb',549,400,65,26],['at-1gb',499,390,45,18],['mtn-10gb',4499,4000,240,96],['mtn-40gb',17699,16000,840,336]] as const)test('dynamic normal/actual example '+product,async()=>{
+ const policy=await dynamicPolicy();
+ const promo={...order({product_id:product,amount:retail-100,supplier_cost_minor:cost}),commercial_context:{regularMinor:retail,paidMinor:retail-100,discountMinor:100,reserveMinor:20,normalReserveMinor:20}} as any;
+ assert.equal(computeEconomicReward(promo,null,50,policy,'acquisition').amount,first);
+ assert.equal(computeEconomicReward({...promo,amount:retail,commercial_context:null},null,10,policy,'recurring').amount,recurring);
+});
+test('dynamic zero/negative normal economics and unknown inputs fail closed',async()=>{
+ const policy=await dynamicPolicy();
+ for(const cost of [479,490,null])assert.equal(computeEconomicReward(order({amount:499,supplier_cost_minor:cost}),null,50,policy,'acquisition').amount,0);
+ const unknown=await dynamicPolicy({reserveConfigured:false});assert.equal(computeEconomicReward(order(),null,50,unknown,'acquisition').amount,0);
+ const o=await initialize();assert.equal(o.amount,449);assert.equal(o.commercial_context!.reserveMinor,null);assert.equal(o.commercial_context!.normalReserveMinor,null);
+ const admin=await C.admin();assert.equal(admin.prices.reserveConfigured,false);
+});
+test('percentage reserve uses normal revenue for first and actual revenue for acquisition loss',async()=>{
+ const policy=await dynamicPolicy({reserveMinor:10,reserveBps:1000});const o=await initialize();
+ assert.equal(o.commercial_context!.normalReserveMinor,65);assert.equal(o.commercial_context!.reserveMinor,55);
+ const reward=computeEconomicReward(o,null,50,policy,'acquisition');assert.equal(reward.amount,42);assert.equal(reward.snapshot.contribution_after_reward_minor,-48);
+});
+test('direct reserve precedes Data fallback; saved percentages and old policies stay authoritative',async()=>{
+ await C.save('admin',{kind:'pricing',confirmed:true,expectedVersion:'direct-launch-v1',configureReserve:true,reserveBps:0,reserveFixedMinor:30,products:[]});
+ await dynamicPolicy({acquisitionBps:4000,recurringBps:1000});const policy=await economicsPolicy('data');
+ assert.equal(policy!.directReserve!.fixed,30);assert.equal(computeEconomicReward(order({amount:549}),null,50,policy,'acquisition').amount,48);
+ const stored=await FinanceStore.readConfig('economics:data');await C.catalog();await C.admin();assert.deepEqual(await FinanceStore.readConfig('economics:data'),stored);
+ await saveEconomicsPolicy('admin',{service:'data',enabled:true,mode:'fixed',marginBps:0,reserveMinor:0,reserveBps:0,supplierCostMinor:null,confirmed:true});
+ assert.equal((await economicsPolicy('data'))!.mode,'fixed');
+});
+test('dynamic activation cannot rewrite historical ledger or affect other services/stores',async()=>{
+ const o=await acquisitionFixture();await OrdersStore.markOrderPaid(o.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(o.id,'delivered');
+ const before=JSON.stringify(await ReferralStore.findLedgerByOrderId(o.id));await dynamicPolicy();await ReferralService.processOrderReward((await OrdersStore.findOrder(o.id))!);
+ assert.equal(JSON.stringify(await ReferralStore.findLedgerByOrderId(o.id)),before);
+ await assert.rejects(()=>dynamicPolicy({service:'airtime'}));await assert.rejects(()=>dynamicPolicy({acquisitionBps:10001}));
+ const next={...order({status:'delivered',payment_status:'success',referrer_user_id:'other'}),store_context:{siteId:'fixture'}} as any;
+ assert.equal(await ReferralService.processOrderReward(next),null);
+});
+test('dynamic self-referral and refund preserve qualification and reversal safety',async()=>{
+ const o=await acquisitionFixture('buyer');await dynamicPolicy();await OrdersStore.markOrderPaid(o.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(o.id,'delivered');
+ assert.equal((await ReferralStore.findLedgerByOrderId(o.id)).length,0);
+});
+test('dynamic refund reverses original percentage reward without revaluation or another acquisition',async()=>{
+ const o=await acquisitionFixture();await dynamicPolicy();await OrdersStore.markOrderPaid(o.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(o.id,'delivered');
+ await OrdersStore.updateOrderStatus(o.id,'refunded',undefined,undefined,undefined,{explicitReversal:true});
+ const [reward]=await ReferralStore.findLedgerByOrderId(o.id);assert.equal(reward.status,'reversed');assert.equal(reward.amount_minor,45);
+ assert.equal((await C.quote('at-1gb','buyer')).discountMinor,100);
+ const next=await C.initialize(order({network:'airteltigo',product_id:'at-1gb',supplier_cost_minor:390,referrer_user_id:'other'}),input());await OrdersStore.markOrderPaid(next.payment_reference,new Date().toISOString());await OrdersStore.updateOrderStatus(next.id,'delivered');
+ assert.equal((await ReferralStore.findLedgerByOrderId(next.id)).length,0); // Actual recurring margin is negative, despite restored welcome.
+});
+test('dynamic absent configuration never seeds policy and Admin fields describe percentages',async()=>{
+ await C.catalog();await C.admin();assert.equal(await FinanceStore.readConfig('economics:data'),undefined);
+ const initialization=readFileSync('server/db/connection.ts','utf8');assert.ok(!initialization.includes('DATA_MARGIN_POLICY'));
+ const ui=readFileSync('src/components/admin/sections/AdminFinanceSection.tsx','utf8');assert.ok(ui.includes('First qualifying reward (%)'));assert.ok(ui.includes('Recurring reward (%)'));assert.ok(ui.includes('reserveConfigured'));
 });

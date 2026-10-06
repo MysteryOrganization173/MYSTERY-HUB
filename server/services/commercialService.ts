@@ -6,6 +6,7 @@ import { FinanceStore, FinanceError, type FinanceTx } from '../db/financeStore.j
 import { AuthStore } from '../db/authStore.js';
 import { OrdersStore } from '../db/ordersStore.js';
 import { ReferralStore } from '../db/referralStore.js';
+import { economicsPolicy,computeEconomicReward } from './referralEconomics.js';
 import { canonicalGhanaPhone } from '../utils/phone.js';
 import { moneyMinor, percentMinor } from '../../shared/money.js';
 import type { OrderRecord } from '../types/orders.js';
@@ -21,7 +22,7 @@ const config=async(id:string,tx?:FinanceTx)=>{
   if(id!=='direct-pricing')return {...OFFER_DEFAULT,...stored};
   // Reuse an existing enabled Data economics reserve until explicitly configured here.
   const economics=await read('economics:data');
-  const fallback=economics?.enabled?{reserveBps:economics.reserveBps,reserveFixedMinor:economics.reserveMinor,reserveConfigured:true}:{};
+  const fallback=economics?.enabled&&(economics.mode!=='stage_margin_percent'||economics.reserveConfigured)?{reserveBps:economics.reserveBps,reserveFixedMinor:economics.reserveMinor,reserveConfigured:true}:{};
   return {...PRICE_DEFAULT,...stored,...(!stored?.reserveConfigured?fallback:{})};
 };
 const lock=async(tx:FinanceTx,exclusive=false)=>{if(tx.client)await tx.client.query(`SELECT pg_advisory_xact_lock${exclusive?'':'_shared'}(hashtextextended('commercial-policy',0))`);};
@@ -69,7 +70,7 @@ export class CommercialService {
     if(process.env.NODE_ENV==='production'&&input.expectedTotalMinor===undefined)throw new FinanceError('Refresh checkout and review the current price before paying.',409);
     const prices=await config('direct-pricing',tx),reserveMinor=prices.reserveConfigured?percentMinor(quote.totalMinor,prices.reserveBps)+prices.reserveFixedMinor:null;
     if(order.supplier_cost_minor!==null&&quote.regularMinor<order.supplier_cost_minor)throw new FinanceError('This regular price does not cover the current supplier cost. Contact support.',409);
-    const snapshot={regularMinor:quote.regularMinor,discountMinor:quote.discountMinor,paidMinor:quote.totalMinor,pricingRevision:quote.pricingRevision,promotionId:quote.discountMinor?'welcome-v1' as const:null,promotionRevision:quote.discountMinor?quote.promotionRevision:null,buyerPhone:quote.discountMinor?quote.buyerPhone:null,supplierCostMinor:order.supplier_cost_minor,reserveMinor,contributionMinor:reserveMinor!==null&&order.supplier_cost_minor!==null?quote.totalMinor-order.supplier_cost_minor-reserveMinor:null};
+    const snapshot={regularMinor:quote.regularMinor,discountMinor:quote.discountMinor,paidMinor:quote.totalMinor,pricingRevision:quote.pricingRevision,promotionId:quote.discountMinor?'welcome-v1' as const:null,promotionRevision:quote.discountMinor?quote.promotionRevision:null,buyerPhone:quote.discountMinor?quote.buyerPhone:null,supplierCostMinor:order.supplier_cost_minor,reserveMinor,normalReserveMinor:prices.reserveConfigured?percentMinor(quote.regularMinor,prices.reserveBps)+prices.reserveFixedMinor:null,contributionMinor:reserveMinor!==null&&order.supplier_cost_minor!==null?quote.totalMinor-order.supplier_cost_minor-reserveMinor:null};
     const result={...order,amount:quote.totalMinor,commercial_context:snapshot};
     if(quote.discountMinor) {
       if(!tx)throw new FinanceError('Promotion transaction unavailable.',503);
@@ -160,17 +161,21 @@ export class CommercialService {
     }
   }
   static async admin() {
-    const [prices,offer,store]=await Promise.all([config('direct-pricing'),config('welcome-offer'),WebsiteConfig()]);
+    const [prices,offer,store,economy]=await Promise.all([config('direct-pricing'),config('welcome-offer'),WebsiteConfig(),economicsPolicy('data')]);
     const products=await Promise.all(Object.values(AUTHORITATIVE_PRODUCTS).map(async p=>{
       const resolved=await FulfilmentService.getProvider().resolvePackage(p.network,p.dataAmount).catch(()=>null),supplierCostMinor=resolved?.resolved?.supplierCostMinor??null;
       const setting=prices.products[p.id],retailMinor=setting?.retailMinor??p.amountPesewas,reserveMinor=prices.reserveConfigured?percentMinor(retailMinor,prices.reserveBps)+prices.reserveFixedMinor:null,discountedMinor=retailMinor-offer.discountMinor;
       const firstRule=await ReferralStore.findMatchingRule('data',p.network,p.id,'acquisition');
       const requestedFirstReward=firstRule?.reward_type==='fixed_minor'?firstRule.reward_minor??0:firstRule?.reward_percent_bps!=null?percentMinor(Math.max(0,discountedMinor),firstRule.reward_percent_bps):0;
       // Estimate for a valid referred first purchase, not a promise of eligibility.
-      const firstReferralRewardMinor=requestedFirstReward<=discountedMinor?requestedFirstReward:0;
+      const dynamic=economy?.enabled&&economy.mode==='stage_margin_percent';
+      const estimate={service_type:'data',amount:discountedMinor,supplier_cost_minor:supplierCostMinor,commercial_context:{regularMinor:retailMinor,discountMinor:offer.discountMinor,reserveMinor:prices.reserveConfigured?percentMinor(Math.max(0,discountedMinor),prices.reserveBps)+prices.reserveFixedMinor:null,normalReserveMinor:reserveMinor}} as OrderRecord;
+      const firstReferralRewardMinor=dynamic?(firstRule?computeEconomicReward(estimate,firstRule,0,economy,'acquisition').amount:0):requestedFirstReward<=discountedMinor?requestedFirstReward:0;
+      const recurringRule=await ReferralStore.findMatchingRule('data',p.network,p.id,'recurring');
+      const recurringReferralRewardMinor=dynamic&&recurringRule?computeEconomicReward({...estimate,amount:retailMinor,commercial_context:{...estimate.commercial_context!,reserveMinor}},recurringRule,0,economy,'recurring').amount:null;
       const promoContributionMinor=supplierCostMinor===null||!prices.reserveConfigured?null:discountedMinor-supplierCostMinor-percentMinor(discountedMinor,prices.reserveBps)-prices.reserveFixedMinor;
-      const wholesale=store.wholesale[p.id];return {...p,retailMinor,enabled:setting?.enabled??true,recommendedMinor:setting?.recommendedMinor??null,supplierCostMinor,reserveMinor,spreadMinor:supplierCostMinor===null?null:retailMinor-supplierCostMinor,contributionMinor:supplierCostMinor===null||reserveMinor===null?null:retailMinor-supplierCostMinor-reserveMinor,discountedMinor,promoContributionMinor,firstReferralRewardMinor,acquisitionContributionMinor:promoContributionMinor===null?null:promoContributionMinor-firstReferralRewardMinor,firstReferralRule:firstRule?{type:firstRule.reward_type,minor:firstRule.reward_minor,bps:firstRule.reward_percent_bps}:null,wholesaleMinor:wholesale?.wholesaleMinor??null,safeResellerFloor:wholesale?minimumFloor(wholesale.wholesaleMinor,store.policy):null,pricePerGb:retailMinor/100/parseFloat(p.dataAmount)};
-    }));return {prices,offer,products,audit:(await AdminAuditStore.findRecent(100)).filter(a=>a.action.startsWith('commercial_')||a.action==='store_wholesale_changed'||a.action==='store_policy_changed').slice(0,25)};
+      const wholesale=store.wholesale[p.id];return {...p,retailMinor,enabled:setting?.enabled??true,recommendedMinor:setting?.recommendedMinor??null,supplierCostMinor,reserveMinor,spreadMinor:supplierCostMinor===null?null:retailMinor-supplierCostMinor,contributionMinor:supplierCostMinor===null||reserveMinor===null?null:retailMinor-supplierCostMinor-reserveMinor,discountedMinor,promoContributionMinor,recurringReferralRewardMinor,normalContributionMinor:supplierCostMinor===null||reserveMinor===null?null:retailMinor-supplierCostMinor-reserveMinor,recurringContributionMinor:supplierCostMinor===null||reserveMinor===null||recurringReferralRewardMinor===null?null:retailMinor-supplierCostMinor-reserveMinor-recurringReferralRewardMinor,firstReferralRewardMinor,acquisitionContributionMinor:promoContributionMinor===null?null:promoContributionMinor-firstReferralRewardMinor,firstReferralRule:firstRule?{type:firstRule.reward_type,minor:firstRule.reward_minor,bps:firstRule.reward_percent_bps}:null,wholesaleMinor:wholesale?.wholesaleMinor??null,safeResellerFloor:wholesale?minimumFloor(wholesale.wholesaleMinor,store.policy):null,pricePerGb:retailMinor/100/parseFloat(p.dataAmount)};
+    }));return {prices,offer,products,dataReferralPolicy:economy,audit:(await AdminAuditStore.findRecent(100)).filter(a=>a.action.startsWith('commercial_')||a.action==='store_wholesale_changed'||a.action==='store_policy_changed').slice(0,25)};
   }
   static async save(adminId:string,input:any) {
     if(input.confirmed!==true)throw new FinanceError('Confirm this commercial change.');
