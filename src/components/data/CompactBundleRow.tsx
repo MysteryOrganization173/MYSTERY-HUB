@@ -1,4 +1,4 @@
-import { dataDeliveryNote } from '../../utils/dataPurchasePresentation';
+import { dataValidityLabel } from '../../utils/dataPurchasePresentation';
 import React from 'react';
 import { DataBundle } from '../../types';
 import { GHANA_NETWORKS } from '../../data/bundles';
@@ -62,8 +62,7 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
             ) : null}
           </div>
 
-          <p className="text-xs text-slate-300 mt-0.5">{network.name} · {bundle.validity}</p>
-          <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{dataDeliveryNote(bundle.network)}</p>
+          <p className="text-xs text-slate-300 mt-0.5">{network.name}{dataValidityLabel(bundle.validity) && ` · ${dataValidityLabel(bundle.validity)}`}</p>
         </div>
       </div>
 

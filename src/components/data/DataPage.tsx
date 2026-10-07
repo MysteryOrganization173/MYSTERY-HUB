@@ -431,7 +431,7 @@ export const DataPage: React.FC = () => {
               <div className="pt-0.5 sm:pt-1 flex flex-wrap gap-2.5 sm:gap-4 text-[11px] sm:text-xs text-slate-400">
                 <div className="flex items-center gap-1 sm:gap-1.5">
                   <Zap className="w-3.5 h-3.5 text-[#00c365]" />
-                  <span>Direct SIM Credit</span>
+                  <span>Data bundles</span>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#00c365]" />
@@ -492,7 +492,7 @@ export const DataPage: React.FC = () => {
                     MTN
                   </div>
                   <div className="text-2xl font-bold text-white">1GB</div>
-                  <div className="text-xs text-slate-400">MTN Express · Direct SIM Credit</div>
+                  <div className="text-xs text-slate-400">MTN Express Data</div>
                   <div className="text-xl font-extrabold text-[#00c365]">GH₵{DATA_BUNDLES.find(b=>b.id==='mtn-1gb')?.priceGhc.toFixed(2) ?? 'Unavailable'}</div>
                   <button
                     type="button"
@@ -940,29 +940,9 @@ export const DataPage: React.FC = () => {
           <div ref={bundlesSectionRef} className="space-y-5">
             {/* MTN Network Service Notice (Tasteful, Customer-Friendly, Config-Driven) */}
             {mtnNotice.enabled && (activeNetwork === 'mtn' || activeNetwork === 'all') && (
-              <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-slate-200 space-y-2 animate-in fade-in duration-200">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
-                    <Info className="w-4 h-4" />
-                  </div>
-                  <div className="space-y-1 text-left min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-semibold text-sm text-amber-200">
-                        {mtnNotice.title}
-                      </h4>
-                      <span className="text-[11px] font-medium text-amber-300/80 bg-amber-500/20 px-2 py-0.5 rounded-full">
-                        {mtnNotice.summary}
-                      </span>
-                    </div>
-                    <p className="text-xs text-amber-100/80 leading-relaxed">
-                      {mtnNotice.message}
-                    </p>
-                    <div className="pt-1 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-[11px] text-amber-300/90 font-medium">
-                      <span>• {mtnNotice.duplicatePolicyNote}</span>
-                      <span>• {mtnNotice.trackingNote}</span>
-                    </div>
-                  </div>
-                </div>
+              <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 px-3 py-2 text-xs text-slate-200">
+                <div className="flex flex-wrap items-center gap-x-2"><strong className="text-amber-200">MTN delivery</strong><span>Most orders arrive within 15–45 minutes.</span></div>
+                <details><summary className="cursor-pointer min-h-11 flex items-center text-amber-300">Details</summary><div className="space-y-2 pb-2 text-slate-300"><p>{mtnNotice.message}</p><p>{mtnNotice.duplicatePolicyNote}</p><p>{mtnNotice.trackingNote}</p></div></details>
               </div>
             )}
 

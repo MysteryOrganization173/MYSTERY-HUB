@@ -1,4 +1,4 @@
-import { dataOrderPresentation, maskDataRecipient } from '../../utils/dataPurchasePresentation';
+import { dataOrderPresentation, dataRecipientDisplay } from '../../utils/dataPurchasePresentation';
 import { afaStatusLabel } from '../../../shared/afa';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
@@ -55,6 +55,7 @@ export const OrdersPage: React.FC = () => {
                 description: o.product_name_snapshot,
               },
               recipientPhone: o.recipient_phone,
+              buyerRecipientVisible: true,
               network: o.network,
               paymentMethod: 'paystack',
               amountGhc: o.amount_ghc,
@@ -322,7 +323,7 @@ export const OrdersPage: React.FC = () => {
                         </span>
                       </div>
                       <div className="text-[11px] sm:text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-x-2.5 sm:gap-x-3 gap-y-1">
-                        <span>Recipient: {order.serviceType==='data'?maskDataRecipient(order.recipientPhone):order.recipientPhone}</span>
+                        <span>Recipient: {order.serviceType==='data'?dataRecipientDisplay(order.recipientPhone,order.buyerRecipientVisible):order.recipientPhone}</span>
                         <span>·</span>
                         <span>
                           {new Date(order.createdAt).toLocaleDateString()}{' '}

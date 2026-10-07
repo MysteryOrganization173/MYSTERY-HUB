@@ -1,5 +1,5 @@
 import { useDialogFocus } from '../../hooks/useDialogFocus';
-import { dataOrderPresentation, maskDataRecipient } from '../../utils/dataPurchasePresentation';
+import { dataOrderPresentation, dataRecipientDisplay } from '../../utils/dataPurchasePresentation';
 import { afaStatusLabel } from '../../../shared/afa';
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
@@ -212,8 +212,8 @@ export const OrderStatusModal: React.FC = () => {
         <div className="overflow-y-auto p-4 sm:p-6 text-center space-y-4 overscroll-contain">
           {/* Animated Central Icon */}
           <div className="flex justify-center">
-            {activeOrder.status === 'delivered' ? (
-              <div className="w-16 h-16 rounded-full bg-[#00c365]/20 border-2 border-[#00c365] flex items-center justify-center text-[#00c365] shadow-[0_0_25px_rgba(0,195,101,0.4)] animate-in zoom-in duration-300">
+            {activeOrder.status === 'delivered' || isDataOrder && dataView.paymentConfirmed && !activeOrder.manualReview && ['paid','queued'].includes(activeOrder.serverStatus || '') ? (
+              <div className="w-16 h-16 rounded-full bg-[#00c365]/20 border-2 border-[#00c365] flex items-center justify-center text-[#00c365] shadow-[0_0_25px_rgba(0,195,101,0.4)] motion-safe:animate-[checkout-success_240ms_ease-out] motion-reduce:animate-none">
                 <CheckCircle2 className="w-9 h-9" />
               </div>
             ) : activeOrder.status === 'processing' ? (
@@ -348,7 +348,7 @@ export const OrderStatusModal: React.FC = () => {
             <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
               <div className="text-xs text-slate-400">Recipient Phone</div>
               <div className="font-medium text-sm text-white mt-0.5">
-                {isDataOrder ? maskDataRecipient(activeOrder.recipientPhone) : activeOrder.recipientPhone}
+                {isDataOrder ? dataRecipientDisplay(activeOrder.recipientPhone, activeOrder.buyerRecipientVisible) : activeOrder.recipientPhone}
               </div>
             </div>
 

@@ -12,6 +12,14 @@ export function maskDataRecipient(phone: string): string {
   return `${digits.slice(0, 3)} ••• ${digits.slice(-4)}`;
 }
 
+/** Only buyer-entered or authenticated account orders opt in; public tracking stays masked. */
+export function dataRecipientDisplay(phone: string, buyerVisible = false): string {
+  if (!buyerVisible) return maskDataRecipient(phone);
+  const digits = phone.replace(/\D/g, '');
+  if (phone.includes('*') || phone.includes('•') || digits.length !== 10) return phone;
+  return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+}
+
 // Presentation only: a popup callback or local order never confirms payment.
 export function dataOrderPresentation(status?: string, manualReview = false) {
   const paymentConfirmed = ['paid', 'queued', 'submitted', 'processing', 'delivered', 'refund_pending', 'refunded'].includes(status || '');
@@ -29,4 +37,10 @@ export function dataOrderPresentation(status?: string, manualReview = false) {
   if (status === 'cancelled' || status === 'expired') { title = 'Payment was not completed'; label = status === 'expired' ? 'Payment expired' : 'Payment cancelled'; next = 'Check your payment history first. If money was deducted, contact support with this reference before paying again.'; }
   if (manualReview) { title = 'Your order needs support review'; label = 'Manual review'; next = 'Support needs to check this order. Keep your reference and avoid placing the same order again.'; }
   return { paymentConfirmed, delivered, processing, title, label, next };
+}
+
+/** Display only an actual validity; legacy delivery/routing labels are not durations. */
+export function dataValidityLabel(validity?: string): string {
+  const value = validity?.trim() || '';
+  return /^direct (?:sim(?: credit)?|credit)$/i.test(value) ? '' : value;
 }

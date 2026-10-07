@@ -50,6 +50,7 @@ export interface OrderRecord {
   serviceType?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'afa';
   bundle: DataBundle;
   recipientPhone: string;
+  buyerRecipientVisible?: boolean; // Presentation only: direct checkout or authenticated account Orders.
   network: NetworkId;
   paymentMethod: PaymentMethod;
   commercialPricing?: {regularMinor:number;discountMinor:number;paidMinor:number};

@@ -290,6 +290,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         (bundle.id.startsWith('instant-') ? 'instant_bundle' : bundle.id.startsWith('airtime-') ? 'airtime' : 'data'),
       bundle,
       recipientPhone: phone,
+      buyerRecipientVisible: true,
       network: bundle.network,
       paymentMethod: method,
       amountGhc: bundle.priceGhc,

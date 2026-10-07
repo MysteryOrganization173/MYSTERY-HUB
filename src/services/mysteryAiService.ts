@@ -549,7 +549,7 @@ export function getGroundedLocalResponse(
   ) {
     return {
       reply:
-        "Delivery depends on your network:\n• ⚡ AirtelTigo (AT iShare): Instant Delivery directly to your AT number.\n• MTN Ghana: Fast direct processing under normal telecom conditions (usually 15–45 minutes). Network congestion can sometimes cause delays, up to 48 hours in exceptional cases. Please note that MTN allows only one active order per recipient number at a time.\n• Telecel Ghana: Standard direct SIM credit delivery as configured.\n\nAll orders remain continuously trackable on our Orders page!",
+        "Delivery depends on your network:\n• ⚡ AirtelTigo (AT iShare): Instant Delivery directly to your AT number.\n• MTN Ghana: Fast direct processing under normal telecom conditions (usually 15–45 minutes). Network congestion can sometimes cause delays, up to 48 hours in exceptional cases. Please note that MTN allows only one active order per recipient number at a time.\n• Telecel Ghana: Standard bundle delivery as configured.\n\nAll orders remain continuously trackable on our Orders page!",
       quickAction: { type: 'navigate', targetPage: 'orders', label: '👉 Track Order Status' },
     };
   }

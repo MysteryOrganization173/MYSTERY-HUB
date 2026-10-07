@@ -1,4 +1,4 @@
-import { dataDeliveryNote } from '../../utils/dataPurchasePresentation';
+import { dataValidityLabel } from '../../utils/dataPurchasePresentation';
 import React, { useRef } from 'react';
 import { DataBundle } from '../../types';
 import { GHANA_NETWORKS } from '../../data/bundles';
@@ -77,8 +77,7 @@ export const BundleCard: React.FC<BundleCardProps> = ({
 
       {/* ROW 2: Existing validity and centrally configured delivery information */}
       <div className="my-2 text-xs leading-relaxed">
-        <p className="text-slate-300">{network.name} · {bundle.validity}</p>
-        <p className="text-slate-400">{dataDeliveryNote(bundle.network)} · Direct SIM Credit</p>
+        <p className="text-slate-300">{network.name}{dataValidityLabel(bundle.validity) && ` · ${dataValidityLabel(bundle.validity)}`}</p>
       </div>
 
       {/* ROW 3: Compact Recipient Input + Action CTA in one unified row */}

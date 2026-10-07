@@ -6,7 +6,7 @@ import { BundleCard } from '../../../src/components/data/BundleCard';
 import { CompactBundleRow } from '../../../src/components/data/CompactBundleRow';
 import { DATA_BUNDLES } from '../../../src/data/bundles';
 import { serviceNotices } from '../../../src/config/serviceNotices';
-import { dataDeliveryNote, dataOrderPresentation, maskDataRecipient } from '../../../src/utils/dataPurchasePresentation';
+import { dataDeliveryNote, dataOrderPresentation, maskDataRecipient, dataValidityLabel } from '../../../src/utils/dataPurchasePresentation';
 
 for (const status of [undefined, 'pending_payment', 'failed', 'cancelled', 'expired', 'unknown']) {
   test(`Data receipt cannot confirm payment from ${status}`,()=>{
@@ -42,8 +42,10 @@ for(const network of ['mtn','airteltigo','telecel'] as const) {
     const bundle=DATA_BUNDLES.find(row=>row.network===network)!;
     for(const Component of [BundleCard,CompactBundleRow]) {
       const html=renderToStaticMarkup(React.createElement(Component,{bundle,onBuy:()=>{}}));
-      assert.ok(html.includes(`GH₵${bundle.priceGhc.toFixed(2)}`));assert.ok(html.includes(bundle.validity));
-      assert.ok(html.includes(dataDeliveryNote(network)));assert.match(html,/Buy/);
+      assert.ok(html.includes(`GH₵${bundle.priceGhc.toFixed(2)}`));if(dataValidityLabel(bundle.validity))assert.ok(html.includes(bundle.validity));
+      else assert.ok(!html.includes(bundle.validity));
+      // Delivery timing lives once at network level, not in every bundle.
+      assert.ok(!html.includes(dataDeliveryNote(network)));assert.match(html,/Buy/);
     }
   });
 }
