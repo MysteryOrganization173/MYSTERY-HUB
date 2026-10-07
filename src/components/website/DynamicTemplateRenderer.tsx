@@ -671,14 +671,14 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
       >
         <Sparkles className="w-3.5 h-3.5" style={{ color: p.secondary }} />
         <span className="truncate">
-          {layout === 'ecommerce' || layout === 'retail'
-            ? '⚡ Same-Day Delivery across Greater Accra on orders over GH₵200!'
+          {template.siteContent ? template.location || template.categoryLabel : layout === 'ecommerce' || layout === 'retail'
+            ? 'Explore products and contact the business'
             : layout === 'hotel'
             ? '🌴 Ada Foah Beachfront Eco Chalets Booking Open'
             : layout === 'church'
-            ? '🔴 Sunday Celebrations Live Stream at 9:00 AM GMT'
+            ? 'Worship, fellowship and community'
             : layout === 'agency'
-            ? '⚡ 99.99% Enterprise SLA Switches Online in Accra'
+            ? 'Digital services and enquiries'
             : layout === 'salon' || layout === 'beauty'
             ? '✨ Luxury Hair & Barbering Sessions Now Booking in East Legon'
             : template.industry}

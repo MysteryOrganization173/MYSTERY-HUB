@@ -1,3 +1,4 @@
+import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
@@ -87,7 +88,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
         <div className="relative max-w-2xl space-y-5">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-[#fbcfe8] text-xs font-semibold uppercase tracking-wider">
             <Heart className="w-3.5 h-3.5 text-[var(--website-accent,#ec4899)]" />
-            <span>Accra’s Premier Luxury Studio</span>
+            <span>{template.categoryLabel}</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-serif tracking-tight leading-tight text-white">
@@ -206,14 +207,14 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
             </p>
           </div>
 
-          {bookingConfirmed ? (
+          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick}/> : bookingConfirmed ? (
             <div className="p-6 rounded-2xl bg-pink-50 border border-pink-200 text-center space-y-2">
               <div className="w-10 h-10 rounded-full bg-[var(--website-accent,#ec4899)] text-white flex items-center justify-center mx-auto">
                 <Check className="w-5 h-5" />
               </div>
               <h4 className="font-bold text-[var(--website-primary,#3b1828)] text-base">Example appointment</h4>
               <p className="text-xs text-[#836574]">
-                Your session with {selectedStylist} for {selectedService} is recorded. We have sent confirmation to your WhatsApp.
+                Example only: {selectedService} with {selectedStylist}. No appointment or confirmation message has been sent.
               </p>
             </div>
           ) : (
@@ -299,7 +300,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
               {template.demoBusinessName}
             </h4>
             <p className="text-pink-200/80 text-xs leading-relaxed">
-              Your crown is our priority. Specialized in natural hair care, painless knotless styling, and royal men's grooming.
+              {template.siteContent?.aboutText ?? template.demoSubtext}
             </p>
           </div>
           <div className="space-y-2">

@@ -1,3 +1,4 @@
+import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
@@ -128,9 +129,9 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       {/* Quick Check-in Reservation Bar */}
       <div id="reserve" className="bg-white p-4 sm:p-6 border-b border-[#e8e5dc] shadow-md">
         <div className="max-w-5xl mx-auto">
-          {booked ? (
+          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick}/> : booked ? (
             <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-center text-xs text-emerald-800 font-bold">
-              ✓ Availability confirmed! We have reserved your provisional dates. Proceeding to WhatsApp concierge.
+              Example only. No availability has been confirmed and no dates have been reserved.
             </div>
           ) : (
             <form onSubmit={handleBooking} className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
@@ -246,7 +247,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
               {template.demoBusinessName}
             </h4>
             <p className="text-emerald-200/80 text-xs leading-relaxed">
-              Sustainable luxury eco-resort nestled on the serene shores of Ada Foah, Ghana.
+              {template.demoSubtext}
             </p>
           </div>
           <div className="space-y-2">

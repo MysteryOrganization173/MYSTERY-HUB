@@ -14,6 +14,7 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
   const [site, setSite] = useState<PublicWebsiteSite | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -44,7 +45,7 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
     return () => {
       isMounted = false;
     };
-  }, [slug]);
+  }, [slug, retry]);
 
   if (isLoading) {
     return (
@@ -53,7 +54,7 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
           <Globe className="w-6 h-6 animate-spin" />
         </div>
         <p className="text-xs uppercase tracking-widest text-slate-400 font-semibold">
-          Loading Website...
+          Loading website…
         </p>
       </div>
     );
@@ -73,6 +74,7 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
             This website is currently unpublished or does not exist. Check the URL or create your own free website.
           </p>
         </div>
+        <button type="button" onClick={()=>setRetry(value=>value+1)} className="min-h-11 px-5 rounded-xl bg-slate-800 text-white">Try again</button>
         <a
           href="/website-builder"
           className="px-5 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg"

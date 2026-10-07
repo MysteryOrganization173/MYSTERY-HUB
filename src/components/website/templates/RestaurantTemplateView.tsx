@@ -1,3 +1,4 @@
+import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
@@ -61,7 +62,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
               {template.demoBusinessName}
             </span>
             <span className="text-[10px] text-[#78716c] uppercase tracking-widest block mt-0.5">
-              Accra · Est. 2018
+              {template.location}
             </span>
           </div>
         </div>
@@ -143,7 +144,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
             Curated Culinary Selection
           </span>
           <h2 className="text-2xl sm:text-3xl font-serif text-[var(--website-primary,#7a1c28)]">
-            Crafted with Fresh Ghanaian Produce
+            Explore our menu
           </h2>
           <p className="text-xs text-[#78716c]">
             Every dish is prepared to order with fresh herbs from our local farmers in Aburi.
@@ -211,20 +212,20 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
             <span className="text-xs font-bold text-[var(--website-primary,#7a1c28)] uppercase tracking-widest">
               {template.siteContent ? 'Reservation Enquiry' : 'Reservation enquiry'}
             </span>
-            <h3 className="text-2xl font-serif text-[#1c1917]">Reserve Your Table in Osu</h3>
+            <h3 className="text-2xl font-serif text-[#1c1917]">Ask about a table</h3>
             <p className="text-xs text-[#78716c]">
               {template.siteContent ? 'Contact the business to confirm availability and arrange your reservation.' : 'Contact the business to arrange a reservation. No booking is made on this page.'}
             </p>
           </div>
 
-          {isBooked ? (
+          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick}/> : isBooked ? (
             <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-center space-y-2">
               <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto">
                 <Check className="w-5 h-5" />
               </div>
               <h4 className="font-bold text-emerald-800 text-base">Example reservation</h4>
               <p className="text-xs text-emerald-700">
-                We have reserved a table for {selectedPartySize} on {reservationDate} at {reservationTime}. See you in Osu!
+                Example only: {selectedPartySize} guests on {reservationDate} at {reservationTime}. No reservation has been made.
               </p>
             </div>
           ) : (

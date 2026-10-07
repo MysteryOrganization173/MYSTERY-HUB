@@ -1,3 +1,4 @@
+import { BusinessEnquiry } from '../BusinessEnquiry';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
@@ -174,7 +175,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
             </p>
           </div>
 
-          {scheduled ? (
+          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} /> : scheduled ? (
             <div className="p-6 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 text-center space-y-2">
               <CheckCircle className="w-10 h-10 text-cyan-400 mx-auto" />
               <h4 className="font-bold text-cyan-300 text-base">Example conversation</h4>

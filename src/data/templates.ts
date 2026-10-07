@@ -128,7 +128,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     demoBusinessName: 'QuickByte Data',
     demoHeroTagline: 'Affordable data. Simple delivery.',
     demoSubtext:
-      'Buy MTN, Telecel and AirtelTigo bundles from one simple storefront. Choose your package, enter the recipient number and place your order through WhatsApp.',
+      'Buy MTN, Telecel and AirtelTigo bundles from one simple storefront. Choose your package and recipient. Managed checkout becomes available when the store is configured and enabled.',
     location: 'Spintex Road, Accra · Open 24/7 for WhatsApp Orders',
     hoursOrContact: '+233 24 555 7788',
     isFreeTier: true,

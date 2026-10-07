@@ -324,7 +324,7 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({
             onClick={() => onNavigateTab('system')}
             className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
           >
-            <span>System Health Diagnostics</span>
+            <span>System & delivery settings</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -337,7 +337,7 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({
             <ShoppingBag className="w-4 h-4 text-[#00c365]" />
             <span>All-Time Financial & Volume Summary</span>
           </h3>
-          <span className="text-[11px] text-slate-500 font-mono">Server-Derived Authoritative Totals</span>
+          <span className="text-[11px] text-slate-500 font-mono">Paid-order totals</span>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">

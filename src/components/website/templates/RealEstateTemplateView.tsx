@@ -1,3 +1,4 @@
+import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
@@ -233,15 +234,15 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
                 <div className="grid grid-cols-3 gap-2 py-2 border-y border-slate-100 text-center text-slate-600 text-xs font-semibold">
                   <span className="flex items-center justify-center gap-1">
                     <Bed className="w-3.5 h-3.5 text-[var(--website-accent,#0ea5e9)]" />
-                    <span>{prop.specs?.[0] || '4 Beds'}</span>
+                    <span>{prop.specs?.[0] || 'Not specified'}</span>
                   </span>
                   <span className="flex items-center justify-center gap-1">
                     <Bath className="w-3.5 h-3.5 text-[var(--website-accent,#0ea5e9)]" />
-                    <span>{prop.specs?.[1] || '4 Baths'}</span>
+                    <span>{prop.specs?.[1] || 'Not specified'}</span>
                   </span>
                   <span className="flex items-center justify-center gap-1">
                     <Maximize2 className="w-3.5 h-3.5 text-[var(--website-accent,#0ea5e9)]" />
-                    <span>{prop.specs?.[2] || '420 m²'}</span>
+                    <span>{prop.specs?.[2] || 'Not specified'}</span>
                   </span>
                 </div>
 
@@ -270,7 +271,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
             </p>
           </div>
 
-          {tourScheduled ? (
+          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick}/> : tourScheduled ? (
             <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-center space-y-2">
               <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto" />
               <h4 className="font-bold text-emerald-900 text-base">Example viewing</h4>
@@ -339,7 +340,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
               {template.demoBusinessName}
             </h4>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Ghana’s premier luxury real estate advisory. Connecting high-net-worth investors and discerning homeowners to titled residential and commercial assets.
+              {template.demoSubtext}
             </p>
           </div>
           <div className="space-y-2">

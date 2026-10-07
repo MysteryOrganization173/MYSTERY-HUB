@@ -8,14 +8,16 @@ export function migrateWebsiteTemplate(content: SiteContent, fromId: string, tar
   const from = WEBSITE_TEMPLATES.find(t => t.id === fromId);
   const itemsType: WebsiteSectionType = ['restaurant','ecommerce','fashion','reseller'].includes(target.layoutType || '') ? 'products' : target.layoutType === 'portfolio' ? 'gallery' : 'services';
   const composition = structuredClone(target.composition || createWebsiteComposition(['header','hero',itemsType,'about','contact','location','footer']));
+  const defaultCta = (id:string) => id==='tmpl-data-reseller'?'Buy Data':id==='tmpl-start-blank'?'Contact us':'Order via WhatsApp';
   const compatible = from?.layoutType === target.layoutType;
   // A new layout must not turn its demonstration catalogue or statistics into owner content.
   const items=(compatible ? content.items : [])?.map(({specs:_specs,rating:_rating,...item})=>structuredClone(item));
-  const migrated = { ...content, items:items || [], stats:content.stats || [], features: compatible ? content.features : [], composition };
+  const migrated = { ...content, ...(content.ctaLabel===defaultCta(fromId) ? {ctaLabel:defaultCta(targetId)} : {}), items:items || [], stats:content.stats || [], features: compatible ? content.features : [], composition };
   for (const section of composition.sections) {
     const source = content.composition?.sections.find(s => s.type === section.type);
     if (!source) continue;
     section.data = structuredClone(source.data);
+    if(section.type==='hero' && section.data.ctaLabel===defaultCta(fromId)) section.data.ctaLabel=defaultCta(targetId);
     if(!compatible && (from?.layoutType==='reseller'||target.layoutType==='reseller') && ['products','services','gallery'].includes(section.type)) delete section.data.items;
     section.enabled = SECTION_REGISTRY[section.type].required ? true : source.enabled;
     if ((SECTION_REGISTRY[section.type].variants as readonly string[]).includes(source.variant)) section.variant = source.variant;

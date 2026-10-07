@@ -1,3 +1,4 @@
+import { BusinessEnquiry } from '../BusinessEnquiry';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
@@ -217,12 +218,12 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
             </p>
           </div>
 
-          {commissionBooked ? (
+          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} /> : commissionBooked ? (
             <div className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-2">
               <CheckCircle className="w-10 h-10 text-emerald-400 mx-auto" />
-              <h4 className="font-bold text-emerald-300 text-base">Inquiry Dispatched</h4>
+              <h4 className="font-bold text-emerald-300 text-base">Example enquiry</h4>
               <p className="text-xs text-zinc-300 font-sans">
-                Our studio team will review your brief and send treatment proposals within 24 hours.
+                Preview only. No enquiry has been sent.
               </p>
             </div>
           ) : (

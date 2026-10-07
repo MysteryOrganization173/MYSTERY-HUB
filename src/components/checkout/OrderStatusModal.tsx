@@ -360,7 +360,8 @@ export const OrderStatusModal: React.FC = () => {
             </div>
 
             {activeOrder.paymentReference && (
-              <div className="col-span-2 bg-[#090d11]/80 px-3.5 py-2.5 rounded-xl border border-slate-800/80 flex items-center justify-between text-left">
+              <details className="col-span-2 bg-[#090d11]/80 px-3.5 py-2.5 rounded-xl border border-slate-800/80 text-left">
+                <summary className="cursor-pointer min-h-11 flex items-center text-sm text-slate-300">View payment details</summary>
                 <div className="min-w-0 pr-2">
                   <div className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">Payment Details</div>
                   <div className="font-mono text-[11px] text-slate-400 mt-0.5 truncate" title={`Paystack Reference: ${activeOrder.paymentReference}`}>
@@ -370,7 +371,7 @@ export const OrderStatusModal: React.FC = () => {
                 <span className={`max-w-[45%] text-right text-[10px] px-2 py-0.5 rounded font-medium shrink-0 border ${isDataOrder&&!dataView.paymentConfirmed?'text-amber-300 bg-amber-500/10 border-amber-500/20':'text-emerald-400/90 bg-emerald-500/10 border-emerald-500/20'}`}>
                   {isDataOrder ? dataView.paymentConfirmed?'Confirmed':'Awaiting confirmation' : 'Verified'}
                 </span>
-              </div>
+              </details>
             )}
           </div>
 

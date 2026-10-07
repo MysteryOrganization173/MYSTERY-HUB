@@ -219,7 +219,7 @@ test('cleared compositional hero resets to template image without resurrecting c
 test('published restaurant uses contact enquiries without promising automatic booking/SMS',()=>{
   const template=getTemplateById('tmpl-buka-bistro');
   const html=renderToStaticMarkup(renderTemplateLayout(mergeSiteWithTemplate(template,{businessName:'Fixture cafe',whatsapp:'0240000000'})));
-  assert.ok(html.includes('Contact to Arrange Reservation'));assert.ok(html.includes('confirm availability'));
+  assert.ok(html.includes('Contact the business'));assert.ok(html.includes('must be confirmed directly'));assert.ok(!html.includes('<form'));
   assert.ok(!html.includes('Instant Online Booking'));assert.ok(!html.includes('Instant SMS'));assert.ok(!html.includes('Instant WhatsApp Confirmation'));
   assert.ok(!renderToStaticMarkup(renderTemplateLayout(template)).includes('Instant Online Booking'));
 });

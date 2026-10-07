@@ -60,11 +60,11 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
   const businessName = template.demoBusinessName || 'QuickByte Data';
   const tagline = template.demoHeroTagline || 'Affordable data. Simple delivery.';
   const aboutText = managedCheckout ? "Choose your bundle, enter the recipient, and pay securely. Mystery Hub manages delivery and order tracking." :
-    template.demoSubtext ||
-    'Buy MTN, Telecel and AirtelTigo bundles from one simple storefront. Choose your package, enter the recipient number and place your order through WhatsApp.';
-  const location = template.location || 'Accra, Ghana · Available Daily for Direct WhatsApp Orders';
-  const contact = template.hoursOrContact || '+233 24 555 7788';
-  const whatsapp = template.hoursOrContact || contact;
+    template.demoSubtext || (template.siteContent ? '' :
+    'Buy MTN, Telecel and AirtelTigo bundles from one simple storefront. Choose your package, enter the recipient number and place your order through WhatsApp.');
+  const location = template.siteContent ? template.location || '' : template.location || 'Sample store location';
+  const contact = template.siteContent ? template.siteContent.phone || '' : template.hoursOrContact || '+233 24 555 7788';
+  const whatsapp = template.siteContent ? template.siteContent.whatsapp || template.siteContent.phone || '' : template.hoursOrContact || contact;
 
   const p = template.colorScheme || {
     primary: '#0f172a',

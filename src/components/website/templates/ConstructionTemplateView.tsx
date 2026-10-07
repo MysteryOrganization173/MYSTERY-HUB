@@ -1,3 +1,4 @@
+import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
@@ -286,16 +287,16 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
               Request Project Estimate & Feasibility
             </h3>
             <p className="text-xs text-slate-400">
-              Our registered quantity surveyors provide certified bill of quantities (BOQ) within 48 hours.
+              Contact the business to discuss project scope, qualifications and estimates.
             </p>
           </div>
 
-          {quoteSubmitted ? (
+          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick}/> : quoteSubmitted ? (
             <div className="p-6 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-2">
               <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
               <h4 className="font-bold text-emerald-300 text-base">Tender Request Received</h4>
               <p className="text-xs text-slate-300">
-                Our Chief Quantity Surveyor has received your project briefing and will contact you via WhatsApp / Phone.
+                Example only. No project request has been sent.
               </p>
             </div>
           ) : (
@@ -370,7 +371,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
               {template.demoBusinessName}
             </h4>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Ghana’s trusted civil engineering and general contracting firm. Building sustainable infrastructure for the nation’s growth.
+              {template.demoSubtext}
             </p>
           </div>
           <div className="space-y-2">

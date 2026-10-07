@@ -30,3 +30,20 @@ test('assistant allows local route and retains unsafe link as literal text',()=>
 test('customer activity codes use understandable labels without hiding unknown activity',()=>{assert.equal(customerActivityLabel('pending_review'),'Awaiting review');assert.equal(customerActivityLabel('checkout_started'),'Checkout started');assert.equal(customerActivityLabel('custom_event'),'Custom event');});
 test('Admin navigation includes every existing operational area at mobile widths',()=>{const s=source('src/components/admin/AdminPage.tsx');assert.match(s,/aria-label="Admin area"/);for(const area of ['overview','orders','customers','finance','earn','commercial','marketplace','websites','waitlist','system'])assert.ok(s.includes(area+':'));assert.ok(!s.includes('Connected to PostgreSQL store.'));});
 test('custom dialog lifecycle includes trapping, Escape, restoring focus and scroll',()=>{const s=source('src/hooks/useDialogFocus.ts');for(const key of ["event.key === 'Escape'","event.key !== 'Tab'",'previous?.isConnected','document.body.style.overflow = savedOverflow'])assert.ok(s.includes(key));});
+
+for(const id of ['tmpl-buka-bistro','tmpl-salon','tmpl-hotel','tmpl-construction','tmpl-real-estate','tmpl-tech-agency','tmpl-portfolio'])test(`published ${id} uses contact instead of a simulated booking form`,()=>{
+ const t=WEBSITE_TEMPLATES.find(t=>t.id===id || (id==='tmpl-salon'&&t.layoutType==='salon') || (id==='tmpl-hotel'&&t.layoutType==='hotel') || (id==='tmpl-construction'&&t.layoutType==='construction') || (id==='tmpl-real-estate'&&t.layoutType==='realestate') || (id==='tmpl-tech-agency'&&t.layoutType==='agency') || (id==='tmpl-portfolio'&&t.layoutType==='portfolio'))!;
+ assert.ok(t,id);
+ const html=renderToStaticMarkup(renderTemplateLayout(mergeSiteWithTemplate(t,{businessName:'Owner Business',phone:'0240000888',whatsapp:'0240000888',tagline:'Owner heading',aboutText:'Owner introduction',location:'Owner location',items:[]})));
+ assert.ok(html.includes('Contact the business'));assert.ok(!html.includes('<form'));for(const text of ['certified bill of quantities','Est. 2018','Reserve Your Table in Osu','Premier Luxury Studio','Ada Foah, Ghana'])assert.ok(!html.includes(text),text);
+});
+test('template switch changes inherited Data CTA but keeps a custom owner action',()=>{
+ const from=WEBSITE_TEMPLATES.find(t=>t.id==='tmpl-data-reseller')!,target=WEBSITE_TEMPLATES.find(t=>t.id==='tmpl-buka-bistro')!;
+ assert.equal(migrateWebsiteTemplate({businessName:'Owner',ctaLabel:'Buy Data'} as any,from.id,target.id).ctaLabel,'Order via WhatsApp');
+ assert.equal(migrateWebsiteTemplate({businessName:'Owner',ctaLabel:'Talk to Ama'} as any,from.id,target.id).ctaLabel,'Talk to Ama');
+});
+test('Admin financial inputs display cedi amounts and percentages while sending original integer units',()=>{
+ const finance=source('src/components/admin/sections/AdminFinanceSection.tsx'),commercial=source('src/components/admin/sections/AdminCommercialSection.tsx'),reseller=source('src/components/admin/sections/AdminResellerControls.tsx');
+ assert.ok(finance.includes('value={settings[key]/100}'));assert.ok(finance.includes('[key]:Math.round(Number(e.target.value)*100)'));assert.ok(commercial.includes('reserveBps:Math.round(Number(bps)*100)'));assert.ok(reseller.includes('withdrawalFeeBps:Math.round(Number(policy.withdrawalFeeBps)*100)'));
+ for(const s of [finance,commercial,reseller])assert.ok(!s.includes('(basis points)'));
+});

@@ -62,8 +62,8 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
             ) : null}
           </div>
 
-          <p className="text-[11px] text-slate-300 mt-0.5">{network.name} · {bundle.validity}</p>
-          <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{dataDeliveryNote(bundle.network)}</p>
+          <p className="text-xs text-slate-300 mt-0.5">{network.name} · {bundle.validity}</p>
+          <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{dataDeliveryNote(bundle.network)}</p>
         </div>
       </div>
 
