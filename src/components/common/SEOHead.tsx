@@ -33,7 +33,7 @@ const SEO_MAP: Record<string, PageMetadata> = {
       'Explore laptops, phones, accessories, AI software, and creator tools in Ghana with transparent pricing and direct WhatsApp inquiries.',
   },
   services: {
-    title: 'Digital Services & Utility Bill Payments in Ghana — Mystery Hub',
+    title: 'Digital Services & Upcoming Utilities in Ghana — Mystery Hub',
     description:
       'Upcoming digital utilities for Ghana: ECG prepaid tokens, Ghana Water bills, WAEC checker PINs, and business services. Join early access.',
   },

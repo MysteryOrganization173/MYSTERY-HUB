@@ -434,7 +434,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                 <Layers className="w-4 h-4 text-[#00c365]" />
                 <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">3-Level Referral Network</h2>
               </div>
-              <span className="text-[11px] text-slate-500 font-medium">Auto-Attributed Network</span>
+              <span className="text-[11px] text-slate-500 font-medium">Your referral network</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
@@ -483,7 +483,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                 <Share2 className="w-4 h-4 text-[#00c365]" />
                 <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Share Hub · Targeted Referral Links</h2>
               </div>
-              <span className="text-[11px] text-[#00c365] font-medium">Lifetime Attribution</span>
+              <span className="text-[11px] text-[#00c365] font-medium">Service referral links</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
@@ -493,7 +493,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                   title: 'Data Bundles',
                   path: '/data',
                   desc: 'MTN, Telecel, and AT data packages at affordable rates.',
-                  badge: 'High Conversion',
+                  badge: 'Connectivity',
                   icon: Smartphone,
                   color: 'text-[#00c365]',
                   bg: 'bg-[#00c365]/10',
@@ -503,7 +503,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                   id: 'marketplace',
                   title: 'Marketplace Sourcing',
                   path: '/marketplace',
-                  desc: 'Verified phones, electronics, and hardware with direct cash rewards.',
+                  desc: 'Explore products and enquiries. Rewards apply only to qualifying purchases.',
                   badge: 'Cash Rewards',
                   icon: ShoppingBag,
                   color: 'text-amber-400',
@@ -596,7 +596,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Reward history</h2>
-              <span className="text-[11px] text-slate-500 font-medium">Immutable Record</span>
+              <span className="text-[11px] text-slate-500 font-medium">Reward activity</span>
             </div>
 
             <div className="rounded-2xl bg-[#0b1015] border border-slate-800/90 overflow-hidden shadow-sm">

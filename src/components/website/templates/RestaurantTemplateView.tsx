@@ -113,7 +113,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
               href="#reserve"
               className="px-6 py-3 rounded-full bg-[var(--website-accent,#c99a45)] hover:bg-[#b58735] text-[#1c1917] font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2"
             >
-              <span>Book an Evening Table</span>
+              <span>Ask about a table</span>
             </a>
             <a
               href="#menu"
@@ -147,7 +147,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
             Explore our menu
           </h2>
           <p className="text-xs text-[#78716c]">
-            Every dish is prepared to order with fresh herbs from our local farmers in Aburi.
+            Contact us for current menu details, ingredients and availability.
           </p>
         </div>
 

@@ -97,7 +97,7 @@ export const AuthModal: React.FC = () => {
             </h3>
             <p className="text-xs text-slate-400 mt-1">
               {isSignup
-                ? 'Join thousands of Ghanaians accessing cheap data and launching business websites.'
+                ? 'Create an account to track orders, use Wallet and build your business website.'
                 : 'Log in to track orders, save bundles, and manage your websites.'}
             </p>
 

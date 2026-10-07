@@ -38,6 +38,6 @@ export const WalletPaymentChoice: React.FC<{
         <span>Mobile Money<span className="block text-xs text-slate-400">Or card at secure checkout</span></span>
       </label>
     </div>
-    {balance!==null&&preferred!=='wallet'&&<p className="text-slate-400 leading-relaxed">{restricted?'Wallet payments are temporarily unavailable.':`You need ${formatGhs(Math.max(0,amountMinor-balance))} more to pay with Wallet.`} <button type="button" className="min-h-11 text-emerald-400 underline" onClick={()=>{closeCheckout();setActivePage('wallet');}}>Top Up Wallet</button></p>}
+    {balance!==null&&Number.isFinite(amountMinor)&&amountMinor>0&&preferred!=='wallet'&&<p className="text-slate-400 leading-relaxed">{restricted?'Wallet payments are temporarily unavailable.':`You need ${formatGhs(Math.max(0,amountMinor-balance))} more to pay with Wallet.`} <button type="button" className="min-h-11 text-emerald-400 underline" onClick={()=>{closeCheckout();setActivePage('wallet');}}>Top Up Wallet</button></p>}
   </fieldset>;
 };

@@ -85,7 +85,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
         <div className="relative max-w-3xl space-y-5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#10b981)]/20 border border-[var(--website-accent,#10b981)]/40 text-[#a7f3d0] text-xs font-semibold uppercase tracking-wider">
             <Compass className="w-3.5 h-3.5 text-[var(--website-accent,#10b981)]" />
-            <span>Ada Foah Estuary Sanctuary</span>
+            <span>{template.siteContent ? template.location || template.categoryLabel : 'Ada Foah Estuary Sanctuary'}</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-serif tracking-tight leading-tight text-white">
@@ -101,7 +101,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
               href="#reserve"
               className="px-6 py-3 rounded-full bg-[var(--website-accent,#10b981)] hover:bg-[#059669] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2"
             >
-              <span>Reserve Eco Chalet</span>
+              <span>Ask about availability</span>
               <ArrowRight className="w-4 h-4" />
             </a>
             <a
@@ -187,7 +187,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
             Private Eco Sanctuary
           </span>
           <h2 className="text-2xl sm:text-3xl font-serif text-[var(--website-primary,#132e23)]">
-            Oceanfront Villas & River Chalets
+            Rooms & Stays
           </h2>
         </div>
 

@@ -119,10 +119,10 @@ export const DIGITAL_SERVICES: DigitalService[] = [
   },
   {
     id: 'srv-rewards',
-    title: 'Referrals & Commission Rewards',
+    title: 'Mystery Earn',
     category: 'Rewards',
-    description: 'Earn free data bundles and cash rewards every time friends, students, or businesses register and transact through your link.',
-    status: 'coming_soon',
+    description: 'Share your referral link and earn rewards from qualifying purchases under the active reward rules.',
+    status: 'active',
     iconName: 'Gift',
     accentColor: '#F43F5E',
   },

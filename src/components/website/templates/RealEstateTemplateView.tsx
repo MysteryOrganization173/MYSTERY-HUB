@@ -112,7 +112,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
           </p>
 
           {/* Embedded Real Estate Search Box */}
-          <div id="search" className="bg-white p-3 sm:p-4 rounded-2xl shadow-2xl text-left max-w-3xl mx-auto text-slate-900 grid grid-cols-1 sm:grid-cols-4 gap-3 mt-6">
+          {template.siteContent ? <a href="#featured" className="inline-block rounded-xl px-5 py-3 bg-white text-slate-900 font-bold">Browse listings</a> : <div id="search" className="bg-white p-3 sm:p-4 rounded-2xl shadow-2xl text-left max-w-3xl mx-auto text-slate-900 grid grid-cols-1 sm:grid-cols-4 gap-3 mt-6">
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
                 Location
@@ -166,7 +166,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
                 <span>Search Listings</span>
               </button>
             </div>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -267,7 +267,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
             </span>
             <h3 className="text-2xl font-extrabold text-[var(--website-primary,#0f172a)]">Schedule a Viewing</h3>
             <p className="text-xs text-slate-500">
-              Our licensed broker will accompany you for an in-person or virtual walkthrough.
+              Contact us to discuss available properties and arrange a viewing.
             </p>
           </div>
 

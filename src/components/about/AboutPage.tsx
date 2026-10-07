@@ -251,7 +251,7 @@ export const AboutPage: React.FC = () => {
               <GraduationCap className="w-6 h-6 text-[#00c365]" />
               <h4 className="font-bold text-sm text-white">Students & Campuses</h4>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Affordable, reliable non-expiring data bundles for Legon, KNUST, UCC, UPSA, and students nationwide.
+                Affordable data bundles for students nationwide, with validity shown before you pay.
               </p>
             </div>
 

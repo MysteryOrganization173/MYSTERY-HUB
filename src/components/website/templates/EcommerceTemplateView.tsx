@@ -168,7 +168,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
               Trending Hardware & Gadgets
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              All items in stock at our Circle retail showroom.
+              Contact the business to confirm current stock and delivery options.
             </p>
           </div>
 

@@ -232,14 +232,14 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
             <span className="text-xs font-mono font-bold text-[var(--website-accent,#f97316)] uppercase">
               Technical Capabilities
             </span>
-            <h3 className="text-2xl font-black uppercase text-white">Full-Spectrum Contracting</h3>
+            <h3 className="text-2xl font-black uppercase text-white">{template.siteContent ? 'Services' : 'Full-Spectrum Contracting'}</h3>
             <p className="text-xs text-slate-400">
-              End-to-end engineering, procurement, and construction (EPC) solutions.
+              {template.siteContent ? 'Contact us to discuss the services and experience needed for your project.' : 'End-to-end engineering, procurement, and construction (EPC) solutions.'}
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
+            {(template.siteContent ? (template.features || []).map(title=>({icon:Hammer,title,desc:''})) : [
               {
                 icon: Building2,
                 title: 'Commercial High-Rises',
@@ -260,7 +260,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
                 title: 'Turnkey Project Delivery',
                 desc: 'Architectural compliance, MEP engineering, and Ministry of Works sign-offs.',
               },
-            ].map((cap, i) => (
+            ]).map((cap, i) => (
               <div
                 key={i}
                 className="p-5 bg-[#0f1722] rounded-xl border border-slate-800 space-y-3 hover:border-[var(--website-accent,#f97316)]/40 transition-colors"

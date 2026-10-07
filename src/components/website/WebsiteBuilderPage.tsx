@@ -485,9 +485,7 @@ export const WebsiteBuilderPage: React.FC = () => {
                           {displayTagline}
                         </h4>
                         <p className="text-[10px] text-slate-300 line-clamp-2 drop-shadow-xs max-w-xs">
-                          {activeSite.content_json?.aboutText ||
-                            activeBaseTemplate?.demoSubtext ||
-                            'Ghanaian enterprise powered by Mystery Hub.'}
+                          {activeSite.content_json?.aboutText || 'Add an introduction in the editor.'}
                         </p>
                       </div>
 

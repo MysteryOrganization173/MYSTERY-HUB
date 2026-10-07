@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../../../hooks/useDialogFocus';
 import { afaStatusLabel } from '../../../../shared/afa';
 import { FULFILMENT_LABELS, FulfilmentMode } from '../../../../shared/marketplacePolicy';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -83,6 +84,8 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
     setCloseTestError(null);
   }, []);
 
+  const drawerFocus = useDialogFocus(Boolean(selectedOrder), closeOrderDrawer);
+
   // Dedicated Drawer Open Handler
   const openOrderDrawer = useCallback((order: AdminOrderDetails) => {
     selectedOrderRef.current = order;
@@ -146,19 +149,6 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
-
-  // Escape key listener to close order details drawer
-  useEffect(() => {
-    if (!selectedOrder) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        closeOrderDrawer();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedOrder, closeOrderDrawer]);
 
   // Handle Copy to Clipboard
   const handleCopy = (text: string, key: string) => {
@@ -754,6 +744,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
           className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
         >
           <div
+            ref={drawerFocus} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Order details"
             onClick={(e) => {
               e.stopPropagation();
             }}

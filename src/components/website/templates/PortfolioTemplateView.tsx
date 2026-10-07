@@ -48,11 +48,11 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
 
       {/* Navigation */}
       <nav className="bg-[var(--website-primary,#09090b)]/90 backdrop-blur-md border-b border-[#27272a] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
-        <div className="flex items-center gap-2">
-          <span className="font-mono font-bold text-base tracking-tighter text-white">
-            KOFI LENS
+        <div className="flex items-center gap-2 min-w-0 flex-1 pr-3">
+          <span className="font-mono font-bold text-base truncate tracking-tighter text-white">
+            {template.demoBusinessName}
           </span>
-          <span className="text-[10px] text-[var(--website-accent,#00c365)] font-mono">/ visual dir.</span>
+          <span className="hidden sm:inline text-[10px] text-[var(--website-accent,#00c365)] font-mono">/ visual dir.</span>
         </div>
 
         <div className="hidden md:flex items-center gap-6 text-xs font-mono tracking-wider text-zinc-400">
@@ -192,13 +192,13 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
             <div className="p-5 bg-zinc-900/60 rounded-xl border border-zinc-800 space-y-2">
               <h4 className="font-bold text-white text-sm">Cinema & Stills Package</h4>
               <p className="text-zinc-400 leading-relaxed">
-                Sony FX6 Full-Frame Cinema Line, Leica M11 Rangefinder, G-Master f/1.2 primes, Aputure 600d lighting kit, and DJI Ronin 4D stabilization.
+                {template.siteContent ? 'Contact us to discuss the equipment and production setup for your project.' : 'Sony FX6 Full-Frame Cinema Line, Leica M11 Rangefinder, G-Master f/1.2 primes, Aputure 600d lighting kit, and DJI Ronin 4D stabilization.'}
               </p>
             </div>
             <div className="p-5 bg-zinc-900/60 rounded-xl border border-zinc-800 space-y-2">
               <h4 className="font-bold text-white text-sm">Standard Commercial Day Rate</h4>
               <p className="text-zinc-400 leading-relaxed">
-                Full-day shoot (up to 8 hours), master color grading, commercial licensing release, and RAW deliverables archived via cloud storage.
+                {template.siteContent ? 'Confirm scope, rates, licensing and deliverables with us before booking.' : 'Full-day shoot (up to 8 hours), master color grading, commercial licensing release, and RAW deliverables archived via cloud storage.'}
               </p>
             </div>
           </div>

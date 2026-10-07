@@ -106,7 +106,7 @@ export const DataPage: React.FC = () => {
     return !isNaN(parsed) && parsed > 0 ? parsed : 10;
   }, [isCustomAirtime, customAmount, airtimeAmount]);
 
-  // Authoritative client fee calculation (2%)
+  // Display the existing zero-fee Airtime quote; the server remains authoritative.
   const airtimeCalculation = useMemo(() => {
     const faceValue = airtimeFaceValueNum;
     const serviceFee = 0;
@@ -115,7 +115,7 @@ export const DataPage: React.FC = () => {
       faceValue,
       serviceFee,
       total,
-      feePercent: 2,
+      feePercent: 0,
     };
   }, [airtimeFaceValueNum]);
 
@@ -144,11 +144,11 @@ export const DataPage: React.FC = () => {
             <ul className="space-y-1.5 pl-1">
               <li className="flex items-start gap-2">
                 <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#FFCC00]/10 text-[#FFCC00] border border-[#FFCC00]/20 shrink-0">MTN</span>
-                <span><strong>Non-Expiry / No Expiry:</strong> All MTN Express bundles remain active until the data volume is completely used.</span>
+                <span><strong>Package validity:</strong> Check the validity shown for your selected MTN bundle. Network terms apply.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20 shrink-0">AirtelTigo</span>
-                <span><strong>Non-Expiry iShare:</strong> AirtelTigo (AT) bundles do not expire and credit directly to your line.</span>
+                <span><strong>Package validity:</strong> Check your selected AirtelTigo bundle for its validity and delivery details.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-600/10 text-red-500 border border-red-600/20 shrink-0">Telecel</span>
@@ -165,7 +165,7 @@ export const DataPage: React.FC = () => {
         answer: (
           <div className="space-y-2 text-slate-300 text-xs leading-relaxed">
             <p>
-              Mystery Hub dispatches orders automatically upon Mobile Money payment authorization:
+              Mystery Hub submits eligible orders after payment is verified:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
               <div className="p-2.5 rounded-xl bg-[#090d10] border border-slate-800">
@@ -173,7 +173,7 @@ export const DataPage: React.FC = () => {
                   <span>⚡ AirtelTigo (AT)</span>
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  <strong>Instant Delivery.</strong> Orders complete directly in seconds via Success Biz Hub iShare.
+                  Orders are normally delivered automatically. Network conditions can cause delays; track progress in Orders.
                 </p>
               </div>
               <div className="p-2.5 rounded-xl bg-[#090d10] border border-slate-800">
@@ -259,7 +259,7 @@ export const DataPage: React.FC = () => {
         question: 'Is paying with Mobile Money safe on Mystery Hub?',
         answer: (
           <p className="text-slate-300 text-xs leading-relaxed">
-            Yes, 100% secure. Payments are processed by Paystack using encrypted, bank-grade protocols. You authenticate directly on your mobile phone via your network operator's official Mobile Money USSD prompt (MTN MoMo, Telecel Cash, AT Money). Mystery Hub never asks for, views, or stores your secret MoMo PIN.
+            Payments are processed securely by Paystack. You authenticate directly on your mobile phone via your network operator's official Mobile Money USSD prompt (MTN MoMo, Telecel Cash, AT Money). Mystery Hub never asks for, views, or stores your secret MoMo PIN.
           </p>
         ),
       },

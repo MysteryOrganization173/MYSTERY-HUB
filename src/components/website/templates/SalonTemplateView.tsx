@@ -138,7 +138,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
             Luxury Hair & Grooming Menu
           </h2>
           <p className="text-xs text-[#836574]">
-            All treatments include scalp therapy and complimentary chilled hibiscus tea.
+            Contact us to confirm services, prices and what is included.
           </p>
         </div>
 
@@ -203,7 +203,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
             </span>
             <h3 className="text-2xl font-serif text-[var(--website-primary,#3b1828)]">Book Your Glow Session</h3>
             <p className="text-xs text-[#836574]">
-              Select your master stylist and preferred time slot in East Legon.
+              Contact us to discuss your preferred service and appointment time.
             </p>
           </div>
 

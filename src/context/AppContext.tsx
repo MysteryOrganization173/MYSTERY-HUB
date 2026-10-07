@@ -405,7 +405,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setIsAuthModalOpen(false);
     setAuthContextMessage(null);
-    showToast(`Welcome back, ${profile.name.split(' ')[0]}!`, 'success');
+    showToast(`Welcome, ${profile.name.split(' ')[0]}!`, 'success');
 
     if (pendingAuthAction && !profile.mustChangePassword) {
       const action = pendingAuthAction;
