@@ -95,7 +95,7 @@ export const AuthModal: React.FC = () => {
             <p className="text-xs text-slate-400 mt-1">
               {isSignup
                 ? 'Create an account to track orders, use Wallet and build your business website.'
-                : 'Log in to track orders, save bundles, and manage your websites.'}
+                : 'Sign in to track orders, use your Wallet and manage your websites.'}
             </p>
 
             {isSignup && (
@@ -104,10 +104,10 @@ export const AuthModal: React.FC = () => {
                   ✓ Track orders across devices
                 </span>
                 <span className="px-2 py-0.5 rounded-md bg-[#00c365]/10 border border-[#00c365]/20 text-[#00c365] text-[11px] font-medium">
-                  ✓ Website Builder identity
+                  ✓ Create your business website
                 </span>
                 <span className="px-2 py-0.5 rounded-md bg-[#00c365]/10 border border-[#00c365]/20 text-[#00c365] text-[11px] font-medium">
-                  ✓ Mystery Earn active rewards
+                  ✓ Earn from eligible referrals
                 </span>
               </div>
             )}
@@ -128,7 +128,7 @@ export const AuthModal: React.FC = () => {
           )}
 
           {existingAccount && <div className="flex flex-wrap gap-3 text-sm"><button className="text-[#00c365]" onClick={() => { setErrorMessage(null); setPassword(''); setExistingAccount(false); openAuth('login'); }}>Log In Instead</button><button className="text-[#00c365]" onClick={() => { setPassword(''); setRecovery(true); }}>Need help accessing your account?</button></div>}
-          {recovery ? <div className="space-y-4 text-sm"><p>We can help you restore access to your Mystery Hub account.</p><p className="text-slate-400">Contact support for assistance. We will confirm account ownership before an administrator restores access. Never send your password.</p><a className="block text-[#00c365] underline" href={BUSINESS_CONFIG.getGeneralWhatsAppUrl('Hi Mystery Hub, I need help accessing my account.')} target="_blank" rel="noopener noreferrer">Contact support on WhatsApp</a><a className="block text-[#00c365] underline break-words" href={BUSINESS_CONFIG.contact.emailLink}>{BUSINESS_CONFIG.contact.supportEmail}</a><button onClick={() => setRecovery(false)} className="text-[#00c365]">Back to sign in</button></div> : <form onSubmit={handleSubmit} className="space-y-4">
+          {recovery ? <div className="space-y-4 text-sm"><p>We can help you restore access to your Mystery Hub account.</p><p className="text-slate-400">Contact support to recover your account. We will confirm ownership before restoring access. Never send your password.</p><a className="block text-[#00c365] underline" href={BUSINESS_CONFIG.getGeneralWhatsAppUrl('Hi Mystery Hub, I need help accessing my account.')} target="_blank" rel="noopener noreferrer">Contact support on WhatsApp</a><a className="block text-[#00c365] underline break-words" href={BUSINESS_CONFIG.contact.emailLink}>{BUSINESS_CONFIG.contact.supportEmail}</a><button onClick={() => setRecovery(false)} className="text-[#00c365]">Back to sign in</button></div> : <form onSubmit={handleSubmit} className="space-y-4">
             {isSignup && (
               <div className="space-y-1.5">
                 <label htmlFor="auth-name" className="text-xs font-semibold text-slate-300">Full Name / Business Name</label>
@@ -163,7 +163,7 @@ export const AuthModal: React.FC = () => {
               </div>
             </div>
 
-            {isSignup&&<label className="block text-xs text-slate-300">Email (optional)<input type="email" value={signupEmail} onChange={e=>setSignupEmail(e.target.value)} maxLength={128} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0a0e12] p-3"/><span className="block mt-2 text-slate-400">Phone uniqueness is required; phone ownership is not verified by SMS.</span></label>}
+            {isSignup&&<label className="block text-xs text-slate-300">Email (optional)<input type="email" value={signupEmail} onChange={e=>setSignupEmail(e.target.value)} maxLength={128} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0a0e12] p-3"/><span className="block mt-2 text-slate-400">Use a phone number that is not on another account. We do not verify phone ownership by SMS.</span></label>}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label htmlFor="auth-password" className="text-xs font-semibold text-slate-300">Password</label>
@@ -215,7 +215,7 @@ export const AuthModal: React.FC = () => {
               {isLoading ? (
                 <span className="flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  Verifying...
+                  Please wait…
                 </span>
               ) : (
                 <span className="flex items-center gap-2">

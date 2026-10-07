@@ -62,7 +62,7 @@ export const MoreServicesPage: React.FC = () => {
   return (
     <div className="py-4 sm:py-8 lg:py-10 text-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5 sm:space-y-8 lg:space-y-10">
-        <button onClick={()=>setActivePage('wallet')} className="w-full rounded-2xl border border-emerald-600/30 bg-emerald-500/10 p-4 text-left"><span className="font-bold text-white">Mystery Wallet</span><p className="text-sm text-slate-400">Add money and spend instantly on Data, Airtime and AFA.</p></button>
+        <button onClick={()=>setActivePage('wallet')} className="w-full rounded-2xl border border-emerald-600/30 bg-emerald-500/10 p-4 text-left"><span className="font-bold text-white">Mystery Wallet</span><p className="text-sm text-slate-400">Add money for eligible Data, Airtime and AFA purchases. Wallet funds cannot be withdrawn.</p></button>
         {/* Compact Hero Section */}
         <div className="relative rounded-2xl sm:rounded-3xl bg-[#070b0e] border border-slate-800/80 p-4 sm:p-8 lg:p-10 overflow-hidden shadow-2xl">
           {/* Backdrop Artwork Layer */}
@@ -111,7 +111,7 @@ export const MoreServicesPage: React.FC = () => {
             <div className="lg:col-span-7 space-y-3.5 text-left">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#111c16]/90 border border-[#00c365]/30 text-[11px] font-semibold text-[#00c365] backdrop-blur-sm">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Digital Utilities Ecosystem</span>
+                <span>Explore Our Services</span>
               </div>
 
               <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-[1.1]">
@@ -120,7 +120,7 @@ export const MoreServicesPage: React.FC = () => {
               </h1>
 
               <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-xl">
-                Explore Mystery Hub services for connectivity, business and everyday digital needs. Live services are ready now, with more on the way.
+                Buy data and airtime, create a website or explore other services. Upcoming services are marked Coming Soon.
               </p>
 
               {/* Compact CTAs */}
@@ -191,7 +191,7 @@ export const MoreServicesPage: React.FC = () => {
             <Search className="w-8 h-8 text-slate-500 mx-auto" />
             <h3 className="text-sm font-bold text-white">No services found</h3>
             <p className="text-xs text-slate-400">
-              No digital utilities matched your current search or category filter.
+              No services match your search. Try another name or category.
             </p>
             <div className="pt-1">
               <button
@@ -260,7 +260,7 @@ export const MoreServicesPage: React.FC = () => {
                     <div className="flex items-center gap-2 shrink-0">
                       {isLive ? (
                         <span className="text-[9px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-2 py-0.5 rounded uppercase">
-                          Live
+                          Available
                         </span>
                       ) : isBeta ? (
                         <span className="text-[9px] font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded uppercase">
@@ -335,7 +335,7 @@ export const MoreServicesPage: React.FC = () => {
 
                         {isLive ? (
                           <span className="text-xs font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                            Live
+                            Available
                           </span>
                         ) : isBeta ? (
                           <span className="text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2.5 py-1 rounded-full uppercase tracking-wider">

@@ -49,7 +49,7 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
             {/* Dominant Promotional Badge: responsive text to prevent narrow-screen collision */}
             {isAirtelTigo ? (
               <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded shrink-0">
-                ⚡ Instant<span className="hidden sm:inline"> Delivery</span>
+                AT<span className="hidden sm:inline"> Data</span>
               </span>
             ) : bundle.isBestValue ? (
               <span className="text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">

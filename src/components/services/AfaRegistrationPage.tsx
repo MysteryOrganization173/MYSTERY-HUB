@@ -355,7 +355,7 @@ export const AfaRegistrationPage: React.FC = () => {
             How AFA Registration Works
           </h2>
           <span className="text-[10px] text-slate-400">
-            One-time setup · Voice and data packages purchased via MTN USSD
+            One-time registration · Buy voice and data packages through MTN’s phone menu
           </span>
         </div>
 
@@ -632,7 +632,7 @@ export const AfaRegistrationPage: React.FC = () => {
               <span>Privacy &amp; Security Commitment</span>
             </div>
             <p className="text-slate-400 leading-relaxed text-xs">
-              We encrypt registration details on the server and send them to our supplier. Sensitive identity data is purged after confirmed completion or safe closure; unresolved cases retain encrypted evidence. Never provide a PIN, password, card photo, or selfie.
+              Your registration details are encrypted and shared with our registration provider. Sensitive identity details are deleted after confirmed completion or safe closure. Unresolved cases remain encrypted while we resolve them. Never provide a PIN, password, card photo or selfie.
             </p>
           </div>
 

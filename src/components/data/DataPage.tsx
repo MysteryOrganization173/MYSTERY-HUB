@@ -161,7 +161,7 @@ export const DataPage: React.FC = () => {
       {
         id: 'faq-delivery',
         category: 'delivery' as const,
-        question: 'How fast is delivery and how does fulfillment work?',
+        question: 'How long does delivery take?',
         answer: (
           <div className="space-y-2 text-slate-300 text-xs leading-relaxed">
             <p>
@@ -182,7 +182,7 @@ export const DataPage: React.FC = () => {
                   <span>MTN Ghana</span>
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Fulfilled swiftly under normal conditions. Restricted to 1 active processing order per recipient phone number.
+                  MTN processing can take longer. Wait for the current order on a number to finish before buying another.
                 </p>
               </div>
               <div className="p-2.5 rounded-xl bg-[#090d10] border border-slate-800">
@@ -191,7 +191,7 @@ export const DataPage: React.FC = () => {
                   <span>Telecel Ghana</span>
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Direct automated delivery upon system confirmation.
+                  Delivery starts after payment is confirmed. Track progress in Orders.
                 </p>
               </div>
             </div>
@@ -234,20 +234,20 @@ export const DataPage: React.FC = () => {
         answer: (
           <div className="space-y-2 text-slate-300 text-xs leading-relaxed">
             <p>
-              Don't worry! Our platform includes built-in tracking and automated support:
+              Check the recipient number carefully before paying. If you need help:
             </p>
             <ul className="space-y-1.5 pl-1">
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-[#00c365] shrink-0 mt-0.5" />
-                <span><strong>Live Order Tracking:</strong> Click "Track Order" in the top bar or footer and enter your phone number or Order Reference ID to see real-time delivery status.</span>
+                <span><strong>Track your order:</strong> Open Orders and enter your order reference or recipient number to check delivery status.</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-[#00c365] shrink-0 mt-0.5" />
-                <span><strong>Prefix Safeguard:</strong> System automatically validates valid 024, 054, 055, 059, 027, 057, 020, 050 network prefixes before taking payment.</span>
+                <span><strong>Check the number:</strong> We check the number format and selected network, but this cannot confirm who owns the number. Review it before paying.</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-[#00c365] shrink-0 mt-0.5" />
-                <span><strong>24/7 Support:</strong> If an order fails or needs manual review, reach out to our WhatsApp support team with your Order ID for immediate resolution.</span>
+                <span><strong>Contact support:</strong> If your order is delayed or you entered the wrong number, send your order reference to our WhatsApp team. Delivered bundles may not be recoverable.</span>
               </li>
             </ul>
           </div>
@@ -425,7 +425,7 @@ export const DataPage: React.FC = () => {
               </h1>
 
               <p className="text-slate-300 text-xs sm:text-sm lg:text-base leading-snug sm:leading-relaxed max-w-lg">
-                Get the best data bundles and airtime for all networks in Ghana. Fast, secure, and affordable with direct delivery to your SIM.
+                Buy data and airtime for MTN, Telecel and AirtelTigo. Choose a product, check the recipient and total, then track your order.
               </p>
 
               <div className="pt-0.5 sm:pt-1 flex flex-wrap gap-2.5 sm:gap-4 text-[11px] sm:text-xs text-slate-400">
@@ -439,7 +439,7 @@ export const DataPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-1 sm:gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-[#00c365]" />
-                  <span>Fast Automated Delivery</span>
+                  <span>Track Your Order</span>
                 </div>
               </div>
             </div>
@@ -619,7 +619,7 @@ export const DataPage: React.FC = () => {
               <div className="mt-3">
                 <div className="font-bold text-sm text-white">AirtelTigo (AT)</div>
                 <div className="text-[11px] text-amber-400 font-semibold flex items-center gap-1">
-                  <span>⚡ Instant Delivery</span>
+                  <span>Delivery to Your Number</span>
                 </div>
               </div>
             </button>
@@ -682,7 +682,7 @@ export const DataPage: React.FC = () => {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-extrabold text-xs sm:text-sm text-white">
-                      ⚡ Need data now? Go Instant
+                      More Bundle Options
                     </h3>
                     {(activeNetwork === 'mtn' || activeNetwork === 'all') && (
                       <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-1.5 py-0.5 rounded whitespace-nowrap">
@@ -691,7 +691,7 @@ export const DataPage: React.FC = () => {
                     )}
                   </div>
                   <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 leading-snug">
-                    Browse Instant Bundles for immediate direct delivery.
+                    Browse Instant Bundles for a different delivery option. Check each package’s restrictions before paying.
                   </p>
                 </div>
               </div>
@@ -733,13 +733,13 @@ export const DataPage: React.FC = () => {
             <div className="text-center space-y-1.5">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00c365]/10 border border-[#00c365]/25 text-[#00c365] text-xs font-semibold">
                 <Zap className="w-3.5 h-3.5" />
-                <span>Live Airtime Top-Up · Instant Recharge</span>
+                <span>Airtime Top-Up</span>
               </div>
               <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                 Recharge Any Ghana Network
               </h3>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                Direct automated airtime delivery for MTN, AirtelTigo, and Telecel. Powered by secure Mobile Money.
+                Choose a network and amount, enter the recipient number, then check the total before paying.
               </p>
             </div>
 
@@ -900,7 +900,7 @@ export const DataPage: React.FC = () => {
               {/* 4. Live Transparent Price & Fee Breakdown */}
               <div className="p-3.5 rounded-xl bg-[#090d10] border border-slate-800/80 space-y-2 text-xs">
                 <div className="flex items-center justify-between text-slate-400">
-                  <span>Airtime Face Value (Credited to SIM)</span>
+                  <span>Airtime to Your Number</span>
                   <span className="text-white tabular-nums font-semibold">
                     GH₵{airtimeCalculation.faceValue.toFixed(2)}
                   </span>
@@ -931,7 +931,7 @@ export const DataPage: React.FC = () => {
 
               <div className="flex items-center justify-center gap-2 text-[11px] text-slate-500 text-center">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Automated telecom fulfillment. Secured by Paystack.</span>
+                <span>Track delivery in Orders. Pay through Paystack.</span>
               </div>
             </div>
           </form>
@@ -1156,7 +1156,7 @@ export const DataPage: React.FC = () => {
                 <div className="flex items-center justify-center gap-2 pt-3 pb-1 text-xs text-slate-400 text-center">
                   <ShieldCheck className="w-4 h-4 text-[#00c365] shrink-0" />
                   <span>
-                    Direct automated SIM delivery · Secured by Paystack with Mobile Money & Card
+                    Track delivery in Orders · Payments handled by Paystack
                   </span>
                 </div>
               </>

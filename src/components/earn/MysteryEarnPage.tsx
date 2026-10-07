@@ -268,7 +268,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00c365]/15 border border-[#00c365]/40 text-xs font-bold text-[#00c365] backdrop-blur-sm">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>MYSTERY EARN · ACTIVE PARTNER</span>
+                  <span>Mystery Earn</span>
                 </div>
 
                 {summary?.code && (
@@ -396,7 +396,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                 <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-[#00c365] tracking-tight truncate">
                   GH₵{summary ? summary.approvedRewardsGhc.toFixed(2) : '0.00'}
                 </div>
-                <p className="text-xs text-slate-400 leading-snug">Approved lifetime rewards</p>
+                <p className="text-xs text-slate-400 leading-snug">Total approved rewards</p>
               </div>
             </div>
           </div>
@@ -481,7 +481,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Share2 className="w-4 h-4 text-[#00c365]" />
-                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Share Hub · Targeted Referral Links</h2>
+                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Share a Service</h2>
               </div>
               <span className="text-[11px] text-[#00c365] font-medium">Service referral links</span>
             </div>
@@ -514,7 +514,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                   id: 'website',
                   title: 'Website Builder',
                   path: '/website',
-                  desc: 'Professional instant business website creation for Ghanaian businesses.',
+                  desc: 'Create a free business website. Paid-plan referral rewards are not available yet.',
                   badge: 'Business',
                   icon: Globe,
                   color: 'text-purple-400',
@@ -700,10 +700,10 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
-              Rewards vary by eligible product and order value. When a referred customer completes a qualifying purchase, your reward is credited automatically.
+              Rewards depend on the active rules for each eligible product. Approved rewards are added when a qualifying referred order is delivered.
             </p>
             <p className="text-[11px] text-slate-400">
-              Every reward credited to your account is tracked with full transaction details in your Reward history above.
+              See each reward and its status in Reward History above.
             </p>
           </div>
         </div>
@@ -754,7 +754,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
           <div className="relative z-20 w-full max-w-xl lg:max-w-2xl p-10 lg:p-12 space-y-4 text-left">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#112019]/90 border border-[#00c365]/40 text-xs font-bold text-[#00c365] backdrop-blur-sm shadow-sm">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>MYSTERY EARN · LIFETIME REFERRALS</span>
+              <span>Mystery Earn</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight">
@@ -765,7 +765,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
             </h1>
 
             <p className="text-xs sm:text-sm lg:text-base text-slate-300 leading-relaxed">
-              Create your free Mystery Hub account, share eligible services and products, and earn rewards when qualifying referrals convert.
+              Create a free account and share your referral link. You can earn when referred customers complete eligible purchases.
             </p>
 
             <div className="p-3 rounded-xl bg-[#0f1714]/80 border border-[#00c365]/30 text-xs text-slate-300 space-y-1">
@@ -774,7 +774,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                 Refer once. Earn when they return.
               </span>
               <p className="text-[11px] text-slate-400">
-                When a customer is linked to your referral account, eligible future purchases can continue generating rewards while the referral remains valid.
+                You can also earn from eligible future purchases while the referral remains valid and the active reward rules allow it.
               </p>
             </div>
 
@@ -784,7 +784,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                 onClick={() => openAuth('signup')}
                 className="px-5 py-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center gap-2 cursor-pointer"
               >
-                <span>Create Free Account & Start Earning</span>
+                <span>Create a Free Account</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 
@@ -815,7 +815,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
             </h1>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Create your free Mystery Hub account, share eligible services and products, and earn rewards when qualifying referrals convert.
+              Create a free account and share your referral link. You can earn when referred customers complete eligible purchases.
             </p>
           </div>
 
@@ -845,7 +845,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
               Refer once. Earn when they return.
             </span>
             <p className="text-[11px] text-slate-400">
-              When a customer is linked to your referral account, eligible future purchases can continue generating rewards while the referral remains valid.
+              You can also earn from eligible future purchases while the referral remains valid and the active reward rules allow it.
             </p>
           </div>
 
@@ -855,7 +855,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
               onClick={() => openAuth('signup')}
               className="w-full py-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span>Create Free Account & Start Earning</span>
+              <span>Create a Free Account</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
 
@@ -887,7 +887,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
               </div>
               <h3 className="font-bold text-white text-sm">Create your free account</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Sign up in seconds to receive your permanent personal Mystery Hub referral code and share links.
+                Create an account to get your personal referral code and links.
               </p>
             </div>
 
@@ -911,7 +911,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
               </div>
               <h3 className="font-bold text-white text-sm">Earn qualifying rewards</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                When eligible referred orders are delivered, immutable rewards are credited directly to your reward ledger.
+                Rewards are added when eligible referred orders are delivered, under the active reward rules.
               </p>
             </div>
           </div>
@@ -934,12 +934,12 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                   <Smartphone className="w-4 h-4" />
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#00c365]/10 text-[#00c365] border border-[#00c365]/30">
-                  Active Channel
+                  Eligible Purchases
                 </span>
               </div>
               <h3 className="font-bold text-white text-sm">Data & Digital Services</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Share daily data bundles and airtime top-ups. When your referred customers complete qualifying telecom orders, your reward is attributed automatically.
+                Share data bundles and airtime. Rewards depend on eligible orders and the active rules shown here.
               </p>
             </div>
 
@@ -951,12 +951,12 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
                     <ShoppingBag className="w-4 h-4" />
                   </div>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                    Active Channel
+                    Eligible Purchases
                   </span>
                 </div>
                 <h3 className="font-bold text-white text-sm">Marketplace Sourcing</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Share verified hardware, phones, and sourced products from the Marketplace. Eligible products credit referral rewards upon successful order delivery.
+                  Share Marketplace items. Rewards apply only to eligible purchases that are successfully delivered.
                 </p>
               </div>
               <div className="pt-2">
@@ -983,7 +983,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
               </div>
               <h3 className="font-bold text-white text-sm">Website Builder</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Refer businesses to the Mystery Hub Website Studio. Referral rewards for professional plans will activate in an upcoming phase.
+                Share the Website Builder with a business. Rewards for paid plans are not available yet.
               </p>
             </div>
           </div>
@@ -1028,13 +1028,13 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
               </span>
               <h3 className="font-bold text-sm text-white pt-1">You Earn a Reward</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                When order fulfillment is delivered, your earned reward is credited automatically to your ledger.
+                When an eligible order is delivered, your reward appears in Reward History.
               </p>
             </div>
 
             <div className="p-4.5 rounded-2xl bg-[#0b1015] border border-slate-800/80 space-y-2">
               <span className="text-[10px] font-mono font-bold text-[#00c365] bg-[#00c365]/10 px-2 py-0.5 rounded border border-[#00c365]/20">
-                04 · LIFETIME
+                04 · FUTURE PURCHASES
               </span>
               <h3 className="font-bold text-sm text-white pt-1">Ongoing Purchases</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
@@ -1061,7 +1061,7 @@ export const MysteryEarnPage: React.FC<MysteryEarnPageProps> = () => {
               onClick={() => openAuth('signup')}
               className="px-6 py-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
             >
-              Create Free Account & Start Earning
+              Create a Free Account
             </button>
           </div>
         </div>

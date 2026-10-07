@@ -16,13 +16,13 @@ export const HomeComingSoonSection: React.FC = () => {
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#00c365]">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Expanding Ecosystem</span>
+              <span>More Services Are Coming</span>
             </div>
             <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
               Coming Soon to Mystery Hub
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 max-w-lg">
-              We are actively developing direct connections with Ghanaian utility providers and services.
+              These services are not available yet. Join a launch list if you would like availability updates.
             </p>
           </div>
 
@@ -30,7 +30,7 @@ export const HomeComingSoonSection: React.FC = () => {
             onClick={() => setActivePage('services')}
             className="text-xs font-semibold text-[#00c365] hover:text-[#00e575] flex items-center gap-1 self-start sm:self-auto cursor-pointer"
           >
-            <span>View All Future Utilities</span>
+            <span>See What’s Coming</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

@@ -80,7 +80,7 @@ export const AboutPage: React.FC = () => {
             </h1>
 
             <p className="text-slate-300 text-xs sm:text-sm lg:text-base leading-relaxed">
-              Mystery Hub is a Ghana-focused digital services platform built to make everyday connectivity, digital tools and online business services easier to access from one trusted place. We&apos;re starting with services people already use today and building toward a broader digital ecosystem for individuals, creators and businesses.
+              Mystery Hub is a digital services marketplace for Ghana. Buy data and airtime, create a free business website, explore Marketplace items and track your orders. AFA registration is available when the service is open; upcoming services are clearly marked.
             </p>
 
             <div className="pt-2 flex flex-wrap gap-3">
@@ -88,13 +88,13 @@ export const AboutPage: React.FC = () => {
                 onClick={() => openWaitlist('Mystery Hub VIP Updates')}
                 className="px-6 py-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
               >
-                Get platform updates
+                Get Service Updates
               </button>
               <button
                 onClick={() => setActivePage('data')}
                 className="px-6 py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 backdrop-blur-sm transition-colors cursor-pointer"
               >
-                Explore available services
+                Buy Data
               </button>
             </div>
           </div>
@@ -117,7 +117,7 @@ export const AboutPage: React.FC = () => {
             </h1>
 
             <p className="text-slate-300 text-xs leading-relaxed">
-              A Ghana-focused digital services platform built to make everyday connectivity, digital tools and online business services easier to access from one trusted place.
+              Buy data and airtime, create a free website and track your orders in one place. Mystery Hub is built for individuals and businesses in Ghana.
             </p>
           </div>
 
@@ -151,13 +151,13 @@ export const AboutPage: React.FC = () => {
               onClick={() => openWaitlist('Mystery Hub VIP Updates')}
               className="w-full py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
             >
-              Get platform updates
+              Get Service Updates
             </button>
             <button
               onClick={() => setActivePage('data')}
               className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-800 transition-colors cursor-pointer"
             >
-              Explore available services
+              Buy Data
             </button>
           </div>
         </div>
@@ -172,7 +172,7 @@ export const AboutPage: React.FC = () => {
               To provide accessible, affordable and reliable digital services for everyone in Ghana.
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Mystery Hub is being built to bring data, business tools and everyday digital services into one simpler experience — with native Mobile Money checkout, reliable data delivery, and transparent customer support.
+              We bring everyday purchases and business tools together, with Mobile Money checkout, clear totals, order tracking and WhatsApp support.
             </p>
           </div>
 
@@ -185,7 +185,7 @@ export const AboutPage: React.FC = () => {
               <div className="space-y-1">
                 <h3 className="font-bold text-base text-white">Convenience</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Everything you need in one place. One unified hub to manage your data bundles, explore website templates, and source quality tech gear with Mobile Money payments.
+                  Buy data or airtime, choose a website design, or ask about Marketplace items from your phone.
                 </p>
               </div>
             </div>
@@ -198,7 +198,7 @@ export const AboutPage: React.FC = () => {
               <div className="space-y-1">
                 <h3 className="font-bold text-base text-white">Trust & Reliability</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Secure transactions powered by Paystack and direct Mobile Money authorization. Order tracking, clear pricing and transparent payment processing, backed by direct WhatsApp support.
+                  Pay through Paystack, check your order status and contact WhatsApp support with your order reference if you need help.
                 </p>
               </div>
             </div>
@@ -281,6 +281,24 @@ export const AboutPage: React.FC = () => {
           </div>
         </div>
 
+        <section aria-label="Common questions" className="space-y-3 text-left">
+          <h2 className="text-xl sm:text-2xl font-bold text-white">New to Mystery Hub?</h2>
+          {[
+            ['How do I place an order?', 'Open Data, choose a network and product, enter the recipient number and review the total before paying. AFA registration has its own form and requires an account.'],
+            ['How can I pay?', 'Use the payment options shown at checkout. Eligible purchases also support Mystery Wallet when you are signed in and have enough balance.'],
+            ['How do I track an order or get help?', 'Open Orders with your order reference or recipient number. Payment confirmation and delivery are separate steps. If delivery takes longer, contact WhatsApp support with your order reference.'],
+            ['What is Mystery Wallet?', 'Add money to pay for eligible Mystery Hub purchases. Wallet funds cannot be withdrawn to Mobile Money and do not earn interest.'],
+            ['How does Mystery Earn work?', 'Create an account and share your referral link. Eligible referred purchases can earn rewards under the active rules. Pending rewards are not yet approved; withdrawal limits and fees are shown in Mystery Earn.'],
+            ['Can I create a website for free?', 'Yes. Choose a design, add your business details and photos, then publish on the Free plan. Your website has its own link and brand colors. Paid-plan features are available only where shown.'],
+            ['Which services are coming later?', 'ECG, Ghana Water, TV renewals and results-checker services are not available yet. See More Services for current availability and launch lists.'],
+          ].map(([question, answer]) => (
+            <details key={question} className="rounded-xl border border-slate-800 bg-[#0d1217] p-4">
+              <summary className="cursor-pointer font-semibold text-sm text-white">{question}</summary>
+              <p className="mt-3 text-sm text-slate-300 leading-relaxed">{answer}</p>
+            </details>
+          ))}
+        </section>
+
         {/* 4. Contact / Partnership Section */}
         <div className="p-6 sm:p-8 rounded-3xl bg-[#0e161c] border border-slate-800 text-center space-y-3.5 max-w-3xl mx-auto shadow-lg">
           <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
@@ -297,7 +315,7 @@ export const AboutPage: React.FC = () => {
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
             >
               <MessageSquare className="w-4 h-4" />
-              <span>Chat With The Founders On WhatsApp</span>
+              <span>Contact Support on WhatsApp</span>
             </a>
           </div>
         </div>

@@ -11,31 +11,31 @@ interface PageMetadata {
 const SEO_MAP: Record<string, PageMetadata> = {
   wallet: {title:'Mystery Wallet — Mystery Hub',description:'Top up your Wallet and use your available balance for supported Mystery Hub purchases.'},
   earn: {title:'Mystery Earn — Mystery Hub',description:'Invite people to Mystery Hub and earn rewards from qualifying purchases.'},
-  afa: { title:'MTN AFA Registration — Mystery Hub', description:'Register your MTN number for AFA with secure payment and order tracking.' },
+  afa: { title:'MTN AFA Registration — Mystery Hub', description:'Check AFA availability, register your MTN number and track your registration. The registration fee does not include future MTN voice or data packages.' },
   home: {
-    title: 'Mystery Hub — Ghana’s All-in-One Digital Platform | Data & Websites',
+    title: 'Mystery Hub — Digital Services Marketplace in Ghana',
     description:
-      'Buy affordable data bundles for MTN, Telecel, and AirtelTigo with Mobile Money. Explore modern website templates and essential everyday digital services across Ghana.',
+      'Buy data and airtime in Ghana, create a free business website and track your orders. Explore Mystery Wallet, referral rewards and Marketplace enquiries.',
   },
   data: {
     title: 'Buy Data Bundles (MTN, Telecel, AirtelTigo) — Mystery Hub Ghana',
     description:
-      'Fast, reliable data bundles for MTN, Telecel, and AirtelTigo. Choose from the current MTN, Telecel and AirtelTigo catalog with clear prices and secure Mobile Money checkout.',
+      'Choose MTN, Telecel or AirtelTigo data and airtime. Review prices and recipient details, pay with Mobile Money and track your order.',
   },
   website: {
     title: 'Website Builder for Ghanaian Businesses — Mystery Hub',
     description:
-      'Explore mobile-responsive website templates handcrafted for chop bars, salons, construction firms, boutiques, and churches in Ghana. Publish your website free, add your images and manage supported reseller stores.',
+      'Create a free business website in Ghana. Choose a design, add your details and photos, and publish a mobile-friendly site with your own brand.',
   },
   marketplace: {
     title: 'Digital Marketplace & Tech Hardware — Mystery Hub Ghana',
     description:
-      'Explore laptops, phones, accessories, AI software, and creator tools in Ghana with transparent pricing and direct WhatsApp inquiries.',
+      'Browse technology, digital products and services in Ghana. Check each listing for checkout or enquiry options, pricing and availability.',
   },
   services: {
     title: 'Digital Services & Upcoming Utilities in Ghana — Mystery Hub',
     description:
-      'Upcoming digital utilities for Ghana: ECG prepaid tokens, Ghana Water bills, WAEC checker PINs, and business services. Join early access.',
+      'Explore available Mystery Hub services and see what is coming next. ECG, water, TV renewals and results-checker services are not yet available.',
   },
   about: {
     title: 'About Mystery Hub — Reliable Digital Solutions for Ghana',
@@ -45,7 +45,7 @@ const SEO_MAP: Record<string, PageMetadata> = {
   orders: {
     title: 'Track Your Order & Receipts — Mystery Hub Ghana',
     description:
-      'Check live status and transaction receipts for your Mystery Hub data bundle orders across MTN, Telecel, and AirtelTigo.',
+      'Track your Mystery Hub orders using your reference or recipient number. Check payment and delivery status, and find support if you need help.',
   },
   admin: {
     title: 'Staff & Operations Portal — Mystery Hub Ghana',

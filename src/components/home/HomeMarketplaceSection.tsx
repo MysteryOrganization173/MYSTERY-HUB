@@ -59,7 +59,7 @@ export const HomeMarketplaceSection: React.FC = () => {
     {
       icon: Cpu,
       title: 'AI & Productivity Tools',
-      desc: 'Legitimate creator suites, office productivity setups, and cloud workspace tools.',
+      desc: 'Ask about software for creative work, office tasks and online collaboration.',
       tag: 'Software',
       accent: 'text-[#00c365] bg-[#00c365]/10 border-[#00c365]/20',
     },
@@ -83,10 +83,10 @@ export const HomeMarketplaceSection: React.FC = () => {
               <span>Tech & Digital Marketplace</span>
             </div>
             <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Quality Technology & Digital Tools Sourced for You
+              Find Tools for Work and Business
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 max-w-xl leading-relaxed">
-              Need the right tools to work, create or grow? Mystery Hub helps you source quality technology and digital solutions with transparent enquiries.
+              Browse technology and digital tools. Send an enquiry to check availability, pricing and delivery before deciding.
             </p>
           </div>
 
@@ -98,7 +98,7 @@ export const HomeMarketplaceSection: React.FC = () => {
             }}
             className="inline-flex items-center gap-2 px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold transition-all shrink-0 cursor-pointer self-start sm:self-auto"
           >
-            <span>Explore Marketplace</span>
+            <span>Browse Marketplace</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </a>
         </div>
@@ -155,7 +155,7 @@ export const HomeMarketplaceSection: React.FC = () => {
                     className="w-full py-2 rounded-xl bg-slate-900 hover:bg-[#00c365] text-slate-200 hover:text-black text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <FileQuestion className="w-3.5 h-3.5" />
-                    <span>Inquire Now</span>
+                    <span>Ask About This Item</span>
                   </button>
                 </div>
               </div>
@@ -189,7 +189,7 @@ export const HomeMarketplaceSection: React.FC = () => {
                   </div>
 
                   <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-400 group-hover:text-white">
-                    <span>Inquire availability</span>
+                    <span>Check Availability</span>
                     <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
                   </div>
                 </div>

@@ -26,12 +26,12 @@ export const QuickServicesBar: React.FC = () => {
       cardBorder: 'border border-amber-500/20 hover:border-amber-400/50',
       badgeAccent: 'text-amber-400 border-amber-500/30 bg-amber-500/10',
       action: () => openDataPage('data'),
-      tag: 'Live',
+      tag: 'Available',
     },
     {
       id: 'airtime',
       title: 'Airtime Top-Up',
-      desc: 'Instant SIM recharge',
+      desc: 'Top up your number',
       icon: Smartphone,
       accentText: 'text-emerald-400',
       accentBg: 'bg-emerald-400/10 group-hover:bg-emerald-400/15',
@@ -39,12 +39,12 @@ export const QuickServicesBar: React.FC = () => {
       cardBorder: 'border border-emerald-500/20 hover:border-emerald-400/50',
       badgeAccent: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10',
       action: () => openDataPage('airtime'),
-      tag: 'Live',
+      tag: 'Available',
     },
     {
       id: 'afa',
       title: 'AFA Registration',
-      desc: 'MTN agent & member ID',
+      desc: 'Check availability',
       icon: ShieldCheck,
       accentText: 'text-teal-400',
       accentBg: 'bg-teal-400/10 group-hover:bg-teal-400/15',
@@ -52,12 +52,12 @@ export const QuickServicesBar: React.FC = () => {
       cardBorder: 'border border-teal-500/20 hover:border-teal-400/50',
       badgeAccent: 'text-teal-400 border-teal-500/30 bg-teal-500/10',
       action: () => setActivePage('afa'),
-      tag: 'Live',
+      tag: 'Check Status',
     },
     {
       id: 'website',
       title: 'Website Builder',
-      desc: 'No-code business sites',
+      desc: 'Create a free website',
       icon: Globe,
       accentText: 'text-sky-400',
       accentBg: 'bg-sky-400/10 group-hover:bg-sky-400/15',
@@ -78,12 +78,12 @@ export const QuickServicesBar: React.FC = () => {
       cardBorder: 'border border-emerald-500/20 hover:border-emerald-400/50',
       badgeAccent: 'text-[#00c365] border-emerald-500/30 bg-emerald-500/10',
       action: () => setActivePage('marketplace'),
-      tag: 'New',
+      tag: 'Available',
     },
     {
       id: 'earn',
       title: 'Mystery Earn',
-      desc: 'Qualifying purchase rewards',
+      desc: 'Refer friends & earn',
       icon: Gift,
       accentText: 'text-yellow-400',
       accentBg: 'bg-yellow-400/10 group-hover:bg-yellow-400/15',
@@ -91,12 +91,12 @@ export const QuickServicesBar: React.FC = () => {
       cardBorder: 'border border-yellow-500/20 hover:border-yellow-400/50',
       badgeAccent: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10',
       action: () => setActivePage('earn'),
-      tag: 'Live',
+      tag: 'Available',
     },
     {
       id: 'services',
       title: 'More Services',
-      desc: 'Utilities & bills',
+      desc: 'See what’s coming',
       icon: Grid2X2,
       accentText: 'text-purple-400',
       accentBg: 'bg-purple-400/10 group-hover:bg-purple-400/15',
@@ -104,7 +104,7 @@ export const QuickServicesBar: React.FC = () => {
       cardBorder: 'border border-purple-500/20 hover:border-purple-400/50',
       badgeAccent: 'text-purple-400 border-purple-500/30 bg-purple-500/10',
       action: () => setActivePage('services'),
-      tag: 'Expanding',
+      tag: 'Coming Soon',
     },
   ];
 
@@ -116,7 +116,7 @@ export const QuickServicesBar: React.FC = () => {
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-[#00c365]" />
             <h2 className="text-xs sm:text-sm font-bold text-white tracking-tight">
-              Platform Services &amp; Discovery
+              Explore Mystery Hub
             </h2>
           </div>
           <button
@@ -124,7 +124,7 @@ export const QuickServicesBar: React.FC = () => {
             onClick={() => setActivePage('services')}
             className="text-[11px] font-semibold text-slate-400 hover:text-[#00c365] transition-colors flex items-center gap-1 cursor-pointer"
           >
-            <span>View All</span>
+            <span>All Services</span>
             <ArrowRight className="w-3 h-3" />
           </button>
         </div>
