@@ -1,3 +1,4 @@
+import { websiteActionText } from '../../../utils/websiteBrand';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState, useEffect, useMemo } from 'react';
 import { WebsiteTemplate, TemplateItem } from '../../../types';
@@ -207,8 +208,8 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
 
   return (
     <div
-      className="min-h-full font-sans antialiased text-slate-100 flex flex-col selection:bg-[#2563eb] selection:text-white"
-      style={{ backgroundColor: p.background }}
+      className="min-h-full font-sans antialiased text-slate-100 flex flex-col selection:bg-[var(--website-accent)] selection:text-[var(--website-on-accent)]"
+      style={{ backgroundColor: p.background, color:p.text, '--website-accent':p.accent, '--website-on-accent':websiteActionText(p.accent) } as React.CSSProperties}
     >
       {/* =========================================================
           1. BRANDED HEADER & NAVIGATION
@@ -220,19 +221,19 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-md shrink-0 text-white"
-            style={{ backgroundColor: p.accent }}
+            style={{ backgroundColor: p.accent, color:websiteActionText(p.accent) }}
           >
-            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Smartphone className="w-5 h-5 text-white" />}
+            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Smartphone className="w-5 h-5" />}
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-extrabold text-sm sm:text-base tracking-tight leading-none" style={{ color: p.text }}>
                 {businessName}
               </h1>
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{backgroundColor:p.accent}} />
             </div>
             <p className="text-[10px] sm:text-xs font-medium" style={{ color: p.mutedText }}>
-              Direct SIM Top-Up Storefront
+              Data Bundle Store
             </p>
           </div>
         </div>
@@ -243,9 +244,9 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
               type="button"
               data-website-event="whatsapp_click"
                   onClick={handleChatWhatsapp}
-              className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 bg-[#25D366] hover:bg-[#22c35e] text-white"
+              className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 bg-[#25D366] hover:bg-[#22c35e] text-black"
             >
-              <MessageSquare className="w-3.5 h-3.5 fill-white" />
+              <MessageSquare className="w-3.5 h-3.5 fill-black" />
               <span className="hidden sm:inline">WhatsApp Support</span>
               <span className="sm:hidden">WhatsApp</span>
             </button>
@@ -310,11 +311,11 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
               style={{
                 backgroundColor: `${p.accent}15`,
                 borderColor: `${p.accent}35`,
-                color: p.accent,
+                color: p.text,
               }}
             >
               <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>Direct SIM Top-Up · MTN, Telecel, AT</span>
+              <span>MTN · Telecel · AirtelTigo</span>
             </div>
 
             <h2
@@ -332,7 +333,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             <div className="grid grid-cols-3 gap-2 sm:gap-4 py-2.5 border-y max-w-lg" style={{ borderColor: `${p.border}80` }}>
               <div className="space-y-0.5">
                 <div className="text-xs font-bold text-white flex items-center gap-1">
-                  <Wifi className="w-3 h-3 text-blue-400" />
+                  <Wifi className="w-3 h-3" style={{color:p.accent}} />
                   <span>Multiple Networks</span>
                 </div>
                 <div className="text-[10px]" style={{ color: p.mutedText }}>
@@ -342,7 +343,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
 
               <div className="space-y-0.5">
                 <div className="text-xs font-bold text-white flex items-center gap-1">
-                  <ShoppingBag className="w-3 h-3 text-blue-400" />
+                  <ShoppingBag className="w-3 h-3" style={{color:p.accent}} />
                   <span>Simple Ordering</span>
                 </div>
                 <div className="text-[10px]" style={{ color: p.mutedText }}>
@@ -352,7 +353,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
 
               <div className="space-y-0.5">
                 <div className="text-xs font-bold text-white flex items-center gap-1">
-                  <MessageSquare className="w-3 h-3 text-blue-400" />
+                  <MessageSquare className="w-3 h-3" style={{color:p.accent}} />
                   <span>{managedCheckout?"Managed checkout":"Direct Chat"}</span>
                 </div>
                 <div className="text-[10px]" style={{ color: p.mutedText }}>
@@ -368,7 +369,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                 data-website-primary-cta="true"
                 onClick={scrollToCatalog}
                 className="px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 cursor-pointer active:scale-95 text-white"
-                style={{ backgroundColor: p.accent }}
+                style={{ backgroundColor: p.accent, color:websiteActionText(p.accent) }}
               >
                 <span>Buy Data</span>
                 <ArrowRight className="w-4 h-4" />
@@ -386,7 +387,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                     color: p.text,
                   }}
                 >
-                  <MessageSquare className="w-4 h-4 text-emerald-400" />
+                  <MessageSquare className="w-4 h-4 text-[#25D366]" />
                   <span>Chat on WhatsApp</span>
                 </button>
               )}
@@ -566,7 +567,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                   value={recipientPhone}
                   onChange={(e) => setRecipientPhone(e.target.value)}
                   placeholder="e.g. 024 123 4567"
-                  className="w-full bg-black/40 border rounded-xl pl-9 pr-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-400"
+                  className="w-full bg-black/40 border rounded-xl pl-9 pr-3.5 py-2.5 text-xs sm:text-sm text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--website-accent)]"
                   style={{ borderColor: p.border }}
                 />
               </div>
@@ -679,7 +680,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                   onClick={handleChatWhatsapp}
                 className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
               >
-                <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                <MessageSquare className="w-3.5 h-3.5 text-[#25D366]" />
                 <span>WhatsApp</span>
               </button>
             )}
