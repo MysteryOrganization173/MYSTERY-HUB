@@ -19,7 +19,7 @@ for(const target of WEBSITE_TEMPLATES.filter(t=>t.id!=='tmpl-buka-bistro'))test(
  assert.deepEqual(next.items,[]);assert.deepEqual(next.stats,[]);assert.deepEqual(next.features,[]);assert.deepEqual(content,before);
  const html=renderToStaticMarkup(renderTemplateLayout(mergeSiteWithTemplate(target,next)));
  for(const old of ['Jollof','old-food.jpg','restaurant.jpg','Restaurant food only','Restaurant story only','restaurant-booking'])assert.ok(!html.includes(old),old);
- assert.ok(html.includes('Ama Business'));assert.ok(html.includes('logo.png'));
+ assert.ok(html.includes('Ama Business'));assert.ok(html.includes('logo.png'));if(!target.composition)assert.equal(next.composition,undefined);
 });
 test('same design preserves content and cloning does not mutate input',()=>{const next=migrateWebsiteTemplate(content,'tmpl-buka-bistro','tmpl-buka-bistro');assert.deepEqual(next,content);next.businessName='Other';assert.equal(content.businessName,'Ama Business');});
 test('migration summary uses semantic compatibility and names actual target',()=>{const summary=websiteMigrationSummary('tmpl-buka-bistro','tmpl-glow-salon');assert.equal(summary.target.id,'tmpl-glow-salon');assert.equal(summary.compatible,false);assert.ok(summary.kept.includes('Uploaded media library'));assert.ok(summary.reset.includes('Cover & gallery image assignments'));});
@@ -32,3 +32,5 @@ test('minimum enforcement includes disabled nonzero overrides; disabled unset st
 for(const value of ['-1','NaN','1e3','0.001','10001'])test(`invalid percentage markup ${value} rejected`,()=>assert.throws(()=>bulkSellerPrices(products,'all','percent',value)));
 test('selected template skips catalogue until Change selection is requested',()=>{const source=readFileSync('src/components/website/WebsiteSettingsControls.tsx','utf8');assert.match(source,/setTarget\(requestedTemplateId\)/);assert.match(source,/!target&&<div[^>]+aria-label="Choose a website design"/);assert.match(source,/Change selection/);});
 test('pricing Apply remains local, explicit Save calls versioned authoritative endpoint',()=>{const source=readFileSync('src/components/website/WebsiteBundlePricing.tsx','utf8');const apply=source.slice(source.indexOf('Apply to')-400,source.indexOf('Apply to'));assert.ok(!apply.includes('websiteBusinessRequest'));assert.match(source,/expectedVersion:catalog.version/);assert.match(source,/Save Changes/);assert.match(source,/sellerPriceError/);assert.ok(!source.includes('Awaiting setup'));});
+
+test('preview-origin switches synchronize dashboard identity, editor keeps reseller controls conditional',()=>{const builder=readFileSync('src/components/website/WebsiteBuilderPage.tsx','utf8'),editor=readFileSync('src/components/website/editor/WebsiteEditor.tsx','utf8');assert.match(builder,/if\(activeEditorSite\)setMySites/);assert.match(editor,/currentSite.template_id === 'tmpl-data-reseller'/);assert.match(editor,/\.\.\.\(isDataReseller\?/);});

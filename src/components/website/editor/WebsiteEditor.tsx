@@ -778,7 +778,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     placeholder={
                       isDataReseller
                         ? 'e.g. Affordable Data Bundles, Straight to Your Line'
-                        : 'e.g. Authentic Ghanaian Flavours with Contemporary Craft'
+                        : 'e.g. Discover what makes our business special'
                     }
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />

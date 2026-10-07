@@ -533,7 +533,7 @@ export class WebsiteStore {
       if (!isValidTemplateId(targetTemplateId) || targetTemplateId === existing.template_id) throw new WebsiteOperationError('Choose a different valid template.');
       if (expectedUpdatedAt && expectedUpdatedAt !== existing.updated_at) throw new WebsiteOperationError('Your website changed. Reload before changing template.', 409);
       const content = migrateWebsiteTemplate(existing.content_json, existing.template_id, targetTemplateId);
-      content.composition = validateWebsiteComposition(content.composition, userId);
+      if (content.composition) content.composition = validateWebsiteComposition(content.composition, userId);
       await WebsiteAssetStore.validateReferences(id, userId, content);
       const updated = { ...existing, template_id: targetTemplateId, content_json: content, updated_at: new Date(Math.max(Date.now(), Date.parse(existing.updated_at) + 1)).toISOString() };
       const db = websiteDatabase();

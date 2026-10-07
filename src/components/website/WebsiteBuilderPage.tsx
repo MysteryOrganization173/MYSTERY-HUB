@@ -8,7 +8,6 @@ import { TemplateCategory, WebsiteSiteRecord, WebsiteTemplate } from '../../type
 import { TemplateCardPreview } from './TemplateCardPreview';
 import { WebsiteEditor } from './editor/WebsiteEditor';
 import { WebsitePlansAndUltra } from './WebsitePlansAndUltra';
-import { SafeImage } from './SafeImage';
 import { mergeSiteWithTemplate } from '../../utils/templateRendererUtils';
 import {
   getMyWebsitesOnServer,
@@ -21,25 +20,18 @@ import {
   Sparkles,
   Smartphone,
   Eye,
-  CheckCircle2,
   ArrowRight,
-  ShieldCheck,
   Zap,
   Layout,
   Search,
-  ExternalLink,
   Copy,
-  Edit3,
   Compass,
   Layers,
   ChevronDown,
   ChevronUp,
   RefreshCw,
-  Sliders,
   AlertCircle,
-  Clock,
   Settings,
-  Lock,
 } from 'lucide-react';
 
 export const WebsiteBuilderPage: React.FC = () => {
@@ -72,6 +64,9 @@ export const WebsiteBuilderPage: React.FC = () => {
     setMySites(prev => prev.map(site => site.id === updated.id ? updated : site));
     if (activeEditorSite?.id === updated.id && activeEditorSite.template_id !== updated.template_id) openWebsiteEditor(updated);
   };
+
+  // A switch started in the global template preview must also update the owner dashboard.
+  useEffect(()=>{if(activeEditorSite)setMySites(prev=>prev.map(site=>site.id===activeEditorSite.id?activeEditorSite:site));},[activeEditorSite]);
 
   useEffect(() => { trackWebsiteEvent('website_builder_viewed', {source:'builder'}, sessionToken || undefined); }, [sessionToken]);
 
@@ -296,17 +291,6 @@ export const WebsiteBuilderPage: React.FC = () => {
   const isPublished = activeSite?.status === 'published';
   const displaySiteName =
     activeSite?.content_json?.businessName || activeSite?.name || 'My Business Website';
-  const displayTagline =
-    activeSite?.content_json?.tagline || activeBaseTemplate?.demoHeroTagline || 'Welcome to our official website';
-  const displayHeroImage =
-    activeSite?.content_json?.heroImage || activeBaseTemplate?.heroImage || '';
-  const displayUpdatedDate = activeSite
-    ? new Date(activeSite.updated_at).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      })
-    : '';
   const publicSiteUrl = activeSite
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/sites/${activeSite.slug}`
     : '';
@@ -352,7 +336,7 @@ export const WebsiteBuilderPage: React.FC = () => {
               </div>
               {activeSite.template_id==='tmpl-data-reseller'&&<div className="flex flex-wrap gap-3 text-sm"><button className="min-h-11 text-emerald-300" onClick={()=>setDashboardTab('Orders')}>Manage Orders</button><button className="min-h-11 text-emerald-300" onClick={()=>setDashboardTab('Bundles & Pricing')}>Bundles &amp; Pricing</button></div>}
             </section>
-            <WebsiteBusinessDashboard site={activeSite} token={sessionToken!} requestedTab={dashboardTab} onTabChange={setDashboardTab} onEdit={()=>editSite(activeSite)} onPricingDirty={setPricingDirty} onSettings={()=>{setShowSettingsDrawer(true);requestAnimationFrame(()=>document.getElementById('website-settings')?.scrollIntoView({block:'start'}));}}/>
+            <WebsiteBusinessDashboard site={activeSite} token={sessionToken!} requestedTab={dashboardTab} onTabChange={setDashboardTab} onEdit={()=>editSite(activeSite)} onPricingDirty={setPricingDirty} onPreview={handlePreviewCurrentSite} onSettings={()=>{setShowSettingsDrawer(true);requestAnimationFrame(()=>document.getElementById('website-settings')?.scrollIntoView({block:'start'}));}}/>
             {showSettingsDrawer&&<section id="website-settings" className="scroll-mt-24 rounded-2xl border border-slate-800 bg-[#0b131a] p-4 text-left space-y-3"><div className="flex items-center justify-between"><h2 className="font-bold">Website settings</h2><button className="min-h-11 px-3 text-sm" onClick={()=>setShowSettingsDrawer(false)}>Close settings</button></div><p className="text-sm text-slate-400">Current design: {activeBaseTemplate?.title}. Your site address stays the same when you change design.</p><WebsiteSettingsControls site={activeSite} token={sessionToken!} onUpdated={updated=>{updateSite(updated);setShowSettingsDrawer(false);openWebsiteEditor(updated);}} onDeleted={()=>{setMySites([]);setShowSettingsDrawer(false);showToast('Website deleted. You can create a new Free website.','success');}}/></section>}
           </div>
         ) : (
@@ -502,12 +486,12 @@ export const WebsiteBuilderPage: React.FC = () => {
         {/* =========================================================
             4. PLANS / PRICING & ULTRA PREMIER SERVICE
             ========================================================= */}
-        <div id="plans" className="scroll-mt-20">
+        <details id="plans" open={!activeSite} className="scroll-mt-20"><summary className="min-h-11 cursor-pointer text-sm text-slate-400">Website plans &amp; services</summary>
           <WebsitePlansAndUltra
             sessionToken={sessionToken || undefined}
             onStartBlank={() => handleCreateSite('tmpl-start-blank', 'My Business')}
           />
-        </div>
+        </details>
 
         {/* =========================================================
             5. TEMPLATES SHOWCASE / DESIGN DISCOVERY SECTION
