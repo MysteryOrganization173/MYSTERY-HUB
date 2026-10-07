@@ -63,6 +63,9 @@ export const WebsiteBuilderPage: React.FC = () => {
   const [actionLoadingSiteId, setActionLoadingSiteId] = useState<string | null>(null);
   const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
   const [changeTarget,setChangeTarget]=useState('');
+  const [pricingDirty,setPricingDirty]=useState(false);
+  const confirmPricingLeave=()=>!pricingDirty||window.confirm('You have unsaved bundle prices. Leave without saving them?');
+  const editSite=(site:WebsiteSiteRecord)=>{if(confirmPricingLeave()){setPricingDirty(false);openWebsiteEditor(site);}};
   const [dashboardTab, setDashboardTab] = useState('Overview');
   const openPricing = () => { setDashboardTab('Bundles & Pricing'); closeWebsiteEditor(); requestAnimationFrame(() => document.getElementById('website-business-dashboard')?.scrollIntoView({block:'start'})); };
   const updateSite = (updated: WebsiteSiteRecord) => {
@@ -163,7 +166,7 @@ export const WebsiteBuilderPage: React.FC = () => {
   const displayedTemplates = isFiltering || showAllTemplates ? filteredTemplates : filteredTemplates.slice(0, 6);
 
   const handleCreateSite = async (templateId: string, templateName?: string) => {
-    if(activeSite && activeSite.template_id!==templateId){setChangeTarget(templateId);return;}
+    if(activeSite && activeSite.template_id!==templateId){if(!confirmPricingLeave())return;setChangeTarget(templateId);return;}
     const doCreate = async (token: string) => {
       trackWebsiteEvent('website_build_started', {templateId,source:'builder'}, token);
       try {
@@ -311,7 +314,7 @@ export const WebsiteBuilderPage: React.FC = () => {
   return (
     <div className="py-6 sm:py-10 text-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
-        {activeSite&&sessionToken&&<WebsiteBusinessDashboard site={activeSite} token={sessionToken} requestedTab={dashboardTab} onTabChange={setDashboardTab} onEdit={()=>openWebsiteEditor(activeSite)} onSettings={()=>{setShowSettingsDrawer(true);requestAnimationFrame(()=>document.getElementById('website-settings')?.scrollIntoView({block:'start'}));}}/>}
+
         {activeSite&&sessionToken&&changeTarget&&<WebsiteSettingsControls site={activeSite} token={sessionToken} requestedTemplateId={changeTarget} selectionOnly onClosed={()=>setChangeTarget('')} onDeleted={()=>setMySites([])} onUpdated={updated=>{setMySites([updated]);setChangeTarget('');openWebsiteEditor(updated);}}/>}
         {/* =========================================================
             LOADING / ERROR STATE FOR AUTHENTICATED USERS
@@ -338,391 +341,19 @@ export const WebsiteBuilderPage: React.FC = () => {
                (PRIORITIZED FOR LOGGED-IN USERS WITH AN ACTIVE WEBSITE)
             ========================================================= */}
         {user && !isLoadingSites && activeSite ? (
-          <div className="space-y-6">
-            {/* Top Identity & Overview Bar */}
-            <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-[#0e161f] to-[#0a1016] border border-slate-800/90 shadow-2xl space-y-6 text-left relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-80 h-80 bg-[#00c365]/5 rounded-full blur-[90px] pointer-events-none" />
-
-              {/* Section Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-800/80">
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/30 text-xs font-bold text-[#00c365] uppercase tracking-wider">
-                      <Globe className="w-3.5 h-3.5 text-[#00c365]" />
-                      <span>My Website</span>
-                    </div>
-
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700/80">
-                      <ShieldCheck className="w-3 h-3 text-[#00c365]" />
-                      <span>Free Plan</span>
-                    </span>
-
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${
-                        isPublished
-                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                          : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isPublished ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-                        }`}
-                      />
-                      <span>{isPublished ? 'Live' : 'Draft'}</span>
-                    </span>
-                  </div>
-
-                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight break-words">
-                    {displaySiteName}
-                  </h1>
-
-                  <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap pt-0.5">
-                    <span>
-                      Template:{' '}
-                      <strong className="text-slate-200 font-semibold">
-                        {activeBaseTemplate?.title || 'Custom Layout'}
-                      </strong>
-                    </span>
-                    <span className="text-slate-700">·</span>
-                    <span className="inline-flex items-center gap-1 text-slate-400">
-                      <Clock className="w-3 h-3 text-slate-500" />
-                      <span>Updated {displayUpdatedDate}</span>
-                    </span>
-                  </div>
-                </div>
-
-                {/* Primary CTA (Desktop & Mobile Top Anchor) */}
-                <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => openWebsiteEditor(activeSite)}
-                    className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.35)] flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                  >
-                    <Edit3 className="w-4 h-4 stroke-[2.5]" />
-                    <span>Edit Website</span>
-                  </button>
-                </div>
+          <div className="space-y-5">
+            <section className="rounded-2xl border border-slate-800 bg-[#0b131a] p-4 sm:p-6 space-y-4 text-left">
+              <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-slate-400 mb-1">My business website · Free plan</p><h1 className="text-2xl sm:text-3xl font-bold break-words">{displaySiteName}</h1><p className="text-sm text-slate-400 break-all mt-1">{publicSiteUrl}</p></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${isPublished?'bg-emerald-500/15 text-emerald-300':'bg-amber-500/15 text-amber-200'}`}>{isPublished?'Live':'Draft'}</span></div>
+              <div className="flex flex-wrap gap-2">
+                <button className="min-h-11 rounded-xl px-4 bg-emerald-500 text-black font-bold text-sm" onClick={()=>editSite(activeSite)}>Edit Website</button>
+                {isPublished?<a className="min-h-11 inline-flex items-center rounded-xl px-4 border border-slate-700 text-sm" href={`/sites/${encodeURIComponent(activeSite.slug)}`} target="_blank" rel="noopener noreferrer">View Site</a>:<button className="min-h-11 rounded-xl px-4 border border-slate-700 text-sm" onClick={handlePreviewCurrentSite}>Preview</button>}
+                {isPublished&&<button className="min-h-11 rounded-xl px-3 border border-slate-700 text-sm" onClick={()=>handleCopyLink(activeSite.slug)}>Copy Link</button>}
+                <button disabled={actionLoadingSiteId===activeSite.id} className="min-h-11 rounded-xl px-3 border border-slate-700 text-sm disabled:opacity-50" onClick={()=>void handleTogglePublish(activeSite)}>{actionLoadingSiteId===activeSite.id?'Updating…':isPublished?'Unpublish':'Publish'}</button>
               </div>
-
-              {/* 2-Column Responsive Dashboard Body */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                {/* 1. LEFT COLUMN: VISUAL WEBSITE PREVIEW CARD */}
-                <div className="lg:col-span-6 space-y-3">
-                  <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-                    <span className="font-semibold text-slate-300">Site Preview</span>
-                    <button
-                      type="button"
-                      onClick={handlePreviewCurrentSite}
-                      className="text-[#00c365] hover:underline flex items-center gap-1 cursor-pointer font-medium"
-                    >
-                      <Eye className="w-3 h-3" />
-                      <span>Full Preview</span>
-                    </button>
-                  </div>
-
-                  {/* Browser Mock Card */}
-                  <div
-                    onClick={handlePreviewCurrentSite}
-                    className="group relative rounded-2xl bg-[#090d12] border border-slate-800 hover:border-[#00c365]/50 overflow-hidden shadow-lg transition-all cursor-pointer"
-                  >
-                    {/* Browser Chrome Header */}
-                    <div className="px-3 py-2 bg-[#0c1117] border-b border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 select-none">
-                      <div className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-rose-500/80" />
-                        <span className="w-2 h-2 rounded-full bg-amber-500/80" />
-                        <span className="w-2 h-2 rounded-full bg-emerald-500/80" />
-                      </div>
-
-                      <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#121921] border border-slate-800 text-[10px] font-mono text-slate-300 truncate max-w-[200px] sm:max-w-[240px]">
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            isPublished ? 'bg-emerald-400' : 'bg-amber-400'
-                          }`}
-                        />
-                        <span className="truncate">/sites/{activeSite.slug}</span>
-                      </div>
-
-                      <span
-                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                          isPublished
-                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                            : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-                        }`}
-                      >
-                        {isPublished ? 'Live' : 'Draft'}
-                      </span>
-                    </div>
-
-                    {/* Miniature Website Canvas Viewport */}
-                    <div className="relative h-44 sm:h-52 w-full overflow-hidden flex flex-col justify-between text-left select-none bg-[#091017]">
-                      {displayHeroImage ? (
-                        <SafeImage
-                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 opacity-80"
-                          src={displayHeroImage}
-                          alt={displaySiteName}
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 bg-gradient-to-br from-[#0c1c24] via-[#091016] to-[#04080b]" />
-                      )}
-
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#080d12] via-[#080d12]/60 to-black/40" />
-
-                      {/* Mini Navbar */}
-                      <div className="relative z-10 px-3 py-2 flex items-center justify-between border-b border-white/10 bg-black/40 backdrop-blur-xs">
-                        <span className="font-extrabold text-[11px] text-white tracking-tight truncate max-w-[140px]">
-                          {displaySiteName}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-[8px] font-bold bg-[#00c365] text-black shadow-xs">
-                          {activeSite.content_json?.ctaLabel || 'Contact'}
-                        </span>
-                      </div>
-
-                      {/* Mini Hero Content */}
-                      <div className="relative z-10 p-3.5 space-y-1">
-                        <h4 className="font-extrabold text-xs sm:text-sm text-white line-clamp-1 leading-snug drop-shadow-md">
-                          {displayTagline}
-                        </h4>
-                        <p className="text-[10px] text-slate-300 line-clamp-2 drop-shadow-xs max-w-xs">
-                          {activeSite.content_json?.aboutText || 'Add an introduction in the editor.'}
-                        </p>
-                      </div>
-
-                      {/* Hover / Tap Action Overlay */}
-                      <div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-1.5 text-center p-4">
-                        <div className="w-10 h-10 rounded-full bg-[#00c365] text-black flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                          <Eye className="w-5 h-5 stroke-[2.5]" />
-                        </div>
-                        <span className="font-extrabold text-xs text-white tracking-wide">
-                          Preview Website
-                        </span>
-                        <span className="text-[10px] text-slate-300">
-                          Click to test layout and interactions
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Footnote helper */}
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5 px-1">
-                    <span>
-                      {isPublished ? (
-                        <span className="text-emerald-400 font-medium flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Live & accessible to anyone
-                        </span>
-                      ) : (
-                        <span className="text-amber-400/90 font-medium">
-                          Draft mode — only you can view this website
-                        </span>
-                      )}
-                    </span>
-
-                    {isPublished && (
-                      <a
-                        href={`/sites/${activeSite.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-slate-300 hover:text-white inline-flex items-center gap-1 transition-colors"
-                      >
-                        <span>Open live tab</span>
-                        <ExternalLink className="w-3 h-3 text-[#00c365]" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-
-                {/* 2. RIGHT COLUMN: STATUS, PUBLIC URL & QUICK ACTION CONTROLS */}
-                <div className="lg:col-span-6 space-y-4">
-                  {/* Status & Public URL Card */}
-                  <div className="p-4 sm:p-5 rounded-2xl bg-[#090e13] border border-slate-800/90 space-y-3.5 text-left">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`w-2.5 h-2.5 rounded-full ${
-                            isPublished ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-                          }`}
-                        />
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                          {isPublished ? 'Website Status: Live' : 'Website Status: Draft'}
-                        </span>
-                      </div>
-
-                      <span className="text-[11px] text-slate-500 font-mono">
-                        ID: {activeSite.id.slice(0, 12)}
-                      </span>
-                    </div>
-
-                    {isPublished ? (
-                      <div className="space-y-2.5 pt-1">
-                        <p className="text-xs text-slate-300 leading-relaxed">
-                          Your website is publicly available on the internet at its live URL.
-                        </p>
-
-                        <div className="p-2.5 rounded-xl bg-[#06090c] border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <span className="text-xs font-mono text-emerald-400 truncate break-all">
-                            {publicSiteUrl}
-                          </span>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => handleCopyLink(activeSite.slug)}
-                              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
-                              title="Copy live link"
-                            >
-                              <Copy className="w-3 h-3" />
-                              <span>Copy Link</span>
-                            </button>
-
-                            <a
-                              href={`/sites/${activeSite.slug}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-bold border border-emerald-500/30 transition-colors flex items-center gap-1"
-                            >
-                              <span>Open Site</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2 pt-1">
-                        <p className="text-xs text-slate-300 leading-relaxed">
-                          Your website is currently in private draft mode. Only you can view and edit it.
-                        </p>
-                        <p className="text-[11px] text-slate-400">
-                          Publish whenever you&apos;re ready to activate your live link at{' '}
-                          <code className="text-slate-300 font-mono">/sites/{activeSite.slug}</code>.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions Suite */}
-                  <div className="p-4 sm:p-5 rounded-2xl bg-[#090e13] border border-slate-800/90 space-y-3 text-left">
-                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                      Quick Actions
-                    </span>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      {/* Secondary: Preview */}
-                      <button
-                        type="button"
-                        onClick={handlePreviewCurrentSite}
-                        className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold border border-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-98"
-                      >
-                        <Eye className="w-3.5 h-3.5 text-slate-400" />
-                        <span>Preview</span>
-                      </button>
-
-                      {/* Secondary: Publish / Unpublish */}
-                      <button
-                        type="button"
-                        onClick={() => handleTogglePublish(activeSite)}
-                        disabled={actionLoadingSiteId === activeSite.id}
-                        className={`w-full py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-sm active:scale-98 ${
-                          isPublished
-                            ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-slate-700'
-                            : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border-emerald-500/30'
-                        }`}
-                      >
-                        {actionLoadingSiteId === activeSite.id ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Globe className="w-3.5 h-3.5" />
-                        )}
-                        <span>{isPublished ? 'Unpublish' : 'Publish Site'}</span>
-                      </button>
-
-                      {/* Secondary: Copy Link */}
-                      <button
-                        type="button"
-                        onClick={() => handleCopyLink(activeSite.slug)}
-                        disabled={!isPublished}
-                        className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 shadow-sm active:scale-98"
-                      >
-                        <Copy className="w-3.5 h-3.5 text-slate-400" />
-                        <span>Copy Link</span>
-                      </button>
-                    </div>
-
-                    {/* Primary Button Anchor in Suite for Mobile Convenience */}
-                    <button
-                      type="button"
-                      onClick={() => openWebsiteEditor(activeSite)}
-                      className="w-full py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-98 mt-1"
-                    >
-                      <Edit3 className="w-4 h-4 stroke-[2.5]" />
-                      <span>Open Website Editor</span>
-                    </button>
-                  </div>
-
-                  {/* Free Plan Summary Strip */}
-                  <div className="p-3.5 sm:p-4 rounded-2xl bg-[#080d12] border border-slate-800/80 flex items-start gap-3 text-left">
-                    <div className="w-7 h-7 rounded-lg bg-[#00c365]/10 border border-[#00c365]/20 flex items-center justify-center text-[#00c365] shrink-0 mt-0.5">
-                      <ShieldCheck className="w-4 h-4" />
-                    </div>
-                    <div className="space-y-1 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-white">Free Plan Active</span>
-                        <span className="text-slate-500">·</span>
-                        <span className="text-slate-400">1 Website Project</span>
-                      </div>
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Includes 1 website project, Mystery Hub hosted publishing at /sites/{activeSite.slug}, core visual editor, and mobile responsive layout.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Collapsible Website Settings & Project Info Strip */}
-              <div id="website-settings" className="pt-2 border-t border-slate-800/80 scroll-mt-24">
-                <button
-                  type="button"
-                  onClick={() => setShowSettingsDrawer((prev) => !prev)}
-                  className="flex items-center justify-between w-full text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors py-1 cursor-pointer"
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    <Settings className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Website Settings & Project Details</span>
-                  </span>
-                  {showSettingsDrawer ? (
-                    <ChevronUp className="w-3.5 h-3.5" />
-                  ) : (
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  )}
-                </button>
-
-                {showSettingsDrawer && (
-                  <div className="mt-3 p-4 rounded-2xl bg-[#070b0f] border border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs animate-in fade-in">
-                    <div className="space-y-1">
-                      <span className="text-slate-500 block">Assigned Template</span>
-                      <p className="text-white font-semibold">
-                        {activeBaseTemplate?.title || 'Custom Layout'}
-                      </p>
-                      <p className="text-[11px] text-slate-400 leading-relaxed">Change your layout while keeping your site address, business details and media library.</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-slate-500 block">Project Identification</span>
-                      <p className="text-white font-mono text-[11px] truncate">
-                        {activeSite.id}
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        Published route: <code className="text-slate-300 font-mono">/sites/{activeSite.slug}</code>
-                      </p>
-                    </div>
-
-                    <WebsiteSettingsControls site={activeSite} token={sessionToken!} onUpdated={updated=>{updateSite(updated);setDashboardTab('Overview');showToast('Your design has been changed.','success');}} onDeleted={()=>{setMySites([]);showToast('Website deleted. You can create a new Free website.','success');}} />
-
-                  </div>
-                )}
-              </div>
-            </div>
+              {activeSite.template_id==='tmpl-data-reseller'&&<div className="flex flex-wrap gap-3 text-sm"><button className="min-h-11 text-emerald-300" onClick={()=>setDashboardTab('Orders')}>Manage Orders</button><button className="min-h-11 text-emerald-300" onClick={()=>setDashboardTab('Bundles & Pricing')}>Bundles &amp; Pricing</button></div>}
+            </section>
+            <WebsiteBusinessDashboard site={activeSite} token={sessionToken!} requestedTab={dashboardTab} onTabChange={setDashboardTab} onEdit={()=>editSite(activeSite)} onPricingDirty={setPricingDirty} onSettings={()=>{setShowSettingsDrawer(true);requestAnimationFrame(()=>document.getElementById('website-settings')?.scrollIntoView({block:'start'}));}}/>
+            {showSettingsDrawer&&<section id="website-settings" className="scroll-mt-24 rounded-2xl border border-slate-800 bg-[#0b131a] p-4 text-left space-y-3"><div className="flex items-center justify-between"><h2 className="font-bold">Website settings</h2><button className="min-h-11 px-3 text-sm" onClick={()=>setShowSettingsDrawer(false)}>Close settings</button></div><p className="text-sm text-slate-400">Current design: {activeBaseTemplate?.title}. Your site address stays the same when you change design.</p><WebsiteSettingsControls site={activeSite} token={sessionToken!} onUpdated={updated=>{updateSite(updated);setShowSettingsDrawer(false);openWebsiteEditor(updated);}} onDeleted={()=>{setMySites([]);setShowSettingsDrawer(false);showToast('Website deleted. You can create a new Free website.','success');}}/></section>}
           </div>
         ) : (
           /* =========================================================
@@ -900,7 +531,7 @@ export const WebsiteBuilderPage: React.FC = () => {
               </h2>
               <p className="text-xs text-slate-400 mt-1">
                 {activeSite
-                  ? 'Preview design layouts and sections. Change your template from Website Settings.'
+                  ? 'Choose a design to review what stays and what resets before switching.'
                   : 'Click "Preview" to test on any device or "Use" to create your free website immediately.'}
               </p>
             </div>

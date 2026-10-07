@@ -579,8 +579,13 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             activeTab === 'edit' ? 'flex' : 'hidden lg:flex'
           }`}
         >
+          <label className="lg:hidden p-3 bg-[#070c10] border-b border-slate-800 text-xs text-slate-400">Editing
+            <select aria-label="Editing area" value={activeSection} onChange={event=>setActiveSection(event.target.value as typeof activeSection)} className="block mt-1 w-full min-h-11 p-2 rounded-lg bg-slate-900 text-white border border-slate-700">
+              {([['business','Business'],['contact','Contact'],['branding','Design'],['media','Images & Media'],['sections','Sections'],...(isDataReseller?[['bundles','Bundles & Pricing']]:[]),['cta','Main button'],['social','Social links']]).map(([id,label])=><option key={id} value={id}>{label}</option>)}
+            </select>
+          </label>
           {/* Navigation Category Tabs */}
-          <div className="p-2.5 sm:p-3 border-b border-slate-800/80 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden shrink-0 bg-[#070c10]">
+          <div className="hidden lg:flex p-2.5 sm:p-3 border-b border-slate-800/80 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden shrink-0 bg-[#070c10]">
             <button
               type="button"
               onClick={() => setActiveSection('business')}

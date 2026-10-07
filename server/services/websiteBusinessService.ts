@@ -52,6 +52,7 @@ export class WebsiteBusinessService {
         exact(item,['productId','retailMinor','enabled']);const product=getAuthoritativeProduct(item.productId);
         if(!product||seen.has(product.id)||typeof item.enabled!=='boolean')throw new FinanceError('Invalid or duplicate bundle.');seen.add(product.id);
         const retail=moneyMinor(item.retailMinor,true),cost=costs[product.id];
+        if(cost?.enabled&&policy.enabled&&retail>0&&retail<minimumStorePrice(cost.wholesaleMinor,policy))throw new FinanceError('Set a price at or above the configured minimum online price.');
         if(item.enabled&&(!policy.enabled||!cost?.enabled||retail<minimumStorePrice(cost.wholesaleMinor,policy)))throw new FinanceError('Set a price at or above the configured minimum online price.');
         products[product.id]={enabled:item.enabled,retailMinor:retail};
       }
