@@ -1,3 +1,4 @@
+import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
@@ -63,14 +64,14 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
       <nav className="bg-[#0e1620]/95 backdrop-blur-md border-b border-slate-800/90 px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-[var(--website-accent,#f97316)] text-black flex items-center justify-center font-black text-xl tracking-tighter">
-            <HardHat className="w-6 h-6 text-black" />
+            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <HardHat className="w-6 h-6 text-black" />}
           </div>
           <div>
             <span className="font-black text-base sm:text-lg tracking-tight text-white block uppercase leading-none">
               {template.demoBusinessName}
             </span>
             <span className="text-[10px] text-[var(--website-accent,#f97316)] uppercase tracking-widest font-mono font-bold block mt-0.5">
-              Civil & Structural Engineers Ghana
+              {template.siteContent ? template.categoryLabel : 'Civil & Structural Engineers Ghana'}
             </span>
           </div>
         </div>
@@ -108,7 +109,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
         <div className="relative max-w-3xl space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[var(--website-accent,#f97316)]/15 border border-[var(--website-accent,#f97316)]/40 text-[var(--website-accent,#f97316)] text-xs font-mono font-bold uppercase tracking-wider">
             <Building2 className="w-3.5 h-3.5" />
-            <span>Heavy Civil & Commercial Engineering</span>
+            <span>{template.siteContent ? template.categoryLabel : 'Heavy Civil & Commercial Engineering'}</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-black uppercase tracking-tight text-white leading-[1.08]">
@@ -181,6 +182,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
 
         {/* Project Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {template.siteContent && !filteredProjects.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {filteredProjects.map((p) => (
             <div
               key={p.id}

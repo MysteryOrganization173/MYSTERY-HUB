@@ -1,3 +1,4 @@
+import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
@@ -59,7 +60,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <nav className="bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-[var(--website-primary,#0f172a)] text-[var(--website-accent,#0ea5e9)] flex items-center justify-center font-bold">
-            <Building className="w-5 h-5" />
+            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Building className="w-5 h-5" />}
           </div>
           <div>
             <span className="font-extrabold text-base tracking-tight text-[var(--website-primary,#0f172a)] block leading-none">
@@ -200,6 +201,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {template.siteContent && !filteredListings.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {filteredListings.map((prop) => (
             <div
               key={prop.id}

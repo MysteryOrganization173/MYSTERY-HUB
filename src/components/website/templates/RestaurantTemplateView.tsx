@@ -1,3 +1,4 @@
+import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
@@ -55,7 +56,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <nav className="bg-[var(--website-background,#fcf9f5)]/95 backdrop-blur-md border-b border-[#f3ece2] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30 font-sans">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-[var(--website-primary,#7a1c28)] text-[var(--website-accent,#c99a45)] flex items-center justify-center font-serif text-lg font-bold">
-            G
+            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : template.demoBusinessName.slice(0,1)}
           </div>
           <div>
             <span className="font-bold text-base sm:text-lg tracking-wide text-[var(--website-primary,#7a1c28)] font-serif block leading-none">
@@ -97,7 +98,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
         <div className="relative max-w-3xl space-y-5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#c99a45)]/20 border border-[var(--website-accent,#c99a45)]/40 text-[var(--website-accent,#c99a45)] text-xs font-sans font-semibold tracking-wider uppercase">
             <Utensils className="w-3.5 h-3.5" />
-            <span>Modern Ghanaian Gastronomy</span>
+            <span>{template.siteContent ? template.categoryLabel : 'Modern Ghanaian Gastronomy'}</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-normal tracking-tight leading-[1.15] text-[var(--website-background,#fcf9f5)]">
@@ -170,6 +171,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
         {/* Menu Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {template.siteContent && !filteredItems.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {filteredItems.map((item) => (
             <div
               key={item.id}

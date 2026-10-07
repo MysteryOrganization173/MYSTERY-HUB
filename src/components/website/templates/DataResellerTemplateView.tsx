@@ -222,7 +222,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-md shrink-0 text-white"
             style={{ backgroundColor: p.accent }}
           >
-            <Smartphone className="w-5 h-5 text-white" />
+            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Smartphone className="w-5 h-5 text-white" />}
           </div>
           <div>
             <div className="flex items-center gap-2">

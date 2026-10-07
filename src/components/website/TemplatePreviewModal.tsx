@@ -69,7 +69,7 @@ export const TemplatePreviewModal: React.FC = () => {
 
   // Update browser URL state for stable sharing and reload persistence
   useEffect(() => {
-    if (!selectedTemplatePreview) return;
+    if (!selectedTemplatePreview || selectedTemplatePreview.siteContent) return;
     try {
       const currentUrl = new URL(window.location.href);
       const targetQuery = selectedTemplatePreview.id;
@@ -131,8 +131,14 @@ export const TemplatePreviewModal: React.FC = () => {
   // Handle postMessage from isolated iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin === window.location.origin && event.source === iframeRef.current?.contentWindow && event.data?.type === 'MYSTERYHUB_TEMPLATE_CTA') {
-        handleStartBuilding();
+      if (event.origin !== window.location.origin || event.source !== iframeRef.current?.contentWindow) return;
+      if (selectedTemplatePreview && event.data?.type === 'MYSTERYHUB_TEMPLATE_LOADED' && event.data.templateId === selectedTemplatePreview.id && selectedTemplatePreview.siteContent) {
+        iframeRef.current?.contentWindow?.postMessage({type:'MYSTERYHUB_PREVIEW_CONTENT',template:selectedTemplatePreview},window.location.origin);
+      }
+      if (event.data?.type === 'MYSTERYHUB_PREVIEW_CLOSE') handleClose();
+      if (event.data?.type === 'MYSTERYHUB_TEMPLATE_CTA') {
+        if (selectedTemplatePreview?.siteContent) showToast('Preview only. Open your published website to contact the business.', 'info');
+        else void handleStartBuilding();
       }
     };
 
@@ -170,6 +176,7 @@ export const TemplatePreviewModal: React.FC = () => {
 
   const handleStartBuilding = async () => {
     handleClose();
+    if (t.siteContent) return;
 
     const doCreate = async (token: string) => {
       trackWebsiteEvent('website_build_started',{templateId:t.id,source:'builder'},token);
@@ -212,6 +219,7 @@ export const TemplatePreviewModal: React.FC = () => {
 
   // Direct share action with native navigator.share or clipboard fallback
   const handleShare = async () => {
+    if (t.siteContent) return; // Private drafts never receive a shareable content URL.
     const shareUrl = `${window.location.origin}/website-builder?template=${encodeURIComponent(t.id)}&preview=1`;
 
     if (typeof navigator !== 'undefined' && navigator.share) {
@@ -300,7 +308,7 @@ export const TemplatePreviewModal: React.FC = () => {
       {/* Main Modal Container: Full Screen on Mobile, Windowed on Desktop */}
       <div className="relative w-full h-[100dvh] sm:h-[95vh] sm:max-w-7xl bg-[#0a0f14] border-0 sm:border border-slate-800 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 z-10">
         
-        <p className="px-4 py-2 text-xs text-slate-300 bg-slate-900">Design preview · Sample content and interactions. Reservations and purchases are not submitted.</p>
+        <p className="px-4 py-2 text-xs text-slate-300 bg-slate-900">{t.siteContent ? 'Your website preview · Saved content. Preview actions do not place orders or bookings.' : 'Design preview · Sample content and interactions. Reservations and purchases are not submitted.'}</p>
         {/* =========================================================
             TOP CONTROL BAR: Clean, Aggressively Simplified
             - Mobile: [ Back ]  Template Name  [ Share ] [ Use ]
@@ -328,6 +336,7 @@ export const TemplatePreviewModal: React.FC = () => {
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
+                disabled={!!t.siteContent}
                 onClick={handleShare}
                 className="p-2 text-slate-300 hover:text-white rounded-lg bg-slate-800/80 active:scale-95 border border-slate-700/60 cursor-pointer"
                 title="Share Template"
@@ -341,7 +350,7 @@ export const TemplatePreviewModal: React.FC = () => {
                 onClick={handleStartBuilding}
                 className="px-3 py-1.5 rounded-lg bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs uppercase tracking-wider active:scale-95 flex items-center gap-1 cursor-pointer shadow-sm"
               >
-                <span>Use</span>
+                <span>{t.siteContent ? 'Done' : 'Use'}</span>
               </button>
             </div>
           </div>
@@ -413,6 +422,7 @@ export const TemplatePreviewModal: React.FC = () => {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
+                disabled={!!t.siteContent}
                 onClick={handleShare}
                 className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-slate-200 hover:text-white font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer active:scale-95"
                 title="Share Template"
@@ -426,7 +436,7 @@ export const TemplatePreviewModal: React.FC = () => {
                 onClick={handleStartBuilding}
                 className="px-4 py-1.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] active:scale-95 flex items-center gap-1.5 cursor-pointer"
               >
-                <span>Use Template</span>
+                <span>{t.siteContent ? 'Done' : 'Use Template'}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
 
@@ -485,13 +495,13 @@ export const TemplatePreviewModal: React.FC = () => {
                 }}
               >
                 <span style={{ color: palette.secondary }} className="font-bold shrink-0">
-                  /sites/
+                  {t.siteContent ? 'Preview' : '/sites/'}
                 </span>
                 <span
                   className="truncate font-semibold"
                   style={{ color: isDarkBackground ? '#f8fafc' : '#0f172a' }}
                 >
-                  {siteSlug}
+                  {t.siteContent ? t.demoBusinessName : siteSlug}
                 </span>
               </div>
 
@@ -528,7 +538,7 @@ export const TemplatePreviewModal: React.FC = () => {
                 <iframe
                   ref={iframeRef}
                   key={`${t.id}-${deviceView}-${iframeKey}`}
-                  src={`/?isolated_template_preview=${encodeURIComponent(t.id)}`}
+                  src={`/?isolated_template_preview=${encodeURIComponent(t.id)}${t.siteContent ? '&owner_preview=1' : ''}`}
                   title={`${t.title} ${deviceView} preview`}
                   className="w-full h-full border-0 block bg-white"
                   sandbox="allow-scripts allow-same-origin"
@@ -556,7 +566,7 @@ export const TemplatePreviewModal: React.FC = () => {
               onClick={() => {
                 handleClose();
                 setTimeout(() => {
-                  const el = document.getElementById('plans');
+                  const el = document.getElementById('plans-pricing');
                   if (el) el.scrollIntoView({ behavior: 'smooth' });
                 }, 150);
               }}

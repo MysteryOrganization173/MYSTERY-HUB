@@ -1,3 +1,4 @@
+import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
@@ -46,7 +47,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       <nav className="bg-white/95 backdrop-blur-md border-b border-[#fae3ec] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-[#fdf2f6] border border-[var(--website-accent,#ec4899)]/30 text-[var(--website-accent,#ec4899)] flex items-center justify-center">
-            <Scissors className="w-5 h-5" />
+            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Scissors className="w-5 h-5" />}
           </div>
           <div>
             <span className="font-bold text-base sm:text-lg tracking-tight text-[var(--website-primary,#3b1828)] block leading-none font-serif">
@@ -143,6 +144,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {template.siteContent && !services.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {services.map((item) => (
             <div
               key={item.id}

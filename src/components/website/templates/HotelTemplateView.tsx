@@ -1,3 +1,4 @@
+import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
@@ -43,14 +44,14 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       <nav className="bg-white/95 backdrop-blur-md border-b border-[#e8e5dc] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-[var(--website-primary,#132e23)] text-[var(--website-accent,#10b981)] flex items-center justify-center font-bold">
-            <Palmtree className="w-5 h-5" />
+            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Palmtree className="w-5 h-5" />}
           </div>
           <div>
             <span className="font-extrabold text-base tracking-tight text-[var(--website-primary,#132e23)] block leading-none font-serif">
               {template.demoBusinessName}
             </span>
             <span className="text-[10px] text-[var(--website-accent,#10b981)] uppercase tracking-widest font-bold block mt-0.5">
-              Eco-Resort & Beachfront Villas
+              {template.siteContent ? template.categoryLabel : 'Eco-Resort & Beachfront Villas'}
             </span>
           </div>
         </div>
@@ -66,7 +67,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
             Book Stay
           </a>
           <a href="#location" className="hover:text-[var(--website-primary,#132e23)] transition-colors">
-            Ada Location
+            Location
           </a>
         </div>
 
@@ -184,7 +185,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       <div id="suites" className="py-14 px-4 sm:px-12 max-w-5xl mx-auto space-y-8">
         <div className="text-center max-w-md mx-auto space-y-2">
           <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#10b981)] font-bold">
-            Private Eco Sanctuary
+            {template.siteContent ? 'Explore your stay' : 'Private Eco Sanctuary'}
           </span>
           <h2 className="text-2xl sm:text-3xl font-serif text-[var(--website-primary,#132e23)]">
             Rooms & Stays
@@ -192,6 +193,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {template.siteContent && !suites.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {suites.map((suite) => (
             <div
               key={suite.id}

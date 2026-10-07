@@ -93,7 +93,6 @@ export const CheckoutModal: React.FC = () => {
     if (isCheckoutOpen && checkoutBundle) {
       setReceiptEmail(user?.email||'');
       directRequest.current=crypto.randomUUID();
-      
       setPaymentMethod('paystack');
       walletRequest.current=null;
       const initial = checkoutInitialPhone !== undefined ? checkoutInitialPhone : (user?.phone || '');

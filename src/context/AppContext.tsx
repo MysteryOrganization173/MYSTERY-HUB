@@ -440,9 +440,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const openAccount = () => { if (user) setAccountOpen(true); else openAuth('login'); };
   const closeAccount = () => setAccountOpen(false);
 
-  const openTemplatePreview = (template: WebsiteTemplate) => {
+  const openTemplatePreview = useCallback((template: WebsiteTemplate) => {
     setSelectedTemplatePreview(template);
-  };
+  }, []);
 
   const closeTemplatePreview = () => {
     setSelectedTemplatePreview(null);

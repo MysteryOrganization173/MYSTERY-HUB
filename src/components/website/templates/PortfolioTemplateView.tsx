@@ -1,3 +1,4 @@
+import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
@@ -49,6 +50,7 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
       {/* Navigation */}
       <nav className="bg-[var(--website-primary,#09090b)]/90 backdrop-blur-md border-b border-[#27272a] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-2 min-w-0 flex-1 pr-3">
+          {template.siteContent?.logoUrl && <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} />}
           <span className="font-mono font-bold text-base truncate tracking-tighter text-white">
             {template.demoBusinessName}
           </span>
@@ -85,7 +87,7 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
         <div className="relative max-w-4xl mx-auto space-y-6 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs font-mono">
             <Camera className="w-3.5 h-3.5 text-[var(--website-accent,#00c365)]" />
-            <span>Documentary & Fashion Cinematography</span>
+            <span>{template.siteContent ? template.categoryLabel : 'Documentary & Fashion Cinematography'}</span>
           </div>
 
           <h1 className="text-3xl sm:text-6xl font-black tracking-tight leading-[1.05] text-white">
@@ -131,7 +133,7 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 font-mono">
           <div>
             <span className="text-xs uppercase text-[var(--website-accent,#00c365)] tracking-widest block">
-              Archive 2024 — 2026
+              {template.siteContent ? 'Our work' : 'Archive 2024 \u2014 2026'}
             </span>
             <h2 className="text-2xl sm:text-3xl font-black text-white mt-1">Selected Projects</h2>
           </div>
@@ -154,6 +156,7 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {template.siteContent && !filteredWorks.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {filteredWorks.map((work) => (
             <div
               key={work.id}

@@ -698,7 +698,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
             className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-white font-bold shrink-0"
             style={{ backgroundColor: p.primary }}
           >
-            {layout === 'realestate' ? (
+            {template.siteContent?.logoUrl ? (<SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} />) : layout === 'realestate' ? (
               <Building className="w-4 h-4 text-white" />
             ) : layout === 'portfolio' ? (
               <Camera className="w-4 h-4 text-white" />

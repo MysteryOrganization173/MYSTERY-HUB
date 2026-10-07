@@ -1,4 +1,3 @@
-import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { SecurityDialog } from './SecurityDialog';
 import React, { useState } from 'react';
@@ -27,8 +26,6 @@ export const AuthModal: React.FC = () => {
   const [recovery, setRecovery] = useState(false);
   const [existingAccount, setExistingAccount] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const dialogRef = useDialogFocus(isAuthModalOpen, () => { if (!isLoading) closeAuth(); });
 
   if (!isAuthModalOpen) return null;
 

@@ -91,10 +91,7 @@
 
 /* Product surfaces: restrained shared geometry and accessible interaction. */
 @layer components {
-  .mh-page { width: 100%; max-width: 80rem; margin-inline: auto; padding: 1.5rem 1rem 2.5rem; }
   .mh-surface { border: 1px solid #28323b; border-radius: 1rem; background: #11181f; padding: 1.25rem; }
-  .mh-section-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
-  .mh-kicker { color: #9daca9; font-size: .75rem; font-weight: 600; letter-spacing: .08em; }
   .mh-button, .mh-button-secondary { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: .5rem; padding: .7rem 1rem; border-radius: .75rem; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background-color 150ms, transform 150ms; }
   .mh-button { background: #00c365; color: #05140c; }
   .mh-button-secondary { background: #1a232b; color: #e9eeed; border: 1px solid #33404b; }
@@ -102,10 +99,8 @@
   .mh-button:active, .mh-button-secondary:active { transform: translateY(1px); }
   .mh-button:disabled, .mh-button-secondary:disabled { opacity: .45; cursor: not-allowed; }
   .mh-field { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #3a4651; border-radius: .75rem; background: #0b1117; color: #f0f3f2; padding: .75rem; }
-  .mh-empty { padding: 2rem 1rem; text-align: center; color: #b2bec7; border-radius: 1rem; background: #111820; }
   .mh-tabbar { display: flex; gap: .5rem; overflow-x: auto; padding-block: .5rem; overscroll-behavior-inline: contain; }
   .mh-tabbar > * { flex-shrink: 0; min-height: 44px; }
-  @media (min-width: 640px) { .mh-page { padding: 2.5rem 1.5rem 3rem; } }
 }
 @layer base {
   :focus-visible { outline: 2px solid #34d399; outline-offset: 3px; }

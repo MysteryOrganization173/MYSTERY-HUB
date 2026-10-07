@@ -1,3 +1,4 @@
+import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
@@ -45,7 +46,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <nav className="bg-[#090d14]/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[var(--website-accent,#8b5cf6)] to-[#06b6d4] p-0.5 flex items-center justify-center font-black">
-            <Cpu className="w-5 h-5 text-black" />
+            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Cpu className="w-5 h-5 text-black" />}
           </div>
           <div>
             <span className="font-extrabold text-base tracking-tight text-white block leading-none font-mono">
@@ -135,6 +136,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-sans">
+          {template.siteContent && !products.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {products.map((item) => (
             <div
               key={item.id}
@@ -142,7 +144,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
             >
               <div className="flex items-center justify-between text-xs font-mono">
                 <span className="text-[#06b6d4] font-bold">{item.category}</span>
-                <span className="text-slate-500">Sub-second Latency</span>
+                {!template.siteContent && <span className="text-slate-500">Sub-second Latency</span>}
               </div>
               <h3 className="font-bold text-lg text-white font-mono">{item.name}</h3>
               <p className="text-xs text-slate-300 leading-relaxed">{item.desc}</p>
@@ -169,7 +171,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
             <span className="text-xs font-bold text-[#06b6d4] uppercase tracking-widest">
               Direct Engagement
             </span>
-            <h3 className="text-2xl font-black text-white">Schedule 30-Min Technical Discovery</h3>
+            <h3 className="text-2xl font-black text-white">Discuss your project</h3>
             <p className="text-xs text-slate-400 font-sans">
               Contact us to discuss your project and arrange a conversation.
             </p>

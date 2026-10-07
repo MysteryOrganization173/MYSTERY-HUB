@@ -1,3 +1,4 @@
+import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
@@ -49,7 +50,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
       <nav className="bg-white border-b border-slate-200 px-4 sm:px-8 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-[var(--website-accent,#2563eb)] text-white flex items-center justify-center font-black">
-            GH
+            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : template.demoBusinessName.slice(0,1)}
           </div>
           <div>
             <span className="font-black text-base sm:text-lg tracking-tight text-slate-900 block leading-none">
@@ -190,6 +191,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {template.siteContent && !filteredProducts.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {filteredProducts.map((p) => (
             <div
               key={p.id}
