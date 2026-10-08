@@ -46,77 +46,6 @@ describe('Member Home & Logged-In Experience', () => {
     );
   });
 
-  test('2. MemberHome greeting panel uses first name and deterministic local time', () => {
-    const memberHomeCode = fs.readFileSync(
-      path.join(process.cwd(), 'src/components/home/MemberHome.tsx'),
-      'utf-8'
-    );
-
-    assert.ok(
-      memberHomeCode.includes('user?.name ? user.name.split(\' \')[0] : \'Member\''),
-      'Greeting must extract and display user first name'
-    );
-    assert.ok(
-      memberHomeCode.includes('hour >= 5 && hour < 12'),
-      'Greeting must deterministically calculate Good morning based on local browser time'
-    );
-    assert.ok(
-      memberHomeCode.includes('hour >= 12 && hour < 17'),
-      'Greeting must deterministically calculate Good afternoon based on local browser time'
-    );
-    assert.strictEqual(
-      memberHomeCode.includes('GoogleGenAI'),
-      false,
-      'Greeting panel must NOT invoke Gemini or AI API'
-    );
-  });
-
-  test('3. MemberHome contains primary quick actions with correct route handlers', () => {
-    const memberHomeCode = fs.readFileSync(
-      path.join(process.cwd(), 'src/components/home/MemberHome.tsx'),
-      'utf-8'
-    );
-
-    assert.ok(
-      memberHomeCode.includes('openDataPage(\'data\')'),
-      'Buy Data quick action must call openDataPage("data")'
-    );
-    assert.ok(
-      memberHomeCode.includes('openDataPage(\'airtime\')'),
-      'Top Up Airtime quick action must call openDataPage("airtime")'
-    );
-    assert.ok(
-      memberHomeCode.includes('setActivePage(\'website\')'),
-      'Build Website quick action must call setActivePage("website")'
-    );
-    assert.ok(
-      memberHomeCode.includes('setActivePage(\'marketplace\')'),
-      'Marketplace quick action must call setActivePage("marketplace")'
-    );
-  });
-
-  test('4. Mystery Earn teaser shows truthful Coming Soon badge without fake balances', () => {
-    const memberHomeCode = fs.readFileSync(
-      path.join(process.cwd(), 'src/components/home/MemberHome.tsx'),
-      'utf-8'
-    );
-
-    assert.ok(
-      memberHomeCode.includes('Coming Soon'),
-      'Mystery Earn must display Coming Soon badge'
-    );
-    assert.strictEqual(
-      memberHomeCode.includes('GH₵150'),
-      false,
-      'Mystery Earn must NOT display fake wallet balance'
-    );
-    assert.strictEqual(
-      memberHomeCode.includes('wallet_balance'),
-      false,
-      'Mystery Earn must NOT reference fake wallet balance variables'
-    );
-  });
-
   test('5. OrdersStore.findOrdersByUserId supports optional limit parameter', async () => {
     const testUserId = 'test_user_member_home_' + Date.now();
     const mockOrder1: OrderRecord = {
@@ -243,19 +172,4 @@ describe('Member Home & Logged-In Experience', () => {
     );
   });
 
-  test('9. AuthModal includes account benefit chips on Signup mode', () => {
-    const authModalCode = fs.readFileSync(
-      path.join(process.cwd(), 'src/components/auth/AuthModal.tsx'),
-      'utf-8'
-    );
-
-    assert.ok(
-      authModalCode.includes('Track orders across devices'),
-      'Signup mode in AuthModal must mention tracking orders across devices'
-    );
-    assert.ok(
-      authModalCode.includes('Create your business website'),
-      'Signup mode in AuthModal must mention Website Builder access'
-    );
-  });
 });

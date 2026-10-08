@@ -29,13 +29,7 @@ export const HomePage: React.FC = () => {
 
   if (user) {
     return (
-      <div className="space-y-0">
-        <MemberHome />
-        <HomeFeaturedData />
-        <HomeWebsiteSection />
-        <HomeMarketplaceSection />
-        <HomeComingSoonSection />
-      </div>
+      <MemberHome />
     );
   }
 
