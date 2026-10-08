@@ -444,7 +444,7 @@ CREATE INDEX IF NOT EXISTS idx_marketplace_inquiry_product ON marketplace_inquir
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS store_context JSONB;
 CREATE INDEX IF NOT EXISTS orders_store_site ON orders((store_context->>'siteId'),created_at DESC) WHERE store_context IS NOT NULL;
 ALTER TABLE finance_operations DROP CONSTRAINT IF EXISTS finance_operations_kind_check;
-ALTER TABLE finance_operations ADD CONSTRAINT finance_operations_kind_check CHECK(kind IN ('topup','withdrawal','transfer','purchase','achievement','adjustment','reversal','refund','review','store_checkout','store_sale'));
+ALTER TABLE finance_operations ADD CONSTRAINT finance_operations_kind_check CHECK(kind IN ('topup','withdrawal','transfer','purchase','achievement','adjustment','reversal','refund','review','store_checkout','store_sale','direct_checkout','welcome'));
 ALTER TABLE finance_ledger DROP CONSTRAINT IF EXISTS finance_ledger_bucket_check;
 ALTER TABLE finance_ledger ADD CONSTRAINT finance_ledger_bucket_check CHECK(bucket IN ('wallet','earn','store'));
 ALTER TABLE finance_ledger DROP CONSTRAINT IF EXISTS finance_ledger_check;
