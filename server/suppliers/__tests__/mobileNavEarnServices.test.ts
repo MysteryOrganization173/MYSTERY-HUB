@@ -85,58 +85,20 @@ describe('Mobile Nav Restructure, Mystery Earn & Services Compression', () => {
     );
   });
 
-  test('5. MysteryEarnPage renders Coming Soon positioning without fake balances', () => {
-    const earnPageCode = fs.readFileSync(
-      path.join(process.cwd(), 'src/components/earn/MysteryEarnPage.tsx'),
-      'utf-8'
-    );
-
-    assert.ok(
-      earnPageCode.includes('Mystery Earn · Coming Soon'),
-      'MysteryEarnPage must render Coming Soon badge'
-    );
-    assert.ok(
-      earnPageCode.includes('Share Mystery Hub. Get Rewarded.'),
-      'MysteryEarnPage must render headline'
-    );
-    assert.ok(
-      earnPageCode.includes('Share Mystery Hub'),
-      'MysteryEarnPage must explain Share Mystery Hub feature'
-    );
-    assert.ok(
-      earnPageCode.includes('Service Referrals'),
-      'MysteryEarnPage must explain Service Referrals feature'
-    );
-    assert.ok(
-      earnPageCode.includes('Product-Specific Rewards'),
-      'MysteryEarnPage must explain Product-Specific Rewards feature'
-    );
-    assert.strictEqual(
-      earnPageCode.includes('GH₵150'),
-      false,
-      'MysteryEarnPage must NOT display fake wallet balances'
-    );
-    assert.strictEqual(
-      earnPageCode.includes('GH₵50.00'),
-      false,
-      'MysteryEarnPage must NOT display fake referral reward amounts'
-    );
+  test('5. Earn guest presentation explains conditional rewards and uses existing signup', () => {
+    const page = fs.readFileSync(path.join(process.cwd(), 'src/components/earn/MysteryEarnPage.tsx'), 'utf8');
+    assert.match(page, /Create a Free Account/);
+    assert.match(page, /No reward for clicks alone/);
+    assert.match(page, /eligible purchase/);
+    assert.match(page, /openAuth\('signup'\)/);
+    assert.ok(!page.includes('Coming Soon'));
   });
 
-  test('6. Guest Earn view offers signup CTA and Member Earn view acknowledges member status', () => {
-    const earnPageCode = fs.readFileSync(
-      path.join(process.cwd(), 'src/components/earn/MysteryEarnPage.tsx'),
-      'utf-8'
-    );
-
-    assert.ok(
-      earnPageCode.includes('openAuth(\'signup\')'),
-      'Guest Earn page must provide signup CTA'
-    );
-    assert.ok(
-      earnPageCode.includes('You\'re already a Mystery Hub member.'),
-      'Member Earn view must acknowledge existing membership status'
-    );
+  test('6. Earn members receive a session-owned dashboard rather than guest marketing', () => {
+    const page = fs.readFileSync(path.join(process.cwd(), 'src/components/earn/MysteryEarnPage.tsx'), 'utf8');
+    assert.match(page, /if \(user && sessionToken\) return <MemberEarn/);
+    assert.match(page, /Make sharing count/);
+    assert.match(page, /<FinancialPanel mode="earn"/);
   });
 
   test('7. MoreServicesPage compressed mobile hero and horizontal card rows', () => {

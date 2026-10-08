@@ -45,7 +45,7 @@ test('Wallet disclosure remains visible and transfer remains explicitly irrevers
   assert.match(wallet, /Wallet Activity/);
 });
 test('referral copy distinguishes browsers, pending and approved rewards without lifetime guarantees', () => {
-  const earn = source('src/components/earn/MysteryEarnPage.tsx');
+  const earn = ['MysteryEarnPage.tsx', 'EarnDetails.tsx', 'EarnSharing.tsx'].map(file => source(`src/components/earn/${file}`)).join('\n');
   for (const copy of ['Distinct browsers', 'Pending Rewards', 'Total approved rewards', 'active reward rules', 'Share a Service']) assert.ok(earn.includes(copy), copy);
   assert.ok(!earn.includes('MYSTERY EARN · LIFETIME REFERRALS'));
   assert.ok(!earn.includes('immutable rewards are credited directly'));

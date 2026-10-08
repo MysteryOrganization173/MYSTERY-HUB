@@ -4,23 +4,27 @@ export function createEarnDashboardRefresh<S, L>(options: {
   loadLedger: () => Promise<{ success: boolean; ledger: L }>;
   onSummary: (summary: S) => void;
   onLedger: (ledger: L) => void;
-  onState: (state: { refreshing: boolean; error: string | null }) => void;
+  onState: (state: { refreshing: boolean; error: string | null; summaryError: boolean; ledgerError: boolean }) => void;
   window: Pick<Window, 'addEventListener' | 'removeEventListener'>;
   document: Pick<Document, 'hidden' | 'addEventListener' | 'removeEventListener'>;
 }) {
   let disposed = false;
   let pending: Promise<void> | null = null;
+  let summaryError = false;
+  let ledgerError = false;
   const refresh = (): Promise<void> => {
     if (disposed) return Promise.resolve();
     if (pending) return pending;
-    options.onState({ refreshing: true, error: null });
+    options.onState({ refreshing: true, error: null, summaryError, ledgerError });
     pending = Promise.allSettled([options.loadSummary(), options.loadLedger()]).then(([summary, ledger]) => {
       if (disposed) return;
       const summaryOk = summary.status === 'fulfilled' && summary.value.success;
       const ledgerOk = ledger.status === 'fulfilled' && ledger.value.success;
       if (summaryOk && summary.status === 'fulfilled') options.onSummary(summary.value.summary);
       if (ledgerOk && ledger.status === 'fulfilled') options.onLedger(ledger.value.ledger);
-      options.onState({ refreshing: false, error: summaryOk && ledgerOk ? null : 'Unable to refresh all metrics. Showing last available values; please retry.' });
+      summaryError = !summaryOk;
+      ledgerError = !ledgerOk;
+      options.onState({ refreshing: false, error: summaryOk && ledgerOk ? null : 'Unable to refresh all metrics. Showing last available values; please retry.', summaryError, ledgerError });
     }).finally(() => { pending = null; });
     return pending;
   };

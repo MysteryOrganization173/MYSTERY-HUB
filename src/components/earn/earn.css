@@ -1,0 +1,85 @@
+.earn-page { max-width: 1180px; margin: auto; padding: 24px 16px 40px; color: #f1f5f9; display: grid; gap: 24px; text-align: left; }
+.earn-page * { min-width: 0; }
+.earn-page h1 { font-family: Outfit, sans-serif; font-size: clamp(1.65rem, 3vw, 2.4rem); line-height: 1.16; font-weight: 700; letter-spacing: -.025em; }
+.earn-page h2 { font-family: Outfit, sans-serif; font-size: 1.25rem; line-height: 1.3; font-weight: 600; color: #f8fafc; }
+.earn-page h3 { font-size: .94rem; font-weight: 650; color: #f1f5f9; }
+.earn-page p { font-size: .875rem; line-height: 1.6; color: #a8b8ca; overflow-wrap: anywhere; }
+.earn-page .earn-eyebrow { color: #44df95; font-weight: 650; margin-bottom: 8px; }
+.earn-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+.earn-heading > div { max-width: 720px; }
+.earn-heading h1 + p { margin-top: 8px; }
+.earn-page .earn-primary, .earn-page .earn-secondary, .earn-page .earn-whatsapp { min-height: 44px; padding: 10px 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; font-size: .875rem; font-weight: 650; cursor: pointer; text-decoration: none; }
+.earn-page .earn-primary { background: #00c365; color: #02190d; border: 1px solid #00c365; }
+.earn-page .earn-secondary { background: #111d28; color: #e2e8f0; border: 1px solid #354457; }
+.earn-page .earn-whatsapp { background: #102d20; color: #50e89b; border: 1px solid #236341; }
+.earn-page button:disabled { opacity: .5; cursor: not-allowed; }
+.earn-page :is(button, a, input, select, summary, [tabindex="0"]):focus-visible { outline: 2px solid #7cedb3; outline-offset: 4px; }
+.earn-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.earn-page .earn-text-button { display: inline-flex; align-items: center; gap: 6px; color: #67e8a8; text-decoration: underline; text-underline-offset: 4px; font-size: .875rem; min-height: 44px; cursor: pointer; }
+.earn-section { border-top: 1px solid #263441; padding-top: 22px; display: grid; gap: 12px; scroll-margin-top: 100px; }
+.earn-section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.earn-share-panel { background: #0b1a16; border: 1px solid #23553c; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 12px; align-self: start; }
+.earn-share-title { display: flex; align-items: center; gap: 10px; color: #44df95; }
+.earn-link-label { font-size: .8rem; font-weight: 600; }
+.earn-page input[readonly] { width: 100%; background: #070e13; color: #e2e8f0; border: 1px solid #425263; border-radius: 10px; padding: 12px; font-size: .875rem; }
+.earn-page .earn-fine { font-size: .78rem; line-height: 1.6; color: #a4b5c7; }
+.earn-manual { display: grid; gap: 8px; font-size: .8rem; }
+.earn-alert { background: #2a2112; border: 1px solid #66502a; padding: 12px 16px; border-radius: 12px; font-size: .875rem; }
+.earn-stale { color: #fcd34d; font-size: .78rem; }
+.earn-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.earn-metrics dt { display: flex; align-items: center; gap: 6px; color: #cbd5e1; font-size: .875rem; }
+.earn-metrics dd { font: 600 1.75rem Outfit, sans-serif; margin: 6px 0; }
+.earn-metrics p { font-size: .78rem; }
+.earn-reward-totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 16px 0; border-top: 1px solid #263441; }
+.earn-reward-totals dt { color: #cbd5e1; font-size: .875rem; }
+.earn-reward-totals dd { font-variant-numeric: tabular-nums; font-size: 1.25rem; padding: 4px 0; }
+.earn-reward-totals p { font-size: .78rem; }
+.earn-network { margin-top: 4px; border-radius: 12px; border: 1px solid #2a3845; padding: 14px; }
+.earn-page summary { cursor: pointer; font-size: .875rem; font-weight: 600; min-height: 44px; align-content: center; }
+.earn-network summary span { display: block; font-size: .8rem; color: #a8b8ca; font-weight: 400; }
+.earn-network dl { display: grid; gap: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 16px; }
+.earn-network dt { font-size: .875rem; color: #cbd5e1; }
+.earn-network dd { font-size: 1.4rem; font-weight: 600; margin: 4px 0; }
+.earn-network p { font-size: .78rem; }
+.earn-reward-list { border-top: 1px solid #263441; max-height: 580px; overflow: auto; scrollbar-gutter: stable; }
+.earn-reward-list article { padding: 16px 0; border-bottom: 1px solid #263441; display: grid; gap: 6px; }
+.earn-reward-main { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.earn-reward-main strong { margin-left: auto; font-variant-numeric: tabular-nums; }
+.earn-status { font-size: .75rem; border-radius: 6px; padding: 3px 8px; }
+.earn-reward-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: .75rem; color: #a4b5c7; }
+.earn-empty { padding: 24px 0; }
+.earn-info-grid { display: grid; gap: 24px; }
+.earn-rules-list { display: grid; gap: 12px; }
+.earn-rules-list li { padding-left: 12px; border-left: 2px solid #35664c; }
+.earn-steps { display: grid; gap: 20px; }
+.earn-steps li { display: flex; align-items: start; gap: 12px; }
+.earn-steps li > span { flex: none; border: 1px solid #31583f; background: #10261a; color: #67e8a8; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: .8rem; }
+.earn-service-details > summary { display: flex; align-items: center; gap: 8px; }
+.earn-services { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 16px; margin-top: 12px; }
+.earn-services article { display: flex; flex-direction: column; gap: 10px; border: 1px solid #263441; padding: 16px; border-radius: 12px; }
+.earn-services .earn-actions { margin-top: auto; }
+.earn-faq details { border-bottom: 1px solid #263441; padding: 4px 0; }
+.earn-faq details p { padding: 8px 0 16px; }
+.earn-guest-hero { display: grid; gap: 12px; border-radius: 24px; background: #0b1712; border: 1px solid #2b4535; overflow: hidden; }
+.earn-guest-hero > div { padding: 24px; align-self: center; display: grid; gap: 18px; }
+.earn-guest-hero h1 { font-size: clamp(2.1rem, 4.4vw, 3.6rem); }
+.earn-guest-hero h1 span { color: #44df95; }
+.earn-guest-hero img { width: 100%; height: 210px; object-fit: cover; object-position: center 55%; }
+.earn-guest-hero .earn-fine { display: flex; align-items: start; gap: 8px; }
+.earn-guest-hero .earn-fine svg { flex-shrink: 0; margin-top: 2px; }
+.earn-discover { display: flex; align-items: start; gap: 14px; flex-wrap: wrap; }
+.earn-discover > div { flex: 1; min-width: 220px; }
+.earn-loading-block { height: 220px; background: #101d25; border-radius: 20px; }
+.earn-finance { scroll-margin-top: 100px; align-self: start; }
+.earn-page .earn-finance p.tabular-nums { font-size: clamp(2rem, 4vw, 2.8rem); line-height: 1.15; color: #f8fafc; }
+.earn-finance > div:first-child { position: relative; padding-right: 62px; }
+.earn-finance > div:first-child > button { position: absolute; right: 0; top: -8px; min-height: 44px; }
+.earn-finance > details { border-top: 1px solid #263441; padding-top: 8px; }
+.earn-finance > details > div { margin-top: 12px; display: grid; gap: 12px; }
+@media (max-width: 430px) { .earn-metrics { grid-template-columns: 1fr; gap: 14px; } .earn-metrics > div { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; border-bottom: 1px solid #1d2e3a; padding-bottom: 12px; } .earn-metrics p { grid-column: 1 / -1; } .earn-metrics dd { font-size: 1.5rem; margin: 0; } .earn-network dl { grid-template-columns: 1fr; } .earn-share-panel { padding: 16px; } }
+@media (min-width: 768px) { .earn-page { padding: 32px 24px 48px; gap: 28px; } .earn-guest-hero { grid-template-columns: 1.15fr 1fr; } .earn-guest-hero img { height: 100%; min-height: 340px; } .earn-info-grid { grid-template-columns: 1fr 1fr; gap: 32px; } }
+@media (min-width: 1024px) { .earn-top-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; } }
+@media (max-width: 1023px) { .earn-top-grid { display: grid; gap: 20px; } }
+@media (prefers-reduced-motion: reduce) { .earn-page *, .earn-page *::before, .earn-page *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+@media (max-width: 767px) { .earn-heading { display: block; position: relative; } .earn-heading > button { position: absolute; top: -8px; right: 0; font-size: .78rem; padding: 8px; min-height: 44px; } .earn-heading .earn-eyebrow { margin-bottom: 18px; padding-right: 150px; } .earn-heading h1 { font-size: 1.6rem; } .earn-heading h1 + p { margin-top: 6px; } }
