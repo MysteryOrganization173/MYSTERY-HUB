@@ -24,7 +24,7 @@ export const HomeWebsiteSection: React.FC = () => {
               <span className="text-[#00c365]">Create Your Website.</span>
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 max-w-xl leading-relaxed">
-              Launch a professional online presence in minutes without writing a single line of code. Designed for restaurants, contractors, boutiques, salons, and consultancies in Ghana.
+              Pick a design, add your business details and photos, then publish your website. No coding needed.
             </p>
           </div>
 
@@ -33,7 +33,7 @@ export const HomeWebsiteSection: React.FC = () => {
               onClick={() => setActivePage('website')}
               className="px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] flex items-center gap-2 cursor-pointer"
             >
-              <span>Explore All Templates</span>
+              <span>Browse Templates</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -62,7 +62,7 @@ export const HomeWebsiteSection: React.FC = () => {
           </div>
           <div className="p-3.5 sm:p-4 rounded-xl bg-[#0e141a] border border-slate-800/80 flex items-center gap-3">
             <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-sky-400 shrink-0" />
-            <span>Managed data checkout on reseller stores</span>
+            <span>Data reseller stores with customer checkout</span>
           </div>
         </div>
       </div>

@@ -254,7 +254,7 @@ describe('Member Home & Logged-In Experience', () => {
       'Signup mode in AuthModal must mention tracking orders across devices'
     );
     assert.ok(
-      authModalCode.includes('Website Builder identity'),
+      authModalCode.includes('Create your business website'),
       'Signup mode in AuthModal must mention Website Builder access'
     );
   });

@@ -48,8 +48,7 @@ describe('Mystery Hub Mobile Layout Polish & Geometry Verification', () => {
     const dataPageCode = fs.readFileSync(dataPagePath, 'utf8');
 
     assert.ok(
-      dataPageCode.includes('Secured by Paystack with Mobile Money & Card') ||
-      dataPageCode.includes('Direct automated SIM delivery · Secured by Paystack'),
+      dataPageCode.includes('Track delivery in Orders · Payments handled by Paystack'),
       'DataPage must contain the elevated section-level trust signal'
     );
   });

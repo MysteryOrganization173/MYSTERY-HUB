@@ -146,10 +146,10 @@ export const OrdersPage: React.FC = () => {
           updatedAt: orderData.created_at,
         });
       } else {
-        showToast('Order reference not found on server.', 'warning');
+        showToast('We couldn’t find that order. Check the reference and try again.', 'warning');
       }
     } catch {
-      showToast('Order lookup failed. Please check the order reference.', 'warning');
+      showToast('We couldn’t check this order. Check the reference or try again.', 'warning');
     } finally {
       setIsSearchingServer(false);
     }
@@ -191,7 +191,7 @@ export const OrdersPage: React.FC = () => {
             onClick={() => setActivePage('data')}
             className="px-4 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all self-start sm:self-auto cursor-pointer"
           >
-            Buy New Bundle
+            Buy Data
           </button>
         </div>
 
@@ -204,7 +204,7 @@ export const OrdersPage: React.FC = () => {
               aria-label="Order reference or saved recipient phone"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by Order ID (e.g. MH-20260929-123456) or recipient phone..."
+              placeholder="Enter an order reference or recipient number"
               className="w-full bg-[#0e141a] border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#00c365]"
             />
           </div>
@@ -393,7 +393,7 @@ export const OrdersPage: React.FC = () => {
             <Smartphone className="w-9 h-9 text-slate-500 mx-auto" />
             <h3 className="text-base sm:text-lg font-bold text-white">No orders found</h3>
             <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
-              You haven&apos;t placed any orders yet. Buy data, airtime, or marketplace products to track them here.
+              No orders to show yet. Buy data, airtime or AFA registration to track your purchases here.
             </p>
             <div className="pt-1">
               <button

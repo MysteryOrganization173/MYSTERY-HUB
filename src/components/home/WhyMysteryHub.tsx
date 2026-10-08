@@ -8,26 +8,26 @@ export const WhyMysteryHub: React.FC = () => {
   const reasons = [
     {
       icon: Zap,
-      title: 'Reliable Automated Delivery',
-      desc: 'Delivery starts after confirmed payment. Timing depends on the selected service and network.',
+      title: 'Track Your Order',
+      desc: 'Follow your order from confirmed payment to delivery. Timing depends on the service and network.',
       accent: 'text-[#00c365] bg-[#00c365]/10',
     },
     {
       icon: DollarSign,
-      title: 'Competitive Bundle Pricing',
-      desc: 'Affordable, transparent pricing designed to give you more megabytes for your Cedis across all networks.',
+      title: 'Clear Prices Before You Pay',
+      desc: 'See your bundle price, any service fee and the total before confirming payment.',
       accent: 'text-amber-400 bg-amber-400/10',
     },
     {
       icon: ShieldCheck,
-      title: 'Safe MoMo Transactions',
-      desc: 'Protected by official telecom authorization prompts. We never store your credentials or PIN.',
+      title: 'Pay with Mobile Money',
+      desc: 'Payments are handled by Paystack. Never share your MoMo PIN with Mystery Hub or support.',
       accent: 'text-sky-400 bg-sky-400/10',
     },
     {
       icon: Clock,
-      title: 'Always-On Availability',
-      desc: 'Top up whenever you need data. Order directly from any browser on phone, tablet, or laptop.',
+      title: 'Help When You Need It',
+      desc: 'Keep your order reference handy and contact our WhatsApp support team if you need help.',
       accent: 'text-purple-400 bg-purple-400/10',
     },
   ];
@@ -40,7 +40,7 @@ export const WhyMysteryHub: React.FC = () => {
             Why Mystery Hub
           </span>
           <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Built for Speed, Reliability, & Everyday Value
+            Clear Prices. Orders You Can Track.
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
             Everyday services with clear prices, visible order progress and support when you need it.

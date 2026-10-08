@@ -105,7 +105,7 @@ export const HomeFeaturedData: React.FC = () => {
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-400 text-xs font-semibold hover:bg-amber-400/20 transition-colors cursor-pointer"
               >
                 <Zap className="w-3.5 h-3.5 fill-amber-400" />
-                <span>Need data right now? Browse Instant Bundles</span>
+                <span>Browse Instant Bundles</span>
               </button>
             )}
           </div>

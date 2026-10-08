@@ -125,12 +125,12 @@ export const MemberHome: React.FC = () => {
       cardBorder: 'border border-amber-500/20 hover:border-amber-400/50',
       badgeAccent: 'text-amber-400 border-amber-500/30 bg-amber-500/10',
       action: () => openDataPage('data'),
-      tag: 'Live',
+      tag: 'Available',
     },
     {
       id: 'airtime',
       title: 'Airtime Top-Up',
-      desc: 'Instant recharge',
+      desc: 'Top up airtime',
       icon: Smartphone,
       accentText: 'text-emerald-400',
       accentBg: 'bg-emerald-400/10 group-hover:bg-emerald-400/15',
@@ -138,12 +138,12 @@ export const MemberHome: React.FC = () => {
       cardBorder: 'border border-emerald-500/20 hover:border-emerald-400/50',
       badgeAccent: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10',
       action: () => openDataPage('airtime'),
-      tag: 'Live',
+      tag: 'Available',
     },
     {
       id: 'afa',
       title: 'AFA Registration',
-      desc: 'Agent & member ID',
+      desc: 'Check availability',
       icon: ShieldCheck,
       accentText: 'text-teal-400',
       accentBg: 'bg-teal-400/10 group-hover:bg-teal-400/15',
@@ -151,12 +151,12 @@ export const MemberHome: React.FC = () => {
       cardBorder: 'border border-teal-500/20 hover:border-teal-400/50',
       badgeAccent: 'text-teal-400 border-teal-500/30 bg-teal-500/10',
       action: () => setActivePage('afa'),
-      tag: 'Live',
+      tag: 'Check Status',
     },
     {
       id: 'website',
       title: 'Website Builder',
-      desc: 'No-code business sites',
+      desc: 'Create a free website',
       icon: Globe,
       accentText: 'text-sky-400',
       accentBg: 'bg-sky-400/10 group-hover:bg-sky-400/15',
@@ -190,7 +190,7 @@ export const MemberHome: React.FC = () => {
       cardBorder: 'border border-yellow-500/20 hover:border-yellow-400/50',
       badgeAccent: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10',
       action: () => setActivePage('earn'),
-      tag: 'Live',
+      tag: 'Available',
     },
     {
       id: 'services',
@@ -498,16 +498,16 @@ export const MemberHome: React.FC = () => {
             </div>
             <div className="space-y-1">
               <h3 className="font-bold text-sm text-white group-hover:text-[#00c365] transition-colors flex items-center justify-between">
-                <span>Refer & Earn Dashboard</span>
+                <span>My Referrals & Rewards</span>
                 <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-[#00c365] group-hover:translate-x-1 transition-all" />
               </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Access your personal referral link, track your referred customers, and view your real-time reward ledger.
+                Share your referral link, view linked customers and check your reward history.
               </p>
             </div>
             <div className="pt-1">
               <span className="inline-block text-[11px] text-[#00c365] font-semibold">
-                Open Earn Dashboard &rarr;
+                View My Referrals &rarr;
               </span>
             </div>
           </div>

@@ -75,7 +75,7 @@ export const Hero: React.FC = () => {
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#11181e]/90 border border-slate-700/60 backdrop-blur-sm shadow-inner">
               <span className="w-2 h-2 rounded-full bg-[#00c365]" />
               <span className="text-xs font-medium text-slate-300 tracking-wide">
-                Ghana&apos;s Digital Utility Platform
+                Digital services for everyday life in Ghana
               </span>
             </div>
 
@@ -89,7 +89,7 @@ export const Hero: React.FC = () => {
 
             {/* Subtitle */}
             <p className="text-sm sm:text-lg text-slate-300 max-w-xl leading-relaxed">
-              Buy data and airtime, manage your Wallet, earn from referrals and build your business online. Made for everyday life in Ghana.
+              Buy data and airtime, create a free business website, and track your orders. Share your referral link to earn from qualifying purchases.
             </p>
 
             {/* Primary & Secondary Action CTAs */}
@@ -102,7 +102,7 @@ export const Hero: React.FC = () => {
                 }}
                 className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-sm tracking-wide transition-all shadow-sm active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
               >
-                <span>Create Your Website</span>
+                <span>Create a Free Website</span>
                 <ArrowRight className="w-4 h-4" />
               </a>
 
@@ -115,7 +115,7 @@ export const Hero: React.FC = () => {
                 className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#141b22]/90 hover:bg-[#1a232c] text-white font-semibold text-sm border border-slate-700/80 backdrop-blur-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
               >
                 <Wifi className="w-4 h-4 text-[#00c365]" />
-                <span>Buy Data Bundles</span>
+                <span>Buy Data</span>
               </a>
             </div>
 

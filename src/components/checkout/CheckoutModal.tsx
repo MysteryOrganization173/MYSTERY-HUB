@@ -303,7 +303,7 @@ export const CheckoutModal: React.FC = () => {
               ? "We've submitted this number for MTN verification.\nNo payment has been taken.\n\nVerification may take some time. You can try again later, use another MTN number, or choose an Instant Bundle instead."
               : `We've submitted this number for verification.\nNo payment has been taken.\n\nVerification may take some time. You can try again later, use another ${networkName} number, or choose an Instant Bundle instead.`,
             conversionNote:
-              'Need data right now?\nInstant Bundles do not require this MTN verification step and are delivered immediately after successful payment.',
+              'Need data right now?\nInstant Bundles do not require this MTN verification step. Check each package’s delivery details and restrictions before paying.',
             supportingNote:
               'Mystery Hub checks eligibility before payment so you are not charged for an order that cannot be processed.',
             networkName,
@@ -462,27 +462,27 @@ export const CheckoutModal: React.FC = () => {
                   </h4>
                   {isInstantBundle ? (
                     <span className="text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded font-bold shrink-0">
-                      ⚡ Instant
+                      Delivery
                     </span>
                   ) : isAirtime ? (
                     <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-bold shrink-0">
-                      ⚡ Instant
+                      Delivery
                     </span>
                   ) : checkoutBundle.network === 'airteltigo' ? (
                     <span className="text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded font-bold shrink-0">
-                      ⚡ Instant
+                      Delivery
                     </span>
                   ) : null}
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5 truncate">
                   {currentNetwork.name} ·{' '}
                   {isInstantBundle && instantInfo
-                    ? instantInfo.restrictionNote || 'Instant automated direct delivery to your line'
+                    ? instantInfo.restrictionNote || 'Delivery after confirmed payment'
                     : isAirtime
-                    ? 'Direct automated airtime recharge'
+                    ? 'Airtime sent to your recipient number'
                     : checkoutBundle.network === 'airteltigo'
-                    ? 'Instant direct delivery to your AT number'
-                    : checkoutBundle.description || 'Fast automated delivery'}
+                    ? 'Delivery to your AirtelTigo number'
+                    : checkoutBundle.description || 'Track delivery in Orders'}
                 </p>
               </div>
             </div>
@@ -600,7 +600,7 @@ export const CheckoutModal: React.FC = () => {
                         <span>Need data right now?</span>
                       </div>
                       <p className="text-[11px] text-amber-200/90 leading-relaxed">
-                        Instant Bundles do not require this MTN verification step and are delivered immediately after successful payment.
+                        Instant Bundles do not require this MTN verification step. Check each package’s delivery details and restrictions before paying.
                       </p>
                     </div>
                   )}

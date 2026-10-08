@@ -125,7 +125,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
 
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     setIsSubmitted(true);
-    showToast(`Inquiry recorded and WhatsApp launched for ${product.name}!`, 'success');
+    showToast(`Enquiry saved for ${product.name}. Continue on WhatsApp to speak with us.`, 'success');
 
     closeTimer.current = setTimeout(() => {
       if (generation !== requestGeneration.current) return;
@@ -158,7 +158,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
                 Sourcing &amp; Availability
               </span>
               <h3 id="marketplace-inquiry-title" className="text-sm sm:text-base font-bold text-white">
-                Product Inquiry
+                Product Enquiry
               </h3>
             </div>
           </div>
@@ -194,7 +194,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
           <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300 flex items-start gap-2.5">
             <ShieldCheck className="w-4 h-4 text-[#00c365] shrink-0 mt-0.5" />
             <p className="leading-relaxed">
-              We source genuine hardware and software through authorized Ghana distributors. Sourcing inquiries carry zero obligation or upfront fee.
+              Ask about availability, price and delivery before deciding. Sending an enquiry does not place an order or require payment.
             </p>
           </div>
 
@@ -210,9 +210,9 @@ export const MarketplaceInquiryModal: React.FC = () => {
               <div className="w-12 h-12 rounded-full bg-[#00c365]/20 text-[#00c365] flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-7 h-7" />
               </div>
-              <h4 className="font-bold text-lg text-white">Inquiry Recorded!</h4>
+              <h4 className="font-bold text-lg text-white">Enquiry Saved</h4>
               <p className="text-xs text-slate-300 max-w-xs mx-auto">
-                Inquiry saved &amp; WhatsApp opened. Our Accra sourcing desk will respond promptly.
+                Your enquiry is saved. Continue the conversation on WhatsApp if it opened, or contact support below.
               </p>
             </div>
           ) : (
@@ -220,7 +220,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
               {/* Question Chips */}
               <div className="space-y-1.5">
                 <label className="font-semibold text-slate-200 block">
-                  What would you like to inquire about?
+                  What would you like to know?
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {inquiryQuestions.map((q) => {
@@ -320,7 +320,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
                   className="w-full py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.25)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-50"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  <span>{isSubmitting ? 'Recording Inquiry...' : 'Continue on WhatsApp'}</span>
+                  <span>{isSubmitting ? 'Saving Enquiry…' : 'Continue on WhatsApp'}</span>
                 </button>
 
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
