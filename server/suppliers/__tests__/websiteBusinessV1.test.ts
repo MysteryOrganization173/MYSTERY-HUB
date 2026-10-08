@@ -130,3 +130,19 @@ test('reviewed paid store order cannot start a supplier POST',async()=>{
 test('checkout checks the displayed total against initialization before opening payment',()=>{const source=readFileSync('src/hooks/usePaystack.ts','utf8');assert.ok(source.indexOf('initRes.amountPesewas!==options.store.expectedMinor')<source.indexOf('popup.resumeTransaction'));assert.ok(readFileSync('src/components/website/editor/WebsiteEditor.tsx','utf8').includes('onOpenPricing'));});
 
 test('disabled nonzero under-minimum price is rejected without changing any saved row',async()=>{await configure();const catalog=await Business.catalog(site.id,'owner'),floor=catalog.products.find(p=>p.id==='mtn-1gb')!.minimumMinor!;await assert.rejects(()=>Business.savePrices(site.id,'owner',{expectedVersion:catalog.version,products:[{productId:'mtn-1gb',retailMinor:floor-1,enabled:false}]}),/minimum/);assert.equal((await Business.catalog(site.id,'owner')).version,catalog.version);assert.deepEqual((await Business.catalog(site.id,'owner')).products,catalog.products);});
+
+
+test('public unconfigured catalogue reports empty version without exposing owner configuration',async()=>{
+  const response=await request(`/api/websites/${site.id}/storefront`);assert.equal(response.status,200);
+  const data=(await response.json()).data;assert.equal(data.version,'empty');assert.deepEqual(data.products,[]);
+  const owner=await Business.catalog(site.id,'owner');assert.ok(owner.products.length>0);
+  for(const key of ['wholesale','minimumMinor','eligible','policy'])assert.ok(!JSON.stringify(data).includes(key));
+});
+
+test('public catalogue retains exact configured network and price while disabled bundles stay hidden',async()=>{
+  await configure();const response=await request(`/api/websites/${site.id}/storefront`);assert.equal(response.status,200);
+  const data=(await response.json()).data;assert.equal(data.products.length,1);
+  assert.equal(data.products[0].network,'mtn');assert.equal(data.products[0].retailMinor,500);
+  const current=await Business.catalog(site.id,'owner');await Business.savePrices(site.id,'owner',{expectedVersion:current.version,products:[{productId:'mtn-1gb',retailMinor:500,enabled:false}]});
+  assert.deepEqual((await Business.catalog(site.id)).products,[]);
+});

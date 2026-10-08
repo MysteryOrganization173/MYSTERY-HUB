@@ -1,4 +1,4 @@
-import { websiteActionText } from '../../../utils/websiteBrand';
+import { websiteActionText, resolveResellerTheme } from '../../../utils/websiteBrand';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState, useEffect, useMemo } from 'react';
 import { WebsiteTemplate, TemplateItem } from '../../../types';
@@ -24,6 +24,7 @@ interface TemplateViewProps {
   template: WebsiteTemplate;
   onCtaClick?: () => void;
   managedCheckout?: React.ReactNode;
+  managedAvailability?: 'loading' | 'available' | 'empty' | 'error';
 }
 
 export interface ResellerPackage {
@@ -52,7 +53,7 @@ export function resolveDataResellerHeroImage(heroImage?: string): string {
   return heroImage;
 }
 
-export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick, managedCheckout }) => {
+export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick, managedCheckout, managedAvailability }) => {
   const [selectedNetwork, setSelectedNetwork] = useState<'mtn' | 'telecel' | 'at'>('mtn');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [orderNotice, setOrderNotice] = useState<string | null>(null);
@@ -60,14 +61,14 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
 
   const businessName = template.demoBusinessName || 'QuickByte Data';
   const tagline = template.demoHeroTagline || 'Affordable data. Simple delivery.';
-  const aboutText = managedCheckout ? "Choose your bundle, enter the recipient, and pay securely. Mystery Hub manages delivery and order tracking." :
+  const aboutText = managedCheckout ? managedAvailability === 'available' ? "Choose your bundle, enter the recipient, and pay securely. Mystery Hub manages delivery and order tracking." : "Check bundle availability below. You can still track an existing order or contact the business." :
     template.demoSubtext || (template.siteContent ? '' :
     'Buy MTN, Telecel and AirtelTigo bundles from one simple storefront. Choose your package, enter the recipient number and place your order through WhatsApp.');
   const location = template.siteContent ? template.location || '' : template.location || 'Sample store location';
   const contact = template.siteContent ? template.siteContent.phone || '' : template.hoursOrContact || '+233 24 555 7788';
   const whatsapp = template.siteContent ? template.siteContent.whatsapp || template.siteContent.phone || '' : template.hoursOrContact || contact;
 
-  const p = template.colorScheme || {
+  const p = resolveResellerTheme(template.colorScheme || {
     primary: '#0f172a',
     secondary: '#2563eb',
     background: '#0a0f1d',
@@ -76,7 +77,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
     mutedText: '#94a3b8',
     accent: '#2563eb',
     border: '#1e293b',
-  };
+  });
 
   const heroImageSrc = resolveDataResellerHeroImage(template.heroImage);
   const optimizedHeroSrc = getCloudinaryUrl(heroImageSrc, { format: 'auto', quality: 'auto', width: 1200 });
@@ -204,35 +205,36 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
       ? '#FFCC00'
       : selectedNetwork === 'telecel'
       ? '#E60000'
-      : '#38bdf8';
+      : '#004B93';
 
   return (
     <div
-      className="min-h-full font-sans antialiased text-slate-100 flex flex-col selection:bg-[var(--website-accent)] selection:text-[var(--website-on-accent)]"
-      style={{ backgroundColor: p.background, color:p.text, '--website-accent':p.accent, '--website-on-accent':websiteActionText(p.accent) } as React.CSSProperties}
+      className="reseller-storefront min-h-full font-sans antialiased  flex flex-col selection:bg-[var(--website-accent)] selection:text-[var(--website-on-accent)]"
+      style={{ backgroundColor: p.background, color:p.text, '--website-accent':p.accent, '--website-on-accent':websiteActionText(p.accent), '--website-focus':p.focus, '--website-placeholder':p.mutedText } as React.CSSProperties}
     >
+      <style>{`.reseller-storefront button,.reseller-storefront a {min-height:44px;} .reseller-storefront button:focus-visible,.reseller-storefront a:focus-visible,.reseller-storefront input:focus-visible {outline:2px solid var(--website-focus);outline-offset:3px;} .reseller-storefront input::placeholder {color:var(--website-placeholder);opacity:1;}`}</style>
       {/* =========================================================
           1. BRANDED HEADER & NAVIGATION
           ========================================================= */}
       <header
         className="px-4 sm:px-8 py-3.5 border-b flex items-center justify-between sticky top-0 z-30 backdrop-blur-md transition-colors"
-        style={{ backgroundColor: `${p.surface}f2`, borderColor: p.border }}
+        style={{ backgroundColor: p.surface, borderColor: p.border, color:p.surfaceText }}
       >
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-md shrink-0 text-white"
-            style={{ backgroundColor: p.accent, color:websiteActionText(p.accent) }}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-md shrink-0 "
+            style={{ backgroundColor: p.accent, color:websiteActionText(p.accent), borderColor:p.border }}
           >
             {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Smartphone className="w-5 h-5" />}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-extrabold text-sm sm:text-base tracking-tight leading-none" style={{ color: p.text }}>
+              <h1 className="font-extrabold text-sm sm:text-base tracking-tight leading-none" style={{ color: p.surfaceText }}>
                 {businessName}
               </h1>
               <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{backgroundColor:p.accent}} />
             </div>
-            <p className="text-[10px] sm:text-xs font-medium" style={{ color: p.mutedText }}>
+            <p className="text-[10px] sm:text-xs font-medium" style={{ color: p.surfaceMutedText }}>
               Data Bundle Store
             </p>
           </div>
@@ -305,13 +307,13 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           </div>
 
           {/* Content Layer (Left-aligned, crisp, high-contrast, fully protected) */}
-          <div className="relative z-10 max-w-xl text-left space-y-4 sm:space-y-5">
+          <div style={{backgroundColor:p.surface, color:p.surfaceText}} className="relative z-10 max-w-xl text-left space-y-4 sm:space-y-5 rounded-xl p-3">
             <div
               className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold border"
               style={{
-                backgroundColor: `${p.accent}15`,
-                borderColor: `${p.accent}35`,
-                color: p.text,
+                backgroundColor: p.surface,
+                borderColor: p.border,
+                color: p.surfaceText,
               }}
             >
               <Zap className="w-3.5 h-3.5 fill-current" />
@@ -320,43 +322,43 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
 
             <h2
               className="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.15]"
-              style={{ color: p.text }}
+              style={{ color: p.surfaceText }}
             >
               {tagline}
             </h2>
 
-            <p className="text-xs sm:text-sm leading-relaxed max-w-lg" style={{ color: p.mutedText }}>
+            <p className="text-xs sm:text-sm leading-relaxed max-w-lg" style={{ color: p.surfaceMutedText }}>
               {aboutText}
             </p>
 
             {/* Compact Trust / Support Row */}
             <div className="grid grid-cols-3 gap-2 sm:gap-4 py-2.5 border-y max-w-lg" style={{ borderColor: `${p.border}80` }}>
               <div className="space-y-0.5">
-                <div className="text-xs font-bold text-white flex items-center gap-1">
-                  <Wifi className="w-3 h-3" style={{color:p.accent}} />
+                <div className="text-xs font-bold  flex items-center gap-1">
+                  <Wifi className="w-3 h-3" style={{color:p.surfaceAccentText}} />
                   <span>Multiple Networks</span>
                 </div>
-                <div className="text-[10px]" style={{ color: p.mutedText }}>
+                <div className="text-[10px]" style={{ color: p.surfaceMutedText }}>
                   MTN · Telecel · AT
                 </div>
               </div>
 
               <div className="space-y-0.5">
-                <div className="text-xs font-bold text-white flex items-center gap-1">
-                  <ShoppingBag className="w-3 h-3" style={{color:p.accent}} />
+                <div className="text-xs font-bold  flex items-center gap-1">
+                  <ShoppingBag className="w-3 h-3" style={{color:p.surfaceAccentText}} />
                   <span>Simple Ordering</span>
                 </div>
-                <div className="text-[10px]" style={{ color: p.mutedText }}>
+                <div className="text-[10px]" style={{ color: p.surfaceMutedText }}>
                   {managedCheckout?'Select & Pay':'Select & WhatsApp'}
                 </div>
               </div>
 
               <div className="space-y-0.5">
-                <div className="text-xs font-bold text-white flex items-center gap-1">
-                  <MessageSquare className="w-3 h-3" style={{color:p.accent}} />
+                <div className="text-xs font-bold  flex items-center gap-1">
+                  <MessageSquare className="w-3 h-3" style={{color:p.surfaceAccentText}} />
                   <span>{managedCheckout?"Managed checkout":"Direct Chat"}</span>
                 </div>
-                <div className="text-[10px]" style={{ color: p.mutedText }}>
+                <div className="text-[10px]" style={{ color: p.surfaceMutedText }}>
                   {managedCheckout?'Managed delivery':'Prompt WhatsApp'}
                 </div>
               </div>
@@ -368,10 +370,10 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                 type="button"
                 data-website-primary-cta="true"
                 onClick={scrollToCatalog}
-                className="px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 cursor-pointer active:scale-95 text-white"
-                style={{ backgroundColor: p.accent, color:websiteActionText(p.accent) }}
+                className="px-5 py-3 border rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 cursor-pointer active:scale-95 "
+                style={{ backgroundColor: p.accent, color:websiteActionText(p.accent), borderColor:p.border }}
               >
-                <span>Buy Data</span>
+                <span>{managedCheckout && managedAvailability !== 'available' ? managedAvailability === 'loading' ? 'Check Availability' : 'View Availability' : 'Buy Data'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 
@@ -382,9 +384,9 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                   onClick={handleChatWhatsapp}
                   className="px-5 py-3 rounded-xl font-semibold text-xs transition-colors flex items-center gap-2 border cursor-pointer hover:bg-white/5"
                   style={{
-                    backgroundColor: `${p.background}b3`,
+                    backgroundColor: p.surface,
                     borderColor: p.border,
-                    color: p.text,
+                    color: p.surfaceText,
                   }}
                 >
                   <MessageSquare className="w-4 h-4 text-[#25D366]" />
@@ -404,16 +406,18 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
         {/* Network Selection Bar */}
         <div
           className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-lg"
-          style={{ backgroundColor: p.surface, borderColor: p.border }}
+          style={{ backgroundColor: p.surface, borderColor: p.border, color:p.surfaceText }}
         >
           <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
             <button
               type="button"
               onClick={() => setSelectedNetwork('mtn')}
+              aria-pressed={selectedNetwork === 'mtn'}
+              style={selectedNetwork === 'mtn' ? undefined : {backgroundColor:p.surface,color:p.surfaceText,borderColor:p.border}}
               className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 selectedNetwork === 'mtn'
                   ? 'bg-[#FFCC00] text-black shadow-[0_0_18px_rgba(255,204,0,0.35)] border border-[#FFCC00] font-extrabold scale-[1.02]'
-                  : 'bg-black/30 text-slate-300 hover:text-white border border-slate-800'
+                  : 'border'
               }`}
             >
               <span className={`w-2.5 h-2.5 rounded-full ${selectedNetwork === 'mtn' ? 'bg-black/80' : 'bg-[#FFCC00]'}`} />
@@ -423,10 +427,12 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             <button
               type="button"
               onClick={() => setSelectedNetwork('telecel')}
+              aria-pressed={selectedNetwork === 'telecel'}
+              style={selectedNetwork === 'telecel' ? undefined : {backgroundColor:p.surface,color:p.surfaceText,borderColor:p.border}}
               className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 selectedNetwork === 'telecel'
                   ? 'bg-[#E60000] text-white shadow-[0_0_18px_rgba(230,0,0,0.35)] border border-[#E60000] font-extrabold scale-[1.02]'
-                  : 'bg-black/30 text-slate-300 hover:text-white border border-slate-800'
+                  : 'border'
               }`}
             >
               <span className="w-2.5 h-2.5 rounded-full bg-white" />
@@ -436,10 +442,12 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             <button
               type="button"
               onClick={() => setSelectedNetwork('at')}
+              aria-pressed={selectedNetwork === 'at'}
+              style={selectedNetwork === 'at' ? undefined : {backgroundColor:p.surface,color:p.surfaceText,borderColor:p.border}}
               className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 selectedNetwork === 'at'
-                  ? 'bg-[#0284c7] text-white shadow-[0_0_18px_rgba(2,132,199,0.35)] border border-[#38bdf8] font-extrabold scale-[1.02]'
-                  : 'bg-black/30 text-slate-300 hover:text-white border border-slate-800'
+                  ? 'bg-[#004B93] text-white shadow-[0_0_18px_rgba(2,132,199,0.35)] border border-[#38bdf8] font-extrabold scale-[1.02]'
+                  : 'border'
               }`}
             >
               <span className="w-2.5 h-2.5 rounded-full bg-white" />
@@ -447,7 +455,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             </button>
           </div>
 
-          <div className="text-xs px-2 flex items-center justify-between sm:justify-end gap-2" style={{ color: p.mutedText }}>
+          <div className="text-xs px-2 flex items-center justify-between sm:justify-end gap-2" style={{ color: p.surfaceMutedText }}>
             <span>
               {currentNetworkPackages.length} package{currentNetworkPackages.length === 1 ? '' : 's'} available
             </span>
@@ -458,14 +466,14 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
         {currentNetworkPackages.length === 0 ? (
           <div
             className="p-10 text-center rounded-3xl border space-y-3"
-            style={{ backgroundColor: p.surface, borderColor: p.border }}
+            style={{ backgroundColor: p.surface, borderColor: p.border, color:p.surfaceText }}
           >
-            <HelpCircle className="w-10 h-10 mx-auto text-slate-500" />
+            <HelpCircle className="w-10 h-10 mx-auto " />
             <div className="space-y-1">
-              <h4 className="font-bold text-white text-sm">
+              <h4 className="font-bold  text-sm">
                 No {selectedNetwork.toUpperCase()} packages currently listed
               </h4>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs ">
                 The business owner has not added bundles for {selectedNetwork.toUpperCase()} yet.
               </p>
             </div>
@@ -492,7 +500,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                 >
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/10 text-slate-200">
+                      <span style={{color:p.surfaceText}} className="text-[10px] font-bold px-2 py-0.5 rounded-md">
                         {pkg.tag || 'Standard'}
                       </span>
                       {isSelected && (
@@ -507,21 +515,21 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                         </div>
                       )}
                     </div>
-                    <h4 className="font-extrabold text-sm sm:text-base tracking-tight leading-snug" style={{ color: p.text }}>
+                    <h4 className="font-extrabold text-sm sm:text-base tracking-tight leading-snug" style={{ color: p.surfaceText }}>
                       {pkg.name}
                     </h4>
                     {pkg.desc && (
-                      <p className="text-[11px] line-clamp-2" style={{ color: p.mutedText }}>
+                      <p className="text-[11px] line-clamp-2" style={{ color: p.surfaceMutedText }}>
                         {pkg.desc}
                       </p>
                     )}
                   </div>
 
                   <div className="pt-2 border-t" style={{ borderColor: `${p.border}80` }}>
-                    <div className="text-[10px] uppercase font-bold tracking-wider" style={{ color: p.mutedText }}>
+                    <div className="text-[10px] uppercase font-bold tracking-wider" style={{ color: p.surfaceMutedText }}>
                       Price
                     </div>
-                    <div className="font-black text-base sm:text-lg" style={{ color: p.accent }}>
+                    <div className="font-black text-base sm:text-lg" style={{ color: p.surfaceAccentText }}>
                       GH₵ {pkg.price}
                     </div>
                   </div>
@@ -535,49 +543,49 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
         {selectedPackage && (
           <div
             className="p-5 sm:p-7 rounded-2xl sm:rounded-3xl border shadow-2xl space-y-5 max-w-lg mx-auto backdrop-blur-sm"
-            style={{ backgroundColor: p.surface, borderColor: p.border }}
+            style={{ backgroundColor: p.surface, borderColor: p.border, color:p.surfaceText }}
           >
             <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: p.border }}>
               <div>
-                <span className="text-xs uppercase tracking-wider font-bold" style={{ color: p.mutedText }}>
+                <span className="text-xs uppercase tracking-wider font-bold" style={{ color: p.surfaceMutedText }}>
                   Selected Bundle
                 </span>
-                <h3 className="font-extrabold text-base sm:text-lg" style={{ color: p.text }}>
+                <h3 className="font-extrabold text-base sm:text-lg" style={{ color: p.surfaceText }}>
                   {selectedNetwork.toUpperCase()} · {selectedPackage.name}
                 </h3>
               </div>
               <div className="text-right">
-                <span className="text-xs uppercase tracking-wider font-bold" style={{ color: p.mutedText }}>
+                <span className="text-xs uppercase tracking-wider font-bold" style={{ color: p.surfaceMutedText }}>
                   Price
                 </span>
-                <div className="font-black text-xl sm:text-2xl" style={{ color: p.accent }}>
+                <div className="font-black text-xl sm:text-2xl" style={{ color: p.surfaceAccentText }}>
                   GH₵ {selectedPackage.price}
                 </div>
               </div>
             </div>
 
             <div className="space-y-1.5 text-left">
-              <label className="text-xs font-semibold text-slate-300">
+              <label className="text-xs font-semibold ">
                 Recipient Ghana Phone Number (Optional)
               </label>
               <div className="relative">
-                <Smartphone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Smartphone className="w-4 h-4  absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="tel"
                   value={recipientPhone}
                   onChange={(e) => setRecipientPhone(e.target.value)}
                   placeholder="e.g. 024 123 4567"
-                  className="w-full bg-black/40 border rounded-xl pl-9 pr-3.5 py-2.5 text-xs sm:text-sm text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--website-accent)]"
-                  style={{ borderColor: p.border }}
+                  className="w-full  border rounded-xl pl-9 pr-3.5 py-2.5 text-xs sm:text-sm  focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--website-focus)]"
+                  style={{ borderColor: p.border, backgroundColor:p.background, color:p.text }}
                 />
               </div>
-              <p className="text-[11px]" style={{ color: p.mutedText }}>
+              <p className="text-[11px]" style={{ color: p.surfaceMutedText }}>
                 Leave empty if purchasing for the phone you are ordering with.
               </p>
             </div>
 
             {orderNotice && (
-              <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl">
+              <p style={{color:p.surfaceText,borderColor:p.border}} className="text-xs border p-2.5 rounded-xl">
                 {orderNotice}
               </p>
             )}
@@ -592,7 +600,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
               <ArrowRight className="w-4 h-4" />
             </button>
 
-            <p className="text-[11px] text-center" style={{ color: p.mutedText }}>
+            <p className="text-[11px] text-center" style={{ color: p.surfaceMutedText }}>
               Connects directly to WhatsApp with your chosen package pre-filled.
             </p>
           </div>
@@ -602,48 +610,48 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
           <div
             className="p-5 rounded-2xl border text-left space-y-2"
-            style={{ backgroundColor: p.surface, borderColor: p.border }}
+            style={{ backgroundColor: p.surface, borderColor: p.border, color:p.surfaceText }}
           >
             <div
               className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black"
-              style={{ backgroundColor: `${p.accent}25`, color: p.accent }}
+              style={{ backgroundColor: p.surface, color: p.surfaceAccentText }}
             >
               1
             </div>
-            <h4 className="font-bold text-sm text-white">Choose Network & Package</h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <h4 className="font-bold text-sm ">Choose Network & Package</h4>
+            <p className="text-xs  leading-relaxed">
               Select your network (MTN, Telecel, or AT) and tap your preferred data bundle.
             </p>
           </div>
 
           <div
             className="p-5 rounded-2xl border text-left space-y-2"
-            style={{ backgroundColor: p.surface, borderColor: p.border }}
+            style={{ backgroundColor: p.surface, borderColor: p.border, color:p.surfaceText }}
           >
             <div
               className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black"
-              style={{ backgroundColor: `${p.accent}25`, color: p.accent }}
+              style={{ backgroundColor: p.surface, color: p.surfaceAccentText }}
             >
               2
             </div>
-            <h4 className="font-bold text-sm text-white">Send WhatsApp Order</h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <h4 className="font-bold text-sm ">Send WhatsApp Order</h4>
+            <p className="text-xs  leading-relaxed">
               Tap Order to open WhatsApp with your chosen bundle and line pre-filled.
             </p>
           </div>
 
           <div
             className="p-5 rounded-2xl border text-left space-y-2"
-            style={{ backgroundColor: p.surface, borderColor: p.border }}
+            style={{ backgroundColor: p.surface, borderColor: p.border, color:p.surfaceText }}
           >
             <div
               className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black"
-              style={{ backgroundColor: `${p.accent}25`, color: p.accent }}
+              style={{ backgroundColor: p.surface, color: p.surfaceAccentText }}
             >
               3
             </div>
-            <h4 className="font-bold text-sm text-white">Direct Line Delivery</h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <h4 className="font-bold text-sm ">Direct Line Delivery</h4>
+            <p className="text-xs  leading-relaxed">
               Complete payment on WhatsApp and receive data credited directly to your SIM.
             </p>
           </div>
@@ -655,20 +663,20 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           4. FOOTER & BUSINESS DETAILS
           ========================================================= */}
       <footer
-        className="mt-12 border-t py-8 px-4 sm:px-8 text-xs text-slate-400 space-y-4"
-        style={{ backgroundColor: p.surface, borderColor: p.border }}
+        className="mt-12 border-t py-8 px-4 sm:px-8 text-xs space-y-4"
+        style={{ backgroundColor: p.surface, borderColor: p.border, color:p.surfaceText }}
       >
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <div className="space-y-1">
-            <div className="font-bold text-white text-sm">{businessName}</div>
-            <div className="text-[11px]" style={{ color: p.mutedText }}>
+            <div className="font-bold  text-sm">{businessName}</div>
+            <div className="text-[11px]" style={{ color: p.surfaceMutedText }}>
               {location}
             </div>
           </div>
 
           <div className="flex items-center gap-4 text-xs font-semibold">
             {contact && (
-              <a href={`tel:${contact}`} className="flex items-center gap-1.5 hover:text-white transition-colors">
+              <a href={`tel:${contact}`} className="flex items-center gap-1.5  transition-colors">
                 <Phone className="w-3.5 h-3.5" />
                 <span>{contact}</span>
               </a>
@@ -678,7 +686,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                 type="button"
                 data-website-event="whatsapp_click"
                   onClick={handleChatWhatsapp}
-                className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                className="flex items-center gap-1.5  transition-colors cursor-pointer"
               >
                 <MessageSquare className="w-3.5 h-3.5 text-[#25D366]" />
                 <span>WhatsApp</span>

@@ -27,6 +27,7 @@ export function WebsiteBundlePricing({siteId,token,onDirty}:{siteId:string;token
  const unconfigured=products.some(p=>!canPrice(p));
  return <section aria-label="Bundles & Pricing" className="space-y-4">
  <p className="text-sm text-slate-400">Set your store prices. Estimated earnings allow for bundle costs and payment processing.</p>
+ {!catalog.policy?.enabled?<p role="status" className="text-sm text-amber-200">Online checkout is not enabled for reseller stores yet. Contact Mystery Hub before offering online purchases.</p>:!products.some(p=>canPrice(p)&&drafts[p.id]?.enabled&&!sellerPriceError(p,drafts[p.id])&&Number(drafts[p.id]?.price)>0)&&<p role="status" className="text-sm text-amber-200">No bundles are ready for customers yet. Set selling prices at or above the minimum, enable the bundles you want to sell, and Save Changes.</p>}
  {unconfigured&&<p role="status" className="rounded-xl border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200">Pricing is not ready yet for some bundles. Mystery Hub must configure wholesale pricing before these bundles can be sold. Configured bundles remain editable.</p>}
  <fieldset disabled={busy} className="min-w-0 rounded-xl border border-slate-700 p-3 space-y-3"><legend className="px-1 font-semibold">Quick pricing</legend>
  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
