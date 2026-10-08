@@ -17,10 +17,11 @@ import {
   ExternalLink,
   Gift,
   Wallet,
+  MessageCircle,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { activePage, setActivePage, openAuth, user, logoutUser, openAccount } = useApp();
+  const { activePage, setActivePage, openAuth, openMysteryAi, user, logoutUser, openAccount } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,7 +95,7 @@ export const Navbar: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-40 bg-[#0a0e11]/90 backdrop-blur-md border-b border-slate-800/80">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
         {/* Zone 1: Brand Wordmark */}
         <a
           href="/"
@@ -102,10 +103,10 @@ export const Navbar: React.FC = () => {
             e.preventDefault();
             handleNavClick('home');
           }}
-          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] rounded-lg transition-transform active:scale-95 inline-flex items-center"
+          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] rounded-lg transition-transform active:scale-95 inline-flex items-center shrink-0"
           aria-label="Mystery Hub Homepage"
         >
-          <BrandLogo size="md" priority="high" />
+          <BrandLogo size="sm" priority="high" wordmarkClassName="max-sm:text-sm whitespace-nowrap" />
         </a>
 
         {/* Zone 2: Navigation Links (Desktop) */}
@@ -135,23 +136,24 @@ export const Navbar: React.FC = () => {
         </nav>
 
         {/* Zone 3: Actions & Auth */}
-        <div className="flex items-center gap-1.5 sm:gap-3">
+        <div className="flex items-center gap-0.5 sm:gap-3">
           {/* Quick Search Toggle */}
-          <div className="relative">
+          <div className="relative min-w-11">
             {searchOpen ? (
-              <form onSubmit={handleSearchSubmit} className="flex items-center">
+              <form onSubmit={handleSearchSubmit} className="fixed left-3 right-3 top-16 mt-2 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-4 p-2 bg-[#0c1116] border border-slate-700 rounded-xl shadow-xl flex items-center sm:w-80">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search..."
+                  placeholder="Search services..."
+                  aria-label="Search services"
                   autoFocus
-                  className="bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-2.5 py-1.5 w-28 xs:w-40 sm:w-64 max-w-[calc(100vw-120px)] focus:outline-none focus:border-[#00c365]"
+                  className="bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-2.5 py-1.5 w-full min-w-0 min-h-11 focus:outline-none focus:border-[#00c365]"
                 />
                 <button
                   type="button"
                   onClick={() => setSearchOpen(false)}
-                  className="ml-1 text-slate-400 hover:text-white p-1 cursor-pointer"
+                  className="ml-1 min-h-11 min-w-11 flex items-center justify-center text-slate-400 hover:text-white cursor-pointer"
                   aria-label="Close search"
                 >
                   <X className="w-4 h-4" />
@@ -160,7 +162,7 @@ export const Navbar: React.FC = () => {
             ) : (
               <button
                 onClick={() => setSearchOpen(true)}
-                className="p-1.5 sm:p-2 text-slate-400 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
+                className="min-h-11 min-w-11 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
                 title="Search Mystery Hub"
                 aria-label="Search"
               >
@@ -169,11 +171,12 @@ export const Navbar: React.FC = () => {
             )}
           </div>
 
-          {user&&<button onClick={()=>handleNavClick('wallet')} className="min-h-11 min-w-11 flex items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800" aria-label="Mystery Wallet" title="Mystery Wallet"><Wallet className="w-4 h-4"/></button>}
+          {user&&<button onClick={()=>handleNavClick('wallet')} className="hidden sm:flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800" aria-label="Mystery Wallet" title="Mystery Wallet"><Wallet className="w-4 h-4"/></button>}
+          <button type="button" onClick={() => openMysteryAi()} className="hidden md:flex min-h-11 min-w-11 items-center justify-center text-slate-300 hover:text-[#00c365] hover:bg-slate-800/60 rounded-lg" aria-label="Open Mystery AI Assistant" title="Ask Mystery AI"><MessageCircle className="w-4 h-4" /></button>
           {/* Mystery Earn Shortcut */}
           <button
             onClick={() => handleNavClick('earn')}
-            className="relative p-1.5 sm:p-2 text-slate-400 hover:text-[#00c365] hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
+            className="relative min-h-11 min-w-11 flex items-center justify-center text-slate-400 hover:text-[#00c365] hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
             title="Mystery Earn"
             aria-label="Mystery Earn"
           >
@@ -284,7 +287,7 @@ export const Navbar: React.FC = () => {
               </button>
               <button
                 onClick={() => openAuth('signup')}
-                className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold text-black bg-[#00c365] hover:bg-[#00e575] rounded-xl transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] active:scale-95 whitespace-nowrap cursor-pointer"
+                className="min-h-11 px-2 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold text-black bg-[#00c365] hover:bg-[#00e575] rounded-xl transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] active:scale-95 whitespace-nowrap cursor-pointer"
               >
                 Sign Up
               </button>
@@ -294,7 +297,9 @@ export const Navbar: React.FC = () => {
           {/* Mobile Menu Hamburger */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="xl:hidden p-2 text-slate-400 hover:text-white rounded-lg focus:outline-none cursor-pointer"
+            className="xl:hidden min-h-11 min-w-11 flex items-center justify-center text-slate-400 hover:text-white rounded-lg cursor-pointer"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-menu"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -304,7 +309,7 @@ export const Navbar: React.FC = () => {
 
       {/* Mobile Dropdown Menu Drawer */}
       {mobileMenuOpen && (
-        <div className="xl:hidden bg-[#0c1116] border-b border-slate-800 px-4 pt-3 pb-5 space-y-3">
+        <div id="mobile-menu" className="xl:hidden bg-[#0c1116] border-b border-slate-800 px-4 pt-3 pb-5 space-y-3">
           {user && (
             <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
@@ -329,6 +334,7 @@ export const Navbar: React.FC = () => {
           )}
 
           <div className="space-y-1">
+            {user && <a href="/wallet" onClick={(e) => { e.preventDefault(); handleNavClick('wallet'); }} className="flex items-center gap-2 min-h-11 px-3 rounded-xl text-sm text-slate-300 hover:bg-slate-900"><Wallet className="w-4 h-4" />Mystery Wallet</a>}
             {navLinks.map((link) => (
               <a
                 key={link.id}

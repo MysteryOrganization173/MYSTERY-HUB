@@ -2,68 +2,30 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { orderedWebsiteTemplates } from '../../data/templates';
 import { TemplateCardPreview } from '../website/TemplateCardPreview';
-import { Globe, ArrowRight, Smartphone, Zap } from 'lucide-react';
+import { Globe, ArrowRight, Check } from 'lucide-react';
 
 export const HomeWebsiteSection: React.FC = () => {
   const { setActivePage, openTemplatePreview } = useApp();
-
-  // 3 sample templates for the home showcase
-  const previewTemplates = orderedWebsiteTemplates().slice(0, 3);
-
+  // Actual existing template and Cloudinary artwork, never a fabricated screenshot.
+  const templates = orderedWebsiteTemplates();
+  const template = templates.find(t => t.id === 'tmpl-data-reseller') || templates[0];
   return (
-    <section className="py-6 sm:py-10 lg:py-14 bg-[#090d10] border-y border-slate-800/80">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5 sm:space-y-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6">
-          <div className="space-y-2 text-left">
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#00c365]">
-              <Globe className="w-3.5 h-3.5" />
-              <span>Built for Ghanaian Businesses</span>
-            </div>
-            <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Start Your Business. <br />
-              <span className="text-[#00c365]">Create Your Website.</span>
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-400 max-w-xl leading-relaxed">
-              Pick a design, add your business details and photos, then publish your website. No coding needed.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setActivePage('website')}
-              className="px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] flex items-center gap-2 cursor-pointer"
-            >
-              <span>Browse Templates</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+    <section className="home-container home-feature-section" aria-labelledby="website-heading">
+      <div className="home-website-panel">
+        <div className="home-website-copy">
+          <p className="home-eyebrow"><Globe className="w-4 h-4" />Website Builder · Free plan</p>
+          <h2 id="website-heading">Your business deserves<br /><span>a place online.</span></h2>
+          <p>Pick a design, add your business details and photos, then publish your website. No coding needed.</p>
+          <ol className="home-builder-steps">
+            <li><span>01</span>Choose your design</li><li><span>02</span>Add your details</li><li><span>03</span>Publish for free</li>
+          </ol>
+          <a href="/website-builder" onClick={(e) => { e.preventDefault(); setActivePage('website'); }} className="mh-button">Browse Templates<ArrowRight className="w-4 h-4" /></a>
+          <p className="home-feature-note"><Check className="w-4 h-4" />Designed for phones, tablets and desktop</p>
         </div>
-
-        {/* 3 Template Previews Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-          {previewTemplates.map((t) => (
-            <TemplateCardPreview
-              key={t.id}
-              template={t}
-              onPreview={() => openTemplatePreview(t)}
-            />
-          ))}
-        </div>
-
-        {/* Value Prop strip */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 pt-2 text-xs text-slate-300">
-          <div className="p-3.5 sm:p-4 rounded-xl bg-[#0e141a] border border-slate-800/80 flex items-center gap-3">
-            <Smartphone className="w-4 h-4 sm:w-5 sm:h-5 text-[#00c365] shrink-0" />
-            <span>Designed for phones, tablets and desktop</span>
-          </div>
-          <div className="p-3.5 sm:p-4 rounded-xl bg-[#0e141a] border border-slate-800/80 flex items-center gap-3">
-            <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 shrink-0" />
-            <span>WhatsApp contact links for your customers</span>
-          </div>
-          <div className="p-3.5 sm:p-4 rounded-xl bg-[#0e141a] border border-slate-800/80 flex items-center gap-3">
-            <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-sky-400 shrink-0" />
-            <span>Data reseller stores with customer checkout</span>
-          </div>
+        <div className="home-template-showcase">
+          <div className="home-template-label"><span>See what you can create</span><span>Design preview</span></div>
+          {template && <TemplateCardPreview template={template} onPreview={() => openTemplatePreview(template)} />}
+          <p>Sample design and content. Your website uses your own business details.</p>
         </div>
       </div>
     </section>

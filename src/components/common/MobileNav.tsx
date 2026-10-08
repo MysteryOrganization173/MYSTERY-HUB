@@ -1,10 +1,10 @@
 import React from 'react';
 import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { ActivePage } from '../../types';
-import { Home, Wifi, Globe, ShoppingBag, Clock } from 'lucide-react';
+import { Home, Wifi, Globe, ShoppingBag, Clock, MessageCircle } from 'lucide-react';
 
 export const MobileNav: React.FC = () => {
-  const { activePage, setActivePage, orders, activeEditorSite, isMysteryAiOpen, isCheckoutOpen, isStatusModalOpen, isAuthModalOpen, selectedTemplatePreview, marketplaceInquiryProduct, waitlistInfo, isAccountOpen } = useApp();
+  const { openMysteryAi, activePage, setActivePage, orders, activeEditorSite, isMysteryAiOpen, isCheckoutOpen, isStatusModalOpen, isAuthModalOpen, selectedTemplatePreview, marketplaceInquiryProduct, waitlistInfo, isAccountOpen } = useApp();
 
   const navItems: { id: ActivePage; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'home', label: 'Home', icon: Home },
@@ -21,7 +21,7 @@ export const MobileNav: React.FC = () => {
       aria-label="Mobile Navigation"
       className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c1116]/95 backdrop-blur-lg border-t border-slate-800/90 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom,0px))] max-w-full overflow-hidden"
     >
-      <div className="grid grid-cols-5 items-center h-13 max-w-md mx-auto w-full">
+      <div className="grid grid-cols-6 items-center h-13 max-w-md mx-auto w-full">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activePage === item.id;
@@ -29,6 +29,7 @@ export const MobileNav: React.FC = () => {
             <a
               key={item.id}
               href={ROUTE_PATH_MAP[item.id]}
+              aria-label={item.label}
               aria-current={isActive ? "page" : undefined}
               onClick={(e) => {
                 e.preventDefault();
@@ -48,7 +49,7 @@ export const MobileNav: React.FC = () => {
                   isActive ? 'text-[#00c365] font-semibold' : 'text-slate-400'
                 }`}
               >
-                {item.label}
+                {item.id === 'marketplace' ? 'Shop' : item.label}
               </span>
               {item.id === 'orders' && orders.length > 0 && !isActive && (
                 <span className="absolute top-1 right-3 w-1.5 h-1.5 bg-[#00c365] rounded-full" />
@@ -56,6 +57,9 @@ export const MobileNav: React.FC = () => {
             </a>
           );
         })}
+        <button type="button" onClick={() => openMysteryAi()} aria-label="Open Mystery AI Assistant" className="flex flex-col items-center justify-center min-h-[44px] min-w-[44px] text-slate-300 hover:text-[#00c365]">
+          <MessageCircle className="w-5 h-5" /><span className="text-[11px] font-medium mt-1">Help</span>
+        </button>
       </div>
     </nav>
   );
