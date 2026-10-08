@@ -23,6 +23,7 @@ import {
 export const MysteryAiAssistant: React.FC = () => {
   const {
     activePage,
+    user,
     setActivePage,
     activeEditorSite,
     editorAiContext,
@@ -65,8 +66,7 @@ export const MysteryAiAssistant: React.FC = () => {
   const isAnyModalActive =
     isCheckoutOpen ||
     isStatusModalOpen ||
-    isAuthModalOpen ||
-    isAccountOpen ||
+    isAuthModalOpen || isAccountOpen || Boolean(user?.mustChangePassword) ||
     Boolean(selectedTemplatePreview) ||
     Boolean(marketplaceInquiryProduct) ||
     Boolean(waitlistInfo?.isOpen);
@@ -269,7 +269,7 @@ export const MysteryAiAssistant: React.FC = () => {
     return()=>{window.visualViewport?.removeEventListener('resize',update);window.visualViewport?.removeEventListener('scroll',update);window.removeEventListener('resize',update);};
   },[isOpen]);
 
-  if (isAnyModalActive) {
+  if (isAnyModalActive || (user && activePage === 'home' && !isOpen)) {
     return null;
   }
 

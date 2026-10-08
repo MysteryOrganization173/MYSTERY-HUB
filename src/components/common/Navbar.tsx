@@ -28,6 +28,7 @@ export const Navbar: React.FC = () => {
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const accountTrigger = useRef<HTMLButtonElement>(null);
 
   const navLinks: { id: ActivePage; label: string }[] = [
     { id: 'home', label: 'Home' },
@@ -48,7 +49,7 @@ export const Navbar: React.FC = () => {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setAccountDropdownOpen(false);
+        setAccountDropdownOpen(open=>{if(open)accountTrigger.current?.focus();return false;});
         setMobileMenuOpen(false);
         setSearchOpen(false);
       }
@@ -95,7 +96,7 @@ export const Navbar: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-40 bg-[#0a0e11]/90 backdrop-blur-md border-b border-slate-800/80">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-1 sm:gap-4">
         {/* Zone 1: Brand Wordmark */}
         <a
           href="/"
@@ -106,7 +107,7 @@ export const Navbar: React.FC = () => {
           className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] rounded-lg transition-transform active:scale-95 inline-flex items-center shrink-0"
           aria-label="Mystery Hub Homepage"
         >
-          <BrandLogo size="sm" priority="high" wordmarkClassName="max-sm:text-sm whitespace-nowrap" />
+          <BrandLogo size="sm" priority="high" wordmarkClassName="max-sm:text-sm whitespace-nowrap sm:!text-lg" />
         </a>
 
         {/* Zone 2: Navigation Links (Desktop) */}
@@ -140,7 +141,7 @@ export const Navbar: React.FC = () => {
           {/* Quick Search Toggle */}
           <div className="relative min-w-11">
             {searchOpen ? (
-              <form onSubmit={handleSearchSubmit} className="fixed left-3 right-3 top-16 mt-2 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-4 p-2 bg-[#0c1116] border border-slate-700 rounded-xl shadow-xl flex items-center sm:w-80">
+              <form onSubmit={handleSearchSubmit} className="fixed left-3 right-3 top-16 mt-2 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-4 p-2 bg-[#0c1116] border border-slate-700 rounded-xl shadow-xl flex items-center sm:w-[min(20rem,calc(100vw-2rem))]">
                 <input
                   type="text"
                   value={searchQuery}
@@ -176,7 +177,7 @@ export const Navbar: React.FC = () => {
           {/* Mystery Earn Shortcut */}
           <button
             onClick={() => handleNavClick('earn')}
-            className="relative min-h-11 min-w-11 flex items-center justify-center text-slate-400 hover:text-[#00c365] hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
+            className="hidden sm:flex relative min-w-11 min-h-11 items-center justify-center text-slate-400 hover:text-[#00c365] hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
             title="Mystery Earn"
             aria-label="Mystery Earn"
           >
@@ -191,9 +192,10 @@ export const Navbar: React.FC = () => {
           {user ? (
             <div className="relative" ref={dropdownRef}>
               <button
-                onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 rounded-xl text-xs text-slate-200 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#00c365]"
-                aria-haspopup="true"
+                ref={accountTrigger}
+                aria-label="Account navigation" aria-controls="account-navigation"
+                onClick={() => {setMobileMenuOpen(false);setAccountDropdownOpen(!accountDropdownOpen);}}
+                className="min-h-11 min-w-11 flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 rounded-xl text-xs text-slate-200 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#00c365]"
                 aria-expanded={accountDropdownOpen}
               >
                 <div className="w-5 h-5 rounded-full bg-[#00c365]/20 text-[#00c365] flex items-center justify-center font-bold text-[10px]">
@@ -205,18 +207,19 @@ export const Navbar: React.FC = () => {
 
               {/* Account Dropdown Menu */}
               {accountDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-[#0f151b] border border-slate-700/80 shadow-2xl py-2 z-50 text-xs text-slate-200 animate-in fade-in zoom-in-95 duration-150">
+                <div id="account-navigation" role="region" aria-label="Account shortcuts" className="absolute right-0 mt-2 w-56 max-h-[calc(100dvh-5rem)] overflow-auto rounded-2xl bg-[#0f151b] border border-slate-700/80 shadow-2xl py-2 z-50 text-xs text-slate-200 animate-in fade-in zoom-in-95 duration-150">
                   {/* User Profile Header */}
                   <div className="px-3.5 py-2.5 border-b border-slate-800 space-y-0.5">
                     <p className="font-bold text-white text-xs truncate">{user.name}</p>
                     {userSubtext && <p className="text-[11px] text-slate-400 truncate">{userSubtext}</p>}
                   </div>
 
+                  <button onClick={()=>handleNavClick('wallet')} className="w-full min-h-11 text-left px-3.5 flex items-center gap-2.5 hover:bg-slate-800"><Wallet className="w-4 h-4"/>Mystery Wallet</button>
                   {/* Navigation Shortcuts */}
                   <div className="py-1">
                     <button
                       onClick={() => handleNavClick('home')}
-                      className="w-full text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
+                      className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
                     >
                       <Home className="w-3.5 h-3.5 text-[#00c365]" />
                       <span>My Home</span>
@@ -224,7 +227,7 @@ export const Navbar: React.FC = () => {
 
                     <button
                       onClick={() => handleNavClick('orders')}
-                      className="w-full text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
+                      className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
                     >
                       <Clock className="w-3.5 h-3.5 text-sky-400" />
                       <span>My Orders</span>
@@ -232,7 +235,7 @@ export const Navbar: React.FC = () => {
 
                     <button
                       onClick={() => handleNavClick('website')}
-                      className="w-full text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
+                      className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
                     >
                       <Globe className="w-3.5 h-3.5 text-purple-400" />
                       <span>Website Builder</span>
@@ -240,7 +243,7 @@ export const Navbar: React.FC = () => {
 
                     <button
                       onClick={() => handleNavClick('marketplace')}
-                      className="w-full text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
+                      className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
                     >
                       <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />
                       <span>Marketplace</span>
@@ -248,7 +251,7 @@ export const Navbar: React.FC = () => {
 
                     <button
                       onClick={() => handleNavClick('earn')}
-                      className="w-full text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
+                      className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
                     >
                       <div className="flex items-center gap-2.5">
                         <Gift className="w-3.5 h-3.5 text-[#00c365]" />
@@ -260,7 +263,7 @@ export const Navbar: React.FC = () => {
                     </button>
                   </div>
 
-                  <button onClick={() => { setAccountDropdownOpen(false); openAccount(); }} className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2"><UserIcon className="w-4 h-4" />My Account</button>
+                  <button onClick={() => { accountTrigger.current?.focus(); setAccountDropdownOpen(false); openAccount(); }} className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2"><UserIcon className="w-4 h-4" />My Account</button>
                   {/* Sign Out */}
                   <div className="pt-1 border-t border-slate-800">
                     <button
@@ -268,7 +271,7 @@ export const Navbar: React.FC = () => {
                         setAccountDropdownOpen(false);
                         logoutUser();
                       }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 flex items-center gap-2.5 transition-colors cursor-pointer"
+                      className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 flex items-center gap-2.5 transition-colors cursor-pointer"
                     >
                       <LogOut className="w-3.5 h-3.5" />
                       <span>Sign Out</span>
@@ -296,10 +299,9 @@ export const Navbar: React.FC = () => {
 
           {/* Mobile Menu Hamburger */}
           <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="xl:hidden min-h-11 min-w-11 flex items-center justify-center text-slate-400 hover:text-white rounded-lg cursor-pointer"
-            aria-expanded={mobileMenuOpen}
-            aria-controls="mobile-menu"
+            onClick={() => {setAccountDropdownOpen(false);setMobileMenuOpen(!mobileMenuOpen);}}
+            aria-expanded={mobileMenuOpen} aria-controls="mobile-menu"
+            className="xl:hidden min-w-11 min-h-11 flex items-center justify-center p-2 text-slate-400 hover:text-white rounded-lg focus:outline-none cursor-pointer"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -309,7 +311,7 @@ export const Navbar: React.FC = () => {
 
       {/* Mobile Dropdown Menu Drawer */}
       {mobileMenuOpen && (
-        <div id="mobile-menu" className="xl:hidden bg-[#0c1116] border-b border-slate-800 px-4 pt-3 pb-5 space-y-3">
+        <div id="mobile-menu" className="xl:hidden max-h-[calc(100dvh-5rem)] overflow-auto bg-[#0c1116] border-b border-slate-800 px-4 pt-3 pb-5 space-y-3">
           {user && (
             <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
