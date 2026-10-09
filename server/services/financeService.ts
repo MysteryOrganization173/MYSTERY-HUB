@@ -194,7 +194,10 @@ export class FinanceService {
     const operations=await tx.operations();return (await this.achievementDefinitions(tx)).filter(x=>x.enabled).map(def=>({...def,progress:values[def.metric as keyof typeof values]||0,claimed:operations.some(x=>x.idempotency_key===`achievement:${def.id}`)}));
   }
   static async claimAchievement(userId:string,id:string) {
-    return FinanceStore.transaction(userId,async tx=>{const key=`achievement:${id}`,old=await tx.find(key);if(old)return old;const def=(await this.achievementProgress(tx)).find(x=>x.id===id);if(!def||def.progress<def.threshold)throw new FinanceError('Achievement is not unlocked.',409);const row=await tx.create('achievement',key,def.rewardMinor,{definition:{...def},rewardMinor:def.rewardMinor});if(def.rewardMinor>0)await tx.append(row,'wallet',def.rewardMinor,'Achievement Reward');return row;});
+    return FinanceStore.transaction(userId,async tx=>{const key=`achievement:${id}`,old=await tx.find(key);if(old)return old;
+      // Existing claims remain replayable; new claims honor the financial account restriction under the owner lock.
+      if((await tx.account()).restricted)throw new FinanceError('Account needs reconciliation.',409);
+      const def=(await this.achievementProgress(tx)).find(x=>x.id===id);if(!def||def.progress<def.threshold)throw new FinanceError('Achievement is not unlocked.',409);const row=await tx.create('achievement',key,def.rewardMinor,{definition:{...def},rewardMinor:def.rewardMinor});if(def.rewardMinor>0)await tx.append(row,'wallet',def.rewardMinor,'Achievement Reward');return row;});
   }
   static async saveAchievements(adminId:string,input:Record<string,unknown>) {
     confirmation(input.confirmed);if(!Array.isArray(input.definitions)||input.definitions.length>20)throw new FinanceError('Invalid achievement definitions.');
