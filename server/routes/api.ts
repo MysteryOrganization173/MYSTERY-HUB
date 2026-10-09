@@ -32,7 +32,7 @@ import { MarketplaceStore } from '../db/marketplaceStore.js';
 import { parseJsonVariants, parseJsonPickupLocations, hasConfiguredMarketplaceVariants } from '../types/marketplace.js';
 import { ReferralStore } from '../db/referralStore.js';
 import { ReferralService } from '../services/referralService.js';
-import { OrderRecord, toSafePublicOrder } from '../types/orders.js';
+import { OrderRecord, toSafePublicOrder, toAuthenticatedCustomerOrder } from '../types/orders.js';
 import { toSafeUserProfile, WaitlistChannel } from '../types/auth.js';
 import { hashPassword, generateSessionToken } from '../utils/crypto.js';
 import { parseIdentifier, validatePassword, normalizeGhanaPhoneIdentifier, normalizeEmail } from '../utils/authValidation.js';
@@ -54,6 +54,11 @@ import { accountRouter } from './accountApi.js';
 import { AccountError, identifierConflict, loginAccount } from '../services/accountSecurity.js';
 
 export const apiRouter = Router();
+// Set before authentication/rate limiting so errors and reference-only responses cannot be cached.
+apiRouter.use(['/payments', '/orders', '/account/orders'], (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 apiRouter.use('/auth', accountRouter);
 apiRouter.use('/finance', financeRouter);
 apiRouter.use('/commercial',commercialRouter);
@@ -922,11 +927,11 @@ apiRouter.get('/payments/verify/:reference', async (req: Request, res: Response)
       res.json({
         verified: false,
         order: toSafePublicOrder(order),
-        message: verifyResult.error || 'Payment not yet confirmed by Paystack.',
+        message: 'Payment not yet confirmed by Paystack.',
       });
     }
   } catch (err) {
-    console.error('Payment Verify Exception:', err);
+    console.error('Payment Verify Exception: verification unavailable');
     res.status(500).json({ error: 'Failed to verify payment.' });
   }
 });
@@ -957,7 +962,7 @@ apiRouter.post('/payments/cancel', async (req: Request, res: Response) => {
       order: toSafePublicOrder(result.order),
     });
   } catch (err) {
-    console.error('Payment Cancel Exception:', err);
+    console.error('Payment Cancel Exception: cancellation unavailable');
     res.status(500).json({ error: 'Failed to cancel payment.' });
   }
 });
@@ -967,10 +972,10 @@ apiRouter.post('/payments/cancel', async (req: Request, res: Response) => {
  * Returns safe public details of an order. No secrets or supplier credentials exposed.
  * If order is submitted or processing, best-effort throttled status refresh is performed.
  */
-apiRouter.get('/orders/lookup/:reference', async (req: Request, res: Response) => {
+apiRouter.get('/orders/lookup/:reference', createRateLimiter({windowMs:60_000,max:60}), async (req: Request, res: Response) => {
   try {
     const ref = req.params.reference;
-    if (!ref) {
+    if (!ref || !/^[a-zA-Z0-9_-]{1,128}$/.test(ref)) {
       res.status(400).json({ error: 'Order reference parameter is required.' });
       return;
     }
@@ -989,7 +994,7 @@ apiRouter.get('/orders/lookup/:reference', async (req: Request, res: Response) =
       order: toSafePublicOrder(activeOrder),
     });
   } catch (err) {
-    console.error('Order Lookup Exception:', err);
+    console.error('Order Lookup Exception: order retrieval unavailable');
     res.status(500).json({ error: 'Unable to retrieve order details.' });
   }
 });
@@ -1331,7 +1336,7 @@ apiRouter.get('/waitlist/my-entries', requireAuth, async (req: Request, res: Res
 
 /**
  * 12. GET /api/orders/my-orders
- * Returns all orders linked to the logged-in customer (by user_id, phone, or email)
+ * Returns only orders linked to the authenticated customer's user_id.
  */
 apiRouter.get('/orders/my-orders', requireAuth, async (req: Request, res: Response) => {
   try {
@@ -1345,14 +1350,14 @@ apiRouter.get('/orders/my-orders', requireAuth, async (req: Request, res: Respon
       }
     }
     const orders = await OrdersStore.findOrdersByUserId(user.id, limit);
-    const safeOrders = orders.map(toSafePublicOrder);
+    const safeOrders = orders.filter(order => order.user_id === user.id).map(toAuthenticatedCustomerOrder);
 
     res.json({
       success: true,
       orders: safeOrders,
     });
   } catch (err) {
-    console.error('My Orders Controller Exception:', err);
+    console.error('My Orders Controller Exception: order retrieval unavailable');
     res.status(500).json({ error: 'Failed to retrieve orders.' });
   }
 });
@@ -1375,14 +1380,14 @@ apiRouter.get('/account/orders', requireAuth, async (req: Request, res: Response
     }
 
     const orders = await OrdersStore.findOrdersByUserId(userId, limit);
-    const safeOrders = orders.map(toSafePublicOrder);
+    const safeOrders = orders.filter(order => order.user_id === userId).map(toAuthenticatedCustomerOrder);
 
     res.json({
       success: true,
       orders: safeOrders,
     });
   } catch (err) {
-    console.error('Account Orders API Exception:', err);
+    console.error('Account Orders API Exception: order retrieval unavailable');
     res.status(500).json({ error: 'Failed to retrieve account orders.' });
   }
 });

@@ -15,6 +15,7 @@ const handler=(work:(req:any)=>Promise<unknown>)=>async(req:any,res:any)=>{
 };
 const offset=(req:any)=>Math.max(0,Math.min(100000,Number(req.query.offset)||0));
 export const websiteBusinessRouter=Router();
+websiteBusinessRouter.use((_req,res,next)=>{res.set('Cache-Control','no-store');next();});
 websiteBusinessRouter.get('/:id/business',requireAuth,handler(async req=>({...await Business.ownerSummary(req.params.id,req.user.id,offset(req)),analytics:await WebsiteAnalyticsStore.ownerAnalytics(req.params.id,req.user.id,String(req.query.range||'30'))})));
 websiteBusinessRouter.get('/:id/bundles',requireAuth,handler(req=>Business.catalog(req.params.id,req.user.id)));
 websiteBusinessRouter.put('/:id/bundles',requireAuth,sensitive,handler(req=>Business.savePrices(req.params.id,req.user.id,req.body)));
