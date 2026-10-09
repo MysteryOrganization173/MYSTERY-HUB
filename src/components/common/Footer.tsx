@@ -25,7 +25,7 @@ export const Footer: React.FC = () => {
           <div className="lg:col-span-2 space-y-3 text-left">
             <BrandLogo size="md" />
             <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-sm">
-              Your Digital World. One Hub. Mystery Hub empowers individuals, creators, and businesses in Ghana with reliable data, professional websites, marketplace products and digital services. More utilities are coming soon.
+              Everything digital. One trusted place. Buy data and airtime, build a business website and explore Marketplace items in Ghana. More services are coming soon.
             </p>
 
             {/* Direct Contact Links */}
@@ -106,7 +106,7 @@ export const Footer: React.FC = () => {
                     className="hover:text-white transition-colors text-left py-0.5 flex items-center gap-1 cursor-pointer"
                   >
                     <span>AFA Registration</span>
-                    <span className="text-[9px] text-[#00c365] font-semibold">Live</span>
+                    <span className="text-[9px] text-[#00c365] font-semibold">Check Status</span>
                   </button>
                 </li>
                 <li>
@@ -158,7 +158,7 @@ export const Footer: React.FC = () => {
 
             {/* Platform & Support */}
             <div className="space-y-2 text-left">
-              <h4 className="text-white font-semibold text-xs uppercase tracking-wider">Platform</h4>
+              <h4 className="text-white font-semibold text-xs uppercase tracking-wider">About &amp; Support</h4>
               <ul className="space-y-1 sm:space-y-1.5 text-xs">
                 <li>
                   <button
@@ -201,7 +201,7 @@ export const Footer: React.FC = () => {
 
             {/* Upcoming Utilities */}
             <div className="col-span-2 sm:col-span-1 space-y-2 text-left">
-              <h4 className="text-white font-semibold text-xs uppercase tracking-wider">Future Utilities</h4>
+              <h4 className="text-white font-semibold text-xs uppercase tracking-wider">Coming Soon</h4>
               <ul className="grid grid-cols-2 sm:grid-cols-1 gap-1 sm:gap-1.5 text-xs">
                 <li>
                   <button

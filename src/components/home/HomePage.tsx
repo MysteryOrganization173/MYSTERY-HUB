@@ -1,4 +1,5 @@
 import React from 'react';
+import './homepage.css';
 import { useApp } from '../../context/AppContext';
 import { Hero } from './Hero';
 import { QuickServicesBar } from './QuickServicesBar';
@@ -14,7 +15,7 @@ export const HomePage: React.FC = () => {
 
   if (isAuthChecking) {
     return (
-      <div className="space-y-0">
+      <div className="home-page space-y-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-8">
           <div className="w-full h-[240px] rounded-3xl bg-[#090d11] border border-slate-800/80 animate-pulse flex items-center justify-center">
             <span className="text-xs text-slate-500 font-medium">Loading Mystery Hub...</span>
@@ -29,18 +30,12 @@ export const HomePage: React.FC = () => {
 
   if (user) {
     return (
-      <div className="space-y-0">
-        <MemberHome />
-        <HomeFeaturedData />
-        <HomeWebsiteSection />
-        <HomeMarketplaceSection />
-        <HomeComingSoonSection />
-      </div>
+      <MemberHome />
     );
   }
 
   return (
-    <div className="space-y-0">
+    <div className="home-page space-y-0">
       <Hero />
       <QuickServicesBar />
       <HomeFeaturedData />

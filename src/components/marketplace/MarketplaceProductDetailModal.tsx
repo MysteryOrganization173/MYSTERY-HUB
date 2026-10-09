@@ -231,7 +231,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
 
               <div className="flex items-center gap-1.5 text-xs text-slate-300 bg-slate-900/90 border border-slate-800 px-3 py-1 rounded-xl">
                 <ShieldCheck className="w-4 h-4 text-[#00c365]" />
-                <span>Verified Mystery Hub Supplier</span>
+                <span>Mystery Hub Marketplace</span>
               </div>
             </div>
           </div>
@@ -366,13 +366,13 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
                 <div className="flex items-center gap-1.5 text-xs font-bold text-white">
                   <Truck className="w-4 h-4 text-sky-400" />
                   <span>
-                    {hasDelivery ? 'Nationwide Delivery' : 'Delivery Status'}
+                    {hasDelivery ? 'Delivery Options' : 'Delivery Status'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
                   {hasDelivery
                     ? product.deliveryNote ||
-                      'Available across Ghana upon order confirmation and dispatch.'
+                      'Confirm delivery availability and charges before ordering.'
                     : 'Direct pickup only or inquiry required.'}
                 </p>
               </div>
@@ -444,7 +444,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
                   className="py-3 px-3 sm:px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/90 font-bold text-xs sm:text-sm uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] shrink-0"
                 >
                   <FileQuestion className="w-4 h-4 text-slate-400" />
-                  <span>Inquire</span>
+                  <span>Ask Us</span>
                 </button>
               </>
             ) : (
@@ -454,7 +454,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
                 className="w-full py-3.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs sm:text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,195,101,0.3)] cursor-pointer active:scale-[0.98]"
               >
                 <FileQuestion className="w-4 h-4 shrink-0" />
-                <span className="truncate">Inquire &amp; Request Sourcing Quote</span>
+                <span className="truncate">Ask About This Item</span>
               </button>
             )}
 

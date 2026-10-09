@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { MarketplaceOverlay, MarketplaceOverlayKind, transitionMarketplaceOverlay, closeMarketplaceOverlayState } from '../utils/marketplaceOverlay';
 import {
   ActivePage,
@@ -14,6 +14,7 @@ import {
 import { DATA_BUNDLES } from '../data/bundles';
 import { SafeUserProfile } from '../../server/types/auth';
 import { getMeOnServer, logoutOnServer } from '../services/apiClient';
+import { appendFeedback, shouldNotifyAuthTransition } from '../utils/authFeedback';
 import { readAuthBootstrap } from '../utils/authStorage';
 import { initReferralCapture, observeReferralNavigation } from '../utils/referralCapture';
 import {
@@ -28,6 +29,7 @@ interface ToastMessage {
   id: string;
   message: string;
   type: 'success' | 'info' | 'warning';
+  key?: string;
 }
 
 interface AppContextType {
@@ -62,6 +64,7 @@ interface AppContextType {
   ) => void;
   isAuthModalOpen: boolean;
   authMode: 'login' | 'signup';
+  switchAuthMode: (mode: 'login' | 'signup') => void;
   authContextMessage: string | null;
   openAuth: (
     mode?: 'login' | 'signup',
@@ -102,7 +105,7 @@ interface AppContextType {
   editorAiContext: SafeEditorAiContext | null;
   setEditorAiContext: (ctx: SafeEditorAiContext | null) => void;
   toasts: ToastMessage[];
-  showToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
+  showToast: (message: string, type?: 'success' | 'info' | 'warning', key?: string) => void;
   removeToast: (id: string) => void;
 }
 
@@ -198,6 +201,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const feedbackToken = useRef<string | null>(null);
 
   // Browser History and Popstate synchronization for back/forward buttons
   useEffect(() => {
@@ -236,12 +240,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   };
 
-  const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'success') => {
+  const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'success', key?: string) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((prev) => appendFeedback(prev, { id, message, type, key }));
     setTimeout(() => {
       removeToast(id);
-    }, 4000);
+    }, key === 'auth' ? 2200 : 4000);
   };
 
   const removeToast = (id: string) => {
@@ -380,13 +384,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthModalOpen(true);
   };
 
+  const switchAuthMode = (mode: 'login' | 'signup') => setAuthMode(mode);
+
   const closeAuth = () => {
     setIsAuthModalOpen(false);
     setAuthContextMessage(null);
     setPendingAuthAction(null);
   };
 
-  const loginUser = (profile: SafeUserProfile, token: string, rememberMe = false) => {
+  const loginUser = (profile: SafeUserProfile, token: string, rememberMe = false, notify = true) => {
     setUser(profile);
     setSessionToken(token);
     try {
@@ -406,7 +412,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setIsAuthModalOpen(false);
     setAuthContextMessage(null);
-    showToast(`Welcome, ${profile.name.split(' ')[0]}!`, 'success');
+    if (shouldNotifyAuthTransition(feedbackToken.current, token, notify)) showToast('Signed in.', 'success', 'auth');
+    feedbackToken.current = token;
 
     if (pendingAuthAction && !profile.mustChangePassword) {
       const action = pendingAuthAction;
@@ -427,16 +434,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const replaceAuthSession = (profile: SafeUserProfile, token: string) => {
     const rememberMe = Boolean(localStorage.getItem('mystery_hub_session_token'));
     setPendingAuthAction(null);
-    loginUser(profile, token, rememberMe);
+    loginUser(profile, token, rememberMe, false);
   };
   const clearLocalAuth = () => {
+    feedbackToken.current = null;
     setUser(null); setSessionToken(null); setAccountOpen(false); setPendingAuthAction(null); setIsCheckoutOpen(false);
     try { for (const storage of [localStorage, sessionStorage]) { storage.removeItem('mystery_hub_user'); storage.removeItem('mystery_hub_session_token'); } } catch { /* Ignore unavailable storage. */ }
   };
   const logoutUser = () => {
     void logoutOnServer(sessionToken);
     clearLocalAuth();
-    showToast('You have been logged out.', 'info');
+    showToast('Signed out.', 'info', 'auth');
   };
   const openAccount = () => { if (user) setAccountOpen(true); else openAuth('login'); };
   const closeAccount = () => setAccountOpen(false);
@@ -489,6 +497,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateOrderStatus,
         isAuthModalOpen,
         authMode,
+        switchAuthMode,
         authContextMessage,
         openAuth,
         closeAuth,

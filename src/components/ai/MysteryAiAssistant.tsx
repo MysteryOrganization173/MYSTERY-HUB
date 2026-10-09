@@ -23,6 +23,7 @@ import {
 export const MysteryAiAssistant: React.FC = () => {
   const {
     activePage,
+    user,
     setActivePage,
     activeEditorSite,
     editorAiContext,
@@ -33,6 +34,7 @@ export const MysteryAiAssistant: React.FC = () => {
     isCheckoutOpen,
     isStatusModalOpen,
     isAuthModalOpen,
+    isAccountOpen,
     selectedTemplatePreview,
     marketplaceInquiryProduct,
     waitlistInfo,
@@ -64,7 +66,7 @@ export const MysteryAiAssistant: React.FC = () => {
   const isAnyModalActive =
     isCheckoutOpen ||
     isStatusModalOpen ||
-    isAuthModalOpen ||
+    isAuthModalOpen || isAccountOpen || Boolean(user?.mustChangePassword) ||
     Boolean(selectedTemplatePreview) ||
     Boolean(marketplaceInquiryProduct) ||
     Boolean(waitlistInfo?.isOpen);
@@ -267,14 +269,14 @@ export const MysteryAiAssistant: React.FC = () => {
     return()=>{window.visualViewport?.removeEventListener('resize',update);window.visualViewport?.removeEventListener('scroll',update);window.removeEventListener('resize',update);};
   },[isOpen]);
 
-  if (isAnyModalActive) {
+  if (isAnyModalActive || (user && activePage === 'home' && !isOpen)) {
     return null;
   }
 
   return (
     <div
       style={isOpen?{height:viewport.height,top:viewport.top}:undefined}
-      className={isOpen?'fixed inset-x-0 z-[80] bg-black/60 flex flex-col items-end justify-end p-3 sm:p-6 pb-[calc(.75rem+env(safe-area-inset-bottom,0px))]':`fixed ${isInsideEditor?'z-[55] bottom-4':'z-40 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]'} right-3 sm:bottom-6 sm:right-6 pointer-events-none max-w-[calc(100vw-1.5rem)]`}
+      className={isOpen?'fixed inset-x-0 z-[80] bg-black/60 flex flex-col items-end justify-end p-3 sm:p-6 pb-[calc(.75rem+env(safe-area-inset-bottom,0px))]':`${isInsideEditor ? '' : 'hidden'} fixed ${isInsideEditor?'z-[55] bottom-4':'z-40 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]'} right-3 sm:bottom-6 sm:right-6 pointer-events-none max-w-[calc(100vw-1.5rem)]`}
 
     >
       {/* Floating Chat Panel */}

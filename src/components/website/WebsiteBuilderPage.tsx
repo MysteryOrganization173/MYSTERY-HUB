@@ -180,7 +180,7 @@ export const WebsiteBuilderPage: React.FC = () => {
           openWebsiteEditor(res.site);
         }
       } catch (err: any) {
-        showToast(err.message || 'Failed to create website project.', 'warning');
+        showToast(err.message || 'We couldn’t create your website. Please try again.', 'warning');
       }
     };
 
@@ -242,7 +242,7 @@ export const WebsiteBuilderPage: React.FC = () => {
         const res = await unpublishWebsiteOnServer(sessionToken, site.id);
         if (res.success && res.site) {
           setMySites((prev) => prev.map((s) => (s.id === res.site.id ? res.site : s)));
-          showToast('Website unpublished (reverted to draft mode).', 'info');
+          showToast('Your website is now a draft and is no longer public.', 'info');
         }
       } else {
         const res = await publishWebsiteOnServer(sessionToken, site.id);
@@ -386,7 +386,7 @@ export const WebsiteBuilderPage: React.FC = () => {
                 {/* Badge */}
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/30 text-xs font-semibold text-[#00c365]">
                   <Globe className="w-3.5 h-3.5" />
-                  <span>Mystery Hub Website Studio</span>
+                  <span>Mystery Hub Website Builder</span>
                 </div>
 
                 {/* Headline */}
@@ -396,7 +396,7 @@ export const WebsiteBuilderPage: React.FC = () => {
 
                 {/* Subheadline */}
                 <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-lg">
-                  Launch a polished business website without coding. Choose a design, customize your brand, and publish at GH₵0.
+                  Pick a design, add your business details and photos, then publish for free. No coding needed.
                 </p>
 
                 {/* Supporting Benefits */}
@@ -426,7 +426,7 @@ export const WebsiteBuilderPage: React.FC = () => {
                     onClick={handlePrimaryHeroAction}
                     className="px-6 py-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.35)] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <span>START BUILDING FREE</span>
+                    <span>Create My Free Website</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
 
@@ -436,7 +436,7 @@ export const WebsiteBuilderPage: React.FC = () => {
                     className="px-6 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 transition-colors flex items-center justify-center gap-2 backdrop-blur-sm cursor-pointer"
                   >
                     <Layers className="w-4 h-4 text-[#00c365]" />
-                    <span>EXPLORE PLANS</span>
+                    <span>View Plans</span>
                   </button>
                 </div>
               </div>
@@ -457,7 +457,7 @@ export const WebsiteBuilderPage: React.FC = () => {
               </div>
               <h3 className="font-bold text-sm sm:text-base text-white">Made for Ghanaian Businesses</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Every template is styled with authentic color schemes, typography, and sections crafted for Ghanaian commerce.
+                Choose a design for your business, then make it yours with your own colors, photos and contact details.
               </p>
             </div>
 
@@ -465,9 +465,9 @@ export const WebsiteBuilderPage: React.FC = () => {
               <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
                 <Zap className="w-4 h-4" />
               </div>
-              <h3 className="font-bold text-sm sm:text-base text-white">Direct WhatsApp Ordering</h3>
+              <h3 className="font-bold text-sm sm:text-base text-white">Customer Enquiries on WhatsApp</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Route orders and inquiries straight to your WhatsApp line with one tap, including pre-filled customer details.
+                Let customers contact your business through WhatsApp links on your website.
               </p>
             </div>
 
@@ -477,7 +477,7 @@ export const WebsiteBuilderPage: React.FC = () => {
               </div>
               <h3 className="font-bold text-sm sm:text-base text-white">13+ Handcrafted Designs</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                From data resellers and tech agencies to salons, food bukas, and churches — ready to launch in minutes.
+                Browse designs for data resellers, agencies, salons, restaurants, churches and more.
               </p>
             </div>
           </div>
