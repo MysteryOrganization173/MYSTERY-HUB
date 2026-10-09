@@ -99,10 +99,10 @@ export const MarketplacePage: React.FC = () => {
       if (res.success) {
         setProducts(res.products || []);
       } else {
-        setError(res.error || 'Unable to connect to Marketplace sourcing catalogue.');
+        setError(res.error || 'We couldn’t load the Marketplace. Please try again.');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to connect to Marketplace service.');
+      setError(err instanceof Error ? err.message : 'We couldn’t load the Marketplace. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -319,7 +319,7 @@ export const MarketplacePage: React.FC = () => {
             </div>
 
             <h1 className="text-xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight">
-              Quality Technology, Creator Gear &amp; <br className="hidden sm:inline" />
+              Technology, Creator Gear &amp; <br className="hidden sm:inline" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E575] via-[#00c365] to-[#38bdf8]">
                 Business Essentials
               </span>
@@ -440,7 +440,7 @@ export const MarketplacePage: React.FC = () => {
                 onClick={fetchCatalog}
                 className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white transition-colors cursor-pointer"
               >
-                Retry Sourcing Catalogue
+                Try Again
               </button>
               <a
                 href={BUSINESS_CONFIG.getGeneralWhatsAppUrl('Hello Mystery Hub, I am inquiring about marketplace sourcing.')}
@@ -704,13 +704,13 @@ export const MarketplacePage: React.FC = () => {
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
               <div className="space-y-1 max-w-2xl text-left">
                 <span className="text-xs sm:text-xs font-bold text-[#00c365] uppercase tracking-wider">
-                  Custom Tech Sourcing Service
+                  Find an Item for Your Business
                 </span>
                 <h3 className="text-base sm:text-xl font-bold text-white tracking-tight">
                   Need Specific Hardware or Software Not Listed Above?
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Whether you need developer laptops, studio microphones, or software licenses, Mystery Hub&apos;s sourcing desk will locate genuine models for you at competitive local rates.
+                  Tell us the item, specifications and budget you have in mind. We’ll check available options and discuss pricing with you.
                 </p>
               </div>
 
@@ -724,7 +724,7 @@ export const MarketplacePage: React.FC = () => {
                   className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  <span>WhatsApp Sourcing Desk</span>
+                  <span>Ask on WhatsApp</span>
                 </a>
 
                 <a
@@ -893,7 +893,7 @@ export const MarketplacePage: React.FC = () => {
 
                   {/* Trust note */}
                   <p className="text-[11px] text-slate-400 leading-relaxed pt-1">
-                    Rewards are credited to your Mystery Earn ledger automatically when the order reaches terminal delivery.
+                    Rewards appear in Mystery Earn when an eligible referred order is delivered.
                   </p>
                 </div>
               ) : (
@@ -908,7 +908,7 @@ export const MarketplacePage: React.FC = () => {
                       <span className="font-mono font-extrabold text-amber-400">
                         GH₵{formatGhcReward(shareModalProduct.referralRewardGhc)}
                       </span>{' '}
-                      when a qualifying purchase of this product is confirmed.
+                      when an eligible referred purchase of this product is delivered.
                     </p>
                   </div>
 
@@ -916,15 +916,15 @@ export const MarketplacePage: React.FC = () => {
                   <div className="p-3.5 rounded-xl bg-[#090e13] border border-slate-800 space-y-2 text-xs text-slate-300">
                     <div className="flex items-center gap-2">
                       <CheckCircle className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Instant permanent referral code generated upon registration</span>
+                      <span>Your own referral link after sign-up</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Tracked lifetime attribution for future orders</span>
+                      <span>Eligible future purchases may also earn rewards under the active rules</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Transparent ledger dashboard to monitor rewards</span>
+                      <span>Reward History shows your rewards and their status</span>
                     </div>
                   </div>
 

@@ -117,3 +117,9 @@
 }
 
 @keyframes checkout-success { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+
+/* Reserve room for the sticky header and mobile navigation when focusing controls. */
+@media (max-width: 767px) {
+  html { scroll-padding-top: 5rem; scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px)); }
+  .mh-app > main :is(button, a, input, select, textarea) { scroll-margin-block: 5rem; }
+}

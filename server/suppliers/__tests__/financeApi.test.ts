@@ -64,3 +64,53 @@ test('Financial Control Room loading endpoints return JSON before the storefront
     assert.deepEqual(queue,[]);assert.ok(operations.length>0);assert.equal(customer.walletMinor,10000);assert.ok(Array.isArray(customer.earnLedger));
   } finally {await new Promise<void>(resolve=>listener.close(()=>resolve()));}
 });
+
+
+// Final customer/Earn release gate: authoritative restriction and owner-scoped claims.
+const seedAchievement = async (rewardMinor=123, eligible=true) => {
+  await FinanceService.saveAchievements('admin',{confirmed:true,definitions:[{id:'release-first',name:'First referral',metric:'successful_referrals',threshold:1,enabled:true,rewardMinor}]});
+  if(eligible)await ReferralStore.createLedgerEntry({referrer_user_id:'owner',referred_user_id:'buyer',referral_attribution_id:null,order_id:'release-rewarded-order',marketplace_product_id:null,service_type:'data',reward_rule_id:null,amount_minor:50,currency:'GHS',status:'approved',reason:'Isolated release fixture',idempotency_key:'release-fixture-reward',reversal_of_id:null,approved_at:new Date().toISOString(),rejected_at:null,reversed_at:null,metadata_json:null});
+};
+const claimPath='/api/finance/achievements/release-first/claim';
+for(const rewardMinor of [0,123])test(`restricted account cannot claim ${rewardMinor ? 'Wallet reward' : 'badge'} through API or service`,async()=>{
+  await seedAchievement(rewardMinor);await FinanceStore.transaction('owner',tx=>tx.restrict());
+  const before=await FinanceService.summary('owner');
+  const response=await request(claimPath,'POST',{});assert.equal(response.status,409);assert.equal(response.headers.get('cache-control'),'no-store');
+  assert.equal((await response.json()).error,'Account needs reconciliation.');
+  await assert.rejects(()=>FinanceService.claimAchievement('owner','release-first'),(e:any)=>e.status===409);
+  const after=await FinanceService.summary('owner');assert.deepEqual(after,before);
+  assert.deepEqual(await FinanceStore.transaction('owner',tx=>tx.operations()),[]);
+});
+test('normal eligible claim credits only configured Wallet reward and ignores supplied progress/owner/value',async()=>{
+  await seedAchievement();const response=await request(claimPath,'POST',{userId:'other',rewardMinor:999999,progress:999,threshold:1});
+  assert.equal(response.status,200);const row=await response.json();assert.equal(row.user_id,'owner');assert.equal(row.amount_minor,123);
+  assert.equal((await FinanceService.summary('owner')).walletMinor,123);assert.equal((await FinanceService.summary('other')).walletMinor,0);
+});
+test('unqualified achievement rejects forged progress without operations or credit',async()=>{
+  await seedAchievement(123,false);assert.equal((await request(claimPath,'POST',{progress:9999})).status,409);
+  const summary=await FinanceService.summary('owner');assert.equal(summary.walletMinor,0);assert.deepEqual(summary.ledger,[]);
+  assert.deepEqual(await FinanceStore.transaction('owner',tx=>tx.operations()),[]);
+});
+test('badge-only eligible claim has zero money and no Wallet ledger entry',async()=>{
+  await seedAchievement(0);const response=await request(claimPath,'POST',{});assert.equal(response.status,200);assert.equal((await response.json()).amount_minor,0);
+  const summary=await FinanceService.summary('owner');assert.equal(summary.walletMinor,0);assert.deepEqual(summary.ledger,[]);assert.equal(summary.achievements[0].claimed,true);
+});
+test('already claimed reward replays after restriction without new credit or altered snapshot',async()=>{
+  await seedAchievement();const first=await (await request(claimPath,'POST',{})).json();await FinanceStore.transaction('owner',tx=>tx.restrict());
+  await FinanceService.saveAchievements('admin',{confirmed:true,definitions:[{id:'release-first',name:'Edited',metric:'successful_referrals',threshold:999,enabled:false,rewardMinor:999}]});
+  const response=await request(claimPath,'POST',{});assert.equal(response.status,200);assert.deepEqual(await response.json(),first);
+  const summary=await FinanceService.summary('owner');assert.equal(summary.walletMinor,123);assert.equal(summary.ledger.length,1);
+  assert.equal((await FinanceStore.transaction('owner',tx=>tx.operations())).length,1);
+});
+for(const token of ['', 'forged'])test(`claim rejects ${token ? 'invalid' : 'missing'} authentication`,async()=>{
+  await seedAchievement();assert.equal((await request(claimPath,'POST',{},token)).status,401);assert.equal((await FinanceService.summary('owner')).walletMinor,0);
+});
+test('another account cannot use owner eligibility or retrieve owner claimed reward',async()=>{
+  await seedAchievement();await request(claimPath,'POST',{});
+  assert.equal((await request(claimPath,'POST',{user_id:'owner',userId:'owner',progress:1},'other-token')).status,409);
+  assert.deepEqual(await FinanceStore.transaction('other',tx=>tx.operations()),[]);assert.equal((await FinanceService.summary('other')).walletMinor,0);
+});
+test('concurrent claim retries keep a single authorized Wallet credit',async()=>{
+  await seedAchievement();const rows=await Promise.all(Array.from({length:20},()=>FinanceService.claimAchievement('owner','release-first')));
+  assert.equal(new Set(rows.map(row=>row.id)).size,1);const summary=await FinanceService.summary('owner');assert.equal(summary.walletMinor,123);assert.equal(summary.ledger.length,1);
+});

@@ -2,7 +2,7 @@ import {useDirectCatalog} from '../../hooks/useDirectCatalog';
 import {WelcomeOfferNotice} from '../data/WelcomeOfferNotice';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { DATA_BUNDLES, GHANA_NETWORKS } from '../../data/bundles';
+import { GHANA_NETWORKS } from '../../data/bundles';
 import { NetworkId } from '../../types';
 import { BundleCard } from '../data/BundleCard';
 import { getInstantBundlesOnServer } from '../../services/apiClient';
@@ -10,7 +10,7 @@ import { ArrowRight, Wifi, Zap } from 'lucide-react';
 
 export const HomeFeaturedData: React.FC = () => {
   const DATA_BUNDLES=useDirectCatalog();
-  const { setActivePage, openCheckout, openDataPage } = useApp();
+  const { openCheckout, openDataPage } = useApp();
   const [selectedNetwork, setSelectedNetwork] = useState<NetworkId>('mtn');
   const [homeQuickBuyPhone, setHomeQuickBuyPhone] = useState('');
   const [instantAvailable, setInstantAvailable] = useState(false);
@@ -37,9 +37,9 @@ export const HomeFeaturedData: React.FC = () => {
   ).slice(0, 4);
 
   return (
-    <section className="pt-1 pb-6 sm:pt-3 sm:pb-10 lg:pt-4 lg:pb-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
-        <WelcomeOfferNotice/>
+    <section className="home-bundles" aria-labelledby="popular-data-heading">
+      <div className="home-container space-y-5 sm:space-y-6">
+        <div className="home-welcome-offer"><WelcomeOfferNotice/></div>
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 sm:gap-4">
           <div className="space-y-1 sm:space-y-2">
@@ -47,10 +47,10 @@ export const HomeFeaturedData: React.FC = () => {
               <Wifi className="w-3.5 h-3.5" />
               <span>Data Bundles</span>
             </div>
-            <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
+            <h2 id="popular-data-heading" className="home-section-title">
               Popular Data Bundles
             </h2>
-            <p className="text-xs sm:text-sm text-slate-400 max-w-lg">
+            <p className="text-sm text-slate-300 max-w-lg leading-relaxed">
               Choose a network and bundle. Review the total and recipient before you pay.
             </p>
           </div>
@@ -64,8 +64,9 @@ export const HomeFeaturedData: React.FC = () => {
                 <button
                   key={netId}
                   type="button"
+                  aria-pressed={isSelected}
                   onClick={() => setSelectedNetwork(netId)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`min-h-11 px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                     isSelected
                       ? 'bg-white text-black shadow-md'
                       : 'bg-[#10171e] text-slate-400 hover:text-white border border-slate-800'
@@ -83,7 +84,7 @@ export const HomeFeaturedData: React.FC = () => {
         </div>
 
         {/* 4 Cards Grid with tighter mobile layout */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+        <div className="home-bundle-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
           {popularBundles.map((b) => (
             <BundleCard
               key={b.id}
@@ -95,6 +96,8 @@ export const HomeFeaturedData: React.FC = () => {
           ))}
         </div>
 
+        {popularBundles.length === 0 && <p className="home-empty-state" role="status">No popular bundles to show for this network. Browse all bundles to check availability.</p>}
+
         {/* Action Footnotes */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
           <div className="flex items-center gap-2">
@@ -102,10 +105,10 @@ export const HomeFeaturedData: React.FC = () => {
               <button
                 type="button"
                 onClick={() => openDataPage('instant')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-400 text-xs font-semibold hover:bg-amber-400/20 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 min-h-11 px-4 py-2 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-400 text-xs font-semibold hover:bg-amber-400/20 transition-colors cursor-pointer"
               >
                 <Zap className="w-3.5 h-3.5 fill-amber-400" />
-                <span>Need data right now? Browse Instant Bundles</span>
+                <span>Browse Instant Bundles</span>
               </button>
             )}
           </div>
@@ -113,7 +116,7 @@ export const HomeFeaturedData: React.FC = () => {
           <button
             type="button"
             onClick={() => openDataPage('data')}
-            className="text-xs font-bold text-[#00c365] hover:text-[#00e575] flex items-center gap-1 cursor-pointer"
+            className="home-text-action"
           >
             <span>View all {GHANA_NETWORKS[selectedNetwork].name} bundles</span>
             <ArrowRight className="w-3.5 h-3.5" />

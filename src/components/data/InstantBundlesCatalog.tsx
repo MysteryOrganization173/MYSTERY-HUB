@@ -68,7 +68,7 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
         );
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load Instant Bundles catalogue.');
+      setError(err instanceof Error ? err.message : 'We couldn’t load these bundles. Please try again.');
       setIsAvailable(false);
     } finally {
       setIsLoading(false);
@@ -181,13 +181,13 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-xs font-bold text-amber-400 mb-2">
             <Zap className="w-3.5 h-3.5 fill-amber-400" />
-            <span>Instant SIM Delivery</span>
+            <span>More Bundle Options</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-            Live Instant Bundles
+            Instant Bundles
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Fast direct top-up packages dispatched in real time upon MoMo payment confirmation.
+            Choose a package, check its restrictions and track delivery after payment is confirmed.
           </p>
         </div>
 
@@ -353,7 +353,7 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
             <h3 className="text-base font-bold text-white">Instant Bundles Unavailable</h3>
             <p className="text-xs text-slate-400 mt-1 leading-relaxed">
               {unavailableReason ||
-                'Instant Bundles are temporarily unavailable from suppliers. You can still purchase standard Data Bundles with fast automated delivery.'}
+                'Instant Bundles are temporarily unavailable. You can still browse standard Data Bundles.'}
             </p>
           </div>
           <div className="pt-2">

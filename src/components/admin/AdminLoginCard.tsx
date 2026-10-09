@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { BrandLogo } from '../common/BrandLogo';
 import { Shield, Lock, Phone, Mail, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react';
 import { loginOnServer } from '../../services/apiClient';
 
 export const AdminLoginCard: React.FC = () => {
-  const { loginUser, setActivePage, showToast } = useApp();
+  const { loginUser, setActivePage } = useApp();
+  const submitting = useRef(false);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -14,6 +15,7 @@ export const AdminLoginCard: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     setErrorMessage(null);
 
     if (!identifier.trim()) {
@@ -26,6 +28,7 @@ export const AdminLoginCard: React.FC = () => {
       return;
     }
 
+    submitting.current = true;
     setIsLoading(true);
 
     try {
@@ -37,17 +40,12 @@ export const AdminLoginCard: React.FC = () => {
 
       if (response && response.user && response.token) {
         loginUser(response.user, response.token, rememberMe);
-
-        if (response.user.role === 'admin') {
-          showToast(`Welcome back, Admin ${response.user.name.split(' ')[0]}!`, 'success');
-        } else {
-          showToast('Signed in successfully. Note: Staff privileges are required for the Admin dashboard.', 'info');
-        }
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Authentication failed. Please check your credentials.';
       setErrorMessage(message);
     } finally {
+      submitting.current = false;
       setIsLoading(false);
     }
   };
@@ -81,12 +79,12 @@ export const AdminLoginCard: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+            <label htmlFor="admin-identifier" className="block text-xs font-semibold text-slate-300 mb-1.5">
               Staff Email or Ghana Phone
             </label>
             <div className="relative">
               <input
-                type="text"
+                id="admin-identifier" type="text"
                 value={identifier}
                 onChange={(e) => {
                   setIdentifier(e.target.value);
@@ -108,12 +106,12 @@ export const AdminLoginCard: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+            <label htmlFor="admin-password" className="block text-xs font-semibold text-slate-300 mb-1.5">
               Admin Password
             </label>
             <div className="relative">
               <input
-                type="password"
+                id="admin-password" type="password"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
