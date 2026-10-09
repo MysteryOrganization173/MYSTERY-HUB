@@ -48,7 +48,7 @@ test('Admin financial inputs display cedi amounts and percentages while sending 
  for(const s of [finance,commercial,reseller])assert.ok(!s.includes('(basis points)'));
 });
 
-test('public reseller bundle input retains the recipient into checkout',()=>{const s=source('src/components/website/ManagedDataStorefront.tsx');assert.ok(s.includes('recipientPhone={phone} onPhoneChange={setPhone}'));assert.ok(s.includes('recipientPhone:phone,customerEmail:email'));assert.ok(s.includes('guard.current=true'));});
+test('public reseller bundle input retains the recipient and locks it after payment starts',()=>{const s=source('src/components/website/ManagedDataStorefront.tsx');assert.ok(s.includes('recipientPhone={phone}'));assert.ok(s.includes('onPhoneChange={value=>{if(!started.current&&!guard.current)setPhone(value);}}'));assert.ok(s.includes('recipientPhone:phone,customerEmail:email'));assert.ok(s.includes('guard.current=true'));});
 
 test('Wallet shortfall is not shown before a valid positive service quote exists',()=>{assert.ok(source('src/components/finance/WalletPaymentChoice.tsx').includes("Number.isFinite(amountMinor)&&amountMinor>0&&preferred!=='wallet'"));});
 
