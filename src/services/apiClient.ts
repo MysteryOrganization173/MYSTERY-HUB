@@ -4,7 +4,7 @@
  * Supports independent deployment (Netlify frontend + Render/Cloud backend via VITE_API_BASE_URL).
  */
 
-import { SafePublicOrderDetails, AdminOrderDetails } from '../../server/types/orders';
+import { SafePublicOrderDetails, AuthenticatedCustomerOrderDetails, AdminOrderDetails } from '../../server/types/orders';
 import { SafeUserProfile, WaitlistChannel, AuthSessionResponse, WaitlistRecord, UserStatus } from '../../server/types/auth';
 import { MarketplaceProduct } from '../types';
 
@@ -350,7 +350,7 @@ export async function getMeOnServer(token: string): Promise<{ success: boolean; 
 export async function getAccountOrdersOnServer(
   token: string,
   limit?: number
-): Promise<{ success: boolean; orders: SafePublicOrderDetails[] }> {
+): Promise<{ success: boolean; orders: AuthenticatedCustomerOrderDetails[] }> {
   const query = limit ? `?limit=${limit}` : '';
   const url = `${API_BASE_URL}/api/account/orders${query}`;
   const res = await fetch(url, {
@@ -412,7 +412,7 @@ export async function joinWaitlistOnServer(
   return data;
 }
 
-export async function getMyOrdersOnServer(token: string): Promise<{ success: boolean; orders: SafePublicOrderDetails[] }> {
+export async function getMyOrdersOnServer(token: string): Promise<{ success: boolean; orders: AuthenticatedCustomerOrderDetails[] }> {
   const url = `${API_BASE_URL}/api/orders/my-orders`;
   const res = await fetch(url, {
     method: 'GET',

@@ -90,18 +90,22 @@ export type SafePublicOrderDetails = Pick<
   service_type?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'afa';
   face_value_ghc?: number;
   service_fee_ghc?: number;
+  fulfilment_method?: 'pickup' | 'delivery' | 'digital_delivery' | 'manual_activation' | null;
+  marketplace_status?: string | null;
+};
+
+/** Only for an authenticated account's user_id-owned history, never reference-only lookup. */
+export interface AuthenticatedCustomerOrderDetails extends SafePublicOrderDetails {
   product_slug?: string | null;
   variant_snapshot?: string | null;
-  fulfilment_method?: 'pickup' | 'delivery' | 'digital_delivery' | 'manual_activation' | null;
   pickup_location_snapshot?: string | null;
   delivery_city?: string | null;
   delivery_area?: string | null;
   delivery_landmark?: string | null;
   delivery_note?: string | null;
-  marketplace_status?: string | null;
-};
+}
 
-export interface AdminOrderDetails extends SafePublicOrderDetails {
+export interface AdminOrderDetails extends AuthenticatedCustomerOrderDetails {
   afa_registration?: {name:string; region:string; location:string; occupation?:string; maskedIdNumber:string; supplierStatus:string|null; supplierPublicId:string|null; submittedAt:string|null; registeredAt:string|null; createdAt:string; sensitivePayloadPurgedAt:string|null} | null;
   marketplace_context?: Record<string,unknown> | null;
   id: string;
@@ -133,7 +137,7 @@ export interface AdminOrderDetails extends SafePublicOrderDetails {
 }
 
 export function toAdminOrderDetails(order: OrderRecord): AdminOrderDetails {
-  const safe = toSafePublicOrder(order);
+  const safe = toAuthenticatedCustomerOrder(order);
   return {
     ...safe,
     marketplace_context: order.marketplace_context || null,
@@ -171,12 +175,12 @@ export function toSafePublicOrder(order: OrderRecord): SafePublicOrderDetails {
 
   return {
     public_reference: order.public_reference,
-    ...(order.service_type === 'afa' || order.store_context || order.commercial_context ? {manual_review:Boolean(order.manual_review)} : {}),
-    recipient_phone: order.recipient_phone,
+    manual_review: Boolean(order.manual_review),
+    recipient_phone: maskOrderRecipient(order.recipient_phone),
     network: order.network,
     service_type: serviceType,
-    product_name_snapshot: order.product_name_snapshot,
-    bundle_size_snapshot: order.bundle_size_snapshot,
+    product_name_snapshot: publicOrderSummary(order.product_name_snapshot, order),
+    bundle_size_snapshot: publicOrderSummary(order.bundle_size_snapshot, order),
     amount: order.amount,
     ...(order.commercial_context?{commercial_pricing:{regularMinor:order.commercial_context.regularMinor,discountMinor:order.commercial_context.discountMinor,paidMinor:order.commercial_context.paidMinor}}:{}),
     currency: order.currency,
@@ -187,14 +191,42 @@ export function toSafePublicOrder(order: OrderRecord): SafePublicOrderDetails {
     amount_ghc: Number((order.amount / 100).toFixed(2)),
     face_value_ghc: order.face_value_minor != null ? Number((order.face_value_minor / 100).toFixed(2)) : undefined,
     service_fee_ghc: order.service_fee_minor != null ? Number((order.service_fee_minor / 100).toFixed(2)) : undefined,
+    fulfilment_method: order.fulfilment_method || null,
+    marketplace_status: order.marketplace_status || null,
+  };
+}
+
+/** A reference holder gets only the last four digits, independently of UI masking. */
+export function maskOrderRecipient(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  return digits.length >= 7 ? `******${digits.slice(-4)}` : '******';
+}
+
+// Catalogue summaries are useful publicly; legacy snapshots may embed contact details.
+// Never pass private delivery/variant snapshots through this projection.
+function publicOrderSummary(value: string, order: OrderRecord): string {
+  let result = value;
+  for (const privateValue of [order.customer_name, order.customer_email, order.delivery_city,
+    order.delivery_area, order.delivery_landmark, order.delivery_note, order.pickup_location_snapshot]) {
+    if (privateValue) result = result.split(privateValue).join('[private]');
+  }
+  return result.replace(/[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+/g, '[private]')
+    .replace(/\+?\d(?:[\s().-]*\d){6,}/g, '[private]');
+}
+
+/** Call only after verifying the account owns the row by user_id. No admin/economic fields. */
+export function toAuthenticatedCustomerOrder(order: OrderRecord): AuthenticatedCustomerOrderDetails {
+  return {
+    ...toSafePublicOrder(order),
+    recipient_phone: order.recipient_phone,
+    product_name_snapshot: order.product_name_snapshot,
+    bundle_size_snapshot: order.bundle_size_snapshot,
     product_slug: order.product_slug || null,
     variant_snapshot: order.variant_snapshot || null,
-    fulfilment_method: order.fulfilment_method || null,
     pickup_location_snapshot: order.pickup_location_snapshot || null,
     delivery_city: order.delivery_city || null,
     delivery_area: order.delivery_area || null,
     delivery_landmark: order.delivery_landmark || null,
     delivery_note: order.delivery_note || null,
-    marketplace_status: order.marketplace_status || null,
   };
 }
