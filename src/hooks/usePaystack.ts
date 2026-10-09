@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { initializePaymentOnServer, verifyPaymentOnServer } from '../services/apiClient';
 import { getActiveSessionToken } from '../utils/authStorage';
 import { initializeStorePayment } from '../services/websiteBusinessApi';
+import { waitForStoreInitialization } from '../utils/storeCheckoutAttempt';
 
 export interface PaystackTransactionResponse {
   reference: string;
@@ -38,6 +39,8 @@ declare global {
 }
 
 export interface ServerPaystackOptions {
+  // Storefront lifecycle guard; other checkout callers keep their existing behavior.
+  isActive?: () => boolean;
   commercial?:{requestId:string;expectedTotalMinor:number;expectedRegularMinor:number;pricingRevision:string;promotionRevision:string};
   store?: {siteId:string;requestId:string;expectedMinor:number};
   onOrderCreated?: (orderRef:string) => void;
@@ -72,20 +75,18 @@ export function usePaystack() {
       return;
     }
 
+    let active=true;
     const existingScript = document.querySelector(`script[src="${PAYSTACK_INLINE_SCRIPT}"]`);
-    if (existingScript) {
-      existingScript.addEventListener('load', () => setIsScriptLoaded(true));
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = PAYSTACK_INLINE_SCRIPT;
-    script.async = true;
-    script.onload = () => setIsScriptLoaded(true);
-    script.onerror = () => {
+    const script = existingScript || document.createElement('script');
+    const loaded=()=>{if(active)setIsScriptLoaded(Boolean(window.PaystackPop));};
+    const failed=() => {
       console.warn('Paystack InlineJS V2 failed to load.');
     };
-    document.body.appendChild(script);
+    script.addEventListener('load',loaded);
+    script.addEventListener('error',failed);
+    if(!existingScript){(script as HTMLScriptElement).src=PAYSTACK_INLINE_SCRIPT;(script as HTMLScriptElement).async=true;document.body.appendChild(script);}
+    // The shared SDK stays available to other checkouts; only our listeners leave.
+    return()=>{active=false;script.removeEventListener('load',loaded);script.removeEventListener('error',failed);};
   }, []);
 
   const waitForPaystackPop = async (maxWaitMs = 1500): Promise<boolean> => {
@@ -107,13 +108,15 @@ export function usePaystack() {
   };
 
   const initializeServerPayment = useCallback(async (options: ServerPaystackOptions) => {
+    const active=()=>options.isActive?.()!==false;
+    const idle=()=>{if(active()){setIsInitializing(false);setLoadingPhase('idle');}};
     setIsInitializing(true);
     setLoadingPhase('preparing');
 
     try {
       // 1. Call Backend to create pending order & initialize Paystack transaction authoritatively
       const sessionToken = getActiveSessionToken();
-      const initRes = options.store ? await initializeStorePayment(options.store.siteId,options.store.requestId,options.productId,options.recipientPhone,options.customerEmail||'',sessionToken||undefined) : await initializePaymentOnServer(
+      const initRes = options.store ? await waitForStoreInitialization(initializeStorePayment(options.store.siteId,options.store.requestId,options.productId,options.recipientPhone,options.customerEmail||'',sessionToken||undefined),ref=>options.onOrderCreated?.(ref)) : await initializePaymentOnServer(
         {
           ...options.commercial,
           productId: options.productId,
@@ -133,6 +136,9 @@ export function usePaystack() {
 
       const { orderRef, reference, accessCode, isSimulated } = initRes;
       options.onOrderCreated?.(orderRef);
+      // Preserve the reference for recovery, but never open a popup after leaving.
+      if(!active())return;
+      if(options.store&&!import.meta.env.DEV&&(isSimulated||accessCode?.startsWith('dev_access_')))throw new Error('A production payment cannot use a simulated authorization. Track this order or contact the business.');
       if(options.commercial&&initRes.amountPesewas!==options.commercial.expectedTotalMinor)throw new Error('Price changed. Refresh and review before paying.');
       if(options.store&&initRes.amountPesewas!==options.store.expectedMinor)throw new Error('This bundle price changed. Refresh the storefront and review the current total before paying. No payment was opened.');
 
@@ -144,37 +150,40 @@ export function usePaystack() {
 
       // 2. Ensure Paystack InlineJS V2 script is ready
       const popAvailable = window.PaystackPop ? true : await waitForPaystackPop();
+      if(!active())return;
 
       // 3. Official Paystack InlineJS V2 Server-Initialized Flow
       if (popAvailable && window.PaystackPop) {
         try {
           const popup = new window.PaystackPop();
+          let settled=false;
+          const acceptSignal=()=>{if(!active()||options.store&&settled)return false;settled=true;return true;};
 
           popup.resumeTransaction(accessCode, {
             onSuccess: async () => {
-              setIsInitializing(false);
-              setLoadingPhase('idle');
+              if(!acceptSignal())return;
+              idle();
               // Trigger backend verification, then poll for authoritative status
               try {
                 await verifyPaymentOnServer(reference);
               } catch {
                 // Backend webhook or polling will reconcile status
               }
-              options.onPaymentReceived(orderRef, reference);
+              if(active())options.onPaymentReceived(orderRef, reference);
             },
             onCancel: () => {
-              setIsInitializing(false);
-              setLoadingPhase('idle');
+              if(!acceptSignal())return;
+              idle();
               options.onCancel?.(orderRef, reference);
             },
             onClose: () => {
-              setIsInitializing(false);
-              setLoadingPhase('idle');
+              if(!acceptSignal())return;
+              idle();
               options.onCancel?.(orderRef, reference);
             },
             onError: (popErr: unknown) => {
-              setIsInitializing(false);
-              setLoadingPhase('idle');
+              if(!acceptSignal())return;
+              idle();
               const errMsg =
                 popErr instanceof Error
                   ? popErr.message
@@ -184,8 +193,8 @@ export function usePaystack() {
           });
           return;
         } catch (popErr) {
-          setIsInitializing(false);
-          setLoadingPhase('idle');
+          if(!active())return;
+          idle();
           const err =
             popErr instanceof Error
               ? popErr
@@ -199,28 +208,29 @@ export function usePaystack() {
       if (import.meta.env.DEV && isSimulated) {
         console.info('[DEV ONLY] Simulating payment processing in local test mode...');
         setTimeout(async () => {
-          setIsInitializing(false);
-          setLoadingPhase('idle');
+          if(!active())return;
+          idle();
           try {
             await verifyPaymentOnServer(reference);
           } catch {
             // ignore dev simulation verification error
           }
-          options.onPaymentReceived(orderRef, reference);
+          if(active())options.onPaymentReceived(orderRef, reference);
         }, 1200);
         return;
       }
 
       // 5. PRODUCTION FAILURE: Missing popup in production must NEVER claim payment success
-      setIsInitializing(false);
-      setLoadingPhase('idle');
+      if(!active())return;
+      idle();
       const scriptError = new Error(
         'Unable to load Paystack payment module. Please check your internet connection, disable ad-blockers, and try again.'
       );
       options.onError?.(scriptError);
     } catch (err) {
-      setIsInitializing(false);
-      setLoadingPhase('idle');
+      if(options.store&&(err as any)?.existingOrderReference)options.onOrderCreated?.((err as any).existingOrderReference);
+      if(!active())return;
+      idle();
       options.onError?.(
         err instanceof Error ? err : new Error('Payment initialization failed.')
       );
