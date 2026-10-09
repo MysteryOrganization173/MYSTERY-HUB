@@ -83,3 +83,149 @@
 @media (prefers-reduced-motion: reduce) { .earn-page *, .earn-page *::before, .earn-page *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 
 @media (max-width: 767px) { .earn-heading { display: block; position: relative; } .earn-heading > button { position: absolute; top: -8px; right: 0; font-size: .78rem; padding: 8px; min-height: 44px; } .earn-heading .earn-eyebrow { margin-bottom: 18px; padding-right: 150px; } .earn-heading h1 { font-size: 1.6rem; } .earn-heading h1 + p { margin-top: 6px; } }
+
+/* Earn V2.1: presentation is scoped to the member experience; Wallet stays independent. */
+.earn-member-page { --earn-brand: #00c365; --earn-bright: #44df95; gap: 24px; }
+.earn-member-page .earn-heading h1 { font-size: clamp(1.7rem, 3vw, 2.35rem); }
+.earn-member-page .earn-heading .earn-eyebrow { font-size: .75rem; letter-spacing: .05em; margin-bottom: 6px; }
+.earn-member-page .earn-heading h1 + p { margin-top: 5px; }
+.earn-member-page .earn-top-grid { display: grid; gap: 16px; align-items: stretch; }
+.earn-member-page .earn-finance { display: contents; }
+.earn-member-page .earn-share-panel { align-self: stretch; gap: 10px; padding: 20px; border-color: #275b43; background: radial-gradient(ellipse at 100% 0, #123b2a 0, transparent 65%), #0d1d17; position: relative; overflow: hidden; }
+.earn-share-emblem { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid #327756; border-radius: 14px; background: #103727; flex-shrink: 0; }
+.earn-member-page .earn-share-title .earn-eyebrow { font-size: .67rem; letter-spacing: .09em; text-transform: uppercase; margin: 0 0 2px; }
+.earn-member-page .earn-share-title h2 { font-size: 1.15rem; }
+.earn-member-page .earn-referral-identity { display: flex; align-items: center; gap: 10px; font-size: .75rem; }
+.earn-referral-identity strong { color: #c4eed7; font-size: .75rem; letter-spacing: .035em; }
+.earn-member-page .earn-share-panel input[readonly] { background: #08140f; border-color: #2e5441; border-radius: 12px; }
+.earn-member-page .earn-share-panel > .earn-text-button { margin-top: auto; font-size: .75rem; min-height: 32px; }
+.earn-member-page .earn-share-panel > .earn-fine { font-size: .7rem; line-height: 1.4; }
+.earn-member-page .earn-share-panel .earn-primary { flex: 1; }
+.earn-member-page .earn-share-panel .earn-secondary { padding-inline: 12px; }
+.earn-balance-summary { padding: 20px; border-radius: 20px; background: #111b20; border: 1px solid #2b393f; display: grid; gap: 8px; align-content: start; scroll-margin-top: 92px; }
+.earn-balance-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.earn-balance-heading .earn-eyebrow { display: flex; align-items: center; gap: 6px; color: #99b5a7; font-size: .72rem; margin: 0; }
+.earn-refresh-icon { width: 44px; height: 44px; margin: -10px -8px -10px 0; display: grid; place-items: center; border-radius: 10px; color: #b1c5d0; }
+.earn-refresh-icon:hover { background: #20312d; }
+.earn-page .earn-balance-summary h2 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: .8rem; color: #b6c7ce; font-weight: 500; margin-top: 2px; }
+.earn-page .earn-balance-value { font: 600 clamp(2rem, 3.5vw, 2.8rem)/1.15 Outfit, sans-serif; letter-spacing: -.025em; color: #f7fff9; font-variant-numeric: tabular-nums; margin: 0 0 8px; }
+.earn-balance-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.earn-balance-actions .earn-secondary { font-size: .76rem; padding: 9px 10px; border-color: #42614f; background: #162c21; color: #b5efd0; }
+.earn-balance-actions .earn-secondary:not(:disabled):hover { background: #234534; border-color: #44df95; }
+.earn-page .earn-balance-actions button:disabled { background: #171f25; border-color: #33414b; color: #9eaebb; opacity: .7; }
+.earn-page .earn-balance-hint { font-size: .72rem; line-height: 1.5; }
+.earn-balance-breakdown { border-top: 1px solid #2b393f; margin-top: 2px; }
+.earn-page .earn-balance-breakdown summary { font-size: .75rem; color: #b7c9d1; min-height: 38px; }
+.earn-balance-breakdown dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 4px 0 12px; }
+.earn-balance-breakdown dt { font-size: .72rem; color: #9db0bd; }
+.earn-balance-breakdown dd { font-size: .95rem; font-weight: 600; font-variant-numeric: tabular-nums; color: #edf4f3; }
+.earn-balance-breakdown > p { font-size: .72rem; padding-bottom: 10px; }
+.earn-page .earn-finance-error { color: #f2ce8b; font-size: .78rem; }
+.earn-page .earn-finance-notice { color: #7cedb3; font-size: .78rem; }
+.earn-transaction-form, .earn-milestones, .earn-withdrawal-history { grid-column: 1 / -1; }
+.earn-transaction-form { scroll-margin-top: 90px; }
+.earn-transaction-form form { background: #101b21; }
+.earn-page .earn-transaction-form h3 { font-family: Outfit, sans-serif; }
+.earn-milestones { display: grid; gap: 14px; margin-top: 6px; scroll-margin-top: 90px; }
+.earn-milestones > .earn-section-heading { padding: 4px 0; align-items: end; }
+.earn-milestones .earn-eyebrow { font-size: .68rem; margin: 0 0 4px; letter-spacing: .09em; text-transform: uppercase; color: #87b49b; }
+.earn-page .earn-milestones h2 { font-size: 1.35rem; }
+.earn-milestone-tally { display: inline-flex; align-items: center; gap: 5px; color: #aabbb5; font-size: .72rem; padding: 5px 0; white-space: nowrap; }
+.earn-milestone { padding: 18px; border: 1px solid #2b3d37; background: #111d19; border-radius: 18px; position: relative; display: flex; flex-direction: column; gap: 12px; }
+.earn-milestone-featured { padding: 22px; background: linear-gradient(120deg, #123727, #10271e 62%, #0d1d18); border-color: #3c8c62; border-radius: 22px; }
+.earn-milestone-top { display: flex; align-items: flex-start; gap: 10px; }
+.earn-milestone-top > div { flex: 1; }
+.earn-metric-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: #1b3428; color: #91e2b4; border: 1px solid #355441; flex-shrink: 0; }
+.earn-milestone-featured .earn-metric-icon { width: 48px; height: 48px; background: #235138; color: #bcf6d5; border-color: #4d8b60; }
+.earn-page .earn-milestone h3 { font-family: Outfit, sans-serif; font-size: 1.05rem; font-weight: 550; line-height: 1.35; overflow-wrap: anywhere; }
+.earn-page .earn-milestone-featured h3 { font-size: 1.3rem; }
+.earn-page .earn-milestone-kicker { font-size: .65rem; color: #a4d9b9; letter-spacing: .1em; text-transform: uppercase; line-height: 1.4; margin-bottom: 4px; }
+.earn-milestone-state { display: inline-flex; align-items: center; justify-content: center; gap: 4px; border: 1px solid #3b5347; background: #182b22; border-radius: 999px; padding: 4px 8px; font-size: .64rem; color: #b0c8b8; white-space: nowrap; flex-shrink: 0; }
+.earn-milestone-ready .earn-milestone-state { background: #a9edc5; color: #0b2815; border-color: #bdeed1; font-weight: 700; }
+.earn-milestone-claiming .earn-milestone-state { background: #283d30; color: #d0efd9; }
+.earn-milestone-claimed { background: #111b20; border-color: #324147; }
+.earn-milestone-claimed .earn-metric-icon { color: #bacbd2; background: #233037; border-color: #425158; }
+.earn-milestone-claimed .earn-milestone-state { color: #c7d9d7; background: #233536; border-color: #415658; }
+.earn-milestone-restricted .earn-milestone-state, .earn-milestone-unavailable .earn-milestone-state { color: #e9c482; background: #342b1e; border-color: #5a4930; }
+.earn-milestone-progress { display: flex; align-items: end; justify-content: space-between; gap: 14px; padding-top: 6px; }
+.earn-milestone-count { font-family: Outfit, sans-serif; font-variant-numeric: tabular-nums; }
+.earn-milestone-count strong { color: #f1fff5; font-size: 1.6rem; font-weight: 550; }
+.earn-milestone-count > span { color: #95b2a0; font-size: 1rem; overflow-wrap: anywhere; }
+.earn-milestone-featured .earn-milestone-count strong { font-size: 2.1rem; }
+.earn-percentage { font: 550 1.45rem/1 Outfit, sans-serif; text-align: right; color: #94e7b6; font-variant-numeric: tabular-nums; }
+.earn-percentage small { display: block; font: 400 .63rem/1.5 'Plus Jakarta Sans', sans-serif; color: #acc5b5; margin-top: 3px; }
+.earn-progress { position: relative; height: 12px; border-radius: 999px; background: #07160f; border: 1px solid #314f3c; overflow: hidden; isolation: isolate; }
+.earn-progress-fill { display: block; width: 100%; height: 100%; border-radius: inherit; background: linear-gradient(180deg, #6be4a0, #00c365); transform-origin: left center; transition-property: transform; transition-timing-function: cubic-bezier(.2,.8,.2,1); transition-duration: 0ms; }
+.earn-progress[data-completed="true"] { animation: earn-completion 600ms ease-out; }
+@keyframes earn-completion { 0% { border-color: #a1edc0; } 100% { border-color: #314f3c; } }
+.earn-milestone-claimed .earn-progress-fill { background: #648a7e; }
+.earn-page .earn-milestone-remaining { color: #b2c8b9; font-size: .76rem; }
+.earn-milestone-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: auto; border-top: 1px solid #2d4538; padding-top: 12px; }
+.earn-reward-type { display: inline-flex; align-items: center; gap: 7px; font-size: .73rem; color: #cadccd; }
+.earn-reward-type svg { color: #a5d1b5; flex-shrink: 0; }
+.earn-reward-type strong { font-weight: 650; }
+.earn-page .earn-claim { font-size: .76rem; min-height: 44px; padding: 9px 12px; border-radius: 11px; }
+.earn-claimed { display: inline-flex; align-items: center; gap: 6px; color: #bbd4cf; font-size: .73rem; }
+.earn-unavailable { display: inline-flex; align-items: center; gap: 5px; color: #c8bda6; font-size: .72rem; }
+.earn-page .earn-metric-explainer summary { font-weight: 400; font-size: .7rem; color: #a5bcae; min-height: 44px; margin-bottom: -8px; }
+.earn-page .earn-metric-explainer p { font-size: .75rem; padding-top: 8px; }
+.earn-milestone-grid { display: grid; gap: 12px; }
+.earn-milestone-empty, .earn-milestone-completion { border: 1px dashed #365345; border-radius: 20px; padding: 22px; background: #0c1c15; display: grid; gap: 10px; color: #91bd9f; }
+.earn-milestone-empty .earn-secondary { justify-self: start; }
+.earn-milestone-completion { display: flex; align-items: center; gap: 14px; }
+.earn-milestone-completion svg { flex-shrink: 0; }
+.earn-withdrawal-history { border-top: 1px solid #293a32; padding: 4px 0; }
+.earn-withdrawal-history summary { color: #b6c7c0; display: flex; align-items: center; justify-content: space-between; }
+.earn-withdrawal-history summary::before { content: '›'; margin-right: 8px; color: #81a793; }
+.earn-withdrawal-history[open] summary::before { transform: rotate(90deg); }
+.earn-withdrawal-history summary span { margin-left: auto; color: #8fa89a; font-size: .72rem; font-weight: 400; }
+.earn-withdrawal-history > div { display: grid; gap: 14px; padding-top: 12px; }
+.earn-withdrawal-row { padding: 12px 0; border-top: 1px solid #233a2c; }
+.earn-history-pagination { display: flex; gap: 12px; }
+.earn-member-page .earn-metrics { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 0; border-block: 1px solid #2b3939; }
+.earn-member-page .earn-metrics > div { display: flex; flex-direction: column; padding: 16px 12px; border-bottom: 0; gap: 5px; }
+.earn-member-page .earn-metrics > div + div { border-left: 1px solid #2b3939; }
+.earn-member-page .earn-metrics dt { font-size: .72rem; color: #adc4b6; line-height: 1.45; }
+.earn-member-page .earn-metrics dt svg { width: 14px; height: 14px; flex-shrink: 0; }
+.earn-member-page .earn-metrics dd { order: -1; margin: 0; color: #edf8f1; font-size: 2rem; }
+.earn-member-page .earn-metrics p { font-size: .68rem; }
+.earn-member-page .earn-reward-totals { padding-block: 0; border: 0; }
+.earn-member-page .earn-reward-totals dd { font-family: Outfit, sans-serif; font-size: 1.2rem; }
+.earn-member-page .earn-reward-list article { padding: 18px 0; }
+@media (min-width: 768px) {
+ .earn-member-page .earn-top-grid { grid-template-columns: 1fr 1fr; gap: 20px; }
+ .earn-milestone-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ .earn-milestone-featured { display: grid; grid-template-columns: 1.1fr 1fr; column-gap: 30px; }
+ .earn-milestone-featured .earn-milestone-top { grid-row: 1 / 4; align-self: center; flex-wrap: wrap; }
+ .earn-milestone-featured .earn-milestone-top .earn-milestone-state { margin-left: 58px; }
+ .earn-milestone-featured .earn-milestone-bottom { grid-column: 1 / -1; }
+ .earn-milestone-featured .earn-metric-explainer { grid-column: 1 / -1; }
+}
+@media (min-width: 1100px) { .earn-milestone-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+@media (max-width: 430px) {
+ .earn-member-page { gap: 20px; }
+ .earn-member-page .earn-share-panel, .earn-balance-summary { padding: 16px; }
+ .earn-member-page .earn-share-panel .earn-actions { gap: 6px; }
+ .earn-member-page .earn-share-panel .earn-actions > :is(button,a) { font-size: .77rem; padding-inline: 10px; }
+ .earn-milestone-featured { padding: 18px; }
+ .earn-milestone-top { flex-wrap: wrap; }
+ .earn-milestone-top > div { min-width: 130px; }
+ .earn-milestone-top .earn-milestone-state { margin-left: 50px; }
+ .earn-milestone-featured .earn-milestone-top .earn-milestone-state { margin-left: 58px; }
+ .earn-member-page .earn-metrics > div { padding: 14px 8px; }
+ .earn-member-page .earn-metrics dt { flex-wrap: wrap; font-size: .66rem; gap: 3px; }
+ .earn-member-page .earn-metrics dd { font-size: 1.7rem; }
+ .earn-member-page .earn-metrics p { font-size: .65rem; line-height: 1.5; }
+ .earn-balance-actions .earn-secondary { gap: 4px; padding-inline: 6px; font-size: .71rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+ .earn-progress-fill { transition-duration: 0ms !important; }
+ .earn-progress[data-completed="true"] { animation: none !important; }
+}
+@media (max-width: 767px) { .earn-member-page .earn-heading .earn-eyebrow { margin-bottom: 20px; } }
+@media (max-width: 359px) { .earn-member-page .earn-share-panel .earn-whatsapp span { display: none; } .earn-member-page .earn-share-panel .earn-whatsapp { min-width: 44px; } }
+.earn-member-page .earn-share-panel .earn-primary { white-space: nowrap; }
+.earn-member-page .earn-metrics .earn-metric-unknown { font: 500 .85rem/1.5 'Plus Jakarta Sans', sans-serif; overflow-wrap: anywhere; min-height: 32px; }
+.earn-page .earn-metrics-explainer summary { font-size: .78rem; color: #b6c8bf; }
+.earn-page .earn-metrics-explainer p { font-size: .8rem; padding: 5px 0; }
+@media (max-width: 430px) { .earn-member-page .earn-metrics dt { font-size: .75rem; } }

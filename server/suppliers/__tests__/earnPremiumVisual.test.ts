@@ -1,0 +1,54 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { milestoneProgress, milestoneState, featuredMilestone, milestoneRemaining, milestoneValue, type EarnAchievement } from '../../../src/utils/earnMilestones';
+import { EarnMilestoneCard, EarnMilestones, EarnProgressBar } from '../../../src/components/earn/EarnMilestones';
+import { EarnBalanceSummary } from '../../../src/components/earn/EarnBalanceSummary';
+const row: EarnAchievement={id:'visitors',name:'Ten qualified visitors',metric:'qualified_visitors',threshold:10,progress:1,enabled:true,rewardMinor:0,claimed:false};
+const noop=()=>{};
+const card=(achievement:EarnAchievement,options:Record<string,unknown>={})=>renderToStaticMarkup(React.createElement(EarnMilestoneCard,{row:achievement,restricted:false,stale:false,busy:false,claimingId:null,onClaim:noop,...options}));
+const section=(achievements:EarnAchievement[]|null,options:Record<string,unknown>={})=>renderToStaticMarkup(React.createElement(EarnMilestones,{achievements,restricted:false,stale:false,busy:false,claimingId:null,onClaim:noop,retry:noop,...options}));
+for(const [progress,percentage] of [[0,0],[1,10],[5,50],[10,100],[20,100]])test('real '+progress+'/10 displays '+percentage+'%',()=>{
+ assert.equal(milestoneProgress({...row,progress})?.percentage,percentage);const html=card({...row,progress});
+ assert.ok(html.includes('aria-valuenow="'+percentage+'"'));assert.ok(html.includes('scaleX('+(percentage/100)+')'));assert.ok(html.includes(percentage+'%'));assert.ok(!html.includes('<progress'));
+});
+for(const threshold of [0,-1,NaN,Infinity,1.5,Number.MAX_SAFE_INTEGER+1])test('invalid threshold '+threshold+' cannot grant eligibility',()=>{
+ const invalid={...row,threshold};assert.equal(milestoneProgress(invalid),null);assert.equal(milestoneState(invalid),'unavailable');
+ const html=card(invalid);assert.match(html,/Unconfirmed/);for(const bad of ['aria-valuenow','Claim Badge','NaN','Infinity'])assert.ok(!html.includes(bad));
+});
+for(const progress of [-1,NaN,Infinity,1.5])test('invalid progress '+progress+' is unavailable',()=>{assert.equal(milestoneProgress({...row,progress}),null);assert.match(card({...row,progress}),/Progress unavailable/);});
+test('zero state is not loading and has a truthful remaining count',()=>{assert.equal(milestoneState({...row,progress:0}),'not-started');assert.match(card({...row,progress:0}),/10 more qualifying visitor keys/);});
+test('ready and claimed badge states are distinct',()=>{assert.match(card({...row,progress:10}),/Claim Badge/);const html=card({...row,progress:10,claimed:true});assert.match(html,/Badge collected/);assert.ok(!html.includes('Claim Badge'));});
+test('only configured money is displayed as Wallet credit',()=>{const html=card({...row,progress:10,rewardMinor:125});assert.match(html,/GH₵1.25/);assert.match(html,/Wallet credit/);assert.match(html,/Claim Reward/);assert.ok(!html.includes('GH₵3.00'));});
+test('badge-only reward never promises money',()=>{const html=card(row);assert.match(html,/Badge only · no cash value/);assert.ok(!html.includes('GH₵'));});
+test('claimed configured reward is accurately Wallet credit',()=>assert.match(card({...row,progress:10,claimed:true,rewardMinor:125}),/Reward collected/));
+test('restriction keeps true progress and blocks claim',()=>{const html=card({...row,progress:10},{restricted:true});assert.match(html,/Restricted/);assert.match(html,/100%/);assert.ok(!html.includes('Claim Badge'));});
+test('stale progress cannot imply eligibility',()=>{const html=card({...row,progress:10},{stale:true});assert.match(html,/Last confirmed progress/);assert.ok(!html.includes('aria-valuenow'));assert.ok(!html.includes('Claim Badge'));});
+test('claiming and shared busy state disable claim',()=>{assert.match(card({...row,progress:10},{busy:true,claimingId:row.id}),/Claiming…/);assert.match(card({...row,progress:10},{busy:true}),/button[^>]*disabled/);});
+test('disabled definitions never appear or become featured',()=>{assert.equal(featuredMilestone([{...row,enabled:false}]),null);assert.ok(!section([{...row,enabled:false}]).includes(row.name));});
+test('claim-ready milestone takes priority',()=>assert.equal(featuredMilestone([row,{...row,id:'ready',progress:10}])?.id,'ready'));
+test('normalized progress selects the closest threshold',()=>assert.equal(featuredMilestone([row,{...row,id:'closer',progress:2,threshold:4}])?.id,'closer'));
+test('tie-breaking is deterministic without mutating the response',()=>{const rows=[{...row,id:'z'},{...row,id:'a'}];assert.equal(featuredMilestone(rows)?.id,'a');assert.deepEqual(rows.map(x=>x.id),['z','a']);});
+test('invalid, claimed and disabled records cannot invent a next reward',()=>assert.equal(featuredMilestone([{...row,claimed:true},{...row,threshold:0},{...row,enabled:false}]),null));
+test('featured milestone is not duplicated in the list',()=>assert.equal((section([row]).match(/data-milestone-id="visitors"/g)||[]).length,1));
+test('all-claimed state is honest',()=>{const html=section([{...row,progress:10,claimed:true}]);assert.match(html,/Every available milestone collected/);assert.ok(!html.includes('Your next milestone'));});
+test('empty definitions and finance failure are distinct',()=>{assert.match(section([]),/No milestones are enabled/);const failed=section(null,{stale:true});assert.match(failed,/Your progress is unavailable/);assert.match(failed,/Retry milestones/);assert.ok(!failed.includes('0%'));});
+test('monetary progress displays integer minor units as GHS',()=>{const money={...row,metric:'lifetime_earnings' as const,progress:125,threshold:500};const html=card(money);for(const text of ['GH₵1.25','GH₵5.00','25%'])assert.ok(html.includes(text));assert.match(milestoneRemaining(money),/GH₵3.75 more approved/);assert.ok(!html.includes('visitor keys'));});
+test('remaining quantities use the correct metric units',()=>{assert.equal(milestoneValue(125,'successful_referrals'),'125');assert.match(milestoneRemaining({...row,metric:'afa_referrals',progress:0,threshold:1}),/1 more qualifying AFA referral$/);assert.match(milestoneRemaining({...row,metric:'successful_referrals',threshold:2}),/1 more successful referral$/);});
+test('long names remain complete escaped text',()=>{const html=card({...row,name:'Long configured milestone '.repeat(4)+'<script>'});assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'));});
+test('unknown progress has semantics without an invented aria value',()=>{const html=renderToStaticMarkup(React.createElement(EarnProgressBar,{percentage:null,label:'Unconfirmed milestone',valueText:'Unavailable'}));assert.match(html,/role="progressbar"/);assert.match(html,/aria-valuetext="Progress unavailable"/);assert.ok(!html.includes('aria-valuenow'));});
+const data={restricted:false,earn:{availableMinor:0,pendingMinor:100,reservedMinor:50,lifetimeMinor:500,withdrawnMinor:200},settings:{withdrawalMinimumMinor:725,withdrawalFeeBps:175}};
+const balance=(value:typeof data|null,options:Record<string,unknown>={})=>renderToStaticMarkup(React.createElement(EarnBalanceSummary,{data:value,error:'',notice:'',busy:false,refresh:noop,withdraw:noop,transfer:noop,...options}));
+test('zero funds disable both financial actions',()=>{const html=balance(data);assert.match(html,/GH₵0.00/);assert.equal((html.match(/disabled/g)||[]).length,2);assert.match(html,/Visits alone do not/);});
+test('minimum and fee come from real settings',()=>{const html=balance({...data,earn:{...data.earn,availableMinor:625}});assert.match(html,/GH₵1.00 more/);assert.match(html,/GH₵7.25 cash-out minimum/);assert.match(balance({...data,earn:{...data.earn,availableMinor:800}}),/1.75% processing fee/);});
+test('failed finance never becomes a fake zero',()=>{const html=balance(null,{error:'Offline'});assert.match(html,/Unavailable/);assert.ok(!html.includes('GH₵0.00'));assert.ok(!html.includes('Withdraw Earnings'));});
+test('stale or restricted finance disables money actions',()=>{for(const html of [balance({...data,earn:{...data.earn,availableMinor:1000}},{error:'Offline'}),balance({...data,restricted:true,earn:{...data.earn,availableMinor:1000}})])assert.equal((html.match(/disabled/g)||[]).length,2);});
+test('increase-only transform motion respects reduced motion',()=>{const css=readFileSync('src/components/earn/earn.css','utf8'),source=readFileSync('src/components/earn/EarnMilestones.tsx','utf8');assert.match(source,/percentage > previous.current/);assert.match(source,/increased \? '550ms' : '0ms'/);assert.match(css,/transform-origin: left center/);assert.match(css,/prefers-reduced-motion: reduce/);assert.match(css,/transition-duration: 0ms !important/);});
+test('presentation uses the loaded summary without duplicate requests',()=>{for(const path of ['EarnMilestones','EarnBalanceSummary']){const s=readFileSync('src/components/earn/'+path+'.tsx','utf8');assert.ok(!s.includes('financeRequest'));assert.ok(!s.includes('setInterval'));}});
+test('claim latch and session-safe refresh preserve endpoint',()=>{const s=readFileSync('src/components/finance/FinancialPanel.tsx','utf8');assert.match(s,/claimPending.current\|\|busy/);assert.match(s,/claimPending.current=true/);assert.ok(s.includes('/achievements/'+String.fromCharCode(36)+'{encodeURIComponent(row.id)}/claim'));assert.match(s,/!mounted.current\|\|activeToken.current!==owner/);assert.match(s,/await refresh\(\)/);});
+test('Wallet retains its activity and transaction controls',()=>{const s=readFileSync('src/components/finance/FinancialPanel.tsx','utf8');for(const value of ['Top Up Wallet','Wallet Activity','Check top-up','crypto.randomUUID()','pending.current','This transfer is irreversible','You receive','I confirm'])assert.ok(s.includes(value));assert.match(s,/if\(mode==='earn'\)return/);assert.match(s,/FinancialPanel mode="wallet"/);});
+
+
+test('older same-account summary responses cannot overwrite a newer refresh',()=>{const source=readFileSync('src/components/finance/FinancialPanel.tsx','utf8');assert.match(source,/const request=\+\+refreshSequence.current/);assert.match(source,/request!==refreshSequence.current/);});

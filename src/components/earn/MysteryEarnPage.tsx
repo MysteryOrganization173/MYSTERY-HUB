@@ -52,8 +52,8 @@ function MemberEarn({ token, name }: { token: string; name: string }) {
     void controller.refresh();
     return () => { controller.dispose(); refresh.current = null; };
   }, [token]);
-  return <main className="earn-page" aria-label="Mystery Earn dashboard">
-    <div className="earn-heading"><div><p className="earn-eyebrow">Mystery Earn</p><h1>Make sharing count, {name}.</h1><p>Your referrals and rewards, in one place.</p></div><button className="earn-secondary" disabled={state.refreshing} onClick={() => void refresh.current?.()}><RefreshCw size={16} aria-hidden="true" />{state.refreshing ? 'Refreshing…' : 'Refresh activity'}</button></div>
+  return <main className="earn-page earn-member-page" aria-label="Mystery Earn dashboard">
+    <div className="earn-heading"><div><p className="earn-eyebrow">{name}’s rewards</p><h1>Your Mystery Earn</h1><p>Share something useful. See your progress.</p></div><button className="earn-secondary" disabled={state.refreshing} onClick={() => void refresh.current?.()}><RefreshCw size={16} aria-hidden="true" />{state.refreshing ? 'Refreshing…' : 'Refresh activity'}</button></div>
     {state.error && <div className="earn-alert" role="alert">Some activity could not refresh. {summary || ledger ? 'Last available activity is shown below.' : 'Referral figures and reward activity have not been confirmed.'} <button className="earn-text-button" onClick={() => void refresh.current?.()}>Retry activity</button></div>}
     <div className="earn-top-grid"><EarnSharing summary={summary} unavailable={state.summaryError} loading={state.refreshing && !summary} /><FinancialPanel mode="earn" /></div>
     <EarnMetrics summary={summary} loading={state.refreshing && !summary} stale={state.summaryError} />

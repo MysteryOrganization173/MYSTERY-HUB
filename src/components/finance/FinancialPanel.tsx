@@ -3,6 +3,9 @@ import React,{useState,useEffect,useRef} from 'react';
 import { useApp } from '../../context/AppContext';
 import { financeRequest } from '../../services/financeApi';
 import { parseGhs,percentMinor,formatGhs } from '../../../shared/money';
+import { EarnBalanceSummary } from '../earn/EarnBalanceSummary';
+import { EarnMilestones } from '../earn/EarnMilestones';
+import type { EarnAchievement } from '../../utils/earnMilestones';
 
 const inputClass='w-full min-w-0 rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm text-white';
 const buttonClass='rounded-xl bg-[#00c365] px-4 py-3 text-sm font-semibold text-black disabled:opacity-50';
@@ -11,10 +14,13 @@ export const FinancialPanel:React.FC<{mode:'wallet'|'earn'}>=({mode})=>{
   const [data,setData]=useState<any>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
   const [action,setAction]=useState(''),[amount,setAmount]=useState(''),[phone,setPhone]=useState(''),[network,setNetwork]=useState('mtn'),[recipientName,setName]=useState('');
   const [confirmed,setConfirmed]=useState(false),[offset,setOffset]=useState(0);
+  const [claimingId,setClaimingId]=useState<string|null>(null);
+  const claimPending=useRef(false),mounted=useRef(true),refreshSequence=useRef(0);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   const pending=useRef<{fingerprint:string;id:string}|null>(null);
   const activeToken=useRef(sessionToken);activeToken.current=sessionToken;
-  const refresh=async()=>{if(!sessionToken)return;try{const result=await financeRequest(sessionToken,`?offset=${offset}`);if(activeToken.current!==sessionToken)return;setData(result);setError('');}catch(e){if(activeToken.current===sessionToken)setError((e as Error).message);}};
-  useEffect(()=>{setData(null);setAction('');setAmount('');setPhone('');setName('');setConfirmed(false);setOffset(0);setNotice('');setError('');pending.current=null;},[sessionToken]);
+  const refresh=async()=>{if(!sessionToken)return;const request=++refreshSequence.current;try{const result=await financeRequest(sessionToken,`?offset=${offset}`);if(!mounted.current||activeToken.current!==sessionToken||request!==refreshSequence.current)return;setData(result);setError('');}catch(e){if(mounted.current&&activeToken.current===sessionToken&&request===refreshSequence.current)setError((e as Error).message);}};
+  useEffect(()=>{setData(null);setAction('');setAmount('');setPhone('');setName('');setConfirmed(false);setOffset(0);setNotice('');setError('');setClaimingId(null);claimPending.current=false;pending.current=null;},[sessionToken]);
   useEffect(()=>{void refresh();},[sessionToken,offset]);
   useEffect(()=>{
     if(mode!=='wallet'||!sessionToken)return;
@@ -43,19 +49,22 @@ export const FinancialPanel:React.FC<{mode:'wallet'|'earn'}>=({mode})=>{
       setNotice(action==='transfer'?'Transfer completed. Funds are now spendable in Wallet.':'Withdrawal requested. Our team will review it before payout.');pending.current=null;setAction('');setAmount('');setConfirmed(false);await refresh();
     }catch(e){setError((e as Error).message);}finally{setBusy(false);}
   };
-  return <section id={mode==='earn'?'earn-available':undefined} className={`${mode==='earn'?'earn-finance ':''}min-w-0 rounded-2xl border border-slate-800 bg-[#0b1116] p-4 sm:p-6 text-left text-slate-100 space-y-5`}>
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">{mode==='wallet'?'Mystery Wallet':'Your earnings'}</h2><p className="text-sm text-slate-400">{mode==='wallet'?'Add money to pay for eligible Mystery Hub purchases. Wallet funds cannot be withdrawn.':'Available funds from your financial account. Referral totals are shown separately.'}</p></div><button onClick={()=>void refresh()} className="text-sm text-[#00c365]" disabled={busy}>Refresh</button></div>
-    {error&&<p role="alert" className="break-words text-sm text-amber-300">{error}</p>}{notice&&<p role="status" className="break-words text-sm text-emerald-300">{notice}</p>}
-    {!data?<p role="status">{mode==='earn'&&error?'Balance unavailable. Refresh to try again.':'Loading your balance…'}</p>:<>
-      {mode==='earn'&&error&&<p className="text-sm text-amber-300">Last available financial values. Refresh successfully before requesting a withdrawal or transfer.</p>}
-      {data.restricted&&<p className="text-amber-300">Your account needs a review by our team. Payments and cash-out may be temporarily unavailable.</p>}
-      <p className="text-sm text-slate-400">{mode==='wallet'?'Wallet Balance':'Available Earnings'}</p><p className="text-4xl sm:text-5xl font-semibold tabular-nums">{formatGhs(mode==='wallet'?data.walletMinor:data.earn.availableMinor)}</p>
-      {mode==='earn'&&<div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">{[['Pending',data.earn.pendingMinor],['Reserved',data.earn.reservedMinor],['Lifetime Earned',data.earn.lifetimeMinor],['Total Withdrawn',data.earn.withdrawnMinor]].map(([label,value])=><div key={label}><p className="text-slate-400">{label}</p><p>{formatGhs(Number(value))}</p></div>)}</div>}
-      <div className="flex flex-wrap gap-3">{mode==='wallet'?<><button className={buttonClass} onClick={()=>{setAction('topup');setConfirmed(false);}}>Top Up Wallet</button><button className="rounded-xl border border-slate-700 px-4 py-3 text-sm" onClick={()=>setActivePage('earn')}>Move earnings to Wallet</button></>:<><button className={buttonClass} disabled={busy||data.restricted||!!error||data.earn.availableMinor<data.settings.withdrawalMinimumMinor} onClick={()=>{setAction('withdrawal');setConfirmed(false);}}>Withdraw Earnings</button><button className="rounded-xl border border-slate-700 px-4 py-3 text-sm" disabled={busy||data.restricted||!!error||data.earn.availableMinor<=0} onClick={()=>{setAction('transfer');setConfirmed(false);}}>Move to Wallet</button></>}</div>
-      {mode==='wallet'&&data.walletMinor===0&&<p className="text-sm text-slate-400">Your wallet is empty. Add money to make future Mystery Hub purchases faster.</p>}
-      {mode==='earn'&&data.earn.lifetimeMinor===0&&<p className="text-sm text-slate-400">No earnings yet. Share your referral link to start earning from qualifying activity.</p>}
-      {mode==='earn'&&data.earn.availableMinor<data.settings.withdrawalMinimumMinor&&<p className="text-sm text-slate-400">Earn {formatGhs(data.settings.withdrawalMinimumMinor-data.earn.availableMinor)} more to unlock cash-out. Minimum: {formatGhs(data.settings.withdrawalMinimumMinor)}.</p>}
-      {action&&<form onSubmit={perform} className="rounded-xl border border-slate-700 p-4 space-y-3">
+
+  const claimAchievement=async(row:EarnAchievement)=>{
+    // A synchronous latch also covers rapid clicks before React commits the busy state.
+    if(claimPending.current||busy||!data||data.restricted||error||row.claimed||row.progress<row.threshold)return;
+    const owner=sessionToken;
+    refreshSequence.current++;
+    claimPending.current=true;setBusy(true);setClaimingId(row.id);
+    try{
+      const claimResult=await financeRequest<{amount_minor?:number}>(owner,`/achievements/${encodeURIComponent(row.id)}/claim`,{});
+      if(!mounted.current||activeToken.current!==owner)return;
+      setNotice(Number.isSafeInteger(claimResult.amount_minor)&&(claimResult.amount_minor??0)>0?'Achievement claimed. Configured credit was added to Wallet.':'Achievement claimed. Refreshing confirmed progress.');
+      await refresh();
+    }catch(e){if(mounted.current&&activeToken.current===owner)setError((e as Error).message);}
+    finally{if(mounted.current&&activeToken.current===owner){claimPending.current=false;setBusy(false);setClaimingId(null);}}
+  };
+  const transactionForm=data&&action&&<form onSubmit={perform} className="rounded-xl border border-slate-700 p-4 space-y-3">
         <h3 className="font-bold">{action==='topup'?'Top Up Wallet':action==='transfer'?'Move to Mystery Wallet':'Withdraw Earnings'}</h3>
         <label className="block text-sm">Amount (GH₵)<input className={inputClass} inputMode="decimal" value={amount} onChange={e=>{setAmount(e.target.value);setConfirmed(false);}} required/></label>
         {action==='topup'&&<p className="text-sm text-slate-400">0% customer fee. Top-up limits: {formatGhs(data.settings.topupMinimumMinor)}–{formatGhs(data.settings.topupMaximumMinor)}. Mobile Money through Paystack.</p>}
@@ -68,11 +77,30 @@ export const FinancialPanel:React.FC<{mode:'wallet'|'earn'}>=({mode})=>{
         {action==='transfer'&&<p className="text-sm text-amber-200">0% fee. Funds transferred to Mystery Wallet can be used for eligible Mystery Hub services and cannot be withdrawn back to Mobile Money. This transfer is irreversible.</p>}
         {action!=='topup'&&<label className="flex gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>I confirm the amount and {action==='transfer'?'irreversible transfer':'payout destination and fee'}.</label>}
         <div className="flex flex-wrap gap-3"><button className={buttonClass} disabled={busy||minor===0||action!=='topup'&&!confirmed||mode==='earn'&&(data.restricted||!!error)}>{busy?'Processing…':'Confirm'}</button><button type="button" className="text-slate-400" onClick={()=>setAction('')} disabled={busy}>Cancel</button></div>
-      </form>}
+      </form>;
+  if(mode==='earn')return <div className="earn-finance">
+    <EarnBalanceSummary data={data} error={error} notice={notice} busy={busy} refresh={()=>void refresh()}
+      withdraw={()=>{setAction('withdrawal');setConfirmed(false);}} transfer={()=>{setAction('transfer');setConfirmed(false);}}/>
+    {transactionForm&&<div className="earn-transaction-form">{transactionForm}</div>}
+    <EarnMilestones achievements={Array.isArray(data?.achievements)?data.achievements:null} restricted={!!data?.restricted} stale={!!error||!!data&&!Array.isArray(data.achievements)} busy={busy} claimingId={claimingId} onClaim={row=>void claimAchievement(row)} retry={()=>void refresh()}/>
+    {data&&<details className="earn-withdrawal-history"><summary>Withdrawal History <span>Latest requests</span></summary><div>
+      {!data.withdrawals.length&&<p>Your cash-out requests will appear here once you request a payout.</p>}
+      {data.withdrawals.map((row:any)=><div key={row.id} className="earn-withdrawal-row"><p>{formatGhs(row.amount_minor)} · {customerActivityLabel(row.state)}</p><p>Fee {formatGhs(row.payload.feeMinor)} · You receive {formatGhs(row.payload.netMinor)}</p><p>{row.payload.maskedPhone} · {row.payload.network} · {new Date(row.created_at).toLocaleDateString()}</p>{row.payload.rejectionReason&&<p>{row.payload.rejectionReason}</p>}{row.payload.paidAt&&<p>Paid {new Date(row.payload.paidAt).toLocaleDateString()}</p>}</div>)}
+      <div className="earn-history-pagination"><button className="earn-secondary" disabled={!offset} onClick={()=>setOffset(Math.max(0,offset-25))}>Previous</button><button className="earn-secondary" disabled={data.withdrawals.length<25} onClick={()=>setOffset(offset+25)}>More history</button></div>
+    </div></details>}
+  </div>;
+  return <section className="min-w-0 rounded-2xl border border-slate-800 bg-[#0b1116] p-4 sm:p-6 text-left text-slate-100 space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">{mode==='wallet'?'Mystery Wallet':'Your earnings'}</h2><p className="text-sm text-slate-400">{mode==='wallet'?'Add money to pay for eligible Mystery Hub purchases. Wallet funds cannot be withdrawn.':'Available funds from your financial account. Referral totals are shown separately.'}</p></div><button onClick={()=>void refresh()} className="text-sm text-[#00c365]" disabled={busy}>Refresh</button></div>
+    {error&&<p role="alert" className="break-words text-sm text-amber-300">{error}</p>}{notice&&<p role="status" className="break-words text-sm text-emerald-300">{notice}</p>}
+    {!data?<p role="status">Loading your balance…</p>:<>
+      {data.restricted&&<p className="text-amber-300">Your account needs a review by our team. Payments and cash-out may be temporarily unavailable.</p>}
+      <p className="text-sm text-slate-400">{mode==='wallet'?'Wallet Balance':'Available Earnings'}</p><p className="text-4xl sm:text-5xl font-semibold tabular-nums">{formatGhs(mode==='wallet'?data.walletMinor:data.earn.availableMinor)}</p>
+      <div className="flex flex-wrap gap-3">{mode==='wallet'?<><button className={buttonClass} onClick={()=>{setAction('topup');setConfirmed(false);}}>Top Up Wallet</button><button className="rounded-xl border border-slate-700 px-4 py-3 text-sm" onClick={()=>setActivePage('earn')}>Move earnings to Wallet</button></>:<><button className={buttonClass} disabled={busy||data.restricted||!!error||data.earn.availableMinor<data.settings.withdrawalMinimumMinor} onClick={()=>{setAction('withdrawal');setConfirmed(false);}}>Withdraw Earnings</button><button className="rounded-xl border border-slate-700 px-4 py-3 text-sm" disabled={busy||data.restricted||!!error||data.earn.availableMinor<=0} onClick={()=>{setAction('transfer');setConfirmed(false);}}>Move to Wallet</button></>}</div>
+      {mode==='wallet'&&data.walletMinor===0&&<p className="text-sm text-slate-400">Your wallet is empty. Add money to make future Mystery Hub purchases faster.</p>}
+      {transactionForm}
       {mode==='wallet'&&<><h3 className="font-bold">Wallet Activity</h3>{!data.ledger.length&&<p className="text-sm text-slate-400">Your top-ups and purchases will appear here. Top up when you’re ready to make a purchase.</p>}{data.ledger.map((row:any)=><div key={row.id} className="flex flex-wrap justify-between gap-2 border-t border-slate-800 pt-3 text-sm"><div><p>{row.description.replace(/_/g,' ')}</p><p className="text-xs text-slate-500">{new Date(row.created_at).toLocaleString()} · Completed</p></div><div className="text-right"><p className={row.delta_minor>0?'text-emerald-300':'text-slate-200'}>{row.delta_minor>0?'+':'−'}{formatGhs(Math.abs(row.delta_minor))}</p><p className="text-xs text-slate-500">Balance {formatGhs(row.balance_after_minor)}</p></div></div>)}
       {data.topups.filter((r:any)=>!['credited','reversed'].includes(r.state)).map((row:any)=><div key={row.id} className="text-sm space-y-2"><p>Top-up {formatGhs(row.amountMinor)} · {customerActivityLabel(row.state)}</p><button disabled={busy} className="text-[#00c365]" onClick={async()=>{setBusy(true);try{const result=await financeRequest(sessionToken,`/topups/${encodeURIComponent(row.reference)}/verify`,{});setNotice(`Top-up: ${customerActivityLabel(result.state)}`);await refresh();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}>Check top-up</button></div>)}</>}
-      {mode==='earn'&&<><details><summary>Withdrawal History</summary><div>{!data.withdrawals.length&&<p className="text-sm text-slate-400">Your cash-out requests will appear here once you request a payout.</p>}{data.withdrawals.map((row:any)=><div key={row.id} className="rounded-xl border border-slate-800 p-3 text-sm space-y-1"><p>{formatGhs(row.amount_minor)} · {customerActivityLabel(row.state)}</p><p className="text-slate-400">Fee {formatGhs(row.payload.feeMinor)} · You receive {formatGhs(row.payload.netMinor)}</p><p>{row.payload.maskedPhone} · {row.payload.network} · {new Date(row.created_at).toLocaleDateString()}</p>{row.payload.rejectionReason&&<p>{row.payload.rejectionReason}</p>}{row.payload.paidAt&&<p>Paid {new Date(row.payload.paidAt).toLocaleDateString()}</p>}</div>)}
-      </div></details><details><summary>Achievements & Rewards</summary><div><p className="text-sm text-slate-400">Progress comes from recorded visitor keys and approved qualifying reward activity. A badge has no cash value. Configured cash rewards are credited to Wallet when claimed.</p>{!data.achievements.length&&<p className="text-sm text-slate-400">No achievements are available right now.</p>}<div className="grid sm:grid-cols-2 gap-3">{data.achievements.map((row:any)=><div key={row.id} className="rounded-xl border border-slate-800 p-3 space-y-2 text-sm"><p className="font-semibold">{row.name}</p><p>{Math.min(row.progress,row.threshold)} / {row.threshold} · {row.rewardMinor?`${formatGhs(row.rewardMinor)} Wallet credit`:'Badge only'}</p><progress className="w-full accent-emerald-500" aria-label={`${row.name} progress`} value={Math.min(row.progress,row.threshold)} max={row.threshold}/><p className="text-xs text-slate-400">{row.metric==='qualified_visitors'?'Distinct stored visitor keys; not verified individual people.':row.metric==='lifetime_earnings'?'Approved referral earnings in pesewas.':'Approved qualifying referral activity.'}</p><button className="text-[#00c365] disabled:text-slate-500" disabled={busy||data.restricted||!!error||row.claimed||row.progress<row.threshold} onClick={async()=>{setBusy(true);try{await financeRequest(sessionToken,`/achievements/${encodeURIComponent(row.id)}/claim`,{});await refresh();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}>{row.claimed?'Claimed':data.restricted?'Unavailable':row.progress>=row.threshold?(row.rewardMinor?'Claim Reward':'Claim Badge'):'In progress'}</button></div>)}</div></div></details></>}
+
       <div className="flex gap-4 text-sm"><button disabled={!offset} onClick={()=>setOffset(Math.max(0,offset-25))}>Previous</button><button disabled={(mode==='wallet'?data.ledger:data.withdrawals).length<25} onClick={()=>setOffset(offset+25)}>More history</button></div>
     </>}
   </section>;
