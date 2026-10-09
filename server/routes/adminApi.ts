@@ -37,6 +37,7 @@ const adminAiRateLimitMap = new Map<string, { count: number; resetAt: number }>(
 import { adminAccountRouter } from './adminAccountApi.js';
 
 export const adminRouter = Router();
+adminRouter.use((_req,res,next)=>{res.setHeader('Cache-Control','no-store');next();});
 
 // Apply strict admin authentication and authorization to all admin routes
 adminRouter.use(requireAdmin);
