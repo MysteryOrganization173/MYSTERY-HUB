@@ -1,7 +1,7 @@
 /**
  * Mystery Hub Mobile Nav Restructure, Mystery Earn Teaser & Services Compression Test Suite
  * Validates:
- * - MobileNav 5th/4th destination replaced with Marketplace (label: Marketplace)
+ * - MobileNav uses five destinations including Earn; Marketplace remains in the main menu
  * - More Services remains accessible in Navbar mobile drawer
  * - Quick-order Navbar trigger replaced with Mystery Earn shortcut (/earn)
  * - /earn teaser page renders Coming Soon badge, 3 earning types, 3-step workflow
@@ -15,25 +15,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 describe('Mobile Nav Restructure, Mystery Earn & Services Compression', () => {
-  test('1. MobileNav contains Marketplace instead of Services in bottom navigation', () => {
-    const mobileNavCode = fs.readFileSync(
-      path.join(process.cwd(), 'src/components/common/MobileNav.tsx'),
-      'utf-8'
-    );
-
-    assert.ok(
-      mobileNavCode.includes('id: \'marketplace\''),
-      'MobileNav must include marketplace item ID'
-    );
-    assert.ok(
-      mobileNavCode.includes('label: \'Marketplace\''),
-      'MobileNav item label must strictly say Marketplace'
-    );
-    assert.strictEqual(
-      mobileNavCode.includes('id: \'services\''),
-      false,
-      'MobileNav bottom bar must NOT contain services item'
-    );
+  test('1. MobileNav uses the five approved destinations with Earn discovery', () => {
+    const code=fs.readFileSync(path.join(process.cwd(),'src/components/common/MobileNav.tsx'),'utf8');
+    assert.deepEqual([...code.matchAll(/id: '([^']+)', label: '([^']+)'/g)].map(m=>m[1]),['home','data','website','earn','orders']);
+    assert.ok(code.includes('grid-cols-5'));
+    const navbar=fs.readFileSync(path.join(process.cwd(),'src/components/common/Navbar.tsx'),'utf8');
+    assert.ok(navbar.includes("handleNavClick('marketplace')"),'Marketplace remains accessible in the main menu');
   });
 
   test('2. More Services remains available in Navbar mobile drawer and desktop nav', () => {
