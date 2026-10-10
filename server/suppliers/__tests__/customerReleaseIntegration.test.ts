@@ -21,7 +21,7 @@ test('assistant preserves account and forced-password exclusions and P1 navigati
   for (const guard of ['isCheckoutOpen', 'isStatusModalOpen', 'isAuthModalOpen', 'isAccountOpen', 'user?.mustChangePassword', 'selectedTemplatePreview', 'marketplaceInquiryProduct']) {
     assert.ok(exclusions.includes(guard), guard);
   }
-  assert.match(source('src/components/common/MobileNav.tsx'), /aria-label="Open Mystery AI Assistant"/);
+  assert.match(source('src/components/common/MobileNav.tsx'), /id: 'earn', label: 'Earn'/);
   assert.match(source('src/components/common/Navbar.tsx'), /aria-label="Open Mystery AI Assistant"/);
 });
 
