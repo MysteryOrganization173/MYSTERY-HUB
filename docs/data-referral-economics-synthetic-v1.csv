@@ -1,0 +1,17 @@
+product,source,retailMinor,supplierCostMinor,welcomeDiscountMinor,paidMinor,reserveMinor,normalRewardableMarginMinor,actualMarginBeforeRewardMinor,fixedFirstMinor,fixedRepeatMinor,dynamicFirstMinor,dynamicRepeatMinor,firstRetainedMinor,repeatRetainedMinor
+"mtn-1gb","retail=repository catalog; cost=synthetic NOT supplier quote",549,400,0,549,0,149,149,50,10,75,30,74,119
+"mtn-1gb","retail=repository catalog; cost=synthetic NOT supplier quote",549,400,0,549,10,139,139,50,10,70,28,69,111
+"mtn-1gb","retail=repository catalog; cost=synthetic NOT supplier quote",549,400,100,449,0,149,49,50,10,75,30,-26,119
+"mtn-1gb","retail=repository catalog; cost=synthetic NOT supplier quote",549,400,100,449,10,139,39,50,10,70,28,-31,111
+"at-1gb","retail=repository catalog; cost=synthetic NOT supplier quote",499,390,0,499,0,109,109,50,10,55,22,54,87
+"at-1gb","retail=repository catalog; cost=synthetic NOT supplier quote",499,390,0,499,10,99,99,50,10,50,20,49,79
+"at-1gb","retail=repository catalog; cost=synthetic NOT supplier quote",499,390,100,399,0,109,9,50,10,55,22,-46,87
+"at-1gb","retail=repository catalog; cost=synthetic NOT supplier quote",499,390,100,399,10,99,-1,50,10,50,20,-51,79
+"mtn-10gb","retail=repository catalog; cost=synthetic NOT supplier quote",4499,4000,0,4499,0,499,499,50,10,250,100,249,399
+"mtn-10gb","retail=repository catalog; cost=synthetic NOT supplier quote",4499,4000,0,4499,10,489,489,50,10,245,98,244,391
+"mtn-10gb","retail=repository catalog; cost=synthetic NOT supplier quote",4499,4000,100,4399,0,499,399,50,10,250,100,149,399
+"mtn-10gb","retail=repository catalog; cost=synthetic NOT supplier quote",4499,4000,100,4399,10,489,389,50,10,245,98,144,391
+"mtn-40gb","retail=repository catalog; cost=synthetic NOT supplier quote",17699,15000,0,17699,0,2699,2699,50,10,1350,540,1349,2159
+"mtn-40gb","retail=repository catalog; cost=synthetic NOT supplier quote",17699,15000,0,17699,10,2689,2689,50,10,1345,538,1344,2151
+"mtn-40gb","retail=repository catalog; cost=synthetic NOT supplier quote",17699,15000,100,17599,0,2699,2599,50,10,1350,540,1249,2159
+"mtn-40gb","retail=repository catalog; cost=synthetic NOT supplier quote",17699,15000,100,17599,10,2689,2589,50,10,1345,538,1244,2151
