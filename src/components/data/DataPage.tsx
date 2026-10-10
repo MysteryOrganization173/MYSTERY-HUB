@@ -370,9 +370,10 @@ export const DataPage: React.FC = () => {
               Choose a service
             </h2>
             {/* 4 Product Mode Navigation Tabs / Discovery Shortcuts */}
-            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 max-w-full sm:flex-wrap">
+            <div role="group" aria-label="Choose a service" className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 max-w-full sm:flex-wrap">
               <button
                 type="button"
+                aria-label="Data Bundles"
                 aria-pressed={dataProductMode === 'data'}
                 onClick={() => {
                   setDataProductMode('data');
@@ -386,10 +387,11 @@ export const DataPage: React.FC = () => {
                     : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'
                 }`}
               >
-                Data Bundles
+                <span className="sm:hidden">Data</span><span className="hidden sm:inline">Data Bundles</span>
               </button>
               <button
                 type="button"
+                aria-label="Instant Bundles"
                 aria-pressed={dataProductMode === 'instant'}
                 onClick={() => {
                   setDataProductMode('instant');
@@ -404,7 +406,7 @@ export const DataPage: React.FC = () => {
                 }`}
               >
                 <Zap className="w-3.5 h-3.5 fill-current" />
-                <span>Instant Bundles</span>
+                <span>Instant<span className="hidden sm:inline"> Bundles</span></span>
               </button>
               <button
                 type="button"
@@ -420,17 +422,18 @@ export const DataPage: React.FC = () => {
               </button>
               <button
                 type="button"
+                aria-label="AFA Registration"
                 onClick={() => setActivePage('afa')}
                 className="min-h-11 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 flex items-center gap-1 border border-slate-700/60 hover:border-[#00c365]/40"
                 title="Register your MTN number for eligible AFA offers"
               >
                 <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-                <span>AFA Registration</span>
+                <span>AFA<span className="hidden sm:inline"> Registration</span></span>
               </button>
             </div>
           </div>
 
-          {/* Network Cards Grid (4 Selector Cards Kept Intact) */}
+          {/* One network selector, backed by the existing AppContext state. */}
           {dataProductMode === 'data' && <DataNetworkSelector value={activeNetwork} onChange={setActiveNetwork} />}
         </div>
 
