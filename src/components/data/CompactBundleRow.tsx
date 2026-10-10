@@ -48,15 +48,15 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
 
             {/* Dominant Promotional Badge: responsive text to prevent narrow-screen collision */}
             {isAirtelTigo ? (
-              <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded shrink-0">
+              <span className="hidden min-[360px]:inline-flex text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded shrink-0">
                 AT<span className="hidden sm:inline"> Data</span>
               </span>
             ) : bundle.isBestValue ? (
-              <span className="text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
+              <span className="hidden min-[360px]:inline-flex text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
                 Best Value
               </span>
             ) : bundle.isPopular ? (
-              <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
+              <span className="hidden min-[360px]:inline-flex text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
                 Popular
               </span>
             ) : null}
@@ -70,14 +70,14 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <div className="text-right">
           <div className="text-[10px] text-slate-400 font-medium hidden xs:block">Price</div>
-          <div className="text-lg sm:text-xl font-extrabold text-white tabular-nums tracking-tight">
+          <div className="text-base min-[360px]:text-lg sm:text-xl font-extrabold text-white tabular-nums tracking-tight">
             GH₵{bundle.priceGhc.toFixed(2)}
           </div>
         </div>
 
         <span
           aria-hidden="true"
-          className="min-h-11 px-3 sm:px-4 rounded-xl bg-[#00c365] group-hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1 shrink-0"
+          className="min-h-11 px-2 min-[360px]:px-3 sm:px-4 rounded-xl bg-[#00c365] group-hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1 shrink-0"
         >
           <span>Buy</span>
           <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
