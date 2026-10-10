@@ -21,7 +21,7 @@ export function AdminCommercialSection({token}:{token:string}) {
  const acquisitionPreview=(p:any)=>{if(previewDiscount===null||p.supplierCostMinor===null||!data.prices.reserveConfigured)return null;const total=p.retailMinor-previewDiscount;if(total<=0)return null;const rule=p.firstReferralRule;const requested=data.dataReferralPolicy?.enabled&&data.dataReferralPolicy.mode==='stage_margin_percent'?p.firstReferralRewardMinor:rule?.type==='fixed_minor'?rule.minor??0:rule?.bps!=null?percentMinor(total,rule.bps):0;const reward=data.dataReferralPolicy?.enabled&&data.dataReferralPolicy.mode==='stage_margin_percent'?requested:requested<=total?requested:0;return total-p.supplierCostMinor-percentMinor(total,data.prices.reserveBps)-data.prices.reserveFixedMinor-reward;};
  const refresh=useCallback(async(retry=false)=>{
   const id=gate.current.start();if(id===null)return;
-  const request=new AbortController();controller.current=request;const timeout=setTimeout(()=>request.abort(),15000);
+  const request=new AbortController();controller.current=request;const timeout=setTimeout(()=>request.abort(),25000);
   setError('');setPhase(retry?'retrying':'loading');
   try{const r=await commercialRequest('admin/commercial',token,undefined,request.signal);
    if(!gate.current.current(id))return;
