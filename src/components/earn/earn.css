@@ -60,11 +60,11 @@
 .earn-services .earn-actions { margin-top: auto; }
 .earn-faq details { border-bottom: 1px solid #263441; padding: 4px 0; }
 .earn-faq details p { padding: 8px 0 16px; }
-.earn-guest-hero { display: grid; gap: 12px; border-radius: 24px; background: #0b1712; border: 1px solid #2b4535; overflow: hidden; }
+.earn-guest-hero { display: grid; gap: 12px; border-radius: 24px; background: radial-gradient(ellipse at top right, #154b32 0%, #0b1712 65%); border: 1px solid #2b4535; overflow: hidden; }
 .earn-guest-hero > div { padding: 24px; align-self: center; display: grid; gap: 18px; }
 .earn-guest-hero h1 { font-size: clamp(2.1rem, 4.4vw, 3.6rem); }
 .earn-guest-hero h1 span { color: #44df95; }
-.earn-guest-hero img { width: 100%; height: 210px; object-fit: cover; object-position: center 55%; }
+
 .earn-guest-hero .earn-fine { display: flex; align-items: start; gap: 8px; }
 .earn-guest-hero .earn-fine svg { flex-shrink: 0; margin-top: 2px; }
 .earn-discover { display: flex; align-items: start; gap: 14px; flex-wrap: wrap; }
@@ -77,7 +77,7 @@
 .earn-finance > details { border-top: 1px solid #263441; padding-top: 8px; }
 .earn-finance > details > div { margin-top: 12px; display: grid; gap: 12px; }
 @media (max-width: 430px) { .earn-metrics { grid-template-columns: 1fr; gap: 14px; } .earn-metrics > div { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; border-bottom: 1px solid #1d2e3a; padding-bottom: 12px; } .earn-metrics p { grid-column: 1 / -1; } .earn-metrics dd { font-size: 1.5rem; margin: 0; } .earn-network dl { grid-template-columns: 1fr; } .earn-share-panel { padding: 16px; } }
-@media (min-width: 768px) { .earn-page { padding: 32px 24px 48px; gap: 28px; } .earn-guest-hero { grid-template-columns: 1.15fr 1fr; } .earn-guest-hero img { height: 100%; min-height: 340px; } .earn-info-grid { grid-template-columns: 1fr 1fr; gap: 32px; } }
+@media (min-width: 768px) { .earn-page { padding: 32px 24px 48px; gap: 28px; }   .earn-info-grid { grid-template-columns: 1fr 1fr; gap: 32px; } }
 @media (min-width: 1024px) { .earn-top-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; } }
 @media (max-width: 1023px) { .earn-top-grid { display: grid; gap: 20px; } }
 @media (prefers-reduced-motion: reduce) { .earn-page *, .earn-page *::before, .earn-page *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

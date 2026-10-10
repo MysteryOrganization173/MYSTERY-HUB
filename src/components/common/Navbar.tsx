@@ -336,6 +336,7 @@ export const Navbar: React.FC = () => {
           )}
 
           <div className="space-y-1">
+            <button type="button" onClick={() => { setMobileMenuOpen(false); openMysteryAi(); }} className="flex items-center gap-2 min-h-11 px-3 rounded-xl text-sm text-slate-300 hover:bg-slate-900" aria-label="Open Mystery AI Assistant"><MessageCircle className="w-4 h-4" />Help · Mystery AI</button>
             {user && <a href="/wallet" onClick={(e) => { e.preventDefault(); handleNavClick('wallet'); }} className="flex items-center gap-2 min-h-11 px-3 rounded-xl text-sm text-slate-300 hover:bg-slate-900"><Wallet className="w-4 h-4" />Mystery Wallet</a>}
             {navLinks.map((link) => (
               <a
