@@ -1,3 +1,4 @@
+import { DataNetworkSelector } from './DataNetworkSelector';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getInstantBundlesOnServer, PublicInstantBundle } from '../../services/apiClient';
@@ -191,42 +192,7 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
           </p>
         </div>
 
-        {/* Network Filter Buttons */}
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setSelectedNetwork('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              selectedNetwork === 'all'
-                ? 'bg-amber-400 text-black shadow-md'
-                : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
-            }`}
-          >
-            All Networks
-          </button>
-          {(['mtn', 'airteltigo', 'telecel'] as NetworkId[]).map((netId) => {
-            const net = GHANA_NETWORKS[netId];
-            const isSelected = selectedNetwork === netId;
-            return (
-              <button
-                key={netId}
-                type="button"
-                onClick={() => setSelectedNetwork(netId)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  isSelected
-                    ? 'bg-white text-black shadow-md'
-                    : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
-                }`}
-              >
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: net.brandColor }}
-                />
-                <span>{netId === 'mtn' ? 'MTN' : netId === 'airteltigo' ? 'AT' : 'Telecel'}</span>
-              </button>
-            );
-          })}
-        </div>
+        <DataNetworkSelector value={selectedNetwork} onChange={setSelectedNetwork} />
       </div>
 
       {/* Category Filter Pills & Search Bar (Only render if categories exist) */}

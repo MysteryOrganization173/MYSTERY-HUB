@@ -1,3 +1,4 @@
+import { DataNetworkSelector } from './DataNetworkSelector';
 import {useDirectCatalog} from '../../hooks/useDirectCatalog';
 import {WelcomeOfferNotice} from './WelcomeOfferNotice';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -272,18 +273,6 @@ export const DataPage: React.FC = () => {
     return faqs.filter((f) => f.category === selectedFaqCategory);
   }, [selectedFaqCategory, faqs]);
 
-  // Network selection with smooth scroll to results
-  const handleSelectNetwork = (net: NetworkId | 'all') => {
-    if (dataProductMode === 'airtime') {
-      setDataProductMode('data');
-    }
-    setActiveNetwork(net);
-    // Smooth scroll to bundle results section
-    setTimeout(() => {
-      smoothScrollToElement(bundlesSectionRef.current, { block: 'start' });
-    }, 50);
-  };
-
   // Airtime selection with smooth scroll to airtime widget
   const handleSelectAirtime = () => {
     setDataProductMode('airtime');
@@ -368,163 +357,30 @@ export const DataPage: React.FC = () => {
     <div className="py-4 sm:py-8 text-slate-100">
       <WelcomeOfferNotice/>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
-        {/* Page Hero Section */}
-        <div className="relative rounded-3xl bg-[#091014] border border-slate-800/80 p-3.5 sm:p-6 lg:p-10 overflow-hidden shadow-2xl">
-          {/* Backdrop Artwork Layer */}
-          <div
-            className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0"
-            aria-hidden="true"
-            role="presentation"
-          >
-            {/* Responsive Cloudinary Image */}
-            <picture>
-              <source
-                media="(max-width: 767px)"
-                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_800,c_fill,g_east/v1790789000/ChatGPT_Image_Sep_30_2026_05_22_58_PM_mh5ypm.png 800w"
-                sizes="100vw"
-              />
-              <source
-                media="(max-width: 1023px)"
-                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1200,c_fill,g_east/v1790789000/ChatGPT_Image_Sep_30_2026_05_22_58_PM_mh5ypm.png 1200w"
-                sizes="100vw"
-              />
-              <img
-                src="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1600/v1790789000/ChatGPT_Image_Sep_30_2026_05_22_58_PM_mh5ypm.png"
-                srcSet="https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1280/v1790789000/ChatGPT_Image_Sep_30_2026_05_22_58_PM_mh5ypm.png 1280w,
-                        https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1600/v1790789000/ChatGPT_Image_Sep_30_2026_05_22_58_PM_mh5ypm.png 1600w"
-                sizes="100vw"
-                alt=""
-                fetchPriority="high"
-                loading="eager"
-                decoding="async"
-                className="w-full h-full object-cover object-[90%_top] sm:object-[85%_center] lg:object-[68%_center] opacity-80 sm:opacity-85 lg:opacity-90"
-              />
-            </picture>
-
-            {/* Desktop Overlay Gradient: Solid dark left 38% for text, smooth transition across center */}
-            <div className="hidden lg:block absolute inset-0 bg-gradient-to-r from-[#091014] via-[#091014]/80 to-transparent from-0% via-38% to-80%" />
-
-            {/* Mobile & Tablet Overlay Gradients */}
-            <div className="lg:hidden absolute inset-0 bg-gradient-to-r from-[#091014]/95 via-[#091014]/70 to-[#091014]/25 from-0% via-45% to-100%" />
-            <div className="lg:hidden absolute inset-0 bg-gradient-to-b from-[#091014]/30 via-transparent to-[#091014] from-0% via-60% to-98%" />
-          </div>
-
-          {/* Ambient Emerald Glow */}
-          <div className="absolute top-0 right-0 w-80 h-80 bg-[#00c365]/10 rounded-full blur-[90px] pointer-events-none" />
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-6 lg:gap-8 items-center relative z-10">
-            <div className="lg:col-span-7 space-y-2.5 sm:space-y-4 text-left">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-[#141d24] border border-slate-700/80 text-[11px] sm:text-xs font-semibold text-[#00c365]">
-                <Wifi className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                <span>Data & Airtime</span>
-              </div>
-
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-snug sm:leading-tight">
-                Stay Connected <br className="hidden sm:inline" />
-                <span className="text-[#00c365]">Always</span>
-              </h1>
-
-              <p className="text-slate-300 text-xs sm:text-sm lg:text-base leading-snug sm:leading-relaxed max-w-lg">
-                Buy data and airtime for MTN, Telecel and AirtelTigo. Choose a product, check the recipient and total, then track your order.
-              </p>
-
-              <div className="pt-0.5 sm:pt-1 flex flex-wrap gap-2.5 sm:gap-4 text-[11px] sm:text-xs text-slate-400">
-                <div className="flex items-center gap-1 sm:gap-1.5">
-                  <Zap className="w-3.5 h-3.5 text-[#00c365]" />
-                  <span>Data bundles</span>
-                </div>
-                <div className="flex items-center gap-1 sm:gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#00c365]" />
-                  <span>MoMo Protected</span>
-                </div>
-                <div className="flex items-center gap-1 sm:gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-[#00c365]" />
-                  <span>Track Your Order</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Visual Featured Bundle Card */}
-            <div className="lg:col-span-5 flex justify-center lg:justify-end w-full">
-              <div className="w-full lg:max-w-[280px] rounded-2xl bg-[#101720]/90 backdrop-blur-md border border-slate-700/80 p-3 sm:p-4 shadow-2xl">
-                {/* Desktop Top Header */}
-                <div className="hidden lg:flex items-center justify-between text-xs text-slate-400 pb-3 border-b border-slate-800">
-                  <span className="font-semibold text-white">Popular Bundle</span>
-                  <span className="text-[10px] font-semibold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/25 px-2 py-0.5 rounded-full">In Stock</span>
-                </div>
-
-                {/* Mobile Compact Horizontal Layout (< lg) */}
-                <div className="flex lg:hidden items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-lg bg-[#FFCC00] text-black font-extrabold text-xs flex items-center justify-center shrink-0 shadow-sm">
-                      MTN
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-base font-extrabold text-white">1GB</span>
-                        <span className="text-[9px] sm:text-[10px] font-semibold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/25 px-2 py-0.5 rounded-full shrink-0">
-                          In Stock
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-slate-400 block truncate">MTN Express Data</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2.5 shrink-0">
-                    <div className="text-right">
-                      <div className="text-[10px] text-slate-400 font-medium">Price</div>
-                      <div className="text-sm sm:text-base font-extrabold text-[#00c365] tabular-nums">GH₵{DATA_BUNDLES.find(b=>b.id==='mtn-1gb')?.priceGhc.toFixed(2) ?? 'Unavailable'}</div>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={!DATA_BUNDLES.some(b=>b.id==='mtn-1gb')}
-                      onClick={() => {const bundle=DATA_BUNDLES.find(b=>b.id==='mtn-1gb');if(bundle)openCheckout(bundle);}}
-                      className="py-1.5 px-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
-                    >
-                      Buy Now
-                    </button>
-                  </div>
-                </div>
-
-                {/* Desktop Vertical Layout (lg+) */}
-                <div className="hidden lg:block py-4 text-center space-y-2">
-                  <div className="w-12 h-12 rounded-xl bg-[#FFCC00] text-black font-extrabold text-sm flex items-center justify-center mx-auto shadow-md">
-                    MTN
-                  </div>
-                  <div className="text-2xl font-bold text-white">1GB</div>
-                  <div className="text-xs text-slate-400">MTN Express Data</div>
-                  <div className="text-xl font-extrabold text-[#00c365]">GH₵{DATA_BUNDLES.find(b=>b.id==='mtn-1gb')?.priceGhc.toFixed(2) ?? 'Unavailable'}</div>
-                  <button
-                    type="button"
-                    disabled={!DATA_BUNDLES.some(b=>b.id==='mtn-1gb')}
-                      onClick={() => {const bundle=DATA_BUNDLES.find(b=>b.id==='mtn-1gb');if(bundle)openCheckout(bundle);}}
-                    className="w-full py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
-                  >
-                    Buy Now
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <header className="rounded-2xl border border-slate-800 bg-gradient-to-br from-[#101f19] to-[#0b1117] px-4 py-4 sm:px-6 sm:py-5">
+          <p className="text-xs font-semibold text-[#44df95] mb-1">Data & Airtime</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Stay connected.</h1>
+          <p className="text-sm text-slate-300 mt-1 max-w-xl">Choose your network and bundle. Check the recipient and total before paying.</p>
+        </header>
 
         {/* Network Selection Banner */}
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-              Choose a Product & Network
+              Choose a service
             </h2>
             {/* 4 Product Mode Navigation Tabs / Discovery Shortcuts */}
             <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 max-w-full sm:flex-wrap">
               <button
                 type="button"
+                aria-pressed={dataProductMode === 'data'}
                 onClick={() => {
                   setDataProductMode('data');
                   setTimeout(() => {
                     smoothScrollToElement(bundlesSectionRef.current, { block: 'start' });
                   }, 50);
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+                className={`min-h-11 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                   dataProductMode === 'data'
                     ? 'bg-[#00c365] text-black shadow-md'
                     : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'
@@ -534,13 +390,14 @@ export const DataPage: React.FC = () => {
               </button>
               <button
                 type="button"
+                aria-pressed={dataProductMode === 'instant'}
                 onClick={() => {
                   setDataProductMode('instant');
                   setTimeout(() => {
                     smoothScrollToElement(bundlesSectionRef.current, { block: 'start' });
                   }, 50);
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1 shrink-0 ${
+                className={`min-h-11 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1 shrink-0 ${
                   dataProductMode === 'instant'
                     ? 'bg-amber-400 text-black shadow-md'
                     : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'
@@ -551,8 +408,9 @@ export const DataPage: React.FC = () => {
               </button>
               <button
                 type="button"
+                aria-pressed={dataProductMode === 'airtime'}
                 onClick={handleSelectAirtime}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+                className={`min-h-11 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                   dataProductMode === 'airtime'
                     ? 'bg-[#00c365] text-black shadow-md'
                     : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'
@@ -563,7 +421,7 @@ export const DataPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setActivePage('afa')}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 flex items-center gap-1 border border-slate-700/60 hover:border-[#00c365]/40"
+                className="min-h-11 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 flex items-center gap-1 border border-slate-700/60 hover:border-[#00c365]/40"
                 title="Register your MTN number for eligible AFA offers"
               >
                 <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
@@ -573,143 +431,7 @@ export const DataPage: React.FC = () => {
           </div>
 
           {/* Network Cards Grid (4 Selector Cards Kept Intact) */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-            {/* MTN */}
-            <button
-              type="button"
-              onClick={() => handleSelectNetwork(activeNetwork === 'mtn' ? 'all' : 'mtn')}
-              className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
-                dataProductMode !== 'airtime' && activeNetwork === 'mtn'
-                  ? 'border-[#FFCC00] bg-[#FFCC00]/10 shadow-[0_0_20px_rgba(255,204,0,0.15)] ring-1 ring-[#FFCC00]/40'
-                  : 'border-slate-800 bg-[#0f151b] hover:border-slate-700'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-[#FFCC00] text-black font-extrabold text-xs flex items-center justify-center shadow-sm">
-                  MTN
-                </div>
-                {dataProductMode !== 'airtime' && activeNetwork === 'mtn' && (
-                  <div className="w-2.5 h-2.5 rounded-full bg-[#FFCC00]" />
-                )}
-              </div>
-              <div className="mt-3">
-                <div className="font-bold text-sm text-white">MTN Ghana</div>
-                <div className="text-[11px] text-slate-400">MTN Express</div>
-              </div>
-            </button>
-
-            {/* AirtelTigo */}
-            <button
-              type="button"
-              onClick={() => handleSelectNetwork(activeNetwork === 'airteltigo' ? 'all' : 'airteltigo')}
-              className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
-                dataProductMode !== 'airtime' && activeNetwork === 'airteltigo'
-                  ? 'border-[#004B93] bg-[#004B93]/20 shadow-[0_0_20px_rgba(0,75,147,0.25)] ring-1 ring-[#004B93]/60'
-                  : 'border-slate-800 bg-[#0f151b] hover:border-slate-700'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-[#004B93] text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                  AT
-                </div>
-                {dataProductMode !== 'airtime' && activeNetwork === 'airteltigo' && (
-                  <div className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-                )}
-              </div>
-              <div className="mt-3">
-                <div className="font-bold text-sm text-white">AirtelTigo (AT)</div>
-                <div className="text-[11px] text-amber-400 font-semibold flex items-center gap-1">
-                  <span>Delivery to Your Number</span>
-                </div>
-              </div>
-            </button>
-
-            {/* Telecel */}
-            <button
-              type="button"
-              onClick={() => handleSelectNetwork(activeNetwork === 'telecel' ? 'all' : 'telecel')}
-              className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
-                dataProductMode !== 'airtime' && activeNetwork === 'telecel'
-                  ? 'border-[#E60000] bg-[#E60000]/10 shadow-[0_0_20px_rgba(230,0,0,0.15)] ring-1 ring-[#E60000]/40'
-                  : 'border-slate-800 bg-[#0f151b] hover:border-slate-700'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="px-2.5 h-10 rounded-xl bg-[#E60000] text-white font-bold text-xs inline-flex items-center justify-center shadow-sm">
-                  Telecel
-                </div>
-                {dataProductMode !== 'airtime' && activeNetwork === 'telecel' && (
-                  <div className="w-2.5 h-2.5 rounded-full bg-[#E60000]" />
-                )}
-              </div>
-              <div className="mt-3">
-                <div className="font-bold text-sm text-white">Telecel Ghana</div>
-                <div className="text-[11px] text-slate-400">Telecel Cash</div>
-              </div>
-            </button>
-
-            {/* Airtime Tab */}
-            <button
-              type="button"
-              onClick={handleSelectAirtime}
-              className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
-                dataProductMode === 'airtime'
-                  ? 'border-[#00c365] bg-[#00c365]/10 shadow-[0_0_20px_rgba(0,195,101,0.15)] ring-1 ring-[#00c365]/40'
-                  : 'border-slate-800 bg-[#0f151b] hover:border-slate-700'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-[#00c365]/20 text-[#00c365] flex items-center justify-center shadow-sm">
-                  <Smartphone className="w-5 h-5" />
-                </div>
-                {dataProductMode === 'airtime' && <div className="w-2.5 h-2.5 rounded-full bg-[#00c365]" />}
-              </div>
-              <div className="mt-3">
-                <div className="font-bold text-sm text-white">Airtime Top-Up</div>
-                <div className="text-[11px] text-slate-400">Custom Amount</div>
-              </div>
-            </button>
-          </div>
-
-          {/* Instant Discovery Banner */}
-          {dataProductMode !== 'instant' && (
-            <div className="rounded-2xl bg-gradient-to-r from-[#0d141b] via-[#141d27] to-[#0d141b] border border-amber-500/30 p-3.5 sm:p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 shadow-lg relative overflow-hidden animate-in fade-in">
-              <div className="absolute right-0 top-0 w-48 h-full bg-amber-500/5 blur-xl pointer-events-none" />
-              <div className="flex items-center gap-3 relative z-10 min-w-0">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 shadow-sm">
-                  <Zap className="w-4 h-4 sm:w-5 sm:h-5 fill-amber-400" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-extrabold text-xs sm:text-sm text-white">
-                      More Bundle Options
-                    </h3>
-                    {(activeNetwork === 'mtn' || activeNetwork === 'all') && (
-                      <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-1.5 py-0.5 rounded whitespace-nowrap">
-                        No MTN Verification
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 leading-snug">
-                    Browse Instant Bundles for a different delivery option. Check each package’s restrictions before paying.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setDataProductMode('instant');
-                  setTimeout(() => {
-                    smoothScrollToElement(bundlesSectionRef.current, { block: 'start' });
-                  }, 50);
-                }}
-                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-bold text-xs tracking-wide transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer relative z-10"
-              >
-                <span>Explore Instant Bundles</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
+          {dataProductMode === 'data' && <DataNetworkSelector value={activeNetwork} onChange={setActiveNetwork} />}
         </div>
 
         {/* Dynamic Mode: Instant Bundles vs Airtime vs Standard Data */}
@@ -937,99 +659,16 @@ export const DataPage: React.FC = () => {
           </form>
         ) : (
           /* Data Bundles View */
-          <div ref={bundlesSectionRef} className="space-y-5">
-            {/* MTN Network Service Notice (Tasteful, Customer-Friendly, Config-Driven) */}
-            {mtnNotice.enabled && (activeNetwork === 'mtn' || activeNetwork === 'all') && (
-              <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 px-3 py-2 text-xs text-slate-200">
-                <div className="flex flex-wrap items-center gap-x-2"><strong className="text-amber-200">MTN delivery</strong><span>Most orders arrive within 15–45 minutes.</span></div>
-                <details><summary className="cursor-pointer min-h-11 flex items-center text-amber-300">Details</summary><div className="space-y-2 pb-2 text-slate-300"><p>{mtnNotice.message}</p><p>{mtnNotice.duplicatePolicyNote}</p><p>{mtnNotice.trackingNote}</p></div></details>
-              </div>
-            )}
-
-            {/* AirtelTigo Instant Delivery Highlight Notice */}
-            {atNotice.enabled && activeNetwork === 'airteltigo' && (
-              <div className="p-4 sm:p-5 rounded-2xl bg-[#004B93]/20 border border-[#004B93]/40 text-slate-200 space-y-2 animate-in fade-in duration-200">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-xl bg-amber-400/20 text-amber-400 shrink-0 mt-0.5">
-                    <Zap className="w-4 h-4" />
-                  </div>
-                  <div className="space-y-1 text-left min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-semibold text-sm text-white">
-                        {atNotice.title}
-                      </h4>
-                      <span className="text-[11px] font-bold text-amber-400 bg-amber-400/15 border border-amber-400/30 px-2 py-0.5 rounded-full">
-                        {atNotice.summary}
-                      </span>
-                    </div>
-                    <p className="text-xs text-sky-100/90 leading-relaxed">
-                      {atNotice.message}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
+          <div ref={bundlesSectionRef} className="space-y-5" id="data-bundles-section">
             {/* Filter Bar & View Mode Toggle */}
             <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3 rounded-2xl bg-[#0e141a] border border-slate-800">
               <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-                {/* Network Selection Pills */}
-                <div className="flex items-center gap-1 pr-2 border-b sm:border-b-0 sm:border-r border-slate-800 shrink-0 pb-1 sm:pb-0">
-                  <button
-                    type="button"
-                    onClick={() => setActiveNetwork('all')}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      activeNetwork === 'all'
-                        ? 'bg-amber-400 text-black shadow-sm font-black'
-                        : 'text-slate-400 hover:text-white bg-slate-900/60 border border-slate-800'
-                    }`}
-                  >
-                    All Networks
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveNetwork('mtn')}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                      activeNetwork === 'mtn'
-                        ? 'bg-[#FFCC00] text-black shadow-sm font-black'
-                        : 'text-slate-400 hover:text-white bg-slate-900/60 border border-slate-800'
-                    }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#FFCC00]" />
-                    <span>MTN</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveNetwork('airteltigo')}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                      activeNetwork === 'airteltigo'
-                        ? 'bg-[#004B93] text-white shadow-sm font-black'
-                        : 'text-slate-400 hover:text-white bg-slate-900/60 border border-slate-800'
-                    }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                    <span>AT</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveNetwork('telecel')}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                      activeNetwork === 'telecel'
-                        ? 'bg-[#E60000] text-white shadow-sm font-black'
-                        : 'text-slate-400 hover:text-white bg-slate-900/60 border border-slate-800'
-                    }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#E60000]" />
-                    <span>Telecel</span>
-                  </button>
-                </div>
-
                 {/* Size Tier Filter Buttons */}
-                <div className="flex items-center gap-1 overflow-x-auto scrollbar-none shrink-0">
+                <div className="flex items-center gap-1 overflow-x-auto scrollbar-none min-w-0 max-w-full">
                   <button
                     type="button"
                     onClick={() => setSizeFilter('all')}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                    className={`min-h-11 px-2.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                       sizeFilter === 'all'
                         ? 'bg-[#00c365] text-black shadow-sm font-bold'
                         : 'text-slate-400 hover:text-white'
@@ -1040,7 +679,7 @@ export const DataPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setSizeFilter('small')}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                    className={`min-h-11 px-2.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                       sizeFilter === 'small'
                         ? 'bg-[#00c365] text-black shadow-sm font-bold'
                         : 'text-slate-400 hover:text-white'
@@ -1051,7 +690,7 @@ export const DataPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setSizeFilter('medium')}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                    className={`min-h-11 px-2.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                       sizeFilter === 'medium'
                         ? 'bg-[#00c365] text-black shadow-sm font-bold'
                         : 'text-slate-400 hover:text-white'
@@ -1062,7 +701,7 @@ export const DataPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setSizeFilter('large')}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                    className={`min-h-11 px-2.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                       sizeFilter === 'large'
                         ? 'bg-[#00c365] text-black shadow-sm font-bold'
                         : 'text-slate-400 hover:text-white'
@@ -1174,12 +813,44 @@ export const DataPage: React.FC = () => {
                     setSizeFilter('all');
                     setSearchQuery('');
                   }}
-                  className="px-4 py-2 rounded-lg bg-[#00c365] text-black font-semibold text-xs cursor-pointer"
+                  className="min-h-11 px-4 py-2 rounded-lg bg-[#00c365] text-black font-semibold text-xs cursor-pointer"
                 >
                   Reset Filters
                 </button>
               </div>
             )}
+            {/* MTN Network Service Notice (Tasteful, Customer-Friendly, Config-Driven) */}
+            {mtnNotice.enabled && (activeNetwork === 'mtn' || activeNetwork === 'all') && (
+              <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 px-3 py-2 text-xs text-slate-200">
+                <div className="flex flex-wrap items-center gap-x-2"><strong className="text-amber-200">MTN delivery</strong><span>Most orders arrive within 15–45 minutes.</span></div>
+                <details><summary className="cursor-pointer min-h-11 flex items-center text-amber-300">Details</summary><div className="space-y-2 pb-2 text-slate-300"><p>{mtnNotice.message}</p><p>{mtnNotice.duplicatePolicyNote}</p><p>{mtnNotice.trackingNote}</p></div></details>
+              </div>
+            )}
+
+            {/* AirtelTigo Instant Delivery Highlight Notice */}
+            {atNotice.enabled && activeNetwork === 'airteltigo' && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#004B93]/20 border border-[#004B93]/40 text-slate-200 space-y-2 animate-in fade-in duration-200">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-amber-400/20 text-amber-400 shrink-0 mt-0.5">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-1 text-left min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-semibold text-sm text-white">
+                        {atNotice.title}
+                      </h4>
+                      <span className="text-[11px] font-bold text-amber-400 bg-amber-400/15 border border-amber-400/30 px-2 py-0.5 rounded-full">
+                        {atNotice.summary}
+                      </span>
+                    </div>
+                    <p className="text-xs text-sky-100/90 leading-relaxed">
+                      {atNotice.message}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         )}
 

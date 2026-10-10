@@ -1,0 +1,9 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {DataNetworkSelector,DATA_NETWORK_CHOICES} from '../../../src/components/data/DataNetworkSelector.js';
+import {readFileSync} from 'node:fs';
+for(const choice of DATA_NETWORK_CHOICES)test('accessible single selected operator '+choice.id,()=>{const html=renderToStaticMarkup(React.createElement(DataNetworkSelector,{value:choice.id,onChange:()=>{}}));assert.equal((html.match(/aria-pressed="true"/g)||[]).length,1);assert.equal((html.match(/<button/g)||[]).length,4);assert.match(html,/min-h-11/);assert.ok(html.includes(choice.color));assert.ok(html.includes('aria-label="'+choice.name+'"'));});
+test('standard and instant use the shared selector with existing controlled network',()=>{const standard=readFileSync('src/components/data/DataPage.tsx','utf8'),instant=readFileSync('src/components/data/InstantBundlesCatalog.tsx','utf8');assert.match(standard,/dataNetwork: activeNetwork/);assert.match(standard,/<DataNetworkSelector value=\{activeNetwork\} onChange=\{setActiveNetwork\}/);assert.doesNotMatch(standard,/grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4/);assert.match(instant,/<DataNetworkSelector value=\{selectedNetwork\}/);assert.match(standard,/useDirectCatalog\(\)/);assert.match(standard,/onBuy=\{\(b\) => openCheckout\(b\)\}/);assert.match(standard,/openCheckout\(b, opts\)/);});
+test('search, size, all reset and secondary delivery disclosure remain',()=>{const s=readFileSync('src/components/data/DataPage.tsx','utf8');for(const value of ["setSizeFilter('all')","setSearchQuery('')","setActiveNetwork('all')",'mb > 5120','mb <= 20480','handleSelectAirtime',"setActivePage('afa')"])assert.ok(s.includes(value),value);assert.ok(s.indexOf('Filter Bar')<s.indexOf('MTN Network Service Notice'));});
