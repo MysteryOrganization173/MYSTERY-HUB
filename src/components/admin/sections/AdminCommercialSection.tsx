@@ -1,10 +1,11 @@
-import React,{useEffect,useState} from 'react';
+import { createAdminReadGate, adminReadMessage, commercialCash } from '../../../utils/adminCommercialRefresh';
+import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {commercialRequest} from '../../../services/commercialApi';
 import {formatGhs,parseGhs,percentMinor} from '../../../../shared/money';
 import {AdminResellerControls} from './AdminResellerControls';
 const field='min-h-11 w-full rounded-lg border border-slate-700 bg-slate-950 p-2';
 const button='min-h-11 rounded-lg bg-emerald-700 px-4 py-2 disabled:opacity-50';
-const cash=(value:number|null)=>value===null?'Unknown / not configured':formatGhs(value);
+const cash=commercialCash;
 function auditChanges(a:any){
  try{const {previous,next}=JSON.parse(a.metadata_safe_json||'{}');if(!next)return [];
  const lines:string[]=[];for(const key of ['enabled','discountMinor','reserveBps','reserveFixedMinor','wholesaleMinor','withdrawalFeeBps'])if(previous?.[key]!==next[key]&&next[key]!==undefined)lines.push(`${key.replace(/([A-Z])/g,' $1')}: ${previous?.[key]??'unconfigured'} -> ${next[key]}${key.endsWith('Minor')?' pesewas':''}`);
@@ -12,15 +13,34 @@ function auditChanges(a:any){
  return lines;}catch{return [];}
 }
 export function AdminCommercialSection({token}:{token:string}) {
+ const gate=useRef(createAdminReadGate()),controller=useRef<AbortController|null>(null),savePending=useRef(false),sessionGeneration=useRef(0);
+ const [phase,setPhase]=useState<'loading'|'success'|'error'|'retrying'>('loading');
  const [data,setData]=useState<any>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const [bps,setBps]=useState('0'),[fixed,setFixed]=useState('0'),[discount,setDiscount]=useState('1'),[enabled,setEnabled]=useState(true);
  const previewDiscount=(()=>{try{return parseGhs(discount);}catch{return null;}})();
  const acquisitionPreview=(p:any)=>{if(previewDiscount===null||p.supplierCostMinor===null||!data.prices.reserveConfigured)return null;const total=p.retailMinor-previewDiscount;if(total<=0)return null;const rule=p.firstReferralRule;const requested=data.dataReferralPolicy?.enabled&&data.dataReferralPolicy.mode==='stage_margin_percent'?p.firstReferralRewardMinor:rule?.type==='fixed_minor'?rule.minor??0:rule?.bps!=null?percentMinor(total,rule.bps):0;const reward=data.dataReferralPolicy?.enabled&&data.dataReferralPolicy.mode==='stage_margin_percent'?requested:requested<=total?requested:0;return total-p.supplierCostMinor-percentMinor(total,data.prices.reserveBps)-data.prices.reserveFixedMinor-reward;};
- const refresh=async()=>{const r=await commercialRequest('admin/commercial',token);setData(r);setBps(String(r.prices.reserveBps/100));setFixed((r.prices.reserveFixedMinor/100).toFixed(2));setDiscount((r.offer.discountMinor/100).toFixed(2));setEnabled(r.offer.enabled);};
- useEffect(()=>{void refresh().catch(e=>setError(e.message));},[token]);
+ const refresh=useCallback(async(retry=false)=>{
+  const id=gate.current.start();if(id===null)return;
+  const request=new AbortController();controller.current=request;const timeout=setTimeout(()=>request.abort(),15000);
+  setError('');setPhase(retry?'retrying':'loading');
+  try{const r=await commercialRequest('admin/commercial',token,undefined,request.signal);
+   if(!gate.current.current(id))return;
+   if(!r?.prices||!r?.offer||!Array.isArray(r.products)||!Array.isArray(r.audit))throw Error('Invalid response');
+   setData(r);setBps(String(r.prices.reserveBps/100));setFixed((r.prices.reserveFixedMinor/100).toFixed(2));setDiscount((r.offer.discountMinor/100).toFixed(2));setEnabled(r.offer.enabled);setPhase('success');
+  }catch(e){if(gate.current.current(id)){setData(null);setError(adminReadMessage(e));setPhase('error');}}
+  finally{clearTimeout(timeout);gate.current.finish(id);}
+ },[token]);
+ useEffect(()=>{sessionGeneration.current++;gate.current.invalidate();controller.current?.abort();savePending.current=false;setBusy(false);setData(null);void refresh();return()=>{sessionGeneration.current++;gate.current.invalidate();controller.current?.abort();};},[refresh]);
  const submit=(create:()=>any)=>{try{void save(create());}catch(e:any){setError(e.message);}};
- const save=async(body:any)=>{if(!window.confirm('Change future commercial pricing? Historical orders stay unchanged. Negative welcome contribution is an intentional acquisition subsidy.'))return;setBusy(true);setError('');try{await commercialRequest('admin/commercial',token,{...body,confirmed:true});await refresh();}catch(e:any){setError(e.message);}finally{setBusy(false);}};
- return <section className="space-y-5 min-w-0"><h2 className="text-xl font-bold">Commercial Pricing & Welcome Offer</h2>{error&&<p role="alert" className="text-rose-300">{error}</p>}{!data?<p>Loading prices and offer settings…</p>:<>
+ const save=async(body:any)=>{if(savePending.current||phase!=='success'||!window.confirm('Change future commercial pricing? Historical orders stay unchanged. Negative welcome contribution is an intentional acquisition subsidy.'))return;
+  const owner=gate.current.start(),session=sessionGeneration.current;if(owner===null)return;
+  savePending.current=true;setBusy(true);setError('');
+  try{await commercialRequest('admin/commercial',token,{...body,confirmed:true});if(gate.current.current(owner)){gate.current.finish(owner);await refresh(true);}}
+  catch(e:any){if(gate.current.current(owner))setError(e.message);}
+  finally{gate.current.finish(owner);if(sessionGeneration.current===session){setBusy(false);savePending.current=false;}}
+ };
+ return <section className="space-y-5 min-w-0"><h2 className="text-xl font-bold">Commercial Pricing & Welcome Offer</h2>{error&&<p role="alert" className="text-rose-300">{error}</p>}{phase==='error'?<button type="button" className={button} onClick={()=>void refresh(true)}>Retry commercial settings</button>:phase==='loading'||phase==='retrying'?<p role="status" aria-live="polite">{phase==='retrying'?'Retrying commercial settings…':'Loading prices and offer settings…'}</p>:data?<>
+ {data.dependencyStatus?.supplierCosts==='unavailable'&&<p role="status" className="rounded-xl border border-amber-800 bg-amber-950/30 p-3 text-sm text-amber-200">Supplier costs are temporarily unavailable for some packages. Settings are loaded; unknown contributions are not profit estimates.</p>}
  <p className="text-sm text-slate-400">Future direct prices only. Supplier cost is live provider authority. Reseller wholesale and owner retail remain separate. Unknown cost/contribution is not a profit estimate.</p>
  <form className="grid sm:grid-cols-3 gap-3" onSubmit={e=>{e.preventDefault();submit(()=>({kind:'pricing',expectedVersion:data.prices.version,configureReserve:true,reserveBps:Math.round(Number(bps)*100),reserveFixedMinor:/^0(?:\.0{1,2})?$/.test(fixed.trim())?0:parseGhs(fixed),products:[]}));}}>
   <label>Direct processing reserve (%)<input className={field} type="number" value={bps} onChange={e=>setBps(e.target.value)} min={0} max={99.99} step="0.01"/></label><label>Fixed reserve (GH₵)<input className={field} value={fixed} onChange={e=>setFixed(e.target.value)}/></label><button disabled={busy} className={button}>Save direct reserve</button>
@@ -38,5 +58,5 @@ export function AdminCommercialSection({token}:{token:string}) {
   <label className="block">Future direct retail (GH₵)<input key={p.retailMinor} name="retail" className={field} defaultValue={(p.retailMinor/100).toFixed(2)}/></label><label className="block">Recommended reseller retail (optional, GH₵)<input key={String(p.recommendedMinor)} name="recommended" className={field} defaultValue={p.recommendedMinor===null?'':(p.recommendedMinor/100).toFixed(2)}/></label><label className="flex gap-2"><input key={String(p.enabled)} name="enabled" type="checkbox" defaultChecked={p.enabled}/>Direct product available</label><button disabled={busy} className={button}>Save future price</button>
  </form>)}</div>
  <AdminResellerControls token={token}/><h3 className="font-bold">Recent pricing and offer changes</h3>{data.audit.map((a:any)=><details key={a.id} className="text-sm break-words"><summary>{a.created_at} · {a.action} · Admin {a.admin_user_id} · {a.entity_id}</summary>{auditChanges(a).map((line:string,i:number)=><p key={i}>{line}</p>)}</details>)}
- </>}</section>;
+ </>:null}</section>;
 }
