@@ -1,3 +1,4 @@
+import { adminRead, validateAdminConfig, adminMatchingRule, adminSupplierCosts, AdminReadFailure } from './adminCommercialRead.js';
 import { getPool } from '../db/connection.js';
 import {AdminAuditStore} from '../db/adminAuditStore.js';
 import { randomUUID } from 'node:crypto';
@@ -161,21 +162,28 @@ export class CommercialService {
     }
   }
   static async admin() {
-    const [prices,offer,store,economy]=await Promise.all([config('direct-pricing'),config('welcome-offer'),WebsiteConfig(),economicsPolicy('data')]);
-    const products=await Promise.all(Object.values(AUTHORITATIVE_PRODUCTS).map(async p=>{
-      const resolved=await FulfilmentService.getProvider().resolvePackage(p.network,p.dataAmount).catch(()=>null),supplierCostMinor=resolved?.resolved?.supplierCostMinor??null;
+    const [prices,offer,store,economy,rules]=await Promise.all([
+      adminRead('direct_pricing',()=>config('direct-pricing')),adminRead('welcome_offer',()=>config('welcome-offer')),
+      adminRead('reseller_config',WebsiteConfig),adminRead('referral_economics',()=>economicsPolicy('data')),
+      adminRead('referral_rules',()=>ReferralStore.getAllRules())]);
+    validateAdminConfig(prices,offer,store,economy);
+    if(!Array.isArray(rules))throw new AdminReadFailure('referral_rules','invalid');
+    const catalog=Object.values(AUTHORITATIVE_PRODUCTS),at=new Date().toISOString();
+    const costs=await adminSupplierCosts(catalog,p=>FulfilmentService.getProvider().resolvePackage(p.network,p.dataAmount));
+    const products=await Promise.all(catalog.map(async(p,index)=>{
+      const supplierCostMinor=costs[index].minor,supplierCostState=costs[index].state;
       const setting=prices.products[p.id],retailMinor=setting?.retailMinor??p.amountPesewas,reserveMinor=prices.reserveConfigured?percentMinor(retailMinor,prices.reserveBps)+prices.reserveFixedMinor:null,discountedMinor=retailMinor-offer.discountMinor;
-      const firstRule=await ReferralStore.findMatchingRule('data',p.network,p.id,'acquisition');
+      const firstRule=adminMatchingRule(rules,p.network,p.id,'acquisition',at);
       const requestedFirstReward=firstRule?.reward_type==='fixed_minor'?firstRule.reward_minor??0:firstRule?.reward_percent_bps!=null?percentMinor(Math.max(0,discountedMinor),firstRule.reward_percent_bps):0;
       // Estimate for a valid referred first purchase, not a promise of eligibility.
       const dynamic=economy?.enabled&&economy.mode==='stage_margin_percent';
       const estimate={service_type:'data',amount:discountedMinor,supplier_cost_minor:supplierCostMinor,commercial_context:{regularMinor:retailMinor,discountMinor:offer.discountMinor,reserveMinor:prices.reserveConfigured?percentMinor(Math.max(0,discountedMinor),prices.reserveBps)+prices.reserveFixedMinor:null,normalReserveMinor:reserveMinor}} as OrderRecord;
       const firstReferralRewardMinor=dynamic?(firstRule?computeEconomicReward(estimate,firstRule,0,economy,'acquisition').amount:0):requestedFirstReward<=discountedMinor?requestedFirstReward:0;
-      const recurringRule=await ReferralStore.findMatchingRule('data',p.network,p.id,'recurring');
+      const recurringRule=adminMatchingRule(rules,p.network,p.id,'recurring',at);
       const recurringReferralRewardMinor=dynamic&&recurringRule?computeEconomicReward({...estimate,amount:retailMinor,commercial_context:{...estimate.commercial_context!,reserveMinor}},recurringRule,0,economy,'recurring').amount:null;
       const promoContributionMinor=supplierCostMinor===null||!prices.reserveConfigured?null:discountedMinor-supplierCostMinor-percentMinor(discountedMinor,prices.reserveBps)-prices.reserveFixedMinor;
-      const wholesale=store.wholesale[p.id];return {...p,retailMinor,enabled:setting?.enabled??true,recommendedMinor:setting?.recommendedMinor??null,supplierCostMinor,reserveMinor,spreadMinor:supplierCostMinor===null?null:retailMinor-supplierCostMinor,contributionMinor:supplierCostMinor===null||reserveMinor===null?null:retailMinor-supplierCostMinor-reserveMinor,discountedMinor,promoContributionMinor,recurringReferralRewardMinor,normalContributionMinor:supplierCostMinor===null||reserveMinor===null?null:retailMinor-supplierCostMinor-reserveMinor,recurringContributionMinor:supplierCostMinor===null||reserveMinor===null||recurringReferralRewardMinor===null?null:retailMinor-supplierCostMinor-reserveMinor-recurringReferralRewardMinor,firstReferralRewardMinor,acquisitionContributionMinor:promoContributionMinor===null?null:promoContributionMinor-firstReferralRewardMinor,firstReferralRule:firstRule?{type:firstRule.reward_type,minor:firstRule.reward_minor,bps:firstRule.reward_percent_bps}:null,wholesaleMinor:wholesale?.wholesaleMinor??null,safeResellerFloor:wholesale?minimumFloor(wholesale.wholesaleMinor,store.policy):null,pricePerGb:retailMinor/100/parseFloat(p.dataAmount)};
-    }));return {prices,offer,products,dataReferralPolicy:economy,audit:(await AdminAuditStore.findRecent(100)).filter(a=>a.action.startsWith('commercial_')||a.action==='store_wholesale_changed'||a.action==='store_policy_changed').slice(0,25)};
+      const wholesale=store.wholesale[p.id];return {...p,supplierCostState,retailMinor,enabled:setting?.enabled??true,recommendedMinor:setting?.recommendedMinor??null,supplierCostMinor,reserveMinor,spreadMinor:supplierCostMinor===null?null:retailMinor-supplierCostMinor,contributionMinor:supplierCostMinor===null||reserveMinor===null?null:retailMinor-supplierCostMinor-reserveMinor,discountedMinor,promoContributionMinor,recurringReferralRewardMinor,normalContributionMinor:supplierCostMinor===null||reserveMinor===null?null:retailMinor-supplierCostMinor-reserveMinor,recurringContributionMinor:supplierCostMinor===null||reserveMinor===null||recurringReferralRewardMinor===null?null:retailMinor-supplierCostMinor-reserveMinor-recurringReferralRewardMinor,firstReferralRewardMinor,acquisitionContributionMinor:promoContributionMinor===null?null:promoContributionMinor-firstReferralRewardMinor,firstReferralRule:firstRule?{type:firstRule.reward_type,minor:firstRule.reward_minor,bps:firstRule.reward_percent_bps}:null,wholesaleMinor:wholesale?.wholesaleMinor??null,safeResellerFloor:wholesale?minimumFloor(wholesale.wholesaleMinor,store.policy):null,pricePerGb:retailMinor/100/parseFloat(p.dataAmount)};
+    }));return {prices,offer,products,dataReferralPolicy:economy,dependencyStatus:{supplierCosts:costs.some(c=>c.state==='unavailable')?'unavailable':costs.some(c=>c.state==='unknown')?'unknown':'known'},audit:(await adminRead('audit_history',()=>AdminAuditStore.findRecent(100))).filter(a=>a.action.startsWith('commercial_')||a.action==='store_wholesale_changed'||a.action==='store_policy_changed').slice(0,25)};
   }
   static async save(adminId:string,input:any) {
     if(input.confirmed!==true)throw new FinanceError('Confirm this commercial change.');

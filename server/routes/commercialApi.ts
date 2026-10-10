@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { AdminReadFailure } from '../services/adminCommercialRead.js';
 import { Router } from 'express';
 import { optionalAuth,requireAdmin } from '../middleware/authMiddleware.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
@@ -15,5 +17,9 @@ commercialRouter.get('/quote/:productId',optionalAuth,handle(async req=>{
 }));
 export const adminCommercialRouter=Router();
 adminCommercialRouter.use(requireAdmin);
-adminCommercialRouter.get('/',handle(()=>CommercialService.admin()));
+adminCommercialRouter.get('/',async(req,res)=>{
+  const requestId=randomUUID();res.setHeader('Cache-Control','no-store');res.setHeader('X-Request-ID',requestId);
+  try{const result=await CommercialService.admin();if(result.dependencyStatus.supplierCosts==='unavailable')console.warn(JSON.stringify({operation:'admin_commercial_read',requestId,dependency:'supplier_costs',reason:'unavailable',transient:true}));res.json(result);}
+  catch(error){const failure=error instanceof AdminReadFailure?error:null;console.warn(JSON.stringify({operation:'admin_commercial_read',requestId,dependency:failure?.dependency??'response',reason:failure?.reason??'unavailable',transient:failure?.reason!=='invalid'}));res.status(503).json({error:'Commercial service unavailable.',requestId});}
+});
 adminCommercialRouter.post('/',createRateLimiter({windowMs:60_000,max:10}),handle(req=>CommercialService.save(req.user.id,req.body)));
