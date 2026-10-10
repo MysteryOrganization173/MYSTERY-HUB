@@ -5,12 +5,10 @@ import { FinancialPanel } from '../finance/FinancialPanel';
 import { getActiveRewardRules, getMyReferralSummary, getMyRewardLedger, type PublicRewardRule, type RewardLedgerItem } from '../../services/apiClient';
 import { createEarnDashboardRefresh } from '../../utils/earnDashboardRefresh';
 import { activeEarnRules, type EarnSummary } from '../../utils/earnExperience';
-import { getCloudinaryUrl } from '../../utils/cloudinary';
 import { EarnSharing } from './EarnSharing';
 import { EarnMetrics, EarnRewardActivity, EarnRules, EarnHowItWorks } from './EarnDetails';
 import './earn.css';
 
-const artwork = 'https://res.cloudinary.com/da6oeat7m/image/upload/v1790940221/Neon_Rewards_Network_with_Gift_Box_ueitrt.png';
 export interface MysteryEarnPageProps { highestActiveReferralRewardMinor?: number | null }
 
 function useEarnRules() {
@@ -77,7 +75,7 @@ function GuestEarn() {
   const { openAuth } = useApp();
   const rules = useEarnRules();
   return <main className="earn-page" aria-label="About Mystery Earn">
-    <section className="earn-guest-hero"><div><p className="earn-eyebrow">Mystery Earn</p><h1>Good things are<br /><span>better shared.</span></h1><p>Introduce someone to Mystery Hub. When they complete an eligible purchase, you could earn a referral reward.</p><div className="earn-actions"><button className="earn-primary" onClick={() => openAuth('signup')}>Create a Free Account <ArrowRight size={18} aria-hidden="true" /></button><a className="earn-secondary" href="#how-it-works-section">How It Works <ArrowDown size={16} aria-hidden="true" /></a></div><p className="earn-fine"><ShieldCheck size={16} aria-hidden="true" /> Free to join. No reward for clicks alone. Eligibility applies.</p></div><img src={getCloudinaryUrl(artwork, { width: 640, quality: 'auto', format: 'auto' })} alt="" aria-hidden="true" width="640" height="480" /></section>
+    <section className="earn-guest-hero"><div><p className="earn-eyebrow">Mystery Earn</p><h1>Good things are<br /><span>better shared.</span></h1><p>Introduce someone to Mystery Hub. When they complete an eligible purchase, you could earn a referral reward.</p><div className="earn-actions"><button className="earn-primary" onClick={() => openAuth('signup')}>Create a Free Account <ArrowRight size={18} aria-hidden="true" /></button><a className="earn-secondary" href="#how-it-works-section">How It Works <ArrowDown size={16} aria-hidden="true" /></a></div><p className="earn-fine"><ShieldCheck size={16} aria-hidden="true" /> Free to join. No reward for clicks alone. Eligibility applies.</p></div></section>
     <EarnHowItWorks /><EarnRules {...rules} />
     <section className="earn-section earn-discover"><Share2 size={24} aria-hidden="true" /><div><h2>One link. Useful services to explore.</h2><p>Data bundles, digital services, Marketplace discovery and the Free Website Builder. Sharing a service does not automatically make it reward-eligible. Marketplace enquiries and free websites are not paid qualifying purchases.</p></div><a className="earn-secondary" href="/">Explore Mystery Hub <ArrowRight size={16} aria-hidden="true" /></a></section>
     <EarnHelp />
