@@ -169,7 +169,7 @@ test('purge rechecks the latch when a caller tries to release an uncertain phone
   assert.ok((await AfaStore.find(order.id))!.encrypted_payload);assert.equal((await AfaStore.find(order.id))!.purchase_blocked,true);
 });
 test('Data discovery links to AFA without a hardcoded registration price or availability',()=>{
-  assert.match(source('src/components/data/DataPage.tsx'),/setActivePage\('afa'\)[\s\S]*AFA Registration/);
+  const page=source('src/components/data/DataPage.tsx');assert.match(page,/setActivePage\('afa'\)/);assert.match(page,/aria-label="AFA Registration"/);
 });
 test('USSD access guidance is shown only after supplier-confirmed registration',()=>{
   assert.match(source('src/components/services/AfaRegistrationPage.tsx'),/confirmedOrder.status === 'delivered' && <p[^>]*>Dial[\s\S]*?\*1848#/);
