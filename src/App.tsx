@@ -17,6 +17,7 @@ import { WebsiteBuilderPage } from './components/website/WebsiteBuilderPage';
 import { MoreServicesPage } from './components/services/MoreServicesPage';
 import { AfaRegistrationPage } from './components/services/AfaRegistrationPage';
 import { MarketplacePage } from './components/marketplace/MarketplacePage';
+import { HelpPage } from './components/help/HelpPage';
 import { AboutPage } from './components/about/AboutPage';
 import { OrdersPage } from './components/orders/OrdersPage';
 import { MysteryEarnPage } from './components/earn/MysteryEarnPage';
@@ -63,6 +64,7 @@ const AppContent: React.FC = () => {
         {activePage === 'services' && <MoreServicesPage />}
         {activePage === 'afa' && <AfaRegistrationPage />}
         {activePage === 'about' && <AboutPage />}
+        {activePage === 'help' && <HelpPage />}
         {activePage === 'orders' && <OrdersPage />}
         {activePage === 'earn' && <MysteryEarnPage />}
         {activePage === 'wallet' && <WalletPage />}

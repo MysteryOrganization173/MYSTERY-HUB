@@ -9,6 +9,7 @@ interface PageMetadata {
 }
 
 const SEO_MAP: Record<string, PageMetadata> = {
+  help: { title: 'Help & FAQs — Mystery Hub Ghana', description: 'Find answers about Data, Airtime, payments, order tracking, Mystery Earn, Website Builder, Wallet and support.' },
   wallet: {title:'Mystery Wallet — Mystery Hub',description:'Top up your Wallet and use your available balance for supported Mystery Hub purchases.'},
   earn: {title:'Mystery Earn — Mystery Hub',description:'Invite people to Mystery Hub and earn rewards from qualifying purchases.'},
   afa: { title:'MTN AFA Registration — Mystery Hub', description:'Check AFA availability, register your MTN number and track your registration. The registration fee does not include future MTN voice or data packages.' },

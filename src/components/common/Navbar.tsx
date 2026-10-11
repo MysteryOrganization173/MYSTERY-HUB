@@ -37,6 +37,7 @@ export const Navbar: React.FC = () => {
     { id: 'marketplace', label: 'Marketplace' },
     { id: 'services', label: 'More Services' },
     { id: 'about', label: 'About' },
+    { id: 'help', label: 'Help & FAQs' },
   ];
 
   // Close dropdown on outside click or Escape key
@@ -73,7 +74,9 @@ export const Navbar: React.FC = () => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     const q = searchQuery.toLowerCase();
-    if (q.includes('wallet') || q.includes('top up')) {
+    if (q.includes('faq') || q.includes('help') || q.includes('support')) {
+      setActivePage('help');
+    } else if (q.includes('wallet') || q.includes('top up')) {
       setActivePage('wallet');
     } else if (q.includes('earn') || q.includes('referral') || q.includes('reward') || q.includes('affiliate') || q.includes('share')) {
       setActivePage('earn');
@@ -111,7 +114,7 @@ export const Navbar: React.FC = () => {
         </a>
 
         {/* Zone 2: Navigation Links (Desktop) */}
-        <nav className="hidden xl:flex items-center gap-5 text-sm font-medium text-slate-300">
+        <nav className="hidden xl:flex items-center gap-3 text-xs font-medium text-slate-300">
           {navLinks.map((link) => {
             const isActive = activePage === link.id;
             return (
@@ -264,6 +267,7 @@ export const Navbar: React.FC = () => {
                   </div>
 
                   <button onClick={() => { accountTrigger.current?.focus(); setAccountDropdownOpen(false); openAccount(); }} className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2"><UserIcon className="w-4 h-4" />My Account</button>
+                  <a href="/help" onClick={event => { event.preventDefault(); handleNavClick('help'); }} className="w-full min-h-11 px-3.5 flex items-center gap-2 hover:bg-slate-800"><MessageCircle className="w-4 h-4" />Help &amp; FAQs</a>
                   {/* Sign Out */}
                   <div className="pt-1 border-t border-slate-800">
                     <button

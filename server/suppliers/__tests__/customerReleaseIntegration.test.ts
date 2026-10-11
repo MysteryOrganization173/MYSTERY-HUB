@@ -9,7 +9,7 @@ test('member homepage does not append guest marketing while guest P1 composition
   const member = home.slice(home.indexOf('if (user) {'), home.lastIndexOf('return ('));
   assert.match(member, /<MemberHome \/>/);
   assert.doesNotMatch(member, /<HomeFeaturedData|<HomeWebsiteSection|<HomeMarketplaceSection/);
-  for (const section of ['Hero', 'QuickServicesBar', 'HomeFeaturedData', 'HomeWebsiteSection', 'HomeMarketplaceSection', 'WhyMysteryHub']) {
+  for (const section of ['Hero', 'QuickServicesBar', 'HomeFeaturedData', 'HomeWebsiteSection', 'HomeMarketplaceSection', 'HomeTrustAnalytics', 'HomeFaqPreview']) {
     assert.match(home.slice(home.lastIndexOf('return (')), new RegExp(`<${section} />`));
   }
   assert.match(home, /import '\.\/homepage\.css'/);

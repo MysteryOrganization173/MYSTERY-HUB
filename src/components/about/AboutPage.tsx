@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { FaqAccordion } from '../common/FaqAccordion';
+import { HOME_FAQS } from '../../data/helpFaqs';
+import '../home/homepage.css';
 import { useApp } from '../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
@@ -283,20 +286,8 @@ export const AboutPage: React.FC = () => {
 
         <section aria-label="Common questions" className="space-y-3 text-left">
           <h2 className="text-xl sm:text-2xl font-bold text-white">New to Mystery Hub?</h2>
-          {[
-            ['How do I place an order?', 'Open Data, choose a network and product, enter the recipient number and review the total before paying. AFA registration has its own form and requires an account.'],
-            ['How can I pay?', 'Use the payment options shown at checkout. Eligible purchases also support Mystery Wallet when you are signed in and have enough balance.'],
-            ['How do I track an order or get help?', 'Open Orders with your order reference or recipient number. Payment confirmation and delivery are separate steps. If delivery takes longer, contact WhatsApp support with your order reference.'],
-            ['What is Mystery Wallet?', 'Add money to pay for eligible Mystery Hub purchases. Wallet funds cannot be withdrawn to Mobile Money and do not earn interest.'],
-            ['How does Mystery Earn work?', 'Create an account and share your referral link. Eligible referred purchases can earn rewards under the active rules. Pending rewards are not yet approved; withdrawal limits and fees are shown in Mystery Earn.'],
-            ['Can I create a website for free?', 'Yes. Choose a design, add your business details and photos, then publish on the Free plan. Your website has its own link and brand colors. Paid-plan features are available only where shown.'],
-            ['Which services are coming later?', 'ECG, Ghana Water, TV renewals and results-checker services are not available yet. See More Services for current availability and launch lists.'],
-          ].map(([question, answer]) => (
-            <details key={question} className="rounded-xl border border-slate-800 bg-[#0d1217] p-4">
-              <summary className="cursor-pointer font-semibold text-sm text-white">{question}</summary>
-              <p className="mt-3 text-sm text-slate-300 leading-relaxed">{answer}</p>
-            </details>
-          ))}
+          <FaqAccordion questions={HOME_FAQS} />
+          <a href="/help" onClick={event => { event.preventDefault(); setActivePage('help'); }} className="home-text-action">View All FAQs →</a>
         </section>
 
         {/* 4. Contact / Partnership Section */}

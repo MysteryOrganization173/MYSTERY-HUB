@@ -11,6 +11,7 @@ export const ROUTE_PATH_MAP: Record<ActivePage, string> = {
   marketplace: '/marketplace',
   services: '/services',
   about: '/about',
+  help: '/help',
   orders: '/orders',
   admin: '/admin',
   earn: '/earn',
@@ -118,6 +119,8 @@ export function getPageFromPath(rawPath: string | null | undefined): ActivePage 
   if (normalized === '/services' || normalized === '/services/index.html') {
     return 'services';
   }
+
+  if (normalized === '/help' || normalized === '/help/index.html' || normalized === '/faq') return 'help';
 
   if (normalized === '/about' || normalized === '/about/index.html') {
     return 'about';

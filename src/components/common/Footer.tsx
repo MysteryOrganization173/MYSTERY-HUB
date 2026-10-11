@@ -176,6 +176,7 @@ export const Footer: React.FC = () => {
                     Track My Order
                   </button>
                 </li>
+                <li><a href="/help" onClick={event => { event.preventDefault(); setActivePage('help'); }} className="inline-flex min-h-11 items-center hover:text-white transition-colors">Help &amp; FAQs</a></li>
                 <li>
                   <a
                     href={BUSINESS_CONFIG.contact.phoneLink}

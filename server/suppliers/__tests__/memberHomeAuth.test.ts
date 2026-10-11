@@ -40,9 +40,9 @@ describe('Member Home & Logged-In Experience', () => {
       'HomePage must render public Hero for guest users'
     );
     assert.strictEqual(
-      homePageCode.includes('<WhyMysteryHub />'),
+      homePageCode.includes('<HomeTrustAnalytics />') && homePageCode.includes('<HomeFaqPreview />'),
       true,
-      'HomePage renders WhyMysteryHub for guests only'
+      'HomePage renders the reviewed trust panel and shared FAQ preview for guests only'
     );
   });
 
