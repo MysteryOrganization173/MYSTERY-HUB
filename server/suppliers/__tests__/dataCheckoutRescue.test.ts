@@ -51,7 +51,7 @@ test('discount and authoritative quote contract remain intact',()=>{
   assert.match(checkout,/customerEmail: isRegularData \? receiptEmail.trim\(\)/);
   assert.match(checkout,/setEditingReceipt\(false\)/);
   assert.match(checkout,/Add receipt email \(optional\)/);
-  assert.ok(!checkout.includes('disabled={walletBusy||isInitializing} required')); 
+  assert.ok(!checkout.includes('disabled={walletBusy||isInitializing} required'));
   assert.match(checkout,/onClick=\{\(\)=>setEditingReceipt\(true\)\}/);
 });
 test('customer Welcome Offer copy hides internal eligibility reasons',()=>{
