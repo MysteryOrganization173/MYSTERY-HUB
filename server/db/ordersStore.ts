@@ -1,3 +1,4 @@
+import type { OwnedOrderSearch } from '../utils/accountOrderSearch.js';
 import { CommercialService } from '../services/commercialService.js';
 import { WebsiteBusinessService } from '../services/websiteBusinessService.js';
 /**
@@ -515,6 +516,26 @@ export class OrdersStore {
    * Find orders belonging to a specific authenticated user
    * Excludes cancelled/expired unpaid payment attempts so customer history stays clean
    */
+  /** Phone matches never establish ownership. Cursor pages preserve stable creation/id ordering. */
+  static async searchOwnedOrders(userId:string,search:OwnedOrderSearch):Promise<OrderRecord[]> {
+    if(!userId)return [];
+    const pool=getPool();
+    if(pool)return (await pool.query<OrderRecord>(`
+      SELECT * FROM orders WHERE user_id=$1
+      AND (status NOT IN ('cancelled','expired','pending_payment') OR (service_type='afa' AND status='pending_payment'))
+      AND ($2::text IS NULL OR mystery_canonical_phone(recipient_phone)=$2 OR mystery_canonical_phone(customer_phone)=$2)
+      AND ($3::text IS NULL OR public_reference=$3)
+      AND ($4::timestamptz IS NULL OR (created_at,id)<($4::timestamptz,$5::text))
+      ORDER BY created_at DESC,id DESC LIMIT $6`,[userId,search.phone,search.reference,search.before?.createdAt||null,search.before?.id||null,search.limit+1])).rows;
+    const before=search.before;
+    return this.adminDevOrders().filter(order=>order.user_id===userId
+      &&!['cancelled','expired'].includes(order.status)&&(order.status!=='pending_payment'||order.service_type==='afa')
+      &&(!search.phone||canonicalGhanaPhone(order.recipient_phone)===search.phone||canonicalGhanaPhone(order.customer_phone)===search.phone)
+      &&(!search.reference||order.public_reference===search.reference)
+      &&(!before||Date.parse(order.created_at)<Date.parse(before.createdAt)||Date.parse(order.created_at)===Date.parse(before.createdAt)&&order.id<before.id))
+      .sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at)||(a.id<b.id?1:a.id>b.id?-1:0)).slice(0,search.limit+1);
+  }
+
   static async findOrdersByUserId(userId: string, limit?: number): Promise<OrderRecord[]> {
     if (!userId) return [];
     const pool = getPool();

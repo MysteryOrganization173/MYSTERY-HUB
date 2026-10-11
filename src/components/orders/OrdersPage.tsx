@@ -1,4 +1,7 @@
 import { dataOrderPresentation, dataRecipientDisplay } from '../../utils/dataPurchasePresentation';
+import { canonicalGhanaPhone } from '../../../server/utils/phone';
+import type { SafePublicOrderDetails } from '../../../server/types/orders';
+import { BUSINESS_CONFIG } from '../../config/business';
 import { afaStatusLabel } from '../../../shared/afa';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
@@ -9,34 +12,11 @@ import { OrderRecord } from '../../types';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { Clock, Search, ArrowRight, CheckCircle2, RefreshCw, AlertTriangle, Smartphone, ShieldCheck, ShoppingBag, X } from 'lucide-react';
 
-export const OrdersPage: React.FC = () => {
-  const { orders: localOrders, openOrderStatus, setActivePage, showToast, user, sessionToken } = useApp();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchingServer, setIsSearchingServer] = useState(false);
-  const [serverOrders, setServerOrders] = useState<OrderRecord[]>([]);
-  const [accountLoading,setAccountLoading]=useState(false),[accountError,setAccountError]=useState(''),[refresh,setRefresh]=useState(0);
-
-  // Fetch account-linked orders when authenticated
-  useEffect(() => {
-    if (!user || !sessionToken) {
-      setServerOrders([]);
-      setAccountLoading(false);
-      setAccountError('');
-      return;
-    }
-
-    let isMounted = true;
-    setAccountLoading(true);setAccountError('');
-    getAccountOrdersOnServer(sessionToken, 50)
-      .then((res) => {
-        if (isMounted && res.success && Array.isArray(res.orders)) {
-          const mapped: OrderRecord[] = res.orders.map((o) => {
-            const isDelivered = o.status === 'delivered';
-            const isProcessing = o.status === 'processing' || o.status === 'submitted';
-            const isPlaced = o.status === 'paid' || o.status === 'queued';
-            const isFailed = o.status === 'failed' || o.status === 'refund_pending' || o.status === 'refunded';
-
-            return {
+type AccountSearch = { phone?: string; reference?: string };
+function customerOrderView(o: SafePublicOrderDetails, owned: boolean): OrderRecord {
+  const isDelivered=o.status==='delivered',isProcessing=o.status==='processing'||o.status==='submitted';
+  const isPlaced=o.status==='paid'||o.status==='queued',isFailed=['failed','refund_pending','refunded'].includes(o.status);
+  return {
               id: o.public_reference,
               publicReference: o.public_reference,
               serverReference: o.public_reference,
@@ -55,7 +35,7 @@ export const OrdersPage: React.FC = () => {
                 description: o.product_name_snapshot,
               },
               recipientPhone: o.recipient_phone,
-              buyerRecipientVisible: true,
+              buyerRecipientVisible: owned,
               network: o.network,
               paymentMethod: 'paystack',
               amountGhc: o.amount_ghc,
@@ -64,109 +44,70 @@ export const OrdersPage: React.FC = () => {
               createdAt: o.created_at,
               updatedAt: o.created_at,
             };
-          });
-          setServerOrders(mapped);
-        }
+}
+
+export const OrdersPage: React.FC = () => {
+  const { openOrderStatus, setActivePage, showToast, user, sessionToken, openAuth } = useApp();
+  const identity=user&&sessionToken?`${user.id}|${sessionToken}`:'';
+  const activeIdentity=React.useRef(identity);activeIdentity.current=identity;
+  const [searchQuery,setSearchQuery]=useState('');
+  const [publicMode,setPublicMode]=useState(false),[guestGuidance,setGuestGuidance]=useState(false);
+  const [isSearchingServer,setIsSearchingServer]=useState(false);
+  const [search,setSearch]=useState<AccountSearch>({}),[pageCursor,setPageCursor]=useState<string|null>(null);
+  const [result,setResult]=useState<{identity:string;orders:OrderRecord[];nextCursor:string|null}>({identity:'',orders:[],nextCursor:null});
+  const [accountLoading,setAccountLoading]=useState(false),[accountError,setAccountError]=useState(''),[refresh,setRefresh]=useState(0);
+  const publicRequest=React.useRef<AbortController|null>(null);
+  const previousIdentity=React.useRef(identity);
+  const filteredOrders=result.identity===identity&&identity?result.orders:[];
+  const nextCursor=result.identity===identity?result.nextCursor:null;
+  const searchKey=JSON.stringify(search);
+
+  useEffect(()=>{
+    publicRequest.current?.abort();setIsSearchingServer(false);setGuestGuidance(false);
+    setSearchQuery('');setPublicMode(false);setSearch({});setPageCursor(null);
+  },[identity]);
+
+  useEffect(()=>{
+    const switched=previousIdentity.current!==identity;previousIdentity.current=identity;
+    if(!identity||!sessionToken){setResult({identity:'',orders:[],nextCursor:null});setAccountLoading(false);setAccountError('');return;}
+    const controller=new AbortController(),cursor=switched?null:pageCursor;
+    setAccountLoading(true);setAccountError('');
+    if(!cursor)setResult({identity,orders:[],nextCursor:null});
+    getAccountOrdersOnServer(sessionToken,50,{...(switched?{}:search),cursor,signal:controller.signal})
+      .then(response=>{
+        if(controller.signal.aborted||activeIdentity.current!==identity)return;
+        if(!response.success||!Array.isArray(response.orders))throw Error('Invalid account response');
+        const incoming=response.orders.map(o=>customerOrderView(o,true));
+        setResult(old=>({identity,orders:cursor&&old.identity===identity?[...new Map([...old.orders,...incoming].map(o=>[o.publicReference||o.id,o])).values()]:incoming,nextCursor:response.nextCursor||null}));
       })
-      .catch(() => {if(isMounted)setAccountError('We couldn’t load your account orders. Saved orders on this device are still shown.');})
-      .finally(()=>{if(isMounted)setAccountLoading(false);});
+      .catch(()=>{if(!controller.signal.aborted&&activeIdentity.current===identity)setAccountError("We couldn't load your account orders. Try again.");})
+      .finally(()=>{if(!controller.signal.aborted&&activeIdentity.current===identity)setAccountLoading(false);});
+    return()=>controller.abort();
+  },[identity,sessionToken,searchKey,pageCursor,refresh]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [user, sessionToken, refresh]);
+  useEffect(()=>()=>publicRequest.current?.abort(),[]);
 
-  // Combine server orders with local orders without duplicates
-  const allOrders = React.useMemo(() => {
-    const combined = [...serverOrders];
-    for (const localOrd of localOrders) {
-      const ref = localOrd.publicReference || localOrd.id;
-      if (!combined.some((s) => s.publicReference === ref || s.id === ref || s.id === localOrd.id)) {
-        combined.push(localOrd);
-      }
+  const handleServerLookup=async(event:React.FormEvent)=>{
+    event.preventDefault();const query=searchQuery.trim();if(!query)return;
+    const phone=query.length<=64?canonicalGhanaPhone(query):null;
+    setGuestGuidance(false);
+    if(identity&&!publicMode) {
+      if(!phone&&!/^[a-zA-Z0-9_-]{1,128}$/.test(query)||!phone&&/^[+0-9 ()-]+$/.test(query)){setAccountError('Enter a Ghana phone number or an order reference.');return;}
+      setSearch(phone?{phone}:{reference:query});setPageCursor(null);setRefresh(x=>x+1);return;
     }
-    return combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [serverOrders, localOrders]);
-
-  const handleServerLookup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const query = searchQuery.trim();
-    if (!query) return;
-
+    if(phone||/^[+0-9 ()-]+$/.test(query)){setGuestGuidance(true);return;}
+    if(!/^[a-zA-Z0-9_-]{1,128}$/.test(query)){showToast('Check your order reference and try again.','warning');return;}
+    publicRequest.current?.abort();const controller=new AbortController();publicRequest.current=controller;
     setIsSearchingServer(true);
     try {
-      const res = await lookupOrderOnServer(query);
-      if (res.success && res.order) {
-        const orderData = res.order;
-        const isDelivered = orderData.status === 'delivered';
-        const isProcessing = orderData.status === 'processing' || orderData.status === 'submitted';
-        const isPlaced = orderData.status === 'paid' || orderData.status === 'queued';
-        const isFailed =
-          orderData.status === 'failed' ||
-          orderData.status === 'refund_pending' ||
-          orderData.status === 'refunded';
-
-        openOrderStatus({
-          id: orderData.public_reference,
-          publicReference: orderData.public_reference,
-          serverReference: orderData.public_reference,
-          serverStatus: orderData.status,
-          serviceType: orderData.service_type,
-          manualReview: orderData.manual_review,
-          commercialPricing: orderData.commercial_pricing,
-          statusMessage:
-            orderData.status === 'refund_pending' || orderData.status === 'refunded'
-              ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
-              : undefined,
-          bundle: {
-            id: 'lookup-bundle',
-            network: orderData.network,
-            dataAmount: orderData.bundle_size_snapshot,
-            dataBytesValue: 0,
-            validity: 'Standard',
-            validityCategory: 'Daily',
-            priceGhc: orderData.amount_ghc,
-            description: orderData.product_name_snapshot,
-          },
-          recipientPhone: orderData.recipient_phone,
-          network: orderData.network,
-          paymentMethod: 'paystack',
-          amountGhc: orderData.amount_ghc,
-          status: isDelivered
-            ? 'delivered'
-            : isProcessing
-            ? 'processing'
-            : isPlaced
-            ? 'placed'
-            : isFailed
-            ? 'failed'
-            : 'verifying',
-          paymentReference: orderData.public_reference,
-          createdAt: orderData.created_at,
-          updatedAt: orderData.created_at,
-        });
-      } else {
-        showToast('We couldn’t find that order. Check the reference and try again.', 'warning');
-      }
-    } catch {
-      showToast('We couldn’t check this order. Check the reference or try again.', 'warning');
-    } finally {
-      setIsSearchingServer(false);
-    }
+      const response=await lookupOrderOnServer(query,controller.signal);
+      if(controller.signal.aborted||activeIdentity.current!==identity)return;
+      if(response.success&&response.order)openOrderStatus(customerOrderView(response.order,false));
+      else showToast("We couldn't find that order. Check the reference and try again.",'warning');
+    } catch {if(!controller.signal.aborted&&activeIdentity.current===identity)showToast("We couldn't check this order. Check the reference or try again.",'warning');}
+    finally{if(!controller.signal.aborted&&activeIdentity.current===identity)setIsSearchingServer(false);}
   };
-
-  const filteredOrders = allOrders.filter((o) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    const pubRef = o.publicReference ? o.publicReference.toLowerCase() : '';
-    return (
-      pubRef.includes(q) ||
-      o.id.toLowerCase().includes(q) ||
-      o.recipientPhone.includes(q) ||
-      o.bundle.dataAmount.toLowerCase().includes(q) ||
-      o.network.toLowerCase().includes(q)
-    );
-  });
+  const clearSearch=()=>{setSearchQuery('');setSearch({});setPageCursor(null);setGuestGuidance(false);setRefresh(x=>x+1);};
 
   return (
     <div className="py-6 sm:py-10 text-slate-100">
@@ -178,7 +119,7 @@ export const OrdersPage: React.FC = () => {
               <span>{user ? 'Account Orders' : 'Order Tracking'}</span>
             </div>
             <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-              {user ? 'Your Orders' : 'Order History & Tracking'}
+              {user ? 'Your Orders' : 'Track an order'}
             </h1>
             <p className="text-xs text-slate-400 mt-1">
               {user
@@ -195,16 +136,19 @@ export const OrdersPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Search Filter & Server Lookup Form */}
-        <form onSubmit={handleServerLookup} className="flex gap-2">
+        {identity&&<button type="button" onClick={()=>{setPublicMode(x=>!x);setSearchQuery('');setGuestGuidance(false);}} className="min-h-11 text-sm text-emerald-300">{publicMode?'Back to your orders':'Track another order by reference'}</button>}
+        <label htmlFor="order-search" className="block text-sm font-semibold">{identity&&!publicMode?'Search your orders':'Mystery Hub order reference'}</label>
+        <form onSubmit={handleServerLookup} className="flex flex-col min-[390px]:flex-row gap-2">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              aria-label="Order reference or saved recipient phone"
+              id="order-search"
+              maxLength={128}
+              aria-label={identity&&!publicMode?"Search your orders by phone or reference":"Mystery Hub order reference"}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Enter an order reference or recipient number"
+              placeholder={identity&&!publicMode?"Recipient phone or order reference":"Enter your order reference"}
               className="w-full bg-[#0e141a] border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#00c365]"
             />
           </div>
@@ -216,12 +160,14 @@ export const OrdersPage: React.FC = () => {
             {isSearchingServer ? (
               <RefreshCw className="w-4 h-4 animate-spin text-[#00c365]" />
             ) : (
-              'Track Order'
+              identity&&!publicMode?'Search your orders':'Track Order'
             )}
           </button>
         </form>
-        <p className="text-xs text-slate-400">Enter your Mystery Hub reference to check the latest status. A phone-number search filters orders already shown here.</p>
+        <p className="text-xs text-slate-400">{identity&&!publicMode?'Search only your account purchases, including older orders.':'Bought with an account? Sign in to see your linked orders.'}</p>
 
+{guestGuidance&&<div role="status" className="mh-surface text-sm space-y-3"><p>To track a guest order, enter your order reference. Sign in to search your account orders.</p><div className="flex flex-wrap gap-3">{!identity&&<button type="button" onClick={()=>openAuth('login','Sign in to search your own orders.')} className="mh-button-primary">Sign In</button>}<a href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="mh-button-secondary">Customer Support</a></div></div>}
+        {identity&&(search.phone||search.reference)&&<button type="button" onClick={clearSearch} className="mh-button-secondary">Show all your orders</button>}
 <div aria-live="polite">{accountLoading&&<p className="text-sm text-slate-400">Loading your account orders…</p>}{accountError&&<div className="mh-surface text-sm"><p role="alert" className="text-amber-300">{accountError}</p><button className="mh-button-secondary mt-3" onClick={()=>setRefresh(x=>x+1)}>Try again</button></div>}</div>
         {/* Orders List */}
         {filteredOrders.length > 0 ? (
@@ -370,30 +316,30 @@ export const OrdersPage: React.FC = () => {
               );
             })}
           </div>
-        ) : searchQuery.trim() ? (
+        ) : identity&&(search.phone||search.reference)&&!accountLoading&&!accountError ? (
           <div className="text-center py-12 px-4 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-3 max-w-md mx-auto shadow-sm">
             <Search className="w-8 h-8 text-slate-500 mx-auto" />
             <h3 className="text-base font-bold text-white">No matching orders</h3>
             <p className="text-xs text-slate-400">
-              No orders matched &ldquo;{searchQuery}&rdquo;. Check the reference or phone number.
+              No orders in your account match this search. Check the reference or phone number.
             </p>
             <div className="pt-1">
               <button
                 type="button"
-                onClick={() => setSearchQuery('')}
+                onClick={clearSearch}
                 className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
-                <span>Clear Filter</span>
+                <span>Clear Search</span>
               </button>
             </div>
           </div>
         ) : (
           <div className="text-center py-14 px-4 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-3.5 max-w-md mx-auto shadow-sm">
             <Smartphone className="w-9 h-9 text-slate-500 mx-auto" />
-            <h3 className="text-base sm:text-lg font-bold text-white">No orders found</h3>
+            <h3 className="text-base sm:text-lg font-bold text-white">{identity?(accountLoading?'Loading your orders':accountError?'Orders unavailable':'No orders to show'):'Your reference keeps tracking simple'}</h3>
             <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
-              No orders to show yet. Buy data, airtime or AFA registration to track your purchases here.
+              {identity?(accountLoading?'Your account history is loading.':accountError?'Use Try again to reload your account history.':'Your linked purchases appear here.'):'Enter the reference from your purchase confirmation. Sign in for your account order history.'}
             </p>
             <div className="pt-1">
               <button
@@ -405,6 +351,7 @@ export const OrdersPage: React.FC = () => {
             </div>
           </div>
         )}
+        {identity&&nextCursor&&<button type="button" disabled={accountLoading} onClick={()=>setPageCursor(nextCursor)} className="mh-button-secondary w-full sm:w-auto">{accountLoading?'Loading orders…':'Load more orders'}</button>}
       </div>
     </div>
   );

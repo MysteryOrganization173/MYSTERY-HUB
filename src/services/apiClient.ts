@@ -260,9 +260,9 @@ export async function cancelPaymentOnServer(orderRef: string): Promise<CancelPay
   return data;
 }
 
-export async function lookupOrderOnServer(reference: string): Promise<LookupOrderResponse> {
+export async function lookupOrderOnServer(reference: string, signal?: AbortSignal): Promise<LookupOrderResponse> {
   const url = `${API_BASE_URL}/api/orders/lookup/${encodeURIComponent(reference)}`;
-  const res = await fetch(url, { method: 'GET' });
+  const res = await fetch(url, { method: 'GET', cache: 'no-store', signal });
 
   const data = await res.json();
   if (!res.ok) {
@@ -349,12 +349,18 @@ export async function getMeOnServer(token: string): Promise<{ success: boolean; 
 
 export async function getAccountOrdersOnServer(
   token: string,
-  limit?: number
-): Promise<{ success: boolean; orders: AuthenticatedCustomerOrderDetails[] }> {
-  const query = limit ? `?limit=${limit}` : '';
+  limit?: number,
+  search?: { phone?: string; reference?: string; cursor?: string | null; signal?: AbortSignal }
+): Promise<{ success: boolean; orders: AuthenticatedCustomerOrderDetails[]; hasMore?: boolean; nextCursor?: string | null }> {
+  const params=new URLSearchParams();
+  if(limit)params.set('limit',String(limit));
+  if(search){params.set('cursor',search.cursor||'');if(search.phone)params.set('phone',search.phone);if(search.reference)params.set('reference',search.reference);}
+  const query=params.size?'?'+params.toString():'';
   const url = `${API_BASE_URL}/api/account/orders${query}`;
   const res = await fetch(url, {
     method: 'GET',
+    cache: 'no-store',
+    signal: search?.signal,
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',

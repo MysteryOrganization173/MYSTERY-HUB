@@ -1,3 +1,4 @@
+import { parseOwnedOrderSearch, ownedOrderCursor, OrderSearchError } from '../utils/accountOrderSearch.js';
 import { commercialRouter } from './commercialApi.js';
 import { CommercialService } from '../services/commercialService.js';
 import { WebsiteBusinessService } from '../services/websiteBusinessService.js';
@@ -1370,23 +1371,16 @@ apiRouter.get('/orders/my-orders', requireAuth, async (req: Request, res: Respon
 apiRouter.get('/account/orders', requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const rawLimit = req.query.limit;
-    let limit = 20;
-    if (typeof rawLimit === 'string') {
-      const parsed = parseInt(rawLimit, 10);
-      if (!isNaN(parsed) && parsed > 0) {
-        limit = Math.min(parsed, 50);
-      }
-    }
-
-    const orders = await OrdersStore.findOrdersByUserId(userId, limit);
-    const safeOrders = orders.filter(order => order.user_id === userId).map(toAuthenticatedCustomerOrder);
-
-    res.json({
-      success: true,
-      orders: safeOrders,
-    });
+    const search=parseOwnedOrderSearch(req.query);
+    // Preserve the existing unfiltered caller contract; the new UI explicitly requests cursor pages.
+    const paged=['phone','reference','cursor'].some(key=>req.query[key]!==undefined);
+    const orders=paged?await OrdersStore.searchOwnedOrders(userId,search):await OrdersStore.findOrdersByUserId(userId,search.limit);
+    const owned=orders.filter(order=>order.user_id===userId);
+    const hasMore=paged&&owned.length>search.limit;
+    const page=owned.slice(0,search.limit);
+    res.json({success:true,orders:page.map(toAuthenticatedCustomerOrder),hasMore,nextCursor:hasMore?ownedOrderCursor(page[page.length-1]):null});
   } catch (err) {
+    if(err instanceof OrderSearchError){res.status(400).json({error:err.message});return;}
     console.error('Account Orders API Exception: order retrieval unavailable');
     res.status(500).json({ error: 'Failed to retrieve account orders.' });
   }

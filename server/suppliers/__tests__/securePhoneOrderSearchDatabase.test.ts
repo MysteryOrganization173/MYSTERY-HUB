@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {test,beforeEach,afterEach} from 'node:test';
+import pg from 'pg';
+import {OrdersStore} from '../../db/ordersStore.js';
+import {parseOwnedOrderSearch,ownedOrderCursor} from '../../utils/accountOrderSearch.js';
+const original=pg.Pool.prototype.query;
+let captured:{sql:string;values:unknown[]};
+beforeEach(()=>{process.env.DATABASE_URL='postgresql://fixture.invalid/never-contacted';pg.Pool.prototype.query=(async(sql:string,values:unknown[])=>{captured={sql,values};return {rows:[]};}) as unknown as typeof original;});
+afterEach(()=>{pg.Pool.prototype.query=original;delete process.env.DATABASE_URL;});
+test('PostgreSQL query enforces user_id outside phone ORs and binds all customer input',async()=>{await OrdersStore.searchOwnedOrders('authenticated-a',parseOwnedOrderSearch({phone:'0201234567',limit:'50'}));assert.match(captured.sql,/WHERE user_id=\$1/);assert.match(captured.sql,/AND \(\$2::text IS NULL OR mystery_canonical_phone\(recipient_phone\)=\$2 OR mystery_canonical_phone\(customer_phone\)=\$2\)/);assert.deepEqual(captured.values,['authenticated-a','+233201234567',null,null,null,51]);assert.ok(!captured.sql.includes('0201234567'));assert.match(captured.sql,/ORDER BY created_at DESC,id DESC LIMIT \$6/);});
+test('cursor/reference are bound; untrusted cursor never becomes authorization',async()=>{const cursor=ownedOrderCursor({id:'foreign-order',created_at:'2026-10-01T00:00:00Z'});await OrdersStore.searchOwnedOrders('authenticated-b',parseOwnedOrderSearch({reference:'MH-SAFE',cursor,limit:'1'}));assert.deepEqual(captured.values,['authenticated-b',null,'MH-SAFE','2026-10-01T00:00:00.000Z','foreign-order',2]);assert.match(captured.sql,/\(created_at,id\)<\(\$4::timestamptz,\$5::text\)/);assert.ok(!captured.sql.includes('foreign-order'));});
+test('existing service-specific pending-payment eligibility is retained',async()=>{await OrdersStore.searchOwnedOrders('a',parseOwnedOrderSearch({cursor:''}));assert.match(captured.sql,/status NOT IN \('cancelled','expired','pending_payment'\)/);assert.match(captured.sql,/service_type='afa' AND status='pending_payment'/);assert.ok(!/UPDATE|INSERT|DELETE/.test(captured.sql));});

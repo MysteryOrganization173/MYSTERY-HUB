@@ -1,0 +1,13 @@
+# Secure phone order search
+
+Signed-in Orders searches `GET /api/account/orders` using a phone or public reference. Session-derived `user_id` is required in every query; neither a client user ID nor possession of the recipient number grants ownership. Buyer and recipient phone fields use the existing Ghana canonicalization (local, 233, +233, supported whitespace/bracket/hyphen forms) and exact equality. SQL is parameterized and reuses the existing canonical-phone SQL function.
+
+Pages contain at most 50 orders, ordered by immutable creation time and ID. An opaque cursor locates the next page; it is not an authorization capability. Each page repeats the ownership/filter constraints. No index or schema migration was added. Existing account-history status rules, including pending AFA visibility, are unchanged. Results use `toAuthenticatedCustomerOrder`; cache controls remain no-store. Search never refreshes suppliers and never runs simply because the customer types.
+
+Guest tracking remains public-reference-only, rate-limited and masked through `toSafePublicOrder`. Phone input is blocked before the public reference request and receives neutral Sign In/support guidance. A signed-in customer can explicitly track another public reference, receiving only that same safe projection.
+
+The old browser-wide local order cache contains no trusted account owner. It is therefore no longer mixed into authenticated history or exposed as a guest history list. The underlying cache is not deleted or rewritten; successful purchases retain confirmation/reference tracking. This prevents another account's device-local purchases from being shown as current-account orders. Account-identity render guards hide old rows immediately, abort obsolete requests, and reject late responses. Public lookups are similarly cancelled during account transitions.
+
+No approved working SMS OTP provider exists in this repository. A future separately approved guest recovery flow could verify possession with expiring OTP and abuse limits, but recipient possession alone must not expose buyer-private history. No provider, fake OTP, paid SMS integration or anonymous phone endpoint was introduced.
+
+Backend-first deployment is required: old unfiltered account calls remain compatible; the new UI requires the phone/reference/cursor contract. Do not publish the new frontend against an old backend that ignores those filters. This pass is retained in review branches pending coordinated release approval. Rollback by normal revert of the reviewed commit and restore the compatible UI/backend pair; no database rollback or customer-data changes are needed.
