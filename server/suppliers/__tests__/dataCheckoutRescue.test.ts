@@ -48,8 +48,10 @@ test('discount and authoritative quote contract remain intact',()=>{
   assert.match(checkout,/commercial&&\/price\|pricing\|quote\|welcome offer\|promotion\/i.test\(serverError\)/);
   assert.match(checkout,/quoteError&&<button/);
   assert.match(checkout,/setQuoteRefresh/);
-  assert.match(checkout,/customerEmail: receiptEmail \|\| user\?\.email/);
-  assert.match(checkout,/setEditingReceipt\(!\//);
+  assert.match(checkout,/customerEmail: isRegularData \? receiptEmail.trim\(\)/);
+  assert.match(checkout,/setEditingReceipt\(false\)/);
+  assert.match(checkout,/Add receipt email \(optional\)/);
+  assert.ok(!checkout.includes('disabled={walletBusy||isInitializing} required')); 
   assert.match(checkout,/onClick=\{\(\)=>setEditingReceipt\(true\)\}/);
 });
 test('customer Welcome Offer copy hides internal eligibility reasons',()=>{
