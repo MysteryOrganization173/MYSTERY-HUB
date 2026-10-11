@@ -393,6 +393,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loginUser = (profile: SafeUserProfile, token: string, rememberMe = false, notify = true) => {
+    if (sessionToken !== token || user?.id !== profile.id) {
+      setIsStatusModalOpen(false);setActiveOrder(null);
+    }
     setUser(profile);
     setSessionToken(token);
     try {
@@ -439,6 +442,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const clearLocalAuth = () => {
     feedbackToken.current = null;
     setUser(null); setSessionToken(null); setAccountOpen(false); setPendingAuthAction(null); setIsCheckoutOpen(false);
+    setIsStatusModalOpen(false);setActiveOrder(null);
     try { for (const storage of [localStorage, sessionStorage]) { storage.removeItem('mystery_hub_user'); storage.removeItem('mystery_hub_session_token'); } } catch { /* Ignore unavailable storage. */ }
   };
   const logoutUser = () => {
