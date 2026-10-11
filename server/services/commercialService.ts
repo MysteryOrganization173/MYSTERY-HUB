@@ -1,6 +1,7 @@
 import { getPool } from '../db/connection.js';
 import {AdminAuditStore} from '../db/adminAuditStore.js';
-import { randomUUID } from 'node:crypto';
+import { dataPaymentEmail } from './dataCheckoutEmail.js';
+import { createHash, randomUUID } from 'node:crypto';
 import { AUTHORITATIVE_PRODUCTS, getAuthoritativeProduct } from '../data/productCatalog.js';
 import { FinanceStore, FinanceError, type FinanceTx } from '../db/financeStore.js';
 import { AuthStore } from '../db/authStore.js';
@@ -92,8 +93,24 @@ export class CommercialService {
         return {order:prepared,created};
       });
       saved=result.order;if(result.old)return {...saved,checkout:result.old.payload.checkout||null,initializationUncertain:!result.old.payload.checkout};operationId=result.created!.id;
-    } else {saved=await this.prepare(order,input);const result=await OrdersStore.createOrderWithMtnDuplicateCheck(saved);if(!result.success)throw new FinanceError('An MTN order is already active. Track the existing order.',409);}
-    const payment=await PaystackServerService.initializeTransaction({email:saved.customer_email,amountPesewas:saved.amount,reference:saved.payment_reference,metadata:{public_reference:saved.public_reference,network:saved.network,service_type:'data',product_id:saved.product_id,product_name:saved.bundle_size_snapshot}});
+    } else {
+      const requestId=input.requestId ?? (process.env.NODE_ENV==='production'?undefined:randomUUID());
+      if(typeof requestId!=='string'||!/^([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(requestId))throw new FinanceError('A stable checkout request ID is required.');
+      const prepared=await this.prepare({...order,id:`ord_guest_${createHash('sha256').update(requestId).digest('hex').slice(0,48)}`},input);
+      const result=await OrdersStore.claimGuestDirectOrder(prepared);
+      saved=result.order;
+      if(!result.created) {
+        if(saved.user_id||saved.product_id!==order.product_id||saved.recipient_phone!==order.recipient_phone||saved.customer_email!==order.customer_email)throw new FinanceError('Request details changed.',409);
+        // The durable pending order is the latch. Never POST again after uncertain acceptance.
+        return {...saved,checkout:null,initializationUncertain:true};
+      }
+    }
+    let payment: Awaited<ReturnType<typeof PaystackServerService.initializeTransaction>>;
+    try {
+      payment=await PaystackServerService.initializeTransaction({email:dataPaymentEmail(saved),amountPesewas:saved.amount,reference:saved.payment_reference,metadata:{public_reference:saved.public_reference,network:saved.network,service_type:'data',product_id:saved.product_id,product_name:saved.bundle_size_snapshot}});
+    } catch {
+      throw new FinanceError('Payment initialization is uncertain. Check the existing order before retrying.',503);
+    }
     if(saved.user_id&&operationId)await FinanceStore.transaction(saved.user_id,async tx=>{const row=(await tx.operations()).find(o=>o.id===operationId)!;await tx.update(row,payment.success?'pending':'initialization_uncertain',{...row.payload,checkout:payment.success?payment:null});});
     if(!payment.success) {
       // A network error is not proof that Paystack rejected initialization.

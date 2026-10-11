@@ -1,4 +1,6 @@
 import { commercialRouter } from './commercialApi.js';
+import { dataReceiptEmail } from '../services/dataCheckoutEmail.js';
+import { randomUUID } from 'node:crypto';
 import { CommercialService } from '../services/commercialService.js';
 import { WebsiteBusinessService } from '../services/websiteBusinessService.js';
 import { purchasableOptions } from '../../shared/marketplaceVariants.js';
@@ -158,6 +160,7 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
       return;
     }
 
+    const standardDataReceipt = !isMarketplace && (!serviceType || serviceType === 'data') && !productId.startsWith('instant-') && !productId.startsWith('airtime-') ? dataReceiptEmail(customerEmail,req.user?.email) : undefined;
     if (req.body.paymentMethod === 'wallet') {
       if (!req.user) {res.status(401).json({error:'Sign in to use Mystery Wallet.'});return;}
       if (isMarketplace || serviceType === 'instant_bundle' || productId.startsWith('instant-')) {res.status(400).json({error:'Wallet supports Data, Airtime and AFA in V1.'});return;}
@@ -814,13 +817,12 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
     const publicRef = `MH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${randomHex}`;
     const paymentRef = `MH_PAY_${product.network.toUpperCase()}_${timestamp}_${randomHex}`;
 
-    const receiptEmail=normalizeEmail(customerEmail||req.user?.email);
-    if(!receiptEmail){res.status(400).json({error:'Enter a valid receipt email for this checkout. Account email remains optional.'});return;}
+    const receiptEmail=standardDataReceipt ?? dataReceiptEmail(customerEmail,req.user?.email);
     const nowIso = new Date().toISOString();
 
     // 6. Create pending order in DB atomically with race-condition check
     const newOrder: OrderRecord = {
-      id: `ord_${timestamp}_${randomHex}`,
+      id: `ord_${randomUUID()}`,
       user_id: req.user?.id || null,
       public_reference: publicRef,
       customer_name: typeof customerName === 'string' ? customerName.trim() : (req.user?.name || null),

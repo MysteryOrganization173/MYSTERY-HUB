@@ -41,7 +41,7 @@ export const CheckoutModal: React.FC = () => {
     openDataPage,
     sessionToken,
   } = useApp();
-  const { initializeServerPayment, isInitializing, loadingPhase, isConfigured } = usePaystack();
+  const { initializeServerPayment, isInitializing, loadingPhase, isConfigured } = usePaystack(sessionToken);
 
   const [phone, setPhone] = useState('');
   const [receiptEmail,setReceiptEmail]=useState('');
@@ -51,6 +51,8 @@ export const CheckoutModal: React.FC = () => {
   const [quoteRefresh,setQuoteRefresh]=useState(0);
   const directRequest=useRef(crypto.randomUUID());
   useEffect(()=>{if(!isCheckoutOpen||!checkoutBundle||checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data'||checkoutBundle.id.startsWith('instant-')||checkoutBundle.id.startsWith('airtime-')){setCommercial(null);return;}let active=true;setCommercial(null);setQuoteError('');commercialRequest('commercial/quote/'+encodeURIComponent(checkoutBundle.id),sessionToken).then(r=>{if(active)setCommercial(r);}).catch(e=>{if(active)setQuoteError(e.message);});return()=>{active=false;};},[isCheckoutOpen,checkoutBundle?.id,sessionToken,quoteRefresh,user?.phone]);
+  const currentSession = useRef(sessionToken);
+  currentSession.current = sessionToken;
   const submissionPending = useRef(false);
   const [paymentMethod,setPaymentMethod]=useState<'paystack'|'wallet'>('paystack');
   const [walletBusy,setWalletBusy]=useState(false);
@@ -92,7 +94,7 @@ export const CheckoutModal: React.FC = () => {
   useEffect(() => {
     if (isCheckoutOpen && checkoutBundle) {
       setReceiptEmail(user?.email||'');
-      setEditingReceipt(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user?.email || ''));
+      setEditingReceipt(false);
       directRequest.current=crypto.randomUUID();
       setPaymentMethod('paystack');
       walletRequest.current=null;
@@ -103,7 +105,7 @@ export const CheckoutModal: React.FC = () => {
       setActiveMtnConflict(null);
       setPreflightIssue(null);
     }
-  }, [isCheckoutOpen,checkoutBundle, checkoutInitialPhone, user?.phone]);
+  }, [isCheckoutOpen,checkoutBundle, checkoutInitialPhone, user?.phone, user?.id, sessionToken]);
 
   useEffect(() => {
     const net = detectGhanaNetwork(phone);
@@ -254,7 +256,7 @@ export const CheckoutModal: React.FC = () => {
       commercial:isRegularData?{requestId:directRequest.current,expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:undefined,
       productId: checkoutBundle.id,
       recipientPhone: phone.trim(),
-      customerEmail: receiptEmail || user?.email || undefined,
+      customerEmail: isRegularData ? receiptEmail.trim() : receiptEmail || user?.email || undefined,
       customerName: user?.name || undefined,
       serviceType: isInstantBundle ? 'instant_bundle' : isAirtime ? 'airtime' : 'data',
       network: checkoutBundle.network,
@@ -354,7 +356,7 @@ export const CheckoutModal: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submissionPending.current || isInitializing || walletBusy) return;
-    if(isRegularData&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(receiptEmail.trim())){setServerError('Enter a valid receipt email before paying.');return;}
+    if(isRegularData&&receiptEmail.trim()&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(receiptEmail.trim())){setServerError('Enter a valid receipt email or leave it empty.');return;}
     if (phone.replace(/\D/g, '').length < 10) {
       setPhoneError('Enter the recipient’s Ghana phone number before paying.');
       phoneInputRef.current?.focus(); return;
@@ -364,12 +366,13 @@ export const CheckoutModal: React.FC = () => {
     if(isRegularData&&!commercial){setServerError('Refresh the current price before paying.');return;}
     submissionPending.current=true;setWalletBusy(true);setServerError('');
     try {
-      const body={productId:checkoutBundle.id,recipientPhone:phone.trim(),customerEmail:receiptEmail||user?.email,customerName:user?.name,serviceType:isAirtime?'airtime':'data',network:checkoutBundle.network,amount:faceValue,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()};
+      const body={productId:checkoutBundle.id,recipientPhone:phone.trim(),customerEmail:isRegularData?receiptEmail.trim():receiptEmail||user?.email,customerName:user?.name,serviceType:isAirtime?'airtime':'data',network:checkoutBundle.network,amount:faceValue,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()};
       const fingerprint=JSON.stringify(body);if(walletRequest.current?.fingerprint!==fingerprint)walletRequest.current={fingerprint,id:crypto.randomUUID()};
       const result=await walletCheckout(sessionToken,'payments/initialize',{...body,requestId:walletRequest.current!.id,...(isRegularData&&commercial?{expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:{})});
+      if (currentSession.current !== sessionToken) return;
       const newOrder=createOrder({...checkoutBundle,priceGhc:result.amountPesewas/100},phone.trim(),'wallet',result.reference,result.orderRef);
       closeCheckout();openOrderStatus(newOrder);
-    }catch(error){setServerError((error as Error).message);}finally{submissionPending.current=false;setWalletBusy(false);}
+    }catch(error){if(currentSession.current===sessionToken)setServerError((error as Error).message);}finally{submissionPending.current=false;setWalletBusy(false);}
   };
 
   const handleViewInstantBundles = () => {
@@ -719,7 +722,8 @@ export const CheckoutModal: React.FC = () => {
           )}
 
           {isRegularData&&<div className="text-xs text-slate-400">
-            {editingReceipt ? <label className="block">Receipt email<input type="email" value={receiptEmail} onChange={e=>setReceiptEmail(e.target.value)} maxLength={128} className="w-full mt-1 min-h-11 p-2 rounded-lg bg-slate-950 border border-slate-700" disabled={walletBusy||isInitializing} required/></label> : <div className="flex items-center gap-2"><span className="min-w-0 break-all">Receipt: {receiptEmail}</span><button type="button" disabled={walletBusy||isInitializing} onClick={()=>setEditingReceipt(true)} className="shrink-0 min-h-11 px-2 text-emerald-400">Change</button></div>}
+            {editingReceipt ? <label className="block">Receipt email (optional)<input type="email" value={receiptEmail} onChange={e=>setReceiptEmail(e.target.value)} maxLength={128} autoComplete="email" className="w-full mt-1 min-h-11 p-2 rounded-lg bg-slate-950 border border-slate-700" disabled={walletBusy||isInitializing}/><span className="block mt-1">Leave empty to track your purchase in Orders.</span></label> : receiptEmail ? <div className="flex items-center gap-2"><span className="min-w-0 break-all">Receipt: {receiptEmail}</span><button type="button" disabled={walletBusy||isInitializing} onClick={()=>setEditingReceipt(true)} className="shrink-0 min-h-11 px-2 text-emerald-400">Change or remove</button></div> : <button type="button" disabled={walletBusy||isInitializing} onClick={()=>setEditingReceipt(true)} className="min-h-11 text-emerald-400">Add receipt email (optional)</button>}
+
             {commercial?.offer.state==='phone_required'&&<p>Add your phone in Account to check your Welcome Offer.</p>}
             {commercial&&/price|pricing|quote|welcome offer|promotion/i.test(serverError)&&<button type="button" disabled={walletBusy||isInitializing} onClick={()=>setQuoteRefresh(x=>x+1)} className="rounded-lg border border-slate-600 px-3 min-h-11 text-emerald-400">Refresh price</button>}
             {!commercial&&<div role="status">{quoteError||'Loading current price…'}{quoteError&&<button type="button" onClick={()=>setQuoteRefresh(x=>x+1)} className="ml-2 rounded-lg border border-slate-600 px-3 min-h-11 text-emerald-400">Retry</button>}</div>}

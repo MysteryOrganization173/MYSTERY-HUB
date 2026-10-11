@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict';
+import { test, before, beforeEach, after } from 'node:test';
+import { randomUUID } from 'node:crypto';
+import express from 'express';
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { dataReceiptEmail, dataPaymentEmail } from '../../services/dataCheckoutEmail.js';
+import { CommercialService } from '../../services/commercialService.js';
+import { OrdersStore } from '../../db/ordersStore.js';
+import { AuthStore } from '../../db/authStore.js';
+import { FinanceStore } from '../../db/financeStore.js';
+import { FinanceService } from '../../services/financeService.js';
+import { ReferralStore } from '../../db/referralStore.js';
+import { PaystackServerService as Paystack } from '../../services/paystackService.js';
+import { FulfilmentService } from '../../services/fulfilmentService.js';
+import { apiRouter } from '../../routes/api.js';
+import { validateOrderPayment } from '../../services/paymentValidation.js';
+import type { OrderRecord } from '../../types/orders.js';
+
+const original={fetch:globalThis.fetch,init:Paystack.initializeTransaction,preflight:FulfilmentService.preflightCheck,dispatch:FulfilmentService.processPaidOrder};
+let server:Server,base:string,calls:Parameters<typeof Paystack.initializeTransaction>[0][];
+before(async()=>{const app=express();app.use(express.json());app.use('/api',apiRouter);server=await new Promise(r=>{const s=app.listen(0,'127.0.0.1',()=>r(s));});base=`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/`;});
+beforeEach(async()=>{
+ assert.equal(process.env.DATABASE_URL,undefined);OrdersStore.clearDevStore();AuthStore._clearDevStore();FinanceStore._reset();ReferralStore._clearDevStore();calls=[];
+ for(const [id,email,phone] of [['phone',null,'0241234567'],['email','account@fixture.test','0271234567'],['admin','admin@fixture.test',null]] as const){await AuthStore.createUser({id,name:id,email,phone,passwordHash:'fixture',role:id==='admin'?'admin':'customer'});await AuthStore.createSession(id,id+'-token');}
+ globalThis.fetch=async()=>{throw Error('External requests forbidden');};
+ Paystack.initializeTransaction=async input=>{calls.push(input);return {success:true,reference:input.reference,accessCode:'synthetic-code'};};
+ FulfilmentService.preflightCheck=async()=>({allowed:true,supplierCostMinor:300});
+ FulfilmentService.processPaidOrder=async ref=>({order:(await OrdersStore.findOrder(ref))!,alreadyHandled:false});
+});
+after(async()=>{await new Promise<void>(r=>server.close(()=>r()));globalThis.fetch=original.fetch;Paystack.initializeTransaction=original.init;FulfilmentService.preflightCheck=original.preflight;FulfilmentService.processPaidOrder=original.dispatch;});
+const request=(body:Record<string,unknown>,token='')=>original.fetch(base+'payments/initialize',{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify({productId:'at-1gb',recipientPhone:'0271234567',requestId:randomUUID(),...body})});
+function draft(extra:Partial<OrderRecord>={}):OrderRecord {const id=randomUUID(),now=new Date().toISOString();return {id,user_id:null,public_reference:'MH-'+id,payment_reference:'PAY-'+id,customer_name:null,customer_email:'',customer_phone:'+233271234567',recipient_phone:'+233271234567',network:'airteltigo',service_type:'data',product_id:'at-1gb',product_name_snapshot:'AT 1GB',bundle_size_snapshot:'1GB',amount:499,currency:'GHS',status:'pending_payment',payment_provider:'paystack',payment_status:'pending',supplier_provider:'success_biz_hub',supplier_order_id:null,supplier_response:null,supplier_cost_minor:300,supplier_offer_ref:null,supplier_last_checked_at:null,failure_reason:null,created_at:now,updated_at:now,paid_at:null,submitted_at:null,delivered_at:null,...extra};}
+for(const supplied of [undefined,null,'','   '])test('missing receipt resolves real account contact '+String(supplied),()=>assert.equal(dataReceiptEmail(supplied,'Account@fixture.test'),'account@fixture.test'));
+for(const supplied of ['bad','bad@',123,{},'a@b.test\nBCC:other@b.test'])test('invalid nonempty receipt rejects rather than falling back '+JSON.stringify(supplied),()=>assert.throws(()=>dataReceiptEmail(supplied,'account@fixture.test'),/valid receipt/));
+test('explicit receipt wins over account email',()=>assert.equal(dataReceiptEmail(' Receipt@fixture.test ','account@fixture.test'),'receipt@fixture.test'));
+test('alias is opaque, stable, order-specific and never persisted into real contact',()=>{const a=draft(),b=draft();const alias=dataPaymentEmail(a);assert.match(alias,/^order-[a-f0-9]{40}@mysterybundlehub\.com$/);assert.equal(alias,dataPaymentEmail({...a}));assert.notEqual(alias,dataPaymentEmail(b));assert.ok(!alias.includes('271234567'));assert.equal(a.customer_email,'');assert.equal(dataPaymentEmail({...a,customer_email:'real@fixture.test'}),'real@fixture.test');});
+for(const [label,email,token,expected] of [['guest omitted',undefined,'',null],['guest real','receipt@fixture.test','','receipt@fixture.test'],['phone-only omitted',undefined,'phone-token',null],['account omitted',undefined,'email-token','account@fixture.test'],['account explicit','receipt@fixture.test','email-token','receipt@fixture.test'],['account cleared','','email-token','account@fixture.test'],['phone-only cleared','','phone-token',null]] as const)test(label+' initializes real route safely',async()=>{const response=await request({customerEmail:email},token);assert.equal(response.status,200);const result=await response.json();const order=(await OrdersStore.findOrder(result.orderRef))!;assert.equal(order.customer_email,expected||'');assert.equal(calls.length,1);assert.equal(calls[0].email,expected||dataPaymentEmail(order));assert.equal(calls[0].amountPesewas,order.amount);assert.equal(order.currency,'GHS');assert.equal((await AuthStore.findUserById('phone'))!.email,null);});
+test('invalid receipt API does not create order or provider call',async()=>{const response=await request({customerEmail:'invalid'},'email-token');assert.equal(response.status,400);assert.equal(calls.length,0);assert.equal(OrdersStore.adminDevOrders().length,0);});
+test('concurrent guest retries create one pending order and one provider initialization',async()=>{const body={requestId:randomUUID()};const responses=await Promise.all([request(body),request(body)]);assert.deepEqual(responses.map(r=>r.status).sort(),[200,409]);const results=await Promise.all(responses.map(r=>r.json()));assert.equal(results[0].orderRef,results[1].orderRef);assert.equal(calls.length,1);assert.equal(OrdersStore.adminDevOrders().length,1);});
+for(const definitiveFailure of [false,true])test('guest initialization failure stays latched '+definitiveFailure,async()=>{Paystack.initializeTransaction=async input=>{calls.push(input);return {success:false,reference:input.reference,definitiveFailure};};const body={requestId:randomUUID()};assert.equal((await request(body)).status,503);assert.equal((await request(body)).status,409);assert.equal(calls.length,1);assert.equal(OrdersStore.adminDevOrders().length,1);});
+test('thrown timeout also leaves durable claim; retry does not POST',async()=>{Paystack.initializeTransaction=async input=>{calls.push(input);throw Error('Synthetic timeout');};const body={requestId:randomUUID()};assert.equal((await request(body)).status,503);assert.equal((await request(body)).status,409);assert.equal(calls.length,1);});
+test('changed guest request cannot retrieve existing reference',async()=>{const id=randomUUID();await request({requestId:id});const response=await request({requestId:id,customerEmail:'other@fixture.test'});assert.equal(response.status,409);assert.ok(!('orderRef' in await response.json()));assert.equal(calls.length,1);});
+test('nonopaque guest request ID rejected',async()=>{assert.equal((await request({requestId:'chosen-predictable-identifier'})).status,400);assert.equal(calls.length,0);});
+for(const email of ['', 'receipt@fixture.test'])test('Wallet with optional receipt '+email,async()=>{await FinanceService.adjustment('admin','phone',{confirmed:true,direction:'credit',amountMinor:1000,requestId:randomUUID(),reason:'Synthetic fixture'});const response=await request({customerEmail:email,paymentMethod:'wallet'},'phone-token');assert.equal(response.status,200);const order=(await OrdersStore.findOrder((await response.json()).orderRef))!;assert.equal(order.payment_status,'success');assert.equal(order.customer_email,email);assert.equal(calls.length,0);assert.equal((await FinanceService.summary('phone')).walletMinor,601);});
+test('alias order retains exact amount/currency/reference verification',()=>{const order=draft();for(const change of [{amountPesewas:500},{currency:'USD'},{reference:'wrong'}])assert.ok(validateOrderPayment(order,{isVerified:true,status:'success',amountPesewas:499,currency:'GHS',reference:order.payment_reference,...change}));assert.equal(validateOrderPayment(order,{isVerified:true,status:'success',amountPesewas:499,currency:'GHS',reference:order.payment_reference}),null);});
+test('active MTN conflict rejects before email/provider processing',async()=>{await OrdersStore.createOrder(draft({network:'mtn',product_id:'mtn-1gb',status:'processing'}));assert.equal((await request({productId:'mtn-1gb'})).status,409);assert.equal(calls.length,0);});
+test('cancellation never clears guest initialization latch',async()=>{const id=randomUUID(),response=await request({requestId:id}),result=await response.json();await OrdersStore.cancelOrder(result.orderRef);assert.equal((await request({requestId:id})).status,409);assert.equal(calls.length,1);});

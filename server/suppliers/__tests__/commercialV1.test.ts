@@ -132,8 +132,8 @@ test('invalid phone/signup and non-owner identity cannot select another welcome 
 test('phone-only account can add real checkout email without fabricating profile email',async()=>{
  const user=(await AuthStore.findUserById('buyer'))!;await AuthStore.saveAccount({...user,email:null});
  const body={productId:'mtn-1gb',recipientPhone:'0271234567',requestId:randomUUID(),expectedTotalMinor:449};
- assert.equal((await request('payments/initialize',body)).status,400);
- const r=await request('payments/initialize',{...body,customerEmail:'phone-owner@fixture.test'});assert.equal(r.status,200);assert.equal(parameters.email,'phone-owner@fixture.test');assert.equal((await AuthStore.findUserById('buyer'))!.email,null);
+ const withoutEmail=await request('payments/initialize',body);assert.equal(withoutEmail.status,200);assert.match(parameters.email,/^order-[a-f0-9]{40}@mysterybundlehub\.com$/);assert.equal((await AuthStore.findUserById('buyer'))!.email,null);
+ const r=await request('payments/initialize',{...body,requestId:randomUUID(),expectedTotalMinor:549,customerEmail:'phone-owner@fixture.test'});assert.equal(r.status,200);assert.equal(parameters.email,'phone-owner@fixture.test');assert.equal((await AuthStore.findUserById('buyer'))!.email,null);
 });
 test('Admin audit records previous/new prices, no account PII',async()=>{
  await C.save('admin',{kind:'pricing',confirmed:true,expectedVersion:'direct-launch-v1',reserveBps:0,reserveFixedMinor:0,products:[{productId:'mtn-1gb',retailMinor:599,recommendedMinor:699,enabled:true}]});

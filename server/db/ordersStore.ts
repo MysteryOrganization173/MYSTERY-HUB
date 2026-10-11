@@ -1,3 +1,4 @@
+import { FinanceError } from './financeStore.js';
 import { CommercialService } from '../services/commercialService.js';
 import { WebsiteBusinessService } from '../services/websiteBusinessService.js';
 /**
@@ -46,6 +47,38 @@ async function acquireLock(key: string): Promise<() => void> {
 }
 
 export class OrdersStore {
+  /** A pending guest order durably claims one initialization request, even across restarts. */
+  static async claimGuestDirectOrder(order: OrderRecord): Promise<{created: boolean; order: OrderRecord}> {
+    const pool=getPool();
+    if(pool) {
+      const client=await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended('guest-direct:' || $1,0))",[order.id]);
+        const existing=(await client.query<OrderRecord>('SELECT * FROM orders WHERE id=$1 FOR UPDATE',[order.id])).rows[0];
+        if(existing){await client.query('COMMIT');return {created:false,order:existing};}
+        if(order.network==='mtn') {
+          await client.query("SELECT pg_advisory_xact_lock(hashtext('mtn_' || $1))",[canonicalGhanaPhone(order.recipient_phone)]);
+          const active=await client.query("SELECT id FROM orders WHERE network='mtn' AND recipient_phone=ANY($1::text[]) AND status IN ('paid','queued','submitted','processing','refund_pending')",[getGhanaPhoneLookupVariants(order.recipient_phone)]);
+          if(active.rows.length)throw new FinanceError('An MTN order is already active. Track the existing order.',409);
+        }
+        const saved=await this.createOrder(order,client);
+        await client.query('COMMIT');return {created:true,order:saved};
+      } catch(error){await client.query('ROLLBACK');throw error;} finally{client.release();}
+    }
+    const release=await acquireLock(`guest-direct:${order.id}`);
+    let releaseMtn: (()=>void)|undefined;
+    try {
+      const existing=devMemoryStore.get(order.id);
+      if(existing)return {created:false,order:existing};
+      if(order.network==='mtn') {
+        releaseMtn=await acquireLock(`mtn:${canonicalGhanaPhone(order.recipient_phone)||order.recipient_phone}`);
+        if(await this.findActiveMtnOrder(order.recipient_phone))throw new FinanceError('An MTN order is already active. Track the existing order.',409);
+      }
+      return {created:true,order:await this.createOrder(order)};
+    } finally{releaseMtn?.();release();}
+  }
+
   /** Called only after a successful authenticated supplier GET, never a seller request. */
   static async resolveStoreSupplierReview(orderId:string,supplierId:string):Promise<OrderRecord|null> {
     const existing=await this.findOrder(orderId);

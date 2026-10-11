@@ -56,13 +56,16 @@ export interface ServerPaystackOptions {
 // Paystack Inline JS V2
 const PAYSTACK_INLINE_SCRIPT = 'https://js.paystack.co/v2/inline.js';
 
-export function usePaystack() {
+export function usePaystack(sessionIdentity?: string | null) {
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState<'idle' | 'preparing' | 'opening'>('idle');
 
   const rawKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '';
   const publicKey = typeof rawKey === 'string' ? rawKey.trim() : '';
+  useEffect(() => {
+    setIsInitializing(false);setLoadingPhase('idle');
+  }, [sessionIdentity]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -110,9 +113,14 @@ export function usePaystack() {
     setIsInitializing(true);
     setLoadingPhase('preparing');
 
+    const initialSession = getActiveSessionToken();
+    const guardDataSession = Boolean(options.commercial && !options.store && options.serviceType === 'data');
+    const currentSession = () => !guardDataSession || getActiveSessionToken() === initialSession;
+    let settled = false;
+    const claimCallback = () => { if (!currentSession() || (guardDataSession && settled)) return false; if (guardDataSession) settled = true; return true; };
     try {
       // 1. Call Backend to create pending order & initialize Paystack transaction authoritatively
-      const sessionToken = getActiveSessionToken();
+      const sessionToken = initialSession;
       const initRes = options.store ? await initializeStorePayment(options.store.siteId,options.store.requestId,options.productId,options.recipientPhone,options.customerEmail||'',sessionToken||undefined) : await initializePaymentOnServer(
         {
           ...options.commercial,
@@ -127,6 +135,7 @@ export function usePaystack() {
         sessionToken
       );
 
+      if (!currentSession()) throw new Error('Account changed. Open checkout again.');
       if (!initRes.success) {
         throw new Error(initRes.error || 'Failed to initialize payment with server.');
       }
@@ -145,6 +154,7 @@ export function usePaystack() {
       // 2. Ensure Paystack InlineJS V2 script is ready
       const popAvailable = window.PaystackPop ? true : await waitForPaystackPop();
 
+      if (!currentSession()) throw new Error('Account changed. Open checkout again.');
       // 3. Official Paystack InlineJS V2 Server-Initialized Flow
       if (popAvailable && window.PaystackPop) {
         try {
@@ -152,6 +162,7 @@ export function usePaystack() {
 
           popup.resumeTransaction(accessCode, {
             onSuccess: async () => {
+              if (!claimCallback()) return;
               setIsInitializing(false);
               setLoadingPhase('idle');
               // Trigger backend verification, then poll for authoritative status
@@ -160,19 +171,22 @@ export function usePaystack() {
               } catch {
                 // Backend webhook or polling will reconcile status
               }
-              options.onPaymentReceived(orderRef, reference);
+              if (currentSession()) options.onPaymentReceived(orderRef, reference);
             },
             onCancel: () => {
+              if (!claimCallback()) return;
               setIsInitializing(false);
               setLoadingPhase('idle');
               options.onCancel?.(orderRef, reference);
             },
             onClose: () => {
+              if (!claimCallback()) return;
               setIsInitializing(false);
               setLoadingPhase('idle');
               options.onCancel?.(orderRef, reference);
             },
             onError: (popErr: unknown) => {
+              if (!claimCallback()) return;
               setIsInitializing(false);
               setLoadingPhase('idle');
               const errMsg =
@@ -190,7 +204,7 @@ export function usePaystack() {
             popErr instanceof Error
               ? popErr
               : new Error('Failed to open Paystack payment popup.');
-          options.onError?.(err);
+          if (currentSession()) options.onError?.(err);
           return;
         }
       }
@@ -206,7 +220,7 @@ export function usePaystack() {
           } catch {
             // ignore dev simulation verification error
           }
-          options.onPaymentReceived(orderRef, reference);
+          if (claimCallback()) options.onPaymentReceived(orderRef, reference);
         }, 1200);
         return;
       }
@@ -217,11 +231,11 @@ export function usePaystack() {
       const scriptError = new Error(
         'Unable to load Paystack payment module. Please check your internet connection, disable ad-blockers, and try again.'
       );
-      options.onError?.(scriptError);
+      if (currentSession()) options.onError?.(scriptError);
     } catch (err) {
       setIsInitializing(false);
       setLoadingPhase('idle');
-      options.onError?.(
+      if (currentSession()) options.onError?.(
         err instanceof Error ? err : new Error('Payment initialization failed.')
       );
     }
