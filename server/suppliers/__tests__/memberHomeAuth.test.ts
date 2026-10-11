@@ -163,7 +163,7 @@ describe('Member Home & Logged-In Experience', () => {
     );
 
     assert.ok(
-      ordersPageCode.includes('user ? \'Your Orders\' : \'Order History & Tracking\''),
+      ordersPageCode.includes('user ? \'Your Orders\' : \'Track an order\''),
       'OrdersPage must customize heading based on authentication state'
     );
     assert.ok(
