@@ -1,3 +1,4 @@
+import { WebsiteContrastBoundary } from '../components/website/WebsiteContrastBoundary.js';
 import { normalizeWebsiteColor, normalizeWebsitePalette, readableWebsiteColor, websiteActionText } from './websiteBrand.js';
 import { SectionSiteRenderer } from '../components/website/SectionSiteRenderer.js';
 import { SiteContactDetails, websiteContactTarget } from '../components/website/SiteContactDetails.js';
@@ -98,7 +99,7 @@ export function renderTemplateLayout(
   const legacy = renderLegacyLayout(template, { ...options, onCtaClick: options?.onCtaClick || (template.siteContent && template.layoutType !== 'reseller' ? () => { window.location.assign(websiteContactTarget(template.siteContent)); } : undefined) });
   if (template.composition) return legacy;
   const variables = { '--website-primary':template.colorScheme?.primary, '--website-accent':template.accentColor, '--website-background':template.colorScheme?.background, '--website-text':template.colorScheme?.text, '--website-on-primary':websiteActionText(template.colorScheme?.primary || '#0f172a'), '--website-on-accent':websiteActionText(template.accentColor) } as React.CSSProperties;
-  return <div className="website-presentation" style={variables}>{legacy}<SiteContactDetails template={template} /></div>;
+  return <WebsiteContrastBoundary style={variables}>{legacy}<SiteContactDetails template={template} /></WebsiteContrastBoundary>;
 }
 function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: () => void; isMobileView?: boolean; managedCheckout?: React.ReactNode; managedAvailability?: 'loading' | 'available' | 'empty' | 'error' }): React.ReactElement {
   if (template.composition) return <SectionSiteRenderer template={template} onCtaClick={options?.onCtaClick} managedCheckout={options?.managedCheckout} />;

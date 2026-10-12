@@ -23,3 +23,6 @@ Fresh unchanged-main full baseline: 1517 total, 1513 passes, 3 failures, 1 skip.
 No backend/payment service, database, commercial pricing, supplier, ledger, auth or provider configuration changes. The preview flag only adds early no-op boundaries; public mode remains false. Published catalog, payment contracts and network/WhatsApp branding are retained. Evidence uses synthetic owners, an in-memory WebsiteStore and blocked financial/provider endpoints; no live customers or production database/provider calls.
 
 Workstream B must add a trusted saved-draft/published-state boundary and published-asset reference protection before the combined release is reviewed. Main remains untouched; no deploy is authorized.
+
+
+Continuation browser check found dark inherited backgrounds in legacy Restaurant layouts retained fixed dark headings. A shared legacy contrast boundary now derives text against actual solid surfaces (including translucent surface composition) using the existing contrast helper, preserving backgrounds and readable brand colors. Fixed gradient artwork retains template-owned foregrounds; Restaurant hero/footer now keep white text on their fixed dark artwork. The boundary batches reads/writes and observes content/viewport changes; it does not modify saved settings. This is a follow-up commit, not an amendment.
