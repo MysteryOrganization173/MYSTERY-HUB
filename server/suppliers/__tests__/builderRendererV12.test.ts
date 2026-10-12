@@ -6,7 +6,7 @@ import {readFileSync} from 'node:fs';
 import {WEBSITE_TEMPLATES} from '../../../src/data/templates';
 import {createWebsiteComposition} from '../../../src/config/websiteBuilder';
 import {mergeSiteWithTemplate,renderTemplateLayout} from '../../../src/utils/templateRendererUtils';
-import {normalizeWebsiteColor,resolveResellerTheme,websiteContrast,websiteActionText} from '../../../src/utils/websiteBrand';
+import {normalizeWebsiteColor,resolveResellerTheme,websiteContrast,websiteActionText,readableWebsiteColor} from '../../../src/utils/websiteBrand';
 import {migrateWebsiteTemplate} from '../../../src/utils/websiteTemplateMigration';
 const text=(path:string)=>readFileSync(path,'utf8');
 const content={businessName:'Synthetic owner business',tagline:'Our edited headline',aboutText:'Our edited description',phone:'0241234567',whatsapp:'0241234567',email:'fixture@example.test',location:'Synthetic Accra',heroImage:'/fixture-cover.svg',logoUrl:'/fixture-logo.svg',ctaLabel:'Contact the owner',ctaTarget:'https://example.test/contact',social:{instagram:'synthetic_owner'},items:[],stats:[],features:[]};
@@ -41,3 +41,8 @@ test('preview denies payment initiation, reference lookup, event tracking and ex
   const store=text('src/components/website/ManagedDataStorefront.tsx');assert.match(store,/if\(preview\|\|!selected\|\|guard.current\)return/);assert.match(store,/if\(preview\|\|!ref\)return/);assert.match(store,/if\(preview\)\{setError/);assert.match(text('src/components/website/WebsiteSiteRenderer.tsx'),/onSubmitCapture/);assert.match(text('src/components/website/WebsiteSiteRenderer.tsx'),/event.stopPropagation/);
 });
 test('template migration keeps business identity and safe links without changing a site address',()=>{const migrated=migrateWebsiteTemplate(content,'tmpl-data-reseller','tmpl-buka-bistro');assert.equal(migrated.businessName,content.businessName);assert.equal(migrated.phone,content.phone);assert.ok(!('slug' in migrated));});
+
+test('inherited themes retain legacy design but repair text on its actual solid surface',()=>{
+ const source=text('src/components/website/WebsiteContrastBoundary.tsx');assert.match(source,/readableWebsiteColor\(original,\[hex\(background\)\]\)/);assert.match(source,/backgroundImage!=='none'/);assert.match(source,/MutationObserver/);
+ const restaurant=mergeSiteWithTemplate(WEBSITE_TEMPLATES.find(t=>t.layoutType==='restaurant')!,content,{backgroundColor:'#07111e',primaryColor:'#123456'});const html=renderToStaticMarkup(renderTemplateLayout(restaurant));assert.ok(html.includes('website-presentation'));assert.ok(html.includes('to-[#1c090d] text-white'));assert.ok(websiteContrast(readableWebsiteColor('#123456',['#07111e']),'#07111e')>=4.5);
+});

@@ -93,7 +93,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
       </nav>
 
       {/* Hero Section */}
-      <div className="relative py-14 sm:py-20 px-6 sm:px-12 bg-gradient-to-br from-[#2a0e14] via-[#3b151d] to-[#1c090d] text-[var(--website-background,#fcf9f5)] overflow-hidden">
+      <div className="relative py-14 sm:py-20 px-6 sm:px-12 bg-gradient-to-br from-[#2a0e14] via-[#3b151d] to-[#1c090d] text-white overflow-hidden">
         <SafeImage className="absolute inset-0 opacity-45   " src={template.heroImage || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-3xl space-y-5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#c99a45)]/20 border border-[var(--website-accent,#c99a45)]/40 text-[var(--website-accent,#c99a45)] text-xs font-sans font-semibold tracking-wider uppercase">
@@ -101,7 +101,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
             <span>{template.siteContent ? template.categoryLabel : 'Modern Ghanaian Gastronomy'}</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-normal tracking-tight leading-[1.15] text-[var(--website-background,#fcf9f5)]">
+          <h1 className="text-3xl sm:text-5xl font-normal tracking-tight leading-[1.15] text-white">
             {template.demoHeroTagline}
           </h1>
 
@@ -307,7 +307,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
       </div>
 
       {/* Location & Contact Footer */}
-      <footer id="location" className="bg-[#1c1917] text-[var(--website-background,#fcf9f5)] py-10 px-6 sm:px-12 font-sans text-xs">
+      <footer id="location" className="bg-[#1c1917] text-white py-10 px-6 sm:px-12 font-sans text-xs">
         <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="space-y-2">
             <h4 className="font-serif font-bold text-base text-[var(--website-accent,#c99a45)]">
