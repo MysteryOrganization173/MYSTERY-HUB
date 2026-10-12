@@ -179,6 +179,8 @@ export interface TemplateItem {
 }
 
 export interface WebsiteTemplate {
+  /** Owner-only preview context; never persisted in website content. */
+  previewSiteId?: string;
   priority?: number;
   integrations?: readonly { id: string; label: string; status: "upcoming" }[];
   composition?: WebsiteComposition;

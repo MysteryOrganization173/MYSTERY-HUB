@@ -1,3 +1,4 @@
+import { WebsiteSiteRenderer } from './WebsiteSiteRenderer';
 import React, { useEffect, useState } from 'react';
 import type { WebsiteTemplate } from '../../types';
 import { WEBSITE_TEMPLATES } from '../../data/templates';
@@ -14,12 +15,14 @@ export const IsolatedTemplatePreview: React.FC<IsolatedTemplatePreviewProps> = (
 
   const ownerPreview = new URLSearchParams(window.location.search).get('owner_preview') === '1';
   const [ownerTemplate, setOwnerTemplate] = useState<WebsiteTemplate | null>(null);
+  const [siteId,setSiteId] = useState<string | undefined>();
   useEffect(() => {
     setOwnerTemplate(null);
     const receiveContent = (event: MessageEvent) => {
       if (event.origin !== window.location.origin || event.source !== window.parent) return;
       if (event.data?.type === 'MYSTERYHUB_PREVIEW_CONTENT' && event.data.template?.id === template.id && event.data.template?.siteContent) {
         setOwnerTemplate(event.data.template);
+        setSiteId(typeof event.data.siteId==='string'?event.data.siteId:undefined);
       }
     };
     const dismissPreview = (event: KeyboardEvent) => {
@@ -58,7 +61,7 @@ export const IsolatedTemplatePreview: React.FC<IsolatedTemplatePreviewProps> = (
       className="min-h-screen w-full text-slate-900 antialiased selection:bg-[#00c365] selection:text-black overflow-x-hidden"
       style={{ backgroundColor: bg }}
     >
-      {renderTemplateLayout(shownTemplate, { onCtaClick: handleCtaClick })}
+      {ownerPreview ? <WebsiteSiteRenderer template={shownTemplate} siteId={siteId} preview/> : renderTemplateLayout(shownTemplate, { onCtaClick: handleCtaClick })}
     </div>
   );
 };

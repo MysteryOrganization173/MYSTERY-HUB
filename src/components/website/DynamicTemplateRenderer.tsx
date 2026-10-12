@@ -1,3 +1,4 @@
+import { websiteActionText, readableWebsiteColor } from '../../utils/websiteBrand';
 import { SafeImage } from './SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate, TemplateItem } from '../../types';
@@ -148,9 +149,9 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
         {/* Top Announcement Bar */}
         <div
           className="px-3 sm:px-4 py-2 text-center text-xs tracking-wider uppercase font-sans flex items-center justify-center gap-2 text-white"
-          style={{ backgroundColor: p.primary }}
+          style={{ backgroundColor: p.primary, color: websiteActionText(p.primary) }}
         >
-          <Sparkles className="w-3.5 h-3.5" style={{ color: p.secondary }} />
+          <Sparkles className="w-3.5 h-3.5" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }} />
           <span className="truncate">Weekend Live Jazz & Osu Night Market Grills · Reserve Early</span>
         </div>
 
@@ -162,14 +163,14 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
           <div className="flex items-center gap-2 sm:gap-3">
             <div
               className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm sm:text-base font-bold text-white shrink-0"
-              style={{ backgroundColor: p.primary, color: p.secondary }}
+              style={{ backgroundColor: p.primary, color: websiteActionText(p.primary) }}
             >
               G
             </div>
             <div>
               <span
                 className="font-bold text-sm sm:text-base tracking-wide block leading-none font-serif truncate max-w-[150px] sm:max-w-none"
-                style={{ color: p.primary }}
+                style={{ color: readableWebsiteColor(p.primary, [p.background,p.surface]) }}
               >
                 {template.demoBusinessName}
               </span>
@@ -188,9 +189,9 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
           <button
             onClick={onCtaClick}
             className={`px-3 sm:px-4 py-1.5 sm:py-2 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer font-sans shrink-0 ${btnRadius}`}
-            style={{ backgroundColor: p.primary }}
+            style={{ backgroundColor: p.primary, color: websiteActionText(p.primary) }}
           >
-            <Calendar className="w-3.5 h-3.5" style={{ color: p.secondary }} />
+            <Calendar className="w-3.5 h-3.5" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }} />
             <span>Book Table</span>
           </button>
         </nav>
@@ -226,7 +227,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
               <a
                 href="#reserve"
                 className={`px-5 py-2.5 text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-2 ${btnRadius}`}
-                style={{ backgroundColor: p.secondary }}
+                style={{ backgroundColor: p.secondary, color: websiteActionText(p.secondary) }}
               >
                 <span>Reserve Table</span>
               </a>
@@ -242,7 +243,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
             <div className="pt-4 grid grid-cols-3 gap-3 border-t border-white/15 max-w-md font-sans">
               {template.stats?.map((stat, i) => (
                 <div key={i}>
-                  <div className="text-lg sm:text-xl font-bold font-serif" style={{ color: p.secondary }}>
+                  <div className="text-lg sm:text-xl font-bold font-serif" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }}>
                     {stat.value}
                   </div>
                   <div className="text-[10px] text-slate-300 uppercase tracking-wider mt-0.5">
@@ -257,10 +258,10 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
         {/* Menu Section */}
         <div id="menu" className="py-10 sm:py-14 px-4 sm:px-12 max-w-5xl mx-auto space-y-6 font-sans">
           <div className="text-center max-w-lg mx-auto space-y-1">
-            <span className="text-xs uppercase tracking-widest font-bold" style={{ color: p.secondary }}>
+            <span className="text-xs uppercase tracking-widest font-bold" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }}>
               Curated Culinary Selection
             </span>
-            <h2 className="text-xl sm:text-3xl font-serif" style={{ color: p.primary }}>
+            <h2 className="text-xl sm:text-3xl font-serif" style={{ color: readableWebsiteColor(p.primary, [p.background,p.surface]) }}>
               Crafted with Fresh Ghanaian Produce
             </h2>
           </div>
@@ -277,7 +278,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                 }`}
                 style={
                   activeTab === cat
-                    ? { backgroundColor: p.primary }
+                    ? { backgroundColor: p.primary, color: websiteActionText(p.primary) }
                     : { borderColor: p.border, color: p.mutedText }
                 }
               >
@@ -303,7 +304,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                     <h3 className="font-bold text-xs sm:text-sm font-serif truncate" style={{ color: p.text }}>
                       {item.name}
                     </h3>
-                    <span className="font-bold text-xs shrink-0" style={{ color: p.primary }}>
+                    <span className="font-bold text-xs shrink-0" style={{ color: readableWebsiteColor(p.primary, [p.background,p.surface]) }}>
                       {item.price}
                     </span>
                   </div>
@@ -331,7 +332,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
             style={{ backgroundColor: p.surface, borderColor: p.border }}
           >
             <div className="text-center space-y-1">
-              <span className="text-xs font-bold uppercase tracking-widest" style={{ color: p.primary }}>
+              <span className="text-xs font-bold uppercase tracking-widest" style={{ color: readableWebsiteColor(p.primary, [p.background,p.surface]) }}>
                 Instant Online Booking
               </span>
               <h3 className="text-xl sm:text-2xl font-serif" style={{ color: p.text }}>
@@ -410,9 +411,9 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                 <button
                   type="submit"
                   className={`w-full py-3 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${btnRadius}`}
-                  style={{ backgroundColor: p.primary }}
+                  style={{ backgroundColor: p.primary, color: websiteActionText(p.primary) }}
                 >
-                  <Calendar className="w-4 h-4" style={{ color: p.secondary }} />
+                  <Calendar className="w-4 h-4" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }} />
                   <span>Confirm Table Booking</span>
                 </button>
               </form>
@@ -421,10 +422,10 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
         </div>
 
         {/* Footer */}
-        <footer id="location" className="py-8 px-4 sm:px-12 text-xs text-white" style={{ backgroundColor: p.primary }}>
+        <footer id="location" className="py-8 px-4 sm:px-12 text-xs text-white" style={{ backgroundColor: p.primary, color: websiteActionText(p.primary) }}>
           <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-start justify-between gap-4">
             <div className="space-y-1">
-              <h4 className="font-serif font-bold text-base" style={{ color: p.secondary }}>
+              <h4 className="font-serif font-bold text-base" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }}>
                 {template.demoBusinessName}
               </h4>
               <p className="text-slate-300 text-xs">{template.location}</p>
@@ -459,12 +460,12 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
         >
           <div className="flex items-center gap-3 text-[10px] sm:text-[11px] truncate">
             <span className="flex items-center gap-1.5 text-slate-300">
-              <MapPin className="w-3.5 h-3.5" style={{ color: p.secondary }} />
+              <MapPin className="w-3.5 h-3.5" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }} />
               <span className="truncate">{template.location}</span>
             </span>
           </div>
           <div className="flex items-center gap-2 text-[10px] font-mono shrink-0">
-            <span style={{ color: p.secondary }} className="font-bold">ISO 9001:2015</span>
+            <span style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }} className="font-bold">ISO 9001:2015</span>
             <span className="text-slate-600">|</span>
             <span className="text-slate-300">Class D1K1</span>
           </div>
@@ -478,7 +479,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
           <div className="flex items-center gap-2.5">
             <div
               className="w-9 h-9 rounded-lg flex items-center justify-center font-black text-black shrink-0"
-              style={{ backgroundColor: p.secondary }}
+              style={{ backgroundColor: p.secondary, color: websiteActionText(p.secondary) }}
             >
               <HardHat className="w-5 h-5 text-black" />
             </div>
@@ -486,7 +487,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
               <span className="font-black text-sm sm:text-base tracking-tight text-white block uppercase leading-none truncate max-w-[170px] sm:max-w-none">
                 {template.demoBusinessName}
               </span>
-              <span className="text-[9px] uppercase tracking-widest font-mono font-bold block mt-0.5" style={{ color: p.secondary }}>
+              <span className="text-[9px] uppercase tracking-widest font-mono font-bold block mt-0.5" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }}>
                 Civil & Structural Engineers
               </span>
             </div>
@@ -495,7 +496,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
           <button
             onClick={onCtaClick}
             className={`px-3 sm:px-4 py-2 text-black font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer shrink-0 ${btnRadius}`}
-            style={{ backgroundColor: p.secondary }}
+            style={{ backgroundColor: p.secondary, color: websiteActionText(p.secondary) }}
           >
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>Request BOQ</span>
@@ -534,7 +535,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
               <a
                 href="#projects"
                 className={`px-5 py-3 text-black font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 ${btnRadius}`}
-                style={{ backgroundColor: p.secondary }}
+                style={{ backgroundColor: p.secondary, color: websiteActionText(p.secondary) }}
               >
                 <span>View Developments</span>
                 <ArrowRight className="w-4 h-4" />
@@ -549,7 +550,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                   className="p-3 rounded-lg border"
                   style={{ backgroundColor: `${p.surface}90`, borderColor: p.border }}
                 >
-                  <div className="text-xl sm:text-2xl font-black font-mono" style={{ color: p.secondary }}>
+                  <div className="text-xl sm:text-2xl font-black font-mono" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }}>
                     {stat.value}
                   </div>
                   <div className="text-[9px] sm:text-[10px] text-slate-400 uppercase tracking-wider font-semibold mt-0.5">
@@ -565,7 +566,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
         <div id="projects" className="py-12 sm:py-16 px-4 sm:px-12 max-w-6xl mx-auto space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
             <div>
-              <span className="text-xs uppercase tracking-widest font-mono font-bold block" style={{ color: p.secondary }}>
+              <span className="text-xs uppercase tracking-widest font-mono font-bold block" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }}>
                 Proven Track Record
               </span>
               <h2 className="text-xl sm:text-3xl font-black uppercase text-white mt-0.5">
@@ -583,7 +584,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                   }`}
                   style={
                     activeTab === cat
-                      ? { backgroundColor: p.secondary }
+                      ? { backgroundColor: p.secondary, color: websiteActionText(p.secondary) }
                       : { borderColor: p.border, backgroundColor: p.surface }
                   }
                 >
@@ -610,7 +611,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                     </div>
                   )}
                   <div className="p-4 space-y-2">
-                    <div className="text-[10px] font-mono uppercase font-bold" style={{ color: p.secondary }}>
+                    <div className="text-[10px] font-mono uppercase font-bold" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }}>
                       {item.category}
                     </div>
                     <h3 className="font-bold text-sm sm:text-base text-white">{item.name}</h3>
@@ -667,9 +668,9 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
       {/* Dynamic Announcement Ribbon */}
       <div
         className="px-3 sm:px-6 py-2 text-center text-xs tracking-wider font-semibold text-white flex items-center justify-center gap-2"
-        style={{ backgroundColor: p.primary }}
+        style={{ backgroundColor: p.primary, color: websiteActionText(p.primary) }}
       >
-        <Sparkles className="w-3.5 h-3.5" style={{ color: p.secondary }} />
+        <Sparkles className="w-3.5 h-3.5" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }} />
         <span className="truncate">
           {template.siteContent ? template.location || template.categoryLabel : layout === 'ecommerce' || layout === 'retail'
             ? 'Explore products and contact the business'
@@ -696,7 +697,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
         <div className="flex items-center gap-2.5">
           <div
             className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-white font-bold shrink-0"
-            style={{ backgroundColor: p.primary }}
+            style={{ backgroundColor: p.primary, color: websiteActionText(p.primary) }}
           >
             {template.siteContent?.logoUrl ? (<SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} />) : layout === 'realestate' ? (
               <Building className="w-4 h-4 text-white" />
@@ -723,7 +724,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
             </span>
             <span
               className="text-[10px] uppercase tracking-widest font-semibold block mt-0.5 truncate"
-              style={{ color: p.secondary }}
+              style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }}
             >
               {template.categoryLabel}
             </span>
@@ -736,7 +737,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
               <ShoppingBag className="w-4 h-4" />
               <span
                 className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-white text-[9px] font-bold flex items-center justify-center"
-                style={{ backgroundColor: p.secondary }}
+                style={{ backgroundColor: p.secondary, color: websiteActionText(p.secondary) }}
               >
                 {cartCount}
               </span>
@@ -746,7 +747,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
           <button
             onClick={onCtaClick}
             className={`px-3 sm:px-4 py-1.5 sm:py-2 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer shrink-0 ${btnRadius}`}
-            style={{ backgroundColor: p.secondary }}
+            style={{ backgroundColor: p.secondary, color: websiteActionText(p.secondary) }}
           >
             <span>
               {layout === 'realestate'
@@ -796,7 +797,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
             <a
               href="#catalog"
               className={`px-5 py-2.5 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-2 ${btnRadius}`}
-              style={{ backgroundColor: p.secondary }}
+              style={{ backgroundColor: p.secondary, color: websiteActionText(p.secondary) }}
             >
               <span>Explore Offerings</span>
               <ArrowRight className="w-4 h-4" />
@@ -825,7 +826,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
       <div id="catalog" className="py-10 sm:py-16 px-4 sm:px-12 max-w-6xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <span className="text-xs uppercase tracking-widest font-bold" style={{ color: p.secondary }}>
+            <span className="text-xs uppercase tracking-widest font-bold" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }}>
               Featured Portfolio
             </span>
             <h2 className="text-xl sm:text-3xl font-black mt-0.5" style={{ color: p.text }}>
@@ -852,7 +853,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                     {item.price && (
                       <div
                         className="absolute bottom-3 right-3 text-white px-2.5 py-1 rounded-lg text-xs font-black shadow-md"
-                        style={{ backgroundColor: p.primary }}
+                        style={{ backgroundColor: p.primary, color: websiteActionText(p.primary) }}
                       >
                         {item.price}
                       </div>
@@ -860,7 +861,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                     {item.tag && (
                       <div
                         className="absolute top-3 left-3 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
-                        style={{ backgroundColor: p.secondary }}
+                        style={{ backgroundColor: p.secondary, color: websiteActionText(p.secondary) }}
                       >
                         {item.tag}
                       </div>
@@ -868,7 +869,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                   </div>
                 )}
                 <div className="p-4 sm:p-5 space-y-2">
-                  <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: p.secondary }}>
+                  <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }}>
                     {item.category}
                   </div>
                   <h3 className="font-bold text-sm sm:text-base" style={{ color: p.text }}>
@@ -899,7 +900,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                   <button
                     onClick={() => handleAddToCart(item.name)}
                     className={`w-full py-2.5 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${btnRadius}`}
-                    style={{ backgroundColor: p.secondary }}
+                    style={{ backgroundColor: p.secondary, color: websiteActionText(p.secondary) }}
                   >
                     <ShoppingBag className="w-3.5 h-3.5" />
                     <span>Add to Bag</span>
@@ -908,7 +909,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                   <button
                     onClick={onCtaClick}
                     className={`w-full py-2 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${btnRadius}`}
-                    style={{ backgroundColor: p.primary }}
+                    style={{ backgroundColor: p.primary, color: websiteActionText(p.primary) }}
                   >
                     <span>Select Option</span>
                   </button>

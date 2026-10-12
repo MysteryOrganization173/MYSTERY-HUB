@@ -34,6 +34,7 @@ export function WebsiteSectionsControl({
 }) {
   const [adding, setAdding] = useState<WebsiteSectionType>('about');
   const config = content.composition;
+  const managed = templateId === 'tmpl-data-reseller';
 
   const save = (composition: WebsiteComposition) =>
     onChange({
@@ -78,6 +79,7 @@ export function WebsiteSectionsControl({
             .sort((a, b) => a.order - b.order)
             .map((s, index) => {
               const required = SECTION_REGISTRY[s.type].required;
+              const managedCatalog = managed && ['products','services','pricing'].includes(s.type);
               const change = (patch: Partial<typeof s>) =>
                 save({
                   ...config,
@@ -236,8 +238,9 @@ export function WebsiteSectionsControl({
                         <label className="text-xs text-slate-400">Section CTA destination<input maxLength={500} value={s.data.ctaUrl || ''} onChange={e=>change({data:{...s.data,ctaUrl:e.target.value}})} placeholder="https://… or #section" className="block w-full bg-slate-900 border border-slate-800 p-2 rounded-lg text-white" /></label>
                       </div>
 
+                      {managedCatalog && <p className="text-xs text-slate-300">The managed catalog uses authoritative Bundles &amp; Pricing settings. Custom item prices here are not used. The protected catalog remains available even if this layout block is hidden.</p>}
                       {/* Section Items / Cards (for lists, menu items, gallery entries) */}
-                      <div className="space-y-2 pt-1">
+                      <div className="space-y-2 pt-1" hidden={managedCatalog}>
                         <div className="flex items-center justify-between">
                           <label className="text-xs font-bold text-slate-300">
                             Section Items ({s.data.items?.length || 0})

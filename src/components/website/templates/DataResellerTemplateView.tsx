@@ -61,9 +61,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
 
   const businessName = template.demoBusinessName || 'QuickByte Data';
   const tagline = template.demoHeroTagline || 'Affordable data. Simple delivery.';
-  const aboutText = managedCheckout ? managedAvailability === 'available' ? "Choose your bundle, enter the recipient, and pay securely. Mystery Hub manages delivery and order tracking." : "Check bundle availability below. You can still track an existing order or contact the business." :
-    template.demoSubtext || (template.siteContent ? '' :
-    'Buy MTN, Telecel and AirtelTigo bundles from one simple storefront. Choose your package, enter the recipient number and place your order through WhatsApp.');
+  const aboutText = template.demoSubtext || (template.siteContent ? '' : 'Buy MTN, Telecel and AirtelTigo bundles from one simple storefront.');
   const location = template.siteContent ? template.location || '' : template.location || 'Sample store location';
   const contact = template.siteContent ? template.siteContent.phone || '' : template.hoursOrContact || '+233 24 555 7788';
   const whatsapp = template.siteContent ? template.siteContent.whatsapp || template.siteContent.phone || '' : template.hoursOrContact || contact;
@@ -373,7 +371,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                 className="px-5 py-3 border rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 cursor-pointer active:scale-95 "
                 style={{ backgroundColor: p.accent, color:websiteActionText(p.accent), borderColor:p.border }}
               >
-                <span>{managedCheckout && managedAvailability !== 'available' ? managedAvailability === 'loading' ? 'Check Availability' : 'View Availability' : 'Buy Data'}</span>
+                <span>{managedCheckout && managedAvailability !== 'available' ? managedAvailability === 'loading' ? 'Check Availability' : 'View Availability' : template.siteContent?.ctaLabel || 'Buy Data'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 
