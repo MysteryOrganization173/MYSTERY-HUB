@@ -128,7 +128,7 @@ export class WebsiteAssetStore {
       const asset = await this.ownedAsset(siteId, userId, assetId);
       if (asset.status === 'deleted') return;
       const site = await this.ownedSite(siteId, userId);
-      const usage = websiteImageReferences(site.content_json).filter(r => managedImagePublicId(r.url) === asset.public_id || r.url === asset.secure_url || r.url === asset.delivery_url);
+      const usage = [...websiteImageReferences(site.content_json),...websiteImageReferences(site.published_snapshot_json?.content || {} as SiteContent).map(reference=>({...reference,location:'Published revision: '+reference.location}))].filter(r => managedImagePublicId(r.url) === asset.public_id || r.url === asset.secure_url || r.url === asset.delivery_url);
       if (usage.length) throw new WebsiteOperationError(`Remove or replace this image first. In use: ${usage.map(r => r.location).join(', ')}.`, 409);
       await this.save({ ...asset, status: 'deleting', updated_at: new Date().toISOString() });
     });

@@ -239,13 +239,13 @@ export const WebsiteBuilderPage: React.FC = () => {
     setActionLoadingSiteId(site.id);
     try {
       if (site.status === 'published') {
-        const res = await unpublishWebsiteOnServer(sessionToken, site.id);
+        const res = await unpublishWebsiteOnServer(sessionToken, site.id, site.updated_at);
         if (res.success && res.site) {
           setMySites((prev) => prev.map((s) => (s.id === res.site.id ? res.site : s)));
           showToast('Your website is now a draft and is no longer public.', 'info');
         }
       } else {
-        const res = await publishWebsiteOnServer(sessionToken, site.id);
+        const res = await publishWebsiteOnServer(sessionToken, site.id, site.updated_at);
         if (res.success && res.site) {
           setMySites((prev) => prev.map((s) => (s.id === res.site.id ? res.site : s)));
           showToast(`Website published! Live at /sites/${res.site.slug}`, 'success');

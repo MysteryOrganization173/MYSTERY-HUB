@@ -1,3 +1,4 @@
+import { createPublishedSnapshot, legacyPublishedSnapshot, publishedWebsiteRecord, publicWebsiteContent } from '../services/websitePublication.js';
 import { validateWebsiteComposition, validateWebsiteContentPatch } from '../services/websiteValidation.js';
 import { resolveWebsitePlan, WEBSITE_PLANS, createWebsiteComposition } from '../../src/config/websiteBuilder.js';
 /**
@@ -85,7 +86,7 @@ export class WebsiteStore {
     if (!pool) {
       for (const s of devWebsiteStore.values()) {
         if (s.slug === cleanSlug && s.status === 'published') {
-          return structuredClone(s);
+          return publishedWebsiteRecord(structuredClone(s));
         }
       }
       return null;
@@ -97,7 +98,13 @@ export class WebsiteStore {
     );
 
     if (res.rows.length === 0) return null;
-    return this.normalizeRecord(res.rows[0]);
+    return publishedWebsiteRecord(this.normalizeRecord(res.rows[0]));
+  }
+
+  /** Public operational reads use the same immutable presentation state as the public URL. */
+  static async findPublishedSiteById(id:string):Promise<WebsiteSiteRecord|null> {
+    const site=await this.findSiteById(id);
+    return site?.status==='published'?publishedWebsiteRecord(site):null;
   }
 
   /**
@@ -231,6 +238,7 @@ export class WebsiteStore {
       created_at: now,
       updated_at: now,
       published_at: null,
+      published_snapshot_json: null,
     };
 
     await WebsiteAssetStore.validateReferences(id, userId, initialContent);
@@ -389,6 +397,7 @@ export class WebsiteStore {
 
     const updatedRecord: WebsiteSiteRecord = {
       ...existing,
+      published_snapshot_json: legacyPublishedSnapshot(existing),
       name: updatedName,
       content_json: mergedContent,
       settings_json: mergedSettings,
@@ -403,7 +412,8 @@ export class WebsiteStore {
 
     await pool.query(
       `UPDATE website_sites 
-       SET name = $1, content_json = $2, settings_json = $3, updated_at = $4
+       SET name = $1, content_json = $2, settings_json = $3, updated_at = $4,
+           published_snapshot_json = COALESCE(published_snapshot_json, $7::jsonb)
        WHERE id = $5 AND user_id = $6;`,
       [
         updatedRecord.name,
@@ -412,6 +422,7 @@ export class WebsiteStore {
         updatedRecord.updated_at,
         id,
         userId,
+        updatedRecord.published_snapshot_json ? JSON.stringify(updatedRecord.published_snapshot_json) : null,
       ]
     );
 
@@ -422,10 +433,10 @@ export class WebsiteStore {
    * Publish a website
    * Enforces server-side ownership
    */
-  static async publishSite(id: string, userId: string) {
-    return withWebsiteLock(userId, () => this.publishSiteLocked(id, userId));
+  static async publishSite(id: string, userId: string, expectedUpdatedAt?: string) {
+    return withWebsiteLock(userId, () => this.publishSiteLocked(id, userId, expectedUpdatedAt));
   }
-  private static async publishSiteLocked(id: string, userId: string): Promise<WebsiteSiteRecord | null> {
+  private static async publishSiteLocked(id: string, userId: string, expectedUpdatedAt?: string): Promise<WebsiteSiteRecord | null> {
     const existing = await this.findSiteById(id);
     if (!existing) return null;
 
@@ -433,10 +444,22 @@ export class WebsiteStore {
       throw new Error('Forbidden: You do not own this website.');
     }
 
+    // A retried acknowledged revision cannot publish a newer draft by accident.
+    if(expectedUpdatedAt && existing.status==='published' && existing.published_snapshot_json?.draftUpdatedAt===expectedUpdatedAt){
+      if(existing.updated_at!==existing.published_snapshot_json.publishedAt)throw new WebsiteOperationError('That revision was published, but a newer draft exists. Reload before continuing.',409);
+      return existing;
+    }
+    if(expectedUpdatedAt !== undefined && expectedUpdatedAt !== existing.updated_at)throw new WebsiteOperationError('Your website changed in another session. Reload before publishing.',409);
+    const publicContent=publicWebsiteContent(existing.content_json);
+    validateWebsiteContentPatch(publicContent);
+    if(publicContent.composition)validateWebsiteComposition(publicContent.composition,userId);
+    await WebsiteAssetStore.validateReferences(id,userId,publicContent);
+
     const now = new Date(Math.max(Date.now(), Date.parse(existing.updated_at) + 1)).toISOString();
     const updatedRecord: WebsiteSiteRecord = {
       ...existing,
       status: 'published',
+      published_snapshot_json: createPublishedSnapshot(existing,now),
       published_at: now,
       updated_at: now,
     };
@@ -449,9 +472,9 @@ export class WebsiteStore {
 
     await pool.query(
       `UPDATE website_sites 
-       SET status = 'published', published_at = $1, updated_at = $2
+       SET status = 'published', published_at = $1, updated_at = $2, published_snapshot_json = $5::jsonb
        WHERE id = $3 AND user_id = $4;`,
-      [updatedRecord.published_at, updatedRecord.updated_at, id, userId]
+      [updatedRecord.published_at, updatedRecord.updated_at, id, userId, JSON.stringify(updatedRecord.published_snapshot_json)]
     );
 
     return updatedRecord;
@@ -461,10 +484,10 @@ export class WebsiteStore {
    * Unpublish a website (return to draft)
    * Enforces server-side ownership
    */
-  static async unpublishSite(id: string, userId: string) {
-    return withWebsiteLock(userId, () => this.unpublishSiteLocked(id, userId));
+  static async unpublishSite(id: string, userId: string, expectedUpdatedAt?: string) {
+    return withWebsiteLock(userId, () => this.unpublishSiteLocked(id, userId, expectedUpdatedAt));
   }
-  private static async unpublishSiteLocked(id: string, userId: string): Promise<WebsiteSiteRecord | null> {
+  private static async unpublishSiteLocked(id: string, userId: string, expectedUpdatedAt?: string): Promise<WebsiteSiteRecord | null> {
     const existing = await this.findSiteById(id);
     if (!existing) return null;
 
@@ -472,10 +495,13 @@ export class WebsiteStore {
       throw new Error('Forbidden: You do not own this website.');
     }
 
+    if(existing.status==='draft')return existing;
+    if(expectedUpdatedAt !== undefined && expectedUpdatedAt !== existing.updated_at)throw new WebsiteOperationError('Your website changed. Reload before unpublishing.',409);
     const now = new Date(Math.max(Date.now(), Date.parse(existing.updated_at) + 1)).toISOString();
     const updatedRecord: WebsiteSiteRecord = {
       ...existing,
       status: 'draft',
+      published_snapshot_json: legacyPublishedSnapshot(existing),
       updated_at: now,
     };
 
@@ -487,9 +513,9 @@ export class WebsiteStore {
 
     await pool.query(
       `UPDATE website_sites 
-       SET status = 'draft', updated_at = $1
+       SET status = 'draft', updated_at = $1, published_snapshot_json = COALESCE(published_snapshot_json,$4::jsonb)
        WHERE id = $2 AND user_id = $3;`,
-      [updatedRecord.updated_at, id, userId]
+      [updatedRecord.updated_at, id, userId, updatedRecord.published_snapshot_json ? JSON.stringify(updatedRecord.published_snapshot_json) : null]
     );
 
     return updatedRecord;
@@ -535,9 +561,9 @@ export class WebsiteStore {
       const content = migrateWebsiteTemplate(existing.content_json, existing.template_id, targetTemplateId);
       if (content.composition) content.composition = validateWebsiteComposition(content.composition, userId);
       await WebsiteAssetStore.validateReferences(id, userId, content);
-      const updated = { ...existing, template_id: targetTemplateId, content_json: content, updated_at: new Date(Math.max(Date.now(), Date.parse(existing.updated_at) + 1)).toISOString() };
+      const updated = { ...existing, published_snapshot_json:legacyPublishedSnapshot(existing), template_id: targetTemplateId, content_json: content, updated_at: new Date(Math.max(Date.now(), Date.parse(existing.updated_at) + 1)).toISOString() };
       const db = websiteDatabase();
-      if (db) await db.query('UPDATE website_sites SET template_id=$1, content_json=$2, updated_at=$3 WHERE id=$4 AND user_id=$5', [targetTemplateId, JSON.stringify(content), updated.updated_at, id, userId]);
+      if (db) await db.query('UPDATE website_sites SET template_id=$1, content_json=$2, updated_at=$3, published_snapshot_json=COALESCE(published_snapshot_json,$6::jsonb) WHERE id=$4 AND user_id=$5', [targetTemplateId, JSON.stringify(content), updated.updated_at, id, userId, updated.published_snapshot_json ? JSON.stringify(updated.published_snapshot_json) : null]);
       else devWebsiteStore.set(id, structuredClone(updated));
       return updated;
     });
@@ -568,6 +594,7 @@ export class WebsiteStore {
       user_id: row.user_id,
       template_id: row.template_id,
       name: row.name,
+      published_snapshot_json: typeof row.published_snapshot_json === 'string' ? JSON.parse(row.published_snapshot_json) : row.published_snapshot_json || null,
       slug: row.slug,
       status: row.status as WebsiteSiteStatus,
       content_json:

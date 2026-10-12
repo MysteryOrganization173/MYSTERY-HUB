@@ -25,7 +25,7 @@ async function configLock(tx:FinanceTx,exclusive=false){if(tx.client)await tx.cl
 export class WebsiteBusinessService {
   static async owned(siteId:string,userId:string){return WebsiteAssetStore.ownedSite(siteId,userId);}
   static async catalog(siteId:string,userId?:string) {
-    const site=userId?await this.owned(siteId,userId):await WebsiteStore.findSiteById(siteId);
+    const site=userId?await this.owned(siteId,userId):await WebsiteStore.findPublishedSiteById(siteId);
     if(!site||!userId&&site.status!=='published')throw new FinanceError('Store not found.',404);
     if(site.template_id!=='tmpl-data-reseller')return {version:'empty',products:[],managed:false};
     const [policy,costs,prices]=await Promise.all([currentPolicy(),wholesale(),priceConfig(site.id)]);
@@ -90,14 +90,14 @@ export class WebsiteBusinessService {
     const product=getAuthoritativeProduct(String(input.productId));if(!product||product.id!==input.productId)throw new FinanceError('Bundle unavailable.');
     const phone=validateAndNormalizeGhanaPhone(input.recipientPhone as string);if(!phone.isValid||!phone.normalized!)throw new FinanceError('Enter a valid Ghana recipient number.');
     if(typeof input.customerEmail!=='string'||input.customerEmail.length>254||!/^\S+@\S+\.\S+$/.test(input.customerEmail))throw new FinanceError('Enter a valid receipt email.');
-    const initialSite=await WebsiteStore.findSiteById(siteId);if(!initialSite||initialSite.status!=='published'||initialSite.template_id!=='tmpl-data-reseller')throw new FinanceError('Store not found.',404);
+    const initialSite=await WebsiteStore.findPublishedSiteById(siteId);if(!initialSite||initialSite.status!=='published'||initialSite.template_id!=='tmpl-data-reseller')throw new FinanceError('Store not found.',404);
     const key=`store-checkout:${operationKey(input.requestId)}`;
     const preflight=await FulfilmentService.preflightCheck(product.network,product.dataAmount,phone.normalized!);
     if(!preflight.allowed||!Number.isSafeInteger(preflight.supplierCostMinor)||Number(preflight.supplierCostMinor)<=0)throw new FinanceError('Bundle is temporarily unavailable for managed checkout.',503);
     const created=await FinanceStore.transaction(initialSite.user_id,async tx=>{
       await configLock(tx);const old=await tx.find(key);if(old){if(old.payload.siteId!==siteId||old.payload.productId!==product.id||old.payload.recipient!==phone.normalized!||old.payload.email!==input.customerEmail||old.payload.customerId!==(customerId||null))throw new FinanceError('Checkout request changed.',409);return {row:old,fresh:false};}
       if(tx.client)await tx.client.query('SELECT id FROM website_sites WHERE id=$1 FOR UPDATE',[siteId]);
-      const site=await WebsiteStore.findSiteById(siteId);if(!site||site.status!=='published'||site.template_id!=='tmpl-data-reseller')throw new FinanceError('Store is unavailable.',409);
+      const site=await WebsiteStore.findPublishedSiteById(siteId);if(!site||site.status!=='published'||site.template_id!=='tmpl-data-reseller')throw new FinanceError('Store is unavailable.',409);
       const policy=await currentPolicy(tx),costs=await wholesale(tx),prices=await priceConfig(siteId,tx),cost=costs[product.id],price=prices.products[product.id];
       if(!policy.enabled||!cost?.enabled||!price?.enabled||cost.wholesaleMinor<Number(preflight.supplierCostMinor)||price.retailMinor<minimumStorePrice(cost.wholesaleMinor,policy))throw new FinanceError('Bundle pricing needs an update before checkout.',409);
       const snapshot:StoreSnapshot={channel:'website_store',siteId,ownerId:site.user_id,productId:product.id,retailMinor:price.retailMinor,wholesaleMinor:cost.wholesaleMinor,reserveMinor:storeReserve(price.retailMinor,policy),earningMinor:price.retailMinor-cost.wholesaleMinor-storeReserve(price.retailMinor,policy),supplierCostMinor:preflight.supplierCostMinor!,currency:'GHS',policyVersion:policy.version,wholesaleVersion:cost.version,priceVersion:prices.version};
