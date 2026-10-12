@@ -22,6 +22,6 @@ export const SERVICE_TRUST_INDICATORS: readonly TrustIndicator[] = [
 ];
 export function publishedTrustIndicators(approved: readonly ApprovedTrustStatistic[] = APPROVED_TRUST_STATISTICS): readonly TrustIndicator[] {
   const verified = approved.filter(item => item.status === 'verified' && item.evidence.trim() && item.approvedBy.trim() && /^\d{4}-\d{2}-\d{2}$/.test(item.verifiedOn) && Number.isFinite(Date.parse(item.verifiedOn)));
-  // Preserve four positions without substituting unverified sample figures.
-  return [...verified.slice(0, 4), ...SERVICE_TRUST_INDICATORS].slice(0, 4);
+  // Numerical positions contain approved statistics only; capabilities have a separate layout.
+  return verified.slice(0, 4);
 }

@@ -1,5 +1,7 @@
 # Premium trust presentation and Help & FAQs
 
+The V2 refinement below supersedes the original analytics layout details.
+
 Frontend-only change based on verified main `a4b8ef0e94f695b252aacac88ba713253092b571`.
 
 ## Customer experience
@@ -23,7 +25,7 @@ To publish an actual statistic later:
 1. Verify its value and precise meaning against authentic source records, including period and denominator where relevant.
 2. Obtain founder approval. Store only a public-safe evidence description, reviewer and verification date; never put customer records or private source documents in the browser bundle.
 3. Add the approved value/label/detail to `APPROVED_TRUST_STATISTICS` with `status: 'verified'`, nonempty `evidence`, `approvedBy`, and an ISO `verifiedOn` date.
-4. Review the resulting claim and responsive layout before release. A draft or incomplete approval record falls back to truthful capability content. Four positions are retained; verified figures use the large-number treatment.
+4. Review the resulting claim and responsive layout before release. Draft or incomplete approval records are excluded; if no verified records remain, the separate capability presentation is shown. Only verified records enter numerical positions; capabilities use a separate layout when there are no approved figures.
 
 This is manual editorial approval, not automated verification of records. There is no analytics service, polling or database counter.
 
@@ -88,3 +90,58 @@ Modified (11):
 - `src/utils/routing.ts`
 
 Removed: none.
+
+## Premium Analytics Visual Refinement V2 — 12 October 2026
+
+Starting review commit: `3e18ccb4f3585c91021b4acc5e8efbe1b0273651`. Same branch: `feat/premium-trust-faq-facelift`; no history rewrite.
+
+### Visual diagnosis and iteration
+
+The original production view put oversized capability words into numerical slots. Its heading dominated the sample figures, while the flat green surface and boxed disclosure competed with the intended numerical hierarchy. The supplied Bundli-X screenshots were reviewed for numerical prominence, dark atmosphere and small secondary badges. No branding, testimonials or unsupported credibility claims were copied.
+
+1. Compiled the unchanged review commit and captured its production and sample views at matching 1280×1000 and 390×1000 dimensions.
+2. Reworked the existing component into two distinct presentations: large numerical figures and a separate editorial capability layout. Created a near-black illuminated surface, a fine top-edge highlight and rounded secondary pills.
+3. Inspected the first refinement. Numerical hierarchy improved, but lighting remained too diffuse. Added a localized glow behind the numerical region.
+4. The second review found a hard edge in that lighting layer on mobile. Changed its elliptical falloff so it reaches full transparency at the boundaries, then inspected the final render at all seven widths.
+
+Figures now use Outfit with tabular numerals, controlled tracking, a mint gradient and a restrained soft highlight. Desktop figures reach 76px at 1280px, 61.44px at 1024px and 48px at 768px; mobile figures range from 34px at 320px to 45.15px at 430px. The grid is four columns on desktop/tablet and 2×2 on mobile. Thin fading dividers replace metric boxes. A single surface has layered charcoal, emerald and cooler mint depth, with no blur filter, perpetual motion or count-up animation.
+
+The numerical preview retains exactly 12K+, 99.9%, 5K+ and 24/7 with their approved sample labels. The disclosure remains visibly placed above the composition. Production has no approved operating statistics and therefore shows an icon-led, open capability layout rather than large Paystack/Reference/MoMo/Ghana words. `publishedTrustIndicators` returns only verified records, up to four; even a partially populated approval list is never padded with capability words. Manual evidence/reviewer/date checks are unchanged.
+
+The eyebrow and concise introduction follow the founder's V2 direction: THE MYSTERY HUB EXPERIENCE / Built for Ghana. Designed for what’s next. The four credibility badges remain secondary. The repetitive final footnote is removed. Hero, artwork, all neighboring service sections, Coming Soon and FAQ composition remain unchanged.
+
+### Verification and preservation
+
+- Focused component/homepage/navigation checks: **42/42 passed**, including the same 19 focused trust/FAQ cases. Three assertions were strengthened for the new view separation and exact numerical-only sample rendering; no FAQ or navigation assertions were removed.
+- TypeScript, final production build and diff check: **passed**.
+- Full isolated regression: **1521 total, 1517 passed, 3 inherited failures, 1 skipped**. This exactly matches the previous reviewed branch result. The failures remain the legacy Direct SIM bundle-card copy assertion, Builder V1 template naming assertion and Free V1 SQL/schema mirror assertion on Windows; none of those systems changed.
+- Final numerical and production views visually inspected at **320, 360, 390, 430, 768, 1024 and 1280px**. No horizontal, metric or capability overflow. Percentage symbols stay on one line. Pills wrap naturally and labels remain readable.
+- **360×480** short views inspected for the numerical preview, production capabilities and expanded Help answer. Content remains scrollable above the unchanged fixed navigation.
+- Homepage FAQ collapsed/expanded views inspected. Enter opens and Space closes; View All FAQs reaches `/help`. Mobile Help menu, expanded tracking answer, guest/member Help access and separate Mystery AI open/close checked without sending a message. Synthetic member dashboard remains intact.
+- Existing hero/artwork images load and existing Outfit / Plus Jakarta Sans font families remain in use. No asset or dependency added. Final JS gzip: 322.42kB vs baseline 322.39kB; CSS gzip: 31.71kB vs baseline 31.19kB. Existing large-chunk warning remains non-blocking.
+- Decorative layers ignore pointer input. Existing reduced-motion rules remain intact; numerical text has a forced-colors fallback. Physical-device, forced-colors browser and production verification were not performed.
+
+### Changed files and scope
+
+Exactly five existing files are refined:
+
+- `src/components/home/HomeTrustAnalytics.tsx`: numerical/capability mode separation and presentation copy.
+- `src/components/home/homepage.css`: scoped surface, type, lighting, layout, dividers and badge treatments. FAQ rules unchanged.
+- `src/config/trustAnalytics.ts`: numerical approval selection no longer pads results with capability words; approval gates and sample values unchanged.
+- `server/suppliers/__tests__/premiumTrustFaq.test.ts`: stronger separation/sample assertions.
+- `docs/premium-trust-faq-facelift.md`: this review and the corrected display-approval description.
+
+No new component architecture, backend, database, payment, email requirement, pricing, referral, Wallet, supplier, authentication, privacy, Builder or reseller behavior is changed. No testimonials, reviews system, public sample route or environment switch is added. Preview helpers and screenshots remain outside Git; all application mutations and external API requests are blocked in the synthetic preview.
+
+### Evidence and founder review
+
+Evidence directory: `C:/Users/AB/Documents/ChatGPT/MYSTERY HUB/premium-analytics-v2-evidence`.
+
+- Previous desktop: `baseline-production-desktop-1280.jpg`; previous mobile: `baseline-production-mobile-390-complete.jpg`.
+- Refined desktop: `final-production-1280.jpg`; refined mobile: `final-production-mobile-390-complete.jpg`.
+- Numerical before: `baseline-sample-desktop-1280.jpg`, `baseline-sample-mobile-390.jpg`; numerical after: `final-sample-1280.jpg`, `final-sample-390.jpg`.
+- Final width evidence: `final-sample-{width}.jpg` and `final-production-{width}.jpg` for all seven sizes.
+- FAQ: `faq-preserved-desktop-collapsed.jpg`, `faq-preserved-desktop-expanded.jpg`, `help-preserved-mobile-390.jpg`, `help-menu-preserved-390.jpg`.
+- Short-height evidence, preserved member dashboard, full homepage and intermediate pass screenshots are also available. `baseline-build.log`, `pass1-build.log`, `final-build.log`, `focused.log`, `typecheck.log` and `full-regression.log` record the engineering checks.
+
+Ready for founder visual review, with no new technical blocker found. Human approval is still needed on glow intensity, numerical hierarchy, mobile density and the distinct production capability composition. These screenshots are real local compiled renders, not image-generated mockups or evidence of production deployment. The illustrative figures remain unverified and must not become factual operating claims without authentic records and founder approval. Nothing is merged or deployed by this checkpoint.
