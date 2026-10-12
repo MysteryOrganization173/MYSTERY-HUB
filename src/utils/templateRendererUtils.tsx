@@ -1,3 +1,4 @@
+import { normalizeWebsiteColor, normalizeWebsitePalette, readableWebsiteColor, websiteActionText } from './websiteBrand.js';
 import { SectionSiteRenderer } from '../components/website/SectionSiteRenderer.js';
 import { SiteContactDetails, websiteContactTarget } from '../components/website/SiteContactDetails.js';
 /**
@@ -31,7 +32,7 @@ export function mergeSiteWithTemplate(
 ): WebsiteTemplate {
   if (!content && !settings) return baseTemplate;
 
-  const currentColors = baseTemplate.colorScheme || {
+  const currentColors = normalizeWebsitePalette(baseTemplate.colorScheme || {
     primary: '#0f172a',
     secondary: baseTemplate.accentColor || '#00c365',
     background: '#ffffff',
@@ -40,11 +41,11 @@ export function mergeSiteWithTemplate(
     mutedText: '#64748b',
     accent: baseTemplate.accentColor || '#00c365',
     border: '#e2e8f0',
-  };
+  });
 
-  const primaryColor = settings?.primaryColor || currentColors.primary;
-  const accentColor = settings?.accentColor || currentColors.accent || baseTemplate.accentColor;
-  const backgroundColor = settings?.backgroundColor || currentColors.background;
+  const primaryColor = normalizeWebsiteColor(settings?.primaryColor, currentColors.primary);
+  const accentColor = normalizeWebsiteColor(settings?.accentColor, currentColors.accent || baseTemplate.accentColor);
+  const backgroundColor = normalizeWebsiteColor(settings?.backgroundColor, currentColors.background);
 
   return {
     ...baseTemplate,
@@ -63,6 +64,8 @@ export function mergeSiteWithTemplate(
       secondary: accentColor,
       accent: accentColor,
       background: backgroundColor,
+      text: readableWebsiteColor(currentColors.text, [backgroundColor, currentColors.surface]),
+      mutedText: readableWebsiteColor(currentColors.mutedText, [backgroundColor, currentColors.surface]),
     },
     items: content ? content.items ?? [] : baseTemplate.items,
     stats: content ? content.stats ?? [] : baseTemplate.stats,
@@ -88,21 +91,23 @@ export function renderTemplateLayout(
   options?: {
     onCtaClick?: () => void;
     isMobileView?: boolean;
+    managedCheckout?: React.ReactNode;
+    managedAvailability?: 'loading' | 'available' | 'empty' | 'error';
   }
 ): React.ReactElement {
   const legacy = renderLegacyLayout(template, { ...options, onCtaClick: options?.onCtaClick || (template.siteContent && template.layoutType !== 'reseller' ? () => { window.location.assign(websiteContactTarget(template.siteContent)); } : undefined) });
   if (template.composition) return legacy;
-  const variables = { '--website-primary':template.colorScheme?.primary, '--website-accent':template.accentColor, '--website-background':template.colorScheme?.background } as React.CSSProperties;
-  return <div style={variables}>{legacy}<SiteContactDetails template={template} /></div>;
+  const variables = { '--website-primary':template.colorScheme?.primary, '--website-accent':template.accentColor, '--website-background':template.colorScheme?.background, '--website-text':template.colorScheme?.text, '--website-on-primary':websiteActionText(template.colorScheme?.primary || '#0f172a'), '--website-on-accent':websiteActionText(template.accentColor) } as React.CSSProperties;
+  return <div className="website-presentation" style={variables}>{legacy}<SiteContactDetails template={template} /></div>;
 }
-function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: () => void; isMobileView?: boolean }): React.ReactElement {
-  if (template.composition) return <SectionSiteRenderer template={template} onCtaClick={options?.onCtaClick} />;
+function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: () => void; isMobileView?: boolean; managedCheckout?: React.ReactNode; managedAvailability?: 'loading' | 'available' | 'empty' | 'error' }): React.ReactElement {
+  if (template.composition) return <SectionSiteRenderer template={template} onCtaClick={options?.onCtaClick} managedCheckout={options?.managedCheckout} />;
   const layout = (template.layoutType || template.category || '').toLowerCase();
   const { onCtaClick, isMobileView } = options || {};
 
   switch (layout) {
     case 'reseller':
-      return <DataResellerTemplateView template={template} onCtaClick={onCtaClick} />;
+      return <DataResellerTemplateView template={template} onCtaClick={onCtaClick} managedCheckout={options?.managedCheckout} managedAvailability={options?.managedAvailability} />;
     case 'restaurant':
       return <RestaurantTemplateView template={template} onCtaClick={onCtaClick} />;
     case 'construction':

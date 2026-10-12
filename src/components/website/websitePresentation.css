@@ -1,0 +1,4 @@
+/* Only controls already bound to the owner theme; fixed artwork surfaces retain their design. */
+.website-presentation [class*="bg-[var(--website-accent"] { color: var(--website-on-accent) !important; }
+.website-presentation [class*="bg-[var(--website-primary"] { color: var(--website-on-primary) !important; }
+.website-presentation :is(input,textarea,select)[class*="bg-[var(--website-background"] { color: var(--website-text) !important; }

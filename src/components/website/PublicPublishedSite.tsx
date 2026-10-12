@@ -1,4 +1,4 @@
-import { ManagedDataStorefront } from './ManagedDataStorefront';
+import { WebsiteSiteRenderer } from './WebsiteSiteRenderer';
 import { trackPublicWebsite, publicWebsiteClickKind } from '../../services/websiteBusinessApi';
 import React, { useState, useEffect } from 'react';
 import { getPublicSiteBySlug } from '../../services/apiClient';
@@ -93,7 +93,7 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
     <div className="min-h-screen flex flex-col justify-between bg-white text-slate-900 antialiased selection:bg-[#00c365] selection:text-black">
       {/* Dynamic Website Render */}
       <div className="flex-1 w-full" onClickCapture={event=>{const target=(event.target as HTMLElement).closest('a,button');if(!target)return;const kind=publicWebsiteClickKind(target);if(kind)trackPublicWebsite(site.id,kind);}}>
-        {site.template_id==='tmpl-data-reseller'?<ManagedDataStorefront siteId={site.id} template={mergedTemplate}/>:renderTemplateLayout(mergedTemplate)}
+        <WebsiteSiteRenderer siteId={site.id} template={mergedTemplate} />
       </div>
 
       {/* Free Tier Attribution Link (Tasteful, Non-Intrusive) */}

@@ -267,7 +267,7 @@ export const WebsiteBuilderPage: React.FC = () => {
 
   const handlePreviewCurrentSite = () => {
     if (activeMergedTemplate) {
-      openTemplatePreview(activeMergedTemplate);
+      openTemplatePreview({...activeMergedTemplate,previewSiteId:activeSite!.id});
     } else if (activeBaseTemplate) {
       openTemplatePreview(activeBaseTemplate);
     }

@@ -61,7 +61,7 @@ test('available managed template retains normal Buy Data action and owner brandi
 
 test('managed catalogue and tracking preserve public state boundaries', () => {
   const source=readFileSync('src/components/website/ManagedDataStorefront.tsx','utf8');
-  for (const text of ['Loading available bundles','Bundles are not available right now.','Choose another network','aria-label="Order reference"','Check status','maskDataRecipient(order.recipient_phone)','managedAvailability={availability}']) assert.ok(source.includes(text));
+  for (const text of ['Loading available bundles','Bundles are not available right now.','Choose another network','aria-label="Order reference"','Check status','maskDataRecipient(order.recipient_phone)','managedAvailability:availability']) assert.ok(source.includes(text));
   assert.ok(!source.includes('sample-mtn'));
   assert.ok(!source.includes('hover:brightness'));
   assert.ok(!readFileSync('src/components/data/BundleCard.tsx','utf8').includes('hover:brightness'));

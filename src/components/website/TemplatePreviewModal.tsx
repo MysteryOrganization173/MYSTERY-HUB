@@ -133,7 +133,7 @@ export const TemplatePreviewModal: React.FC = () => {
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin || event.source !== iframeRef.current?.contentWindow) return;
       if (selectedTemplatePreview && event.data?.type === 'MYSTERYHUB_TEMPLATE_LOADED' && event.data.templateId === selectedTemplatePreview.id && selectedTemplatePreview.siteContent) {
-        iframeRef.current?.contentWindow?.postMessage({type:'MYSTERYHUB_PREVIEW_CONTENT',template:selectedTemplatePreview},window.location.origin);
+        iframeRef.current?.contentWindow?.postMessage({type:'MYSTERYHUB_PREVIEW_CONTENT',template:selectedTemplatePreview,siteId:selectedTemplatePreview.previewSiteId},window.location.origin);
       }
       if (event.data?.type === 'MYSTERYHUB_PREVIEW_CLOSE') handleClose();
       if (event.data?.type === 'MYSTERYHUB_TEMPLATE_CTA') {

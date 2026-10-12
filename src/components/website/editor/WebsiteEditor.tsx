@@ -1,3 +1,4 @@
+import { WebsitePreviewFrame } from '../WebsitePreviewFrame';
 import { WebsiteImageLibrary, WebsiteImageField } from './WebsiteImageField';
 import { trackWebsiteEvent } from '../../../utils/websiteAnalytics';
 import React, { useState, useEffect, useRef } from 'react';
@@ -247,16 +248,9 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     previewDevice === 'desktop' || previewDevice === 'tablet' ? (isMobileScreen ? 8 : 16) : 16;
   const usableWidth = Math.max(280, availableWidth - paddingX);
 
-  const isWidePreviewOnSmallScreen =
-    (previewDevice === 'tablet' || previewDevice === 'desktop') && isSmallScreen;
-  const effectiveCanvasWidth =
-    previewDevice === 'mobile' && isMobileScreen
-      ? Math.min(usableWidth, 420)
-      : targetWidth;
-  const scale =
-    (previewDevice === 'mobile' && isMobileScreen) || isWidePreviewOnSmallScreen
-      ? 1
-      : Math.min(1, usableWidth / targetWidth);
+  const isWidePreviewOnSmallScreen = false; // Scale a fixed iframe viewport; never shrink its media-query width.
+  const effectiveCanvasWidth = targetWidth;
+  const scale = isWidePreviewOnSmallScreen ? 1 : Math.min(1, usableWidth / targetWidth);
 
   return (
     <div className="fixed inset-0 z-50 bg-[#080d11] text-slate-100 flex flex-col font-sans overflow-hidden">
@@ -1125,6 +1119,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                   <label className="text-xs font-semibold text-slate-300 block">Button Action / WhatsApp Target</label>
                   <input
                     type="text"
+                    disabled={isDataReseller}
                     value={content.ctaTarget}
                     maxLength={300}
                     onChange={(e) => {
@@ -1135,7 +1130,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
                   <p className="text-[11px] text-slate-400">
-                    Leave blank to automatically route to your WhatsApp contact number.
+                    {isDataReseller ? 'Managed store buttons open the protected bundle catalog. Configure contact details separately.' : 'Leave blank to automatically route to your WhatsApp contact number.'}
                   </p>
                 </div>
               </div>
@@ -1271,7 +1266,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               </button>
               <div className="text-xs text-slate-400 hidden sm:flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Live Reactive Preview</span>
+                <span>Draft Preview</span>
               </div>
             </div>
           </div>
@@ -1312,8 +1307,9 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 isWidePreviewOnSmallScreen ? 'inline-block text-left' : ''
               }`}
               style={{
-                width: `${effectiveCanvasWidth}px`,
-                maxWidth: isWidePreviewOnSmallScreen ? 'none' : '100%',
+                width: `${effectiveCanvasWidth + 2}px`,
+                flexShrink: 0,
+                maxWidth: 'none',
                 height: '100%',
                 maxHeight: '100%',
                 transform: scale < 0.99 ? `scale(${scale})` : undefined,
@@ -1336,10 +1332,8 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               </div>
 
               {/* Rendered Live Website Canvas */}
-              <div className="h-[calc(100%-32px)] overflow-y-auto w-full bg-white text-slate-900 scrollbar-thin">
-                {renderTemplateLayout(previewTemplate, {
-                  isMobileView: previewDevice === 'mobile',
-                })}
+              <div className="h-[calc(100%-32px)] overflow-hidden w-full bg-white text-slate-900 scrollbar-thin">
+                <div className="h-[75dvh] min-h-[480px]"><WebsitePreviewFrame template={previewTemplate} siteId={currentSite.id} viewportWidth={targetWidth} /></div>
 
                 {/* Free Tier Attribution Badge */}
                 <div className="py-3 px-4 bg-[#090d11] border-t border-slate-800 text-center text-xs text-slate-400 select-none">
@@ -1383,7 +1377,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                       : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                   }`}
                 >
-                  {currentSite.status === 'published' ? 'Live Preview' : 'Draft Preview'}
+                  Draft Preview
                 </span>
               </div>
             </div>
@@ -1451,15 +1445,13 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             <div
               className={`w-full bg-white text-slate-900 min-h-full shadow-2xl transition-all ${
                 previewDevice === 'mobile'
-                  ? 'max-w-md sm:rounded-2xl sm:my-4 sm:border sm:border-slate-700'
+                  ? 'max-w-[375px] sm:rounded-2xl sm:my-4 sm:border sm:border-slate-700'
                   : previewDevice === 'tablet'
                   ? 'max-w-3xl sm:rounded-2xl sm:my-4 sm:border sm:border-slate-700'
-                  : 'max-w-6xl sm:rounded-2xl sm:my-4 sm:border sm:border-slate-700'
+                  : 'max-w-[1280px] sm:rounded-2xl sm:my-4 sm:border sm:border-slate-700'
               }`}
             >
-              {renderTemplateLayout(previewTemplate, {
-                isMobileView: previewDevice === 'mobile',
-              })}
+              <div className="h-[75dvh] min-h-[480px]"><WebsitePreviewFrame template={previewTemplate} siteId={currentSite.id} viewportWidth={targetWidth} /></div>
               {/* Free Tier Attribution */}
               <div className="py-4 px-4 bg-[#090d11] border-t border-slate-800 text-center text-xs text-slate-400 select-none">
                 <span className="inline-flex items-center gap-1.5">
