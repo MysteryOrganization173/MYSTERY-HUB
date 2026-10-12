@@ -7,6 +7,7 @@ import { HomeFeaturedData } from './HomeFeaturedData';
 import { HomeWebsiteSection } from './HomeWebsiteSection';
 import { HomeMarketplaceSection } from './HomeMarketplaceSection';
 import { WhyMysteryHub } from './WhyMysteryHub';
+import { HomeFaqPreview } from './HomeFaqPreview';
 import { HomeComingSoonSection } from './HomeComingSoonSection';
 import { MemberHome } from './MemberHome';
 
@@ -43,6 +44,7 @@ export const HomePage: React.FC = () => {
       <HomeMarketplaceSection />
       <WhyMysteryHub />
       <HomeComingSoonSection />
+      <HomeFaqPreview />
     </div>
   );
 };

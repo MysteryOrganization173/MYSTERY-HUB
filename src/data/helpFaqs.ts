@@ -1,0 +1,38 @@
+export interface HelpFaq { id: string; question: string; answer: string; link?: { label: string; href: string } }
+export interface HelpCategory { id: string; title: string; description: string; questions: readonly HelpFaq[] }
+// Content describes released main, not pending checkout/order-search branches.
+export const HELP_CATEGORIES: readonly HelpCategory[] = [
+  { id: 'getting-started', title: 'Getting Started', description: 'A simple place to start.', questions: [
+    { id: 'buy-data', question: 'How do I purchase Data on Mystery Hub?', answer: 'Open Data, choose your network and bundle, enter the recipient’s Ghana phone number and review the total before paying. You can buy standard Data as a guest. An account gives you linked order history and access to member features.', link: { label: 'Browse Data', href: '/data' } },
+    { id: 'email', question: 'Do I need an email address?', answer: 'You can register an account with a phone number without an email. Current standard Data checkout requires a valid receipt email, including when paying with Wallet. If your account has an email, checkout can prefill it. Check the fields shown for other services.' },
+    { id: 'available', question: 'Which services are available?', answer: 'Explore Data, Airtime, the Free Website Builder, Mystery Earn, Wallet and Marketplace. AFA registration depends on service availability. Utilities and other future services are marked Coming Soon; a launch list is not a purchase.', link: { label: 'Explore services', href: '/services' } },
+  ] },
+  { id: 'data-airtime', title: 'Data & Airtime', description: 'Choose the right network and recipient.', questions: [
+    { id: 'recipient', question: 'Can I buy for someone else?', answer: 'Yes. Enter the intended recipient’s phone number and check the network and final confirmation carefully. Buying for someone does not give them access to your private account history.' },
+    { id: 'delivery', question: 'When will my bundle arrive?', answer: 'Delivery depends on the selected product, network and current processing conditions. Read the delivery guidance shown before paying. Payment confirmation is separate from delivery; timing is not guaranteed.' },
+    { id: 'wrong-number', question: 'What if I enter the wrong number?', answer: 'Contact support promptly with your order reference. A delivered bundle sent to the wrong number may not be recoverable. Always check the recipient before paying.', link: { label: 'Track your order', href: '/orders' } },
+  ] },
+  { id: 'payments-orders', title: 'Payments & Order Tracking', description: 'Know what happens after you pay.', questions: [
+    { id: 'tracking', question: 'How can I track my order?', answer: 'Open Orders and enter the reference from your purchase confirmation. Signed-in customers can also view purchases linked to their account. A phone number alone does not authorize access to someone else’s history; use your reference for guest tracking.', link: { label: 'Open Orders', href: '/orders' } },
+    { id: 'delayed', question: 'What should I do if my order is delayed?', answer: 'Check your order status first. Payment confirmed, processing and delivered are different stages. If the order remains unresolved, contact WhatsApp support with its reference. Do not start another payment simply because a confirmation is delayed.' },
+    { id: 'payment-safety', question: 'How do I pay safely?', answer: 'Use the payment options shown at checkout. Paystack handles Mobile Money checkout, and eligible signed-in purchases can use available Wallet balance. Never share your MoMo PIN, password or payment security codes with support.' },
+    { id: 'refunds', question: 'How do refunds work?', answer: 'Contact support with your reference when an order fails or remains unresolved. The team reviews the payment and fulfilment state before deciding the next step. Refund Pending means a refund is still being processed; it is not the same as Refunded. Refunds and delivery are not guaranteed automatically.' },
+  ] },
+  { id: 'mystery-earn', title: 'Mystery Earn', description: 'Share useful services. Understand eligibility.', questions: [
+    { id: 'earn', question: 'How does Mystery Earn work?', answer: 'Create an account and share your referral link. Eligible referred purchases can earn rewards under the active rules. Clicks alone do not earn money, and sharing a service does not make every purchase reward-eligible.', link: { label: 'Explore Mystery Earn', href: '/earn' } },
+    { id: 'earn-pending', question: 'Can I withdraw pending rewards?', answer: 'Pending rewards are not yet approved or available to withdraw. Review your available earnings, eligibility, withdrawal limits and any fees in Mystery Earn before submitting a request.' },
+  ] },
+  { id: 'website-builder', title: 'Website Builder', description: 'Give your business a place online.', questions: [
+    { id: 'free-website', question: 'Can I publish a website for free?', answer: 'Yes. Choose a design, create or sign in to your account, add your business details and photos, save your changes and publish using the Free plan. Your published website has its own link. Paid-plan capabilities are available only where explicitly shown.', link: { label: 'Browse website designs', href: '/website-builder' } },
+    { id: 'website-sales', question: 'Does every website include online payments?', answer: 'No. Templates and enquiry links do not automatically enable checkout. Managed Data Reseller checkout requires a configured, enabled store. Only advertise sales, bookings or payment features that your published site actually supports.' },
+  ] },
+  { id: 'wallet-accounts', title: 'Wallet & Accounts', description: 'Keep your account and balance clear.', questions: [
+    { id: 'wallet', question: 'What is Mystery Wallet?', answer: 'Mystery Wallet holds funds for eligible Mystery Hub purchases. Add money from the Wallet page and wait for the confirmed balance before spending. Wallet funds cannot be withdrawn to Mobile Money and do not earn interest.', link: { label: 'Open Wallet', href: '/wallet' } },
+    { id: 'account-recovery', question: 'How do I get help signing in?', answer: 'Use Forgot Password on the sign-in form for assisted recovery. Support must confirm account ownership before restoring access. Never send your password, MoMo PIN or security codes to anyone.' },
+  ] },
+  { id: 'marketplace-support', title: 'Marketplace & Support', description: 'Check listings. Find the right help.', questions: [
+    { id: 'marketplace', question: 'Does a Marketplace enquiry place an order?', answer: 'No. An enquiry asks about an item and does not create a paid order. Read each listing for current availability, checkout or enquiry options, fulfilment details and any pickup or delivery requirements.', link: { label: 'Browse Marketplace', href: '/marketplace' } },
+    { id: 'support', question: 'How can I contact Mystery Hub?', answer: 'Use the WhatsApp support link below. For a purchase, include your order reference and a short explanation. Mystery AI offers general product guidance; it does not replace a payment or order investigation.' },
+  ] },
+];
+export const HOME_FAQS: readonly HelpFaq[] = ['buy-data', 'tracking', 'delayed', 'earn'].map(id => HELP_CATEGORIES.flatMap(category => category.questions).find(question => question.id === id)!);
