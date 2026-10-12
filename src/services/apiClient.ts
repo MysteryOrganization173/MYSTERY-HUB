@@ -1108,11 +1108,13 @@ export async function updateWebsiteOnServer(
 
 export async function publishWebsiteOnServer(
   token: string,
-  id: string
+  id: string,
+  expectedUpdatedAt?: string
 ): Promise<{ success: boolean; site: WebsiteSiteRecord; publicUrl: string }> {
   const url = `${API_BASE_URL}/api/websites/${encodeURIComponent(id)}/publish`;
   const res = await fetch(url, {
     method: 'POST',
+    body: JSON.stringify({expectedUpdatedAt}),
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
@@ -1126,11 +1128,13 @@ export async function publishWebsiteOnServer(
 
 export async function unpublishWebsiteOnServer(
   token: string,
-  id: string
+  id: string,
+  expectedUpdatedAt?: string
 ): Promise<{ success: boolean; site: WebsiteSiteRecord }> {
   const url = `${API_BASE_URL}/api/websites/${encodeURIComponent(id)}/unpublish`;
   const res = await fetch(url, {
     method: 'POST',
+    body: JSON.stringify({expectedUpdatedAt}),
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',

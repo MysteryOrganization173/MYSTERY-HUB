@@ -40,6 +40,10 @@ export interface SiteSettings {
   borderRadius?: string;
 }
 
+export interface WebsitePublishedSnapshot {
+  version: 1; templateId: string; name: string; content: SiteContent; settings: SiteSettings;
+  draftUpdatedAt: string; publishedAt: string | null;
+}
 export interface WebsiteSiteRecord {
   id: string;
   user_id: string;
@@ -47,6 +51,7 @@ export interface WebsiteSiteRecord {
   name: string;
   slug: string;
   status: WebsiteSiteStatus;
+  published_snapshot_json?: WebsitePublishedSnapshot | null;
   content_json: SiteContent;
   settings_json: SiteSettings;
   created_at: string;

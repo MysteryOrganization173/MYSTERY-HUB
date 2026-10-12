@@ -112,11 +112,15 @@ websiteRouter.patch('/:id', requireAuth, async (req: Request, res: Response) => 
     const { name, content, settings, expectedUpdatedAt } = req.body || {};
     if (req.body?.templateId !== undefined || req.body?.template_id !== undefined) throw new WebsiteInputError('Use the confirmed Change Template action.');
 
-    const updated = await WebsiteStore.updateSite(req.params.id, user.id, {
+    const updated = await withWebsiteLock(user.id, async()=>{
+      await WebsiteAssetStore.ownedSite(req.params.id,user.id);
+      if(typeof expectedUpdatedAt!=='string' || !expectedUpdatedAt || expectedUpdatedAt.length>40)throw new WebsiteInputError('Reload the website before saving its current draft.');
+      return WebsiteStore.updateSite(req.params.id, user.id, {
       name,
       content,
       settings,
       expectedUpdatedAt,
+      });
     });
 
     if (!updated) {
@@ -144,20 +148,25 @@ websiteRouter.patch('/:id', requireAuth, async (req: Request, res: Response) => 
 websiteRouter.post('/:id/publish', requireAuth, async (req: Request, res: Response) => {
   try {
     const user = req.user!;
-    const published = await WebsiteStore.publishSite(req.params.id, user.id);
+    await WebsiteAssetStore.ownedSite(req.params.id,user.id);
+    const expectedUpdatedAt=req.body?.expectedUpdatedAt;
+    if(typeof expectedUpdatedAt!=='string' || !expectedUpdatedAt || expectedUpdatedAt.length>40)throw new WebsiteInputError('Reload the website and publish its current saved revision.');
+    const published = await WebsiteStore.publishSite(req.params.id, user.id, expectedUpdatedAt);
 
     if (!published) {
       res.status(404).json({ error: 'Website project not found.' });
       return;
     }
 
-    await WebsiteAnalyticsStore.action('website_published', user.id, published.id, published.template_id);
+    await WebsiteAnalyticsStore.action('website_published', user.id, published.id, published.template_id).catch(()=>console.warn('[Website] Publication analytics unavailable.'));
     res.json({
       success: true,
       site: published,
       publicUrl: `/sites/${published.slug}`,
     });
   } catch (err: any) {
+    if(err instanceof WebsiteOperationError){res.status(err.status).json({error:err.message});return;}
+    if(err instanceof WebsiteInputError){res.status(400).json({error:err.message});return;}
     if (err.message && err.message.includes('Forbidden')) {
       res.status(403).json({ error: err.message });
       return;
@@ -174,16 +183,18 @@ websiteRouter.post('/:id/publish', requireAuth, async (req: Request, res: Respon
 websiteRouter.post('/:id/unpublish', requireAuth, async (req: Request, res: Response) => {
   try {
     const user = req.user!;
-    const unpublished = await WebsiteStore.unpublishSite(req.params.id, user.id);
+    const unpublished = await WebsiteStore.unpublishSite(req.params.id, user.id, req.body?.expectedUpdatedAt);
 
     if (!unpublished) {
       res.status(404).json({ error: 'Website project not found.' });
       return;
     }
 
-    await WebsiteAnalyticsStore.action('website_unpublished', user.id, unpublished.id, unpublished.template_id);
+    await WebsiteAnalyticsStore.action('website_unpublished', user.id, unpublished.id, unpublished.template_id).catch(()=>console.warn('[Website] Unpublish analytics unavailable.'));
     res.json({ success: true, site: unpublished });
   } catch (err: any) {
+    if(err instanceof WebsiteOperationError){res.status(err.status).json({error:err.message});return;}
+    if(err instanceof WebsiteInputError){res.status(400).json({error:err.message});return;}
     if (err.message && err.message.includes('Forbidden')) {
       res.status(403).json({ error: err.message });
       return;

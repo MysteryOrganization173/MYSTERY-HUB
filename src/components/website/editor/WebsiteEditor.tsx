@@ -65,6 +65,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   draftRef.current = {name:siteName,content,settings};
   const serverSiteRef = useRef(currentSite);
   const editVersion = useRef(0), savedVersion = useRef(0);
+  const publicationJob = useRef(false);
   const savingJob = useRef<Promise<WebsiteSiteRecord | null> | null>(null);
   const failedSaveVersion = useRef<number | null>(null);
 
@@ -191,42 +192,32 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
   // Publish / Unpublish Handlers
   const handlePublish = async () => {
-    setIsPublishing(true);
+    if(publicationJob.current)return;
+    publicationJob.current=true;setIsPublishing(true);
     try {
-      if (savingJob.current && !(await savingJob.current)) throw new Error('Save failed. Publishing was stopped.');
-      if (editVersion.current !== savedVersion.current && !(await handleSaveDraft())) throw new Error('Save failed. Publishing was stopped.');
-
-      const res = await publishWebsiteOnServer(sessionToken, currentSite.id);
-      if (res.success && res.site) {
-        serverSiteRef.current=res.site;
-        setCurrentSite(res.site);
-        onSiteUpdated(res.site);
-        setIsDirty(false);
-        setSaveStatusText('saved');
-        showToast(`Your website is live.`, 'success');
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Failed to publish website.', 'warning');
-    } finally {
-      setIsPublishing(false);
-    }
+      if(savingJob.current && !(await savingJob.current))throw new Error('Save failed. Publishing was stopped.');
+      if(editVersion.current!==savedVersion.current && !(await handleSaveDraft()))throw new Error('Save failed. Publishing was stopped.');
+      if(editVersion.current!==savedVersion.current)throw new Error('Your draft changed during saving. Save it before publishing.');
+      const version=savedVersion.current;
+      const res=await publishWebsiteOnServer(sessionToken,currentSite.id,serverSiteRef.current.updated_at);
+      if(!res.success || !res.site)throw new Error('Publication was not confirmed. Check your website before retrying.');
+      serverSiteRef.current=res.site;setCurrentSite(res.site);onSiteUpdated(res.site);
+      const unchanged=editVersion.current===version;setIsDirty(!unchanged);setSaveStatusText(unchanged?'saved':'unsaved');
+      showToast('Your saved revision is now live.','success');
+    } catch(err:any){showToast(err.message || 'Failed to publish website.','warning');}
+    finally{publicationJob.current=false;setIsPublishing(false);}
   };
-
   const handleUnpublish = async () => {
-    setIsPublishing(true);
+    if(publicationJob.current)return;
+    publicationJob.current=true;setIsPublishing(true);
     try {
-      const res = await unpublishWebsiteOnServer(sessionToken, currentSite.id);
-      if (res.success && res.site) {
-        serverSiteRef.current=res.site;
-        setCurrentSite(res.site);
-        onSiteUpdated(res.site);
-        showToast('Your website is now a draft.', 'info');
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Failed to unpublish website.', 'warning');
-    } finally {
-      setIsPublishing(false);
-    }
+      if(savingJob.current && !(await savingJob.current))throw new Error('Save failed. Reload before unpublishing.');
+      const res=await unpublishWebsiteOnServer(sessionToken,currentSite.id,serverSiteRef.current.updated_at);
+      if(!res.success || !res.site)throw new Error('Unpublication was not confirmed. Check your website before retrying.');
+      serverSiteRef.current=res.site;setCurrentSite(res.site);onSiteUpdated(res.site);
+      showToast('Your website is no longer public. Your draft is preserved.','info');
+    } catch(err:any){showToast(err.message || 'Failed to unpublish website.','warning');}
+    finally{publicationJob.current=false;setIsPublishing(false);}
   };
 
   const handleCopyLink = () => {
@@ -306,7 +297,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 {saveStatusText === 'saved' && (
                   <span className="text-emerald-400 flex items-center gap-1">
                     <Check className="w-2.5 h-2.5" />
-                    <span>Saved</span>
+                    <span>Draft saved</span>
                   </span>
                 )}
                 {saveStatusText === 'unsaved' && (
@@ -394,7 +385,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                   className="min-h-11 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs border border-emerald-500/40 flex items-center gap-1 cursor-pointer"
                 >
                   <RefreshCw className={`w-3 h-3 ${isPublishing ? 'animate-spin' : ''}`} />
-                  <span>Update</span>
+                  <span>Publish</span>
                 </button>
                 <button
                   type="button"
@@ -471,7 +462,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               {saveStatusText === 'saved' && (
                 <span className="text-emerald-400 flex items-center gap-1">
                   <Check className="w-3 h-3" />
-                  <span>Saved</span>
+                  <span>Draft saved</span>
                 </span>
               )}
               {saveStatusText === 'unsaved' && (
@@ -540,6 +531,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 <span className="hidden sm:inline">Copy Link</span>
               </button>
 
+              <button type="button" onClick={handlePublish} disabled={isPublishing} className="min-h-11 px-3 rounded-xl bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/40">{isPublishing?'Publishing…':'Publish Changes'}</button>
               <button
                 type="button"
                 onClick={handleUnpublish}
@@ -569,6 +561,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
       <div className="flex-1 flex overflow-hidden">
         {/* LEFT COLUMN: EDITING CONTROLS */}
         <div
+          inert={isPublishing}
           className={`w-full lg:w-[460px] xl:w-[490px] border-r border-slate-800 bg-[#0a1117] flex flex-col shrink-0 overflow-hidden ${
             activeTab === 'edit' ? 'flex' : 'hidden lg:flex'
           }`}

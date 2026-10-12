@@ -42,7 +42,13 @@ beforeEach(async()=>{
   resourceChanges={};inspected=[];destroyed=[];providerFailure=false;deleteFailure=false;
   for(const [id,role] of [['owner','customer'],['other','customer'],['admin','admin']] as const){await AuthStore.createUser({id,name:`${id} name`,email:`${id}@example.com`,phone:null,passwordHash:'fixture-hash',role,status:'active'});await AuthStore.createSession(id,`${id}-token`,false);}
 });
-const request=(path:string,method='GET',body?:unknown,token?:string)=>fetch(base+'/api/'+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});
+const rawRequest=(path:string,method='GET',body?:unknown,token?:string)=>fetch(base+'/api/'+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});
+const request=async(path:string,method='GET',body?:unknown,token?:string)=>{
+  if((method==='POST' && /websites\/[^/]+\/publish$/.test(path) || method==='PATCH' && /^websites\/[^/]+$/.test(path)) && body && typeof body==='object' && !('expectedUpdatedAt' in body)){
+    const site=await WebsiteStore.findSiteById(path.split('/')[1]);body={...body,expectedUpdatedAt:site?.updated_at};
+  }
+  return rawRequest(path,method,body,token);
+};
 const create=(userId='owner',template='tmpl-start-blank')=>WebsiteStore.createSite(userId,{template_id:template,name:'Ama Studio'});
 const intent=async(siteId:string,token='owner-token',body:unknown={filename:'shop.png',mime:'image/png',bytes:6000})=>request(`websites/${siteId}/assets/upload-intent`,'POST',body,token);
 const uploaded=async(siteId:string)=>{const {intent:reserved}=await (await intent(siteId)).json();const response=await request(`websites/${siteId}/assets/${reserved.assetId}/finalize`,'POST',{},'owner-token');assert.equal(response.status,200);return (await response.json()).asset;};
