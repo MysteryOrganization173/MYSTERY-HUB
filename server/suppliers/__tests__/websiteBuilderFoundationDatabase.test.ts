@@ -23,8 +23,13 @@ before(async () => {
       if (failInsert) throw new Error('Fixture write failed');
       leads.push({id:values[0],reference:values[1],user_id:values[2],brief:JSON.parse(values[3]),status:values[4],created_at:values[5]});return {rows:[]};
     }
-    if (sql.startsWith('SELECT COUNT(*) FROM website_ultra')) return {rows:[{count:String(leads.length)}]};
-    if (sql.includes('FROM website_ultra_enquiries')) return {rows:leads.slice(values[1],values[1]+values[0])};
+    if (sql.includes('FROM website_ultra_enquiries')) {
+      if (sql.includes('WHERE reference=$1')) return {rows:leads.filter(lead=>lead.reference===values[0])};
+      const search=String(values[0]).slice(1,-1).replace(/\\([\\%_])/g,'$1').toLowerCase();
+      const filtered=leads.filter(lead=>[lead.reference,lead.brief.businessName,lead.brief.businessType,lead.brief.contactName,lead.brief.phone,lead.brief.email].some(value=>String(value||'').toLowerCase().includes(search)));
+      if (sql.startsWith('SELECT COUNT(*)')) return {rows:[{count:String(filtered.length)}]};
+      return {rows:filtered.slice(values[2],values[2]+values[1])};
+    }
     if (sql.startsWith('SELECT * FROM website_sites WHERE id')) return {rows:[structuredClone(site)]};
     if (sql.includes('UPDATE website_sites')) {site.content_json=JSON.parse(values[1]);return {rows:[]};}
     throw new Error(`Unexpected query: ${sql}`);
@@ -36,7 +41,8 @@ before(async () => {
 after(async()=>{pg.Pool.prototype.connect=originalConnect;pg.Pool.prototype.query=originalQuery;if(oldUrl===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=oldUrl;await new Promise<void>(resolve=>server.close(()=>resolve()));});
 beforeEach(()=>{statements=[];leads=[];failInsert=false;site={id:'site-db',user_id:'owner',name:'Studio',template_id:'tmpl-start-blank',slug:'studio',status:'draft',content_json:{businessName:'Studio'},settings_json:{primaryColor:'#000000',accentColor:'#00c365'},created_at:new Date().toISOString(),updated_at:new Date().toISOString(),published_at:null};});
 test('PostgreSQL enquiry insert parameterizes contacts and stores exact sanitized brief',async()=>{const record=await WebsiteUltraStore.create(input,'owner');const saved=await WebsiteUltraStore.list(25,0);assert.equal(saved.total,1);assert.equal(saved.enquiries[0].reference,record.reference);assert.equal(saved.enquiries[0].user_id,'owner');assert.equal(saved.enquiries[0].brief.businessName,"Ama's Studio");assert.ok(!statements[0].sql.includes("Ama's"));assert.ok(statements[0].sql.includes('$6'));});
-test('database listing passes bounded pagination as parameters',async()=>{await WebsiteUltraStore.create(input);await WebsiteUltraStore.list(10,20);const select=statements.find(s=>s.sql.includes('ORDER BY'));assert.deepEqual(select?.values,[10,20]);});
+test('database listing passes bounded pagination and literal search as parameters',async()=>{await WebsiteUltraStore.create(input);await WebsiteUltraStore.list(10,20);const select=statements.find(s=>s.sql.includes('ORDER BY'));assert.deepEqual(select?.values,['%%',10,20]);});
+test('database search and detail preserve guest records and parameterize untrusted text',async()=>{const record=await WebsiteUltraStore.create(input);assert.equal((await WebsiteUltraStore.list(25,0,'AMA')).total,1);assert.equal((await WebsiteUltraStore.list(25,0,"%' OR true --")).total,0);assert.ok(!statements.some(s=>s.sql.includes("%' OR true")));assert.deepEqual(await WebsiteUltraStore.findByReference(record.reference),record);assert.equal(await WebsiteUltraStore.findByReference('MH-ULTRA-00000000'),null);});
 test('failed database insert returns 503 without success reference or WhatsApp link',async()=>{failInsert=true;const response=await fetch(`${base}/ultra/enquiries`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)});assert.equal(response.status,503);const body=await response.json();assert.equal(body.whatsappUrl,undefined);assert.equal(body.reference,undefined);assert.equal(leads.length,0);});
 test('invalid enquiry is rejected before any database query',async()=>{await assert.rejects(()=>WebsiteUltraStore.create({...input,estimatedPages:999}));assert.equal(statements.length,0);});
 test('section composition update survives PostgreSQL JSONB normalization',async()=>{const {createWebsiteComposition}=await import('../../../src/config/websiteBuilder.js');const composition=createWebsiteComposition(['header','contact','hero','footer']);await WebsiteStore.updateSite('site-db','owner',{content:{composition}});const loaded=await WebsiteStore.findSiteById('site-db');assert.deepEqual(loaded?.content_json.composition,composition);const write=statements.find(s=>s.sql.includes('UPDATE website_sites'));assert.deepEqual(write?.values.slice(-2),['site-db','owner']);});
