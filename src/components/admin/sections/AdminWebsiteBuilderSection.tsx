@@ -1,4 +1,5 @@
 import { AdminResellerControls } from './AdminResellerControls';
+import { AdminUltraEnquiries } from './AdminUltraEnquiries';
 import React, { useEffect, useRef, useState } from 'react';
 import { getAdminWebsiteSummary, forceUnpublishWebsite } from '../../../services/apiClient';
 import type { WebsiteAdminSummary, AdminWebsiteRow } from '../../../config/websiteAnalytics';
@@ -17,6 +18,7 @@ export function AdminWebsiteBuilderSection({sessionToken}:{sessionToken:string})
   useEffect(()=>{if(selected){setConfirmation('');dialog.current?.showModal();}},[selected]);
   return <section className="space-y-5 text-left min-w-0">
     <header><h1 className="text-2xl font-bold text-white">Website Builder</h1><p className="text-sm text-slate-400">Free website adoption and operational controls.</p></header>
+    <AdminUltraEnquiries token={sessionToken} />
     <div className="flex flex-wrap gap-2"><input aria-label="Search websites" placeholder="Name, owner, slug or site ID" value={search} onChange={e=>setSearch(e.target.value)} maxLength={100} className="p-2 rounded-xl bg-slate-900 border border-slate-700 min-w-0 flex-1" /><select aria-label="Website date range" value={range} onChange={e=>setRange(e.target.value)} className="p-2 rounded-xl bg-slate-900 border border-slate-700">{['7','30','90','all'].map(r=><option key={r} value={r}>{r==='all'?'All time':`${r} days`}</option>)}</select><select aria-label="Website status" value={status} onChange={e=>setStatus(e.target.value)} className="p-2 rounded-xl bg-slate-900 border border-slate-700"><option value="">All statuses</option><option value="draft">Draft</option><option value="published">Published</option></select><select aria-label="Website template" value={template} onChange={e=>setTemplate(e.target.value)} className="p-2 rounded-xl bg-slate-900 border border-slate-700 max-w-full"><option value="">All templates</option>{WEBSITE_TEMPLATES.map(t=><option key={t.id} value={t.id}>{t.title}</option>)}</select><button type="button" onClick={()=>setRefresh(n=>n+1)} className="px-3 py-2 rounded-xl bg-slate-800">Refresh</button></div>
     {error && <p role="alert" className="text-rose-300">{error}</p>}{loading && <p role="status" className="text-slate-400 text-sm">Loading websites…</p>}
     {data && <>

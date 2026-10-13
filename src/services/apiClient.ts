@@ -1211,6 +1211,12 @@ export function uploadWebsiteImage(intent: WebsiteUploadIntent, file: File, onPr
 export function changeWebsiteTemplate(token: string, id: string, targetTemplateId: string, expectedUpdatedAt: string) { return websiteFreeRequest<{success:true;site:WebsiteSiteRecord}>(`websites/${encodeURIComponent(id)}/change-template`,token,'POST',{targetTemplateId,confirmed:true,expectedUpdatedAt}); }
 export function recordWebsiteAnalytics(input: WebsiteAnalyticsInput, token?: string) { return websiteFreeRequest<{success:true}>('websites/analytics',token,'POST',input); }
 export function getAdminWebsiteSummary(token: string, filters: {range:string;search?:string;status?:string;template?:string;offset?:number}) { return websiteFreeRequest<WebsiteAdminSummary>(`admin/website-builder?${new URLSearchParams(Object.entries(filters).map(([key,value])=>[key,String(value)]))}`,token); }
+export function getAdminUltraEnquiries(token: string, search: string, offset: number) {
+  return websiteFreeRequest<{success:true; enquiries:import('../../server/db/websiteUltraStore').UltraEnquiryRecord[]; total:number; limit:number; offset:number}>(`admin/websites/ultra-enquiries?${new URLSearchParams({search,offset:String(offset),limit:'25'})}`, token);
+}
+export function getAdminUltraEnquiry(token: string, reference: string) {
+  return websiteFreeRequest<{success:true; enquiry:import('../../server/db/websiteUltraStore').UltraEnquiryRecord}>(`admin/websites/ultra-enquiries/${encodeURIComponent(reference)}`, token);
+}
 export function forceUnpublishWebsite(token: string, id: string, confirmation: string) { return websiteFreeRequest<{success:true}>(`admin/website-builder/${encodeURIComponent(id)}/force-unpublish`,token,'POST',{confirmation}); }
 
 // ==========================================

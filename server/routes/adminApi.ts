@@ -52,8 +52,18 @@ adminRouter.use('/referrals', adminEarnRouter);
 adminRouter.get('/websites/ultra-enquiries', async (req, res) => {
   const limit = Number(req.query.limit ?? 25), offset = Number(req.query.offset ?? 0);
   if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0 || offset > 100000) { res.status(400).json({ error: 'Invalid pagination.' }); return; }
-  try { res.json({ success: true, ...(await WebsiteUltraStore.list(limit, offset)), limit, offset }); }
+  const search = req.query.search ?? '';
+  if (typeof search !== 'string' || search.length > 100) { res.status(400).json({ error: 'Invalid enquiry search.' }); return; }
+  try { res.json({ success: true, ...(await WebsiteUltraStore.list(limit, offset, search.trim())), limit, offset }); }
   catch { res.status(503).json({ error: 'Could not retrieve enquiries.' }); }
+});
+adminRouter.get('/websites/ultra-enquiries/:reference', async (req, res) => {
+  if (!/^MH-ULTRA-[A-Z0-9]{8}$/.test(req.params.reference)) { res.status(400).json({ error: 'Invalid enquiry reference.' }); return; }
+  try {
+    const enquiry = await WebsiteUltraStore.findByReference(req.params.reference);
+    if (!enquiry) { res.status(404).json({ error: 'Enquiry not found.' }); return; }
+    res.json({ success: true, enquiry });
+  } catch { res.status(503).json({ error: 'Could not retrieve this enquiry.' }); }
 });
 
 /**
