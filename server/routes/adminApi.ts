@@ -1,3 +1,5 @@
+import { OrderResolutionService } from '../services/orderResolutionService.js';
+import { FinanceError } from '../db/financeStore.js';
 import { adminCommercialRouter } from './commercialApi.js';
 import { AfaStore } from '../db/afaStore.js';
 import { adminFinanceRouter } from './financeApi.js';
@@ -191,6 +193,9 @@ adminRouter.get('/orders', async (req: Request, res: Response) => {
  * 3. GET /api/admin/orders/:reference
  * Full administrative order details
  */
+adminRouter.get('/orders/:reference/resolution',async(req,res)=>{try{res.json({success:true,...await OrderResolutionService.details(req.params.reference)});}catch(error){res.status(error instanceof FinanceError?error.status:503).json({error:error instanceof FinanceError?error.message:'Resolution history unavailable.'});}});
+adminRouter.post('/orders/:reference/resolution',async(req,res)=>{try{res.json({success:true,...await OrderResolutionService.action(req.params.reference,req.user!.id,req.body||{})});}catch(error){res.status(error instanceof FinanceError?error.status:(error as any)?.code==='23505'?409:503).json({error:error instanceof FinanceError?error.message:(error as any)?.code==='23505'?'This refund is already linked to a recorded resolution.':'Resolution could not be committed. Reload before retrying.'});}});
+
 adminRouter.get('/orders/:reference', async (req: Request, res: Response) => {
   try {
     const ref = req.params.reference;
@@ -239,11 +244,12 @@ adminRouter.post('/orders/:reference/refresh', async (req: Request, res: Respons
     res.json({
       success: true,
       order: { ...toAdminOrderDetails(refreshed), ...(refreshed.service_type === 'afa' ? { afa_registration: await AfaStore.operationalDetails(refreshed.id) } : {}) },
-      message: 'Order status refreshed from supplier.',
+      message: 'Supplier status checked. This does not confirm a customer refund.',
     });
   } catch (err) {
-    console.error('[Admin API] Refresh order error:', err);
-    res.status(500).json({ error: 'Failed to refresh order status.' });
+    if(err instanceof FinanceError){res.status(err.status).json({error:err.message});return;}
+    console.warn('[Admin API] Supplier reconciliation unavailable.');
+    res.status(503).json({ error: 'Supplier status could not be confirmed.' });
   }
 });
 
@@ -311,6 +317,7 @@ adminRouter.patch('/orders/:reference/status', async (req: Request, res: Respons
     }
 
     const targetStatus = marketplaceStatus || status;
+    if(targetStatus==='refunded'&&order.payment_status==='success'){res.status(409).json({error:'Use the order-linked customer refund workflow. A status change is not proof of a refund.'});return;}
     if (!targetStatus) {
       res.status(400).json({ error: 'Status is required.' });
       return;

@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 /**
  * Admin Audit Log Store
  * Records administrative actions with safe sanitization (no passwords, session tokens, or keys).
@@ -17,8 +18,14 @@ export interface AuditLogRecord {
 }
 
 const devAuditStore: AuditLogRecord[] = [];
+const pendingDevAudit=new AsyncLocalStorage<AuditLogRecord[]>();
 
 export class AdminAuditStore {
+  /** Match PostgreSQL audit rollback semantics in memory-only resolution tests. */
+  static async withDevTransaction<T>(work:()=>Promise<T>):Promise<T>{
+    if(getPool())return work();const pending:AuditLogRecord[]=[];
+    const result=await pendingDevAudit.run(pending,work);devAuditStore.unshift(...pending.reverse());devAuditStore.splice(200);return result;
+  }
   /**
    * Log an administrative mutation safely
    */
@@ -85,6 +92,7 @@ export class AdminAuditStore {
       }
     }
 
+    if(pendingDevAudit.getStore()){pendingDevAudit.getStore()!.push(record);return record;}
     devAuditStore.unshift(record);
     if (devAuditStore.length > 200) {
       devAuditStore.pop();

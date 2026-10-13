@@ -21,7 +21,7 @@ import {
 
 interface AdminOverviewSectionProps {
   sessionToken: string;
-  onNavigateTab: (tab: 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system' | 'earn') => void;
+  onNavigateTab: (tab: 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system' | 'earn', orderFilter?:string) => void;
 }
 
 export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({
@@ -178,19 +178,19 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({
             </div>
           </div>
 
-          {/* Attention / Failed */}
-          <div className="p-4 rounded-2xl bg-[#0f171d] border border-slate-800/90 space-y-2">
+          {/* Current and historical unresolved paid cases use the same Orders filter. */}
+          <button type="button" onClick={()=>onNavigateTab('orders','needs_attention')} className="p-4 text-left rounded-2xl bg-[#0f171d] border border-slate-800/90 space-y-2">
             <div className="flex items-center justify-between text-slate-400">
-              <span className="text-xs font-medium">Needs Attention</span>
+              <span className="text-xs font-medium">Needs attention today</span>
               <AlertTriangle className="w-4 h-4 text-amber-400" />
             </div>
             <div className={`text-xl sm:text-2xl font-extrabold font-mono ${today.attentionCount > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
               {today.attentionCount}
             </div>
             <div className="text-[11px] text-slate-500">
-              Failed or refund pending
-            </div>
-          </div>
+              Created today; failed, refund pending or flagged
+            </div><p className="text-xs text-amber-300">{allTime.unresolvedPaidCount||0} paid orders unresolved · all dates</p>
+          </button>
         </div>
       </div>
 

@@ -30,6 +30,7 @@ export type AdminTab = 'commercial' | 'finance' | 'overview' | 'orders' | 'marke
 
 export const AdminPage: React.FC = () => {
   const { user, sessionToken, logoutUser, setActivePage } = useApp();
+  const [ordersFilter,setOrdersFilter]=useState('');
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [earnUserId, setEarnUserId] = useState<string | null>(null);
   const [customerUserId, setCustomerUserId] = useState<string | null>(null);
@@ -223,11 +224,11 @@ export const AdminPage: React.FC = () => {
             {activeTab === 'overview' && (
               <AdminOverviewSection
                 sessionToken={sessionToken}
-                onNavigateTab={(tab) => setActiveTab(tab)}
+                onNavigateTab={(tab,filter) => {setOrdersFilter(filter||'');setActiveTab(tab);}}
               />
             )}
             {activeTab === 'orders' && (
-              <AdminOrdersSection sessionToken={sessionToken} />
+              <AdminOrdersSection sessionToken={sessionToken} initialStatusFilter={ordersFilter} />
             )}
             {activeTab === 'marketplace' && (
               <AdminMarketplaceSection sessionToken={sessionToken} />

@@ -130,12 +130,17 @@ export class FinanceService {
   static async refund(order:OrderRecord,adminId?:string) {
     // Only an authoritative terminal refund, never timeout/refund_pending/queued.
     if(order.payment_provider!=='wallet'||!order.user_id||order.status!=='refunded'||order.manual_review)return;
-    return FinanceStore.transaction(order.user_id,async tx=>{
-      const purchase=(await tx.operations()).find(x=>x.kind==='purchase'&&x.payload.orderId===order.id);
-      if(!purchase||purchase.amount_minor!==order.amount)throw new FinanceError('Wallet purchase ledger does not match the refund.',409);
-      const key=`refund:${order.id}`;const old=await tx.find(key);if(old)return old;const row=await tx.create('refund',key,purchase.amount_minor,{orderId:order.id});await tx.append(row,'wallet',purchase.amount_minor,'Refund');
-      if(adminId)await tx.audit(adminId,'wallet_refund_reconciled',row.id,{order_id:order.id,amount_minor:purchase.amount_minor});return row;});
+    return FinanceStore.transaction(order.user_id,tx=>this.refundInTransaction(order,tx,adminId));
   }
+  static async refundInTransaction(order:OrderRecord,tx:FinanceTx,adminId?:string) {
+    if(order.payment_provider!=='wallet'||!order.user_id||tx.userId!==order.user_id||order.status!=='refunded'||order.manual_review)throw new FinanceError('Order is not eligible for its original Wallet refund.',409);
+    const purchase=(await tx.operations()).find(x=>x.kind==='purchase'&&x.payload.orderId===order.id);
+    if(!purchase||purchase.amount_minor!==order.amount||(await tx.ledger()).filter(e=>e.operation_id===purchase.id&&e.bucket==='wallet'&&e.delta_minor===-purchase.amount_minor).length!==1)throw new FinanceError('Wallet purchase ledger does not match the refund.',409);
+    const key=`refund:${order.id}`,old=await tx.find(key);if(old){if(old.amount_minor!==purchase.amount_minor||(await tx.ledger()).filter(e=>e.operation_id===old.id&&e.bucket==='wallet'&&e.delta_minor===purchase.amount_minor).length!==1)throw new FinanceError('Wallet refund ledger mismatch.',409);return old;}
+    const row=await tx.create('refund',key,purchase.amount_minor,{orderId:order.id});await tx.append(row,'wallet',purchase.amount_minor,'Refund');
+    if(adminId)await tx.audit(adminId,'wallet_refund_reconciled',row.id,{order_id:order.id,amount_minor:purchase.amount_minor});return row;
+  }
+
   static async reverseReward(record:import('../types/referral.js').RewardLedgerRecord,reason:string) {
     return FinanceStore.transaction(record.referrer_user_id,async tx=>{
       const key=`reward-reversal:${record.id}`,old=await tx.find(key);if(old)return null;

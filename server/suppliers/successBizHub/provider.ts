@@ -78,7 +78,7 @@ export class SuccessBizHubProvider implements SupplierProvider {
     if (s === 'pending' || s === 'queued' || s === 'accepted') {
       return 'submitted';
     }
-    if (s === 'failed' || s === 'rejected' || s === 'cancelled') {
+    if (s === 'failed' || s === 'rejected' || s === 'cancelled' || s === 'refund_pending' || s === 'refunded') {
       return 'failed';
     }
     console.warn(`Unknown Success Biz Hub supplier order status received: "${rawStatus}". Defaulting to non-terminal "processing".`);

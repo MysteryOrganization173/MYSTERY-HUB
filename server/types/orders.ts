@@ -16,6 +16,7 @@ export type OrderStatus =
   | 'expired';
 
 export interface OrderRecord {
+  resolution_json?: import('./orderResolution.js').OrderResolution | null;
   commercial_context?: import('../../shared/directPricing.js').CommercialSnapshot | null;
   store_context?: import('../../shared/storeEconomics.js').StoreSnapshot | null;
   marketplace_context?: Record<string, unknown> | null;
@@ -85,6 +86,7 @@ export type SafePublicOrderDetails = Pick<
   | 'delivered_at'
 > & {
   commercial_pricing?: {regularMinor:number;discountMinor:number;paidMinor:number};
+  customer_resolution?: 'review'|'refund_pending'|'refund_confirmed';
   amount_ghc: number;
   manual_review?: boolean;
   service_type?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'afa';
@@ -106,6 +108,7 @@ export interface AuthenticatedCustomerOrderDetails extends SafePublicOrderDetail
 }
 
 export interface AdminOrderDetails extends AuthenticatedCustomerOrderDetails {
+  resolution?: import('./orderResolution.js').OrderResolution | null;
   afa_registration?: {name:string; region:string; location:string; occupation?:string; maskedIdNumber:string; supplierStatus:string|null; supplierPublicId:string|null; submittedAt:string|null; registeredAt:string|null; createdAt:string; sensitivePayloadPurgedAt:string|null} | null;
   marketplace_context?: Record<string,unknown> | null;
   id: string;
@@ -140,6 +143,7 @@ export function toAdminOrderDetails(order: OrderRecord): AdminOrderDetails {
   const safe = toAuthenticatedCustomerOrder(order);
   return {
     ...safe,
+    resolution: order.resolution_json || null,
     marketplace_context: order.marketplace_context || null,
     id: order.id,
     user_id: order.user_id || null,
@@ -175,6 +179,7 @@ export function toSafePublicOrder(order: OrderRecord): SafePublicOrderDetails {
 
   return {
     public_reference: order.public_reference,
+    ...(order.resolution_json?.outcome ? {customer_resolution: order.resolution_json.stage==='resolved'?'refund_confirmed' as const:order.resolution_json.stage==='refund_pending'?'refund_pending' as const:'review' as const} : ['refund_pending','failed','refunded','cancelled','expired'].includes(order.status)&&order.payment_status==='success'?{customer_resolution:'review' as const}:{}),
     manual_review: Boolean(order.manual_review),
     recipient_phone: maskOrderRecipient(order.recipient_phone),
     network: order.network,

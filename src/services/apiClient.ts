@@ -457,6 +457,7 @@ export interface AdminOverviewMetrics {
     supplierCostGhc: number;
     estimatedGrossMarginGhc: number | null;
     manualReviewPendingCount: number;
+    unresolvedPaidCount?:number;
     totalCustomers: number;
     totalWaitlist: number;
     pendingWaitlist: number;
@@ -1415,3 +1416,9 @@ export const revokeOwnSessionsOnServer = (token: string) => accountRequest<{ suc
 export const resetAdminCustomerPassword = (token: string, id: string) => accountRequest<{ success: boolean; temporaryPassword: string; user: SafeUserProfile }>(token, 'admin/users/' + encodeURIComponent(id) + '/reset-password', 'POST', { confirm: true });
 export const revokeAdminCustomerSessions = (token: string, id: string) => accountRequest<{ success: boolean }>(token, 'admin/users/' + encodeURIComponent(id) + '/revoke-sessions', 'POST', { confirm: true });
 export const updateAdminCustomerProfile = (token: string, id: string, body: ProfileUpdateRequest) => accountRequest<{ success: boolean; user: SafeUserProfile }>(token, 'admin/users/' + encodeURIComponent(id) + '/profile', 'PATCH', body);
+
+/** Admin-only order-linked customer remedy; no refund creation occurs in the browser. */
+export async function adminOrderResolution(token:string,reference:string,body?:Record<string,unknown>):Promise<{success:boolean;order:import('../../server/types/orders').AdminOrderDetails;history:import('../../server/types/orderResolution').OrderResolutionEvent[];message?:string}>{
+ const response=await fetch(`${API_BASE_URL}/api/admin/orders/${encodeURIComponent(reference)}/resolution`,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+ const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error||'Order resolution unavailable.'),{status:response.status});return data;
+}

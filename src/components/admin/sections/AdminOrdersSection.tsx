@@ -1,3 +1,4 @@
+import { AdminOrderResolution } from './AdminOrderResolution';
 import { useDialogFocus } from '../../../hooks/useDialogFocus';
 import { afaStatusLabel } from '../../../../shared/afa';
 import { FULFILMENT_LABELS, FulfilmentMode } from '../../../../shared/marketplacePolicy';
@@ -33,14 +34,15 @@ import {
 
 interface AdminOrdersSectionProps {
   sessionToken: string;
+  initialStatusFilter?:string;
 }
 
-export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionToken }) => {
+export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionToken,initialStatusFilter='' }) => {
   // Query & Filter State
   const [searchTerm, setSearchTerm] = useState('');
   const [serviceTypeFilter, setServiceTypeFilter] = useState<string>('');
   const [networkFilter, setNetworkFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('');
   const [manualReviewFilter, setManualReviewFilter] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -164,7 +166,8 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
 
     try {
       const res = await refreshAdminOrderOnServer(sessionToken, reference);
-      if (res.success && res.order) {
+      if (res.success && res.order && selectedOrderRef.current?.public_reference === res.order.public_reference) {
+        selectedOrderRef.current = res.order;
         setSelectedOrder(res.order);
         setActionSuccessMessage(res.message || 'Supplier status successfully updated.');
         // Refresh full table
@@ -184,9 +187,10 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
       const res = await updateAdminOrderReviewOnServer(sessionToken, order.public_reference, {
         manualReview: newFlag,
       });
-      if (res.success && res.order) {
+      if (res.success && res.order && selectedOrderRef.current?.public_reference === res.order.public_reference) {
+        selectedOrderRef.current = res.order;
         setSelectedOrder(res.order);
-        setActionSuccessMessage(newFlag ? 'Flagged for manual review.' : 'Manual review flag resolved.');
+        setActionSuccessMessage(newFlag ? 'Flagged for manual review.' : 'Review flag removed; customer refund resolution is unchanged.');
         fetchOrders();
       }
     } catch (err: unknown) {
@@ -202,7 +206,8 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
       const res = await updateAdminOrderReviewOnServer(sessionToken, order.public_reference, {
         adminNote: adminNoteInput.trim() || null,
       });
-      if (res.success && res.order) {
+      if (res.success && res.order && selectedOrderRef.current?.public_reference === res.order.public_reference) {
+        selectedOrderRef.current = res.order;
         setSelectedOrder(res.order);
         setActionSuccessMessage('Admin operational note saved.');
         fetchOrders();
@@ -268,7 +273,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
   };
 
   // Helper for Status Badge
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string,refundState?:string) => {
     switch (status) {
       case 'delivered':
         return (
@@ -296,7 +301,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
       case 'refunded':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/30">
-            <span>Refunded</span>
+            <span>{refundState==='refund_confirmed'?'Refunded':'Refund unverified'}</span>
           </span>
         );
       default:
@@ -441,6 +446,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
               className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 focus:border-[#00c365] focus:outline-none"
             >
               <option value="">All Statuses</option>
+              <option value="needs_attention">Needs Attention (all dates)</option>
               <option value="delivered">Delivered</option>
               <option value="processing">Processing</option>
               <option value="submitted">Submitted</option>
@@ -616,7 +622,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                       </td>
 
                       <td className="py-3 px-4">
-                        {order.service_type === 'afa' ? <span className="text-xs text-amber-300">{afaStatusLabel(order.status,order.manual_review)}</span> : getStatusBadge(order.status)}
+                        {order.service_type === 'afa' ? <span className="text-xs text-amber-300">{afaStatusLabel(order.status,order.manual_review)}</span> : getStatusBadge(order.status,order.customer_resolution)}
                       </td>
 
                       <td className="py-3 px-4">
@@ -692,7 +698,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
 
                   <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
                     <div className="flex items-center gap-1.5">
-                      {order.service_type === 'afa' ? <span className="text-xs text-amber-300">{afaStatusLabel(order.status,order.manual_review)}</span> : getStatusBadge(order.status)}
+                      {order.service_type === 'afa' ? <span className="text-xs text-amber-300">{afaStatusLabel(order.status,order.manual_review)}</span> : getStatusBadge(order.status,order.customer_resolution)}
                       {getPaymentBadge(order.payment_status)}
                     </div>
                     <span className="text-[10px] text-slate-500 font-mono">
@@ -800,11 +806,12 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                     <span>Manual Operational Attention Required</span>
                   </div>
                   <p className="text-[11px] text-slate-300 leading-relaxed">
-                    This order encountered a supplier delivery exception. Check internal failure reason below. Note: Live Paystack refunds or supplier re-orders must be handled directly through verified dashboards.
+                    This order encountered a supplier delivery exception. Review supplier evidence and the customer resolution below. Supplier failure or a supplier balance refund does not confirm a customer refund. Do not blindly resubmit the order.
                   </p>
                 </div>
               )}
 
+              <AdminOrderResolution key={selectedOrder.id} order={selectedOrder} token={sessionToken} onUpdated={updated=>{if(selectedOrderRef.current?.id===updated.id){selectedOrderRef.current=updated;setSelectedOrder(updated);void fetchOrders();}}}/>
               {/* Core Order Summary Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
                 <div>
@@ -841,7 +848,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
 
                 <div>
                   <span className="text-[11px] text-slate-500 block">Fulfilment Status</span>
-                  <div className="pt-0.5">{selectedOrder.service_type === 'afa' ? <span className="text-xs text-amber-300">{afaStatusLabel(selectedOrder.status,selectedOrder.manual_review)}</span> : getStatusBadge(selectedOrder.status)}</div>
+                  <div className="pt-0.5">{selectedOrder.service_type === 'afa' ? <span className="text-xs text-amber-300">{afaStatusLabel(selectedOrder.status,selectedOrder.manual_review)}</span> : getStatusBadge(selectedOrder.status,selectedOrder.customer_resolution)}</div>
                 </div>
 
                 <div>
@@ -948,7 +955,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                         { id: 'ready_for_pickup', label: 'Ready for Pickup' },
                         { id: 'out_for_delivery', label: 'Out for Delivery' },
                         { id: 'completed', label: 'Completed / Delivered' },
-                        { id: 'refunded', label: 'Refunded' },
+                        ...(selectedOrder.payment_status==='success'?[]:[{ id: 'refunded', label: 'Refunded' }]),
                         { id: 'cancelled', label: 'Cancelled' },
                       ].filter(st => !['digital_delivery','manual_activation'].includes(selectedOrder.fulfilment_method || '') || !['ready_for_pickup','out_for_delivery'].includes(st.id)).map((st) => {
                         const isCurrent =
@@ -982,7 +989,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                     {(selectedOrder.supplier_order_id || selectedOrder.service_type === 'afa') && (
                       <button
                         onClick={() => handleRefreshSupplierStatus(selectedOrder.public_reference)}
-                        disabled={isRefreshingSupplier}
+                        disabled={isRefreshingSupplier||selectedOrder.status==='delivered'||selectedOrder.resolution?.stage==='resolved'}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 font-semibold text-[11px] border border-sky-500/30 transition-colors cursor-pointer disabled:opacity-50"
                       >
                         <RefreshCw className={`w-3 h-3 ${isRefreshingSupplier ? 'animate-spin' : ''}`} />
@@ -1106,12 +1113,12 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                 {(selectedOrder.status === 'failed' || selectedOrder.status === 'refunded') && (
                   <div className="p-3 rounded-lg bg-slate-800/80 border border-slate-700/60 flex items-center gap-2 text-[11px] text-slate-400">
                     <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span>Order is in terminal status ({selectedOrder.status}). It does not block MTN duplicate protection.</span>
+                    <span>{selectedOrder.resolution?.stage==='resolved'?'Customer refund verified; resolution complete.':'Supplier flow has stopped. Customer refund remains unconfirmed until verified in Customer resolution.'}</span>
                   </div>
                 )}
 
                 {/* Case A: supplier_order_id exists -> Show Refresh Supplier Status */}
-                {selectedOrder.supplier_order_id && selectedOrder.status !== 'delivered' && selectedOrder.status !== 'failed' && selectedOrder.status !== 'refunded' && (
+                {selectedOrder.supplier_order_id && selectedOrder.status !== 'delivered' && selectedOrder.status !== 'refunded' && selectedOrder.resolution?.stage!=='resolved' && (
                   <div className="p-3.5 rounded-lg bg-sky-500/10 border border-sky-500/25 space-y-2">
                     <p className="text-[11px] text-sky-200 leading-relaxed">
                       This order was dispatched to Success Biz Hub (ID: <span className="font-mono font-bold text-white">{selectedOrder.supplier_order_id}</span>). Use supplier refresh to synchronize the live delivery state.
@@ -1129,7 +1136,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                 )}
 
                 {/* Case B: No supplier_order_id AND non-terminal -> Can close as Pre-launch Test */}
-                {!selectedOrder.supplier_order_id && selectedOrder.status !== 'delivered' && selectedOrder.status !== 'failed' && selectedOrder.status !== 'refunded' && (
+                {!selectedOrder.supplier_order_id && !['delivered','failed','refunded'].includes(selectedOrder.status) && selectedOrder.resolution?.stage!=='resolved' && (
                   <div className="space-y-3">
                     {!showCloseTestConfirm ? (
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">

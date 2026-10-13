@@ -22,7 +22,7 @@ for (const status of ['paid','queued','submitted','processing','delivered','refu
   });
 }
 test('Refunded and review orders provide safe distinct next steps',()=>{
-  assert.equal(dataOrderPresentation('refunded').label,'Refunded');
+  assert.equal(dataOrderPresentation('refunded',false,'refund_confirmed').label,'Refunded');
   assert.equal(dataOrderPresentation('refund_pending').label,'Refund pending');
   assert.match(dataOrderPresentation('queued',true).next,/avoid placing the same order/);
   assert.match(dataOrderPresentation('failed').next,/before placing/);

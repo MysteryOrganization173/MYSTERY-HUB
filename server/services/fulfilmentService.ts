@@ -1,3 +1,4 @@
+import { FinanceError } from '../db/financeStore.js';
 import { CommercialService } from './commercialService.js';
 import { WebsiteBusinessService } from './websiteBusinessService.js';
 /**
@@ -687,11 +688,15 @@ export class FulfilmentService {
   static async refreshOrderStatusIfDue(order: OrderRecord, force = false): Promise<OrderRecord> {
     if (order.service_type === 'afa') return AfaService.refresh(order);
     const uncertainWithId = order.failure_reason === 'supplier_submission_uncertain' && (order.status === 'queued' || order.store_context && order.manual_review && ['submitted','processing','delivered'].includes(order.status));
-    if (!order.supplier_order_id || (order.status !== 'submitted' && order.status !== 'processing' && !uncertainWithId)) {
+    const failedPaidRefresh=force&&order.payment_status==='success'&&['paid','queued','submitted','processing','failed','refund_pending','refunded'].includes(order.status)&&order.resolution_json?.stage!=='resolved';
+    if (!order.supplier_order_id || (order.status !== 'submitted' && order.status !== 'processing' && !uncertainWithId && !failedPaidRefresh)) {
+      if(force&&!order.supplier_order_id)throw new FinanceError('No supplier identifier is available. Record documented supplier evidence instead.',409);
+      if(force)throw new FinanceError('This order state does not permit supplier reconciliation.',409);
       return order;
     }
 
-    if (!this.provider.client.isFulfillmentEnabled() || !this.provider.client.isConfigured()) {
+    if ((!force&&!this.provider.client.isFulfillmentEnabled()) || !this.provider.client.isConfigured()) {
+      if(force)throw new FinanceError('Supplier status lookup is not configured. Use documented manual reconciliation.',503);
       return order;
     }
 
@@ -718,6 +723,9 @@ export class FulfilmentService {
         statusRes = await this.provider.getOrderStatus(order.supplier_order_id);
       }
 
+      order=(await OrdersStore.recordSupplierCheck(order.id,order.supplier_order_id!,statusRes.rawResponse?JSON.stringify(statusRes.rawResponse):undefined))||order;
+      if(statusRes.supplierOrderId&&String(statusRes.supplierOrderId)!==order.supplier_order_id)throw new FinanceError('Supplier identifier did not match the order.',503);
+      if(force&&!statusRes.success)throw new FinanceError('Supplier lookup failed; the customer resolution remains open.',503);
       if (statusRes.success && statusRes.status) {
         const mappedStatus: OrderStatus =
           statusRes.status === 'delivered'
@@ -733,15 +741,18 @@ export class FulfilmentService {
             order.id,
             mappedStatus,
             statusRes.errorMessage,
-            order.supplier_order_id,
-            JSON.stringify(statusRes.rawResponse)
+            order.supplier_order_id!,
+            JSON.stringify(statusRes.rawResponse),
+            {expectedSupplierId:order.supplier_order_id!,authoritativeSupplierRecovery:['processed','completed','success','delivered','processing','in_progress','pending','queued','accepted'].includes(String((statusRes.rawResponse as any)?.status||'').toLowerCase())}
           );
-          if(order.store_context&&order.manual_review&&order.failure_reason==='supplier_submission_uncertain'&&(updated||order).status===mappedStatus)return await OrdersStore.resolveStoreSupplierReview(order.id,order.supplier_order_id)||updated||order;
+          if(order.store_context&&order.manual_review&&order.failure_reason==='supplier_submission_uncertain'&&(updated||order).status===mappedStatus)return await OrdersStore.resolveStoreSupplierReview(order.id,order.supplier_order_id!)||updated||order;
           return updated || order;
         }
       }
     } catch (err) {
-      console.warn(`[Fulfilment Refresh] Error refreshing order status for ${order.public_reference}:`, err);
+      await OrdersStore.recordSupplierCheck(order.id,order.supplier_order_id!);
+      if(force)throw new FinanceError('Supplier lookup could not be confirmed. Customer resolution remains open.',503);
+      console.warn('[Fulfilment Refresh] Supplier status lookup unavailable.');
     }
 
     return order;

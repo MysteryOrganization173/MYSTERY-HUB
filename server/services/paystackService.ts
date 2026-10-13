@@ -26,6 +26,7 @@ export interface PaystackInitializeResult {
 }
 
 export interface PaystackVerifyResult {
+  transactionId?: number;
   isTestMode?: boolean;
   metadata?: Record<string, unknown>;
   reference?: string;
@@ -132,7 +133,7 @@ export class PaystackServerService {
   /**
    * Verifies a Paystack transaction directly with Paystack API
    */
-  static async verifyTransaction(reference: string): Promise<PaystackVerifyResult> {
+  static async verifyTransaction(reference: string, timeoutMs?:number): Promise<PaystackVerifyResult> {
     const secretKey = this.getSecretKey();
     const isProd = process.env.NODE_ENV === 'production';
 
@@ -163,6 +164,7 @@ export class PaystackServerService {
     try {
       const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
         method: 'GET',
+        ...(timeoutMs?{signal:AbortSignal.timeout(timeoutMs)}:{}),
         headers: {
           Authorization: `Bearer ${secretKey}`,
         },
@@ -172,6 +174,8 @@ export class PaystackServerService {
         status: boolean;
         message?: string;
         data?: {
+          id?: number;
+          domain?: string;
           status: string;
           amount: number;
           currency: string;
@@ -198,7 +202,8 @@ export class PaystackServerService {
 
       return {
         isVerified: isSuccess,
-        isTestMode: secretKey.startsWith('sk_test_'),
+        isTestMode: secretKey.startsWith('sk_test_') || tx.domain==='test',
+        transactionId: tx.id,
         reference: tx.reference,
         metadata: tx.metadata,
         status: isSuccess ? 'success' : (tx.status as PaystackVerifyResult['status']),
@@ -218,6 +223,19 @@ export class PaystackServerService {
         error: 'Network error verifying payment.',
       };
     }
+  }
+
+  /** Read-only reconciliation of a refund already initiated outside Mystery Hub. Never simulates success. */
+  static async fetchRefund(id:string):Promise<{id:string;transactionId:number;amountMinor:number;currency:string;status:string;domain:string;refundedAt:string|null}> {
+    if(!/^[1-9][0-9]{0,18}$/.test(id))throw new Error('Enter a valid Paystack refund ID.');
+    const key=this.getSecretKey();if(!key||key.startsWith('sk_test_'))throw new Error('Live refund verification is not configured.');
+    const response=await fetch(`https://api.paystack.co/refund/${encodeURIComponent(id)}`,{headers:{Authorization:`Bearer ${key}`},signal:AbortSignal.timeout(12000)});
+    const json=await response.json() as any;const data=json.data;
+    if(!response.ok||json.status!==true||!data)throw new Error('Paystack refund verification is unavailable.');
+    const tx=typeof data.transaction==='object'?data.transaction?.id:data.transaction;
+    if(!['pending','processing','processed','failed','needs-attention'].includes(data.status))throw new Error('Unconfirmed Paystack refund state.');
+    if(String(data.id)!==id||!Number.isSafeInteger(tx)||tx<=0||!Number.isSafeInteger(data.amount)||data.amount<=0)throw new Error('Paystack returned incomplete refund evidence.');
+    return {id:String(data.id),transactionId:tx,amountMinor:data.amount,currency:data.currency,status:data.status,domain:data.domain,refundedAt:typeof data.refunded_at==='string'?data.refunded_at:null};
   }
 
   /**

@@ -32,7 +32,7 @@ export const OrderStatusModal: React.FC = () => {
     if (!isStatusModalOpen || !lookupReference) return;
 
     // Stop aggressive polling when terminal status is reached
-    const isTerminal = activeOrder?.status === 'delivered' || activeOrder?.status === 'failed';
+    const isTerminal = activeOrder?.status === 'delivered' || activeOrder?.status === 'failed'&&(!activeOrder.customerResolution||activeOrder.customerResolution==='refund_confirmed');
     if (isTerminal) return;
 
     const fetchServerStatus = async () => {
@@ -62,7 +62,7 @@ export const OrderStatusModal: React.FC = () => {
             mappedStatus = 'placed';
           } else if (serverStatus === 'refund_pending' || serverStatus === 'refunded') {
             mappedStatus = 'failed';
-            statusMessage = 'Delivery could not be completed. Your payment is being reviewed for refund.';
+            statusMessage = dataOrderPresentation(serverStatus,res.order.manual_review,res.order.customer_resolution).next;
           } else if (serverStatus === 'failed') {
             mappedStatus = 'failed';
             statusMessage = res.order.service_type === 'afa' ? 'Registration needs support review. Do not start another registration until support confirms it is safe.' : 'The mobile network was unable to complete the delivery. Please contact support or retry.';
@@ -74,11 +74,13 @@ export const OrderStatusModal: React.FC = () => {
             mappedStatus !== activeOrder?.status ||
             serverStatus !== activeOrder?.serverStatus ||
             res.order.manual_review !== activeOrder?.manualReview ||
+            res.order.customer_resolution !== activeOrder?.customerResolution ||
             statusMessage !== activeOrder?.statusMessage
           ) {
             updateOrderStatus(activeOrder!.id, mappedStatus, {
               serverStatus,
               manualReview: res.order.manual_review,
+              customerResolution:res.order.customer_resolution,
               statusMessage,
             });
           }
@@ -109,8 +111,8 @@ export const OrderStatusModal: React.FC = () => {
 
   const currentNetwork = GHANA_NETWORKS[activeOrder.network];
   const displayRef = activeOrder.publicReference || activeOrder.id;
-  const isDataOrder = activeOrder.serviceType === 'data' || (!activeOrder.serviceType && !/^(airtime|instant|marketplace)/.test(activeOrder.bundle.id));
-  const dataView = dataOrderPresentation(activeOrder.serverStatus, activeOrder.manualReview);
+  const isDataOrder = Boolean(activeOrder.customerResolution) || activeOrder.serviceType === 'data' || (!activeOrder.serviceType && !/^(airtime|instant|marketplace)/.test(activeOrder.bundle.id));
+  const dataView = dataOrderPresentation(activeOrder.serverStatus, activeOrder.manualReview,activeOrder.customerResolution);
   const isRefundIssue = activeOrder.serverStatus === 'refund_pending' || activeOrder.serverStatus === 'refunded';
 
   const handleCopyOrderId = () => {

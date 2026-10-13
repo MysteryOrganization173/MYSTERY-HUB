@@ -140,10 +140,10 @@ for (const status of ['failed','refunded','cancelled','expired'] as const) test(
   await assert.rejects(AfaStore.create(fixture(),payload),/active or completed/);
   assert.equal(posts,0);
 });
-test('admin refund of an uncertain POST cannot permit repurchase or destroy evidence',async()=>{
+test('unverified admin refund of an uncertain POST is blocked and retains evidence',async()=>{
   const order=await saved('queued');await AfaStore.claimSubmission(order.id);
   const response=await request(`/admin/orders/${order.public_reference}/status`,'PATCH',{status:'refunded'},'admin-token');
-  assert.equal(response.status,200);await AfaStore.reconcileTerminalPayloads();
+  assert.equal(response.status,409);assert.equal((await OrdersStore.findOrder(order.id))!.status,'queued');await AfaStore.reconcileTerminalPayloads();
   assert.ok((await AfaStore.find(order.id))!.encrypted_payload);
   assert.equal((await checkout()).status,409);assert.equal(initialization,null);assert.equal(posts,0);
 });

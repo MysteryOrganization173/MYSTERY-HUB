@@ -1283,8 +1283,9 @@ export class OrdersStore {
         if (!order) throw new Error('Supplier webhook order is not yet available.');
         // The documented data webhook cannot authoritatively update AFA registrations.
         if (order.service_type === 'afa') { containsAfa = true; continue; }
+        let rawStatus='';try{rawStatus=String(JSON.parse(update.response)?.status||'').toLowerCase();}catch{}
         const updated = await this.updateOrderStatus(order.id, update.status, update.failureReason,
-          update.supplierOrderId, update.response, { client, afterCommit });
+          update.supplierOrderId, update.response, { client, afterCommit, expectedSupplierId:update.supplierOrderId, authoritativeSupplierRecovery:['processed','completed','success','delivered','processing','in_progress','pending','queued','accepted'].includes(rawStatus) });
         if (!updated) throw new Error('Supplier webhook order update failed.');
       }
       await this.recordSupplierWebhookEvent(eventId, eventType, containsAfa ? { eventId, eventType, ignoredAfa: true } : payload, client);
@@ -1316,6 +1317,23 @@ export class OrdersStore {
       && ['paid', 'queued', 'submitted', 'processing'].includes(o.status)).map(o => o.id)).size;
   }
 
+  static async recordSupplierCheck(id:string,supplierId:string,response?:string):Promise<OrderRecord|null>{
+    const now=new Date().toISOString(),pool=getPool();
+    if(pool)return (await pool.query(`UPDATE orders SET supplier_last_checked_at=GREATEST($1::timestamptz,updated_at+interval '1 millisecond'),updated_at=GREATEST($1::timestamptz,updated_at+interval '1 millisecond'),supplier_response=COALESCE($2,supplier_response) WHERE id=$3 AND supplier_order_id=$4 RETURNING *`,[now,response||null,id,supplierId])).rows[0]||null;
+    const order=await this.findOrder(id);if(!order||order.supplier_order_id!==supplierId)return order;
+    const stamp=new Date(Math.max(Date.now(),new Date(order.updated_at).getTime()+1)).toISOString();
+    const updated={...order,supplier_last_checked_at:stamp,updated_at:stamp,...(response?{supplier_response:response}:{})};this.restoreResolutionMemory(updated);return updated;
+  }
+
+  static async persistResolution(order:OrderRecord,resolution:import('../types/orderResolution.js').OrderResolution,client?:PoolClient) {
+    const updated={...order,resolution_json:resolution,updated_at:new Date(Math.max(Date.now(),new Date(order.updated_at).getTime()+1)).toISOString()};
+    if(client){const result=await client.query('UPDATE orders SET resolution_json=$1,updated_at=$2,manual_review=$3,status=$4 WHERE id=$5 RETURNING *',[JSON.stringify(resolution),updated.updated_at,updated.manual_review||false,updated.status,updated.id]);if(!result.rows[0])throw new Error('Order resolution write failed.');return result.rows[0] as OrderRecord;}
+    if(getPool())throw new Error('Resolution requires a database transaction.');
+    if(resolution.refundId&&this.adminDevOrders().some(o=>o.id!==order.id&&o.resolution_json?.refundId===resolution.refundId))throw Object.assign(new Error('Refund already linked.'),{code:'23505'});
+    this.restoreResolutionMemory(updated);return updated;
+  }
+  static restoreResolutionMemory(order:OrderRecord){if(getPool())throw new Error('Memory-only helper.');for(const key of [order.id,`payref:${order.payment_reference}`,`pubref:${order.public_reference}`])devMemoryStore.set(key,order);}
+
   /** Update order status with an atomic compare-and-set and forward transition guard. */
   static async updateOrderStatus(
     orderId: string,
@@ -1323,16 +1341,19 @@ export class OrdersStore {
     failureReason?: string,
     supplierOrderId?: string,
     supplierResponse?: string,
-    options: { client?: PoolClient; explicitReversal?: boolean; afterCommit?: Array<() => Promise<void>> } = {}
+    options: { client?: PoolClient; explicitReversal?: boolean; afterCommit?: Array<() => Promise<void>>; authoritativeSupplierRecovery?:boolean; authoritativeCustomerRefund?:boolean; expectedSupplierId?:string } = {}
   ): Promise<OrderRecord | null> {
     const existing = await this.findOrder(orderId, options.client);
     if (!existing) return null;
+    if(options.expectedSupplierId&&existing.supplier_order_id!==options.expectedSupplierId)return existing;
     const sameStateMetadataChange = existing.status === status && (
       (failureReason !== undefined && failureReason !== existing.failure_reason) ||
       (supplierOrderId !== undefined && supplierOrderId !== existing.supplier_order_id) ||
       (supplierResponse !== undefined && supplierResponse !== existing.supplier_response)
     );
-    if (!sameStateMetadataChange && !canAdvanceOrderStatus(existing.status, status, options.explicitReversal)) return existing;
+    const recovery=options.authoritativeSupplierRecovery && ['refund_pending','failed'].includes(existing.status) && ['submitted','processing','delivered'].includes(status) && existing.payment_status==='success' && !existing.resolution_json?.outcome;
+    const customerRefund=options.authoritativeCustomerRefund && status==='refunded' && ['failed','refund_pending','refunded','cancelled','expired'].includes(existing.status) && existing.payment_status==='success';
+    if (!sameStateMetadataChange && !recovery && !customerRefund && !canAdvanceOrderStatus(existing.status, status, options.explicitReversal)) return existing;
 
     const nowIso = new Date().toISOString();
     const updated: OrderRecord = {
@@ -1546,7 +1567,7 @@ export class OrdersStore {
       }
 
       if (params.status === 'needs_attention') {
-        conditions.push(`(manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%'))`);
+        conditions.push(`(manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status IN ('failed','cancelled','expired','refunded') AND COALESCE(resolution_json->>'stage','') <> 'resolved')) AND (payment_status = 'success' OR failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%'))`);
       } else if (params.status === 'abandoned') {
         conditions.push(`status IN ('cancelled', 'expired')`);
       } else if (params.status === 'all') {
@@ -1635,8 +1656,8 @@ export class OrdersStore {
           (Boolean(o.manual_review) ||
             (o.failure_reason === 'supplier_submission_uncertain' && ['paid', 'queued', 'submitted', 'processing'].includes(o.status)) ||
             o.status === 'refund_pending' ||
-            (o.payment_status === 'success' && o.status === 'failed')) &&
-          (!o.failure_reason || (!o.failure_reason.toLowerCase().startsWith('prelaunch') && !o.failure_reason.toLowerCase().startsWith('pre-launch')))
+            (o.payment_status === 'success' && ['failed','cancelled','expired','refunded'].includes(o.status) && o.resolution_json?.stage!=='resolved')) &&
+          (o.payment_status==='success'||!o.failure_reason || (!o.failure_reason.toLowerCase().startsWith('prelaunch') && !o.failure_reason.toLowerCase().startsWith('pre-launch')))
       );
     } else if (params.status === 'abandoned') {
       all = all.filter((o) => o.status === 'cancelled' || o.status === 'expired');
@@ -1706,6 +1727,7 @@ export class OrdersStore {
       supplierCostGhc: number;
       estimatedGrossMarginGhc: number | null;
       manualReviewPendingCount: number;
+      unresolvedPaidCount:number;
     };
   }> {
     const now = new Date();
@@ -1719,14 +1741,15 @@ export class OrdersStore {
           COUNT(CASE WHEN payment_status = 'success' THEN 1 END) as total_orders,
           COALESCE(SUM(CASE WHEN payment_status = 'success' THEN amount ELSE 0 END), 0) as total_revenue,
           COALESCE(SUM(CASE WHEN payment_status = 'success' AND (supplier_order_id IS NOT NULL OR submitted_at IS NOT NULL OR status IN ('submitted', 'processing', 'delivered', 'refund_pending', 'refunded')) THEN supplier_cost_minor ELSE 0 END), 0) as total_cost,
-          COUNT(CASE WHEN (manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%')) THEN 1 END) as manual_reviews,
+          COUNT(CASE WHEN payment_status='success' AND status IN ('failed','refund_pending','cancelled','expired','refunded') AND COALESCE(resolution_json->>'stage','') <> 'resolved' THEN 1 END) as unresolved_paid,
+          COUNT(CASE WHEN (manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status IN ('failed','cancelled','expired','refunded') AND COALESCE(resolution_json->>'stage','') <> 'resolved')) AND (payment_status = 'success' OR failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%')) THEN 1 END) as manual_reviews,
           
           -- Today
           COUNT(CASE WHEN created_at >= $1 AND payment_status = 'success' THEN 1 END) as today_orders,
           COALESCE(SUM(CASE WHEN created_at >= $1 AND payment_status = 'success' THEN amount ELSE 0 END), 0) as today_revenue,
           COUNT(CASE WHEN created_at >= $1 AND status = 'delivered' THEN 1 END) as today_delivered,
           COUNT(CASE WHEN created_at >= $1 AND status IN ('processing', 'submitted', 'queued') THEN 1 END) as today_processing,
-          COUNT(CASE WHEN created_at >= $1 AND (manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status = 'failed')) AND (failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%')) THEN 1 END) as today_attention,
+          COUNT(CASE WHEN created_at >= $1 AND (manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status IN ('failed','cancelled','expired','refunded') AND COALESCE(resolution_json->>'stage','') <> 'resolved')) AND (payment_status = 'success' OR failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%')) THEN 1 END) as today_attention,
 
           -- Last 7 Days
           COUNT(CASE WHEN created_at >= $2 AND payment_status = 'success' THEN 1 END) as last7_orders,
@@ -1768,6 +1791,7 @@ export class OrdersStore {
           supplierCostGhc: Number((totalCost / 100).toFixed(2)),
           estimatedGrossMarginGhc: marginGhc,
           manualReviewPendingCount: parseInt(row.manual_reviews || '0', 10),
+          unresolvedPaidCount:parseInt(row.unresolved_paid||'0',10),
         },
       };
     }
@@ -1790,8 +1814,8 @@ export class OrdersStore {
       (Boolean(o.manual_review) ||
         (o.failure_reason === 'supplier_submission_uncertain' && ['paid', 'queued', 'submitted', 'processing'].includes(o.status)) ||
         o.status === 'refund_pending' ||
-        (o.payment_status === 'success' && o.status === 'failed')) &&
-      (!o.failure_reason || (!o.failure_reason.toLowerCase().startsWith('prelaunch') && !o.failure_reason.toLowerCase().startsWith('pre-launch')));
+        (o.payment_status === 'success' && ['failed','cancelled','expired','refunded'].includes(o.status) && o.resolution_json?.stage!=='resolved')) &&
+      (o.payment_status==='success'||!o.failure_reason || (!o.failure_reason.toLowerCase().startsWith('prelaunch') && !o.failure_reason.toLowerCase().startsWith('pre-launch')));
 
     return {
       today: {
@@ -1817,6 +1841,7 @@ export class OrdersStore {
         supplierCostGhc: Number((totalCostMinor / 100).toFixed(2)),
         estimatedGrossMarginGhc: totalRevMinor > 0 ? Number(((totalRevMinor - totalCostMinor) / 100).toFixed(2)) : null,
         manualReviewPendingCount: all.filter(isActionableAttention).length,
+        unresolvedPaidCount:paidAll.filter(o=>['failed','refund_pending','cancelled','expired','refunded'].includes(o.status)&&o.resolution_json?.stage!=='resolved').length,
       },
     };
   }
