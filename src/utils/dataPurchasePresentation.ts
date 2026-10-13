@@ -37,7 +37,7 @@ export function dataOrderPresentation(status?: string, manualReview = false, cus
   if (status === 'cancelled' || status === 'expired') { title = 'Payment was not completed'; label = status === 'expired' ? 'Payment expired' : 'Payment cancelled'; next = 'Check your payment history first. If money was deducted, contact support with this reference before paying again.'; }
   if(customerResolution==='review'){title='Payment received · Resolution under review';label='Resolution review';next='Your payment was received, but delivery or customer refund needs confirmation. Contact support with this reference; do not repeat the order.';}
   if(customerResolution==='refund_pending'){title='Customer refund awaiting verification';label='Refund pending';next='A customer refund is being reconciled. Completion is not confirmed yet; contact support with your reference.';}
-  if(customerResolution==='refund_confirmed'){title='Refund completed';label='Refunded';next='Your full customer refund has been verified. Contact support with your reference if you need help locating it.';}
+  if(customerResolution==='refund_confirmed'){title='Refund verified';label='Refunded';next='Your full refund has been verified. If you paid through Paystack, your bank or MoMo provider may take time to show the funds. Contact support with your reference if you need help.';}
   if (manualReview && customerResolution!=='refund_confirmed') { title = 'Your order needs support review'; label = 'Manual review'; next = 'Support needs to check this order. Keep your reference and avoid placing the same order again.'; }
   return { paymentConfirmed, delivered, processing, title, label, next };
 }

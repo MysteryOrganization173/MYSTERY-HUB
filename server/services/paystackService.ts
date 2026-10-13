@@ -225,6 +225,27 @@ export class PaystackServerService {
     }
   }
 
+  /** Refund evidence only. This never grants successful-payment or dispatch eligibility.
+   * Paystack transitions refunded transactions to reversed; ordinary verifyTransaction
+   * must continue requiring success. https://paystack.com/docs/payments/refunds/#refund-status
+   */
+  static async fetchRefundTransaction(reference:string):Promise<{transactionId:number;reference:string;amountPesewas:number;currency:string;domain:string;status:string}> {
+    const key=this.getSecretKey();
+    if(!key.startsWith('sk_live_'))throw new Error('Live refund transaction verification is not configured.');
+    const response=await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,{
+      method:'GET',headers:{Authorization:`Bearer ${key}`},signal:AbortSignal.timeout(12000),
+    });
+    const json=await response.json() as {status?:unknown;data?:Record<string,unknown>};
+    const data=json?.data;
+    if(!response.ok||json?.status!==true||!data||!Number.isSafeInteger(data.id)||(data.id as number)<=0||
+       typeof data.reference!=='string'||!data.reference||!Number.isSafeInteger(data.amount)||(data.amount as number)<=0||
+       typeof data.currency!=='string'||!data.currency||typeof data.domain!=='string'||
+       typeof data.status!=='string'||!data.status.trim())throw new Error('Paystack returned incomplete refund transaction evidence.');
+    // Deliberately no isVerified flag, simulation, payment authorization or customer PII.
+    return {transactionId:data.id as number,reference:data.reference,amountPesewas:data.amount as number,
+      currency:data.currency,domain:data.domain,status:data.status.trim().toLowerCase()};
+  }
+
   /** Read-only reconciliation of a refund already initiated outside Mystery Hub. Never simulates success. */
   static async fetchRefund(id:string):Promise<{id:string;transactionId:number;amountMinor:number;currency:string;status:string;domain:string;refundedAt:string|null}> {
     if(!/^[1-9][0-9]{0,18}$/.test(id))throw new Error('Enter a valid Paystack refund ID.');

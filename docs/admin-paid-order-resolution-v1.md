@@ -14,7 +14,9 @@ Admin Orders retains the existing drawer, search, notes and review controls. Its
 
 Supported actions are begin review, record supplier evidence, verify an externally initiated Paystack refund, and refund an original Wallet purchase. Each requires authenticated admin RBAC, explicit confirmation, operational reason, request ID and current order/resolution revision. Amounts come from immutable order/payment facts. Stale or conflicting actions are rejected. Repeating the identical request ID and input returns the recorded result. Changing its actor or payload is rejected.
 
-Paystack: the application does not create refunds. An authorized operator uses the verified Paystack dashboard after checking the original payment and any existing refund. The server then performs authenticated read-only GET /refund/:id and transaction verification. Exact original transaction ID/reference, full amount, GHS and live mode must match. Pending/processing is not completion. Only processed with a valid refunded_at completes the customer refund. Timeout or malformed/mismatched evidence cannot close the case. One provider refund ID is uniquely bound to one order. No payment secrets/raw customer provider response are stored in resolution history.
+Paystack: the application does not create refunds. An authorized operator uses the verified Paystack dashboard after checking the original payment and any existing refund. The server performs authenticated read-only GET /refund/:id and a dedicated refund transaction read. Exact original transaction ID/reference, full amount, GHS, refund ID and both live domains must match. Pending/processing is not completion. Only processed with a valid refunded_at and original transaction status reversed (or success during state propagation) closes the case. Timeout or malformed/mismatched evidence cannot close it. One provider refund ID is uniquely bound to one order. No payment secrets/raw customer provider response are stored in resolution history. Closure means Paystack processed the refund; it does not prove funds are already visible in the customer's bank or MoMo account.
+
+The reviewed V1 commit incorrectly used ordinary payment verification, which requires success and rejected genuine reversed transactions after a processed refund. fetchRefundTransaction now validates identity without granting payment-success eligibility. Ordinary verifyTransaction remains unchanged and still rejects reversed payments for supplier dispatch, purchase confirmation and Wallet funding. Official lifecycle: https://paystack.com/docs/payments/refunds/#refund-status; API: https://paystack.com/docs/api/refund/.
 
 Wallet: only the original Wallet-paid purchase, its owning account and its matching actual debit qualify. Confirmed supplier failure evidence is required. The existing full original-purchase refund uses one idempotent refund operation. The account/ledger, locked order, resolution event and admin audits commit together. Missing or mismatched debit/credit fails closed. Repeated requests cannot credit twice. PostgreSQL account locking precedes order locking.
 
@@ -47,12 +49,13 @@ No production migration was executed in this task. Rollback must preserve additi
 
 ## Verification evidence
 
-New recovery/provider/database tests: 66/66 pass.
-Final focused recovery + AFA + customer journey + admin test-order pass: 207/207.
-Earlier broader finance/payment/supplier/referral/commercial/customer pass: 498 passed, 1 obsolete refund-copy assertion subsequently corrected, 1 skipped.
-Final full isolated suite: 1583 tests; 1579 passed, 3 inherited failures, 1 skipped.
+Recovery/provider/database/lifecycle tests: 96/96 pass, including 30 new lifecycle tests using raw synthetic Paystack HTTP responses through the actual adapters and resolution service.
+Final affected refund + Wallet + payment integrity + customer journey checks: 261/261.
+Final full isolated suite: 1613 tests; 1609 passed, 3 inherited failures, 1 skipped.
 Unchanged same-SHA baseline: 1517 tests; 1513 passed, 3 failures, 1 skipped.
-Difference: 66 additional passing tests, no additional failures/skips.
+Difference: 96 additional passing tests over main (30 additional passing tests over reviewed V1), no additional failures/skips.
+
+Raw HTTP coverage includes processed/reversed, pending/reversal_pending, failed/success, partial/wrong amounts, wrong currency, transaction ID/reference mismatches, test domains, missing completion, timeout/malformed evidence, duplicate ID binding/idempotency and reversed transactions rejected by ordinary payment verification. Existing Wallet transaction, rollback, audit, locking and idempotency protections are preserved.
 
 Inherited failures remain untouched:
 - bundleCardCompression: obsolete direct-SIM delivery-copy expectation.
@@ -63,9 +66,9 @@ Two existing tests were deliberately updated for the new truthful refund contrac
 
 TypeScript, production build and diff check passed. Build retains the existing non-blocking Vite large-chunk warning.
 
-The database test used disposable embedded PostgreSQL (PGlite, real PostgreSQL execution), executing the complete SQL schema and repeated additive migration. It verified RLS/grants, post-write rollback of Wallet/ledger/order/history/audits, exactly one original Wallet credit, unique provider ID binding and immutable payment facts. It did not contact an external database. A standalone PostgreSQL server and cross-process concurrency were not exercised; memory concurrent requests and actual PostgreSQL transaction/constraint rollback were exercised. The optional database test skips when MYSTERY_TEST_PGLITE_PATH is absent; it ran and passed in this task.
+The database test used disposable embedded PostgreSQL (PGlite, real PostgreSQL execution), executing the complete SQL schema and repeated additive migration. It verified RLS, denied SELECT/INSERT/UPDATE/DELETE privileges for anon and authenticated, an actual permission-denied read under anon, backend SELECT/INSERT privileges, post-write rollback of Wallet/ledger/order/history/audits, exactly one original Wallet credit, unique provider ID binding and immutable payment facts. It did not contact an external database. A standalone PostgreSQL server/container runtime is unavailable locally; separate-connection/cross-process concurrency and actual deployment-role permissions remain mandatory staging release gates. Memory concurrent requests and actual embedded PostgreSQL transaction/constraint rollback were exercised. The optional database test skips when MYSTERY_TEST_PGLITE_PATH is absent; it ran and passed in this task. This correction adds no schema changes.
 
-Compiled synthetic browser checks at 1280px and 390px covered Overview navigation, unresolved queue, failed drawer, explicit confirmation, disabled submit, checking/loading, unavailable verification, pending/processed refund, original Wallet refund, missing-ID manual review, resolved history and customer tracking. Mobile body/root width was 390px, dialog width 364px, with no horizontal overflow. Mobile console had no errors. Test infrastructure/providers/screenshots/logs live outside Git; no new application dependency.
+Previously recorded V1 compiled synthetic browser checks at 1280px and 390px covered Overview navigation, unresolved queue, failed drawer, explicit confirmation, disabled submit, checking/loading, unavailable verification, pending/processed refund, original Wallet refund, missing-ID manual review, resolved history and customer tracking. Mobile body/root width was 390px, dialog width 364px, with no horizontal overflow. Mobile console had no errors. The correction changes only refund verification and explanatory text; it was verified with raw HTTP, presentation regression tests and the production build, without repeating those browser journeys. Test infrastructure/providers/screenshots/logs live outside Git; no new application dependency.
 
 ## Production incidents: operator procedure after release
 
@@ -82,7 +85,9 @@ For each separately:
 
 No main merge, deployment, production financial write, supplier POST, live payment/refund or configuration change occurred. Unreleased Builder/payment/reseller branches and unrelated worktrees were preserved.
 
-## Reviewed file inventory (31 files)
+Release decision: GO for founder review of this correction; NO-GO for production activation until the standalone PostgreSQL concurrency/actual-role prechecks above are completed and the founder approves deployment. No live Paystack or supplier verification/refund operation was performed for this correction; the two incident orders were not accessed or modified.
+
+## Reviewed file inventory (32 files across V1 and correction)
 
 - docs/admin-paid-order-resolution-v1.md
 - server/db/adminAuditStore.ts
@@ -99,6 +104,7 @@ No main merge, deployment, production financial write, supplier POST, live payme
 - server/suppliers/__tests__/adminOrderResolution.test.ts
 - server/suppliers/__tests__/adminOrderResolutionPostgres.test.ts
 - server/suppliers/__tests__/adminRefundProvider.test.ts
+- server/suppliers/__tests__/adminRefundLifecycle.test.ts
 - server/suppliers/__tests__/afaRegistration.test.ts
 - server/suppliers/__tests__/dataPurchaseJourney.test.ts
 - server/suppliers/successBizHub/provider.ts

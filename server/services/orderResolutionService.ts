@@ -31,9 +31,9 @@ export class OrderResolutionService {
      if(typeof input.refundId!=='string'||! /^[1-9][0-9]{0,18}$/.test(input.refundId))throw new FinanceError('Enter the externally initiated Paystack refund ID.');
      if(initial.resolution_json.refundId&&initial.resolution_json.refundId!==input.refundId)throw new FinanceError('Reconcile the already linked refund before using another ID.',409);
      try{provider=await PaystackServerService.fetchRefund(input.refundId);}catch{unavailable=true;}
-     if(provider){const payment=await PaystackServerService.verifyTransaction(initial.payment_reference,12000);
-       if(payment.error)unavailable=true;
-       if(!unavailable&&(!payment.isVerified||payment.isSimulated||payment.isTestMode||payment.reference!==initial.payment_reference||payment.amountPesewas!==initial.amount||payment.currency!==initial.currency||payment.transactionId!==provider.transactionId||provider.domain!=='live'||provider.amountMinor!==initial.amount||provider.currency!==initial.currency))throw new FinanceError('Refund evidence does not match this exact live payment, amount and currency.',409);
+     if(provider){let payment:Awaited<ReturnType<typeof PaystackServerService.fetchRefundTransaction>>|undefined;
+       try{payment=await PaystackServerService.fetchRefundTransaction(initial.payment_reference);}catch{unavailable=true;}
+       if(!unavailable&&(!payment||payment.domain!=='live'||payment.reference!==initial.payment_reference||payment.amountPesewas!==initial.amount||payment.currency!==initial.currency||payment.transactionId!==provider.transactionId||provider.id!==input.refundId||provider.domain!=='live'||provider.amountMinor!==initial.amount||provider.currency!==initial.currency||provider.status==='processed'&&!['success','reversed'].includes(payment.status)))throw new FinanceError('Refund evidence does not match this exact live payment, amount and currency.',409);
        if(provider.status==='processed'&&(!provider.refundedAt||!Number.isFinite(Date.parse(provider.refundedAt))))throw new FinanceError('Refund completion evidence is incomplete.',409);
      }
    }
@@ -71,6 +71,6 @@ export class OrderResolutionService {
      return toAdminOrderDetails(await OrdersStore.persistResolution(current,resolution,client));
    });
    for(const effect of effects)try{await effect();}catch{console.warn('[Order resolution] Durable refund requires downstream reconciliation.');}
-   return {order:result,history:await OrderResolutionStore.history(initial.id),message:unavailable?'Verification unavailable; refund remains unconfirmed.':result.resolution?.stage==='resolved'?'Customer refund confirmed and case resolved.':'Resolution evidence saved; customer refund is not yet confirmed.'};
+   return {order:result,history:await OrderResolutionStore.history(initial.id),message:unavailable?'Verification unavailable; refund remains unconfirmed.':result.resolution?.stage==='resolved'?(result.resolution.outcome==='paystack_refund'?'Paystack refund processed and case resolved; customer account visibility may take time.':'Original Wallet refund confirmed and case resolved.'):'Resolution evidence saved; customer refund is not yet confirmed.'};
  }
 }

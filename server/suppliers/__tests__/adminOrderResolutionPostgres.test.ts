@@ -15,14 +15,16 @@ const modulePath=process.env.MYSTERY_TEST_PGLITE_PATH;
 test('actual isolated PostgreSQL repeat migration, Wallet atomicity, audit rollback and refund uniqueness',{skip:!modulePath},async()=>{
  assert.equal(process.env.NODE_ENV,'test');assert.equal(process.env.DATABASE_URL,undefined);
  const {PGlite}=createRequire(import.meta.url)(modulePath!);const db=new PGlite();
- const originalQuery=pg.Pool.prototype.query,originalConnect=pg.Pool.prototype.connect,refund=Paystack.fetchRefund,verify=Paystack.verifyTransaction;
+ const originalQuery=pg.Pool.prototype.query,originalConnect=pg.Pool.prototype.connect,refund=Paystack.fetchRefund,verify=Paystack.fetchRefundTransaction;
  let failWrite=false;
  try{
   await db.exec("CREATE ROLE anon; CREATE ROLE authenticated;");
   await db.exec(fs.readFileSync('server/db/schema.sql','utf8'));
   await db.exec(ORDER_RESOLUTION_SCHEMA);await db.exec(ORDER_RESOLUTION_SCHEMA);
   assert.equal((await db.query("SELECT relrowsecurity FROM pg_class WHERE relname='order_resolution_events'")).rows[0].relrowsecurity,true);
-  assert.equal((await db.query("SELECT has_table_privilege('anon','order_resolution_events','SELECT') AS granted")).rows[0].granted,false);
+  for(const role of ['anon','authenticated'])for(const privilege of ['SELECT','INSERT','UPDATE','DELETE'])assert.equal((await db.query('SELECT has_table_privilege($1,\'order_resolution_events\',$2) AS granted',[role,privilege])).rows[0].granted,false);
+  await db.exec('SET ROLE anon');await assert.rejects(()=>db.query('SELECT * FROM order_resolution_events'),/permission denied/);await db.exec('RESET ROLE');
+  for(const privilege of ['SELECT','INSERT'])assert.equal((await db.query('SELECT has_table_privilege(current_user,\'order_resolution_events\',$1) AS granted',[privilege])).rows[0].granted,true);
   const query=async(sql:string,values:any[]=[])=>{const result=await db.query(sql,values);if(failWrite&&sql.includes('UPDATE orders SET resolution_json='))throw Error('Injected post-write failure');return {rows:result.rows,rowCount:result.affectedRows};};
   pg.Pool.prototype.query=query as any;pg.Pool.prototype.connect=(async()=>({query,release(){}})) as any;process.env.DATABASE_URL='postgresql://fixture.invalid/never-contacted';
   for(const id of ['admin','buyer','other'])await AuthStore.createUser({id,name:'Synthetic '+id,email:null,phone:null,passwordHash:'fixture-only',role:id==='admin'?'admin':'customer',status:'active'});
@@ -37,11 +39,11 @@ test('actual isolated PostgreSQL repeat migration, Wallet atomicity, audit rollb
   failWrite=true;await assert.rejects(()=>action(wallet.id,'refund_wallet'),/Injected/);failWrite=false;
   assert.equal((await FinanceService.summary('buyer')).walletMinor,0);assert.equal((await OrdersStore.findOrder(wallet.id))!.status,'refund_pending');assert.equal((await OrderResolutionStore.history(wallet.id)).length,events);assert.equal((await db.query('SELECT count(*) FROM admin_audit_log')).rows[0].count,audits);assert.equal((await db.query("SELECT count(*) FROM finance_operations WHERE kind='refund'")).rows[0].count,0);
   await action(wallet.id,'refund_wallet');assert.equal((await FinanceService.summary('buyer')).walletMinor,549);assert.equal((await OrdersStore.findOrder(wallet.id))!.resolution_json?.stage,'resolved');assert.equal((await db.query("SELECT count(*) FROM finance_ledger WHERE description='Refund'")).rows[0].count,1);
-  Paystack.fetchRefund=async id=>({id,transactionId:9001,amountMinor:549,currency:'GHS',status:'processed',domain:'live',refundedAt:new Date().toISOString()});Paystack.verifyTransaction=async reference=>({isVerified:true,reference,transactionId:9001,amountPesewas:549,currency:'GHS',status:'success'});
+  Paystack.fetchRefund=async id=>({id,transactionId:9001,amountMinor:549,currency:'GHS',status:'processed',domain:'live',refundedAt:new Date().toISOString()});Paystack.fetchRefundTransaction=async reference=>({reference,transactionId:9001,amountPesewas:549,currency:'GHS',status:'reversed',domain:'live'});
   await action(untouched.id,'begin_review');await action(untouched.id,'verify_external',{refundId:'12345'});const third=await make('third-order','paystack');await action(third.id,'begin_review');await assert.rejects(()=>action(third.id,'verify_external',{refundId:'12345'}));assert.equal((await OrdersStore.findOrder(third.id))!.status,'refund_pending');
   const expected=(await db.query('SELECT resolution_json FROM orders WHERE id=$1',[wallet.id])).rows[0].resolution_json;await db.exec(ORDER_RESOLUTION_SCHEMA);assert.deepEqual((await db.query('SELECT resolution_json FROM orders WHERE id=$1',[wallet.id])).rows[0].resolution_json,expected);
   // Original customer/payment facts on the Paystack fixture remain unchanged after its resolution.
   const final=(await db.query("SELECT * FROM orders WHERE id='unrelated-order'")).rows[0];for(const field of ['id','user_id','public_reference','amount','currency','payment_provider','payment_reference','payment_status','paid_at','customer_email','recipient_phone'])assert.deepEqual(final[field],before[0][field]);
   console.log('Actual embedded PostgreSQL: repeat migration, private history, full transaction rollback, original Wallet credit, unique external refund claim and immutable payment facts passed. No external server/provider used.');
- }finally{pg.Pool.prototype.query=originalQuery;pg.Pool.prototype.connect=originalConnect;Paystack.fetchRefund=refund;Paystack.verifyTransaction=verify;delete process.env.DATABASE_URL;await db.close();}
+ }finally{pg.Pool.prototype.query=originalQuery;pg.Pool.prototype.connect=originalConnect;Paystack.fetchRefund=refund;Paystack.fetchRefundTransaction=verify;delete process.env.DATABASE_URL;await db.close();}
 });
