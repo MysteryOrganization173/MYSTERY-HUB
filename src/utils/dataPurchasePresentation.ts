@@ -21,9 +21,9 @@ export function dataRecipientDisplay(phone: string, buyerVisible = false): strin
 }
 
 // Presentation only: a popup callback or local order never confirms payment.
-export function dataOrderPresentation(status?: string, manualReview = false, customerResolution?:'review'|'refund_pending'|'refund_confirmed') {
+export function dataOrderPresentation(status?: string, manualReview = false, customerResolution?:import('../../server/types/orderResolution').CustomerResolution) {
   const paymentConfirmed = Boolean(customerResolution) || ['paid', 'queued', 'submitted', 'processing', 'delivered', 'refund_pending', 'refunded'].includes(status || '');
-  const delivered = status === 'delivered';
+  const delivered = status === 'delivered' || customerResolution==='manual_fulfillment';
   const processing = ['submitted', 'processing'].includes(status || '');
   let title = paymentConfirmed ? 'Payment confirmed' : 'Confirming your payment';
   let label = paymentConfirmed ? 'Awaiting delivery' : 'Awaiting payment confirmation';
@@ -38,7 +38,9 @@ export function dataOrderPresentation(status?: string, manualReview = false, cus
   if(customerResolution==='review'){title='Payment received · Resolution under review';label='Resolution review';next='Your payment was received, but delivery or customer refund needs confirmation. Contact support with this reference; do not repeat the order.';}
   if(customerResolution==='refund_pending'){title='Customer refund awaiting verification';label='Refund pending';next='A customer refund is being reconciled. Completion is not confirmed yet; contact support with your reference.';}
   if(customerResolution==='refund_confirmed'){title='Refund verified';label='Refunded';next='Your full refund has been verified. If you paid through Paystack, your bank or MoMo provider may take time to show the funds. Contact support with your reference if you need help.';}
-  if (manualReview && customerResolution!=='refund_confirmed') { title = 'Your order needs support review'; label = 'Manual review'; next = 'Support needs to check this order. Keep your reference and avoid placing the same order again.'; }
+  if(customerResolution==='manual_fulfillment'){title='Service completed manually';label='Manually resolved';next='Support has confirmed that your service was completed through another channel. This does not claim delivery by the original supplier. Contact support with your reference if you need help.';}
+  if(customerResolution==='external_compensation'){title='External remedy recorded';label='Manually resolved';next='Support has recorded an external customer remedy. This is an operator confirmation, not a Paystack-verified refund. Contact support with your reference if you need help.';}
+  if (manualReview && !['refund_confirmed','manual_fulfillment','external_compensation'].includes(customerResolution||'')) { title = 'Your order needs support review'; label = 'Manual review'; next = 'Support needs to check this order. Keep your reference and avoid placing the same order again.'; }
   return { paymentConfirmed, delivered, processing, title, label, next };
 }
 

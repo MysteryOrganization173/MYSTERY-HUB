@@ -59,7 +59,7 @@ export interface OrderRecord {
   serviceFeeGhc?: number;
   status: OrderStatus;
   manualReview?: boolean;
-  customerResolution?:'review'|'refund_pending'|'refund_confirmed';
+  customerResolution?:import('../../server/types/orderResolution').CustomerResolution;
   serverStatus?: string; // Raw backend status e.g. 'refund_pending', 'delivered'
   statusMessage?: string; // Customer-friendly status message (e.g. for refund pending)
   paymentReference?: string;

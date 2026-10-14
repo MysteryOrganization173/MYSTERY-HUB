@@ -60,7 +60,7 @@ interface AppContextType {
   updateOrderStatus: (
     orderId: string,
     status: OrderRecord['status'],
-    extra?: { serverStatus?: string; statusMessage?: string; manualReview?: boolean;customerResolution?:'review'|'refund_pending'|'refund_confirmed' }
+    extra?: { serverStatus?: string; statusMessage?: string; manualReview?: boolean;customerResolution?:import('../../server/types/orderResolution').CustomerResolution }
   ) => void;
   isAuthModalOpen: boolean;
   authMode: 'login' | 'signup';
@@ -317,7 +317,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateOrderStatus = (
     orderId: string,
     status: OrderRecord['status'],
-    extra?: { serverStatus?: string; statusMessage?: string; manualReview?: boolean;customerResolution?:'review'|'refund_pending'|'refund_confirmed' }
+    extra?: { serverStatus?: string; statusMessage?: string; manualReview?: boolean;customerResolution?:import('../../server/types/orderResolution').CustomerResolution }
   ) => {
     // Server-loaded Data and AFA orders may not be in the legacy local list.
     if (activeOrder && ['afa', 'data'].includes(activeOrder.serviceType || '') && (activeOrder.id === orderId || activeOrder.publicReference === orderId)) {

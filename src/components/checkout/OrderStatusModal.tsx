@@ -32,7 +32,7 @@ export const OrderStatusModal: React.FC = () => {
     if (!isStatusModalOpen || !lookupReference) return;
 
     // Stop aggressive polling when terminal status is reached
-    const isTerminal = activeOrder?.status === 'delivered' || activeOrder?.status === 'failed'&&(!activeOrder.customerResolution||activeOrder.customerResolution==='refund_confirmed');
+    const isTerminal = ['manual_fulfillment','external_compensation'].includes(activeOrder?.customerResolution||'') || activeOrder?.status === 'delivered' || activeOrder?.status === 'failed'&&(!activeOrder.customerResolution||activeOrder.customerResolution==='refund_confirmed');
     if (isTerminal) return;
 
     const fetchServerStatus = async () => {
@@ -70,6 +70,7 @@ export const OrderStatusModal: React.FC = () => {
             mappedStatus = 'verifying';
           }
 
+          if(res.order.customer_resolution)statusMessage=dataOrderPresentation(serverStatus,res.order.manual_review,res.order.customer_resolution).next;
           if (
             mappedStatus !== activeOrder?.status ||
             serverStatus !== activeOrder?.serverStatus ||
@@ -166,6 +167,7 @@ export const OrderStatusModal: React.FC = () => {
 
   const isAfa = activeOrder.serviceType === 'afa';
   if (isAfa) statusConfig.label = afaStatusLabel(activeOrder.serverStatus, activeOrder.manualReview);
+  if(activeOrder.customerResolution)statusConfig.label=dataView.label;
 
   const headingText = isDataOrder ? dataView.title : isAfa
     ? afaStatusLabel(activeOrder.serverStatus, activeOrder.manualReview)

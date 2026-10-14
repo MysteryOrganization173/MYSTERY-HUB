@@ -274,6 +274,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
 
   // Helper for Status Badge
   const getStatusBadge = (status: string,refundState?:string) => {
+    if(refundState==='manual_fulfillment'||refundState==='external_compensation')return <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-300 border border-sky-500/30">Manually Resolved</span>;
     switch (status) {
       case 'delivered':
         return (
@@ -622,7 +623,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                       </td>
 
                       <td className="py-3 px-4">
-                        {order.service_type === 'afa' ? <span className="text-xs text-amber-300">{afaStatusLabel(order.status,order.manual_review)}</span> : getStatusBadge(order.status,order.customer_resolution)}
+                        {order.service_type === 'afa' && !['manual_fulfillment','external_compensation'].includes(order.customer_resolution||'') ? <span className="text-xs text-amber-300">{afaStatusLabel(order.status,order.manual_review)}</span> : getStatusBadge(order.status,order.customer_resolution)}
                       </td>
 
                       <td className="py-3 px-4">
@@ -698,7 +699,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
 
                   <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
                     <div className="flex items-center gap-1.5">
-                      {order.service_type === 'afa' ? <span className="text-xs text-amber-300">{afaStatusLabel(order.status,order.manual_review)}</span> : getStatusBadge(order.status,order.customer_resolution)}
+                      {order.service_type === 'afa' && !['manual_fulfillment','external_compensation'].includes(order.customer_resolution||'') ? <span className="text-xs text-amber-300">{afaStatusLabel(order.status,order.manual_review)}</span> : getStatusBadge(order.status,order.customer_resolution)}
                       {getPaymentBadge(order.payment_status)}
                     </div>
                     <span className="text-[10px] text-slate-500 font-mono">
@@ -798,7 +799,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
               )}
 
               {/* Status Alert if Needs Attention */}
-              {(selectedOrder.status === 'refund_pending' || selectedOrder.status === 'failed') &&
+              {selectedOrder.resolution?.stage!=='resolved' && (selectedOrder.status === 'refund_pending' || selectedOrder.status === 'failed') &&
                !(selectedOrder.failure_reason?.toLowerCase().startsWith('prelaunch') || selectedOrder.failure_reason?.toLowerCase().startsWith('pre-launch')) && (
                 <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1 text-amber-300">
                   <div className="flex items-center gap-2 font-bold text-xs">
@@ -848,7 +849,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
 
                 <div>
                   <span className="text-[11px] text-slate-500 block">Fulfilment Status</span>
-                  <div className="pt-0.5">{selectedOrder.service_type === 'afa' ? <span className="text-xs text-amber-300">{afaStatusLabel(selectedOrder.status,selectedOrder.manual_review)}</span> : getStatusBadge(selectedOrder.status,selectedOrder.customer_resolution)}</div>
+                  <div className="pt-0.5">{selectedOrder.service_type === 'afa' && !['manual_fulfillment','external_compensation'].includes(selectedOrder.customer_resolution||'') ? <span className="text-xs text-amber-300">{afaStatusLabel(selectedOrder.status,selectedOrder.manual_review)}</span> : getStatusBadge(selectedOrder.status,selectedOrder.customer_resolution)}</div>
                 </div>
 
                 <div>
@@ -1113,7 +1114,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                 {(selectedOrder.status === 'failed' || selectedOrder.status === 'refunded') && (
                   <div className="p-3 rounded-lg bg-slate-800/80 border border-slate-700/60 flex items-center gap-2 text-[11px] text-slate-400">
                     <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span>{selectedOrder.resolution?.stage==='resolved'?'Customer refund verified; resolution complete.':'Supplier flow has stopped. Customer refund remains unconfirmed until verified in Customer resolution.'}</span>
+                    <span>{selectedOrder.resolution?.stage==='resolved'?'Customer resolution complete; see the recorded outcome below.':'Supplier flow has stopped. Customer refund remains unconfirmed until verified in Customer resolution.'}</span>
                   </div>
                 )}
 

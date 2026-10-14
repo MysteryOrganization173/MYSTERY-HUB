@@ -86,7 +86,7 @@ export type SafePublicOrderDetails = Pick<
   | 'delivered_at'
 > & {
   commercial_pricing?: {regularMinor:number;discountMinor:number;paidMinor:number};
-  customer_resolution?: 'review'|'refund_pending'|'refund_confirmed';
+  customer_resolution?: import('./orderResolution.js').CustomerResolution;
   amount_ghc: number;
   manual_review?: boolean;
   service_type?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'afa';
@@ -179,7 +179,7 @@ export function toSafePublicOrder(order: OrderRecord): SafePublicOrderDetails {
 
   return {
     public_reference: order.public_reference,
-    ...(order.resolution_json?.outcome ? {customer_resolution: order.resolution_json.stage==='resolved'?'refund_confirmed' as const:order.resolution_json.stage==='refund_pending'?'refund_pending' as const:'review' as const} : ['refund_pending','failed','refunded','cancelled','expired'].includes(order.status)&&order.payment_status==='success'?{customer_resolution:'review' as const}:{}),
+    ...(order.resolution_json?.outcome ? {customer_resolution: order.resolution_json.stage==='resolved'?(order.resolution_json.outcome==='manual_fulfillment'?'manual_fulfillment' as const:order.resolution_json.outcome==='external_compensation'?'external_compensation' as const:'refund_confirmed' as const):order.resolution_json.stage==='refund_pending'?'refund_pending' as const:'review' as const} : ['refund_pending','failed','refunded','cancelled','expired'].includes(order.status)&&order.payment_status==='success'?{customer_resolution:'review' as const}:{}),
     manual_review: Boolean(order.manual_review),
     recipient_phone: maskOrderRecipient(order.recipient_phone),
     network: order.network,

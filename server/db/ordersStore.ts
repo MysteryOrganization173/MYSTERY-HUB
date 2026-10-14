@@ -1567,7 +1567,7 @@ export class OrdersStore {
       }
 
       if (params.status === 'needs_attention') {
-        conditions.push(`(manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status IN ('failed','cancelled','expired','refunded') AND COALESCE(resolution_json->>'stage','') <> 'resolved')) AND (payment_status = 'success' OR failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%'))`);
+        conditions.push(`COALESCE(resolution_json->>'stage','') <> 'resolved' AND (manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status IN ('failed','cancelled','expired','refunded') AND COALESCE(resolution_json->>'stage','') <> 'resolved')) AND (payment_status = 'success' OR failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%'))`);
       } else if (params.status === 'abandoned') {
         conditions.push(`status IN ('cancelled', 'expired')`);
       } else if (params.status === 'all') {
@@ -1653,10 +1653,10 @@ export class OrdersStore {
     if (params.status === 'needs_attention') {
       all = all.filter(
         (o) =>
-          (Boolean(o.manual_review) ||
+          o.resolution_json?.stage!=='resolved' && (Boolean(o.manual_review) ||
             (o.failure_reason === 'supplier_submission_uncertain' && ['paid', 'queued', 'submitted', 'processing'].includes(o.status)) ||
             o.status === 'refund_pending' ||
-            (o.payment_status === 'success' && ['failed','cancelled','expired','refunded'].includes(o.status) && o.resolution_json?.stage!=='resolved')) &&
+            (o.payment_status === 'success' && ['failed','cancelled','expired','refunded'].includes(o.status))) &&
           (o.payment_status==='success'||!o.failure_reason || (!o.failure_reason.toLowerCase().startsWith('prelaunch') && !o.failure_reason.toLowerCase().startsWith('pre-launch')))
       );
     } else if (params.status === 'abandoned') {
@@ -1742,14 +1742,14 @@ export class OrdersStore {
           COALESCE(SUM(CASE WHEN payment_status = 'success' THEN amount ELSE 0 END), 0) as total_revenue,
           COALESCE(SUM(CASE WHEN payment_status = 'success' AND (supplier_order_id IS NOT NULL OR submitted_at IS NOT NULL OR status IN ('submitted', 'processing', 'delivered', 'refund_pending', 'refunded')) THEN supplier_cost_minor ELSE 0 END), 0) as total_cost,
           COUNT(CASE WHEN payment_status='success' AND status IN ('failed','refund_pending','cancelled','expired','refunded') AND COALESCE(resolution_json->>'stage','') <> 'resolved' THEN 1 END) as unresolved_paid,
-          COUNT(CASE WHEN (manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status IN ('failed','cancelled','expired','refunded') AND COALESCE(resolution_json->>'stage','') <> 'resolved')) AND (payment_status = 'success' OR failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%')) THEN 1 END) as manual_reviews,
+          COUNT(CASE WHEN COALESCE(resolution_json->>'stage','') <> 'resolved' AND (manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status IN ('failed','cancelled','expired','refunded') AND COALESCE(resolution_json->>'stage','') <> 'resolved')) AND (payment_status = 'success' OR failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%')) THEN 1 END) as manual_reviews,
           
           -- Today
           COUNT(CASE WHEN created_at >= $1 AND payment_status = 'success' THEN 1 END) as today_orders,
           COALESCE(SUM(CASE WHEN created_at >= $1 AND payment_status = 'success' THEN amount ELSE 0 END), 0) as today_revenue,
           COUNT(CASE WHEN created_at >= $1 AND status = 'delivered' THEN 1 END) as today_delivered,
           COUNT(CASE WHEN created_at >= $1 AND status IN ('processing', 'submitted', 'queued') THEN 1 END) as today_processing,
-          COUNT(CASE WHEN created_at >= $1 AND (manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status IN ('failed','cancelled','expired','refunded') AND COALESCE(resolution_json->>'stage','') <> 'resolved')) AND (payment_status = 'success' OR failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%')) THEN 1 END) as today_attention,
+          COUNT(CASE WHEN created_at >= $1 AND COALESCE(resolution_json->>'stage','') <> 'resolved' AND (manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status IN ('failed','cancelled','expired','refunded') AND COALESCE(resolution_json->>'stage','') <> 'resolved')) AND (payment_status = 'success' OR failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%')) THEN 1 END) as today_attention,
 
           -- Last 7 Days
           COUNT(CASE WHEN created_at >= $2 AND payment_status = 'success' THEN 1 END) as last7_orders,
@@ -1811,10 +1811,10 @@ export class OrdersStore {
       .reduce((sum, o) => sum + (o.supplier_cost_minor || 0), 0);
 
     const isActionableAttention = (o: OrderRecord) =>
-      (Boolean(o.manual_review) ||
+      o.resolution_json?.stage!=='resolved' && (Boolean(o.manual_review) ||
         (o.failure_reason === 'supplier_submission_uncertain' && ['paid', 'queued', 'submitted', 'processing'].includes(o.status)) ||
         o.status === 'refund_pending' ||
-        (o.payment_status === 'success' && ['failed','cancelled','expired','refunded'].includes(o.status) && o.resolution_json?.stage!=='resolved')) &&
+        (o.payment_status === 'success' && ['failed','cancelled','expired','refunded'].includes(o.status))) &&
       (o.payment_status==='success'||!o.failure_reason || (!o.failure_reason.toLowerCase().startsWith('prelaunch') && !o.failure_reason.toLowerCase().startsWith('pre-launch')));
 
     return {
