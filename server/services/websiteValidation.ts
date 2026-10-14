@@ -86,7 +86,13 @@ export function validateWebsiteContentPatch(value: unknown): void {
   }
   if (content.stats !== undefined) {
     if (!Array.isArray(content.stats) || content.stats.length > 8) fail('Too many statistics.');
-    for (const raw of content.stats) { const stat = object(raw); keys(stat,['label','value']); safeWebsiteText(stat.label,50); safeWebsiteText(stat.value,50); }
+    for (const raw of content.stats) {
+      const stat = object(raw); keys(stat,['label','value']); safeWebsiteText(stat.label,50);
+      // Existing registered templates save plain comparisons such as "< 3 Mins".
+      // Preserve that literal text; this narrow grammar never accepts an HTML tag.
+      const comparison = typeof stat.value==='string' && stat.value.length<=50 && /^[<>]\s*\d+(?:\.\d+)?(?:\s+[a-zA-Z%]+)?$/.test(stat.value);
+      if(!comparison)safeWebsiteText(stat.value,50);
+    }
   }
   if (content.features !== undefined) {
     if (!Array.isArray(content.features) || content.features.length > 10) fail('Too many features.');
