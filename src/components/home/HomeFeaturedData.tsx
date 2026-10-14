@@ -1,5 +1,6 @@
 import {useDirectCatalog} from '../../hooks/useDirectCatalog';
 import {WelcomeOfferNotice} from '../data/WelcomeOfferNotice';
+import {useWelcomeOffer} from '../../hooks/useWelcomeOffer';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS } from '../../data/bundles';
@@ -10,6 +11,7 @@ import { ArrowRight, Wifi, Zap } from 'lucide-react';
 
 export const HomeFeaturedData: React.FC = () => {
   const DATA_BUNDLES=useDirectCatalog();
+  const welcomeOffer=useWelcomeOffer(DATA_BUNDLES);
   const { openCheckout, openDataPage } = useApp();
   const [selectedNetwork, setSelectedNetwork] = useState<NetworkId>('mtn');
   const [homeQuickBuyPhone, setHomeQuickBuyPhone] = useState('');
@@ -39,7 +41,7 @@ export const HomeFeaturedData: React.FC = () => {
   return (
     <section className="home-bundles" aria-labelledby="popular-data-heading">
       <div className="home-container space-y-5 sm:space-y-6">
-        <div className="home-welcome-offer"><WelcomeOfferNotice/></div>
+        <div className="home-welcome-offer"><WelcomeOfferNotice offer={welcomeOffer}/></div>
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 sm:gap-4">
           <div className="space-y-1 sm:space-y-2">
@@ -89,6 +91,7 @@ export const HomeFeaturedData: React.FC = () => {
             <BundleCard
               key={b.id}
               bundle={b}
+              directWelcomeOffer={welcomeOffer}
               recipientPhone={homeQuickBuyPhone}
               onPhoneChange={setHomeQuickBuyPhone}
               onBuy={(bundle, opts) => openCheckout(bundle, opts)}

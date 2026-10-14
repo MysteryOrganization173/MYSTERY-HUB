@@ -1,6 +1,7 @@
 import { DataNetworkSelector } from './DataNetworkSelector';
 import {useDirectCatalog} from '../../hooks/useDirectCatalog';
 import {WelcomeOfferNotice} from './WelcomeOfferNotice';
+import {useWelcomeOffer} from '../../hooks/useWelcomeOffer';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DATA_BUNDLES, GHANA_NETWORKS, detectGhanaNetwork } from '../../data/bundles';
@@ -34,6 +35,7 @@ import {
 
 export const DataPage: React.FC = () => {
   const DATA_BUNDLES=useDirectCatalog();
+  const welcomeOffer=useWelcomeOffer(DATA_BUNDLES);
   const {
     openCheckout,
     showToast,
@@ -355,7 +357,7 @@ export const DataPage: React.FC = () => {
 
   return (
     <div className="py-4 sm:py-8 text-slate-100">
-      <WelcomeOfferNotice/>
+      {dataProductMode==='data'&&<WelcomeOfferNotice offer={welcomeOffer}/>}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
         <header className="rounded-2xl border border-slate-800 bg-gradient-to-br from-[#101f19] to-[#0b1117] px-4 py-4 sm:px-6 sm:py-5">
           <p className="text-xs font-semibold text-[#44df95] mb-1">Data & Airtime</p>
@@ -775,6 +777,7 @@ export const DataPage: React.FC = () => {
                       <CompactBundleRow
                         key={bundle.id}
                         bundle={bundle}
+                        directWelcomeOffer={welcomeOffer}
                         onBuy={(b) => openCheckout(b)}
                       />
                     ))}
@@ -786,6 +789,7 @@ export const DataPage: React.FC = () => {
                       <BundleCard
                         key={bundle.id}
                         bundle={bundle}
+                        directWelcomeOffer={welcomeOffer}
                         recipientPhone={quickBuyPhone}
                         onPhoneChange={setQuickBuyPhone}
                         onBuy={(b, opts) => openCheckout(b, opts)}

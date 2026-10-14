@@ -4,16 +4,21 @@ import { DataBundle } from '../../types';
 import { GHANA_NETWORKS } from '../../data/bundles';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { ArrowRight } from 'lucide-react';
+import { welcomePriceForBundle, type WelcomeOffer } from '../../utils/welcomeOfferPresentation';
+import { WelcomeBundlePrice } from './WelcomeBundlePrice';
 
 interface CompactBundleRowProps {
   bundle: DataBundle;
   onBuy: (bundle: DataBundle) => void;
+  directWelcomeOffer?: WelcomeOffer | null;
 }
 
 export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
   bundle,
   onBuy,
+  directWelcomeOffer,
 }) => {
+  const welcomePrice = welcomePriceForBundle(bundle, directWelcomeOffer);
   const network = GHANA_NETWORKS[bundle.network];
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -32,7 +37,7 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
       tabIndex={0}
       onClick={() => onBuy(bundle)}
       onKeyDown={handleKeyDown}
-      aria-label={`Buy ${bundle.dataAmount} ${network.name} data for GH₵${bundle.priceGhc.toFixed(2)}`}
+      aria-label={`Buy ${bundle.dataAmount} ${network.name} data${welcomePrice ? '. '+welcomePrice.description : ` for GH₵${bundle.priceGhc.toFixed(2)}`}`}
       className="group relative rounded-xl border border-slate-800/90 hover:border-[#00c365]/60 bg-[#0e141a] hover:bg-[#111922] transition-all duration-150 p-3 sm:p-3.5 flex items-center justify-between gap-2.5 sm:gap-3 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] active:scale-[0.99]"
     >
       {/* Left: Network logo & Data Details */}
@@ -47,7 +52,7 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
             </span>
 
             {/* Dominant Promotional Badge: responsive text to prevent narrow-screen collision */}
-            {isAirtelTigo ? (
+            {welcomePrice ? null : isAirtelTigo ? (
               <span className="hidden min-[360px]:inline-flex text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded shrink-0">
                 AT<span className="hidden sm:inline"> Data</span>
               </span>
@@ -68,12 +73,12 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
 
       {/* Right: Price & Visual Buy Indicator (Not a nested button) */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        <div className="text-right">
+        {welcomePrice ? <WelcomeBundlePrice price={welcomePrice} /> : <div className="text-right">
           <div className="text-[10px] text-slate-400 font-medium hidden xs:block">Price</div>
           <div className="text-base min-[360px]:text-lg sm:text-xl font-extrabold text-white tabular-nums tracking-tight">
             GH₵{bundle.priceGhc.toFixed(2)}
           </div>
-        </div>
+        </div>}
 
         <span
           aria-hidden="true"
