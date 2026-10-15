@@ -55,7 +55,8 @@ function StorefrontCheckout({siteId,template,preview}:{siteId:string;template:We
   useEffect(()=>{if(!reference)return;void refresh();const timer=setInterval(()=>void refresh(),10000);return()=>clearInterval(timer);},[reference]);
   const choose=(bundle:DataBundle,recipient?:string)=>{if(preview){setError('Preview only. Customer checkout is available on the published store.');return;}if(guard.current)return;if(started.current){setError('Finish or track your existing order before choosing another bundle.');trackingInput.current?.focus();return;}restoreFocus.current=false;paymentReference.current="";setSelected(bundle);if(recipient)setPhone(recipient);requestId.current=crypto.randomUUID();setError('');trackPublicWebsite(siteId,'product_view');trackPublicWebsite(siteId,'checkout_started');};
   const checkout=async()=>{
-    if(preview||!selected||guard.current||recoveryOnly)return;
+    if(preview||!selected||guard.current)return;
+    if(recoveryOnly)return;
     if(!isValidGhanaPhoneNumber(phone)){setError('Enter a valid Ghana recipient number.');return;}
     if(!/^\S+@\S+\.\S+$/.test(email)){setError('Enter a valid email for your receipt.');return;}
     const currentAttempt=lifecycle.current.begin();if(currentAttempt===null)return;
