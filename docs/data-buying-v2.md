@@ -48,6 +48,23 @@ The journey has three moments: **choose, pay, follow**. Each one gets a single c
 3. **The receipt polls every 3s while open**, regardless of connection quality. A server-side push or backoff would reduce load. The frontend now shows the freshness of the status.
 4. **The Instant Bundle fee in checkout is a display estimate** carried over from before. The server total remains authoritative.
 
+## Connectivity & Purchase Experience V2 (follow-up on this branch)
+
+Masked's broader brief extends this work to Instant Bundles, Airtime and AFA. Data, Instant and Airtime ship here; the AFA Registration page ships in a separate draft PR stacked on this one, so its identity handling gets its own review.
+
+| Area | Before | After |
+| --- | --- | --- |
+| Prices | Each surface formatted cedis differently (`GH₵ 15.00`, `GH₵5.99`, mono, green). | One `Money` treatment: a quiet GH₵ mark, whole cedis at full weight, smaller pesewas, tabular figures. |
+| Buy actions | Colour change on hover only; on a phone a tap gave no sign until the sheet opened. | Press-in scale, the pill fills green and pulses once, with an 8ms vibration on Android. Reduced motion keeps only the colour change. |
+| Instant Bundles | Large cards, each with its own recipient box (the number was asked again in checkout). Price only; the checkout fee appeared first in checkout. Emoji filter pills plus an always-open search. | Tappable rows like Data: amount, network, a coloured condition chip (Midnight-only data, For supported video usage), validity, price and "+ GH₵0.23 fee". Out-of-stock rows sink to the end and are disabled. Search sits behind an icon. |
+| Flexi | Free number field defaulting to GH₵10 with tiny min/max text. Checkout reused the fee the server priced for the minimum amount, whatever was typed. | "Choose amount" opens an inline panel with quick picks within the server limits, inline errors and "Bundle GH₵20.00 + checkout fee about GH₵0.52". Checkout labels a Flexi fee as an estimate and computes it for the typed amount. |
+| Airtime | Numbered steps starting with the network; network cards labelled with MoMo wallet names; errors as toasts. | Number first (formatted, with a "This looks like a Telecel number. Switch to Telecel" hint once complete), network chips, a 3×2 amount grid with "Other amount", a total panel and "Continue · GH₵10.00". Errors sit under the field. The number carries into checkout. |
+| FAQ | Category pills plus a custom accordion. | Plain disclosures, first one open. |
+
+Kept as is: server pricing, quotes, the Flexi min/max limits, the zero Airtime fee, supported networks, and checkout's payment logic. The fee estimate (`src/utils/instantFee.ts`) mirrors the server's default gross-up, and a test checks it against `calculateFlexiInstantBundlePrice`.
+
+Backend note 5 (for Codex): the catalogue prices a Flexi bundle only at its minimum amount, and there is no quote endpoint for other amounts. The checkout total for a typed Flexi amount is therefore a client estimate until Paystack shows the server's figure. A small `GET /api/instant-bundles/:id/quote?amount=` would make it exact.
+
 ## Not yet checked
 
 A real Android device: the keyboard covering the sheet (handled through `visualViewport`) and switching to the MoMo prompt and back. Live Paystack and telecom behaviour were not exercised, by design.
