@@ -126,3 +126,30 @@ test('real frame listener rejects stale/foreign/unsupported selections and clean
   assert.equal(calls.length,1);render('site-a',false);fire();assert.equal(calls.length,1);render('site-b');fire();assert.equal(calls.length,1);
   cleanup.forEach(fn=>fn?.());assert.equal(listeners.size,0);
 });
+
+test('frame forwards All Settings hints and validated reading order only from the current editor frame',()=>{
+  const source={postMessage(){}} as unknown as Window,selects:any[]=[],orders:any[]=[],listeners=new Set<(event:any)=>void>(),effects:Array<()=>void|(()=>void)>=[],cells:any[]=[];let cursor=0;
+  const react:any={createElement:(type:any,props:any)=>({type,props}),useRef:(initial:any)=>{const i=cursor++;return cells[i]??(cells[i]={current:initial});},useMemo:(fn:any,deps:any[])=>{const i=cursor++;if(!cells[i]||deps.some((d,j)=>d!==cells[i].deps[j]))cells[i]={deps,value:fn()};return cells[i].value;},useEffect:(fn:any)=>effects.push(fn)};
+  const windowMock={location:{origin:'https://owner.example'},addEventListener:(_type:string,fn:any)=>listeners.add(fn),removeEventListener:(_type:string,fn:any)=>listeners.delete(fn)};
+  const module={exports:{} as any},code=transformSync(readFileSync('src/components/website/WebsitePreviewFrame.tsx','utf8'),{loader:'tsx',format:'cjs'}).code;
+  runInNewContext(code,{module,exports:module.exports,require:(id:string)=>id==='react'?react:{matchesVisualMessage,visualTargets},window:windowMock,crypto:{randomUUID:()=>'frame-1'}});
+  const template=mergeSiteWithTemplate(getTemplateById('tmpl-buka-bistro'),content,settings);
+  const frame=module.exports.WebsitePreviewFrame({template,siteId:'site-a',editMode:true,onSelect:(id:any,hint:any)=>selects.push([id,hint]),onOrder:(ids:any)=>orders.push(ids)});
+  frame.props.ref.current={contentWindow:source};effects.forEach(fn=>fn());
+  const identity={siteId:'site-a',templateId:template.id,channel:'frame-1'};
+  const fire=(data:any,patch:any={})=>{for(const receive of listeners)receive({origin:windowMock.location.origin,source,data:{...identity,...data},...patch});};
+  fire({type:'MYSTERYHUB_VISUAL_SELECT',targetId:null,hint:'settings'});
+  fire({type:'MYSTERYHUB_VISUAL_SELECT',targetId:null,hint:'navigate'});
+  assert.deepEqual(selects,[[null,'settings'],[null,undefined]]);
+  fire({type:'MYSTERYHUB_VISUAL_ORDER',targetIds:['content:businessName','content:tagline','settings:accentColor','content:__proto__',{}]});
+  assert.deepEqual(orders,[['content:businessName','content:tagline']]);
+  fire({type:'MYSTERYHUB_VISUAL_ORDER',targetIds:['content:tagline']},{source:{}});
+  fire({type:'MYSTERYHUB_VISUAL_ORDER',targetIds:['content:tagline'],channel:'old-frame'});
+  fire({type:'MYSTERYHUB_VISUAL_ORDER',targetIds:'content:tagline'});
+  assert.equal(orders.length,1);
+});
+test('contextual labels use plain words for owners',()=>{
+  const labels=visualTargets(mergeSiteWithTemplate(getTemplateById('tmpl-buka-bistro'),content,settings)).map(t=>t.label);
+  for(const label of ['Main heading','Short description','Main photo','Main button text','Button link','Logo'])assert.ok(labels.includes(label),label);
+  for(const label of labels)assert.ok(!/hero|destination/i.test(label),label);
+});
