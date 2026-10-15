@@ -6,6 +6,8 @@ import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS } from '../../data/bundles';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { lookupOrderOnServer } from '../../services/apiClient';
+import { clearPendingCheckout, isSettledForRecovery } from '../../utils/checkoutRecovery';
+import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
 import { OrderRecord } from '../../types';
 import { CheckCircle2, Clock, AlertTriangle, ArrowRight, MessageSquare, Copy, Check, RefreshCw, X, ShieldAlert, Phone as PhoneIcon } from 'lucide-react';
@@ -23,11 +25,16 @@ export const OrderStatusModal: React.FC = () => {
   } = useApp();
 
   const [copied, setCopied] = useState(false);
+  // Shown so customers on weak connections know whether the status they see is current.
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [checkFailed, setCheckFailed] = useState(false);
 
   // Authoritative reference: Real backend public order reference takes precedence
   const lookupReference = activeOrder?.publicReference || activeOrder?.id;
 
   // Poll server for status updates if order is pending or in-progress
+  useEffect(() => { setLastChecked(null); setCheckFailed(false); }, [lookupReference]);
+
   useEffect(() => {
     if (!isStatusModalOpen || !lookupReference) return;
 
@@ -38,7 +45,10 @@ export const OrderStatusModal: React.FC = () => {
     const fetchServerStatus = async () => {
       try {
         const res = await lookupOrderOnServer(lookupReference);
+        setCheckFailed(false);
+        setLastChecked(new Date());
         if (res.success && res.order) {
+          if (isSettledForRecovery(res.order.status)) clearPendingCheckout(res.order.public_reference);
           const serverStatus = res.order.status;
 
           // Status mapping:
@@ -87,6 +97,7 @@ export const OrderStatusModal: React.FC = () => {
           }
         }
       } catch (err) {
+        setCheckFailed(true);
         if (import.meta.env.DEV) {
           console.warn('[OrderStatusModal] Polling error for reference:', lookupReference, err);
         }
@@ -196,62 +207,110 @@ export const OrderStatusModal: React.FC = () => {
         ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
         : statusConfig.description);
 
+  const productName = (() => {
+    const isInst =
+      activeOrder.serviceType === 'instant_bundle' ||
+      (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('instant-'));
+    if (isInst) {
+      const info = getInstantBundlePresentation({
+        category: activeOrder.bundle.category,
+        name: activeOrder.bundle.description || activeOrder.bundle.dataAmount,
+        dataAmount: activeOrder.bundle.dataAmount,
+        isFlexi: activeOrder.bundle.isFlexi,
+      });
+      return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${info.formattedAmount} ${info.categoryLabel} ⚡`;
+    }
+    if (isAfa) {
+      return 'MTN AFA Registration';
+    }
+    if (activeOrder.serviceType === 'marketplace' || (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('marketplace-'))) {
+      return activeOrder.bundle.description || activeOrder.bundle.dataAmount || 'Marketplace Item';
+    }
+    if (
+      activeOrder.serviceType === 'airtime' ||
+      (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('airtime-'))
+    ) {
+      return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount}`;
+    }
+    return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount} Data`;
+  })();
+
+  // Data journey steps come only from verified server state; a stopped order marks where it stopped.
+  const stopped = Boolean(activeOrder.manualReview) || ['failed', 'refund_pending', 'refunded', 'cancelled', 'expired'].includes(activeOrder.serverStatus || '') || Boolean(activeOrder.customerResolution && !dataView.delivered);
+  const journey: { label: string; detail: string; complete: boolean }[] = [
+    { label: 'Payment confirmed', detail: dataView.paymentConfirmed ? 'Confirmed by Paystack' : 'Waiting for Paystack to confirm', complete: dataView.paymentConfirmed },
+    { label: 'Processing', detail: dataView.processing || dataView.delivered ? 'Sent to the network' : 'Queued after payment', complete: dataView.delivered },
+    { label: 'Delivered', detail: dataView.delivered ? 'Check the recipient’s balance' : 'Timing depends on the network', complete: dataView.delivered },
+  ];
+  const currentStep = journey.findIndex(step => !step.complete);
+  const tone = activeOrder.status === 'delivered' || dataView.delivered ? 'success' : stopped || activeOrder.status === 'failed' ? 'attention' : 'progress';
+
   return (
-    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Order status and receipt" className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-[calc(100vw-1rem)] sm:max-w-lg bg-[#0f151b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 max-h-[94dvh] flex flex-col">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Order status and receipt" className="mh-sheet-backdrop fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/75 backdrop-blur-sm">
+      <div className="mh-sheet relative w-full max-w-[calc(100vw-1rem)] mx-auto sm:max-w-md bg-[#0f151b] border border-slate-700/70 border-b-0 sm:border-b rounded-t-[1.5rem] sm:rounded-[1.5rem] shadow-2xl overflow-hidden text-slate-100 max-h-[calc(100dvh-0.75rem)] sm:max-h-[92dvh] flex flex-col">
         {/* Header with Close */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#0c1116]">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Order Status & Receipt
-          </span>
+        <div className="relative flex items-center justify-between gap-3 px-4 sm:px-5 pt-3 pb-1 shrink-0">
+          <span aria-hidden="true" className="sm:hidden absolute left-1/2 top-1.5 -translate-x-1/2 h-1 w-10 rounded-full bg-slate-700" />
+          <span className="pt-1 text-xs font-semibold uppercase tracking-wider text-slate-400">Order status</span>
           <button
             onClick={closeOrderStatus}
-            className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            className="w-11 h-11 flex items-center justify-center rounded-full bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
             aria-label="Close status"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="overflow-y-auto p-4 sm:p-6 text-center space-y-4 overscroll-contain">
-          {/* Animated Central Icon */}
-          <div className="flex justify-center">
+        <div className="overflow-y-auto px-4 sm:px-5 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-4 overscroll-contain">
+          {/* Status hero */}
+          <div className="flex items-start gap-3.5 pt-1">
             {activeOrder.status === 'delivered' || isDataOrder && dataView.paymentConfirmed && !activeOrder.manualReview && ['paid','queued'].includes(activeOrder.serverStatus || '') ? (
-              <div className="w-16 h-16 rounded-full bg-[#00c365]/20 border-2 border-[#00c365] flex items-center justify-center text-[#00c365] shadow-[0_0_25px_rgba(0,195,101,0.4)] motion-safe:animate-[checkout-success_240ms_ease-out] motion-reduce:animate-none">
-                <CheckCircle2 className="w-9 h-9" />
+              <div className="w-12 h-12 shrink-0 rounded-full bg-[#00c365]/15 border border-[#00c365]/60 flex items-center justify-center text-[#00c365] motion-safe:animate-[checkout-success_240ms_ease-out] motion-reduce:animate-none">
+                <CheckCircle2 className="w-7 h-7" />
               </div>
             ) : activeOrder.status === 'processing' ? (
-              <div className="w-16 h-16 rounded-full bg-sky-500/20 border-2 border-sky-400 flex items-center justify-center text-sky-400 animate-pulse">
-                <RefreshCw className="w-8 h-8 animate-spin" />
+              <div className="w-12 h-12 shrink-0 rounded-full bg-sky-500/15 border border-sky-400/60 flex items-center justify-center text-sky-300">
+                <RefreshCw className="w-6 h-6 motion-safe:animate-spin [animation-duration:2.4s]" />
               </div>
             ) : activeOrder.status === 'failed' ? (
-              <div className="w-16 h-16 rounded-full bg-rose-500/20 border-2 border-rose-500 flex items-center justify-center text-rose-400">
-                <AlertTriangle className="w-8 h-8" />
+              <div className="w-12 h-12 shrink-0 rounded-full bg-rose-500/15 border border-rose-500/60 flex items-center justify-center text-rose-300">
+                <AlertTriangle className="w-6 h-6" />
               </div>
             ) : (
-              <div className="w-16 h-16 rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-amber-400">
-                <Clock className="w-8 h-8" />
+              <div className="w-12 h-12 shrink-0 rounded-full bg-amber-500/15 border border-amber-400/60 flex items-center justify-center text-amber-300">
+                <Clock className="w-6 h-6" />
               </div>
             )}
-          </div>
-
-          {/* Heading */}
-          <div>
-            <h3 className="text-2xl font-bold text-white tracking-tight">
-              {headingText}
-            </h3>
-            <p className="text-xs text-slate-400 mt-2 max-w-sm mx-auto leading-relaxed">
-              {descriptionText}
-            </p>
+            <div className="min-w-0">
+              <h3 className="text-xl font-bold text-white tracking-tight leading-snug">
+                {headingText}
+              </h3>
+              <p className="text-sm text-slate-300 mt-1 leading-relaxed">
+                {descriptionText}
+              </p>
+            </div>
           </div>
 
           {/* Only verified server states advance the Data journey; no percentage estimates. */}
-          {isDataOrder ? <div className="border-y border-slate-800 py-3 text-left space-y-3" aria-label="Order journey">
-            <p role="status" className="text-sm font-semibold text-white">Current status: {dataView.label}</p>
-            <ol className="grid grid-cols-3 gap-2 text-xs">
-              {[['Payment confirmed',dataView.paymentConfirmed],['Processing',dataView.processing||dataView.delivered],['Delivered',dataView.delivered]].map(([label,complete])=><li key={String(label)} className={complete?'text-[#00c365]':'text-slate-400'}><span aria-hidden="true">{complete?'✓':'○'} </span>{label}<span className="sr-only">{complete?' — confirmed':' — not confirmed'}</span></li>)}
+          {isDataOrder ? <div className="rounded-2xl border border-slate-800 bg-[#0a0f14] p-4 space-y-3" aria-label="Order journey">
+            <p role="status" className="text-sm font-semibold text-white">Current status: <span className={tone === 'success' ? 'text-[#44df95]' : tone === 'attention' ? 'text-rose-300' : 'text-amber-200'}>{dataView.label}</span></p>
+            <ol className="space-y-0">
+              {journey.map((step, index) => {
+                const isCurrent = index === currentStep;
+                const halted = isCurrent && stopped;
+                return <li key={step.label} className="relative flex gap-3 pb-4 last:pb-0">
+                  {index < journey.length - 1 && <span aria-hidden="true" className={`absolute left-[11px] top-6 bottom-0 w-0.5 ${step.complete ? 'bg-[#00c365]/70' : 'bg-slate-800'}`} />}
+                  <span aria-hidden="true" className={`relative z-10 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold ${step.complete ? 'border-[#00c365] bg-[#00c365] text-[#03160c]' : halted ? 'border-rose-400 bg-rose-500/15 text-rose-300' : isCurrent ? 'border-amber-300 bg-amber-400/10 text-amber-200' : 'border-slate-700 bg-[#0a0f14] text-slate-600'}`}>
+                    {step.complete ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : halted ? '!' : isCurrent ? <span className="h-2 w-2 rounded-full bg-amber-300 motion-safe:animate-pulse" /> : ''}
+                  </span>
+                  <div className="min-w-0">
+                    <p className={`text-sm font-semibold ${step.complete ? 'text-white' : isCurrent ? halted ? 'text-rose-200' : 'text-amber-100' : 'text-slate-500'}`}>{step.label}<span className="sr-only">{step.complete?' — confirmed':' — not confirmed'}</span></p>
+                    <p className={`text-xs ${step.complete || isCurrent ? 'text-slate-400' : 'text-slate-600'}`}>{halted ? dataView.label : step.detail}</p>
+                  </div>
+                </li>;
+              })}
             </ol>
-          </div> : <div className="bg-[#090d10] p-4 rounded-xl border border-slate-800 space-y-2">
+          </div> : <div className="bg-[#0a0f14] p-4 rounded-2xl border border-slate-800 space-y-2">
             <div className="flex justify-between text-xs text-slate-400 font-medium">
               <span>Order Received</span>
               <span>{isAfa ? 'Registration Progress' : 'Delivery Progress'}</span>
@@ -265,116 +324,70 @@ export const OrderStatusModal: React.FC = () => {
                     : activeOrder.status === 'delivered'
                     ? 'w-full bg-[#00c365]'
                     : activeOrder.status === 'processing'
-                    ? 'w-2/3 bg-sky-400 animate-pulse'
+                    ? 'w-2/3 bg-sky-400'
                     : 'w-1/3 bg-amber-400'
                 }`}
               />
             </div>
+            <p className="text-xs text-slate-400">{statusConfig.label}</p>
           </div>
 
           }
 
-          {/* Buttons */}
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <button
-              onClick={() => {
-                closeOrderStatus();
-                setActivePage('orders');
-              }}
-              className="mh-button py-3 px-4"
-            >
-              Track Order
-            </button>
-            <button
-              onClick={() => {
-                closeOrderStatus();
-                setActivePage('home');
-              }}
-              className="mh-button-secondary py-3 px-4 flex items-center justify-center gap-1.5"
-            >
-              <span>Back to Home</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          {/* Freshness: customers on weak connections see whether this is live. */}
+          {!(activeOrder.status === 'delivered') && (
+            <p aria-live="polite" className={`flex items-center gap-1.5 text-xs ${checkFailed ? 'text-amber-300' : 'text-slate-500'}`}>
+              {checkFailed ? <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> : <RefreshCw className="w-3.5 h-3.5 shrink-0" />}
+              {checkFailed
+                ? 'Can’t reach Mystery Hub right now. Your order is safe; we’ll keep checking when you’re back online.'
+                : lastChecked
+                ? `Updates automatically · last checked ${lastChecked.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                : 'Checking the latest status…'}
+            </p>
+          )}
 
-          {/* Key Information Grid */}
-          <div className="grid grid-cols-2 gap-3 text-left">
-            <div className="col-span-2 bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
-              <div className="text-xs text-slate-400">Order Reference</div>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="font-mono text-xs sm:text-sm font-semibold text-white break-all min-w-0">
-                  #{displayRef}
-                </span>
+          {/* Receipt */}
+          <div className="rounded-2xl border border-slate-800 bg-[#0a0f14] divide-y divide-slate-800/80 text-sm">
+            <div className="flex items-center gap-3 p-3.5">
+              {!isAfa && activeOrder.serviceType !== 'marketplace' && <NetworkBrandBadge network={activeOrder.network} size="md" />}
+              <div className="min-w-0 flex-1">
+                <div className="text-xs text-slate-400">Product</div>
+                <div className="font-semibold text-white break-words">{productName}</div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-xs text-slate-400">{isDataOrder&&!dataView.paymentConfirmed?'Order Total':'Amount Paid'}</div>
+                <div className="font-bold text-white tabular-nums">GH₵{activeOrder.amountGhc.toFixed(2)}</div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+              <span className="text-slate-400">Recipient Phone</span>
+              <span className="font-semibold text-white tabular-nums">{isDataOrder ? dataRecipientDisplay(activeOrder.recipientPhone, activeOrder.buyerRecipientVisible) : activeOrder.recipientPhone}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 pl-3.5 pr-1 py-1">
+              <span className="text-slate-400 shrink-0">Order Reference</span>
+              <span className="flex items-center min-w-0">
+                <span className="font-mono text-xs sm:text-sm font-semibold text-white break-all text-right">{displayRef}</span>
                 <button
                   onClick={handleCopyOrderId}
                   aria-label="Copy order reference"
                   className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-white shrink-0 cursor-pointer"
                   title="Copy Reference"
                 >
-                  {copied ? <Check className="w-3.5 h-3.5 text-[#00c365]" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? <Check className="w-4 h-4 text-[#00c365]" /> : <Copy className="w-4 h-4" />}
                 </button>
-              </div>
+              </span>
             </div>
-
-            <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
-              <div className="text-xs text-slate-400">Product</div>
-              <div className="font-semibold text-sm text-white break-words mt-0.5">
-                {(() => {
-                  const isInst =
-                    activeOrder.serviceType === 'instant_bundle' ||
-                    (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('instant-'));
-                  if (isInst) {
-                    const info = getInstantBundlePresentation({
-                      category: activeOrder.bundle.category,
-                      name: activeOrder.bundle.description || activeOrder.bundle.dataAmount,
-                      dataAmount: activeOrder.bundle.dataAmount,
-                      isFlexi: activeOrder.bundle.isFlexi,
-                    });
-                    return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${info.formattedAmount} ${info.categoryLabel} ⚡`;
-                  }
-                  if (isAfa) {
-                    return 'MTN AFA Registration';
-                  }
-                  if (activeOrder.serviceType === 'marketplace' || (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('marketplace-'))) {
-                    return activeOrder.bundle.description || activeOrder.bundle.dataAmount || 'Marketplace Item';
-                  }
-                  if (
-                    activeOrder.serviceType === 'airtime' ||
-                    (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('airtime-'))
-                  ) {
-                    return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount}`;
-                  }
-                  return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount} Data`;
-                })()}
-              </div>
-            </div>
-
-            <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
-              <div className="text-xs text-slate-400">Recipient Phone</div>
-              <div className="font-medium text-sm text-white mt-0.5">
-                {isDataOrder ? dataRecipientDisplay(activeOrder.recipientPhone, activeOrder.buyerRecipientVisible) : activeOrder.recipientPhone}
-              </div>
-            </div>
-
-            <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
-              <div className="text-xs text-slate-400">{isDataOrder&&!dataView.paymentConfirmed?'Order Total':'Amount Paid'}</div>
-              <div className="font-bold text-sm text-[#00c365] mt-0.5 tabular-nums">
-                GH₵{activeOrder.amountGhc.toFixed(2)}
-              </div>
-            </div>
-
             {activeOrder.paymentReference && (
-              <details className="col-span-2 bg-[#090d11]/80 px-3.5 py-2.5 rounded-xl border border-slate-800/80 text-left">
-                <summary className="cursor-pointer min-h-11 flex items-center text-sm text-slate-300">View payment details</summary>
-                <div className="min-w-0 pr-2">
-                  <div className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">Payment Details</div>
-                  <div className="font-mono text-[11px] text-slate-400 mt-0.5 truncate" title={`Paystack Reference: ${activeOrder.paymentReference}`}>
+              <details className="px-3.5 text-left">
+                <summary className="cursor-pointer min-h-11 flex items-center text-sm text-slate-400">View payment details</summary>
+                <div className="flex items-center justify-between gap-2 pb-3">
+                  <div className="font-mono text-[11px] text-slate-400 min-w-0 break-all" title={`Paystack Reference: ${activeOrder.paymentReference}`}>
                     {activeOrder.paymentMethod==='wallet'?'Wallet':'Payment'} Ref: {activeOrder.paymentReference}
                   </div>
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-medium shrink-0 border ${isDataOrder&&!dataView.paymentConfirmed?'text-amber-300 bg-amber-500/10 border-amber-500/20':'text-emerald-400/90 bg-emerald-500/10 border-emerald-500/20'}`}>
+                    {isDataOrder ? dataView.paymentConfirmed?'Confirmed':'Awaiting confirmation' : 'Verified'}
+                  </span>
                 </div>
-                <span className={`max-w-[45%] text-right text-[10px] px-2 py-0.5 rounded font-medium shrink-0 border ${isDataOrder&&!dataView.paymentConfirmed?'text-amber-300 bg-amber-500/10 border-amber-500/20':'text-emerald-400/90 bg-emerald-500/10 border-emerald-500/20'}`}>
-                  {isDataOrder ? dataView.paymentConfirmed?'Confirmed':'Awaiting confirmation' : 'Verified'}
-                </span>
               </details>
             )}
           </div>
@@ -422,6 +435,39 @@ export const OrderStatusModal: React.FC = () => {
             </div>
           )}
 
+          {/* Buttons */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              onClick={() => {
+                closeOrderStatus();
+                setActivePage('orders');
+              }}
+              className="mh-button-secondary"
+            >
+              All orders
+            </button>
+            <button
+              onClick={() => {
+                closeOrderStatus();
+                setActivePage(isAfa ? 'home' : 'data');
+              }}
+              className="mh-button"
+            >
+              <span>{isAfa ? 'Back to Home' : tone === 'success' ? 'Buy again' : 'Done'}</span>
+            </button>
+          </div>
+
+          {/* WhatsApp Support Assistance */}
+          <a
+            href={BUSINESS_CONFIG.getOrderSupportWhatsAppUrl(displayRef, activeOrder.recipientPhone)}
+            target="_blank"
+            rel="noreferrer"
+            className={`flex items-center justify-center gap-2 min-h-11 rounded-xl text-sm transition-colors ${tone === 'attention' ? 'border border-[#00c365]/40 text-white bg-[#00c365]/10 hover:bg-[#00c365]/15' : 'text-slate-400 hover:text-white'}`}
+          >
+            <MessageSquare className="w-4 h-4 text-[#00c365]" />
+            <span>{tone === 'attention' ? 'Get help on WhatsApp with this reference' : 'Need help with this order? Contact us on WhatsApp'}</span>
+          </a>
+
           {/* Development Status Simulator (only visible in dev mode) */}
           {import.meta.env.DEV && (
             <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
@@ -468,35 +514,22 @@ export const OrderStatusModal: React.FC = () => {
 
           {/* Guest Account Conversion Banner */}
           {!user && (
-            <div className="p-3.5 rounded-xl bg-[#121c24] border border-[#00c365]/30 flex items-center justify-between gap-3 text-xs">
-              <div className="space-y-0.5">
-                <p className="font-semibold text-white">Want your orders available across devices?</p>
-                <p className="text-slate-400 text-[11px]">Create a free Mystery Hub account to link and track all purchases.</p>
+            <div className="p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between gap-3 text-xs">
+              <div className="space-y-0.5 min-w-0">
+                <p className="font-semibold text-slate-200">Keep your orders across devices</p>
+                <p className="text-slate-400 text-[11px]">A free Mystery Hub account links and tracks every purchase.</p>
               </div>
               <button
                 onClick={() => {
                   closeOrderStatus();
                   openAuth('signup');
                 }}
-                className="px-3 py-1.5 rounded-lg bg-[#00c365] hover:bg-[#00e575] text-black font-bold shrink-0 transition-colors cursor-pointer"
+                className="min-h-11 px-3 rounded-xl border border-[#00c365]/40 text-[#44df95] hover:bg-[#00c365]/10 font-semibold shrink-0 transition-colors cursor-pointer"
               >
                 Create Account
               </button>
             </div>
           )}
-
-          {/* WhatsApp Support Assistance */}
-          <div className="pt-2">
-            <a
-              href={BUSINESS_CONFIG.getOrderSupportWhatsAppUrl(displayRef, activeOrder.recipientPhone)}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors"
-            >
-              <MessageSquare className="w-4 h-4 text-[#00c365]" />
-              <span>Need help with this order? Contact us on WhatsApp</span>
-            </a>
-          </div>
         </div>
       </div>
     </div>

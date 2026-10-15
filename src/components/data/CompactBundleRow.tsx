@@ -38,7 +38,7 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
       onClick={() => onBuy(bundle)}
       onKeyDown={handleKeyDown}
       aria-label={`Buy ${bundle.dataAmount} ${network.name} data${welcomePrice ? '. '+welcomePrice.description : ` for GH₵${bundle.priceGhc.toFixed(2)}`}`}
-      className="group relative rounded-xl border border-slate-800/90 hover:border-[#00c365]/60 bg-[#0e141a] hover:bg-[#111922] transition-all duration-150 p-3 sm:p-3.5 flex items-center justify-between gap-2.5 sm:gap-3 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] active:scale-[0.99]"
+      className="group relative rounded-2xl border border-slate-800/90 hover:border-[#00c365]/50 bg-[#0e141a] hover:bg-[#111922] transition-colors duration-150 p-3 sm:p-3.5 flex items-center justify-between gap-2.5 sm:gap-3 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] active:bg-[#131d26]"
     >
       {/* Left: Network logo & Data Details */}
       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
@@ -47,7 +47,7 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
         <div className="min-w-0 flex-1">
           {/* Top Line: Size + Single Dominant Badge */}
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            <span className="font-extrabold text-base sm:text-lg text-white tracking-tight group-hover:text-[#00c365] transition-colors shrink-0">
+            <span className="font-extrabold text-lg text-white tracking-tight shrink-0">
               {bundle.dataAmount}
             </span>
 
@@ -74,7 +74,6 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
       {/* Right: Price & Visual Buy Indicator (Not a nested button) */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {welcomePrice ? <WelcomeBundlePrice price={welcomePrice} /> : <div className="text-right">
-          <div className="text-[10px] text-slate-400 font-medium hidden xs:block">Price</div>
           <div className="text-base min-[360px]:text-lg sm:text-xl font-extrabold text-white tabular-nums tracking-tight">
             GH₵{bundle.priceGhc.toFixed(2)}
           </div>
@@ -82,10 +81,10 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
 
         <span
           aria-hidden="true"
-          className="min-h-11 px-2 min-[360px]:px-3 sm:px-4 rounded-xl bg-[#00c365] group-hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1 shrink-0"
+          className="min-h-11 px-2.5 min-[360px]:px-3.5 rounded-xl border border-[#00c365]/40 bg-[#00c365]/10 text-[#44df95] group-hover:bg-[#00c365] group-hover:border-[#00c365] group-hover:text-[#03160c] group-focus-visible:bg-[#00c365] group-focus-visible:text-[#03160c] font-bold text-sm transition-colors flex items-center justify-center gap-1 shrink-0"
         >
           <span>Buy</span>
-          <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+          <ArrowRight className="w-3.5 h-3.5" />
         </span>
       </div>
     </div>

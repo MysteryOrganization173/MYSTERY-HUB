@@ -6,8 +6,8 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DATA_BUNDLES, GHANA_NETWORKS, detectGhanaNetwork } from '../../data/bundles';
 import { NetworkId, DataBundle } from '../../types';
-import { BundleCard } from './BundleCard';
 import { CompactBundleRow } from './CompactBundleRow';
+import { PendingPaymentBanner } from '../checkout/PendingPaymentBanner';
 import { InstantBundlesCatalog } from './InstantBundlesCatalog';
 import { smoothScrollToElement } from '../../utils/scroll';
 import { serviceNotices } from '../../config/serviceNotices';
@@ -20,8 +20,7 @@ import {
   Clock,
   HelpCircle,
   ArrowRight,
-  LayoutGrid,
-  List,
+  X,
   AlertCircle,
   Info,
   ChevronDown,
@@ -49,27 +48,8 @@ export const DataPage: React.FC = () => {
 
   const [sizeFilter, setSizeFilter] = useState<'all' | 'small' | 'medium' | 'large'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [quickBuyPhone, setQuickBuyPhone] = useState('');
-
-  // View mode: 'cards' or 'compact'
-  // Mobile defaults to compact view, desktop defaults to card view. Stored in localStorage.
-  const [viewMode, setViewMode] = useState<'cards' | 'compact'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('mysteryhub_bundle_view_mode');
-      if (saved === 'cards' || saved === 'compact') return saved;
-      return window.innerWidth < 768 ? 'compact' : 'cards';
-    }
-    return 'compact';
-  });
-
-  const handleSetViewMode = (mode: 'cards' | 'compact') => {
-    setViewMode(mode);
-    try {
-      localStorage.setItem('mysteryhub_bundle_view_mode', mode);
-    } catch {
-      // Ignore localStorage write failures in private/restricted browsing
-    }
-  };
 
   // Scroll target refs
   const bundlesSectionRef = useRef<HTMLDivElement>(null);
@@ -359,20 +339,18 @@ export const DataPage: React.FC = () => {
     <div className="py-4 sm:py-8 text-slate-100">
       {dataProductMode==='data'&&<WelcomeOfferNotice offer={welcomeOffer}/>}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
-        <header className="rounded-2xl border border-slate-800 bg-gradient-to-br from-[#101f19] to-[#0b1117] px-4 py-4 sm:px-6 sm:py-5">
-          <p className="text-xs font-semibold text-[#44df95] mb-1">Data & Airtime</p>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Stay connected.</h1>
-          <p className="text-sm text-slate-300 mt-1 max-w-xl">Choose your network and bundle. Check the recipient and total before paying.</p>
-        </header>
+        <PendingPaymentBanner />
 
-        {/* Network Selection Banner */}
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-              Choose a service
-            </h2>
-            {/* 4 Product Mode Navigation Tabs / Discovery Shortcuts */}
-            <div role="group" aria-label="Choose a service" className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 max-w-full sm:flex-wrap">
+        <header className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold text-[#44df95] mb-1">Data & Airtime</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Stay connected.</h1>
+            <p className="text-sm text-slate-400 mt-1 max-w-xl">Pick a bundle, enter the number and pay with Mobile Money. You check the total before paying.</p>
+          </div>
+
+          {/* 4 Product Mode Navigation Tabs / Discovery Shortcuts */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div role="group" aria-label="Choose a service" className="inline-flex shrink-0 rounded-2xl bg-[#0c1217] border border-slate-800 p-1 gap-1">
               <button
                 type="button"
                 aria-label="Data Bundles"
@@ -383,13 +361,11 @@ export const DataPage: React.FC = () => {
                     smoothScrollToElement(bundlesSectionRef.current, { block: 'start' });
                   }, 50);
                 }}
-                className={`min-h-11 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
-                  dataProductMode === 'data'
-                    ? 'bg-[#00c365] text-black shadow-md'
-                    : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'
+                className={`min-h-11 px-4 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                  dataProductMode === 'data' ? 'bg-[#00c365] text-[#03160c]' : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <span className="sm:hidden">Data</span><span className="hidden sm:inline">Data Bundles</span>
+                Data<span className="hidden sm:inline"> Bundles</span>
               </button>
               <button
                 type="button"
@@ -401,43 +377,39 @@ export const DataPage: React.FC = () => {
                     smoothScrollToElement(bundlesSectionRef.current, { block: 'start' });
                   }, 50);
                 }}
-                className={`min-h-11 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1 shrink-0 ${
-                  dataProductMode === 'instant'
-                    ? 'bg-amber-400 text-black shadow-md'
-                    : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'
+                className={`min-h-11 px-4 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer inline-flex items-center gap-1.5 ${
+                  dataProductMode === 'instant' ? 'bg-amber-400 text-black' : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <Zap className="w-3.5 h-3.5 fill-current" />
-                <span>Instant<span className="hidden sm:inline"> Bundles</span></span>
+                <Zap className={`w-3.5 h-3.5 ${dataProductMode === 'instant' ? 'fill-current' : 'text-amber-400'}`} />
+                Instant
               </button>
               <button
                 type="button"
                 aria-pressed={dataProductMode === 'airtime'}
                 onClick={handleSelectAirtime}
-                className={`min-h-11 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
-                  dataProductMode === 'airtime'
-                    ? 'bg-[#00c365] text-black shadow-md'
-                    : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'
+                className={`min-h-11 px-4 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                  dataProductMode === 'airtime' ? 'bg-[#00c365] text-[#03160c]' : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
                 Airtime
               </button>
-              <button
-                type="button"
-                aria-label="AFA Registration"
-                onClick={() => setActivePage('afa')}
-                className="min-h-11 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 flex items-center gap-1 border border-slate-700/60 hover:border-[#00c365]/40"
-                title="Register your MTN number for eligible AFA offers"
-              >
-                <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-                <span>AFA<span className="hidden sm:inline"> Registration</span></span>
-              </button>
             </div>
+            <button
+              type="button"
+              aria-label="AFA Registration"
+              onClick={() => setActivePage('afa')}
+              className="min-h-11 px-3.5 rounded-xl text-sm font-semibold whitespace-nowrap cursor-pointer shrink-0 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-600 inline-flex items-center gap-1.5"
+              title="Register your MTN number for eligible AFA offers"
+            >
+              <Smartphone className="w-4 h-4 text-emerald-400" />
+              <span>AFA<span className="hidden sm:inline"> Registration</span></span>
+            </button>
           </div>
 
           {/* One network selector, backed by the existing AppContext state. */}
           {dataProductMode === 'data' && <DataNetworkSelector value={activeNetwork} onChange={setActiveNetwork} />}
-        </div>
+        </header>
 
         {/* Dynamic Mode: Instant Bundles vs Airtime vs Standard Data */}
         {dataProductMode === 'instant' ? (
@@ -664,142 +636,102 @@ export const DataPage: React.FC = () => {
           </form>
         ) : (
           /* Data Bundles View */
-          <div ref={bundlesSectionRef} className="space-y-5" id="data-bundles-section">
-            {/* Filter Bar & View Mode Toggle */}
-            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3 rounded-2xl bg-[#0e141a] border border-slate-800">
-              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-                {/* Size Tier Filter Buttons */}
-                <div className="flex items-center gap-1 overflow-x-auto scrollbar-none min-w-0 max-w-full">
-                  <button
-                    type="button"
-                    onClick={() => setSizeFilter('all')}
-                    className={`min-h-11 px-2.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                      sizeFilter === 'all'
-                        ? 'bg-[#00c365] text-black shadow-sm font-bold'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    All Sizes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSizeFilter('small')}
-                    className={`min-h-11 px-2.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                      sizeFilter === 'small'
-                        ? 'bg-[#00c365] text-black shadow-sm font-bold'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    1GB – 5GB
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSizeFilter('medium')}
-                    className={`min-h-11 px-2.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                      sizeFilter === 'medium'
-                        ? 'bg-[#00c365] text-black shadow-sm font-bold'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    6GB – 20GB
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSizeFilter('large')}
-                    className={`min-h-11 px-2.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                      sizeFilter === 'large'
-                        ? 'bg-[#00c365] text-black shadow-sm font-bold'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    25GB+
-                  </button>
-                </div>
-              </div>
-
-              {/* Search Bar & View Mode Switcher */}
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1 sm:w-48 min-w-[150px]">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div ref={bundlesSectionRef} className="space-y-4 scroll-mt-24" id="data-bundles-section">
+            {/* Filter Bar: size chips, with search one tap away */}
+            <div className="flex items-center gap-2">
+              {searchOpen ? (
+                <div className="relative flex-1 min-w-0">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
-                    type="text"
+                    type="search"
                     value={searchQuery}
+                    autoFocus
                     onChange={(e) => setSearchQuery(e.target.value)}
                     aria-label="Search data bundles by size, price or network"
-                    placeholder="Search size..."
-                    className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl pl-8 pr-3 min-h-11 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
+                    placeholder="Search size or price, e.g. 10GB"
+                    className="w-full bg-[#0c1217] border border-slate-700 rounded-xl pl-10 pr-3 min-h-11 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
                   />
                 </div>
-
-                {/* View Mode Toggle: Cards vs Compact */}
-                <div className="flex items-center bg-[#090d10] p-1 rounded-xl border border-slate-800 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => handleSetViewMode('compact')}
-                    aria-pressed={viewMode==='compact'}
-                    aria-label="Compact bundle view"
-                    title="Compact View (fast browsing)"
-                    className={`min-w-11 min-h-11 p-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1 ${
-                      viewMode === 'compact'
-                        ? 'bg-[#00c365] text-black font-bold shadow-sm'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <List className="w-4 h-4" />
-                    <span className="hidden md:inline text-[11px]">Compact</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSetViewMode('cards')}
-                    aria-pressed={viewMode==='cards'}
-                    aria-label="Bundle card view"
-                    title="Card View (detailed cards)"
-                    className={`min-w-11 min-h-11 p-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1 ${
-                      viewMode === 'cards'
-                        ? 'bg-[#00c365] text-black font-bold shadow-sm'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <LayoutGrid className="w-4 h-4" />
-                    <span className="hidden md:inline text-[11px]">Cards</span>
-                  </button>
+              ) : (
+                <div role="group" aria-label="Filter by bundle size" className="flex items-center gap-1.5 overflow-x-auto no-scrollbar min-w-0 flex-1 -ml-4 pl-4 sm:ml-0 sm:pl-0">
+                  {([
+                    ['all', 'All sizes'],
+                    ['small', '1GB – 5GB'],
+                    ['medium', '6GB – 20GB'],
+                    ['large', '25GB+'],
+                  ] as const).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={sizeFilter === id}
+                      onClick={() => setSizeFilter(id)}
+                      className={`min-h-10 px-3.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer shrink-0 border ${
+                        sizeFilter === id
+                          ? 'bg-white text-[#0b1015] border-white'
+                          : 'border-slate-700/80 text-slate-300 hover:text-white hover:border-slate-500'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
-              </div>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (searchOpen) setSearchQuery('');
+                  setSearchOpen(!searchOpen);
+                }}
+                aria-label={searchOpen ? 'Close search' : 'Search bundles'}
+                aria-expanded={searchOpen}
+                className="min-w-11 min-h-11 shrink-0 flex items-center justify-center rounded-xl border border-slate-700/80 text-slate-300 hover:text-white hover:border-slate-500 cursor-pointer"
+              >
+                {searchOpen ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+              </button>
             </div>
 
-            {/* Bundles Content: Compact View vs Card View */}
+            {/* MTN Network Service Notice (Tasteful, Customer-Friendly, Config-Driven) */}
+            {mtnNotice.enabled && (activeNetwork === 'mtn' || activeNetwork === 'all') && (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3.5 text-xs text-slate-300">
+                <details>
+                  <summary className="cursor-pointer min-h-11 flex flex-wrap items-center gap-x-2 py-2 list-none [&::-webkit-details-marker]:hidden">
+                    <Clock className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                    <strong className="text-amber-100 font-semibold">MTN delivery</strong>
+                    <span>Most orders arrive within 15–45 minutes.</span>
+                    <span className="text-amber-300 underline underline-offset-2">Details</span>
+                  </summary>
+                  <div className="space-y-2 pb-3 text-slate-300 leading-relaxed"><p>{mtnNotice.message}</p><p>{mtnNotice.duplicatePolicyNote}</p><p>{mtnNotice.trackingNote}</p></div>
+                </details>
+              </div>
+            )}
+
+            {/* AirtelTigo Instant Delivery Highlight Notice */}
+            {atNotice.enabled && activeNetwork === 'airteltigo' && (
+              <p className="rounded-xl border border-sky-500/20 bg-sky-500/[0.06] px-3.5 py-2.5 text-xs text-sky-100/90 leading-relaxed">
+                <strong className="text-white font-semibold">{atNotice.title}</strong> · {atNotice.message}
+              </p>
+            )}
+
+            {/* Bundles: one list; the whole row opens checkout */}
             {filteredBundles.length > 0 ? (
               <>
-                {viewMode === 'compact' ? (
-                  /* Compact View - Whole row is actionable, no separate selection */
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                    {filteredBundles.map((bundle) => (
-                      <CompactBundleRow
-                        key={bundle.id}
-                        bundle={bundle}
-                        directWelcomeOffer={welcomeOffer}
-                        onBuy={(b) => openCheckout(b)}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  /* Card View - Quick buy with shared recipient number input */
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 sm:gap-4">
-                    {filteredBundles.map((bundle) => (
-                      <BundleCard
-                        key={bundle.id}
-                        bundle={bundle}
-                        directWelcomeOffer={welcomeOffer}
-                        recipientPhone={quickBuyPhone}
-                        onPhoneChange={setQuickBuyPhone}
-                        onBuy={(b, opts) => openCheckout(b, opts)}
-                      />
-                    ))}
-                  </div>
-                )}
+                <p className="text-xs text-slate-500" aria-live="polite">
+                  {filteredBundles.length} {filteredBundles.length === 1 ? 'bundle' : 'bundles'}
+                  {activeNetwork !== 'all' ? ` · ${GHANA_NETWORKS[activeNetwork].name}` : ' · all networks'}
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
+                  {filteredBundles.map((bundle) => (
+                    <CompactBundleRow
+                      key={bundle.id}
+                      bundle={bundle}
+                      directWelcomeOffer={welcomeOffer}
+                      onBuy={(b) => openCheckout(b)}
+                    />
+                  ))}
+                </div>
 
                 {/* Elevated Section-Level Trust Signal (replaces repeated copy inside every card) */}
-                <div className="flex items-center justify-center gap-2 pt-3 pb-1 text-xs text-slate-400 text-center">
+                <div className="flex items-center justify-center gap-2 pt-2 pb-1 text-xs text-slate-400 text-center">
                   <ShieldCheck className="w-4 h-4 text-[#00c365] shrink-0" />
                   <span>
                     Track delivery in Orders · Payments handled by Paystack
@@ -807,11 +739,11 @@ export const DataPage: React.FC = () => {
                 </div>
               </>
             ) : (
-              <div className="text-center py-16 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-3">
-                <HelpCircle className="w-10 h-10 text-slate-500 mx-auto" />
-                <h3 className="font-bold text-white text-base">No bundles match your filter</h3>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  Try clearing your search query or selecting All Packages.
+              <div className="text-center py-14 px-4 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-3">
+                <Search className="w-8 h-8 text-slate-500 mx-auto" />
+                <h3 className="font-bold text-white text-base">No bundles match</h3>
+                <p className="text-sm text-slate-400 max-w-sm mx-auto">
+                  Try another size or clear your search to see every bundle.
                 </p>
                 <button
                   type="button"
@@ -819,45 +751,14 @@ export const DataPage: React.FC = () => {
                     setActiveNetwork('all');
                     setSizeFilter('all');
                     setSearchQuery('');
+                    setSearchOpen(false);
                   }}
-                  className="min-h-11 px-4 py-2 rounded-lg bg-[#00c365] text-black font-semibold text-xs cursor-pointer"
+                  className="mh-button"
                 >
-                  Reset Filters
+                  Show all bundles
                 </button>
               </div>
             )}
-            {/* MTN Network Service Notice (Tasteful, Customer-Friendly, Config-Driven) */}
-            {mtnNotice.enabled && (activeNetwork === 'mtn' || activeNetwork === 'all') && (
-              <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 px-3 py-2 text-xs text-slate-200">
-                <div className="flex flex-wrap items-center gap-x-2"><strong className="text-amber-200">MTN delivery</strong><span>Most orders arrive within 15–45 minutes.</span></div>
-                <details><summary className="cursor-pointer min-h-11 flex items-center text-amber-300">Details</summary><div className="space-y-2 pb-2 text-slate-300"><p>{mtnNotice.message}</p><p>{mtnNotice.duplicatePolicyNote}</p><p>{mtnNotice.trackingNote}</p></div></details>
-              </div>
-            )}
-
-            {/* AirtelTigo Instant Delivery Highlight Notice */}
-            {atNotice.enabled && activeNetwork === 'airteltigo' && (
-              <div className="p-4 sm:p-5 rounded-2xl bg-[#004B93]/20 border border-[#004B93]/40 text-slate-200 space-y-2 animate-in fade-in duration-200">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-xl bg-amber-400/20 text-amber-400 shrink-0 mt-0.5">
-                    <Zap className="w-4 h-4" />
-                  </div>
-                  <div className="space-y-1 text-left min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-semibold text-sm text-white">
-                        {atNotice.title}
-                      </h4>
-                      <span className="text-[11px] font-bold text-amber-400 bg-amber-400/15 border border-amber-400/30 px-2 py-0.5 rounded-full">
-                        {atNotice.summary}
-                      </span>
-                    </div>
-                    <p className="text-xs text-sky-100/90 leading-relaxed">
-                      {atNotice.message}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
           </div>
         )}
 
