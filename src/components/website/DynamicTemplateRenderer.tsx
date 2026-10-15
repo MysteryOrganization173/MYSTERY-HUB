@@ -299,7 +299,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                 className="relative p-3.5 sm:p-4 rounded-2xl border shadow-sm flex gap-3.5 items-start transition-shadow hover:shadow-md"
                 style={{ backgroundColor: p.surface, borderColor: p.border }}
               >
-                <ExampleTag item={item} corner="left"/>
+                <ExampleTag item={item} corner="left" flow={!item.image}/>
                 {item.image && (
                   <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden shrink-0 bg-slate-100">
                     <SafeImage src={item.image} alt={item.name} className="w-full h-full object-cover" />
@@ -607,7 +607,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                 className="relative rounded-xl border overflow-hidden shadow-lg flex flex-col justify-between"
                 style={{ backgroundColor: p.surface, borderColor: p.border }}
               >
-                <ExampleTag item={item} corner="left"/>
+                <ExampleTag item={item} corner="left" flow={!item.image}/>
                 <div>
                   {item.image && (
                     <div className="h-40 overflow-hidden relative bg-slate-900">
@@ -845,7 +845,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
               className="relative rounded-2xl border shadow-sm overflow-hidden flex flex-col justify-between transition-all hover:shadow-lg"
               style={{ backgroundColor: p.surface, borderColor: p.border }}
             >
-              <ExampleTag item={item} corner="left"/>
+              <ExampleTag item={item} corner="left" flow={!item.image}/>
               <div>
                 {item.image && (
                   <div className="h-44 sm:h-48 overflow-hidden relative bg-slate-950/20">

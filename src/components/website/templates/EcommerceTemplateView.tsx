@@ -196,7 +196,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
               key={p.id}
               className="relative bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between group"
             >
-              <ExampleTag item={p} corner="right"/>
+              <ExampleTag item={p} corner="right" flow={!p.image}/>
               <div>
                 {p.image && (
                   <div className="h-48 overflow-hidden relative bg-slate-50 p-4 flex items-center justify-center">

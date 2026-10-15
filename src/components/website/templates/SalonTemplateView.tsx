@@ -147,7 +147,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
               key={item.id}
               className="relative bg-white rounded-2xl border border-[#fae3ec] overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between"
             >
-              <ExampleTag item={item} corner="left"/>
+              <ExampleTag item={item} corner="left" flow={!item.image}/>
               <div>
                 {item.image && (
                   <div className="h-44 overflow-hidden relative">

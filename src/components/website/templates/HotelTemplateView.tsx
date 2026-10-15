@@ -198,7 +198,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
               key={suite.id}
               className="relative bg-white rounded-3xl border border-[#e8e5dc] overflow-hidden shadow-sm hover:shadow-lg transition-shadow flex flex-col justify-between"
             >
-              <ExampleTag item={suite} corner="left"/>
+              <ExampleTag item={suite} corner="left" flow={!suite.image}/>
               <div>
                 {suite.image && (
                   <div className="h-56 overflow-hidden relative">

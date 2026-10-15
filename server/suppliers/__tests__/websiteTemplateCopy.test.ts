@@ -39,7 +39,7 @@ test('a tapped design label saves only the owner override, and emptying it resto
 test('template wording is a finite validated map that reaches the public snapshot',()=>{
   validateWebsiteContentPatch({copy:{'salon.itemsHeading':'Our menu'}});
   for(const copy of [{'salon.unknown':'x'},{'nope.itemsHeading':'x'},{'__proto__.constructor':'x'},{'salon.itemsHeading.extra':'x'},{'salon.itemsHeading':'x'.repeat(TEMPLATE_COPY.salon.itemsHeading.max+1)},{'salon.itemsHeading':'<script>'}])
-    assert.throws(()=>validateWebsiteContentPatch({copy}),undefined,JSON.stringify(copy));
+    assert.throws(()=>validateWebsiteContentPatch({copy}),Error,JSON.stringify(copy));
   assert.deepEqual(publicWebsiteContent({...base,copy:{'salon.itemsHeading':'Our menu'}}).copy,{'salon.itemsHeading':'Our menu'});
 });
 test('with a WhatsApp number the enquiry form writes a WhatsApp message and never submits',()=>{

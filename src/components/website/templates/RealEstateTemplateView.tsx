@@ -206,7 +206,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
               key={prop.id}
               className="relative bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
             >
-              <ExampleTag item={prop} corner="right"/>
+              <ExampleTag item={prop} corner="right" flow={!prop.image}/>
               <div>
                 {prop.image && (
                   <div className="h-48 overflow-hidden relative bg-slate-100">

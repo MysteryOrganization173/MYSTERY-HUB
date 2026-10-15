@@ -187,7 +187,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
               key={p.id}
               className="relative bg-[#101822] rounded-xl border border-slate-800 overflow-hidden shadow-lg hover:border-[var(--website-accent,#f97316)]/50 transition-colors flex flex-col justify-between group"
             >
-              <ExampleTag item={p} corner="left"/>
+              <ExampleTag item={p} corner="left" flow={!p.image}/>
               <div>
                 {p.image && (
                   <div className="h-44 overflow-hidden relative bg-slate-900">
@@ -228,6 +228,8 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
       </div>
 
       {/* Core Engineering Capabilities Grid */}
+      {/* Owners see this band once they list capabilities; an empty heading would read as unfinished. */}
+      {(!template.siteContent || !!template.features?.length) && <>
       <div id="capabilities" className="py-14 px-4 sm:px-12 bg-[#080d13] border-y border-slate-800">
         <div className="max-w-6xl mx-auto space-y-8">
           <div className="text-center max-w-xl mx-auto space-y-1">
@@ -273,6 +275,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
           </div>
         </div>
       </div>
+      </>}
 
       {/* Instant Project Consultation & Tender Cost Estimator */}
       <div id="quote" className="py-16 px-4 sm:px-12 max-w-4xl mx-auto">

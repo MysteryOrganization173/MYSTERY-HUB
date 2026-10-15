@@ -165,7 +165,7 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
               key={work.id}
               className="group relative bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 hover:border-zinc-600 transition-all"
             >
-              <ExampleTag item={work} corner="left"/>
+              <ExampleTag item={work} corner="left" flow={!work.image}/>
               {work.image && (
                 <div className="h-72 overflow-hidden bg-zinc-950">
                   <SafeImage

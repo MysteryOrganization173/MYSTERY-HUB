@@ -63,8 +63,8 @@ export function WebsitePublishSheet({content, published, publishedAt, publicUrl,
         </li>
         {suggestions.length > 0 && <li data-state="info">
           <span className="website-check-icon" aria-hidden="true"><PenLine size={15}/></span>
-          <div><strong>Make it sound like you <span className="font-normal text-slate-400">· optional</span></strong>
-            <p>Still from the design: {suggestions.map(s => s.label).join(', ')}. Fine to publish if they fit your business.</p></div>
+          <div><strong>Make it sound like you</strong>
+            <p>Optional. Still from the design: {suggestions.map(s => s.label).join(', ')}. Fine to publish if they fit your business.</p></div>
           <button type="button" onClick={() => onEditField(suggestions[0].target)}>Review</button>
         </li>}
         {!managed && <li data-state={examples.length ? 'todo' : 'ok'} className="website-check-examples">
