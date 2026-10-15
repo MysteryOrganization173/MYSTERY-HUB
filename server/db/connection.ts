@@ -7,6 +7,7 @@ import { FINANCE_SCHEMA } from './financeSchema.js';
 import { AFA_SCHEMA } from './afaSchema.js';
 import { MARKETPLACE_FLEXIBILITY_SCHEMA } from './marketplaceFlexibilitySchema.js';
 import { ULTRA_ENQUIRY_SCHEMA } from './websiteUltraSchema.js';
+import { MARKETPLACE_ASSET_SCHEMA } from './marketplaceAssetSchema.js';
 /**
  * Shared PostgreSQL Connection Pool & Initialization
  * Ensures Orders, Auth, Waitlist, and Admin use ONE single database connection pool.
@@ -373,6 +374,7 @@ export async function initDatabase(): Promise<void> {
     baseTables.push({ name: 'website_publishing_snapshots', sql: WEBSITE_PUBLISHING_SCHEMA });
     baseTables.push({ name: 'website_free_media_analytics', sql: WEBSITE_FREE_SCHEMA });
     baseTables.push({ name: 'website_ultra_enquiries', sql: ULTRA_ENQUIRY_SCHEMA });
+    baseTables.push({ name: 'marketplace_assets', sql: MARKETPLACE_ASSET_SCHEMA });
     for (const table of baseTables) {
       try {
         await client.query(table.sql);
