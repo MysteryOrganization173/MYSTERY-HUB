@@ -1,5 +1,6 @@
 import {useDialogFocus} from '../../hooks/useDialogFocus';
 import {useVisualViewport} from '../../hooks/useVisualViewport';
+import { estimateInstantCheckoutFeeGhc } from '../../utils/instantFee';
 import {commercialRequest} from '../../services/commercialApi';
 import { WalletPaymentChoice } from '../finance/WalletPaymentChoice';
 import { dataValidityLabel } from '../../utils/dataPurchasePresentation';
@@ -176,7 +177,7 @@ export const CheckoutModal: React.FC = () => {
     (isAirtime
       ? 0
       : isInstantBundle
-      ? Number((Math.ceil((Math.round(faceValue * 100) + 10) / 0.98) / 100 - faceValue).toFixed(2))
+      ? estimateInstantCheckoutFeeGhc(faceValue)
       : 0);
   const totalAmount =
     isAirtime || isInstantBundle
@@ -819,7 +820,7 @@ export const CheckoutModal: React.FC = () => {
               <div className="flex justify-between gap-3"><dt className="text-slate-400">Recipient</dt><dd className="font-semibold text-white tabular-nums text-right min-w-0 break-all">{phoneComplete ? phone : <span className="font-normal text-slate-500">Not entered yet</span>}</dd></div>
               {isInstantBundle || isAirtime ? <>
                 <div className="flex justify-between gap-3"><dt className="text-slate-400">{isAirtime ? 'Airtime value' : 'Bundle Price'}</dt><dd className="text-white tabular-nums">GH₵{faceValue.toFixed(2)}</dd></div>
-                <div className="flex justify-between gap-3"><dt className="text-slate-400">{isAirtime ? 'Service Fee (0%)' : 'Checkout fee'}</dt><dd className="text-slate-300 tabular-nums">GH₵{serviceFee.toFixed(2)}</dd></div>
+                <div className="flex justify-between gap-3"><dt className="text-slate-400">{isAirtime ? 'Service Fee (0%)' : checkoutBundle.isFlexi ? 'Checkout fee (estimate)' : 'Checkout fee'}</dt><dd className="text-slate-300 tabular-nums">GH₵{serviceFee.toFixed(2)}</dd></div>
               </> : <>
                 {commercial?.discountMinor>0&&<><div className="flex justify-between gap-3"><dt className="text-slate-400">Regular price</dt><dd className="tabular-nums text-slate-300">GH₵{(commercial.regularMinor/100).toFixed(2)}</dd></div><div className="flex justify-between gap-3 text-emerald-400"><dt>Welcome Offer</dt><dd className="tabular-nums">−GH₵{(commercial.discountMinor/100).toFixed(2)}</dd></div></>}
               </>}

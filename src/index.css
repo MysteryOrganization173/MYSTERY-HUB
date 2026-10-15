@@ -130,3 +130,18 @@
   html { scroll-padding-top: 5rem; scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px)); }
   .mh-app > main :is(button, a, input, select, textarea) { scroll-margin-block: 5rem; }
 }
+
+/* Purchase actions: press feedback that shows the tap registered, without flashy motion. */
+.mh-press { -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: transform 140ms cubic-bezier(.2,.8,.2,1), background-color 150ms, border-color 150ms, box-shadow 150ms, color 150ms; }
+.mh-press:active { transform: scale(.985); }
+.mh-buy { position: relative; isolation: isolate; -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: transform 140ms cubic-bezier(.2,.8,.2,1), background-color 150ms, color 150ms, box-shadow 150ms; }
+.mh-buy:active, .group:active .mh-buy { transform: scale(.94); background: #00c365; color: #03160c; border-color: #00c365; }
+.mh-buy::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 0 0 rgba(0, 195, 101, .55); opacity: 0; pointer-events: none; z-index: -1; }
+[data-tapped="true"] .mh-buy, .mh-buy[data-tapped="true"] { background: #00c365; color: #03160c; border-color: #00c365; }
+[data-tapped="true"] .mh-buy::after, .mh-buy[data-tapped="true"]::after { animation: mh-tap-ring 420ms cubic-bezier(.2,.8,.2,1); }
+@keyframes mh-tap-ring { from { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 195, 101, .55); } to { opacity: 0; box-shadow: 0 0 0 10px rgba(0, 195, 101, 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .mh-press, .mh-buy { transition: background-color 150ms, color 150ms; }
+  .mh-press:active, .mh-buy:active, .group:active .mh-buy { transform: none; }
+  [data-tapped="true"] .mh-buy::after, .mh-buy[data-tapped="true"]::after { animation: none; }
+}

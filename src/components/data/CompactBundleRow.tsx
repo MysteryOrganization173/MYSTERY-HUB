@@ -6,6 +6,8 @@ import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { ArrowRight } from 'lucide-react';
 import { welcomePriceForBundle, type WelcomeOffer } from '../../utils/welcomeOfferPresentation';
 import { WelcomeBundlePrice } from './WelcomeBundlePrice';
+import { Money } from '../purchase/Money';
+import { useTapFeedback } from '../../hooks/useTapFeedback';
 
 interface CompactBundleRowProps {
   bundle: DataBundle;
@@ -20,11 +22,13 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
 }) => {
   const welcomePrice = welcomePriceForBundle(bundle, directWelcomeOffer);
   const network = GHANA_NETWORKS[bundle.network];
+  const [tapped, confirmTap] = useTapFeedback();
+  const buy = () => { confirmTap(); onBuy(bundle); };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      onBuy(bundle);
+      buy();
     }
   };
 
@@ -35,10 +39,11 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onBuy(bundle)}
+      onClick={buy}
       onKeyDown={handleKeyDown}
+      data-tapped={tapped}
       aria-label={`Buy ${bundle.dataAmount} ${network.name} data${welcomePrice ? '. '+welcomePrice.description : ` for GH₵${bundle.priceGhc.toFixed(2)}`}`}
-      className="group relative rounded-2xl border border-slate-800/90 hover:border-[#00c365]/50 bg-[#0e141a] hover:bg-[#111922] transition-colors duration-150 p-3 sm:p-3.5 flex items-center justify-between gap-2.5 sm:gap-3 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] active:bg-[#131d26]"
+      className="mh-press group relative rounded-2xl border border-slate-800/90 hover:border-[#00c365]/50 bg-[#0e141a] hover:bg-[#111922] p-3 sm:p-3.5 flex items-center justify-between gap-2.5 sm:gap-3 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] active:bg-[#131d26]"
     >
       {/* Left: Network logo & Data Details */}
       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
@@ -74,17 +79,15 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
       {/* Right: Price & Visual Buy Indicator (Not a nested button) */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {welcomePrice ? <WelcomeBundlePrice price={welcomePrice} /> : <div className="text-right">
-          <div className="text-base min-[360px]:text-lg sm:text-xl font-extrabold text-white tabular-nums tracking-tight">
-            GH₵{bundle.priceGhc.toFixed(2)}
-          </div>
+          <Money ghc={bundle.priceGhc} text="text-lg min-[360px]:text-xl sm:text-[1.35rem]" />
         </div>}
 
         <span
           aria-hidden="true"
-          className="min-h-11 px-2.5 min-[360px]:px-3.5 rounded-xl border border-[#00c365]/40 bg-[#00c365]/10 text-[#44df95] group-hover:bg-[#00c365] group-hover:border-[#00c365] group-hover:text-[#03160c] group-focus-visible:bg-[#00c365] group-focus-visible:text-[#03160c] font-bold text-sm transition-colors flex items-center justify-center gap-1 shrink-0"
+          className="mh-buy min-h-11 px-2.5 min-[360px]:px-3.5 rounded-xl border border-[#00c365]/40 bg-[#00c365]/10 text-[#44df95] group-hover:bg-[#00c365] group-hover:border-[#00c365] group-hover:text-[#03160c] group-focus-visible:bg-[#00c365] group-focus-visible:text-[#03160c] font-bold text-sm flex items-center justify-center gap-1 shrink-0"
         >
           <span>Buy</span>
-          <ArrowRight className="w-3.5 h-3.5" />
+          <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
         </span>
       </div>
     </div>
