@@ -175,13 +175,15 @@
   .home-template-chips li { flex-shrink: 0; }
 }
 @media (max-width: 767px) {
-  .home-hero-content { grid-template-columns: 1fr; padding-block: 32px 40px; }
-  /* Phones: the artwork is a quiet full-bleed backdrop behind the copy, strongest top-right,
-     dissolving well before the buttons end. No band, no extra space, no edge. */
-  .home-hero-art { background: radial-gradient(90% 55% at 90% 8%, #0f3826, transparent 70%), var(--home-bg, #070b0e); }
-  .home-hero-art img { object-position: 72% 55%; opacity: .78;
-    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 40%, #0007 66%, transparent 88%); mask-image: linear-gradient(180deg, #000 0%, #000 40%, #0007 66%, transparent 88%); }
-  .home-hero-art::after { background: linear-gradient(100deg, #070b0ee6 0%, #070b0eb3 45%, #070b0e40 100%), linear-gradient(180deg, #070b0e66 0%, transparent 30%, #070b0e 92%); }
+  /* Phones: the artwork is a cinematic band across the top of the hero, shown whole and at
+     full strength, so its subject sits in the open rather than behind the copy. The headline
+     rises over its lower edge, where a scrim and mask dissolve it into the page; the
+     description and buttons sit on plain page colour, so nothing follows below them. */
+  .home-hero-content { grid-template-columns: 1fr; padding-block: clamp(128px, 36vw, 168px) 36px; }
+  .home-hero-art { bottom: auto; height: clamp(300px, 84vw, 380px); background: var(--home-bg, #070b0e); }
+  .home-hero-art img { object-position: 70% 50%;
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 50%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 50%, transparent 100%); }
+  .home-hero-art::after { background: linear-gradient(180deg, #070b0e40 0%, #070b0e00 8%, #070b0e00 30%, #070b0e80 42%, #070b0eb3 56%, #070b0ee6 78%, #070b0e 100%); }
   .home-hero h1 { font-size: clamp(2.25rem, 9.6vw, 3.25rem); }
   .home-hero-description { font-size: .9375rem; line-height: 1.6; margin-block: 14px 20px; max-width: 450px; }
   .home-hero-caption { display: none; }
@@ -213,7 +215,7 @@
 @media (max-width: 479px) {
   .home-hero-actions { flex-direction: column; gap: 10px; }
   .home-hero-actions a { width: 100%; }
-  .home-hero .home-eyebrow { font-size: .6875rem; }
+  .home-hero .home-eyebrow { font-size: .6875rem; width: fit-content; padding: 5px 10px; border-radius: 999px; background: #070b0ecc; }
   .home-utility-grid { gap: 10px; }
   .home-network-switch button { font-size: .75rem; gap: 6px; }
   .home-website-actions .mh-button { width: 100%; }
