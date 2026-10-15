@@ -1,3 +1,4 @@
+import {paymentSignals} from '../../../src/utils/paymentSignals';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
@@ -36,7 +37,7 @@ function harness(overrides:Record<string,unknown>={},sdk=true) {
   let initWork:any=async()=>({success:true,orderRef:'MH-fixture',reference:'pay-fixture',accessCode:'access-fixture',amountPesewas:521,...overrides});
   let verifyWork:any=async()=>{state.verify++;return {success:true};};
   const window:any=sdk?{PaystackPop:class {resumeTransaction(code:string,callbacks:any){assert.equal(code,'access-fixture');state.opens++;state.callbacks=callbacks;}}}:{};
-  const modules:any={react:{useState:(value:unknown)=>[value,()=>{}],useEffect:()=>{},useCallback:(fn:any)=>fn},'../utils/storeCheckoutAttempt':{waitForStoreInitialization},'../services/apiClient':{initializePaymentOnServer:async(payload:any)=>{state.direct++;state.directPayload=payload;return initWork();},verifyPaymentOnServer:()=>verifyWork()},'../services/websiteBusinessApi':{initializeStorePayment:async(...args:any[])=>{state.init++;assert.deepEqual(args,['site','request','mtn-1gb','0240000000','receipt@example.test',undefined]);return initWork();}},'../utils/authStorage':{getActiveSessionToken:()=>null}};
+  const modules:any={'../utils/paymentSignals':{paymentSignals},react:{useState:(value:unknown)=>[value,()=>{}],useEffect:()=>{},useCallback:(fn:any)=>fn},'../utils/storeCheckoutAttempt':{waitForStoreInitialization},'../services/apiClient':{initializePaymentOnServer:async(payload:any)=>{state.direct++;state.directPayload=payload;return initWork();},verifyPaymentOnServer:()=>verifyWork()},'../services/websiteBusinessApi':{initializeStorePayment:async(...args:any[])=>{state.init++;assert.deepEqual(args,['site','request','mtn-1gb','0240000000','receipt@example.test',undefined]);return initWork();}},'../utils/authStorage':{getActiveSessionToken:()=>null}};
   const module={exports:{} as any};let clock=0;
   runInNewContext(compiled,{module,exports:module.exports,require:(name:string)=>{assert.ok(modules[name],name);return modules[name];},window,console,Error,setTimeout,setInterval:(fn:()=>void)=>setInterval(fn,1),clearInterval,Date:{now:()=>clock+=1000}});
   const hook=module.exports.usePaystack();
@@ -58,3 +59,11 @@ test('uncertain initialization keeps the supplied reference even after leaving',
 test('direct Data caller still uses its existing API and callback',async()=>{const h=harness();delete h.options.store;delete h.options.isActive;await h.run();assert.equal(h.state.direct,1);assert.equal(h.state.init,0);await h.state.callbacks.onSuccess();assert.equal(h.state.received,1);});
 
 for(const serviceType of ['data','airtime'])test(`shared hook preserves direct ${serviceType} request and verification`,async()=>{const h=harness();delete h.options.store;delete h.options.isActive;h.options.serviceType=serviceType;h.options.network='telecel';h.options.amount=10;await h.run();assert.equal(h.state.directPayload.serviceType,serviceType);assert.equal(h.state.directPayload.network,'telecel');assert.equal(h.state.directPayload.amount,10);assert.equal(h.state.init,0);await h.state.callbacks.onSuccess();assert.equal(h.state.verify,1);assert.equal(h.state.received,1);});
+
+test('direct checkout closure followed by late success verifies once and preserves receipt recovery',async()=>{
+  const h=harness();delete h.options.store;await h.run();h.state.callbacks.onClose();h.state.callbacks.onCancel();
+  assert.equal(h.state.cancels,1);await h.state.callbacks.onSuccess();await h.state.callbacks.onSuccess();assert.equal(h.state.verify,1);assert.equal(h.state.received,1);
+});
+test('exact Instant quote total mismatch preserves reference without opening SDK',async()=>{
+  const h=harness();delete h.options.store;h.options.instantQuote={token:'signed',totalMinor:999};await h.run();assert.equal(h.state.directPayload.instantQuote,'signed');assert.equal(h.state.opens,0);assert.match(h.state.errors[0],/Price changed/);
+});

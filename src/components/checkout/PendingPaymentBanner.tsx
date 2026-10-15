@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { RefreshCw, X, Smartphone } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { lookupOrderOnServer } from '../../services/apiClient';
+import { checkPendingPayment } from '../../services/apiClient';
 import { dataOrderPresentation } from '../../utils/dataPurchasePresentation';
 import {
   clearPendingCheckout,
@@ -22,6 +22,9 @@ export const PendingPaymentBanner: React.FC<{ className?: string }> = ({ classNa
   const [pending, setPending] = useState<PendingCheckout | null>(() => readPendingCheckout());
   const [checking, setChecking] = useState(false);
   const [note, setNote] = useState('');
+  const inFlight=useRef(false);
+  const generation=useRef(0);
+  useEffect(()=>()=>{generation.current++;},[]);
 
   useEffect(() => subscribePendingCheckout(() => { setPending(readPendingCheckout()); setNote(''); }), []);
   // Re-read after checkout or receipt closes; those flows clear or create the record.
@@ -34,11 +37,15 @@ export const PendingPaymentBanner: React.FC<{ className?: string }> = ({ classNa
   const when = `${sameDay ? 'today' : started.toLocaleDateString([], { day: 'numeric', month: 'short' })} at ${started.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 
   const check = async () => {
+    if(inFlight.current)return;
+    inFlight.current=true;const ticket=++generation.current;
+    const current=()=>ticket===generation.current&&readPendingCheckout()?.orderRef===pending.orderRef;
     setChecking(true);
     setNote('');
     try {
-      const res = await lookupOrderOnServer(pending.orderRef);
-      if (!res.success || !res.order) throw new Error('missing');
+      const res = await checkPendingPayment(pending.orderRef);
+      if(!current())return;
+      if (!res.success || !res.order) throw Object.assign(new Error('missing'),{status:404});
       const view = dataOrderPresentation(res.order.status, res.order.manual_review, res.order.customer_resolution);
       if (view.paymentConfirmed || isSettledForRecovery(res.order.status)) {
         clearPendingCheckout(pending.orderRef);
@@ -47,12 +54,11 @@ export const PendingPaymentBanner: React.FC<{ className?: string }> = ({ classNa
       }
       setNote('No payment has been confirmed for this order yet. If you approved the prompt, check again in a minute before paying again.');
     } catch (error) {
-      setNote((error as Error).message === 'Order not found.'
-        ? 'This payment was not found. You can start a new purchase.'
-        : 'We couldn’t reach Mystery Hub. Check your connection and try again.');
-      if ((error as Error).message === 'Order not found.') clearPendingCheckout(pending.orderRef);
+      if(current())setNote((error as {status?:number}).status===404
+        ? 'This reference could not be found. If you approved a payment, keep your payment proof and contact support before buying again.'
+        : 'We couldn’t reach Mystery Hub. Keep your reference and check again before paying.');
     } finally {
-      setChecking(false);
+      if(ticket===generation.current){inFlight.current=false;setChecking(false);}
     }
   };
 
@@ -76,7 +82,7 @@ export const PendingPaymentBanner: React.FC<{ className?: string }> = ({ classNa
             <span className="font-mono text-[11px] text-slate-400 break-all">{pending.orderRef}</span>
           </div>
         </div>
-        <button type="button" onClick={() => clearPendingCheckout()} aria-label="Dismiss last payment reminder" className="min-w-11 min-h-11 -mt-2 -mr-2 flex items-center justify-center text-slate-400 hover:text-white cursor-pointer">
+        <button type="button" onClick={() => {generation.current++;inFlight.current=false;setChecking(false);clearPendingCheckout(pending.orderRef);}} aria-label="Dismiss last payment reminder" className="min-w-11 min-h-11 -mt-2 -mr-2 flex items-center justify-center text-slate-400 hover:text-white cursor-pointer">
           <X className="w-4 h-4" />
         </button>
       </div>

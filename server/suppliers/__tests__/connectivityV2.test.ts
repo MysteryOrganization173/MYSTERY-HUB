@@ -9,7 +9,7 @@ import {calculateFlexiInstantBundlePrice} from '../../data/instantBundlePricing.
 import {InstantBundleCard} from '../../../src/components/data/InstantBundleCard';
 import type {PublicInstantBundle} from '../../../src/services/apiClient';
 
-const source = (path: string) => readFileSync(path, 'utf8');
+const source = (path: string) => readFileSync(path, 'utf8').replace(/\r\n/g,'\n');
 const product: PublicInstantBundle = {productKey: 'instant-x', packageId: 'x', name: '3GB', network: 'mtn', dataAmount: '3GB', validity: '1 Day',
   isFlexi: false, retailPriceGhc: 3, retailPricePesewas: 300, paymentProcessingFeeGhc: 0.17, estimatedTotalGhc: 3.17, availability: 'in_stock', category: 'Midnight'};
 
@@ -26,8 +26,8 @@ test('Flexi fee estimate matches the server default gross-up it describes', () =
     assert.equal(server.productRetailPriceGhc, amount);
     assert.equal(estimateInstantCheckoutFeeGhc(amount), server.paymentProcessingFeeGhc, `amount ${amount}`);
   }
-  assert.match(source('src/components/checkout/CheckoutModal.tsx'), /estimateInstantCheckoutFeeGhc\(faceValue\)/);
-  assert.match(source('src/components/checkout/CheckoutModal.tsx'), /Checkout fee \(estimate\)/);
+  assert.doesNotMatch(source('src/components/checkout/CheckoutModal.tsx'), /estimateInstantCheckoutFeeGhc/);
+  assert.match(source('src/components/checkout/CheckoutModal.tsx'), /useInstantQuote/);
 });
 
 test('Instant cards state conditions and the fee before the tap, and take no phone number', () => {

@@ -24,6 +24,7 @@ const rawBaseUrl =
 export const API_BASE_URL = typeof rawBaseUrl === 'string' ? rawBaseUrl.replace(/\/$/, '') : '';
 
 export interface InitializePaymentRequest {
+  instantQuote?:string;
   requestId?:string;
   expectedTotalMinor?:number;
   expectedRegularMinor?:number;
@@ -216,7 +217,7 @@ export async function initializePaymentOnServer(
   } catch (err: unknown) {
     clearTimeout(timeoutHandle);
     if (err instanceof Error && err.name === 'AbortError') {
-      const timeoutError: ApiError = new Error('Checkout is taking longer than expected. Please try again.');
+      const timeoutError: ApiError = new Error('Payment setup could not be confirmed. Check your order before trying again.');
       timeoutError.code = 'CHECKOUT_TIMEOUT';
       throw timeoutError;
     }
@@ -230,7 +231,7 @@ export async function verifyPaymentOnServer(reference: string): Promise<VerifyPa
 
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.error || 'Failed to verify payment with server.');
+    throw Object.assign(new Error(data.error || 'Failed to verify payment with server.'),{status:res.status});
   }
 
   return data;
@@ -266,7 +267,7 @@ export async function lookupOrderOnServer(reference: string): Promise<LookupOrde
 
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.error || 'Order lookup failed.');
+    throw Object.assign(new Error(data.error || 'Order lookup failed.'),{status:res.status});
   }
 
   return data;
@@ -1431,4 +1432,30 @@ export const updateAdminCustomerProfile = (token: string, id: string, body: Prof
 export async function adminOrderResolution(token:string,reference:string,body?:Record<string,unknown>):Promise<{success:boolean;order:import('../../server/types/orders').AdminOrderDetails;history:import('../../server/types/orderResolution').OrderResolutionEvent[];message?:string}>{
  const response=await fetch(`${API_BASE_URL}/api/admin/orders/${encodeURIComponent(reference)}/resolution`,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
  const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error||'Order resolution unavailable.'),{status:response.status});return data;
+}
+
+export interface InstantQuote {
+  productId:string; requestedAmount:number|null; productRetailMinor:number; feeMinor:number;
+  totalMinor:number; currency:'GHS'; expiresAt:number; revision:string; token:string;
+}
+export async function getInstantQuote(productId:string,amount:number,signal?:AbortSignal):Promise<InstantQuote> {
+  const res=await fetch(`${API_BASE_URL}/api/instant-bundles/quote?${new URLSearchParams({productId,amount:String(amount)})}`,{signal,cache:'no-store'});
+  const data=await res.json();
+  if(!res.ok || !data.success)throw new Error(data.error || 'Unable to load the exact price.');
+  const q=data.quote as InstantQuote;
+  if(q.productId!==productId || q.requestedAmount!==null&&q.requestedAmount!==amount || q.currency!=='GHS' || !Number.isSafeInteger(q.totalMinor) || q.totalMinor<=0
+    || !Number.isSafeInteger(q.productRetailMinor) || q.productRetailMinor<=0 || !Number.isSafeInteger(q.feeMinor) || q.feeMinor<0
+    || q.totalMinor!==q.productRetailMinor+q.feeMinor || !Number.isFinite(q.expiresAt) || q.expiresAt<=Date.now()
+    || typeof q.token!=='string' || !q.token) throw new Error('The exact price is unavailable. Refresh before paying.');
+  return q;
+}
+
+/** Customer-requested recovery only. Pending attempts recheck Paystack through the server. */
+export async function checkPendingPayment(reference:string):Promise<LookupOrderResponse> {
+  const lookup=await lookupOrderOnServer(reference);
+  if(lookup.success&&lookup.order?.status==='pending_payment') {
+    const verified=await verifyPaymentOnServer(reference);
+    return {success:true,order:verified.order};
+  }
+  return lookup;
 }

@@ -3,7 +3,6 @@ import { PublicInstantBundle } from '../../services/apiClient';
 import { GHANA_NETWORKS } from '../../data/bundles';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { getInstantBundlePresentation, type InstantBundleCategoryType } from '../../utils/instantBundleUtils';
-import { estimateInstantCheckoutFeeGhc } from '../../utils/instantFee';
 import { Money } from '../purchase/Money';
 import { useTapFeedback } from '../../hooks/useTapFeedback';
 import { ArrowRight, AlertCircle, Moon, Clapperboard, MessageCircle, Globe2, Zap, X } from 'lucide-react';
@@ -46,7 +45,6 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({ product, o
 
   const flexiValue = parseFloat(flexiAmount);
   const flexiValid = Number.isFinite(flexiValue) && flexiValue >= min && flexiValue <= max;
-  const flexiFee = flexiValid ? estimateInstantCheckoutFeeGhc(flexiValue) : 0;
 
   const buyFixed = () => { confirmTap(); onBuy(product); };
   const continueFlexi = () => {
@@ -111,7 +109,7 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({ product, o
             </div>}
             <p id={`${amountId}-note`} role={flexiError ? 'alert' : undefined} className={`text-xs ${flexiError ? 'text-rose-300 flex items-center gap-1' : 'text-slate-400'}`}>
               {flexiError ? <><AlertCircle className="w-3.5 h-3.5 shrink-0" />{flexiError}</>
-                : flexiValid ? <>Bundle {ghs(flexiValue)} + checkout fee about {ghs(flexiFee)}. You see the final total before paying.</>
+                : flexiValid ? <>Flexi value {ghs(flexiValue)}. Continue to see the exact bundle price, checkout fee and total before paying.</>
                 : 'The network sets what this amount buys. You see the total before paying.'}
             </p>
             <button type="button" onClick={continueFlexi}

@@ -183,10 +183,10 @@ test('unpaid verify does not echo provider errors containing private data',async
   const order=await save({status:'pending_payment',payment_status:'pending'});
   const response=await request(`/api/payments/verify/${order.payment_reference}`);const data=await response.json();assert.equal(data.verified,false);assertPublic(data);
 });
-test('pending cancellation retains safe cancelled status and masked response',async()=>{
+test('uncertain popup closure retains pending status and masked response',async()=>{
   const order=await save({status:'pending_payment',payment_status:'pending'});
   const response=await request('/api/payments/cancel','','POST',{orderRef:order.public_reference});const data=await response.json();
-  assert.equal(data.cancelled,true);assert.equal(data.order.status,'cancelled');assertPublic(data);
+  assert.equal(data.cancelled,false);assert.equal(data.order.status,'pending_payment');assertPublic(data);
 });
 for(const path of ['/api/payments/verify/MH-missing','/api/payments/cancel'])test(`missing payment reference is safe and no-store at ${path}`,async()=>{
   const response=await request(path,'',path.includes('cancel')?'POST':'GET',path.includes('cancel')?{orderRef:'MH-missing'}:undefined);

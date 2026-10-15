@@ -1,3 +1,4 @@
+import {paymentSignals} from '../utils/paymentSignals';
 /**
  * Paystack Hook (Server-First Bridge)
  * Uses official Paystack Inline JS V2 with server-created access codes.
@@ -41,6 +42,7 @@ declare global {
 export interface ServerPaystackOptions {
   // Storefront lifecycle guard; other checkout callers keep their existing behavior.
   isActive?: () => boolean;
+  instantQuote?:{token:string;totalMinor:number};
   commercial?:{requestId:string;expectedTotalMinor:number;expectedRegularMinor:number;pricingRevision:string;promotionRevision:string};
   store?: {siteId:string;requestId:string;expectedMinor:number};
   onOrderCreated?: (orderRef:string) => void;
@@ -119,6 +121,7 @@ export function usePaystack() {
       const initRes = options.store ? await waitForStoreInitialization(initializeStorePayment(options.store.siteId,options.store.requestId,options.productId,options.recipientPhone,options.customerEmail||'',sessionToken||undefined),ref=>options.onOrderCreated?.(ref)) : await initializePaymentOnServer(
         {
           ...options.commercial,
+          instantQuote:options.instantQuote?.token,
           productId: options.productId,
           recipientPhone: options.recipientPhone,
           customerEmail: options.customerEmail,
@@ -139,6 +142,7 @@ export function usePaystack() {
       // Preserve the reference for recovery, but never open a popup after leaving.
       if(!active())return;
       if(options.store&&!import.meta.env.DEV&&(isSimulated||accessCode?.startsWith('dev_access_')))throw new Error('A production payment cannot use a simulated authorization. Track this order or contact the business.');
+      if(options.instantQuote&&initRes.amountPesewas!==options.instantQuote.totalMinor)throw new Error('Price changed. Refresh and review before paying.');
       if(options.commercial&&initRes.amountPesewas!==options.commercial.expectedTotalMinor)throw new Error('Price changed. Refresh and review before paying.');
       if(options.store&&initRes.amountPesewas!==options.store.expectedMinor)throw new Error('This bundle price changed. Refresh the storefront and review the current total before paying. No payment was opened.');
 
@@ -156,12 +160,11 @@ export function usePaystack() {
       if (popAvailable && window.PaystackPop) {
         try {
           const popup = new window.PaystackPop();
-          let settled=false;
-          const acceptSignal=()=>{if(!active()||options.store&&settled)return false;settled=true;return true;};
+          const signals=paymentSignals(active,!!options.store);
 
           popup.resumeTransaction(accessCode, {
             onSuccess: async () => {
-              if(!acceptSignal())return;
+              if(!signals.success())return;
               idle();
               // Trigger backend verification, then poll for authoritative status
               try {
@@ -172,17 +175,17 @@ export function usePaystack() {
               if(active())options.onPaymentReceived(orderRef, reference);
             },
             onCancel: () => {
-              if(!acceptSignal())return;
+              if(!signals.close())return;
               idle();
               options.onCancel?.(orderRef, reference);
             },
             onClose: () => {
-              if(!acceptSignal())return;
+              if(!signals.close())return;
               idle();
               options.onCancel?.(orderRef, reference);
             },
             onError: (popErr: unknown) => {
-              if(!acceptSignal())return;
+              if(!signals.close())return;
               idle();
               const errMsg =
                 popErr instanceof Error
@@ -228,7 +231,7 @@ export function usePaystack() {
       );
       options.onError?.(scriptError);
     } catch (err) {
-      if(options.store&&(err as any)?.existingOrderReference)options.onOrderCreated?.((err as any).existingOrderReference);
+      if((err as any)?.existingOrderReference && !(err as any)?.code?.startsWith('ACTIVE_MTN'))options.onOrderCreated?.((err as any).existingOrderReference);
       if(!active())return;
       idle();
       options.onError?.(
@@ -237,7 +240,9 @@ export function usePaystack() {
     }
   }, []);
 
+  const resetInitialization=useCallback(()=>{setIsInitializing(false);setLoadingPhase('idle');},[]);
   return {
+    resetInitialization,
     initializeServerPayment,
     isScriptLoaded,
     isInitializing,

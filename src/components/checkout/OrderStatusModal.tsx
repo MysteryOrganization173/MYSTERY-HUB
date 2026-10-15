@@ -42,9 +42,12 @@ export const OrderStatusModal: React.FC = () => {
     const isTerminal = ['manual_fulfillment','external_compensation'].includes(activeOrder?.customerResolution||'') || activeOrder?.status === 'delivered' || activeOrder?.status === 'failed'&&(!activeOrder.customerResolution||activeOrder.customerResolution==='refund_confirmed');
     if (isTerminal) return;
 
+    let active=true;let checking=false;
     const fetchServerStatus = async () => {
+      if(checking)return;checking=true;
       try {
         const res = await lookupOrderOnServer(lookupReference);
+        if(!active)return;
         setCheckFailed(false);
         setLastChecked(new Date());
         if (res.success && res.order) {
@@ -97,16 +100,17 @@ export const OrderStatusModal: React.FC = () => {
           }
         }
       } catch (err) {
+        if(!active)return;
         setCheckFailed(true);
         if (import.meta.env.DEV) {
           console.warn('[OrderStatusModal] Polling error for reference:', lookupReference, err);
         }
-      }
+      } finally {checking=false;}
     };
 
     fetchServerStatus();
     const interval = setInterval(fetchServerStatus, 3000);
-    return () => clearInterval(interval);
+    return () => {active=false;clearInterval(interval);};
   }, [
     isStatusModalOpen,
     lookupReference,

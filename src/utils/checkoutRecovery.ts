@@ -43,7 +43,7 @@ const listeners = new Set<() => void>();
 const notify = () => { for (const listener of listeners) listener(); };
 
 export function savePendingCheckout(entry: PendingCheckout): void {
-  try { localStorage.setItem(KEY, JSON.stringify(entry)); } catch { /* Storage can be unavailable; recovery is a convenience. */ }
+  try { localStorage.setItem(KEY, JSON.stringify({orderRef:entry.orderRef,label:entry.label,network:entry.network,startedAt:entry.startedAt})); } catch { /* Storage can be unavailable; recovery is a convenience. */ }
   notify();
 }
 
@@ -51,8 +51,9 @@ export function readPendingCheckout(now = Date.now()): PendingCheckout | null {
   try {
     const value = JSON.parse(localStorage.getItem(KEY) || 'null') as PendingCheckout | null;
     if (!value || typeof value.orderRef !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(value.orderRef)) return null;
-    if (!(now - Date.parse(value.startedAt) < MAX_AGE_MS)) { localStorage.removeItem(KEY); return null; }
-    return value;
+    if(typeof value.label!=='string'||!value.label.trim()||value.label.length>160||!['mtn','telecel','airteltigo'].includes(value.network)||typeof value.startedAt!=='string')return null;
+    if (!(now - Date.parse(value.startedAt) < MAX_AGE_MS) || Date.parse(value.startedAt)>now+60_000) { localStorage.removeItem(KEY); return null; }
+    return {orderRef:value.orderRef,label:value.label,network:value.network,startedAt:value.startedAt};
   } catch {
     return null;
   }
