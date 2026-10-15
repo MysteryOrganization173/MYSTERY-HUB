@@ -166,7 +166,10 @@ export const TemplatePreviewModal: React.FC = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [selectedTemplatePreview]);
 
-  const startSheet = starting && selectedTemplatePreview ? <WebsiteStartSheet templateId={selectedTemplatePreview.id} initialName={previewName.trim()} onClose={()=>setStarting(false)} onCreated={(site,alreadyExists)=>{setStarting(false);handleClose();openWebsiteEditor(site);showToast(alreadyExists?'Opening your existing website.':'Your website is ready. Tap anything to change it.',alreadyExists?'info':'success');}}/> : null;
+  const startSheet = starting && selectedTemplatePreview ? <WebsiteStartSheet templateId={selectedTemplatePreview.id} initialName={previewName.trim()} onClose={()=>setStarting(false)} onCreated={(site,alreadyExists)=>{setStarting(false);
+    // An owner who already has a website on another design is offered the change, never switched silently.
+    if(alreadyExists&&site.template_id!==selectedTemplatePreview.id){setChangeSite(site);setChangeTarget(selectedTemplatePreview.id);return;}
+    handleClose();openWebsiteEditor(site);showToast(alreadyExists?'Opening your existing website.':'Your website is ready. Tap anything to change it.',alreadyExists?'info':'success');}}/> : null;
   if(changeSite&&sessionToken)return <WebsiteSettingsControls site={changeSite} token={sessionToken} requestedTemplateId={changeTarget} selectionOnly onClosed={()=>setChangeSite(null)} onDeleted={()=>setChangeSite(null)} onUpdated={updated=>{setChangeSite(null);openWebsiteEditor(updated);}}/>;
   if (!selectedTemplatePreview) return null;
 

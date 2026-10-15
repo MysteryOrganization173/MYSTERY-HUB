@@ -22,7 +22,7 @@ for(const base of WEBSITE_TEMPLATES)test(`${base.id}: real rendered elements hav
   for(const id of ids)assert.ok(targets.some(t=>t.id===id),id);
   for(const id of ['content:businessName','content:logoUrl','content:email','content:phone','content:whatsapp'])assert.ok(ids.includes(id),id);
   assert.ok(ids.includes(t.composition ? 'section:hero-1:heading' : 'content:tagline'));
-  assert.equal(editHtml.replace(/ data-visual-target="[^"]*"| tabindex="0"| aria-label="Edit [^"]*"/g,''),publicHtml);
+  assert.equal(editHtml.replace(/ data-visual-target="[^"]*"| data-visual-empty="[^"]*"| tabindex="0"| aria-label="Edit [^"]*"/g,''),publicHtml);
 });
 test('stable section IDs create an override without editing inherited global content or siblings',()=>{
   const composition=createWebsiteComposition(['header','hero','about','contact','footer']);
@@ -80,16 +80,17 @@ function editorHarness(){
     useRef:(init:any)=>{const i=cursor++;return cells[i]??(cells[i]={current:init});},
     useEffect:(fn:any,deps:any[])=>{const i=cursor++,old=cells[i];if(!old||deps.some((d,j)=>!Object.is(d,old.deps[j]))){effects.push(()=>{old?.cleanup?.();cells[i]={deps,cleanup:fn()};});}}
   };
-  const toolbar=()=>null,panel=()=>null;
+  const toolbar=()=>null,panel=()=>null,sheet=()=>null;
   const api={updateWebsiteOnServer:async(_token:string,_id:string,input:any)=>{calls.saved.push(input);if(pauseSave)await new Promise<void>(resolve=>{releaseSave=resolve;});if(saveFailure)throw Error('Synthetic save failure');return {site:{...initial,content_json:input.content,settings_json:input.settings,updated_at:'revision-'+(calls.saved.length+1)}};},publishWebsiteOnServer:async(_token:string,_id:string,revision:string)=>{calls.published.push(revision);if(publishFailure)throw Error('Synthetic publication failure');return {success:true,site:{...initial,updated_at:revision}};},unpublishWebsiteOnServer:async()=>({success:true,site:{...initial,status:'draft'}})};
-  const modules:any={react,'./VisualContextPanel':{VisualContextPanel:panel},'./WebsiteEditorToolbar':{WebsiteEditorToolbar:toolbar},'../../../utils/websiteVisualEditing':{visualTargets,applyVisualValue},'../WebsitePreviewFrame':{WebsitePreviewFrame:'iframe'},'./WebsiteImageField':{},'../../../utils/websiteAnalytics':{trackWebsiteEvent(){}},'../../../services/apiClient':api,'../../../utils/templateRendererUtils':{getTemplateById,mergeSiteWithTemplate},'../../../context/AppContext':{useApp:()=>({openMysteryAi(){}})},'./WebsiteSectionsControl':{},'../SafeImage':{},'lucide-react':new Proxy({},{get:()=>()=>null})};
-  const module={exports:{} as any};runInNewContext(compiled,{module,exports:module.exports,require:(key:string)=>{assert.ok(modules[key],key);return modules[key];},window:{innerWidth:1280,addEventListener(){},removeEventListener(){},confirm:()=>true},localStorage:{getItem:()=> 'dismissed'},setTimeout:(fn:()=>void)=>{timers.set(++timerId,fn);return timerId;},clearTimeout:(id:number)=>timers.delete(id)});
+  const modules:any={react,'./VisualContextPanel':{VisualContextPanel:panel},'./WebsiteEditorToolbar':{WebsiteEditorToolbar:toolbar},'../../../utils/websiteVisualEditing':{visualTargets,applyVisualValue},'../WebsitePreviewFrame':{WebsitePreviewFrame:'iframe'},'./WebsiteImageField':{},'../../../utils/websiteAnalytics':{trackWebsiteEvent(){}},'../../../services/apiClient':api,'../../../utils/templateRendererUtils':{getTemplateById,mergeSiteWithTemplate},'../../../context/AppContext':{useApp:()=>({openMysteryAi(){}})},'./WebsiteSectionsControl':{},'../SafeImage':{},'./WebsiteItemPanel':{WebsiteItemPanel:()=>null},'./WebsiteItemsList':{WebsiteItemsList:()=>null},'./WebsitePublishSheet':{WebsitePublishSheet:sheet},'./WebsiteLayoutAndHistory':{WebsiteLayoutControl:()=>null,WebsiteHistoryControl:()=>null},'../../../services/websiteB1Api':{publishWebsiteB1:(token:string,id:string,revision:string)=>api.publishWebsiteOnServer(token,id,revision),WebsiteB1Error:class extends Error{}},'../../../config/websiteStarters':{websiteItemVocabulary:()=>({singular:'Project',plural:'Projects',many:'projects'})},'../../../config/websiteBuilder':{websiteTemplateItemFields:()=>['name','desc','image']},'../../../utils/websiteLayout':{websiteLayoutMode:()=>'template'},'lucide-react':new Proxy({},{get:()=>()=>null})};
+  const module={exports:{} as any};runInNewContext(compiled,{module,exports:module.exports,require:(key:string)=>{assert.ok(modules[key],key);return modules[key];},window:{innerWidth:1280,location:{origin:'https://synthetic.test'},addEventListener(){},removeEventListener(){},confirm:()=>true},localStorage:{getItem:()=> 'dismissed'},setTimeout:(fn:()=>void)=>{timers.set(++timerId,fn);return timerId;},clearTimeout:(id:number)=>timers.delete(id)});
   const render=()=>{cursor=0;const tree=module.exports.WebsiteEditor({site:initial,sessionToken:'synthetic',onClose(){},onSiteUpdated(){},showToast:(m:string)=>calls.toasts.push(m)});while(effects.length)effects.shift()!();return tree;};
   const nodes=(tree:any):any[]=>!tree||typeof tree!=='object'?[]:Array.isArray(tree)?tree.flatMap(nodes):[tree,...nodes(tree.props?.children)];
   const find=(type:any)=>nodes(render()).find(n=>n.type===type)?.props;
   render();render();
   const choose=(id:string)=>{const frame=nodes(render()).find(n=>n.type==='iframe');frame.props.onSelect(id);return find(panel);};
-  return {calls,choose,toolbar:()=>find(toolbar),panel:()=>find(panel),render,failSave:()=>saveFailure=true,failPublish:()=>publishFailure=true,pauseSave:()=>pauseSave=true,resumeSave:()=>{pauseSave=false;releaseSave?.();},autosave:()=>{for(const fn of timers.values())fn();timers.clear();},initial};
+  const publish=()=>{find(toolbar).onPublish();return find(sheet).onPublish();};
+  return {calls,choose,publish,toolbar:()=>find(toolbar),panel:()=>find(panel),render,failSave:()=>saveFailure=true,failPublish:()=>publishFailure=true,pauseSave:()=>pauseSave=true,resumeSave:()=>{pauseSave=false;releaseSave?.();},autosave:()=>{for(const fn of timers.values())fn();timers.clear();},initial};
 }
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 test('context edit updates the shared draft, dirty status and debounced autosave revision',async()=>{
@@ -97,16 +98,16 @@ test('context edit updates the shared draft, dirty status and debounced autosave
   assert.equal(h.calls.saved[0].content.tagline,'Edited on canvas');assert.equal(h.calls.saved[0].expectedUpdatedAt,'revision-1');assert.equal(h.toolbar().status,'saved');
 });
 test('failed save preserves edited draft, reports error and blocks publication',async()=>{
-  const h=editorHarness();h.choose('content:tagline').onChange('content:tagline','Keep this edit');h.failSave();h.toolbar().onPublish();await tick();assert.equal(h.calls.published.length,0);assert.equal(h.toolbar().status,'unsaved');assert.equal(h.choose('content:tagline').targets[0].value,'Keep this edit');assert.ok(h.calls.toasts.some(t=>t.includes('save failure')));
+  const h=editorHarness();h.choose('content:tagline').onChange('content:tagline','Keep this edit');h.failSave();h.publish();await tick();assert.equal(h.calls.published.length,0);assert.equal(h.toolbar().status,'unsaved');assert.equal(h.choose('content:tagline').targets[0].value,'Keep this edit');assert.ok(h.calls.toasts.some(t=>t.includes('save failure')));
 });
 test('an edit during a save remains dirty and cannot publish an unacknowledged revision',async()=>{
-  const h=editorHarness();h.choose('content:tagline').onChange('content:tagline','First');h.pauseSave();h.toolbar().onSave();await tick();h.choose('content:tagline').onChange('content:tagline','Later');h.resumeSave();await tick();assert.equal(h.calls.saved[0].content.tagline,'First');assert.equal(h.toolbar().status,'unsaved');assert.equal(h.choose('content:tagline').targets[0].value,'Later');h.failSave();h.toolbar().onPublish();await tick();assert.equal(h.calls.published.length,0);
+  const h=editorHarness();h.choose('content:tagline').onChange('content:tagline','First');h.pauseSave();h.toolbar().onSave();await tick();h.choose('content:tagline').onChange('content:tagline','Later');h.resumeSave();await tick();assert.equal(h.calls.saved[0].content.tagline,'First');assert.equal(h.toolbar().status,'unsaved');assert.equal(h.choose('content:tagline').targets[0].value,'Later');h.failSave();h.publish();await tick();assert.equal(h.calls.published.length,0);
 });
 test('mode switches clear contextual editing but retain unsaved values; template identity clears stale selection',()=>{
   const h=editorHarness();h.choose('content:tagline').onChange('content:tagline','Unpublished');h.toolbar().onMode('preview');assert.equal(h.panel(),undefined);h.toolbar().onMode('edit');assert.equal(h.choose('content:tagline').targets[0].value,'Unpublished');h.initial.template_id='tmpl-data-reseller';h.render();h.render();assert.equal(h.panel(),undefined);
 });
 test('publication uses saved revision, failed publication preserves draft, and unpublish remains available',async()=>{
-  const h=editorHarness();h.choose('content:tagline').onChange('content:tagline','Ready');h.toolbar().onPublish();await tick();assert.equal(h.calls.published[0],'revision-2');h.failPublish();h.toolbar().onPublish();await tick();assert.ok(h.calls.toasts.includes('Synthetic publication failure'));h.toolbar().onUnpublish();await tick();assert.equal(h.toolbar().published,false);
+  const h=editorHarness();h.choose('content:tagline').onChange('content:tagline','Ready');h.publish();await tick();assert.equal(h.calls.published[0],'revision-2');h.failPublish();h.publish();await tick();assert.ok(h.calls.toasts.includes('Synthetic publication failure'));h.toolbar().onUnpublish();await tick();assert.equal(h.toolbar().published,false);
 });
 
 test('real frame listener rejects stale/foreign/unsupported selections and cleans up on unmount',()=>{

@@ -6,7 +6,7 @@ import { WebsiteImageLibrary, WebsiteImageField } from './WebsiteImageField';
 import { trackWebsiteEvent } from '../../../utils/websiteAnalytics';
 import React, { useState, useEffect, useRef } from 'react';
 import { WebsiteSiteRecord, SiteContent, SiteSettings, WebsiteTemplate } from '../../../types';
-import { updateWebsiteOnServer, publishWebsiteOnServer, unpublishWebsiteOnServer } from '../../../services/apiClient';
+import { updateWebsiteOnServer, unpublishWebsiteOnServer } from '../../../services/apiClient';
 import { getTemplateById, mergeSiteWithTemplate, renderTemplateLayout } from '../../../utils/templateRendererUtils';
 import { useApp } from '../../../context/AppContext';
 import { WebsiteSectionsControl } from './WebsiteSectionsControl';
