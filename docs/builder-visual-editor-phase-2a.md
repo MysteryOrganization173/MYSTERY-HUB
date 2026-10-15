@@ -11,7 +11,7 @@ Status: implemented for founder review. Do not merge or deploy without that revi
 - **Previous/Next.** The sheet steps through the editable parts of the page in reading order ("5 of 9"), reported by the frame from the rendered page.
 - **Clear feedback for other taps.** Tapping visible content without a tap-to-edit field (menu items, galleries, fixed template labels) briefly outlines it and opens a short sheet that explains where it is changed, with an Open All Settings button. Tapping empty space still clears the selection.
 - **Plain labels.** Main heading, Short description, Main photo, Main button text, Button link, Logo.
-- **Light editor surfaces.** Toolbar, sheet and canvas use light neutrals with Mystery Hub green and ink; All Settings keeps its existing dark structured controls.
+- **Dark editor surfaces.** Toolbar, dock, menus, sheets, inputs and canvas surroundings use layered charcoal and slate with restrained Mystery Hub green, matching the existing All Settings panel. The customer site renders in its own frame and keeps its own colours.
 
 ## Unchanged
 

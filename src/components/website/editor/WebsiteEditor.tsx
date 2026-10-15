@@ -105,6 +105,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   // Rendered targets in reading order, reported by the draft frame, for Previous/Next.
   const [targetOrder, setTargetOrder] = useState<string[]>([]);
   const [canvasHintSeen, setCanvasHintSeen] = useState(false);
+  const [previewHintSeen, setPreviewHintSeen] = useState(false);
   const clearSelection = () => {setVisualSelection(null);setSettingsNotice(false);setFocusRequest(n=>n+1);};
   const selectTarget = (id:string|null, hint?:'settings') => {setAllSettings(false);setVisualSelection(id);setSettingsNotice(!id && hint==='settings');if(id || hint)setCanvasHintSeen(true);};
   const changeMode = (mode:'edit'|'preview') => {setActiveTab(mode);setVisualSelection(null);setSettingsNotice(false);setAllSettings(false);};
@@ -937,7 +938,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         </div>}
         <div className="visual-canvas">
           {activeTab==='edit' && !canvasHintSeen && !visualSelection && !allSettings && <div className="visual-canvas-hint" role="note"><span>Tap a heading, photo or contact detail to change it</span><button type="button" aria-label="Dismiss tip" onClick={()=>setCanvasHintSeen(true)}><X size={15}/></button></div>}
-          {activeTab==='preview' && <div className="visual-canvas-hint is-preview" role="note"><Eye size={15}/><span>Preview of your draft · payments are off</span></div>}
+          {activeTab==='preview' && !previewHintSeen && <div className="visual-canvas-hint is-preview" role="note"><Eye size={15}/><span>Preview of your draft · payments are off</span><button type="button" aria-label="Dismiss preview note" onClick={()=>setPreviewHintSeen(true)}><X size={15}/></button></div>}
           <div ref={canvasRef} className="visual-canvas-viewport">
             <div style={{width:effectiveCanvasWidth, flexShrink:0, height:scale<1 ? 'calc(100% / '+scale+')' : '100%', transform:scale<1 ? 'scale('+scale+')' : undefined, transformOrigin:'top center'}} className="visual-canvas-page">
               <WebsitePreviewFrame template={previewTemplate} siteId={currentSite.id} viewportWidth={targetWidth} editMode={activeTab==='edit' && !isPublishing} selectedTarget={visualSelection} onSelect={selectTarget} onOrder={setTargetOrder} focusRequest={focusRequest} reserveBottom={contextualTargets.length>0 || settingsNotice ? sheetReserve : 0}/>

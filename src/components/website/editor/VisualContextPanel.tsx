@@ -23,7 +23,7 @@ function VisualField({target, onChange, siteId, token}: {target: VisualTarget; o
   const finish = (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {if (event.key === 'Enter') {event.preventDefault(); event.currentTarget.blur();}};
   const inputType = target.control === 'email' ? 'email' : target.control === 'phone' ? 'tel' : target.control === 'url' ? 'url' : 'text';
   return <div className="visual-field">
-    {target.control === 'image' ? <WebsiteImageField label={target.label} value={value} onChange={change} siteId={siteId} token={token} variant="light"/> : <>
+    {target.control === 'image' ? <WebsiteImageField label={target.label} value={value} onChange={change} siteId={siteId} token={token}/> : <>
       <div className="visual-field-label"><label htmlFor={id}>{target.label}</label>{counted && <span id={countId}>{value.length}/{target.maxLength}</span>}</div>
       {target.control === 'text' && target.maxLength > 100 ? <textarea id={id} rows={2} maxLength={target.maxLength} value={value} onChange={e=>change(e.target.value.replace(/\n/g,' '))} onKeyDown={finish} enterKeyHint="done" className="visual-input" aria-invalid={!!error} aria-describedby={describedBy}/> : target.control === 'body' ? <textarea id={id} rows={4} maxLength={target.maxLength} value={value} onChange={e=>change(e.target.value)} className="visual-input" aria-invalid={!!error} aria-describedby={describedBy}/> : <div className="visual-input-row">
         {target.control === 'color' && <input type="color" aria-label={`Choose ${target.label}`} value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#2563eb'} onChange={e=>change(e.target.value)} className="visual-color-swatch"/>}
