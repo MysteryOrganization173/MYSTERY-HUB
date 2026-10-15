@@ -118,7 +118,7 @@ test('verified API payment completes AFA once',async()=>{const order=await saved
 test('duplicate signed Paystack webhooks dispatch once',async()=>{const order=await saved();liveMockMode();const body={event:'charge.success',data:{reference:order.payment_reference,status:'success',amount:2500,currency:'GHS'}},rawBody=Buffer.from(JSON.stringify(body)),signature=crypto.createHmac('sha512','sk_live_fixture').update(rawBody).digest('hex');const req={body,rawBody,headers:{'x-paystack-signature':signature}} as any;const res={status(){return this;},json(){return this;}} as any;await Promise.all([handlePaystackWebhook(req,res),handlePaystackWebhook(req,res)]);assert.equal(posts,1);});
 test('customer Orders list includes AFA safely',async()=>{const order=await saved('processing');const response=await request('/orders/my-orders');const json=await response.json();assert.equal(json.orders[0].service_type,'afa');assert.ok(!JSON.stringify(json).includes(payload.idNumber));assert.equal(json.orders[0].public_reference,order.public_reference);});
 test('safe public availability exposes no supplier credentials',async()=>{const json=JSON.stringify(await (await request('/afa/config','GET',undefined,'')).json());assert.ok(!json.includes(process.env.SUCCESS_BIZ_HUB_API_KEY!));assert.ok(!json.includes(process.env.AFA_PII_ENCRYPTION_KEY!));});
-test('initialization failure cancels and purges, without supplier POST',async()=>{PaystackServerService.initializeTransaction=async params=>{initialization=params;return {success:false,reference:params.reference};};assert.equal((await checkout()).status,503);const order=(await OrdersStore.findOrder(initialization.reference))!;assert.equal(order.status,'cancelled');assert.equal((await AfaStore.find(order.id))!.encrypted_payload,null);assert.equal(posts,0);});
+test('definitive initialization failure cancels and purges, without supplier POST',async()=>{PaystackServerService.initializeTransaction=async params=>{initialization=params;return {success:false,definitiveFailure:true,reference:params.reference};};assert.equal((await checkout()).status,503);const order=(await OrdersStore.findOrder(initialization.reference))!;assert.equal(order.status,'cancelled');assert.equal((await AfaStore.find(order.id))!.encrypted_payload,null);assert.equal(posts,0);});
 
 const source=(file:string)=>readFileSync(new URL('../../../'+file,import.meta.url),'utf8');
 test('public AFA page, auth continuation and memory-only form are wired',()=>{const code=source('src/components/services/AfaRegistrationPage.tsx');assert.match(code,/openAuth\('login'/);assert.match(code,/user.mustChangePassword[\s\S]*openAccount/);assert.doesNotMatch(code,/localStorage|sessionStorage|indexedDB/);assert.match(code,/type="date"/);assert.match(code,/aria-invalid/);assert.match(code,/config\?\.available === true/);assert.match(code,/validateAfaPayload/);assert.match(code,/initializeAfaPayment\(payload, formData.consent, formData.customerEmail, sessionToken\)/);assert.doesNotMatch(code,/usePaystack|initializeServerPayment|createOrder/);});
@@ -202,4 +202,17 @@ test('browser AFA checkout surfaces guest rejection instead of inventing success
   globalThis.fetch=async(url,options)=>originalFetch(base+new URL(String(url),base).pathname,options);
   await assert.rejects(initializeAfaPayment(payload,true,'browser-receipt@example.test',''),(err:any)=>err.status===401);
   assert.equal(initialization,null);assert.equal(posts,0);
+});
+
+for (const failure of ['timeout','network']) test(`uncertain AFA ${failure} retains encrypted identity and duplicate guard`,async()=>{
+  PaystackServerService.initializeTransaction=async()=>({success:false,reference:'unknown',error:'unavailable'});
+  const response=await checkout(),body=await response.json();assert.equal(response.status,503);assert.equal(body.code,'INITIALIZATION_UNCERTAIN');
+  const order=(await OrdersStore.findOrder(body.existingOrderReference))!;assert.equal(order.status,'pending_payment');
+  const registration=(await AfaStore.find(order.id))!;assert.ok(registration.encrypted_payload);assert.equal(registration.purchase_blocked,true);
+  assert.doesNotMatch(JSON.stringify(body),new RegExp(payload.idNumber+'|'+payload.dateOfBirth));assert.equal((await checkout()).status,409);
+});
+test('definitive AFA initialization rejection closes only the unpaid attempt',async()=>{
+  PaystackServerService.initializeTransaction=async()=>({success:false,definitiveFailure:true,reference:'rejected'});
+  const response=await checkout(),body=await response.json();assert.equal(body.code,'INITIALIZATION_REJECTED');
+  const order=(await OrdersStore.findOrder(body.existingOrderReference))!;assert.equal(order.status,'cancelled');assert.equal((await AfaStore.find(order.id))!.encrypted_payload,null);
 });

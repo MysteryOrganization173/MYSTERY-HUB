@@ -32,7 +32,7 @@ export interface PaystackVerifyResult {
   reference?: string;
   isSimulated?: boolean;
   isVerified: boolean;
-  status: 'success' | 'failed' | 'abandoned' | 'pending' | 'unknown';
+  status: 'success' | 'failed' | 'abandoned' | 'pending' | 'ongoing' | 'processing' | 'reversed' | 'unknown';
   amountPesewas: number;
   currency: string;
   customerEmail?: string;
@@ -60,6 +60,7 @@ export class PaystackServerService {
         console.error('CRITICAL: PAYSTACK_SECRET_KEY is missing in production environment!');
         return {
           success: false,
+          definitiveFailure: true,
           reference: params.reference,
           error: 'Payment initialization failed. Server payment configuration is incomplete.',
         };
@@ -78,6 +79,7 @@ export class PaystackServerService {
     try {
       const response = await fetch('https://api.paystack.co/transaction/initialize', {
         method: 'POST',
+        signal: AbortSignal.timeout(20000),
         headers: {
           Authorization: `Bearer ${secretKey}`,
           'Content-Type': 'application/json',
@@ -104,7 +106,7 @@ export class PaystackServerService {
       };
 
       if (!response.ok || !data.status || !data.data) {
-        console.error('Paystack API Initialization Error:', data);
+        console.error('Paystack initialization rejected', response.status);
         return {
           success: false,
           reference: params.reference,
@@ -121,7 +123,7 @@ export class PaystackServerService {
         reference: data.data.reference,
       };
     } catch (err) {
-      console.error('Paystack Network Exception:', err);
+      console.error('Paystack initialization connection unavailable');
       return {
         success: false,
         reference: params.reference,
@@ -164,7 +166,7 @@ export class PaystackServerService {
     try {
       const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
         method: 'GET',
-        ...(timeoutMs?{signal:AbortSignal.timeout(timeoutMs)}:{}),
+        signal: AbortSignal.timeout(timeoutMs ?? 12000),
         headers: {
           Authorization: `Bearer ${secretKey}`,
         },
@@ -190,7 +192,7 @@ export class PaystackServerService {
       if (!response.ok || !json.status || !json.data) {
         return {
           isVerified: false,
-          status: 'failed',
+          status: 'unknown',
           amountPesewas: 0,
           currency: 'GHS',
           error: json.message || 'Verification failed on Paystack API.',
@@ -214,7 +216,7 @@ export class PaystackServerService {
         paidAt: tx.paid_at || new Date().toISOString(),
       };
     } catch (err) {
-      console.error('Paystack Verification Exception:', err);
+      console.error('Paystack verification connection unavailable');
       return {
         isVerified: false,
         status: 'unknown',

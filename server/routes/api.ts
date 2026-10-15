@@ -1,3 +1,5 @@
+import { createInstantQuote, priceInstantPackage, validateInstantQuote } from '../services/instantBundleQuote.js';
+import { reconcileCheckoutClosure } from '../services/paymentClosure.js';
 import { commercialRouter } from './commercialApi.js';
 import { CommercialService } from '../services/commercialService.js';
 import { WebsiteBusinessService } from '../services/websiteBusinessService.js';
@@ -84,6 +86,23 @@ apiRouter.get('/health', (_req: Request, res: Response) => {
  * Returns live Instant Bundle offers with server-calculated Mystery Hub retail pricing.
  * Wholesale supplier costs, API keys, and accounting internals are NEVER returned.
  */
+/** Read-only exact total, with an expiring commercial revision approved before payment. */
+apiRouter.get('/instant-bundles/quote', createRateLimiter({windowMs:60_000,max:40}), async (req,res) => {
+  res.setHeader('Cache-Control','no-store');
+  try {
+    if (typeof req.query.productId !== 'string' || req.query.productId.length > 128) {res.status(400).json({error:'Select a valid package.'});return;}
+    const provider = FulfilmentService.getProvider();
+    const availability = await provider.client.checkInstantBundlesService();
+    if (!availability.available || !availability.permitted) {res.status(503).json({error:'Instant Bundles are temporarily unavailable.'});return;}
+    const catalog = await provider.client.getInstantBundles();
+    const data = catalog.data;
+    const list = Array.isArray(data) ? data : data?.packages ?? data?.products ?? [];
+    const pkg = list.find(p => p.id === req.query.productId || `instant-${p.id}` === req.query.productId);
+    if (!pkg || pkg.enabled === false || pkg.available === false) {res.status(404).json({error:'This package is unavailable.'});return;}
+    res.json({success:true,quote:createInstantQuote(pkg,req.query.amount)});
+  } catch { res.status(400).json({error:'Unable to quote this package. Check the amount and try again.'}); }
+});
+
 apiRouter.get('/instant-bundles', async (_req: Request, res: Response) => {
   try {
     const provider = FulfilmentService.getProvider();
@@ -395,37 +414,18 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
       const targetPkgId = productId.startsWith('instant-') ? productId.replace('instant-', '') : productId;
       const pkg = rawList.find((p) => p.id === targetPkgId || p.id === productId || `instant-${p.id}` === productId);
 
-      if (!pkg || pkg.enabled === false) {
+      if (!pkg || pkg.enabled === false || pkg.available === false) {
         res.status(404).json({ error: 'Selected Instant Bundle package is no longer available.' });
         return;
       }
 
-      const isFlexi = Boolean(pkg.isFlexi || pkg.mode === 'flexi');
-      let pricing;
-      let requestedMajorVal: number | string | undefined;
-
-      if (isFlexi) {
-        const reqVal = typeof reqAmount === 'number' ? reqAmount : parseFloat(String(reqAmount || '0'));
-        const minVal = typeof pkg.minAmountMajor === 'number' ? pkg.minAmountMajor : parseFloat(String(pkg.minAmountMajor || '1')) || 1;
-        const maxVal = typeof pkg.maxAmountMajor === 'number' ? pkg.maxAmountMajor : parseFloat(String(pkg.maxAmountMajor || '500')) || 500;
-        const ratio = typeof pkg.payableRatio === 'number' ? pkg.payableRatio : 1.0;
-
-        try {
-          pricing = calculateFlexiInstantBundlePrice(pkg.id, reqVal, ratio, minVal, maxVal);
-          requestedMajorVal = reqVal;
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : 'Invalid flexi package amount.';
-          res.status(400).json({ error: msg });
-          return;
-        }
-      } else {
-        try {
-          pricing = calculateFixedInstantBundlePrice(pkg.id, pkg.priceMinor);
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : 'Unable to calculate retail price for this package.';
-          res.status(400).json({ error: msg });
-          return;
-        }
+      let resolved;
+      try { resolved = priceInstantPackage(pkg,reqAmount); }
+      catch (err) { res.status(400).json({error:err instanceof Error ? err.message : 'Invalid package amount.'});return; }
+      const {isFlexi,requestedAmount:requestedMajorVal,pricing} = resolved;
+      // Flexi must always have exact customer consent. Fixed-price legacy clients remain compatible.
+      if ((isFlexi || req.body.instantQuote !== undefined) && !validateInstantQuote(req.body.instantQuote,pkg,reqAmount)) {
+        res.status(409).json({code:'INSTANT_QUOTE_CHANGED',error:'Refresh the exact price and review it before paying.'});return;
       }
 
       const rawNet = (pkg.network || reqNetwork || 'mtn').toLowerCase().trim();
@@ -539,7 +539,8 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
       });
 
       if (!paystackRes.success) {
-        res.status(500).json({ error: paystackRes.error || 'Failed to initialize payment with Paystack.' });
+        if (paystackRes.definitiveFailure) await OrdersStore.cancelOrder(newOrder.id,'payment_initialization_rejected');
+        res.status(503).json({code:paystackRes.definitiveFailure ? 'INITIALIZATION_REJECTED' : 'INITIALIZATION_UNCERTAIN',existingOrderReference:publicRef,error:'Payment setup could not be completed. Check this order before trying again.'});
         return;
       }
 
@@ -939,17 +940,17 @@ apiRouter.get('/payments/verify/:reference', async (req: Request, res: Response)
 /**
  * 2b. POST /api/payments/cancel
  * Handles customer-initiated transaction cancellations (e.g., closing checkout popup).
- * Transitions pending order to 'cancelled' status cleanly and records reason.
+ * Reconciles with the provider; uncertain or ongoing payments remain pending.
  */
-apiRouter.post('/payments/cancel', async (req: Request, res: Response) => {
+apiRouter.post('/payments/cancel', createRateLimiter({windowMs:60_000,max:30}), async (req: Request, res: Response) => {
   try {
     const { orderRef } = req.body || {};
-    if (!orderRef) {
+    if (typeof orderRef !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(orderRef)) {
       res.status(400).json({ error: 'Order reference is required.' });
       return;
     }
 
-    const result = await OrdersStore.cancelOrder(orderRef, 'customer_closed_checkout');
+    const result = await reconcileCheckoutClosure(orderRef);
     if (!result.order) {
       res.status(404).json({ error: 'Order reference not found.' });
       return;
