@@ -1,3 +1,4 @@
+import {useVisualEditMarkers} from './editor/VisualEditMarkers';
 import { websiteActionText, readableWebsiteColor } from '../../utils/websiteBrand';
 import { SafeImage } from './SafeImage.js';
 import React, { useState } from 'react';
@@ -55,6 +56,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
   onCtaClick,
   isMobileView,
 }) => {
+  const edit = useVisualEditMarkers();
   // Extract and standardize template color scheme with safe fallbacks
   const p = template.colorScheme || {
     primary: '#0f172a',
@@ -171,7 +173,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
               <span
                 className="font-bold text-sm sm:text-base tracking-wide block leading-none font-serif truncate max-w-[150px] sm:max-w-none"
                 style={{ color: readableWebsiteColor(p.primary, [p.background,p.surface]) }}
-              >
+               {...edit("content:businessName")}>
                 {template.demoBusinessName}
               </span>
               <span className="text-[10px] uppercase tracking-widest block mt-0.5" style={{ color: p.mutedText }}>
@@ -204,7 +206,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
           }}
         >
           {template.heroImage && (
-            <SafeImage className="absolute inset-0 opacity-45   " src={template.heroImage} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
+            <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-45   " src={template.heroImage} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
           )}
           <div className="relative max-w-3xl space-y-4">
             <div
@@ -215,11 +217,11 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
               <span>Modern Ghanaian Gastronomy</span>
             </div>
 
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-normal tracking-tight leading-[1.15]">
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-normal tracking-tight leading-[1.15]" {...edit("content:tagline")}>
               {template.demoHeroTagline}
             </h1>
 
-            <p className="text-xs sm:text-sm text-slate-200 font-sans max-w-xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-200 font-sans max-w-xl leading-relaxed" {...edit("content:aboutText")}>
               {template.demoSubtext}
             </p>
 
@@ -425,10 +427,10 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
         <footer id="location" className="py-8 px-4 sm:px-12 text-xs text-white" style={{ backgroundColor: p.primary, color: websiteActionText(p.primary) }}>
           <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-start justify-between gap-4">
             <div className="space-y-1">
-              <h4 className="font-serif font-bold text-base" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }}>
+              <h4 className="font-serif font-bold text-base" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }} {...edit("content:businessName")}>
                 {template.demoBusinessName}
               </h4>
-              <p className="text-slate-300 text-xs">{template.location}</p>
+              <p className="text-slate-300 text-xs" {...edit("content:location")}>{template.location}</p>
             </div>
             <div className="text-slate-300 text-xs">
               <div className="font-bold text-white uppercase text-[10px]">Reservations</div>
@@ -461,7 +463,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
           <div className="flex items-center gap-3 text-[10px] sm:text-[11px] truncate">
             <span className="flex items-center gap-1.5 text-slate-300">
               <MapPin className="w-3.5 h-3.5" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }} />
-              <span className="truncate">{template.location}</span>
+              <span className="truncate" {...edit("content:location")}>{template.location}</span>
             </span>
           </div>
           <div className="flex items-center gap-2 text-[10px] font-mono shrink-0">
@@ -484,7 +486,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
               <HardHat className="w-5 h-5 text-black" />
             </div>
             <div>
-              <span className="font-black text-sm sm:text-base tracking-tight text-white block uppercase leading-none truncate max-w-[170px] sm:max-w-none">
+              <span className="font-black text-sm sm:text-base tracking-tight text-white block uppercase leading-none truncate max-w-[170px] sm:max-w-none" {...edit("content:businessName")}>
                 {template.demoBusinessName}
               </span>
               <span className="text-[9px] uppercase tracking-widest font-mono font-bold block mt-0.5" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }}>
@@ -512,7 +514,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
           }}
         >
           {template.heroImage && (
-            <SafeImage className="absolute inset-0 opacity-40   mix-blend-luminosity" src={template.heroImage} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
+            <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-40   mix-blend-luminosity" src={template.heroImage} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
           )}
           <div className="relative max-w-3xl space-y-4 sm:space-y-5">
             <div
@@ -523,11 +525,11 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
               <span>Heavy Civil & Commercial EPC</span>
             </div>
 
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black uppercase tracking-tight text-white leading-[1.1]">
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black uppercase tracking-tight text-white leading-[1.1]" {...edit("content:tagline")}>
               {template.demoHeroTagline}
             </h1>
 
-            <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed" {...edit("content:aboutText")}>
               {template.demoSubtext}
             </p>
 
@@ -641,8 +643,8 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
         <footer className="border-t py-8 px-4 sm:px-12 text-xs text-slate-400" style={{ backgroundColor: '#070b10', borderColor: p.border }}>
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between gap-4">
             <div>
-              <div className="font-black text-white uppercase text-sm">{template.demoBusinessName}</div>
-              <div className="text-xs text-slate-400 mt-1">{template.location}</div>
+              <div className="font-black text-white uppercase text-sm" {...edit("content:businessName")}>{template.demoBusinessName}</div>
+              <div className="text-xs text-slate-400 mt-1" {...edit("content:location")}>{template.location}</div>
             </div>
             <div className="text-xs">{template.hoursOrContact}</div>
           </div>
@@ -699,7 +701,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
             className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-white font-bold shrink-0"
             style={{ backgroundColor: p.primary, color: websiteActionText(p.primary) }}
           >
-            {template.siteContent?.logoUrl ? (<SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} />) : layout === 'realestate' ? (
+            {template.siteContent?.logoUrl ? (<SafeImage {...edit("content:logoUrl")} src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} />) : layout === 'realestate' ? (
               <Building className="w-4 h-4 text-white" />
             ) : layout === 'portfolio' ? (
               <Camera className="w-4 h-4 text-white" />
@@ -719,7 +721,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
             <span
               className="font-black text-sm sm:text-base tracking-tight block leading-none truncate max-w-[160px] sm:max-w-none"
               style={{ color: p.text }}
-            >
+             {...edit("content:businessName")}>
               {template.demoBusinessName}
             </span>
             <span
@@ -775,7 +777,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
         }}
       >
         {template.heroImage && (
-          <SafeImage className="absolute inset-0 opacity-40  " src={template.heroImage} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
+          <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-40  " src={template.heroImage} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         )}
         <div className="relative max-w-3xl space-y-4">
           <span
@@ -785,11 +787,11 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
             {template.badgeText || template.categoryLabel}
           </span>
 
-          <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-white">
+          <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-white" {...edit("content:tagline")}>
             {template.demoHeroTagline}
           </h1>
 
-          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed max-w-xl">
+          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed max-w-xl" {...edit("content:aboutText")}>
             {template.demoSubtext}
           </p>
 
@@ -931,8 +933,8 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
       >
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between gap-4">
           <div className="space-y-1">
-            <h4 className="font-bold text-white text-sm">{template.demoBusinessName}</h4>
-            <p className="text-xs opacity-80">{template.location}</p>
+            <h4 className="font-bold text-white text-sm" {...edit("content:businessName")}>{template.demoBusinessName}</h4>
+            <p className="text-xs opacity-80" {...edit("content:location")}>{template.location}</p>
           </div>
           <div className="text-xs opacity-90">{template.hoursOrContact}</div>
         </div>

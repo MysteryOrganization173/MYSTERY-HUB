@@ -1,3 +1,4 @@
+import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry';
 import { SafeImage } from '../SafeImage.js';
@@ -20,6 +21,7 @@ interface TemplateViewProps {
 }
 
 export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
+  const edit = useVisualEditMarkers();
   const [filter, setFilter] = useState<string>('All');
   const [commissionBooked, setCommissionBooked] = useState<boolean>(false);
 
@@ -44,14 +46,14 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
           <span className="w-2 h-2 rounded-full bg-[var(--website-accent,#00c365)] animate-pulse" />
           <span>Project enquiries</span>
         </div>
-        <div className="text-[11px] text-zinc-500 font-mono">{template.location}</div>
+        <div className="text-[11px] text-zinc-500 font-mono" {...edit("content:location")}>{template.location}</div>
       </div>
 
       {/* Navigation */}
       <nav className="bg-[var(--website-primary,#09090b)]/90 backdrop-blur-md border-b border-[#27272a] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-2 min-w-0 flex-1 pr-3">
-          {template.siteContent?.logoUrl && <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} />}
-          <span className="font-mono font-bold text-base truncate tracking-tighter text-white">
+          {template.siteContent?.logoUrl && <SafeImage {...edit("content:logoUrl")} src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} />}
+          <span className="font-mono font-bold text-base truncate tracking-tighter text-white" {...edit("content:businessName")}>
             {template.demoBusinessName}
           </span>
           <span className="hidden sm:inline text-[10px] text-[var(--website-accent,#00c365)] font-mono">/ visual dir.</span>
@@ -72,7 +74,7 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
           </a>
         </div>
 
-        <button
+        <button {...edit("content:ctaLabel")}
           onClick={onCtaClick}
           className="px-4 py-1.5 rounded-full bg-[#fafafa] hover:bg-[var(--website-accent,#00c365)] hover:text-black text-black font-mono font-bold text-xs uppercase transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
         >
@@ -83,18 +85,18 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
 
       {/* Full-Bleed Editorial Statement Hero */}
       <div className="relative py-20 sm:py-32 px-6 sm:px-12 border-b border-[#27272a] overflow-hidden">
-        <SafeImage className="absolute inset-0 opacity-40   grayscale" src={template.heroImage || 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
+        <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-40   grayscale" src={template.heroImage || 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-4xl mx-auto space-y-6 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs font-mono">
             <Camera className="w-3.5 h-3.5 text-[var(--website-accent,#00c365)]" />
             <span>{template.siteContent ? template.categoryLabel : 'Documentary & Fashion Cinematography'}</span>
           </div>
 
-          <h1 className="text-3xl sm:text-6xl font-black tracking-tight leading-[1.05] text-white">
+          <h1 className="text-3xl sm:text-6xl font-black tracking-tight leading-[1.05] text-white" {...edit("content:tagline")}>
             {template.demoHeroTagline}
           </h1>
 
-          <p className="text-sm sm:text-base text-zinc-400 font-mono max-w-xl mx-auto leading-relaxed">
+          <p className="text-sm sm:text-base text-zinc-400 font-mono max-w-xl mx-auto leading-relaxed" {...edit("content:aboutText")}>
             {template.demoSubtext}
           </p>
 

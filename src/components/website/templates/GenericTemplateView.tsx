@@ -1,3 +1,4 @@
+import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
@@ -23,6 +24,7 @@ interface TemplateViewProps {
 }
 
 export const GenericTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
+  const edit = useVisualEditMarkers();
   const [formSubmitted, setFormSubmitted] = useState<boolean>(false);
   const items = template.items || [];
   const palette = template.colorScheme || {
@@ -87,7 +89,7 @@ export const GenericTemplateView: React.FC<TemplateViewProps> = ({ template, onC
             <span
               className="font-black text-base sm:text-lg tracking-tight block leading-none"
               style={{ color: palette.primary }}
-            >
+             {...edit("content:businessName")}>
               {template.demoBusinessName}
             </span>
             <span
@@ -119,7 +121,7 @@ export const GenericTemplateView: React.FC<TemplateViewProps> = ({ template, onC
         }}
       >
         {template.heroImage && (
-          <SafeImage className="absolute inset-0 opacity-40  " src={template.heroImage} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
+          <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-40  " src={template.heroImage} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         )}
         <div className="relative max-w-3xl space-y-5">
           <span
@@ -129,11 +131,11 @@ export const GenericTemplateView: React.FC<TemplateViewProps> = ({ template, onC
             {template.categoryLabel}
           </span>
 
-          <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight text-white">
+          <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight text-white" {...edit("content:tagline")}>
             {template.demoHeroTagline}
           </h1>
 
-          <p className="text-sm sm:text-base text-slate-200 leading-relaxed max-w-xl">
+          <p className="text-sm sm:text-base text-slate-200 leading-relaxed max-w-xl" {...edit("content:aboutText")}>
             {template.demoSubtext}
           </p>
 
@@ -281,7 +283,7 @@ export const GenericTemplateView: React.FC<TemplateViewProps> = ({ template, onC
       >
         <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <h4 className="font-bold text-white text-base">
+            <h4 className="font-bold text-white text-base" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </h4>
             <p className="text-xs text-slate-300 leading-relaxed">
@@ -290,7 +292,7 @@ export const GenericTemplateView: React.FC<TemplateViewProps> = ({ template, onC
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Address</h5>
-            <p className="text-xs text-slate-300">{template.location}</p>
+            <p className="text-xs text-slate-300" {...edit("content:location")}>{template.location}</p>
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Contact Information</h5>

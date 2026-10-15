@@ -1,3 +1,4 @@
+import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
@@ -22,6 +23,7 @@ interface TemplateViewProps {
 }
 
 export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
+  const edit = useVisualEditMarkers();
   const [booked, setBooked] = useState<boolean>(false);
   const suites = template.items || [];
 
@@ -37,17 +39,17 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       {/* Top Banner */}
       <div className="bg-[var(--website-primary,#132e23)] text-[var(--website-background,#f8f6f0)] text-xs px-4 py-2 text-center tracking-wider flex items-center justify-center gap-2">
         <Palmtree className="w-3.5 h-3.5 text-[var(--website-accent,#10b981)]" />
-        <span>{template.location}</span>
+        <span {...edit("content:location")}>{template.location}</span>
       </div>
 
       {/* Navigation */}
       <nav className="bg-white/95 backdrop-blur-md border-b border-[#e8e5dc] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-[var(--website-primary,#132e23)] text-[var(--website-accent,#10b981)] flex items-center justify-center font-bold">
-            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Palmtree className="w-5 h-5" />}
+            {template.siteContent?.logoUrl ? <SafeImage {...edit("content:logoUrl")} src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Palmtree className="w-5 h-5" />}
           </div>
           <div>
-            <span className="font-extrabold text-base tracking-tight text-[var(--website-primary,#132e23)] block leading-none font-serif">
+            <span className="font-extrabold text-base tracking-tight text-[var(--website-primary,#132e23)] block leading-none font-serif" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </span>
             <span className="text-[10px] text-[var(--website-accent,#10b981)] uppercase tracking-widest font-bold block mt-0.5">
@@ -71,7 +73,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
           </a>
         </div>
 
-        <button
+        <button {...edit("content:ctaLabel")}
           onClick={onCtaClick}
           className="px-4 py-2 rounded-full bg-[var(--website-primary,#132e23)] hover:bg-[#1f4838] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
         >
@@ -82,18 +84,18 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
 
       {/* Hero Section */}
       <div className="relative py-16 sm:py-24 px-6 sm:px-12 bg-gradient-to-r from-[#0d1e17] via-[#143025] to-[#0b1812] text-white overflow-hidden">
-        <SafeImage className="absolute inset-0 opacity-45  " src={template.heroImage || 'https://images.unsplash.com/photo-1566073771259-6a8506099945'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
+        <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-45  " src={template.heroImage || 'https://images.unsplash.com/photo-1566073771259-6a8506099945'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-3xl space-y-5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#10b981)]/20 border border-[var(--website-accent,#10b981)]/40 text-[#a7f3d0] text-xs font-semibold uppercase tracking-wider">
             <Compass className="w-3.5 h-3.5 text-[var(--website-accent,#10b981)]" />
             <span>{template.siteContent ? template.location || template.categoryLabel : 'Ada Foah Estuary Sanctuary'}</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-serif tracking-tight leading-tight text-white">
+          <h1 className="text-3xl sm:text-5xl font-serif tracking-tight leading-tight text-white" {...edit("content:tagline")}>
             {template.demoHeroTagline}
           </h1>
 
-          <p className="text-sm sm:text-base text-slate-300 max-w-xl leading-relaxed">
+          <p className="text-sm sm:text-base text-slate-300 max-w-xl leading-relaxed" {...edit("content:aboutText")}>
             {template.demoSubtext}
           </p>
 
@@ -245,16 +247,16 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       <footer id="location" className="bg-[#0e2119] text-emerald-100 py-10 px-6 sm:px-12 text-xs">
         <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <h4 className="font-serif font-bold text-base text-white">
+            <h4 className="font-serif font-bold text-base text-white" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </h4>
-            <p className="text-emerald-200/80 text-xs leading-relaxed">
+            <p className="text-emerald-200/80 text-xs leading-relaxed" {...edit("content:aboutText")}>
               {template.demoSubtext}
             </p>
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Resort Location</h5>
-            <p className="text-emerald-200/80 text-xs">{template.location}</p>
+            <p className="text-emerald-200/80 text-xs" {...edit("content:location")}>{template.location}</p>
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Concierge Reservations</h5>

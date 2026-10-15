@@ -1,3 +1,4 @@
+import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
@@ -22,6 +23,7 @@ interface TemplateViewProps {
 }
 
 export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
+  const edit = useVisualEditMarkers();
   const [selectedStylist, setSelectedStylist] = useState<string>('Abena - Braiding Artisan');
   const [selectedService, setSelectedService] = useState<string>('Goddess Knotless Box Braids (Mid-Back)');
   const [bookingConfirmed, setBookingConfirmed] = useState<boolean>(false);
@@ -40,17 +42,17 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       {/* Top Rose Gold Announcement */}
       <div className="bg-[var(--website-accent,#ec4899)] text-white text-xs px-4 py-2 text-center tracking-wider font-semibold flex items-center justify-center gap-2">
         <Sparkles className="w-3.5 h-3.5" />
-        <span>{template.location}</span>
+        <span {...edit("content:location")}>{template.location}</span>
       </div>
 
       {/* Navigation */}
       <nav className="bg-white/95 backdrop-blur-md border-b border-[#fae3ec] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-[#fdf2f6] border border-[var(--website-accent,#ec4899)]/30 text-[var(--website-accent,#ec4899)] flex items-center justify-center">
-            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Scissors className="w-5 h-5" />}
+            {template.siteContent?.logoUrl ? <SafeImage {...edit("content:logoUrl")} src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Scissors className="w-5 h-5" />}
           </div>
           <div>
-            <span className="font-bold text-base sm:text-lg tracking-tight text-[var(--website-primary,#3b1828)] block leading-none font-serif">
+            <span className="font-bold text-base sm:text-lg tracking-tight text-[var(--website-primary,#3b1828)] block leading-none font-serif" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </span>
             <span className="text-[10px] text-[var(--website-accent,#ec4899)] uppercase tracking-widest font-semibold block mt-0.5">
@@ -74,7 +76,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
           </a>
         </div>
 
-        <button
+        <button {...edit("content:ctaLabel")}
           onClick={onCtaClick}
           className="px-4 py-2 rounded-full bg-[var(--website-accent,#ec4899)] hover:bg-[#db2777] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
         >
@@ -85,18 +87,18 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
 
       {/* Hero Banner */}
       <div className="relative py-16 sm:py-24 px-6 sm:px-12 bg-gradient-to-r from-[#381425] via-[#4d1b33] to-[#2b0f1d] text-white overflow-hidden">
-        <SafeImage className="absolute inset-0 opacity-45   " src={template.heroImage || 'https://images.unsplash.com/photo-1560066984-138dadb4c035'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
+        <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-45   " src={template.heroImage || 'https://images.unsplash.com/photo-1560066984-138dadb4c035'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-2xl space-y-5">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-[#fbcfe8] text-xs font-semibold uppercase tracking-wider">
             <Heart className="w-3.5 h-3.5 text-[var(--website-accent,#ec4899)]" />
             <span>{template.categoryLabel}</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-serif tracking-tight leading-tight text-white">
+          <h1 className="text-3xl sm:text-5xl font-serif tracking-tight leading-tight text-white" {...edit("content:tagline")}>
             {template.demoHeroTagline}
           </h1>
 
-          <p className="text-sm sm:text-base text-pink-100 max-w-lg leading-relaxed">
+          <p className="text-sm sm:text-base text-pink-100 max-w-lg leading-relaxed" {...edit("content:aboutText")}>
             {template.demoSubtext}
           </p>
 
@@ -298,16 +300,16 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       <footer id="salon-info" className="bg-[#240c17] text-pink-100 py-10 px-6 sm:px-12 text-xs">
         <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <h4 className="font-serif font-bold text-base text-white">
+            <h4 className="font-serif font-bold text-base text-white" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </h4>
-            <p className="text-pink-200/80 text-xs leading-relaxed">
+            <p className="text-pink-200/80 text-xs leading-relaxed" {...edit("content:aboutText")}>
               {template.siteContent?.aboutText ?? template.demoSubtext}
             </p>
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Studio Location</h5>
-            <p className="text-pink-200/80 text-xs">{template.location}</p>
+            <p className="text-pink-200/80 text-xs" {...edit("content:location")}>{template.location}</p>
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Direct Studio Line</h5>

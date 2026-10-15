@@ -1,3 +1,6 @@
+import {VisualContextPanel} from './VisualContextPanel';
+import {WebsiteEditorToolbar} from './WebsiteEditorToolbar';
+import {visualTargets, applyVisualValue} from '../../../utils/websiteVisualEditing';
 import { WebsitePreviewFrame } from '../WebsitePreviewFrame';
 import { WebsiteImageLibrary, WebsiteImageField } from './WebsiteImageField';
 import { trackWebsiteEvent } from '../../../utils/websiteAnalytics';
@@ -53,6 +56,23 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const { openMysteryAi } = useApp();
   const [mediaOpen, setMediaOpen] = useState(false);
   const [currentSite, setCurrentSite] = useState<WebsiteSiteRecord>(initialSite);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  // This fullscreen workspace must not leave the underlying app's navigation or
+  // floating launcher in the keyboard/touch path. Restore pre-existing state on exit.
+  useEffect(() => {
+    const workspace=workspaceRef.current;if(!workspace)return;
+    const changed=new Map<HTMLElement,boolean>();
+    let branch:HTMLElement=workspace;
+    while(branch.parentElement){
+      for(const sibling of Array.from(branch.parentElement.children)) {
+        if(sibling!==branch && sibling instanceof HTMLElement && !['SCRIPT','STYLE','LINK'].includes(sibling.tagName)) {
+          changed.set(sibling,sibling.inert);sibling.inert=true;
+        }
+      }
+      branch=branch.parentElement;if(branch===document.body)break;
+    }
+    return ()=>{for(const [element,inert]of changed)element.inert=inert;};
+  },[]);
 
   useEffect(() => { trackWebsiteEvent('website_editor_opened', { siteId:initialSite.id, templateId:initialSite.template_id, source:'editor' }, sessionToken); }, [initialSite.id, sessionToken]);
 
@@ -77,6 +97,12 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
   // View Mode: 'edit' or 'preview' (on mobile)
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
+  const [allSettings, setAllSettings] = useState(false);
+  const [visualSelection, setVisualSelection] = useState<string|null>(null);
+  const [focusRequest, setFocusRequest] = useState(0);
+  const clearSelection = () => {setVisualSelection(null);setFocusRequest(n=>n+1);};
+  const selectTarget = (id:string|null) => {setAllSettings(false);setVisualSelection(id);};
+  const changeMode = (mode:'edit'|'preview') => {setActiveTab(mode);setVisualSelection(null);setAllSettings(false);};
 
   // Device View in Preview: responsive default based on viewport width
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>(() => {
@@ -124,6 +150,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     serverSiteRef.current = initialSite;
     editVersion.current = 0; savedVersion.current = 0; failedSaveVersion.current = null;
     setIsDirty(false); setSaveStatusText('saved'); setActiveSection('business');
+    setVisualSelection(null);setAllSettings(false);setActiveTab('edit');setFocusRequest(0);
   }, [initialSite.id, initialSite.template_id]);
 
   // Mark dirty on any edit
@@ -158,7 +185,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     });
     observer.observe(canvasRef.current);
     return () => observer.disconnect();
-  }, [previewDevice, activeTab]);
+  }, [previewDevice, activeTab, allSettings, visualSelection]);
 
   // A completed save only acknowledges the snapshot it sent, not edits made during the request.
   const handleSaveDraft = async (): Promise<WebsiteSiteRecord | null> => {
@@ -237,335 +264,36 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const targetWidth = previewDevice === 'mobile' ? 375 : previewDevice === 'tablet' ? 768 : 1280;
   const paddingX =
     previewDevice === 'desktop' || previewDevice === 'tablet' ? (isMobileScreen ? 8 : 16) : 16;
-  const usableWidth = Math.max(280, availableWidth - paddingX);
+  const usableWidth = Math.max(240, availableWidth - paddingX);
 
   const isWidePreviewOnSmallScreen = false; // Scale a fixed iframe viewport; never shrink its media-query width.
   const effectiveCanvasWidth = targetWidth;
   const scale = isWidePreviewOnSmallScreen ? 1 : Math.min(1, usableWidth / targetWidth);
 
+  const targets = visualTargets(previewTemplate);
+  const selected = targets.find(t=>t.id===visualSelection);
+  const contextualTargets = visualSelection==='branding' ? targets.filter(t=>t.source.kind==='settings') : selected ? [selected,...(selected.destinationId ? targets.filter(t=>t.id===selected.destinationId) : [])] : [];
+  const editVisualValue = (id:string,value:string) => {
+    if(isPublishing)return;
+    const draft=draftRef.current;
+    const next=applyVisualValue(draft.content,draft.settings,mergeSiteWithTemplate(baseTemplate,draft.content,draft.settings),id,value);
+    if(!next)return;
+    draftRef.current={...draft,...next};setContent(next.content);setSettings(next.settings);markDirty();
+  };
+  const openSettings=()=>{setAllSettings(true);setVisualSelection(null);};
+
   return (
-    <div className="fixed inset-0 z-50 bg-[#080d11] text-slate-100 flex flex-col font-sans overflow-hidden">
+    <div ref={workspaceRef} role="dialog" aria-modal="true" aria-label="Website editor" className="fixed inset-0 z-[80] bg-[#080d11] text-slate-100 flex flex-col font-sans overflow-hidden">
       {mediaOpen && <WebsiteImageLibrary siteId={currentSite.id} token={sessionToken} onClose={()=>setMediaOpen(false)} onChoose={url=>{setContent({...content,heroImage:url});markDirty();setMediaOpen(false);}} />}
-      {/* =========================================================
-          TOP ACTION BAR — MOBILE ONLY (< sm)
-          Two-level compact toolbar
-          ========================================================= */}
-      <header className="sm:hidden bg-[#0a1117] border-b border-slate-800 flex flex-col shrink-0 z-30 select-none">
-        {/* ROW 1: Navigation, Identity, Status, Quick Actions */}
-        <div className="h-12 px-3 flex items-center justify-between gap-2 border-b border-slate-800/60">
-          <div className="flex items-center gap-2 min-w-0">
-            <button
-              type="button"
-              onClick={() => {
-                if (isDirty) {
-                  if (window.confirm('You have unsaved changes. Exit anyway?')) {
-                    onClose();
-                  }
-                } else {
-                  onClose();
-                }
-              }}
-              className="w-11 h-11 -ml-1 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 active:bg-slate-700 flex items-center justify-center transition-colors cursor-pointer shrink-0"
-              title="Back to Dashboard"
-              aria-label="Back to Dashboard"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-
-            <div className="min-w-0 flex flex-col justify-center">
-              <div className="flex items-center gap-1.5">
-                <h2 className="font-bold text-xs text-white truncate max-w-[130px]">
-                  {content.businessName || siteName}
-                </h2>
-                <span
-                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-wider shrink-0 ${
-                    currentSite.status === 'published'
-                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                      : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                  }`}
-                >
-                  {currentSite.status === 'published' ? 'Live' : 'Draft'}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] leading-none text-slate-400 mt-0.5">
-                {saveStatusText === 'saving' && (
-                  <span className="text-amber-400 flex items-center gap-1">
-                    <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-                    <span>Saving...</span>
-                  </span>
-                )}
-                {saveStatusText === 'saved' && (
-                  <span className="text-emerald-400 flex items-center gap-1">
-                    <Check className="w-2.5 h-2.5" />
-                    <span>Draft saved</span>
-                  </span>
-                )}
-                {saveStatusText === 'unsaved' && (
-                  <span className="text-amber-300 font-medium">Unsaved changes</span>
-                )}
-                <span className="text-slate-600">·</span>
-                <span className="truncate max-w-[90px] text-slate-400">{baseTemplate.title}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            {currentSite.status === 'published' && (
-              <>
-                <a
-                  href={`/sites/${currentSite.slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-11 h-11 rounded-lg bg-slate-800 text-emerald-400 flex items-center justify-center border border-slate-700 active:scale-95"
-                  title="View Live Site"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-                <button
-                  type="button"
-                  onClick={handleCopyLink}
-                  className="w-11 h-11 rounded-lg bg-slate-800 text-slate-200 flex items-center justify-center border border-slate-700 active:scale-95 cursor-pointer"
-                  title="Copy Link"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                </button>
-              </>
-            )}
-            {isDirty && (
-              <button
-                type="button"
-                onClick={handleSaveDraft}
-                disabled={isSaving}
-                className="w-11 h-11 rounded-lg bg-slate-800 text-slate-200 flex items-center justify-center border border-slate-700 active:scale-95 cursor-pointer disabled:opacity-50"
-                title="Save Draft"
-              >
-                <Save className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* ROW 2: Edit/Preview Switcher + Obvious Publish CTA */}
-        <div className="min-h-14 px-3 flex items-center justify-between gap-2">
-          {/* [Edit] [Preview] */}
-          <div className="flex items-center bg-[#070c10] border border-slate-800 rounded-xl p-0.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setActiveTab('edit')}
-              className={`min-h-11 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'edit'
-                  ? 'bg-[#00c365] text-black shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('preview')}
-              className={`min-h-11 px-3 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                activeTab === 'preview'
-                  ? 'bg-[#00c365] text-black shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Eye className="w-3 h-3" />
-              <span>Preview</span>
-            </button>
-          </div>
-
-          {/* [Publish / Update] */}
-          <div className="flex items-center gap-1 shrink-0">
-            {currentSite.status === 'published' ? (
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={handlePublish}
-                  disabled={isPublishing}
-                  className="min-h-11 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs border border-emerald-500/40 flex items-center gap-1 cursor-pointer"
-                >
-                  <RefreshCw className={`w-3 h-3 ${isPublishing ? 'animate-spin' : ''}`} />
-                  <span>Publish</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleUnpublish}
-                  disabled={isPublishing}
-                  className="h-8 px-2 rounded-xl bg-slate-900 text-rose-400 hover:text-rose-300 text-xs border border-slate-800 cursor-pointer"
-                  title="Unpublish"
-                >
-                  Unpublish
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handlePublish}
-                disabled={isPublishing}
-                className="min-h-11 px-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider shadow-[0_0_12px_rgba(0,195,101,0.3)] flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
-              >
-                <Globe className="w-3.5 h-3.5" />
-                <span>Publish</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* =========================================================
-          TOP ACTION BAR — TABLET & DESKTOP (>= sm)
-          Information-dense single-row toolbar
-          ========================================================= */}
-      <header className="hidden sm:flex h-14 sm:h-16 px-4 sm:px-6 bg-[#0a1117] border-b border-slate-800 items-center justify-between shrink-0 z-30">
-        <div className="flex items-center gap-3 min-w-0">
-          <button
-            type="button"
-            onClick={() => {
-              if (isDirty) {
-                if (window.confirm('You have unsaved changes. Exit anyway?')) {
-                  onClose();
-                }
-              } else {
-                onClose();
-              }
-            }}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-            title="Back to Dashboard"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="font-bold text-sm sm:text-base text-white truncate max-w-[140px] sm:max-w-xs">
-                {content.businessName || siteName}
-              </h2>
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                  currentSite.status === 'published'
-                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                }`}
-              >
-                {currentSite.status === 'published' ? 'Live' : 'Draft'}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-400">
-              <span className="truncate">{baseTemplate.title}</span>
-              <span className="text-slate-600">·</span>
-              {saveStatusText === 'saving' && (
-                <span className="text-amber-400 flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3 animate-spin" />
-                  <span>Saving...</span>
-                </span>
-              )}
-              {saveStatusText === 'saved' && (
-                <span className="text-emerald-400 flex items-center gap-1">
-                  <Check className="w-3 h-3" />
-                  <span>Draft saved</span>
-                </span>
-              )}
-              {saveStatusText === 'unsaved' && (
-                <span className="text-amber-300 font-medium">Unsaved changes</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex items-center gap-2">
-          {/* Tablet Tab Switcher (lg:hidden) */}
-          <div className="lg:hidden flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5">
-            <button
-              type="button"
-              onClick={() => setActiveTab('edit')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
-                activeTab === 'edit' ? 'bg-[#00c365] text-black font-bold' : 'text-slate-400'
-              }`}
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('preview')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer ${
-                activeTab === 'preview' ? 'bg-[#00c365] text-black font-bold' : 'text-slate-400'
-              }`}
-            >
-              <Eye className="w-3 h-3" />
-              <span>Preview</span>
-            </button>
-          </div>
-
-          {/* Save Draft Button */}
-          <button
-            type="button"
-            onClick={handleSaveDraft}
-            disabled={isSaving}
-            className="hidden sm:inline-flex px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold border border-slate-700 transition-colors items-center gap-1.5 cursor-pointer disabled:opacity-50"
-          >
-            <Save className="w-3.5 h-3.5" />
-            <span>Save Draft</span>
-          </button>
-
-          {/* Publish / Unpublish */}
-          {currentSite.status === 'published' ? (
-            <>
-              <a
-                href={`/sites/${currentSite.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden md:inline-flex px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold border border-slate-700 transition-colors items-center gap-1.5"
-              >
-                <span>View Live</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
-                title="Copy Live Website URL"
-              >
-                <Copy className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Copy Link</span>
-              </button>
-
-              <button type="button" onClick={handlePublish} disabled={isPublishing} className="min-h-11 px-3 rounded-xl bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/40">{isPublishing?'Publishing…':'Publish Changes'}</button>
-              <button
-                type="button"
-                onClick={handleUnpublish}
-                disabled={isPublishing}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/40 text-rose-300 text-xs font-semibold border border-rose-900/40 transition-colors cursor-pointer"
-              >
-                Unpublish
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={handlePublish}
-              disabled={isPublishing}
-              className="px-4 py-1.5 sm:py-2 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(0,195,101,0.35)] flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <Globe className="w-3.5 h-3.5" />
-              <span>Publish</span>
-            </button>
-          )}
-        </div>
-      </header>
-
+      <WebsiteEditorToolbar name={content.businessName || siteName} mode={activeTab} device={previewDevice} status={saveStatusText} published={currentSite.status==='published'} saving={isSaving} publishing={isPublishing}
+        onExit={()=>{if(!isDirty || window.confirm('You have unsaved changes. Exit anyway?'))onClose();}} onMode={changeMode} onDevice={setPreviewDevice} onSave={()=>void handleSaveDraft()} onPublish={()=>void handlePublish()} onUnpublish={()=>void handleUnpublish()} onSettings={openSettings} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} liveUrl={`/sites/${currentSite.slug}`}/>
       {/* =========================================================
           WORKSPACE: LEFT EDITOR / RIGHT LIVE PREVIEW
           ========================================================= */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* LEFT COLUMN: EDITING CONTROLS */}
-        <div
-          inert={isPublishing}
-          className={`w-full lg:w-[460px] xl:w-[490px] border-r border-slate-800 bg-[#0a1117] flex flex-col shrink-0 overflow-hidden ${
-            activeTab === 'edit' ? 'flex' : 'hidden lg:flex'
-          }`}
-        >
+      <div className="flex-1 min-h-0 flex overflow-hidden relative">
+        {/* Existing structured controls remain available without a competing draft store. */}
+        {allSettings && <div inert={isPublishing} className="visual-all-settings">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-slate-700"><h3 className="font-bold">All Settings</h3><button type="button" className="visual-tool-button" onClick={()=>setAllSettings(false)}>Back to canvas</button></div>
           <label className="lg:hidden p-3 bg-[#070c10] border-b border-slate-800 text-xs text-slate-400">Editing
             <select aria-label="Editing area" value={activeSection} onChange={event=>setActiveSection(event.target.value as typeof activeSection)} className="block mt-1 w-full min-h-11 p-2 rounded-lg bg-slate-900 text-white border border-slate-700">
               {([['business','Business'],['contact','Contact'],['branding','Design'],['media','Images & Media'],['sections','Sections'],...(isDataReseller?[['bundles','Bundles & Pricing']]:[]),['cta','Main button'],['social','Social links']]).map(([id,label])=><option key={id} value={id}>{label}</option>)}
@@ -1195,151 +923,20 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               </div>
             )}
           </div>
-        </div>
-
-        {/* RIGHT COLUMN: LIVE RESPONSIVE PREVIEW */}
-        <div
-          className={`flex-1 flex flex-col bg-[#05080b] overflow-hidden ${
-            activeTab === 'preview' ? 'flex' : 'hidden lg:flex'
-          }`}
-        >
-          {/* Preview Viewport Toolbar */}
-          <div className="px-4 py-2 bg-[#090e13] border-b border-slate-800 flex items-center justify-between shrink-0 select-none">
-            <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-xl p-0.5">
-              <button
-                type="button"
-                onClick={() => setPreviewDevice('desktop')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  previewDevice === 'desktop'
-                    ? 'bg-[#00c365] text-black font-bold shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Desktop View (1280px)"
-              >
-                <Monitor className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Desktop</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewDevice('tablet')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  previewDevice === 'tablet'
-                    ? 'bg-[#00c365] text-black font-bold shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Tablet View (768px)"
-              >
-                <Tablet className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Tablet</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewDevice('mobile')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  previewDevice === 'mobile'
-                    ? 'bg-[#00c365] text-black font-bold shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Mobile View (375px)"
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Mobile</span>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsPrivateFullPreviewOpen(true)}
-                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Open Fullscreen Editor Preview"
-              >
-                <Eye className="w-3.5 h-3.5 text-[#00c365]" />
-                <span>Full Preview</span>
-              </button>
-              <div className="text-xs text-slate-400 hidden sm:flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Draft Preview</span>
-              </div>
-            </div>
+        </div>}
+        <div className="visual-canvas">
+          <div className="flex flex-wrap items-center justify-between gap-1 px-3 py-1 border-b border-slate-800 text-xs text-slate-300">
+            <p className="hidden sm:block">{activeTab==='edit'?'Tap a heading, image or contact detail to edit.':'Draft preview · payments are disabled'}</p>
+            <p className="sm:hidden">{activeTab==='edit'?'Tap to edit your website':'Safe draft preview'}</p>
+            <div className="flex"><button type="button" onClick={clearSelection} className="visual-tool-button" disabled={!visualSelection}>Deselect</button><button type="button" onClick={()=>setIsPrivateFullPreviewOpen(true)} className="visual-tool-button">Full Preview</button></div>
           </div>
-
-          {/* Wide Preview on Mobile/Small Screen Banner */}
-          {isWidePreviewOnSmallScreen && (
-            <div className="bg-amber-500/10 border-b border-amber-500/20 px-3.5 py-2 flex items-center justify-between gap-2 text-xs text-amber-300 shrink-0">
-              <div className="flex items-center gap-1.5 min-w-0">
-                {previewDevice === 'tablet' ? (
-                  <Tablet className="w-3.5 h-3.5 shrink-0 text-amber-400" />
-                ) : (
-                  <Monitor className="w-3.5 h-3.5 shrink-0 text-amber-400" />
-                )}
-                <span className="truncate">
-                  {previewDevice === 'tablet' ? 'Tablet view (768px)' : 'Desktop view (1280px)'}. Pan horizontally or open full preview:
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPrivateFullPreviewOpen(true)}
-                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-bold text-[11px] border border-amber-500/40 shrink-0 flex items-center gap-1 cursor-pointer"
-              >
-                <Eye className="w-3 h-3" />
-                <span>Full Preview</span>
-              </button>
-            </div>
-          )}
-
-          {/* Interactive Scaled Canvas Container */}
-          <div
-            ref={canvasRef}
-            className={`flex-1 w-full p-2 sm:p-4 lg:p-6 flex items-center justify-center relative bg-[#040608] ${
-              isWidePreviewOnSmallScreen ? 'overflow-auto block text-center' : 'overflow-hidden'
-            }`}
-          >
-            <div
-              className={`rounded-2xl border border-slate-800 shadow-2xl overflow-hidden bg-white relative transition-all duration-300 ${
-                isWidePreviewOnSmallScreen ? 'inline-block text-left' : ''
-              }`}
-              style={{
-                width: `${effectiveCanvasWidth + 2}px`,
-                flexShrink: 0,
-                maxWidth: 'none',
-                height: '100%',
-                maxHeight: '100%',
-                transform: scale < 0.99 ? `scale(${scale})` : undefined,
-                transformOrigin: 'top center',
-              }}
-            >
-              {/* Browser Mock Header */}
-              <div className="bg-[#0f1722] border-b border-slate-800 px-3 py-1.5 flex items-center justify-between text-[11px] text-slate-400 select-none">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-rose-500/80" />
-                  <span className="w-2 h-2 rounded-full bg-amber-500/80" />
-                  <span className="w-2 h-2 rounded-full bg-emerald-500/80" />
-                </div>
-                <div className="bg-black/60 px-3 py-0.5 rounded-lg border border-slate-800 text-[10px] font-mono text-slate-300 truncate max-w-[200px] sm:max-w-xs">
-                  /sites/{currentSite.slug}
-                </div>
-                <div className="text-[10px] text-emerald-400 font-semibold">
-                  {previewDevice === 'mobile' ? '375px' : previewDevice === 'tablet' ? '768px' : '1280px'}
-                </div>
-              </div>
-
-              {/* Rendered Live Website Canvas */}
-              <div className="h-[calc(100%-32px)] overflow-hidden w-full bg-white text-slate-900 scrollbar-thin">
-                <div className="h-[75dvh] min-h-[480px]"><WebsitePreviewFrame template={previewTemplate} siteId={currentSite.id} viewportWidth={targetWidth} /></div>
-
-                {/* Free Tier Attribution Badge */}
-                <div className="py-3 px-4 bg-[#090d11] border-t border-slate-800 text-center text-xs text-slate-400 select-none">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Sparkles className="w-3 h-3 text-[#00c365]" />
-                    <span>Powered by</span>
-                    <span className="font-bold text-[#00c365]">Mystery Hub</span>
-                  </span>
-                </div>
-              </div>
+          <div ref={canvasRef} className="visual-canvas-viewport">
+            <div style={{width:effectiveCanvasWidth, flexShrink:0, height:scale<1 ? 'calc(100% / '+scale+')' : '100%', transform:scale<1 ? 'scale('+scale+')' : undefined, transformOrigin:'top center'}} className="bg-white shadow-2xl rounded-lg overflow-hidden">
+              <WebsitePreviewFrame template={previewTemplate} siteId={currentSite.id} viewportWidth={targetWidth} editMode={activeTab==='edit' && !isPublishing} selectedTarget={visualSelection} onSelect={selectTarget} focusRequest={focusRequest}/>
             </div>
           </div>
         </div>
+        {activeTab==='edit' && contextualTargets.length>0 && <div className="contents" inert={isPublishing}><VisualContextPanel title={visualSelection==='branding'?'Website colors':selected!.label} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={openSettings}/></div>}
       </div>
 
       {/* =========================================================

@@ -1,3 +1,4 @@
+import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
@@ -23,6 +24,7 @@ interface TemplateViewProps {
 }
 
 export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
+  const edit = useVisualEditMarkers();
   const [propertyType, setPropertyType] = useState<string>('All');
   const [selectedLocation, setSelectedLocation] = useState<string>('All Locations');
   const [tourScheduled, setTourScheduled] = useState<boolean>(false);
@@ -47,7 +49,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <div className="bg-[var(--website-primary,#0f172a)] text-slate-300 text-xs px-4 py-2 flex items-center justify-between border-b border-slate-800">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[var(--website-accent,#0ea5e9)]" />
-          <span>{template.location}</span>
+          <span {...edit("content:location")}>{template.location}</span>
         </div>
         <div className="hidden sm:flex items-center gap-4 text-[11px]">
           <span>Confirm property documents</span>
@@ -60,10 +62,10 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <nav className="bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-[var(--website-primary,#0f172a)] text-[var(--website-accent,#0ea5e9)] flex items-center justify-center font-bold">
-            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Building className="w-5 h-5" />}
+            {template.siteContent?.logoUrl ? <SafeImage {...edit("content:logoUrl")} src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Building className="w-5 h-5" />}
           </div>
           <div>
-            <span className="font-extrabold text-base tracking-tight text-[var(--website-primary,#0f172a)] block leading-none">
+            <span className="font-extrabold text-base tracking-tight text-[var(--website-primary,#0f172a)] block leading-none" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </span>
             <span className="text-[10px] text-[var(--website-accent,#0ea5e9)] uppercase tracking-widest font-bold block mt-0.5">
@@ -87,7 +89,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
           </a>
         </div>
 
-        <button
+        <button {...edit("content:ctaLabel")}
           onClick={onCtaClick}
           className="px-4 py-2 rounded-xl bg-[var(--website-primary,#0f172a)] hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
         >
@@ -98,17 +100,17 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
       {/* Hero with Embedded Property Search Bar */}
       <div className="relative py-14 sm:py-20 px-6 sm:px-12 bg-gradient-to-r from-[#0c131f] via-[#111e31] to-[#0a101b] text-white overflow-hidden">
-        <SafeImage className="absolute inset-0 opacity-45  " src={template.heroImage || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
+        <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-45  " src={template.heroImage || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-4xl mx-auto space-y-6 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#0ea5e9)]/20 border border-[var(--website-accent,#0ea5e9)]/40 text-[#38bdf8] text-xs font-semibold uppercase tracking-wider">
             <span>Prime Real Estate in Ghana</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight text-white">
+          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight text-white" {...edit("content:tagline")}>
             {template.demoHeroTagline}
           </h1>
 
-          <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto leading-relaxed">
+          <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto leading-relaxed" {...edit("content:aboutText")}>
             {template.demoSubtext}
           </p>
 
@@ -338,16 +340,16 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <footer id="contact" className="bg-[var(--website-primary,#0f172a)] text-slate-400 py-10 px-6 sm:px-12 text-xs">
         <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <h4 className="font-bold text-white text-base">
+            <h4 className="font-bold text-white text-base" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className="text-xs text-slate-400 leading-relaxed" {...edit("content:aboutText")}>
               {template.demoSubtext}
             </p>
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Office Suite</h5>
-            <p className="text-xs">{template.location}</p>
+            <p className="text-xs" {...edit("content:location")}>{template.location}</p>
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Direct Broker Contact</h5>

@@ -1,3 +1,4 @@
+import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry';
 import { SafeImage } from '../SafeImage.js';
@@ -21,6 +22,7 @@ interface TemplateViewProps {
 }
 
 export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
+  const edit = useVisualEditMarkers();
   const [scheduled, setScheduled] = useState<boolean>(false);
   const products = template.items || [];
 
@@ -37,19 +39,19 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <div className="bg-[#0f141c] border-b border-slate-800/80 px-4 sm:px-8 py-2 text-xs flex items-center justify-between text-slate-400 font-mono">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#06b6d4] " />
-          <span className="text-slate-300">{template.demoBusinessName}</span>
+          <span className="text-slate-300" {...edit("content:businessName")}>{template.demoBusinessName}</span>
         </div>
-        <div className="text-[11px] text-cyan-400">{template.location}</div>
+        <div className="text-[11px] text-cyan-400" {...edit("content:location")}>{template.location}</div>
       </div>
 
       {/* Navigation */}
       <nav className="bg-[#090d14]/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[var(--website-accent,#8b5cf6)] to-[#06b6d4] p-0.5 flex items-center justify-center font-black">
-            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Cpu className="w-5 h-5 text-black" />}
+            {template.siteContent?.logoUrl ? <SafeImage {...edit("content:logoUrl")} src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Cpu className="w-5 h-5 text-black" />}
           </div>
           <div>
-            <span className="font-extrabold text-base tracking-tight text-white block leading-none font-mono">
+            <span className="font-extrabold text-base tracking-tight text-white block leading-none font-mono" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </span>
             <span className="text-[10px] text-[#06b6d4] uppercase tracking-widest font-mono font-bold block mt-0.5">
@@ -70,7 +72,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
           </a>
         </div>
 
-        <button
+        <button {...edit("content:ctaLabel")}
           onClick={onCtaClick}
           className="px-4 py-2 rounded-xl bg-[var(--website-accent,#8b5cf6)] hover:bg-[#7c3aed] text-white font-mono font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(139,92,246,0.3)] flex items-center gap-1.5 cursor-pointer"
         >
@@ -81,18 +83,18 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
       {/* Hero Section */}
       <div className="relative py-16 sm:py-24 px-6 sm:px-12 bg-gradient-to-b from-[#090d14] via-[#0d131f] to-[var(--website-background,#070a0f)] border-b border-slate-800 overflow-hidden">
-        <SafeImage className="absolute inset-0 opacity-40  " src={template.heroImage || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
+        <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-40  " src={template.heroImage || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-3xl space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#8b5cf6)]/15 border border-[var(--website-accent,#8b5cf6)]/40 text-[#c084fc] text-xs font-mono font-bold uppercase tracking-wider">
             <Zap className="w-3.5 h-3.5 text-[#06b6d4]" />
             <span>Mission-Critical African Enterprise Engineering</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-[1.08] text-white">
+          <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-[1.08] text-white" {...edit("content:tagline")}>
             {template.demoHeroTagline}
           </h1>
 
-          <p className="text-sm sm:text-base text-slate-300 font-sans max-w-xl leading-relaxed">
+          <p className="text-sm sm:text-base text-slate-300 font-sans max-w-xl leading-relaxed" {...edit("content:aboutText")}>
             {template.demoSubtext}
           </p>
 
@@ -224,16 +226,16 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <footer className="bg-[#05080c] border-t border-slate-800 py-10 px-6 sm:px-12 text-xs font-mono text-slate-400">
         <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <h4 className="font-bold text-white text-base font-mono">
+            <h4 className="font-bold text-white text-base font-mono" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </h4>
-            <p className="text-xs text-slate-400 leading-relaxed font-sans">
+            <p className="text-xs text-slate-400 leading-relaxed font-sans" {...edit("content:aboutText")}>
               {template.demoSubtext}
             </p>
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Engineering HQ</h5>
-            <p className="text-xs">{template.location}</p>
+            <p className="text-xs" {...edit("content:location")}>{template.location}</p>
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Operations Switch</h5>

@@ -1,3 +1,4 @@
+import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
@@ -21,6 +22,7 @@ interface TemplateViewProps {
 }
 
 export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
+  const edit = useVisualEditMarkers();
   const [cartCount, setCartCount] = useState<number>(1);
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [notification, setNotification] = useState<string | null>(null);
@@ -50,13 +52,13 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
       <nav className="bg-white border-b border-slate-200 px-4 sm:px-8 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-[var(--website-accent,#2563eb)] text-white flex items-center justify-center font-black">
-            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : template.demoBusinessName.slice(0,1)}
+            {template.siteContent?.logoUrl ? <SafeImage {...edit("content:logoUrl")} src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : template.demoBusinessName.slice(0,1)}
           </div>
           <div>
-            <span className="font-black text-base sm:text-lg tracking-tight text-slate-900 block leading-none">
+            <span className="font-black text-base sm:text-lg tracking-tight text-slate-900 block leading-none" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </span>
-            <span className="text-[10px] text-slate-500 block font-semibold mt-0.5">
+            <span className="text-[10px] text-slate-500 block font-semibold mt-0.5" {...edit("content:location")}>
               {template.location}
             </span>
           </div>
@@ -74,7 +76,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
             </span>
           </button>
 
-          <button
+          <button {...edit("content:ctaLabel")}
             onClick={onCtaClick}
             className="px-3.5 py-2 rounded-xl bg-[var(--website-accent,#2563eb)] hover:bg-[#1d4ed8] text-white font-bold text-xs transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
           >
@@ -94,17 +96,17 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
 
       {/* Hero Showcase */}
       <div className="relative py-12 sm:py-16 px-6 sm:px-12 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 text-white overflow-hidden">
-        <SafeImage className="absolute inset-0 opacity-40  " src={template.heroImage || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
+        <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-40  " src={template.heroImage || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-2xl space-y-4">
           <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30">
             Explore the collection
           </span>
 
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight text-white">
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight text-white" {...edit("content:tagline")}>
             {template.demoHeroTagline}
           </h1>
 
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-lg">
+          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-lg" {...edit("content:aboutText")}>
             {template.demoSubtext}
           </p>
 
@@ -251,16 +253,16 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
       <footer className="bg-slate-900 text-slate-400 py-10 px-6 sm:px-12 text-xs">
         <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <h4 className="font-bold text-white text-base">
+            <h4 className="font-bold text-white text-base" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </h4>
-            <p className="text-slate-400 text-xs leading-relaxed">
+            <p className="text-slate-400 text-xs leading-relaxed" {...edit("content:aboutText")}>
               {template.demoSubtext}
             </p>
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Showroom Address</h5>
-            <p className="text-xs">{template.location}</p>
+            <p className="text-xs" {...edit("content:location")}>{template.location}</p>
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Order Desk</h5>

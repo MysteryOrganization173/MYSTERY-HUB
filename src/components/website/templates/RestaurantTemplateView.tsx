@@ -1,3 +1,4 @@
+import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
@@ -23,6 +24,7 @@ interface TemplateViewProps {
 }
 
 export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
+  const edit = useVisualEditMarkers();
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [selectedPartySize, setSelectedPartySize] = useState<number>(2);
   const [reservationDate, setReservationDate] = useState<string>('2026-10-02');
@@ -49,20 +51,20 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
       {/* Editorial Announcement Bar */}
       <div className="bg-[var(--website-primary,#7a1c28)] text-[var(--website-background,#fcf9f5)] px-4 py-2 text-center text-xs tracking-wider uppercase font-sans flex items-center justify-center gap-2">
         <Sparkles className="w-3.5 h-3.5 text-[var(--website-accent,#c99a45)]" />
-        <span>{template.location}</span>
+        <span {...edit("content:location")}>{template.location}</span>
       </div>
 
       {/* Restaurant Navigation */}
       <nav className="bg-[var(--website-background,#fcf9f5)]/95 backdrop-blur-md border-b border-[#f3ece2] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30 font-sans">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-[var(--website-primary,#7a1c28)] text-[var(--website-accent,#c99a45)] flex items-center justify-center font-serif text-lg font-bold">
-            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : template.demoBusinessName.slice(0,1)}
+            {template.siteContent?.logoUrl ? <SafeImage {...edit("content:logoUrl")} src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : template.demoBusinessName.slice(0,1)}
           </div>
           <div>
-            <span className="font-bold text-base sm:text-lg tracking-wide text-[var(--website-primary,#7a1c28)] font-serif block leading-none">
+            <span className="font-bold text-base sm:text-lg tracking-wide text-[var(--website-primary,#7a1c28)] font-serif block leading-none" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </span>
-            <span className="text-[10px] text-[#78716c] uppercase tracking-widest block mt-0.5">
+            <span className="text-[10px] text-[#78716c] uppercase tracking-widest block mt-0.5" {...edit("content:location")}>
               {template.location}
             </span>
           </div>
@@ -83,7 +85,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
           </a>
         </div>
 
-        <button
+        <button {...edit("content:ctaLabel")}
           onClick={onCtaClick}
           className="px-4 py-2 rounded-full bg-[var(--website-primary,#7a1c28)] hover:bg-[#5d151e] text-[var(--website-background,#fcf9f5)] text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer font-sans"
         >
@@ -94,18 +96,18 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
       {/* Hero Section */}
       <div className="relative py-14 sm:py-20 px-6 sm:px-12 bg-gradient-to-br from-[#2a0e14] via-[#3b151d] to-[#1c090d] text-white overflow-hidden">
-        <SafeImage className="absolute inset-0 opacity-45   " src={template.heroImage || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
+        <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-45   " src={template.heroImage || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-3xl space-y-5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#c99a45)]/20 border border-[var(--website-accent,#c99a45)]/40 text-[var(--website-accent,#c99a45)] text-xs font-sans font-semibold tracking-wider uppercase">
             <Utensils className="w-3.5 h-3.5" />
             <span>{template.siteContent ? template.categoryLabel : 'Modern Ghanaian Gastronomy'}</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-normal tracking-tight leading-[1.15] text-white">
+          <h1 className="text-3xl sm:text-5xl font-normal tracking-tight leading-[1.15] text-white" {...edit("content:tagline")}>
             {template.demoHeroTagline}
           </h1>
 
-          <p className="text-sm sm:text-base text-slate-300 font-sans max-w-xl leading-relaxed">
+          <p className="text-sm sm:text-base text-slate-300 font-sans max-w-xl leading-relaxed" {...edit("content:aboutText")}>
             {template.demoSubtext}
           </p>
 
@@ -310,10 +312,10 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <footer id="location" className="bg-[#1c1917] text-white py-10 px-6 sm:px-12 font-sans text-xs">
         <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <h4 className="font-serif font-bold text-base text-[var(--website-accent,#c99a45)]">
+            <h4 className="font-serif font-bold text-base text-[var(--website-accent,#c99a45)]" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </h4>
-            <p className="text-slate-400 text-xs leading-relaxed">
+            <p className="text-slate-400 text-xs leading-relaxed" {...edit("content:aboutText")}>
               {template.demoSubtext}
             </p>
           </div>
@@ -321,7 +323,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
             <h5 className="font-bold text-white uppercase tracking-wider text-[11px]">
               Location & Hours
             </h5>
-            <p className="text-slate-400 text-xs">
+            <p className="text-slate-400 text-xs" {...edit("content:location")}>
               {template.location}
             </p>
           </div>

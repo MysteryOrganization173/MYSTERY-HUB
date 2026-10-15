@@ -1,3 +1,4 @@
+import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { websiteActionText, resolveResellerTheme } from '../../../utils/websiteBrand';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState, useEffect, useMemo } from 'react';
@@ -54,6 +55,7 @@ export function resolveDataResellerHeroImage(heroImage?: string): string {
 }
 
 export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick, managedCheckout, managedAvailability }) => {
+  const edit = useVisualEditMarkers();
   const [selectedNetwork, setSelectedNetwork] = useState<'mtn' | 'telecel' | 'at'>('mtn');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [orderNotice, setOrderNotice] = useState<string | null>(null);
@@ -223,11 +225,11 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-md shrink-0 "
             style={{ backgroundColor: p.accent, color:websiteActionText(p.accent), borderColor:p.border }}
           >
-            {template.siteContent?.logoUrl ? <SafeImage src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Smartphone className="w-5 h-5" />}
+            {template.siteContent?.logoUrl ? <SafeImage {...edit("content:logoUrl")} src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : <Smartphone className="w-5 h-5" />}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-extrabold text-sm sm:text-base tracking-tight leading-none" style={{ color: p.surfaceText }}>
+              <h1 {...edit("content:businessName")} className="font-extrabold text-sm sm:text-base tracking-tight leading-none" style={{ color: p.surfaceText }}>
                 {businessName}
               </h1>
               <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{backgroundColor:p.accent}} />
@@ -242,7 +244,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           {whatsapp && (
             <button
               type="button"
-              data-website-event="whatsapp_click"
+              {...edit("content:whatsapp")} data-website-event="whatsapp_click"
                   onClick={handleChatWhatsapp}
               className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 bg-[#25D366] hover:bg-[#22c35e] text-black"
             >
@@ -258,7 +260,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           2. DATA RESELLER HERO WITH BLENDED STARTER ARTWORK
           ========================================================= */}
       <section className="px-4 sm:px-8 py-4 sm:py-8 max-w-6xl mx-auto w-full">
-        <div
+        <div {...edit("content:heroImage")}
           className="relative rounded-2xl sm:rounded-3xl border overflow-hidden p-5 sm:p-8 lg:p-10 shadow-2xl transition-all"
           style={{
             backgroundColor: p.surface,
@@ -318,14 +320,14 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
               <span>MTN · Telecel · AirtelTigo</span>
             </div>
 
-            <h2
+            <h2 {...edit("content:tagline")}
               className="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.15]"
               style={{ color: p.surfaceText }}
             >
               {tagline}
             </h2>
 
-            <p className="text-xs sm:text-sm leading-relaxed max-w-lg" style={{ color: p.surfaceMutedText }}>
+            <p {...edit("content:aboutText")} className="text-xs sm:text-sm leading-relaxed max-w-lg" style={{ color: p.surfaceMutedText }}>
               {aboutText}
             </p>
 
@@ -366,7 +368,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <button
                 type="button"
-                data-website-primary-cta="true"
+                {...edit("content:ctaLabel")} data-website-primary-cta="true"
                 onClick={scrollToCatalog}
                 className="px-5 py-3 border rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 cursor-pointer active:scale-95 "
                 style={{ backgroundColor: p.accent, color:websiteActionText(p.accent), borderColor:p.border }}

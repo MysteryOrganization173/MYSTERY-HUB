@@ -1,3 +1,4 @@
+import {useVisualEditMarkers} from './editor/VisualEditMarkers';
 import { websiteActionText } from '../../utils/websiteBrand';
 import React from 'react';
 import type { SiteContent, WebsiteTemplate } from '../../types';
@@ -21,14 +22,15 @@ export function websiteSocialUrl(network: 'instagram'|'facebook'|'tiktok', value
 }
 /** Existing dedicated layouts share these real saved business/contact fields. No forms/checkout. */
 export function SiteContactDetails({template}:{template:WebsiteTemplate}) {
+  const edit=useVisualEditMarkers();
   const content=template.siteContent;
   if(!content)return null;
   return <section id="website-contact-details" aria-label="Business contact details" className="px-5 py-8 border-t" style={{backgroundColor:template.colorScheme?.background || '#fff',color:template.colorScheme?.text || '#0f172a'}}>
     <div className="max-w-6xl mx-auto space-y-3 break-words">
-      {content.logoUrl && <SafeImage src={content.logoUrl} alt={`${content.businessName} logo`} className="w-20 h-20 rounded-lg" style={{objectFit:'contain'}} />}
-      <strong className="block">{content.businessName}</strong>{content.location && <p>{content.location}</p>}
-      <div className="flex flex-wrap gap-4 text-sm">{content.phone && <a href={`tel:${content.phone.replace(/[^\d+]/g,'')}`}>Call {content.phone}</a>}{content.email && <a href={`mailto:${content.email}`}>{content.email}</a>}{content.whatsapp && <a href={`https://wa.me/${content.whatsapp.replace(/\D/g,'').replace(/^0/,'233')}`}>WhatsApp {content.whatsapp}</a>}</div>
-      <a href={template.id==='tmpl-data-reseller'?'#bundle-catalog':websiteContactTarget(content)} className="inline-block px-4 py-3 rounded-xl text-white" style={{backgroundColor:template.accentColor,color:websiteActionText(template.accentColor)}}>{content.ctaLabel || 'Contact us'}</a>
+      {content.logoUrl && <SafeImage {...edit("content:logoUrl")} src={content.logoUrl} alt={`${content.businessName} logo`} className="w-20 h-20 rounded-lg" style={{objectFit:'contain'}} />}
+      <strong {...edit("content:businessName")} className="block">{content.businessName}</strong>{content.location && <p {...edit("content:location")}>{content.location}</p>}
+      <div className="flex flex-wrap gap-4 text-sm">{content.phone && <a {...edit("content:phone")} href={`tel:${content.phone.replace(/[^\d+]/g,'')}`}>Call {content.phone}</a>}{content.email && <a {...edit("content:email")} href={`mailto:${content.email}`}>{content.email}</a>}{content.whatsapp && <a {...edit("content:whatsapp")} href={`https://wa.me/${content.whatsapp.replace(/\D/g,'').replace(/^0/,'233')}`}>WhatsApp {content.whatsapp}</a>}</div>
+      <a {...edit("content:ctaLabel")} href={template.id==='tmpl-data-reseller'?'#bundle-catalog':websiteContactTarget(content)} className="inline-block px-4 py-3 rounded-xl text-white" style={{backgroundColor:template.accentColor,color:websiteActionText(template.accentColor)}}>{content.ctaLabel || 'Contact us'}</a>
       <div className="flex flex-wrap gap-4 text-sm">{(['instagram','facebook','tiktok'] as const).map(network=>{const url=websiteSocialUrl(network,content.social?.[network]);return url?<a key={network} href={url} target="_blank" rel="noopener noreferrer" className="underline">{network}</a>:null;})}</div>
     </div>
   </section>;
