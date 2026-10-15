@@ -29,37 +29,35 @@ export const HomeMarketplaceSection: React.FC = () => {
     { icon: Store, title: 'Business Hardware', desc: 'Retail and POS equipment' },
   ];
   return (
-    <section className="home-marketplace" aria-labelledby="marketplace-heading">
-      <div className="home-container">
+    <section className="home-container home-marketplace" aria-labelledby="marketplace-heading">
+      <div className="home-marketplace-panel">
+        <div className="home-marketplace-art" aria-hidden="true">
+          <OptimizedImage src={BUSINESS_CONFIG.marketplaceHeroImageUrl} alt="" aspectRatio="16/10" objectFit="cover" responsiveWidths={[400, 640, 800]} sizes="(min-width: 1024px) 400px, (min-width: 768px) 40vw, 100vw" fallbackIcon={<Store className="w-12 h-12" />} />
+        </div>
         <div className="home-marketplace-intro">
-          <div>
-            <p className="home-eyebrow">Tech & Digital Marketplace</p>
-            <h2 id="marketplace-heading">Find your next<br /><span>work companion.</span></h2>
-            <p>Browse technology and digital tools. Send an enquiry to check availability, pricing and delivery before deciding.</p>
-            <a href="/marketplace" onClick={(e) => { e.preventDefault(); setActivePage('marketplace'); }} className="mh-button-secondary">Browse Marketplace<ArrowRight className="w-4 h-4" /></a>
-          </div>
-          <div className="home-marketplace-art" aria-hidden="true">
-            <OptimizedImage src={BUSINESS_CONFIG.marketplaceHeroImageUrl} alt="" aspectRatio="16/9" objectFit="cover" responsiveWidths={[480, 800, 1200]} sizes="(min-width: 768px) 50vw, 100vw" fallbackIcon={<Store className="w-12 h-12" />} />
-          </div>
+          <p className="home-eyebrow">Tech & Digital Marketplace</p>
+          <h2 id="marketplace-heading">Find your next <span>work companion.</span></h2>
+          <p>Browse technology and digital tools. Send an enquiry to check availability, pricing and delivery before deciding.</p>
+          <a href="/marketplace" onClick={(e) => { e.preventDefault(); setActivePage('marketplace'); }} className="mh-button-secondary">Browse Marketplace<ArrowRight className="w-4 h-4" /></a>
         </div>
-        <div aria-busy={loading}>
-          {loading ? <div className="home-marketplace-loading" role="status">Loading featured items…</div> : featuredProducts.length > 0 ? (
-            <div className="home-product-grid">{featuredProducts.map(p => (
-              <article key={p.id} className="home-product">
-                <div className="home-product-image"><OptimizedImage src={p.imageUrl} alt={p.imageAlt || p.name} aspectRatio="4/3" objectFit="contain" responsiveWidths={[320, 480, 640]} sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" fallbackIcon={<ImageIcon className="w-8 h-8" />} /></div>
-                <div className="home-product-details"><p>{p.categoryLabel}</p><h3>{p.name}</h3><strong>{p.priceDisplay}</strong>{p.tagline && <p>{p.tagline}</p>}</div>
-                <button onClick={() => openMarketplaceInquiry(p)} className="mh-button-secondary"><FileQuestion className="w-4 h-4" />Ask About This Item</button>
-              </article>
+      </div>
+      <div aria-busy={loading} className="home-marketplace-items">
+        {loading ? <div className="home-marketplace-loading" role="status">Loading featured items…</div> : featuredProducts.length > 0 ? (
+          <div className="home-product-grid">{featuredProducts.map(p => (
+            <article key={p.id} className="home-product">
+              <div className="home-product-image"><OptimizedImage src={p.imageUrl} alt={p.imageAlt || p.name} aspectRatio="4/3" objectFit="contain" responsiveWidths={[320, 480, 640]} sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" fallbackIcon={<ImageIcon className="w-8 h-8" />} /></div>
+              <div className="home-product-details"><p>{p.categoryLabel}</p><h3>{p.name}</h3><strong>{p.priceDisplay}</strong>{p.tagline && <p>{p.tagline}</p>}</div>
+              <button type="button" onClick={() => openMarketplaceInquiry(p)} className="mh-button-secondary"><FileQuestion className="w-4 h-4" />Ask About This Item</button>
+            </article>
+          ))}</div>
+        ) : (
+          <>
+            {failed && <p className="home-marketplace-state" role="status">Featured items could not load.<button type="button" onClick={() => setRetry(n => n + 1)} className="home-text-action">Try Again</button></p>}
+            <div className="home-marketplace-categories">{categories.map(({ icon: Icon, title, desc }) => (
+              <button type="button" key={title} onClick={() => setActivePage('marketplace')}><Icon className="w-5 h-5" /><span><strong>{title}</strong><span>{desc}</span></span><ArrowRight className="w-4 h-4" /></button>
             ))}</div>
-          ) : (
-            <>
-              <p className="home-marketplace-state" role="status">{failed ? 'Featured items could not load.' : 'Explore categories and check current availability in Marketplace.'}{failed && <button onClick={() => setRetry(n => n + 1)} className="home-text-action">Try Again</button>}</p>
-              <div className="home-marketplace-categories">{categories.map(({ icon: Icon, title, desc }) => (
-                <button key={title} onClick={() => setActivePage('marketplace')}><Icon className="w-6 h-6" /><span><strong>{title}</strong><span>{desc}</span></span><ArrowRight className="w-4 h-4" /></button>
-              ))}</div>
-            </>
-          )}
-        </div>
+          </>
+        )}
       </div>
     </section>
   );

@@ -5,16 +5,28 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS } from '../../data/bundles';
 import { NetworkId } from '../../types';
-import { BundleCard } from '../data/BundleCard';
+import { CompactBundleRow } from '../data/CompactBundleRow';
 import { getInstantBundlesOnServer } from '../../services/apiClient';
-import { ArrowRight, Wifi, Zap } from 'lucide-react';
+import { ArrowRight, Wifi, Zap, ReceiptText, ShieldCheck, PackageSearch } from 'lucide-react';
+
+const NETWORKS: { id: NetworkId; label: string }[] = [
+  { id: 'mtn', label: 'MTN' },
+  { id: 'airteltigo', label: 'AirtelTigo' },
+  { id: 'telecel', label: 'Telecel' },
+];
+
+// What happens after Buy; timing depends on the network, so no delivery promises.
+const STEPS = [
+  { icon: ReceiptText, title: 'Check the total and number', desc: 'Checkout shows the bundle price, any fee and the recipient before you pay.' },
+  { icon: ShieldCheck, title: 'Pay with MoMo through Paystack', desc: 'Payments are handled by Paystack. Never share your MoMo PIN with anyone, including support.' },
+  { icon: PackageSearch, title: 'Track your order', desc: 'Follow it from confirmed payment to delivery. Timing depends on the network.' },
+];
 
 export const HomeFeaturedData: React.FC = () => {
   const DATA_BUNDLES=useDirectCatalog();
   const welcomeOffer=useWelcomeOffer(DATA_BUNDLES);
-  const { openCheckout, openDataPage } = useApp();
+  const { openCheckout, openDataPage, setActivePage } = useApp();
   const [selectedNetwork, setSelectedNetwork] = useState<NetworkId>('mtn');
-  const [homeQuickBuyPhone, setHomeQuickBuyPhone] = useState('');
   const [instantAvailable, setInstantAvailable] = useState(false);
 
   useEffect(() => {
@@ -33,97 +45,78 @@ export const HomeFeaturedData: React.FC = () => {
     };
   }, []);
 
-  // Popular 4 bundles for the selected network
+  // Popular 4 bundles for the selected network, from the live catalogue.
   const popularBundles = DATA_BUNDLES.filter(
     (b) => b.network === selectedNetwork && b.isPopular
   ).slice(0, 4);
 
   return (
     <section className="home-bundles" aria-labelledby="popular-data-heading">
-      <div className="home-container space-y-5 sm:space-y-6">
-        <div className="home-welcome-offer"><WelcomeOfferNotice offer={welcomeOffer}/></div>
-        {/* Section Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 sm:gap-4">
-          <div className="space-y-1 sm:space-y-2">
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#00c365]">
-              <Wifi className="w-3.5 h-3.5" />
-              <span>Data Bundles</span>
-            </div>
-            <h2 id="popular-data-heading" className="home-section-title">
-              Popular Data Bundles
-            </h2>
-            <p className="text-sm text-slate-300 max-w-lg leading-relaxed">
-              Choose a network and bundle. Review the total and recipient before you pay.
-            </p>
+      <div className="home-container">
+        <div className="home-section-heading">
+          <div>
+            <p className="home-eyebrow"><Wifi className="w-3.5 h-3.5" />Data Bundles</p>
+            <h2 id="popular-data-heading">Popular data bundles</h2>
+            <p>Pick a bundle. You confirm the recipient number and total before you pay.</p>
           </div>
+        </div>
 
-          {/* Network Filter Pills */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            {(['mtn', 'airteltigo', 'telecel'] as NetworkId[]).map((netId) => {
-              const net = GHANA_NETWORKS[netId];
-              const isSelected = selectedNetwork === netId;
-              return (
+        <div className="home-buy-layout">
+          <div className="home-buy-panel">
+            <div className="home-network-switch" role="group" aria-label="Choose network">
+              {NETWORKS.map(({ id, label }) => (
                 <button
-                  key={netId}
+                  key={id}
                   type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => setSelectedNetwork(netId)}
-                  className={`min-h-11 px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    isSelected
-                      ? 'bg-white text-black shadow-md'
-                      : 'bg-[#10171e] text-slate-400 hover:text-white border border-slate-800'
-                  }`}
+                  aria-pressed={selectedNetwork === id}
+                  onClick={() => setSelectedNetwork(id)}
                 >
-                  <span
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: net.brandColor }}
-                  />
-                  <span>{netId === 'mtn' ? 'MTN' : netId === 'airteltigo' ? 'AT' : 'Telecel'}</span>
+                  <span className="home-network-dot" style={{ backgroundColor: GHANA_NETWORKS[id].brandColor }} aria-hidden="true" />
+                  {label}
                 </button>
-              );
-            })}
-          </div>
-        </div>
+              ))}
+            </div>
 
-        {/* 4 Cards Grid with tighter mobile layout */}
-        <div className="home-bundle-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-          {popularBundles.map((b) => (
-            <BundleCard
-              key={b.id}
-              bundle={b}
-              directWelcomeOffer={welcomeOffer}
-              recipientPhone={homeQuickBuyPhone}
-              onPhoneChange={setHomeQuickBuyPhone}
-              onBuy={(bundle, opts) => openCheckout(bundle, opts)}
-            />
-          ))}
-        </div>
+            <div className="home-welcome-offer"><WelcomeOfferNotice offer={welcomeOffer}/></div>
 
-        {popularBundles.length === 0 && <p className="home-empty-state" role="status">No popular bundles to show for this network. Browse all bundles to check availability.</p>}
+            <div className="home-bundle-list">
+              {popularBundles.map((b) => (
+                <CompactBundleRow
+                  key={b.id}
+                  bundle={b}
+                  directWelcomeOffer={welcomeOffer}
+                  onBuy={(bundle) => openCheckout(bundle)}
+                />
+              ))}
+              {popularBundles.length === 0 && <p className="home-empty-state" role="status">No popular bundles to show for this network. Browse all bundles to check availability.</p>}
+            </div>
 
-        {/* Action Footnotes */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
-          <div className="flex items-center gap-2">
-            {instantAvailable && (
-              <button
-                type="button"
-                onClick={() => openDataPage('instant')}
-                className="inline-flex items-center gap-1.5 min-h-11 px-4 py-2 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-400 text-xs font-semibold hover:bg-amber-400/20 transition-colors cursor-pointer"
-              >
-                <Zap className="w-3.5 h-3.5 fill-amber-400" />
-                <span>Browse Instant Bundles</span>
+            <div className="home-buy-footer">
+              <button type="button" onClick={() => openDataPage('data', selectedNetwork)} className="home-text-action">
+                <span>View all {GHANA_NETWORKS[selectedNetwork].name} bundles</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
-            )}
+              {instantAvailable && (
+                <button type="button" onClick={() => openDataPage('instant')} className="home-instant-action">
+                  <Zap className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Browse Instant Bundles</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => openDataPage('data')}
-            className="home-text-action"
-          >
-            <span>View all {GHANA_NETWORKS[selectedNetwork].name} bundles</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          <aside className="home-buy-steps" aria-labelledby="buy-steps-heading">
+            <h3 id="buy-steps-heading">How buying works</h3>
+            <ol>
+              {STEPS.map(({ icon: Icon, title, desc }, index) => (
+                <li key={title}>
+                  <span className="home-step-index" aria-hidden="true">{index + 1}</span>
+                  <div><strong><Icon className="w-4 h-4" aria-hidden="true" />{title}</strong><p>{desc}</p></div>
+                </li>
+              ))}
+            </ol>
+            <button type="button" onClick={() => setActivePage('orders')} className="home-text-action">Track an existing order<ArrowRight className="w-4 h-4" /></button>
+          </aside>
         </div>
       </div>
     </section>
