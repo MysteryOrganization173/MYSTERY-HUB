@@ -402,6 +402,9 @@ export class WebsiteStore {
             features: Array.isArray(input.content.features)
               ? input.content.features
               : existing.content_json.features,
+            ...(input.content.copy && typeof input.content.copy === 'object'
+              ? {copy: Object.fromEntries(Object.entries(input.content.copy).map(([key, text]) => [key, sanitizeString(text, 200)]).filter(([, text]) => text))}
+              : existing.content_json.copy !== undefined ? {copy: existing.content_json.copy} : {}),
           }
         : {}),
     };

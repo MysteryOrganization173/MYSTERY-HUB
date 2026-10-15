@@ -1,5 +1,6 @@
 import { SECTION_REGISTRY, sectionEligible, resolveWebsitePlan, type WebsiteComposition, type WebsiteSectionType, type SectionData, type UltraEnquiryInput } from '../../src/config/websiteBuilder.js';
 import { sanitizeUrl } from '../types/website.js';
+import { TEMPLATE_COPY } from '../../src/config/websiteTemplateCopy.js';
 export class WebsiteInputError extends Error {}
 function fail(message: string): never { throw new WebsiteInputError(message); }
 function object(value: unknown): Record<string, unknown> {
@@ -63,7 +64,7 @@ export function validateWebsiteComposition(value: unknown, userId: string): Webs
 export function validateWebsiteContentPatch(value: unknown): void {
   if (value === undefined) return;
   const content = object(value);
-  keys(content, ['starterVersion','layoutMode','composition','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','social','items','stats','features']);
+  keys(content, ['starterVersion','layoutMode','composition','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','social','items','stats','features','copy']);
   if(content.starterVersion!==undefined && content.starterVersion!==1)fail('Unsupported starter version.');
   if(content.layoutMode !== undefined && !['template','sections'].includes(content.layoutMode as string))fail('Invalid website layout mode.');
   const limits = { businessName:100, tagline:150, aboutText:2000, location:150, phone:30, whatsapp:30, email:100, ctaLabel:50 };
@@ -94,6 +95,14 @@ export function validateWebsiteContentPatch(value: unknown): void {
       // Preserve that literal text; this narrow grammar never accepts an HTML tag.
       const comparison = typeof stat.value==='string' && stat.value.length<=50 && /^[<>]\s*\d+(?:\.\d+)?(?:\s+[a-zA-Z%]+)?$/.test(stat.value);
       if(!comparison)safeWebsiteText(stat.value,50);
+    }
+  }
+  if (content.copy !== undefined) {
+    // Only the finite heading and label slots a designed template declares; never a free-form map.
+    for (const [key, text] of Object.entries(object(content.copy))) {
+      const [layout, slot, extra] = key.split('.'), def = extra === undefined ? TEMPLATE_COPY[layout]?.[slot] : undefined;
+      if (!def || !Object.hasOwn(TEMPLATE_COPY, layout) || !Object.hasOwn(TEMPLATE_COPY[layout], slot)) fail('Unsupported template text.');
+      safeWebsiteText(text, def.max);
     }
   }
   if (content.features !== undefined) {

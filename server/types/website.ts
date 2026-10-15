@@ -32,6 +32,8 @@ export interface SiteContent {
   items?: TemplateItem[];
   stats?: Array<{ label: string; value: string }>;
   features?: string[];
+  /** Owner wording for a designed template's headings and labels, keyed `${layout}.${slot}`. */
+  copy?: Record<string, string>;
 }
 
 export interface SiteSettings {

@@ -4,7 +4,7 @@ const pick=(value:unknown,keys:readonly string[])=>{const input=object(value);re
 const items=(value:unknown,keys:readonly string[])=>Array.isArray(value)?value.map(item=>pick(item,keys)):[];
 /** Public field projection also removes historical unknown/editor-only nested keys. */
 export function publicWebsiteContent(value:unknown):SiteContent {
- const input=object(value),result=pick(input,['starterVersion','layoutMode','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','features']);
+ const input=object(value),result=pick(input,['starterVersion','layoutMode','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','features','copy']);
  if(Object.hasOwn(input,'items'))result.items=items(Array.isArray(input.items)?input.items.filter(item=>object(item).isExample!==true):[],['id','name','price','category','tag','desc','image']);
  if(Object.hasOwn(input,'stats'))result.stats=items(input.stats,['label','value']);
  if(Object.hasOwn(input,'social'))result.social=pick(input.social,['instagram','facebook','tiktok']);
