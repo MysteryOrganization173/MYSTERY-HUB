@@ -1,3 +1,4 @@
+import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
 import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
@@ -206,10 +207,11 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {template.siteContent && !filteredListings.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {filteredListings.map((prop) => (
-            <div
+            <div {...edit(`item:${prop.id}`)}
               key={prop.id}
-              className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
+              className="relative bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
             >
+              <ExampleTag item={prop} corner="right"/>
               <div>
                 {prop.image && (
                   <div className="h-48 overflow-hidden relative bg-slate-100">
@@ -221,9 +223,9 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
                     <div className="absolute top-3 left-3 bg-[var(--website-primary,#0f172a)]/90 backdrop-blur-sm px-2.5 py-1 rounded-md text-[10px] font-bold text-white uppercase tracking-wider">
                       {prop.category}
                     </div>
-                    <div className="absolute bottom-3 right-3 bg-[var(--website-accent,#0ea5e9)] text-white px-3 py-1 rounded-lg text-xs font-black shadow-md">
+                    {prop.price && <div className="absolute bottom-3 right-3 bg-[var(--website-accent,#0ea5e9)] text-white px-3 py-1 rounded-lg text-xs font-black shadow-md">
                       {prop.price}
-                    </div>
+                    </div>}
                   </div>
                 )}
                 <div className="p-5 space-y-2">

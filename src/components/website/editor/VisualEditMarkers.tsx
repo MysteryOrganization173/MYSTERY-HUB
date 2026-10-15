@@ -7,6 +7,7 @@ export function useVisualEditMarkers() {
   const targets = useContext(VisualEditContext);
   return (id: string) => {
     const target = targets.find(t => t.id === id);
-    return target ? {'data-visual-target': id, tabIndex: 0, 'aria-label': `Edit ${target.label}`} : {};
+    // Empty text shows an owner-only prompt (CSS `:empty::before`), so blank spots invite a tap.
+    return target ? {'data-visual-target': id, 'data-visual-empty': `Tap to add ${target.label.toLowerCase()}`, tabIndex: 0, 'aria-label': `Edit ${target.label}`} : {};
   };
 }

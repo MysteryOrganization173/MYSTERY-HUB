@@ -1,3 +1,4 @@
+import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
 import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
@@ -161,10 +162,11 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {template.siteContent && !filteredWorks.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {filteredWorks.map((work) => (
-            <div
+            <div {...edit(`item:${work.id}`)}
               key={work.id}
               className="group relative bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 hover:border-zinc-600 transition-all"
             >
+              <ExampleTag item={work} corner="left"/>
               {work.image && (
                 <div className="h-72 overflow-hidden bg-zinc-950">
                   <SafeImage

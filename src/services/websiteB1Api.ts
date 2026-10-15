@@ -14,7 +14,8 @@ async function request<T>(path:string,token?:string,body?:unknown,method=body?'P
   return result;
 }
 export const getWebsiteStarter=(templateId:string)=>request<ReturnType<typeof websiteStarter>&{success:true}>(`/starter-preview?templateId=${encodeURIComponent(templateId)}`);
-export const createWebsiteStarter=(token:string,templateId:string,businessName:string,starterVersion:number)=>request<{success:true;site:WebsiteSiteRecord;alreadyExists:boolean}>('',token,{templateId,businessName,starterVersion});
+/** Optional `content` uses the existing validated owner fields (e.g. whatsapp, location). */
+export const createWebsiteStarter=(token:string,templateId:string,businessName:string,starterVersion:number,content?:Partial<WebsiteSiteRecord['content_json']>)=>request<{success:true;site:WebsiteSiteRecord;alreadyExists:boolean}>('',token,{templateId,businessName,starterVersion,...(content&&Object.keys(content).length?{content}:{})});
 export const getWebsitePublicationReadiness=(token:string,id:string)=>request<{success:true;revision:string;layoutMode:WebsiteLayoutMode;canPublish:boolean;review:ReturnType<typeof websiteExampleReview>}>(`/${encodeURIComponent(id)}/publication-readiness`,token);
 export const setWebsiteLayout=(token:string,id:string,expectedUpdatedAt:string,mode:WebsiteLayoutMode)=>request<{success:true;site:WebsiteSiteRecord}>(`/${encodeURIComponent(id)}/layout`,token,{expectedUpdatedAt,mode,confirmed:true});
 export const reviewWebsiteExamples=(token:string,id:string,expectedUpdatedAt:string,itemIds:string[],action:'confirm'|'remove')=>request<{success:true;site:WebsiteSiteRecord}>(`/${encodeURIComponent(id)}/review-examples`,token,{expectedUpdatedAt,itemIds,action,confirmed:true});

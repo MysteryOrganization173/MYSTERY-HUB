@@ -56,3 +56,62 @@
 }
 @media(prefers-reduced-motion:no-preference){.website-sheet[open]{animation:website-sheet-rise .22s cubic-bezier(.2,.8,.2,1)}}
 @keyframes website-sheet-rise{from{transform:translateY(24px);opacity:.6}}
+
+/* Publish checklist and "you're live" sheet. */
+.website-checklist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.website-checklist>li{display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:16px;background:#111a21;border:1px solid #1f2a32}
+.website-checklist>li>div{flex:1;min-width:0}
+.website-checklist strong{display:block;font-size:15px}
+.website-checklist p{margin:3px 0 0;font-size:14px;line-height:1.5;color:#b8c6c0;overflow-wrap:anywhere}
+.website-checklist>li>button{min-height:40px;padding:0 12px;border-radius:10px;color:#3ee08f;font-weight:700;font-size:14px;flex-shrink:0}
+.website-checklist>li>button:hover{background:#18232b}
+.website-check-icon{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;font-size:13px;font-weight:800;background:rgba(0,195,101,.16);color:#3ee08f}
+[data-state="warn"] .website-check-icon{background:rgba(242,178,76,.16);color:#fcd38a}
+[data-state="todo"] .website-check-icon{background:#f2b24c;color:#1a1204}
+[data-state="todo"]{border-color:rgba(242,178,76,.4)!important}
+.website-example-list{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.website-example-list>li{display:flex;align-items:center;gap:10px;padding:8px;border-radius:14px;background:#0a1117;border:1px solid #1f2a32;flex-wrap:wrap}
+.website-example-thumb{width:44px;height:44px;border-radius:10px;flex-shrink:0;background:#18232b;overflow:hidden}
+.website-example-name{flex:1 1 120px;min-width:0;text-align:left;min-height:44px;display:flex;flex-direction:column;justify-content:center;color:#eef3f1}
+.website-example-name span{font-weight:700;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.website-example-name small{font-size:12.5px;color:#9fb0a8}
+.website-example-buttons{display:flex;gap:6px;margin-left:auto}
+.website-example-buttons button{min-height:42px;min-width:72px;padding:0 12px;border-radius:12px;font-weight:700;font-size:14px;background:#00c365;color:#05140c}
+.website-example-buttons button.is-remove{background:#111a21;border:1px solid #334155;color:#eef3f1}
+.website-example-buttons button:disabled{opacity:.5}
+.website-publish-done{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:8px 0}
+.website-publish-done>svg{color:#3ee08f}
+.website-publish-done p{margin:0;font-size:15px;color:#cbd5d1}
+.website-publish-done .website-owner-address{width:100%}
+.website-publish-actions{display:grid;gap:8px;width:100%}
+.website-publish-actions a{min-height:50px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;text-decoration:none}
+@media(min-width:640px){.website-publish-actions{grid-template-columns:1fr 1fr}}
+
+/* Start sheet: one name, two optional details. */
+.website-start-field{display:flex;flex-direction:column;gap:6px}
+.website-start-field>span{font-size:14px;font-weight:700;color:#dbe4e0}
+.website-start-field em{font-style:normal;font-weight:500;color:#9fb0a8;margin-left:4px}
+.website-start-field input{min-height:52px;border-radius:14px;background:#0a1117;border:1.5px solid #334155;color:#eef3f1;padding:12px 14px;font-size:16px}
+.website-start-field input:focus{outline:none;border-color:#00c365;box-shadow:0 0 0 3px rgba(0,195,101,.22)}
+.website-start-field input::placeholder{color:#6b7c75}
+.website-start-field small{font-size:13px;color:#9fb0a8}
+.website-sheet .contents{display:contents}
+
+/* Starter preview: the owner's own name appears in the design as they type it. */
+.website-preview-namebar{display:flex;gap:8px;padding:10px 12px max(10px,env(safe-area-inset-bottom));background:#080d12;border-top:1px solid #1f2a32;flex-shrink:0}
+.website-preview-namebar input{flex:1;min-width:0;min-height:48px;border-radius:14px;background:#0a1117;border:1.5px solid #334155;color:#eef3f1;padding:0 14px;font-size:16px}
+.website-preview-namebar input:focus{outline:none;border-color:#00c365;box-shadow:0 0 0 3px rgba(0,195,101,.22)}
+.website-preview-namebar input::placeholder{color:#7b8b85}
+.website-preview-namebar button{min-height:48px;padding:0 18px;border-radius:14px;background:#00c365;color:#05140c;font-weight:800;font-size:15px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.website-preview-namebar button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+@media(max-width:400px){.website-preview-namebar button{padding:0 14px;font-size:14px}}
+
+/* Dashboard: examples still to review, one tap from the checklist. */
+.website-owner-review{margin-top:12px;width:100%;max-width:560px;display:flex;align-items:center;gap:12px;text-align:left;padding:12px 14px;border-radius:14px;border:1px solid rgba(242,178,76,.4);background:rgba(242,178,76,.08);color:#eef3f1}
+.website-owner-review>span:first-child{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#f2b24c;color:#1a1204;font-weight:800;flex-shrink:0}
+.website-owner-review strong{display:block;font-size:14.5px}
+.website-owner-review small{display:block;font-size:13px;color:#cbd5d1;margin-top:2px}
+.website-owner-review:hover{background:rgba(242,178,76,.13)}
+.website-owner-review:focus-visible{outline:2px solid #00c365;outline-offset:2px}
+.website-sheet-restore{border-radius:14px;border:1px solid rgba(0,195,101,.4);background:rgba(0,195,101,.08);padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5}
+.website-sheet-restore button{align-self:flex-start;min-height:44px;padding:0 14px;border-radius:12px;background:#00c365;color:#05140c;font-weight:800}

@@ -1,5 +1,4 @@
 import { WebsiteImageField } from './WebsiteImageField';
-import { WebsiteTemplateItemsControl } from './WebsiteTemplateItemsControl';
 import React, { useState } from 'react';
 import type { SiteContent } from '../../../types/index.js';
 import {
@@ -54,25 +53,13 @@ export function WebsiteSectionsControl({
             <span>Page Sections</span>
           </h3>
           <p className="text-xs text-slate-400">
-            Reorder, toggle, and customize the layout blocks on your website.
+            Add, reorder, hide and fill in the blocks that make up your page.
           </p>
         </div>
       </div>
 
       {!config ? (
-        <div className="p-4 rounded-2xl bg-[#0e1620] border border-slate-800 space-y-3 text-xs">
-          <p className="text-slate-300 leading-relaxed">
-            Your current template layout is active with your customized business content. You can enable custom sections management to reorder, add, and remove specific content blocks.
-          </p>
-          <button
-            type="button"
-            className="px-4 py-2 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs cursor-pointer transition-all shadow-sm active:scale-95"
-            onClick={() => save(createWebsiteComposition())}
-          >
-            Enable Custom Sections Layout
-          </button>
-          {templateId !== 'tmpl-data-reseller' && <WebsiteTemplateItemsControl items={content.items || []} onChange={items=>onChange({...content,items})} siteId={siteId} token={token} templateId={templateId} />}
-        </div>
+        <p className="text-xs text-slate-400">Custom sections are not set up for this website.</p>
       ) : (
         <div className="space-y-3">
           {[...config.sections]

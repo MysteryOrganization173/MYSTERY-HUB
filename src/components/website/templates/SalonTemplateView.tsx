@@ -1,3 +1,4 @@
+import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
 import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
@@ -149,10 +150,11 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {template.siteContent && !services.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {services.map((item) => (
-            <div
+            <div {...edit(`item:${item.id}`)}
               key={item.id}
-              className="bg-white rounded-2xl border border-[#fae3ec] overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between"
+              className="relative bg-white rounded-2xl border border-[#fae3ec] overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between"
             >
+              <ExampleTag item={item} corner="left"/>
               <div>
                 {item.image && (
                   <div className="h-44 overflow-hidden relative">
@@ -161,9 +163,9 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                       alt={item.name}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute top-2.5 right-2.5 bg-black/70 backdrop-blur-sm px-2.5 py-0.5 rounded-full text-xs font-bold text-pink-200">
+                    {item.price && <div className="absolute top-2.5 right-2.5 bg-black/70 backdrop-blur-sm px-2.5 py-0.5 rounded-full text-xs font-bold text-pink-200">
                       {item.price}
-                    </div>
+                    </div>}
                   </div>
                 )}
                 <div className="p-5 space-y-2">

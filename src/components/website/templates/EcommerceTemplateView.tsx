@@ -1,3 +1,4 @@
+import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
 import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
@@ -196,10 +197,11 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {template.siteContent && !filteredProducts.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {filteredProducts.map((p) => (
-            <div
+            <div {...edit(`item:${p.id}`)}
               key={p.id}
-              className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between group"
+              className="relative bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between group"
             >
+              <ExampleTag item={p} corner="right"/>
               <div>
                 {p.image && (
                   <div className="h-48 overflow-hidden relative bg-slate-50 p-4 flex items-center justify-center">

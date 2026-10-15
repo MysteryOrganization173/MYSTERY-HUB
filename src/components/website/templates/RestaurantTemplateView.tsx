@@ -1,3 +1,4 @@
+import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
 import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
@@ -176,10 +177,11 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {template.siteContent && !filteredItems.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {filteredItems.map((item) => (
-            <div
+            <div {...edit(`item:${item.id}`)}
               key={item.id}
-              className="bg-white p-4 rounded-2xl border border-[#f3ece2] shadow-sm hover:shadow-md transition-shadow flex gap-4 items-start"
+              className="relative bg-white p-4 rounded-2xl border border-[#f3ece2] shadow-sm hover:shadow-md transition-shadow flex gap-4 items-start"
             >
+              <ExampleTag item={item} corner="left"/>
               {item.image && (
                 <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-slate-100">
                   <SafeImage

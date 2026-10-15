@@ -1,3 +1,4 @@
+import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
 import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
@@ -141,10 +142,11 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-sans">
           {template.siteContent && !products.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {products.map((item) => (
-            <div
+            <div {...edit(`item:${item.id}`)}
               key={item.id}
-              className="bg-[#0f141c] rounded-2xl border border-slate-800 p-6 space-y-4 hover:border-[var(--website-accent,#8b5cf6)]/50 transition-colors"
+              className="relative bg-[#0f141c] rounded-2xl border border-slate-800 p-6 space-y-4 hover:border-[var(--website-accent,#8b5cf6)]/50 transition-colors"
             >
+              <ExampleTag item={item} corner="right"/>
               <div className="flex items-center justify-between text-xs font-mono">
                 <span className="text-[#06b6d4] font-bold">{item.category}</span>
                 {!template.siteContent && <span className="text-slate-500">Sub-second Latency</span>}

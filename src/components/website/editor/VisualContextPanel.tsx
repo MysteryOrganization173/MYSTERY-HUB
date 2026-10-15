@@ -69,7 +69,7 @@ export function VisualContextPanel({title, targets, siteId, token, onChange, onD
     </div>
     <div className="visual-context-fields">
       {notice ? <>
-        <p className="visual-notice-text">Tapping doesn’t edit this part yet. Menu items, products, galleries, section order and social links are changed in All Settings. A few labels are part of the template design and can’t be changed.</p>
+        <p className="visual-notice-text">Tapping doesn’t edit this part. Galleries, section order and social links are changed in All Settings. A few labels are part of the design and can’t be changed.</p>
         <button type="button" onClick={onAllSettings} className="visual-primary-button"><SlidersHorizontal size={17}/>Open All Settings</button>
       </> : <>
         {targets.map(target=><VisualField key={target.id} target={target} siteId={siteId} token={token} onChange={onChange}/>)}

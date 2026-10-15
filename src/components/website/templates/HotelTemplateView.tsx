@@ -1,3 +1,4 @@
+import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
 import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
@@ -198,10 +199,11 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {template.siteContent && !suites.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {suites.map((suite) => (
-            <div
+            <div {...edit(`item:${suite.id}`)}
               key={suite.id}
-              className="bg-white rounded-3xl border border-[#e8e5dc] overflow-hidden shadow-sm hover:shadow-lg transition-shadow flex flex-col justify-between"
+              className="relative bg-white rounded-3xl border border-[#e8e5dc] overflow-hidden shadow-sm hover:shadow-lg transition-shadow flex flex-col justify-between"
             >
+              <ExampleTag item={suite} corner="left"/>
               <div>
                 {suite.image && (
                   <div className="h-56 overflow-hidden relative">
@@ -210,9 +212,9 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                       alt={suite.name}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute bottom-3 right-3 bg-[var(--website-primary,#132e23)] text-white px-3 py-1 rounded-full text-xs font-bold">
+                    {suite.price && <div className="absolute bottom-3 right-3 bg-[var(--website-primary,#132e23)] text-white px-3 py-1 rounded-full text-xs font-bold">
                       {suite.price}
-                    </div>
+                    </div>}
                   </div>
                 )}
                 <div className="p-6 space-y-2">

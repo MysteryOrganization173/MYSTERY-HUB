@@ -1,3 +1,4 @@
+import { ExampleTag } from './ExampleTag';
 import { SiteFooterContact } from './SiteContactDetails';
 import {useVisualEditMarkers} from './editor/VisualEditMarkers';
 import { websiteActionText, readableWebsiteColor } from '../../utils/websiteBrand';
@@ -292,11 +293,12 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredItems.map((item) => (
-              <div
+              <div {...edit(`item:${item.id}`)}
                 key={item.id}
-                className="p-3.5 sm:p-4 rounded-2xl border shadow-sm flex gap-3.5 items-start transition-shadow hover:shadow-md"
+                className="relative p-3.5 sm:p-4 rounded-2xl border shadow-sm flex gap-3.5 items-start transition-shadow hover:shadow-md"
                 style={{ backgroundColor: p.surface, borderColor: p.border }}
               >
+                <ExampleTag item={item} corner="left"/>
                 {item.image && (
                   <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden shrink-0 bg-slate-100">
                     <SafeImage src={item.image} alt={item.name} className="w-full h-full object-cover" />
@@ -599,18 +601,19 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {filteredItems.map((item) => (
-              <div
+              <div {...edit(`item:${item.id}`)}
                 key={item.id}
-                className="rounded-xl border overflow-hidden shadow-lg flex flex-col justify-between"
+                className="relative rounded-xl border overflow-hidden shadow-lg flex flex-col justify-between"
                 style={{ backgroundColor: p.surface, borderColor: p.border }}
               >
+                <ExampleTag item={item} corner="left"/>
                 <div>
                   {item.image && (
                     <div className="h-40 overflow-hidden relative bg-slate-900">
                       <SafeImage src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                      <div className="absolute top-2.5 right-2.5 bg-black/80 px-2 py-0.5 rounded text-[10px] font-mono text-white font-bold border border-white/20">
+                      {item.price && <div className="absolute top-2.5 right-2.5 bg-black/80 px-2 py-0.5 rounded text-[10px] font-mono text-white font-bold border border-white/20">
                         {item.price}
-                      </div>
+                      </div>}
                     </div>
                   )}
                   <div className="p-4 space-y-2">
@@ -840,11 +843,12 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {items.map((item) => (
-            <div
+            <div {...edit(`item:${item.id}`)}
               key={item.id}
-              className="rounded-2xl border shadow-sm overflow-hidden flex flex-col justify-between transition-all hover:shadow-lg"
+              className="relative rounded-2xl border shadow-sm overflow-hidden flex flex-col justify-between transition-all hover:shadow-lg"
               style={{ backgroundColor: p.surface, borderColor: p.border }}
             >
+              <ExampleTag item={item} corner="left"/>
               <div>
                 {item.image && (
                   <div className="h-44 sm:h-48 overflow-hidden relative bg-slate-950/20">
