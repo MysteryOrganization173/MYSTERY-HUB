@@ -19,6 +19,7 @@ import {
 } from '../../../services/apiClient';
 
 import { useApp } from '../../../context/AppContext';
+import { AdminButton, AdminPageHeader, AdminStat, AdminTabs, adminField, adminLabel } from '../ui/AdminUi';
 import {
   Store,
   Plus,
@@ -48,10 +49,21 @@ import {
 
 interface AdminMarketplaceSectionProps {
   sessionToken: string;
+  /** Deep link from the admin hash route: products | inquiries | categories. */
+  initialView?: string;
+  /** Lets the shell refresh navigation badges after inquiry or product changes. */
+  onChanged?: () => void;
 }
+type MarketplaceView = 'products' | 'inquiries' | 'categories';
+const MARKETPLACE_VIEWS: MarketplaceView[] = ['products', 'inquiries', 'categories'];
 
-export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = ({ sessionToken }) => {
+export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = ({ sessionToken, initialView, onChanged }) => {
   const { showToast } = useApp();
+  const [view, setView] = useState<MarketplaceView>(MARKETPLACE_VIEWS.includes(initialView as MarketplaceView) ? initialView as MarketplaceView : 'products');
+  const changeView = (next: MarketplaceView) => {
+    setView(next);
+    if (typeof window !== 'undefined') window.history.replaceState(null, '', `#marketplace${next === 'products' ? '' : `/${next}`}`);
+  };
 
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [metrics, setMetrics] = useState<AdminMarketplaceMetrics>({
@@ -150,10 +162,12 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
       const data = await getAdminMarketplaceProducts(sessionToken, {
         productKind: selectedKind !== 'all' ? selectedKind : undefined,
         category: selectedCategory !== 'all' ? selectedCategory : undefined,
-        status: selectedStatus !== 'all' ? selectedStatus : undefined,
+        status: selectedStatus !== 'all' && selectedStatus !== 'needs_review' ? selectedStatus : undefined,
         search: searchQuery.trim() || undefined,
       });
-      setProducts(data.products || []);
+      const rows = data.products || [];
+      // "Needs fixes" uses the server's readiness verdict returned with each product.
+      setProducts(selectedStatus === 'needs_review' ? rows.filter(p => !p.archived && (p as MarketplaceProduct & { readiness?: { ready?: boolean } }).readiness?.ready === false) : rows);
       if (data.metrics) {
         setMetrics(data.metrics);
       }
@@ -492,112 +506,53 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
   const readiness=productReadiness({name:formName,category:formCategory,productKind:formKind,priceType:formPriceType,priceMinor:formPriceType==='quote'?null:Math.round(Number(formPriceGhc)*100),purchaseEnabled:formPurchaseEnabled,fulfilmentMode:formFulfilmentMode,pickupLocations:formPickupLocations,deliveryAvailable:formDeliveryAvailable,imageUrl:formImageUrl,imageAlt:formImageAlt,description:formDescription,highlights:formHighlights.filter(Boolean),referralRewardMinor:Number(formReferralRewardGhc)*100,fulfilmentIdentifierLabel:formIdentifierLabel,fulfilmentIdentifierPlaceholder:formIdentifierPlaceholder,fulfilmentIdentifierRequired:formIdentifierRequired,fulfilmentNote:formFulfilmentNote,purchaseNote:formPurchaseNote},categories);
   return (
     <div className="space-y-6 text-slate-100">
-      {/* 1. Header & Summary Metrics */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Store className="w-5 h-5 text-[#00c365]" />
-            <span>Marketplace Sourcing Catalogue</span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Manage physical products, digital subscriptions and services for Ghanaian customers.
-          </p>
-        </div>
-
-        <button
-          onClick={openAddModal}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-[#00c365]/20 cursor-pointer self-start sm:self-auto active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Product</span>
-        </button>
+      <AdminPageHeader
+        title="Marketplace"
+        description="Physical products, digital subscriptions and services you sell to customers in Ghana."
+        actions={view==='products'?<AdminButton variant="primary" onClick={openAddModal}><Plus className="h-4 w-4" />Add product</AdminButton>:undefined}
+      />
+      <AdminTabs label="Marketplace views" value={view} onChange={changeView} tabs={[
+        {id:'products',label:'Products',count:metrics.total},
+        {id:'inquiries',label:'Inquiries',count:metrics.newInquiries||null,tone:metrics.newInquiries?'warning':'neutral'},
+        {id:'categories',label:'Categories'},
+      ]} />
+      {view==='products'&&<>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <AdminStat label="Live on marketplace" value={metrics.published} tone="success" onClick={()=>setSelectedStatus('published')} actionLabel="Show live products" />
+        <AdminStat label="Drafts" value={metrics.drafts} onClick={()=>setSelectedStatus('draft')} actionLabel="Show drafts" />
+        <AdminStat label="Need fixes before publishing" value={metrics.needsReview ?? 0} tone={metrics.needsReview?'warning':'neutral'} onClick={()=>setSelectedStatus('needs_review')} actionLabel="Show products that need fixes" />
+        <AdminStat label="Featured" value={metrics.featured} tone="accent" />
+        <AdminStat label="Archived" value={metrics.archived} onClick={()=>setSelectedStatus('archived')} actionLabel="Show archived products" />
       </div>
+      <p className="text-xs text-slate-500">Active catalogue: {metrics.physical||0} physical · {metrics.digital||0} digital · {metrics.service||0} service.</p>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <div className="p-4 rounded-2xl bg-[#0f171d] border border-slate-800/90">
-          <span className="text-[11px] font-semibold text-slate-400 block">Total Products</span>
-          <span className="text-2xl font-extrabold text-white mt-1 block tabular-nums">
-            {metrics.total}
-          </span>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-[#0f171d] border border-emerald-500/20">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-emerald-400">Published Live</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-          </div>
-          <span className="text-2xl font-extrabold text-white mt-1 block tabular-nums">
-            {metrics.published}
-          </span>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-[#0f171d] border border-slate-800/90">
-          <span className="text-[11px] font-semibold text-slate-400 block">Drafts / Unpublished</span>
-          <span className="text-2xl font-extrabold text-slate-300 mt-1 block tabular-nums">
-            {metrics.drafts}
-          </span>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-[#0f171d] border border-amber-500/20">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-amber-400">Featured</span>
-            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-          </div>
-          <span className="text-2xl font-extrabold text-white mt-1 block tabular-nums">
-            {metrics.featured}
-          </span>
-        </div>
-      </div>
-
-      {/* 2. Filter & Search Toolbar */}
-      <div className="p-4 rounded-2xl bg-[#0f171d] border border-slate-800/90 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          {/* Search */}
-          <div className="sm:col-span-6 relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search products by name, tagline, or slug..."
-              className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
-            />
-          </div>
-
-          {/* Category Filter */}
-          <div className="sm:col-span-3">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00c365]"
-            >
-              <option value="all">All Categories</option>
-              {categories.map((c) => (
-                <option key={c.slug} value={c.slug}>
-                  {c.label}
-                </option>
-              ))}
+      <div className="space-y-3 rounded-2xl border border-slate-800/90 bg-[#0b1116] p-3 sm:p-4">
+        <label className="relative block">
+          <span className="sr-only">Search products</span>
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by name, tagline or slug" className={`${adminField} pl-10`} />
+        </label>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <label className={adminLabel}><span className="text-xs">Status</span>
+            <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className={adminField}>
+              <option value="all">All statuses</option>
+              <option value="published">Live</option>
+              <option value="draft">Drafts</option>
+              <option value="needs_review">Needs fixes before publishing</option>
+              <option value="archived">Archived</option>
             </select>
-          </div>
-
-          {/* Status Filter */}
-          <div className="sm:col-span-3">
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full bg-[#090d10] border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00c365]"
-            >
-              <option value="all">All Statuses</option>
-              <option value="published">Published Only</option>
-              <option value="draft">Drafts Only</option>
-              <option value="archived">Archived Only</option>
+          </label>
+          <label className={adminLabel}><span className="text-xs">Category</span>
+            <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className={adminField}>
+              <option value="all">All categories</option>
+              {categories.map((c) => <option key={c.slug} value={c.slug}>{c.label}</option>)}
             </select>
-          </div>
+          </label>
+          <label className={adminLabel}><span className="text-xs">Product Type</span>
+            <select className={adminField} value={selectedKind} onChange={e=>setSelectedKind(e.target.value)}><option value="all">All types</option><option value="physical">Physical</option><option value="digital">Digital</option><option value="service">Service</option></select>
+          </label>
         </div>
       </div>
-
-      <label className="block text-xs">Product Type<select className="mt-1 w-full sm:w-48 bg-slate-900 p-2 rounded-lg border border-slate-700" value={selectedKind} onChange={e=>setSelectedKind(e.target.value)}><option value="all">All types</option><option value="physical">Physical</option><option value="digital">Digital</option><option value="service">Service</option></select></label>
       {/* 3. Product Listings Table / Cards */}
       {loading ? (
         <div className="p-12 text-center rounded-2xl bg-[#0f171d] border border-slate-800 space-y-3">
@@ -792,9 +747,9 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
           })}
         </div>
       )}
+      </>}
 
-      <div className="flex flex-wrap gap-2 text-xs">{[['Archived',metrics.archived],['Needs Review',metrics.needsReview],['Physical',metrics.physical],['Digital',metrics.digital],['Service',metrics.service],['New Inquiries',metrics.newInquiries]].map(([label,value])=><span key={String(label)} className="rounded-lg border border-slate-700 p-2">{label}: {value || 0}</span>)}</div>
-      <MarketplaceControlPanels token={sessionToken} categories={categories} onCategoriesChanged={loadCategories} products={products} onChanged={fetchProducts} />
+      {view!=='products'&&<MarketplaceControlPanels token={sessionToken} view={view} categories={categories} onCategoriesChanged={loadCategories} products={products} onChanged={()=>{void fetchProducts();onChanged?.();}} />}
       {preview&&<MarketplaceProductDetailModal product={preview} onClose={()=>setPreview(null)} onBuyNow={()=>showToast('Internal draft preview: purchasing is disabled.','info')} onInquire={()=>showToast('Internal draft preview.','info')} onShare={()=>showToast('Drafts cannot be shared publicly.','info')} formatGhcReward={n=>'GH₵'+(n ?? 0).toFixed(2)} />}
       {/* 4. Add / Edit Product Modal */}
       {isModalOpen && (

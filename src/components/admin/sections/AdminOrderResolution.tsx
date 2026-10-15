@@ -16,7 +16,7 @@ export function AdminOrderResolution({order,token,onUpdated}:{order:AdminOrderDe
    catch(e:any){if(!alive.current)return;setError(e.message);if(e.status===409){request.current=null;try{const latest=await adminOrderResolution(token,current.public_reference);if(alive.current){setCurrent(latest.order);setHistory(latest.history);onUpdated(latest.order);}}catch{}}}
    finally{guard.current=false;if(alive.current)setBusy(false);}
  };
- const box='rounded-xl border border-slate-700 p-3 space-y-2 min-w-0 break-words',button='min-h-11 px-3 rounded-lg border border-slate-600 text-sm disabled:opacity-40',field='mh-field w-full min-w-0';
+ const box='rounded-2xl border border-slate-800 bg-[#0b1116] p-4 space-y-2 min-w-0 break-words text-sm',button='inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-900/60 px-4 text-sm font-semibold text-slate-100 hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40',field='mh-field w-full min-w-0';
  const manuallyResolved=resolved&&['manual_fulfillment','external_compensation'].includes(resolution?.outcome||'');
  const manualLabel=resolution?.manual?.outcome==='manual_fulfillment'?'Customer received service manually':resolution?.manual?.outcome==='external_compensation'?'Customer compensated externally':'Supplier failed / still awaiting remedy';
  let supplierStatus='Unconfirmed';try{const raw=JSON.parse(current.supplier_response||'null');const value=raw?.status||raw?.data?.status;if(typeof value==='string'&&['processed','completed','success','delivered','failed','refund_pending','refunded','processing','in_progress','pending','queued','accepted','rejected','cancelled'].includes(value.toLowerCase()))supplierStatus=value;}catch{}

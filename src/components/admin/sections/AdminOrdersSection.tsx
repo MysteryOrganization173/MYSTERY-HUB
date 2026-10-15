@@ -1,134 +1,118 @@
 import { AdminOrderResolution } from './AdminOrderResolution';
-import { useDialogFocus } from '../../../hooks/useDialogFocus';
 import { afaStatusLabel } from '../../../../shared/afa';
 import { FULFILMENT_LABELS, FulfilmentMode } from '../../../../shared/marketplacePolicy';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   AdminOrdersResponse,
   getAdminOrdersOnServer,
+  getAdminOrderOnServer,
   refreshAdminOrderOnServer,
   updateAdminOrderReviewOnServer,
   updateAdminOrderStatusOnServer,
   closeAdminTestOrderOnServer,
 } from '../../../services/apiClient';
 import { AdminOrderDetails } from '../../../../server/types/orders';
+import { describeOrderCase, orderTimeline, parseSupplierStatus, ORDER_LENSES, type OrderLensId } from '../../../utils/adminOrderCase';
 import {
-  Search,
-  Filter,
-  RefreshCw,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  ChevronLeft,
-  ChevronRight,
-  X,
-  Copy,
-  Check,
-  Flag,
-  FileText,
-  Radio,
-  Eye,
-  SlidersHorizontal,
-  ShoppingBag,
-} from 'lucide-react';
+  AdminPageHeader, AdminPanel, AdminLoading, AdminError, AdminEmpty, AdminNotice, AdminButton, AdminSheet, StatusPill, RefreshButton, Freshness,
+  DefinitionList, adminField, adminLabel, ghs,
+} from '../ui/AdminUi';
+import { Search, SlidersHorizontal, Copy, Check, Flag, ChevronLeft, ChevronRight, X, RefreshCw, MessageCircle, Circle, CheckCircle2, XCircle } from 'lucide-react';
+import { whatsappLink } from '../../../../shared/marketplacePolicy';
 
 interface AdminOrdersSectionProps {
   sessionToken: string;
-  initialStatusFilter?:string;
+  initialStatusFilter?: string;
+  /** Opens one order directly (deep link from an alert or another section). */
+  initialReference?: string;
+  onChanged?: () => void;
 }
 
-export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionToken,initialStatusFilter='' }) => {
-  // Query & Filter State
-  const [searchTerm, setSearchTerm] = useState('');
+const lensFromFilter = (filter: string): OrderLensId => (ORDER_LENSES.some(l => l.id === filter) ? filter as OrderLensId : filter ? 'active' : 'active');
+
+export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionToken, initialStatusFilter = '', initialReference, onChanged }) => {
+  // Query & filter state. A lens maps to the existing server filters; nothing new is queried.
+  const [searchTerm, setSearchTerm] = useState(initialReference || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(initialReference || '');
+  const [lens, setLens] = useState<OrderLensId>(initialReference ? 'active' : lensFromFilter(initialStatusFilter));
   const [serviceTypeFilter, setServiceTypeFilter] = useState<string>('');
   const [networkFilter, setNetworkFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('');
   const [manualReviewFilter, setManualReviewFilter] = useState<string>('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [showFilters, setShowFilters] = useState(false);
   const pageSize = 20;
 
-  // Data State
+  // Data state
   const [ordersData, setOrdersData] = useState<AdminOrdersResponse | null>(null);
+  const [loadedAt, setLoadedAt] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Selected Order for Drawer & Stable Ref to prevent race conditions on close
+  // Selected order (stable ref prevents stale list refreshes overwriting a newer detail)
   const [selectedOrder, setSelectedOrder] = useState<AdminOrderDetails | null>(null);
   const selectedOrderRef = useRef<AdminOrderDetails | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [isRefreshingSupplier, setIsRefreshingSupplier] = useState(false);
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [adminNoteInput, setAdminNoteInput] = useState('');
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  // Administrative Resolution State
+  // Test-order closure (kept for genuine pre-launch tests only)
   const [showCloseTestConfirm, setShowCloseTestConfirm] = useState(false);
   const [confirmPaidCheckbox, setConfirmPaidCheckbox] = useState(false);
   const [closeTestReason, setCloseTestReason] = useState('');
   const [isClosingTest, setIsClosingTest] = useState(false);
   const [closeTestError, setCloseTestError] = useState<string | null>(null);
 
-  // Dedicated Drawer Close Handler
+  useEffect(() => { const timer = setTimeout(() => { setDebouncedSearch(searchTerm.trim()); setCurrentPage(1); }, 300); return () => clearTimeout(timer); }, [searchTerm]);
+
+  const setSelected = (order: AdminOrderDetails | null) => { selectedOrderRef.current = order; setSelectedOrder(order); };
+
   const closeOrderDrawer = useCallback(() => {
-    selectedOrderRef.current = null;
-    setSelectedOrder(null);
-    setActionSuccessMessage(null);
-    setShowTechnicalDetails(false);
-    setCopiedKey(null);
-    setShowCloseTestConfirm(false);
-    setConfirmPaidCheckbox(false);
-    setCloseTestReason('');
-    setIsClosingTest(false);
-    setCloseTestError(null);
+    setSelected(null);
+    setActionSuccessMessage(null); setActionError(null); setDetailError(null); setCopiedKey(null);
+    setShowCloseTestConfirm(false); setConfirmPaidCheckbox(false); setCloseTestReason(''); setIsClosingTest(false); setCloseTestError(null);
   }, []);
 
-  const drawerFocus = useDialogFocus(Boolean(selectedOrder), closeOrderDrawer);
-
-  // Dedicated Drawer Open Handler
   const openOrderDrawer = useCallback((order: AdminOrderDetails) => {
-    selectedOrderRef.current = order;
-    setSelectedOrder(order);
-    setActionSuccessMessage(null);
-    setShowTechnicalDetails(false);
-    setCopiedKey(null);
+    setSelected(order);
+    setActionSuccessMessage(null); setActionError(null); setDetailError(null); setCopiedKey(null);
     setAdminNoteInput(order.admin_note || '');
-    setShowCloseTestConfirm(false);
-    setConfirmPaidCheckbox(false);
-    setCloseTestReason('');
-    setIsClosingTest(false);
-    setCloseTestError(null);
-  }, []);
+    setShowCloseTestConfirm(false); setConfirmPaidCheckbox(false); setCloseTestReason(''); setIsClosingTest(false); setCloseTestError(null);
+    // The list projection omits operational extras (for example AFA registration details); load the full record.
+    getAdminOrderOnServer(sessionToken, order.public_reference)
+      .then(res => { if (res.success && res.order && selectedOrderRef.current?.public_reference === res.order.public_reference) setSelected(res.order); })
+      .catch(err => { if (selectedOrderRef.current?.public_reference === order.public_reference) setDetailError(err instanceof Error ? err.message : 'Full order details could not be refreshed.'); });
+  }, [sessionToken]);
 
+  const lensParams = ORDER_LENSES.find(l => l.id === lens)?.params || {};
   const fetchOrders = useCallback(async () => {
     setIsSearching(true);
     setError(null);
-
     try {
       const res = await getAdminOrdersOnServer(sessionToken, {
-        q: searchTerm.trim() || undefined,
+        q: debouncedSearch || undefined,
         serviceType: serviceTypeFilter || undefined,
         network: networkFilter || undefined,
-        status: statusFilter || undefined,
-        paymentStatus: paymentStatusFilter || undefined,
+        ...lensParams,
         manualReview: manualReviewFilter === 'true' ? true : manualReviewFilter === 'false' ? false : undefined,
+        dateFrom: dateFrom ? new Date(`${dateFrom}T00:00:00Z`).toISOString() : undefined,
+        dateTo: dateTo ? new Date(`${dateTo}T23:59:59.999Z`).toISOString() : undefined,
         page: currentPage,
         limit: pageSize,
       });
-
       if (res.success) {
         setOrdersData(res);
-        // Only update selectedOrder if drawer is currently open and reference matches
+        setLoadedAt(Date.now());
         if (selectedOrderRef.current) {
-          const currentRef = selectedOrderRef.current.public_reference;
-          const updated = res.orders.find((o) => o.public_reference === currentRef);
-          if (updated && selectedOrderRef.current) {
-            selectedOrderRef.current = updated;
-            setSelectedOrder(updated);
-          }
+          const updated = res.orders.find(o => o.public_reference === selectedOrderRef.current?.public_reference);
+          if (updated && selectedOrderRef.current) setSelected({ ...selectedOrderRef.current, ...updated });
         }
       }
     } catch (err: unknown) {
@@ -137,1143 +121,463 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
       setIsLoading(false);
       setIsSearching(false);
     }
-  }, [
-    sessionToken,
-    searchTerm,
-    serviceTypeFilter,
-    networkFilter,
-    statusFilter,
-    paymentStatusFilter,
-    manualReviewFilter,
-    currentPage,
-  ]);
+  }, [sessionToken, debouncedSearch, serviceTypeFilter, networkFilter, lens, manualReviewFilter, dateFrom, dateTo, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => { void fetchOrders(); }, [fetchOrders]);
+
+  // Deep link: open the referenced order once.
+  const deepLinked = useRef(false);
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    if (!initialReference || deepLinked.current) return;
+    deepLinked.current = true;
+    getAdminOrderOnServer(sessionToken, initialReference).then(res => { if (res.success && res.order) openOrderDrawer(res.order); }).catch(() => setError(`Order ${initialReference} could not be opened.`));
+  }, [initialReference, sessionToken, openOrderDrawer]);
 
-  // Handle Copy to Clipboard
-  const handleCopy = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
+  const afterAction = () => { void fetchOrders(); onChanged?.(); };
+
+  const handleCopy = async (text: string, key: string) => {
+    try { await navigator.clipboard.writeText(text); setCopiedKey(key); setTimeout(() => setCopiedKey(null), 2000); } catch { setActionError('Copy is unavailable here. Select the text and copy it manually.'); }
   };
 
-  // Handle Supplier Status Refresh
   const handleRefreshSupplierStatus = async (reference: string) => {
-    setIsRefreshingSupplier(true);
-    setActionSuccessMessage(null);
-
+    setIsRefreshingSupplier(true); setActionSuccessMessage(null); setActionError(null);
     try {
       const res = await refreshAdminOrderOnServer(sessionToken, reference);
       if (res.success && res.order && selectedOrderRef.current?.public_reference === res.order.public_reference) {
-        selectedOrderRef.current = res.order;
-        setSelectedOrder(res.order);
-        setActionSuccessMessage(res.message || 'Supplier status successfully updated.');
-        // Refresh full table
-        fetchOrders();
+        setSelected(res.order);
+        setActionSuccessMessage(res.message || 'Supplier status checked.');
+        afterAction();
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to refresh supplier status.');
-    } finally {
-      setIsRefreshingSupplier(false);
-    }
+      setActionError(err instanceof Error ? err.message : 'Failed to refresh supplier status.');
+    } finally { setIsRefreshingSupplier(false); }
   };
 
-  // Handle Manual Review Toggle
   const handleToggleManualReview = async (order: AdminOrderDetails) => {
+    setActionSuccessMessage(null); setActionError(null);
     try {
       const newFlag = !order.manual_review;
-      const res = await updateAdminOrderReviewOnServer(sessionToken, order.public_reference, {
-        manualReview: newFlag,
-      });
+      const res = await updateAdminOrderReviewOnServer(sessionToken, order.public_reference, { manualReview: newFlag });
       if (res.success && res.order && selectedOrderRef.current?.public_reference === res.order.public_reference) {
-        selectedOrderRef.current = res.order;
-        setSelectedOrder(res.order);
+        setSelected({ ...selectedOrderRef.current, ...res.order });
         setActionSuccessMessage(newFlag ? 'Flagged for manual review.' : 'Review flag removed; customer refund resolution is unchanged.');
-        fetchOrders();
+        afterAction();
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to update review flag.');
+      setActionError(err instanceof Error ? err.message : 'Failed to update review flag.');
     }
   };
 
-  // Handle Admin Note Save
   const handleSaveAdminNote = async (order: AdminOrderDetails) => {
-    setIsSavingNote(true);
-    setActionSuccessMessage(null);
+    setIsSavingNote(true); setActionSuccessMessage(null); setActionError(null);
     try {
-      const res = await updateAdminOrderReviewOnServer(sessionToken, order.public_reference, {
-        adminNote: adminNoteInput.trim() || null,
-      });
+      const res = await updateAdminOrderReviewOnServer(sessionToken, order.public_reference, { adminNote: adminNoteInput.trim() || null });
       if (res.success && res.order && selectedOrderRef.current?.public_reference === res.order.public_reference) {
-        selectedOrderRef.current = res.order;
-        setSelectedOrder(res.order);
-        setActionSuccessMessage('Admin operational note saved.');
-        fetchOrders();
+        setSelected({ ...selectedOrderRef.current, ...res.order });
+        setActionSuccessMessage('Internal note saved.');
+        afterAction();
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save admin note.');
-    } finally {
-      setIsSavingNote(false);
-    }
+      setActionError(err instanceof Error ? err.message : 'Failed to save admin note.');
+    } finally { setIsSavingNote(false); }
   };
 
-  // Handle Controlled Close As Pre-launch Test Order
   const handleCloseTestOrder = async () => {
     if (!selectedOrder) return;
-    setIsClosingTest(true);
-    setCloseTestError(null);
-    setActionSuccessMessage(null);
-
+    setIsClosingTest(true); setCloseTestError(null); setActionSuccessMessage(null);
     try {
-      const res = await closeAdminTestOrderOnServer(sessionToken, selectedOrder.public_reference, {
-        confirmPaidTestOrder: confirmPaidCheckbox,
-        reason: closeTestReason.trim() || undefined,
-      });
-
+      const res = await closeAdminTestOrderOnServer(sessionToken, selectedOrder.public_reference, { confirmPaidTestOrder: confirmPaidCheckbox, reason: closeTestReason.trim() || undefined });
       if (res.success && res.order) {
-        selectedOrderRef.current = res.order;
-        setSelectedOrder(res.order);
+        setSelected(res.order);
         setActionSuccessMessage(res.message || 'Test order closed. It will no longer block new MTN orders.');
-        setShowCloseTestConfirm(false);
-        setConfirmPaidCheckbox(false);
-        setCloseTestReason('');
-        // Refresh full table
-        fetchOrders();
+        setShowCloseTestConfirm(false); setConfirmPaidCheckbox(false); setCloseTestReason('');
+        afterAction();
       }
     } catch (err: unknown) {
       setCloseTestError(err instanceof Error ? err.message : 'Failed to close test order.');
-    } finally {
-      setIsClosingTest(false);
-    }
+    } finally { setIsClosingTest(false); }
   };
-
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   const handleUpdateOrderStatus = async (order: AdminOrderDetails, newStatus: string) => {
-    setIsUpdatingStatus(true);
-    setActionSuccessMessage(null);
+    setIsUpdatingStatus(true); setActionSuccessMessage(null); setActionError(null);
     try {
-      const res = await updateAdminOrderStatusOnServer(sessionToken, order.public_reference, {
-        marketplaceStatus: newStatus,
-        adminNote: adminNoteInput.trim() || undefined,
-      });
+      const res = await updateAdminOrderStatusOnServer(sessionToken, order.public_reference, { marketplaceStatus: newStatus, adminNote: adminNoteInput.trim() || undefined });
       if (res.success && res.order) {
-        selectedOrderRef.current = res.order;
-        setSelectedOrder(res.order);
-        setActionSuccessMessage(`Order status updated to "${res.order.marketplace_status || res.order.status}".`);
-        fetchOrders();
+        setSelected({ ...selectedOrderRef.current, ...res.order });
+        setActionSuccessMessage(`Fulfilment step updated to "${(res.order.marketplace_status || res.order.status).replace(/_/g, ' ')}".`);
+        afterAction();
       }
     } catch (err) {
-      console.error('Failed to update order status:', err);
-    } finally {
-      setIsUpdatingStatus(false);
-    }
+      setActionError(err instanceof Error ? err.message : 'Failed to update the fulfilment step.');
+    } finally { setIsUpdatingStatus(false); }
   };
 
-  // Helper for Status Badge
-  const getStatusBadge = (status: string,refundState?:string) => {
-    if(refundState==='manual_fulfillment'||refundState==='external_compensation')return <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-300 border border-sky-500/30">Manually Resolved</span>;
-    switch (status) {
-      case 'delivered':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-            <CheckCircle2 className="w-2.5 h-2.5" />
-            <span>Delivered</span>
-          </span>
-        );
-      case 'processing':
-      case 'submitted':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/30">
-            <Clock className="w-2.5 h-2.5 animate-spin" />
-            <span>{status === 'submitted' ? 'Submitted' : 'Processing'}</span>
-          </span>
-        );
-      case 'refund_pending':
-      case 'failed':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-            <AlertTriangle className="w-2.5 h-2.5" />
-            <span>{status === 'refund_pending' ? 'Refund Attention' : 'Failed'}</span>
-          </span>
-        );
-      case 'refunded':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/30">
-            <span>{refundState==='refund_confirmed'?'Refunded':'Refund unverified'}</span>
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400">
-            <span>{status}</span>
-          </span>
-        );
-    }
-  };
+  const activeFilterCount = [serviceTypeFilter, networkFilter, manualReviewFilter, dateFrom, dateTo].filter(Boolean).length;
+  const clearFilters = () => { setServiceTypeFilter(''); setNetworkFilter(''); setManualReviewFilter(''); setDateFrom(''); setDateTo(''); setCurrentPage(1); };
+  const productLabel = (order: AdminOrderDetails) => order.service_type === 'airtime' ? `${order.network.toUpperCase()} Airtime` : order.product_name_snapshot;
 
-  const getPaymentBadge = (paymentStatus: string) => {
-    if (paymentStatus === 'success') {
-      return (
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#00c365]/10 text-[#00c365]">
-          Paid
-        </span>
-      );
-    }
-    if (paymentStatus === 'pending') {
-      return (
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400">
-          Payment Pending
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-400">
-        {paymentStatus}
-      </span>
-    );
+  const caseLabel = (order: AdminOrderDetails) => {
+    const kase = describeOrderCase(order);
+    if (order.service_type === 'afa' && !kase.key.startsWith('resolved_')) return <StatusPill tone={kase.tone}>{`AFA · ${afaStatusLabel(order.status, order.manual_review)}`}</StatusPill>;
+    return <StatusPill tone={kase.tone}>{kase.label}</StatusPill>;
   };
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Order Management</h2>
-          <p className="text-xs text-slate-400">
-            Search, filter, inspect supplier dispatch, and flag orders for manual review.
-          </p>
-        </div>
+      <AdminPageHeader
+        title="Orders & delivery"
+        description="Find any order, see exactly where the customer stands, and act on what needs attention."
+        actions={<><Freshness at={loadedAt} /><RefreshButton onClick={() => void fetchOrders()} busy={isSearching} /></>}
+      />
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowMobileFilters(!showMobileFilters)}
-            className="md:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-medium text-slate-300"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-[#00c365]" />
-            <span>Filters</span>
+      {/* Lenses: one tap to the situation the founder is asking about */}
+      <div role="tablist" aria-label="Order situation" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
+        {ORDER_LENSES.map(item => (
+          <button key={item.id} type="button" role="tab" aria-selected={lens === item.id} onClick={() => { setLens(item.id); setCurrentPage(1); }}
+            className={`min-h-11 shrink-0 rounded-xl border px-3.5 text-sm font-semibold ${lens === item.id ? item.id === 'needs_attention' ? 'border-amber-400/60 bg-amber-400/10 text-amber-100' : 'border-[#00c365]/50 bg-[#00c365]/12 text-white' : 'border-slate-800 bg-[#0d151b] text-slate-400 hover:text-white'}`}>
+            {item.label}
           </button>
-
-          <button
-            onClick={() => fetchOrders()}
-            disabled={isSearching}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-medium text-slate-300 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin text-[#00c365]' : ''}`} />
-            <span>{isSearching ? 'Updating...' : 'Refresh'}</span>
-          </button>
-        </div>
+        ))}
       </div>
 
-      {/* Search & Filter Bar */}
-      <div className="p-4 rounded-2xl bg-[#0f171d] border border-slate-800/90 space-y-3">
-        {/* Search Input */}
-        <div className="relative">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Search by MH reference, recipient phone, email, or Paystack ref..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-[#00c365] focus:outline-none text-xs sm:text-sm text-white placeholder:text-slate-500 font-mono transition-colors"
-          />
-          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          {searchTerm && (
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setCurrentPage(1);
-              }}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs"
-            >
-              Clear
-            </button>
-          )}
+      {/* Search & filters */}
+      <div className="space-y-3 rounded-2xl border border-slate-800 bg-[#0d151b] p-3 sm:p-4">
+        <div className="flex gap-2">
+          <label className="relative min-w-0 flex-1">
+            <span className="sr-only">Search orders</span>
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <input type="search" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="MH reference, phone, email, Paystack or supplier ref" className={`${adminField} pl-10`} />
+          </label>
+          <AdminButton onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters} aria-controls="order-filters">
+            <SlidersHorizontal className="h-4 w-4" /><span className="hidden sm:inline">Filters</span>{activeFilterCount > 0 && <span className="rounded-full bg-[#00c365] px-1.5 text-xs text-black">{activeFilterCount}</span>}
+          </AdminButton>
         </div>
-
-        {/* Filter Dropdowns (Desktop always visible, Mobile toggleable) */}
-        <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-xs ${showMobileFilters ? 'block' : 'hidden md:grid'}`}>
-          {/* Service Type */}
-          <div>
-            <label className="block text-[11px] text-slate-400 font-medium mb-1">Service Type</label>
-            <select
-              value={serviceTypeFilter}
-              onChange={(e) => {
-                setServiceTypeFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 focus:border-[#00c365] focus:outline-none"
-            >
-              <option value="">All Services</option>
-              <option value="afa">AFA Registration</option>
-              <option value="marketplace">Marketplace Commerce</option>
-              <option value="data">Data Bundles</option>
-              <option value="instant_bundle">Instant Bundles</option>
-              <option value="airtime">Airtime Top-up</option>
-            </select>
-          </div>
-
-          {/* Network */}
-          <div>
-            <label className="block text-[11px] text-slate-400 font-medium mb-1">Network</label>
-            <select
-              value={networkFilter}
-              onChange={(e) => {
-                setNetworkFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 focus:border-[#00c365] focus:outline-none"
-            >
-              <option value="">All Networks</option>
-              <option value="mtn">MTN</option>
-              <option value="telecel">Telecel</option>
-              <option value="airteltigo">AirtelTigo (AT)</option>
-            </select>
-          </div>
-
-          {/* Order Status */}
-          <div>
-            <label className="block text-[11px] text-slate-400 font-medium mb-1">Fulfilment Status</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 focus:border-[#00c365] focus:outline-none"
-            >
-              <option value="">All Statuses</option>
-              <option value="needs_attention">Needs Attention (all dates)</option>
-              <option value="delivered">Delivered</option>
-              <option value="processing">Processing</option>
-              <option value="submitted">Submitted</option>
-              <option value="queued">Queued</option>
-              <option value="refund_pending">Refund Attention</option>
-              <option value="failed">Failed</option>
-              <option value="refunded">Refunded</option>
-            </select>
-          </div>
-
-          {/* Payment Status */}
-          <div>
-            <label className="block text-[11px] text-slate-400 font-medium mb-1">Payment Status</label>
-            <select
-              value={paymentStatusFilter}
-              onChange={(e) => {
-                setPaymentStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 focus:border-[#00c365] focus:outline-none"
-            >
-              <option value="">All Payments</option>
-              <option value="success">Paid (Success)</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Payment Failed</option>
-            </select>
-          </div>
-
-          {/* Manual Review Flag */}
-          <div>
-            <label className="block text-[11px] text-slate-400 font-medium mb-1">Manual Review</label>
-            <select
-              value={manualReviewFilter}
-              onChange={(e) => {
-                setManualReviewFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 focus:border-[#00c365] focus:outline-none"
-            >
-              <option value="">All Orders</option>
-              <option value="true">Flagged for Review</option>
-              <option value="false">Unflagged Only</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Active Filter Badges */}
-        {(serviceTypeFilter || networkFilter || statusFilter || paymentStatusFilter || manualReviewFilter) && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-slate-400">
-            <span className="font-semibold text-slate-500">Active filters:</span>
-            {serviceTypeFilter && (
-              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 flex items-center gap-1">
-                Type: {serviceTypeFilter}
-                <X className="w-3 h-3 cursor-pointer" onClick={() => setServiceTypeFilter('')} />
-              </span>
-            )}
-            {networkFilter && (
-              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 flex items-center gap-1">
-                Network: {networkFilter}
-                <X className="w-3 h-3 cursor-pointer" onClick={() => setNetworkFilter('')} />
-              </span>
-            )}
-            {statusFilter && (
-              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 flex items-center gap-1">
-                Status: {statusFilter}
-                <X className="w-3 h-3 cursor-pointer" onClick={() => setStatusFilter('')} />
-              </span>
-            )}
-            {paymentStatusFilter && (
-              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 flex items-center gap-1">
-                Payment: {paymentStatusFilter}
-                <X className="w-3 h-3 cursor-pointer" onClick={() => setPaymentStatusFilter('')} />
-              </span>
-            )}
-            {manualReviewFilter && (
-              <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 flex items-center gap-1">
-                Manual Review: Flagged
-                <X className="w-3 h-3 cursor-pointer" onClick={() => setManualReviewFilter('')} />
-              </span>
-            )}
-            <button
-              onClick={() => {
-                setServiceTypeFilter('');
-                setNetworkFilter('');
-                setStatusFilter('');
-                setPaymentStatusFilter('');
-                setManualReviewFilter('');
-                setCurrentPage(1);
-              }}
-              className="text-[#00c365] hover:underline ml-1 cursor-pointer"
-            >
-              Reset All
-            </button>
+        {showFilters && (
+          <div id="order-filters" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <label className={adminLabel}><span>Service</span>
+              <select className={adminField} value={serviceTypeFilter} onChange={e => { setServiceTypeFilter(e.target.value); setCurrentPage(1); }}>
+                <option value="">All services</option><option value="data">Data bundles</option><option value="instant_bundle">Instant bundles</option><option value="airtime">Airtime</option><option value="afa">AFA Registration</option><option value="marketplace">Marketplace</option>
+              </select></label>
+            <label className={adminLabel}><span>Network</span>
+              <select className={adminField} value={networkFilter} onChange={e => { setNetworkFilter(e.target.value); setCurrentPage(1); }}>
+                <option value="">All networks</option><option value="mtn">MTN</option><option value="telecel">Telecel</option><option value="airteltigo">AirtelTigo</option>
+              </select></label>
+            <label className={adminLabel}><span>Review flag</span>
+              <select className={adminField} value={manualReviewFilter} onChange={e => { setManualReviewFilter(e.target.value); setCurrentPage(1); }}>
+                <option value="">Any</option><option value="true">Flagged for review</option><option value="false">Not flagged</option>
+              </select></label>
+            <label className={adminLabel}><span>Created from</span><input type="date" className={adminField} value={dateFrom} onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }} /></label>
+            <label className={adminLabel}><span>Created to</span><input type="date" className={adminField} value={dateTo} onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }} /></label>
+            {activeFilterCount > 0 && <button type="button" onClick={clearFilters} className="justify-self-start text-sm font-semibold text-[#00c365]">Clear filters</button>}
           </div>
         )}
+        {lens === 'needs_attention' && <p className="text-xs text-slate-400">Needs Attention covers all dates: flagged orders, uncertain supplier submissions, refunds in progress and paid orders that failed without a recorded customer remedy. Resolved cases leave this list but stay searchable.</p>}
+        {lens === 'active' && <p className="text-xs text-slate-500">Active orders hide abandoned checkouts. Use the Abandoned checkouts lens to see them.</p>}
       </div>
 
-      {/* Orders List / Table */}
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center min-h-[300px] text-slate-400">
-          <RefreshCw className="w-6 h-6 text-[#00c365] animate-spin mb-2" />
-          <p className="text-xs">Loading orders...</p>
-        </div>
-      ) : error ? (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400">
-          {error}
-        </div>
-      ) : !ordersData || ordersData.orders.length === 0 ? (
-        <div className="p-8 rounded-2xl bg-[#0f171d] border border-slate-800/90 text-center space-y-2">
-          <Filter className="w-8 h-8 text-slate-600 mx-auto" />
-          <h4 className="text-sm font-bold text-white">No Orders Found</h4>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            No customer orders matched your search or active filter criteria. Try clearing your filters or searching a different term.
-          </p>
-        </div>
+      {/* Results */}
+      {isLoading ? <AdminLoading label="Loading orders…" /> : error ? <AdminError message={error} onRetry={() => void fetchOrders()} /> : !ordersData || ordersData.orders.length === 0 ? (
+        <AdminEmpty title={lens === 'needs_attention' ? 'No orders need attention' : 'No orders found'}>
+          {lens === 'needs_attention' ? 'Every paid order is delivered, in progress or has a recorded customer remedy.' : 'Nothing matches this search and filter. Try another lens or clear the filters.'}
+        </AdminEmpty>
       ) : (
-        <div className="space-y-4">
-          {/* Desktop Table View (md and up) */}
-          <div className="hidden md:block overflow-x-auto rounded-2xl bg-[#0f171d] border border-slate-800/90">
-            <table className="w-full text-left text-xs border-collapse">
+        <div className="space-y-3">
+          <p className="text-sm text-slate-400">{ordersData.pagination.total.toLocaleString()} order{ordersData.pagination.total === 1 ? '' : 's'}</p>
+
+          {/* Desktop table */}
+          <div className="hidden overflow-x-auto rounded-2xl border border-slate-800 bg-[#0d151b] md:block">
+            <table className="w-full border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 font-semibold">
-                  <th className="py-3 px-4">Reference</th>
-                  <th className="py-3 px-4">Service & Network</th>
-                  <th className="py-3 px-4">Recipient</th>
-                  <th className="py-3 px-4 text-right">Amount</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Payment</th>
-                  <th className="py-3 px-4">Supplier Status</th>
-                  <th className="py-3 px-4">Created</th>
-                  <th className="py-3 px-4 text-center">Action</th>
+                <tr className="border-b border-slate-800 text-xs uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-3 font-semibold">Order</th>
+                  <th className="px-4 py-3 font-semibold">Product</th>
+                  <th className="px-4 py-3 font-semibold">Where it stands</th>
+                  <th className="px-4 py-3 text-right font-semibold">Amount</th>
+                  <th className="px-4 py-3 font-semibold">Created</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {ordersData.orders.map((order) => {
-                  const isAirtime = order.service_type === 'airtime' || order.product_name_snapshot.toLowerCase().includes('airtime');
-                  const amountGhc = (order.amount / 100).toFixed(2);
-                  const isFlagged = Boolean(order.manual_review);
-
-                  return (
-                    <tr
-                      key={order.id}
-                      onClick={() => openOrderDrawer(order)}
-                      className="hover:bg-slate-900/80 transition-colors cursor-pointer"
-                    >
-                      <td className="py-3 px-4 font-mono font-bold text-white flex items-center gap-1.5">
-                        {isFlagged && (
-                          <span title="Flagged for manual review">
-                            <Flag className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
-                          </span>
-                        )}
-                        <span>{order.public_reference}</span>
-                      </td>
-
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-200 flex items-center gap-1.5">
-                          <span>{isAirtime ? 'Airtime Top-Up' : order.product_name_snapshot}</span>
-                          {order.service_type === 'instant_bundle' && (
-                            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-1 rounded">
-                              Instant
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-slate-400 uppercase font-mono">{order.network}</div>
-                      </td>
-
-                      <td className="py-3 px-4 font-mono text-slate-300">
-                        {order.recipient_phone}
-                      </td>
-
-                      <td className="py-3 px-4 text-right font-mono font-bold text-white">
-                        GH₵ {amountGhc}
-                      </td>
-
-                      <td className="py-3 px-4">
-                        {order.service_type === 'afa' && !['manual_fulfillment','external_compensation'].includes(order.customer_resolution||'') ? <span className="text-xs text-amber-300">{afaStatusLabel(order.status,order.manual_review)}</span> : getStatusBadge(order.status,order.customer_resolution)}
-                      </td>
-
-                      <td className="py-3 px-4">
-                        {getPaymentBadge(order.payment_status)}
-                      </td>
-
-                      <td className="py-3 px-4">
-                        {order.supplier_order_id ? (
-                          <span className="font-mono text-[11px] text-slate-300" title={`Supplier ID: ${order.supplier_order_id}`}>
-                            {order.supplier_order_id.slice(0, 14)}...
-                          </span>
-                        ) : (
-                          <span className="text-slate-500 text-[11px]">Not dispatched</span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">
-                        {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        <span className="block text-[10px] text-slate-500">
-                          {new Date(order.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openOrderDrawer(order);
-                          }}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-                          title="View order details"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+              <tbody className="divide-y divide-slate-800/70">
+                {ordersData.orders.map(order => (
+                  <tr key={order.id} className="cursor-pointer hover:bg-slate-900/70" onClick={() => openOrderDrawer(order)}>
+                    <td className="px-4 py-3">
+                      <button type="button" onClick={e => { e.stopPropagation(); openOrderDrawer(order); }} className="flex items-center gap-1.5 font-mono text-[13px] font-semibold text-white hover:text-[#00c365]">
+                        {order.manual_review && <Flag className="h-3.5 w-3.5 fill-amber-400 text-amber-400" aria-label="Flagged for review" />}
+                        {order.public_reference}
+                      </button>
+                      <span className="block font-mono text-xs text-slate-500">{order.recipient_phone}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="block text-slate-100">{productLabel(order)}</span>
+                      <span className="block text-xs uppercase text-slate-500">{order.service_type === 'marketplace' ? 'Marketplace' : order.network}{order.service_type === 'instant_bundle' ? ' · Instant' : ''}</span>
+                    </td>
+                    <td className="px-4 py-3">{caseLabel(order)}</td>
+                    <td className="px-4 py-3 text-right font-semibold tabular-nums text-white">{ghs(order.amount)}</td>
+                    <td className="px-4 py-3 text-xs text-slate-400">{new Date(order.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}<span className="block">{new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
 
-          {/* Mobile Cards View (Hidden on md, visible on phones 360-412px) */}
-          <div className="md:hidden space-y-3">
-            {ordersData.orders.map((order) => {
-              const isAirtime = order.service_type === 'airtime' || order.product_name_snapshot.toLowerCase().includes('airtime');
-              const amountGhc = (order.amount / 100).toFixed(2);
-              const isFlagged = Boolean(order.manual_review);
-
-              return (
-                <div
-                  key={order.id}
-                  onClick={() => openOrderDrawer(order)}
-                  className="p-4 rounded-2xl bg-[#0f171d] border border-slate-800/90 active:bg-slate-900 transition-colors space-y-2.5 cursor-pointer"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 font-mono font-bold text-white text-xs">
-                      {isFlagged && <Flag className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />}
-                      <span>{order.public_reference}</span>
-                    </div>
-                    <div className="font-mono font-extrabold text-sm text-[#00c365]">
-                      GH₵ {amountGhc}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs text-slate-300">
-                    <div>
-                      <span className="font-medium text-white">{isAirtime ? 'Airtime' : order.product_name_snapshot}</span>
-                      <span className="text-slate-500 font-mono uppercase ml-1.5">({order.network})</span>
-                    </div>
-                    <span className="font-mono text-slate-400 text-[11px]">{order.recipient_phone}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
-                    <div className="flex items-center gap-1.5">
-                      {order.service_type === 'afa' && !['manual_fulfillment','external_compensation'].includes(order.customer_resolution||'') ? <span className="text-xs text-amber-300">{afaStatusLabel(order.status,order.manual_review)}</span> : getStatusBadge(order.status,order.customer_resolution)}
-                      {getPaymentBadge(order.payment_status)}
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      {new Date(order.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}{' '}
-                      {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {/* Phone cards */}
+          <ul className="space-y-2 md:hidden">
+            {ordersData.orders.map(order => (
+              <li key={order.id}>
+                <button type="button" onClick={() => openOrderDrawer(order)} className="w-full space-y-2 rounded-2xl border border-slate-800 bg-[#0d151b] p-4 text-left active:bg-slate-900">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-1.5 font-mono text-[13px] font-semibold text-white">
+                      {order.manual_review && <Flag className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" aria-label="Flagged for review" />}
+                      <span className="truncate">{order.public_reference}</span>
                     </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                    <span className="shrink-0 font-semibold tabular-nums text-white">{ghs(order.amount)}</span>
+                  </span>
+                  <span className="flex items-center justify-between gap-2 text-sm text-slate-300">
+                    <span className="truncate">{productLabel(order)} <span className="text-xs uppercase text-slate-500">{order.service_type === 'marketplace' ? '' : order.network}</span></span>
+                    <span className="shrink-0 text-xs text-slate-500">{new Date(order.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  </span>
+                  <span className="block">{caseLabel(order)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
 
-          {/* Pagination Controls */}
           {ordersData.pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between px-2 pt-2 text-xs text-slate-400">
-              <span>
-                Page <strong className="text-white">{ordersData.pagination.page}</strong> of{' '}
-                <strong className="text-white">{ordersData.pagination.totalPages}</strong> ({ordersData.pagination.total} orders)
+            <nav aria-label="Order pages" className="flex items-center justify-between gap-3 text-sm text-slate-400">
+              <span>Page {ordersData.pagination.page} of {ordersData.pagination.totalPages}</span>
+              <span className="flex gap-2">
+                <AdminButton aria-label="Previous page" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1}><ChevronLeft className="h-4 w-4" /></AdminButton>
+                <AdminButton aria-label="Next page" onClick={() => setCurrentPage(p => Math.min(ordersData.pagination.totalPages, p + 1))} disabled={currentPage >= ordersData.pagination.totalPages}><ChevronRight className="h-4 w-4" /></AdminButton>
               </span>
-
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage <= 1}
-                  className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 disabled:opacity-30 text-white cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setCurrentPage((p) => Math.min(ordersData.pagination.totalPages, p + 1))}
-                  disabled={currentPage >= ordersData.pagination.totalPages}
-                  className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 disabled:opacity-30 text-white cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+            </nav>
           )}
         </div>
       )}
 
-      {/* Order Details Drawer / Modal */}
       {selectedOrder && (
-        <div
-          onClick={(e) => {
-            e.stopPropagation();
-            closeOrderDrawer();
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
-        >
-          <div
-            ref={drawerFocus} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Order details"
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            className="w-full max-w-2xl max-h-[92vh] flex flex-col bg-[#0f171d] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
-          >
-            {/* Drawer Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm sm:text-base font-bold text-white font-mono">
-                    {selectedOrder.public_reference}
-                  </h3>
-                  {selectedOrder.manual_review && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      Manual Review Active
-                    </span>
-                  )}
-                </div>
-                <p className="text-[11px] text-slate-400 font-mono">
-                  Internal ID: {selectedOrder.id}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeOrderDrawer();
-                }}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
-                title="Close drawer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Drawer Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 text-xs">
-              {/* Action Success Alert */}
-              {actionSuccessMessage && (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2 text-emerald-400">
-                  <Check className="w-4 h-4 shrink-0" />
-                  <span>{actionSuccessMessage}</span>
-                </div>
-              )}
-
-              {/* Status Alert if Needs Attention */}
-              {selectedOrder.resolution?.stage!=='resolved' && (selectedOrder.status === 'refund_pending' || selectedOrder.status === 'failed') &&
-               !(selectedOrder.failure_reason?.toLowerCase().startsWith('prelaunch') || selectedOrder.failure_reason?.toLowerCase().startsWith('pre-launch')) && (
-                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1 text-amber-300">
-                  <div className="flex items-center gap-2 font-bold text-xs">
-                    <AlertTriangle className="w-4 h-4 text-amber-400" />
-                    <span>Manual Operational Attention Required</span>
-                  </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
-                    This order encountered a supplier delivery exception. Review supplier evidence and the customer resolution below. Supplier failure or a supplier balance refund does not confirm a customer refund. Do not blindly resubmit the order.
-                  </p>
-                </div>
-              )}
-
-              <AdminOrderResolution key={selectedOrder.id} order={selectedOrder} token={sessionToken} onUpdated={updated=>{if(selectedOrderRef.current?.id===updated.id){selectedOrderRef.current=updated;setSelectedOrder(updated);void fetchOrders();}}}/>
-              {/* Core Order Summary Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
-                <div>
-                  <span className="text-[11px] text-slate-500 block">Service & Network</span>
-                  <span className="font-bold text-white">{selectedOrder.product_name_snapshot}</span>
-                  <span className="block text-slate-400 uppercase font-mono">{selectedOrder.network}</span>
-                </div>
-
-                <div>
-                  <span className="text-[11px] text-slate-500 block">Recipient Phone</span>
-                  <div className="flex items-center gap-1.5 font-mono font-bold text-white">
-                    <span>{selectedOrder.recipient_phone}</span>
-                    <button
-                      onClick={() => handleCopy(selectedOrder.recipient_phone, 'phone')}
-                      className="text-slate-500 hover:text-white"
-                      title="Copy phone"
-                    >
-                      {copiedKey === 'phone' ? <Check className="w-3 h-3 text-[#00c365]" /> : <Copy className="w-3 h-3" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <span className="text-[11px] text-slate-500 block">Amount Paid</span>
-                  <span className="font-mono font-bold text-base text-[#00c365]">
-                    GH₵ {(selectedOrder.amount / 100).toFixed(2)}
-                  </span>
-                  {selectedOrder.service_fee_ghc !== undefined && selectedOrder.service_fee_ghc > 0 && (
-                    <span className="block text-[10px] text-slate-500">
-                      (Fee: GH₵ {selectedOrder.service_fee_ghc.toFixed(2)})
-                    </span>
-                  )}
-                </div>
-
-                <div>
-                  <span className="text-[11px] text-slate-500 block">Fulfilment Status</span>
-                  <div className="pt-0.5">{selectedOrder.service_type === 'afa' && !['manual_fulfillment','external_compensation'].includes(selectedOrder.customer_resolution||'') ? <span className="text-xs text-amber-300">{afaStatusLabel(selectedOrder.status,selectedOrder.manual_review)}</span> : getStatusBadge(selectedOrder.status,selectedOrder.customer_resolution)}</div>
-                </div>
-
-                <div>
-                  <span className="text-[11px] text-slate-500 block">Payment Status</span>
-                  <div className="pt-0.5">{getPaymentBadge(selectedOrder.payment_status)}</div>
-                </div>
-
-                <div>
-                  <span className="text-[11px] text-slate-500 block">Payment Reference</span>
-                  <div className="flex items-center gap-1 font-mono text-[11px] text-slate-300 truncate">
-                    <span className="truncate">{selectedOrder.payment_reference || 'N/A'}</span>
-                    {selectedOrder.payment_reference && (
-                      <button
-                        onClick={() => handleCopy(selectedOrder.payment_reference!, 'pay_ref')}
-                        className="text-slate-500 hover:text-white shrink-0"
-                      >
-                        {copiedKey === 'pay_ref' ? <Check className="w-3 h-3 text-[#00c365]" /> : <Copy className="w-3 h-3" />}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Customer Details */}
-              <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
-                <h4 className="text-xs font-bold text-slate-300">Customer Identification</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                  <div>
-                    <span className="text-[11px] text-slate-500 block">Name</span>
-                    <span className="text-white">{selectedOrder.customer_name || 'Guest Checkout'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-500 block">Email</span>
-                    <span className="text-white font-mono">{selectedOrder.customer_email || 'None'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-500 block">Customer Phone</span>
-                    <span className="text-white font-mono">{selectedOrder.customer_phone || selectedOrder.recipient_phone}</span>
-                  </div>
-                </div>
-              </div>
-
-              {selectedOrder.service_type === 'afa' && <div className="rounded-xl border border-amber-500/40 p-4 text-xs space-y-2 break-words"><h4 className="font-bold text-amber-300">AFA registration</h4>{selectedOrder.afa_registration && <><p>Legal name: {selectedOrder.afa_registration.name}</p><p>Ghana Card: {selectedOrder.afa_registration.maskedIdNumber}</p><p>Region / location: {selectedOrder.afa_registration.region} / {selectedOrder.afa_registration.location}</p><p>Occupation: {selectedOrder.afa_registration.occupation || 'Not supplied'}</p><p>Supplier ID: {selectedOrder.afa_registration.supplierPublicId || 'Awaiting acknowledgement'}</p><p>Supplier status: {selectedOrder.afa_registration.supplierStatus || 'Not submitted'}</p><p>Identity payload: {selectedOrder.afa_registration.sensitivePayloadPurgedAt ? 'Purged' : 'Encrypted, retained for fulfilment'}</p></>}<p>Uncertain submissions without a supplier ID require support reconciliation. Never resubmit blindly.</p></div>}
-              {/* Marketplace Specific Fulfilment Card */}
-              {selectedOrder.service_type === 'marketplace' ? (
-                <div className="p-4 rounded-xl bg-slate-900/80 border border-[#00c365]/30 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                      <ShoppingBag className="w-4 h-4 text-[#00c365]" />
-                      <span>Marketplace Commerce Order Fulfilment</span>
-                    </h4>
-                    <span className="text-[10px] font-bold text-[#00c365] bg-[#00c365]/10 px-2 py-0.5 rounded uppercase">
-                      {FULFILMENT_LABELS[(selectedOrder.fulfilment_method || 'pickup') as FulfilmentMode]}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-[11px] text-slate-400 block">Product Ordered</span>
-                      <span className="font-bold text-white block">{selectedOrder.product_name_snapshot}</span>
-                      {selectedOrder.variant_snapshot && (
-                        <span className="text-[11px] text-amber-400 block">Variant: {selectedOrder.variant_snapshot}</span>
-                      )}
-                    </div>
-
-                    <div>
-                      <span className="text-[11px] text-slate-400 block">Fulfilment Method</span>
-                      <span className="font-bold text-white capitalize">
-                        {selectedOrder.fulfilment_method || 'Pickup'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {selectedOrder.marketplace_context&&<div className="p-3 rounded-lg border border-slate-700 text-xs space-y-2 break-words"><strong>Order context at purchase</strong><p>Product type: {String(selectedOrder.marketplace_context.productKind || '')}</p>{Boolean(selectedOrder.marketplace_context.identifierValue)&&<p>{String(selectedOrder.marketplace_context.identifierLabel)}: {String(selectedOrder.marketplace_context.identifierValue)}</p>}{Boolean(selectedOrder.marketplace_context.fulfilmentNote)&&<p>{String(selectedOrder.marketplace_context.fulfilmentNote)}</p>}{Boolean(selectedOrder.marketplace_context.purchaseNote)&&<p>{String(selectedOrder.marketplace_context.purchaseNote)}</p>}</div>}
-                  {['pickup','delivery'].includes(selectedOrder.fulfilment_method || 'pickup')&&(selectedOrder.fulfilment_method === 'pickup' ? (
-                    <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1 text-xs">
-                      <span className="text-[11px] text-slate-400 block font-bold">Pickup Location:</span>
-                      <p className="text-white font-medium">{selectedOrder.pickup_location_snapshot || 'Accra Pickup Hub'}</p>
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1 text-xs">
-                      <span className="text-[11px] text-slate-400 block font-bold">Delivery Address:</span>
-                      <p className="text-white font-medium">
-                        {selectedOrder.delivery_city}, {selectedOrder.delivery_area}
-                      </p>
-                      {selectedOrder.delivery_landmark && (
-                        <p className="text-slate-300 text-[11px]">Landmark: {selectedOrder.delivery_landmark}</p>
-                      )}
-                      {selectedOrder.delivery_note && (
-                        <p className="text-amber-300 text-[11px] italic">Note: {selectedOrder.delivery_note}</p>
-                      )}
-                    </div>
-                  ))}
-
-                  {/* Admin Status Update Action */}
-                  <div className="pt-2 border-t border-slate-800 space-y-2">
-                    <span className="text-[11px] font-bold text-slate-300 block">
-                      Update Fulfilment Status:
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { id: 'awaiting_fulfilment', label: ['digital_delivery','manual_activation'].includes(selectedOrder.fulfilment_method || '') ? 'Awaiting Fulfilment' : 'Awaiting Dispatch' },
-                        { id: 'processing', label: 'Processing' },
-                        { id: 'ready_for_pickup', label: 'Ready for Pickup' },
-                        { id: 'out_for_delivery', label: 'Out for Delivery' },
-                        { id: 'completed', label: 'Completed / Delivered' },
-                        ...(selectedOrder.payment_status==='success'?[]:[{ id: 'refunded', label: 'Refunded' }]),
-                        { id: 'cancelled', label: 'Cancelled' },
-                      ].filter(st => !['digital_delivery','manual_activation'].includes(selectedOrder.fulfilment_method || '') || !['ready_for_pickup','out_for_delivery'].includes(st.id)).map((st) => {
-                        const isCurrent =
-                          selectedOrder.marketplace_status === st.id || selectedOrder.status === st.id;
-                        return (
-                          <button
-                            key={st.id}
-                            disabled={isUpdatingStatus}
-                            onClick={() => handleUpdateOrderStatus(selectedOrder, st.id)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
-                              isCurrent
-                                ? 'bg-[#00c365] text-black font-extrabold shadow-sm'
-                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700'
-                            }`}
-                          >
-                            {st.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* Supplier Integration Diagnostics (Telecom Services) */
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                      <Radio className="w-3.5 h-3.5 text-sky-400" />
-                      <span>Supplier Dispatch Details (Success Biz Hub)</span>
-                    </h4>
-                    {(selectedOrder.supplier_order_id || selectedOrder.service_type === 'afa') && (
-                      <button
-                        onClick={() => handleRefreshSupplierStatus(selectedOrder.public_reference)}
-                        disabled={isRefreshingSupplier||selectedOrder.status==='delivered'||selectedOrder.resolution?.stage==='resolved'}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 font-semibold text-[11px] border border-sky-500/30 transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        <RefreshCw className={`w-3 h-3 ${isRefreshingSupplier ? 'animate-spin' : ''}`} />
-                        <span>{isRefreshingSupplier ? 'Checking Supplier...' : 'Refresh Status'}</span>
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                    <div>
-                      <span className="text-[11px] text-slate-500 block">Supplier Order ID</span>
-                      <span className="font-mono text-white font-bold">
-                        {selectedOrder.supplier_order_id || 'Not Dispatched'}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[11px] text-slate-500 block">Recorded Wholesale Cost</span>
-                      <span className="font-mono text-white">
-                        {selectedOrder.supplier_cost_minor !== null
-                          ? `GH₵ ${(selectedOrder.supplier_cost_minor / 100).toFixed(2)}`
-                          : 'N/A'}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[11px] text-slate-500 block">Package Offer Code</span>
-                      <span className="font-mono text-slate-300">
-                        {selectedOrder.supplier_offer_ref || 'Standard Catalog'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {selectedOrder.failure_reason && (
-                    <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/25 text-[11px] text-red-300 font-mono">
-                      <strong className="block text-red-400 font-sans">Failure / Rejection Reason:</strong>
-                      {selectedOrder.failure_reason}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Internal Admin Note & Manual Review Controls */}
-              <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Operational Notes & Review State</span>
-                  </h4>
-                  <button
-                    onClick={() => handleToggleManualReview(selectedOrder)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                      selectedOrder.manual_review
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
-                        : 'bg-slate-800 text-slate-300 border border-slate-700 hover:text-white'
-                    }`}
-                  >
-                    <Flag className="w-3.5 h-3.5" />
-                    <span>{selectedOrder.manual_review ? 'Resolve Review Flag' : 'Flag for Manual Review'}</span>
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  <textarea
-                    value={adminNoteInput}
-                    onChange={(e) => setAdminNoteInput(e.target.value)}
-                    placeholder="Add operational notes (e.g. 'Verified with customer on WhatsApp', 'Customer requested change of network')..."
-                    rows={2}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-[#00c365] focus:outline-none text-xs text-slate-200 placeholder:text-slate-600 transition-colors"
-                  />
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => handleSaveAdminNote(selectedOrder)}
-                      disabled={isSavingNote}
-                      className="px-3 py-1.5 rounded-lg bg-[#00c365] hover:bg-[#00e575] text-black text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      {isSavingNote ? 'Saving...' : 'Save Note'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Collapsible Technical Supplier Response */}
-              {selectedOrder.supplier_response && (
-                <div className="border border-slate-800 rounded-xl overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-                    className="w-full p-3 bg-slate-900/90 text-left text-xs text-slate-400 hover:text-white flex items-center justify-between font-mono cursor-pointer"
-                  >
-                    <span>Technical Supplier Response</span>
-                    <span>{showTechnicalDetails ? '▲ Hide' : '▼ Expand'}</span>
-                  </button>
-                  {showTechnicalDetails && (
-                    <div className="p-3 bg-black/80 font-mono text-[11px] text-emerald-400 overflow-x-auto max-h-48">
-                      <pre>{selectedOrder.supplier_response}</pre>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Administrative Resolution Section */}
-              <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Administrative Resolution</span>
-                  </h4>
-                  <span className="text-[10px] text-slate-500 font-mono">Restricted Controls</span>
-                </div>
-
-                {/* Case C: Delivered -> No destructive action */}
-                {(selectedOrder.status === 'delivered' || selectedOrder.delivered_at) && (
-                  <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/25 flex items-center gap-2 text-[11px] text-emerald-300">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>This order has been verified as delivered to the customer. No administrative intervention permitted.</span>
-                  </div>
-                )}
-
-                {/* Case D: Already terminal failed/refunded -> Informational */}
-                {(selectedOrder.status === 'failed' || selectedOrder.status === 'refunded') && (
-                  <div className="p-3 rounded-lg bg-slate-800/80 border border-slate-700/60 flex items-center gap-2 text-[11px] text-slate-400">
-                    <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span>{selectedOrder.resolution?.stage==='resolved'?'Customer resolution complete; see the recorded outcome below.':'Supplier flow has stopped. Customer refund remains unconfirmed until verified in Customer resolution.'}</span>
-                  </div>
-                )}
-
-                {/* Case A: supplier_order_id exists -> Show Refresh Supplier Status */}
-                {selectedOrder.supplier_order_id && selectedOrder.status !== 'delivered' && selectedOrder.status !== 'refunded' && selectedOrder.resolution?.stage!=='resolved' && (
-                  <div className="p-3.5 rounded-lg bg-sky-500/10 border border-sky-500/25 space-y-2">
-                    <p className="text-[11px] text-sky-200 leading-relaxed">
-                      This order was dispatched to Success Biz Hub (ID: <span className="font-mono font-bold text-white">{selectedOrder.supplier_order_id}</span>). Use supplier refresh to synchronize the live delivery state.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => handleRefreshSupplierStatus(selectedOrder.public_reference)}
-                      disabled={isRefreshingSupplier}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingSupplier ? 'animate-spin' : ''}`} />
-                      <span>{isRefreshingSupplier ? 'Checking Supplier...' : 'Refresh Supplier Status'}</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Case B: No supplier_order_id AND non-terminal -> Can close as Pre-launch Test */}
-                {!selectedOrder.supplier_order_id && !['delivered','failed','refunded'].includes(selectedOrder.status) && selectedOrder.resolution?.stage!=='resolved' && (
-                  <div className="space-y-3">
-                    {!showCloseTestConfirm ? (
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
-                        <div>
-                          <div className="font-bold text-amber-300 text-xs">Stale Test Order Resolution</div>
-                          <p className="text-[11px] text-slate-400">
-                            Terminalize this pre-launch test order so it no longer blocks MTN duplicate protection.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowCloseTestConfirm(true);
-                            setCloseTestError(null);
-                            setConfirmPaidCheckbox(false);
-                            setCloseTestReason('');
-                          }}
-                          className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-colors cursor-pointer shrink-0"
-                        >
-                          Close as Pre-launch Test
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="p-3.5 rounded-xl bg-[#141b22] border border-amber-500/40 space-y-3 animate-fadeIn">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 font-bold text-amber-400 text-xs">
-                            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                            <span>Confirm Pre-Launch Test Resolution</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowCloseTestConfirm(false);
-                              setCloseTestError(null);
-                            }}
-                            className="text-slate-400 hover:text-white text-xs cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-
-                        {/* Paid Warning & Mandatory Checkbox */}
-                        {(selectedOrder.payment_status === 'success' || Boolean(selectedOrder.paid_at)) && (
-                          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 space-y-2">
-                            <p className="text-[11px] text-red-300 leading-relaxed font-medium">
-                              This order has a successful payment record but no supplier order ID. Only close it if you have confirmed it was a test/pre-launch transaction. This does not refund the payment.
-                            </p>
-                            <label className="flex items-start gap-2 text-[11px] text-slate-200 cursor-pointer select-none">
-                              <input
-                                type="checkbox"
-                                checked={confirmPaidCheckbox}
-                                onChange={(e) => setConfirmPaidCheckbox(e.target.checked)}
-                                className="mt-0.5 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-400 cursor-pointer"
-                              />
-                              <span className="leading-snug">
-                                I confirm this is a pre-launch/test order and no customer refund is being performed by this action.
-                              </span>
-                            </label>
-                          </div>
-                        )}
-
-                        <div className="space-y-1.5">
-                          <label className="block text-[11px] text-slate-400">
-                            Reason for closure (recorded in audit log):
-                          </label>
-                          <input
-                            type="text"
-                            value={closeTestReason}
-                            onChange={(e) => setCloseTestReason(e.target.value)}
-                            placeholder="e.g. Pre-launch developer test order"
-                            className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400 font-mono"
-                          />
-                        </div>
-
-                        {closeTestError && (
-                          <div className="text-[11px] text-red-400 font-medium p-2 rounded-lg bg-red-500/10 border border-red-500/20">
-                            {closeTestError}
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-end gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowCloseTestConfirm(false);
-                              setCloseTestError(null);
-                            }}
-                            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleCloseTestOrder}
-                            disabled={
-                              isClosingTest ||
-                              ((selectedOrder.payment_status === 'success' || Boolean(selectedOrder.paid_at)) &&
-                                !confirmPaidCheckbox)
-                            }
-                            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 text-xs font-bold transition-colors cursor-pointer"
-                          >
-                            {isClosingTest ? 'Terminalizing...' : 'Confirm & Terminalize Order'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Drawer Footer */}
-            <div className="p-4 bg-slate-900/90 border-t border-slate-800 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => handleCopy(selectedOrder.public_reference, 'pub_ref_btn')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
-              >
-                {copiedKey === 'pub_ref_btn' ? <Check className="w-3.5 h-3.5 text-[#00c365]" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>Copy Reference</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeOrderDrawer();
-                }}
-                className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition-colors cursor-pointer"
-              >
-                Close Drawer
-              </button>
-            </div>
-          </div>
-        </div>
+        <OrderDetailSheet
+          order={selectedOrder}
+          token={sessionToken}
+          onClose={closeOrderDrawer}
+          detailError={detailError}
+          message={actionSuccessMessage}
+          actionError={actionError}
+          copiedKey={copiedKey}
+          onCopy={handleCopy}
+          note={adminNoteInput}
+          setNote={setAdminNoteInput}
+          savingNote={isSavingNote}
+          onSaveNote={() => void handleSaveAdminNote(selectedOrder)}
+          onToggleFlag={() => void handleToggleManualReview(selectedOrder)}
+          refreshingSupplier={isRefreshingSupplier}
+          onRefreshSupplier={() => void handleRefreshSupplierStatus(selectedOrder.public_reference)}
+          updatingStatus={isUpdatingStatus}
+          onMarketplaceStep={step => void handleUpdateOrderStatus(selectedOrder, step)}
+          onResolutionUpdated={updated => { if (selectedOrderRef.current?.id === updated.id) { setSelected({ ...selectedOrderRef.current, ...updated }); afterAction(); } }}
+          testClosure={{ show: showCloseTestConfirm, setShow: v => { setShowCloseTestConfirm(v); setCloseTestError(null); setConfirmPaidCheckbox(false); setCloseTestReason(''); }, confirmPaid: confirmPaidCheckbox, setConfirmPaid: setConfirmPaidCheckbox, reason: closeTestReason, setReason: setCloseTestReason, busy: isClosingTest, error: closeTestError, run: () => void handleCloseTestOrder() }}
+        />
       )}
     </div>
   );
 };
+
+function OrderDetailSheet({ order, token, onClose, detailError, message, actionError, copiedKey, onCopy, note, setNote, savingNote, onSaveNote, onToggleFlag, refreshingSupplier, onRefreshSupplier, updatingStatus, onMarketplaceStep, onResolutionUpdated, testClosure }: {
+  order: AdminOrderDetails; token: string; onClose: () => void; detailError: string | null; message: string | null; actionError: string | null;
+  copiedKey: string | null; onCopy: (text: string, key: string) => void; note: string; setNote: (v: string) => void; savingNote: boolean; onSaveNote: () => void; onToggleFlag: () => void;
+  refreshingSupplier: boolean; onRefreshSupplier: () => void; updatingStatus: boolean; onMarketplaceStep: (step: string) => void; onResolutionUpdated: (order: AdminOrderDetails) => void;
+  testClosure: { show: boolean; setShow: (v: boolean) => void; confirmPaid: boolean; setConfirmPaid: (v: boolean) => void; reason: string; setReason: (v: string) => void; busy: boolean; error: string | null; run: () => void };
+}) {
+  const kase = describeOrderCase(order);
+  const timeline = orderTimeline(order);
+  const supplierStatus = parseSupplierStatus(order.supplier_response);
+  const paid = order.payment_status === 'success' || Boolean(order.paid_at);
+  const isMarketplace = order.service_type === 'marketplace';
+  const digital = ['digital_delivery', 'manual_activation'].includes(order.fulfilment_method || '');
+  const customerWhatsapp = whatsappLink(order.customer_phone);
+  const [showRaw, setShowRaw] = useState(false);
+  const copyButton = (text: string, key: string, label: string) => (
+    <button type="button" onClick={() => onCopy(text, key)} aria-label={label} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-800 hover:text-white">
+      {copiedKey === key ? <Check className="h-4 w-4 text-[#00c365]" /> : <Copy className="h-4 w-4" />}
+    </button>
+  );
+  const resolutionEligible = paid && ['failed', 'refund_pending', 'refunded', 'cancelled', 'expired'].includes(order.status);
+  const paidButHeld = order.payment_status === 'success' && ['paid', 'queued'].includes(order.status) && !order.supplier_order_id && !isMarketplace && order.resolution?.stage !== 'resolved';
+
+  return (
+    <AdminSheet wide onClose={onClose}
+      title={<span className="font-mono">{order.public_reference}</span>}
+      subtitle={<span>{order.service_type === 'airtime' ? `${order.network.toUpperCase()} Airtime` : order.product_name_snapshot} · {ghs(order.amount)}</span>}
+      footer={<div className="flex items-center justify-between gap-2"><AdminButton onClick={() => onCopy(order.public_reference, 'ref-footer')}>{copiedKey === 'ref-footer' ? <Check className="h-4 w-4 text-[#00c365]" /> : <Copy className="h-4 w-4" />}Copy reference</AdminButton><AdminButton variant="primary" onClick={onClose}>Done</AdminButton></div>}>
+      <div className="space-y-4 text-sm">
+        {/* Where this customer stands */}
+        <div className={`space-y-2 rounded-2xl border p-4 ${kase.tone === 'danger' ? 'border-rose-500/40 bg-rose-500/5' : kase.tone === 'warning' ? 'border-amber-500/40 bg-amber-500/5' : kase.tone === 'success' ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-slate-700 bg-slate-900/40'}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill tone={kase.tone}>{kase.label}</StatusPill>
+            {kase.flagged && <StatusPill tone="warning">Flagged for review</StatusPill>}
+            {kase.needsAttention && !kase.flagged && <StatusPill tone="warning">In Needs Attention</StatusPill>}
+          </div>
+          <p className="text-slate-200">{kase.explanation}</p>
+          <p className="text-slate-400"><span className="font-semibold text-slate-300">Next: </span>{kase.nextStep}</p>
+        </div>
+
+        {message && <AdminNotice tone="success">{message}</AdminNotice>}
+        {actionError && <AdminNotice tone="danger">{actionError}</AdminNotice>}
+        {detailError && <AdminNotice tone="warning" title="Showing the list copy of this order">{detailError}</AdminNotice>}
+
+        {/* Timeline */}
+        <ol className="flex flex-col gap-0 rounded-2xl border border-slate-800 p-4 sm:flex-row sm:gap-2">
+          {timeline.map((step, index) => (
+            <li key={index} className="flex flex-1 gap-3 sm:flex-col sm:gap-1.5">
+              <span className="flex flex-col items-center sm:flex-row">
+                {step.state === 'done' ? <CheckCircle2 className="h-5 w-5 text-emerald-400" /> : step.state === 'failed' ? <XCircle className="h-5 w-5 text-rose-400" /> : <Circle className={`h-5 w-5 ${step.state === 'current' ? 'text-amber-300' : 'text-slate-600'}`} />}
+                {index < timeline.length - 1 && <span className="my-1 h-5 w-px bg-slate-700 sm:mx-1 sm:my-0 sm:h-px sm:w-full" />}
+              </span>
+              <span className="pb-2 sm:pb-0">
+                <span className={`block text-sm ${step.state === 'pending' ? 'text-slate-500' : 'text-slate-200'}`}>{step.label}</span>
+                {step.at && <span className="block text-xs text-slate-500">{new Date(step.at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>}
+              </span>
+            </li>
+          ))}
+        </ol>
+
+        {/* Paid but never sent to the supplier: explain the real limits honestly */}
+        {paidButHeld && (
+          <AdminNotice tone="info" title="Fulfilled this order outside Mystery Hub?">
+            <p>Mystery Hub cannot yet close a paid order that was never sent to the supplier as "fulfilled externally". Clearing the flag would only hide it, and "Close as test order" would wrongly record it as a failed test.</p>
+            <p className="mt-1">Until that server action exists: save an internal note with what you delivered, when and how you checked it, and keep the order flagged so it stays visible.</p>
+          </AdminNotice>
+        )}
+
+        {/* Payment and customer */}
+        <AdminPanel title="Payment and customer">
+          <DefinitionList items={[
+            ['Payment', <StatusPill key="p" tone={order.payment_status === 'success' ? 'success' : order.payment_status === 'pending' ? 'warning' : 'neutral'}>{order.payment_status === 'success' ? 'Verified paid' : order.payment_status === 'pending' ? 'Not confirmed' : order.payment_status}</StatusPill>],
+            ['Amount', <span key="a">{ghs(order.amount)}{order.service_fee_ghc ? <span className="text-slate-500"> · fee GH₵{order.service_fee_ghc.toFixed(2)}</span> : null}</span>],
+            ['Paid with', order.payment_provider === 'wallet' ? 'Mystery Wallet' : 'Paystack'],
+            ['Payment reference', <span key="r" className="inline-flex items-center gap-1 font-mono text-xs">{order.payment_reference || '—'}{order.payment_reference && copyButton(order.payment_reference, 'pay', 'Copy payment reference')}</span>],
+            ['Recipient', <span key="rc" className="inline-flex items-center gap-1 font-mono">{order.recipient_phone}{copyButton(order.recipient_phone, 'phone', 'Copy recipient phone')}</span>],
+            ['Customer', order.customer_name || 'Guest checkout'],
+            ['Email', order.customer_email || '—'],
+            ['Customer phone', order.customer_phone || order.recipient_phone],
+          ]} />
+          {customerWhatsapp && <a href={customerWhatsapp} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 px-4 text-sm font-semibold text-slate-100 hover:border-[#00c365]"><MessageCircle className="h-4 w-4 text-[#00c365]" />Message customer on WhatsApp</a>}
+        </AdminPanel>
+
+        {order.service_type === 'afa' && (
+          <AdminPanel title="AFA registration" tone="warning">
+            {order.afa_registration ? <DefinitionList items={[
+              ['Legal name', order.afa_registration.name], ['Ghana Card', order.afa_registration.maskedIdNumber], ['Region / location', `${order.afa_registration.region} / ${order.afa_registration.location}`],
+              ['Occupation', order.afa_registration.occupation || 'Not supplied'], ['Supplier ID', order.afa_registration.supplierPublicId || 'Awaiting acknowledgement'], ['Supplier status', order.afa_registration.supplierStatus || 'Not submitted'],
+              ['Identity payload', order.afa_registration.sensitivePayloadPurgedAt ? 'Purged' : 'Encrypted, retained for fulfilment'],
+            ]} /> : <p className="text-slate-400">Registration details are loading or unavailable.</p>}
+            <p className="mt-2 text-xs text-slate-400">Uncertain submissions without a supplier ID require support reconciliation. Never resubmit blindly.</p>
+          </AdminPanel>
+        )}
+
+        {/* Fulfilment */}
+        {isMarketplace ? (
+          <AdminPanel title="Marketplace fulfilment" actions={<StatusPill tone="accent" dot={false}>{FULFILMENT_LABELS[(order.fulfilment_method || 'pickup') as FulfilmentMode]}</StatusPill>}>
+            <DefinitionList items={[
+              ['Product', order.product_name_snapshot],
+              ...(order.variant_snapshot ? [['Option', order.variant_snapshot] as [string, string]] : []),
+              ...(order.fulfilment_method === 'pickup' ? [['Pickup location', order.pickup_location_snapshot || 'Not recorded on this order'] as [string, string]] : []),
+              ...(order.fulfilment_method === 'delivery' ? [['Delivery address', [order.delivery_city, order.delivery_area].filter(Boolean).join(', ') || 'Not recorded'] as [string, string]] : []),
+              ...(order.delivery_landmark ? [['Landmark', order.delivery_landmark] as [string, string]] : []),
+              ...(order.delivery_note ? [['Customer note', order.delivery_note] as [string, string]] : []),
+            ]} />
+            {order.marketplace_context && (
+              <div className="mt-3 space-y-1 rounded-xl border border-slate-800 p-3 text-xs text-slate-300">
+                <p className="font-semibold text-slate-200">Captured at purchase</p>
+                <p>Product type: {String(order.marketplace_context.productKind || '—')}</p>
+                {Boolean(order.marketplace_context.identifierValue) && <p>{String(order.marketplace_context.identifierLabel)}: {String(order.marketplace_context.identifierValue)}</p>}
+                {Boolean(order.marketplace_context.fulfilmentNote) && <p>{String(order.marketplace_context.fulfilmentNote)}</p>}
+                {Boolean(order.marketplace_context.purchaseNote) && <p>{String(order.marketplace_context.purchaseNote)}</p>}
+              </div>
+            )}
+            <div className="mt-4 space-y-2">
+              <p className="text-sm font-semibold text-slate-200">Fulfilment step</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: 'awaiting_fulfilment', label: digital ? 'Awaiting Fulfilment' : 'Awaiting Dispatch' },
+                  { id: 'processing', label: 'Processing' },
+                  { id: 'ready_for_pickup', label: 'Ready for Pickup' },
+                  { id: 'out_for_delivery', label: 'Out for Delivery' },
+                  { id: 'completed', label: 'Completed / Delivered' },
+                  ...(order.payment_status === 'success' ? [] : [{ id: 'refunded', label: 'Refunded' }]),
+                  { id: 'cancelled', label: 'Cancelled' },
+                ].filter(step => !digital || !['ready_for_pickup', 'out_for_delivery'].includes(step.id))
+                  .filter(step => order.fulfilment_method !== 'delivery' || step.id !== 'ready_for_pickup')
+                  .filter(step => order.fulfilment_method !== 'pickup' || step.id !== 'out_for_delivery')
+                  .map(step => {
+                    const current = order.marketplace_status === step.id || order.status === step.id;
+                    return <button key={step.id} type="button" disabled={updatingStatus || current} aria-pressed={current} onClick={() => onMarketplaceStep(step.id)} className={`min-h-11 rounded-xl border px-3 text-sm font-semibold ${current ? 'border-[#00c365] bg-[#00c365] text-black' : 'border-slate-700 text-slate-200 hover:border-slate-500'} disabled:cursor-default`}>{step.label}</button>;
+                  })}
+              </div>
+              <p className="text-xs text-slate-500">Cancelling a paid order does not refund the customer. Paid refunds go through Customer resolution.</p>
+            </div>
+          </AdminPanel>
+        ) : (
+          <AdminPanel title="Supplier" description="Success Biz Hub" actions={(order.supplier_order_id || order.service_type === 'afa') && <AdminButton onClick={onRefreshSupplier} busy={refreshingSupplier} disabled={order.status === 'delivered' || order.resolution?.stage === 'resolved'}><RefreshCw className="h-4 w-4" />Check supplier now</AdminButton>}>
+            <DefinitionList items={[
+              ['Supplier order ID', order.supplier_order_id ? <span key="s" className="inline-flex items-center gap-1 font-mono text-xs">{order.supplier_order_id}{copyButton(order.supplier_order_id, 'sup', 'Copy supplier order ID')}</span> : 'Never sent to supplier'],
+              ['Last supplier status', supplierStatus || (order.supplier_response ? 'Unreadable response' : 'No response recorded')],
+              ['Last checked', order.supplier_last_checked_at ? new Date(order.supplier_last_checked_at).toLocaleString() : 'Not recorded'],
+              ['Recorded supplier cost', order.supplier_cost_minor != null ? ghs(order.supplier_cost_minor) : 'Not recorded'],
+              ['Package code', order.supplier_offer_ref || 'Standard catalogue'],
+            ]} />
+            {order.failure_reason && <p className="mt-3 rounded-xl border border-rose-500/30 bg-rose-500/5 p-3 text-xs text-rose-200"><span className="font-semibold">Failure reason: </span><span className="font-mono">{order.failure_reason}</span></p>}
+            <p className="mt-3 text-xs text-slate-500">A successful supplier API response is not proof the customer received the bundle. Delivery is confirmed only when the supplier reports it delivered.</p>
+            {order.supplier_response && (
+              <div className="mt-3">
+                <button type="button" onClick={() => setShowRaw(!showRaw)} aria-expanded={showRaw} className="min-h-11 text-sm font-semibold text-slate-300 hover:text-white">{showRaw ? 'Hide' : 'Show'} raw supplier response</button>
+                {showRaw && <pre className="max-h-48 overflow-auto rounded-xl bg-black/70 p-3 font-mono text-xs text-emerald-300">{order.supplier_response}</pre>}
+              </div>
+            )}
+          </AdminPanel>
+        )}
+
+        {/* Customer resolution (existing audited workflow) */}
+        {(resolutionEligible || order.resolution) && (
+          <AdminPanel title="Customer resolution" description="Refunds and documented remedies for paid orders that were not delivered.">
+            <AdminOrderResolution key={order.id} order={order} token={token} onUpdated={onResolutionUpdated} />
+          </AdminPanel>
+        )}
+
+        {/* Notes and review flag */}
+        <AdminPanel title="Internal note and review flag" actions={<AdminButton onClick={onToggleFlag} className={order.manual_review ? 'border-amber-500/50 text-amber-200' : ''}><Flag className="h-4 w-4" />{order.manual_review ? 'Clear review flag' : 'Flag for review'}</AdminButton>}>
+          <label className={adminLabel}>
+            <span>Internal note (never shown to the customer)</span>
+            <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} maxLength={1000} placeholder="What happened, what you checked and what you told the customer" className={`${adminField} min-h-24`} />
+          </label>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-500">{order.manual_review ? 'Clearing the flag only removes it from review. It does not refund or resolve the customer case.' : 'Flag an order to keep it in Needs Attention while you investigate.'}</p>
+            <AdminButton variant="primary" onClick={onSaveNote} busy={savingNote} disabled={(order.admin_note || '') === note.trim()}>Save note</AdminButton>
+          </div>
+        </AdminPanel>
+
+        {/* Genuine pre-launch test orders only */}
+        {!order.supplier_order_id && !['delivered', 'failed', 'refunded'].includes(order.status) && order.resolution?.stage !== 'resolved' && (
+          <details className="rounded-2xl border border-slate-800 p-4" open={testClosure.show}>
+            <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-slate-300" onClick={e => { e.preventDefault(); testClosure.setShow(!testClosure.show); }}>Pre-launch test order tools</summary>
+            <div className="space-y-3 pt-2">
+              <AdminNotice tone="warning" title="Only for genuine test orders">
+                This marks the order <strong>failed</strong> with a test-order reason so it stops blocking MTN duplicate protection. Never use it for a real customer, including one you fulfilled outside the system: it would record a false failure and does not refund anyone.
+              </AdminNotice>
+              {paid && (
+                <label className="flex items-start gap-3 text-sm text-slate-200">
+                  <input type="checkbox" className="mt-1 h-4 w-4 accent-amber-400" checked={testClosure.confirmPaid} onChange={e => testClosure.setConfirmPaid(e.target.checked)} />
+                  <span>I confirm this is a pre-launch/test order and no customer refund is being performed by this action.</span>
+                </label>
+              )}
+              <label className={adminLabel}><span>Reason (recorded in the audit log)</span><input value={testClosure.reason} onChange={e => testClosure.setReason(e.target.value)} placeholder="e.g. Pre-launch developer test order" className={adminField} /></label>
+              {testClosure.error && <p role="alert" className="text-sm text-rose-300">{testClosure.error}</p>}
+              <div className="flex justify-end gap-2">
+                <AdminButton onClick={() => testClosure.setShow(false)} disabled={testClosure.busy}><X className="h-4 w-4" />Cancel</AdminButton>
+                <AdminButton variant="danger" busy={testClosure.busy} disabled={paid && !testClosure.confirmPaid} onClick={testClosure.run}>Close as test order</AdminButton>
+              </div>
+            </div>
+          </details>
+        )}
+      </div>
+    </AdminSheet>
+  );
+}
