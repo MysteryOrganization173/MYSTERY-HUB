@@ -4,6 +4,8 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {readFileSync} from 'node:fs';
 import {WEBSITE_TEMPLATES} from '../../../src/data/templates';
 import {mergeSiteWithTemplate,renderTemplateLayout} from '../../../src/utils/templateRendererUtils';
+import {websiteContactTarget} from '../../../src/components/website/SiteContactDetails';
+import {WebsiteStore} from '../../db/websiteStore';
 
 const text=(path:string)=>readFileSync(path,'utf8');
 const content={businessName:'Pass A owner',tagline:'Owner headline',aboutText:'Owner intro',phone:'0241234567',whatsapp:'0551234567',email:'owner@example.test',location:'Osu, Accra',heroImage:'https://example.test/hero.jpg',logoUrl:'https://example.test/logo.png',ctaLabel:'Order now',ctaTarget:'',social:{instagram:'passaowner'},items:[],stats:[],features:[]};
@@ -39,4 +41,26 @@ test('editor, settings, design switch and exit share the Canvas First patterns',
   assert.ok(!dashboard.includes('aria-label="Manage website"'));
   // Owner chrome styles never reach the customer site renderer.
   assert.ok(!text('src/components/website/WebsiteSiteRenderer.tsx').includes('websiteBuilder.css'));
+});
+
+// A brand-new website has blank contact fields. Its main button must still land somewhere real.
+for(const base of WEBSITE_TEMPLATES.filter(t=>!t.composition && t.id!=='tmpl-data-reseller')) test(`${base.id} new website with blank contacts: main button target exists`,async()=>{
+  const {site}=await WebsiteStore.createSite(`pass-a-blank-${base.id}`,{template_id:base.id,name:'Brand new business'});
+  assert.equal(site.content_json.phone,'');assert.equal(site.content_json.whatsapp,'');assert.equal(site.content_json.email,'');
+  const target=websiteContactTarget(site.content_json);
+  assert.equal(target,'#website-contact-details');
+  const html=renderToStaticMarkup(renderTemplateLayout(mergeSiteWithTemplate(base,site.content_json,site.settings_json)));
+  assert.equal(html.split('id="website-contact-details"').length-1,1,'destination rendered exactly once');
+  assert.ok(html.includes('Contact details coming soon.'));
+  assert.ok(html.indexOf('id="website-contact-details"')>html.lastIndexOf('<footer'),'destination is inside the footer');
+});
+
+test('contact fallback prefers WhatsApp, then phone, then email',()=>{
+  const blank={...content,phone:'',whatsapp:'',email:'',ctaTarget:''};
+  assert.equal(websiteContactTarget({...blank,phone:'024 123 4567'}),'tel:0241234567');
+  assert.equal(websiteContactTarget({...blank,email:'a@example.test'}),'mailto:a@example.test');
+  assert.equal(websiteContactTarget({...blank,whatsapp:'0551234567',phone:'0241234567'}),'https://wa.me/233551234567');
+  // Once a real contact exists the placeholder disappears.
+  const base=WEBSITE_TEMPLATES.find(t=>t.id==='tmpl-makola-mart')!;
+  assert.ok(!renderToStaticMarkup(renderTemplateLayout(mergeSiteWithTemplate(base,{...blank,phone:'0241234567'}))).includes('Contact details coming soon.'));
 });

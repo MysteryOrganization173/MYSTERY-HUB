@@ -14,10 +14,18 @@ Branch `claude/builder-launch-pass-a-pbsz1p`, based on `main` at `90c7c47` (veri
 | Exiting lands near the bottom of the Mystery Hub page | The editor replaces the builder page with a fixed overlay, so the document collapses to header + footer and the browser keeps (or clamps) the old scroll offset. On close the page re-grows under that offset. | On leaving the editor the builder returns to the top of the website card (or to Bundles & Pricing when the owner chose that), and focus moves to the site name. |
 | Dashboard, gallery, editor and settings feel like different products | Inconsistent buttons, raw URL text, native "Manage" picker. | Website card redesigned: status pill, address chip with copy, full-width Edit website, View site + Share (native share sheet on phones, copy elsewhere), quieter Unpublish. Dashboard areas use the same chip row as All Settings. |
 
+## Review fix: new websites with no contact details
+
+A newly created website has blank phone, WhatsApp and email. Its main button falls back to `#website-contact-details`, and the first Pass A commit rendered nothing with that id when no details were saved, so the button went nowhere. Now:
+- the fallback order is WhatsApp, then phone (`tel:`), then email, then the footer contact block;
+- the footer always renders that block for a saved site. With no details yet it reads "Contact details coming soon." In the editor, tapping it opens the WhatsApp field, and it disappears as soon as any contact is saved.
+
+Regression tests cover a freshly created site on each of the 12 non-Data legacy templates, and the fallback order. Without the fix, 13 of those tests fail.
+
 ## Verification
 
 - `npx tsc --noEmit`: pass. `npm run build`: pass (existing chunk-size warning only).
-- `npm test`: 1,805 tests, 1,799 pass, 2 fail, 4 skipped. Main: 1,789 / 1,783 / 2 / 4. The 16 new tests (`websiteBuilderPassA.test.ts`) pass. Inherited failures, identical on main: "Mystery Hub Mobile Bundle Card Compression Verification" and `websiteBuilderV1.test.ts`.
+- `npm test`: 1,818 tests, 1,812 pass, 2 fail, 4 skipped. Main: 1,789 / 1,783 / 2 / 4. The 29 new tests (`websiteBuilderPassA.test.ts`) pass. Inherited failures, identical on main: "Mystery Hub Mobile Bundle Card Compression Verification" and `websiteBuilderV1.test.ts`.
 - One existing assertion changed: `websiteFreeV1` "legacy layouts render saved contacts…" looked for the saved CTA URL in the markup, which only the removed duplicate block printed. It now asserts the main button resolves to that URL (the button navigates on tap, as before).
 - Browser journey (Playwright, Chromium touch emulation, in-memory server): Data, Makola Mart (light), Lens Creative (dark) and Glow Salon at 360, 390, 768 and 1280px. Branch 56/56; main 35/56 on the same script. Covers duplicate contact, hero visibility from real pixels, no horizontal overflow, tap without keyboard, All Settings type size and navigation, preview, exit position, design-switch actions visible without scrolling, customer theme kept inside the editor frame, and draft-until-publish isolation on the public API.
 - Image hosts are blocked in the sandbox, so screenshots use a stand-in photo and logo routed in place of Cloudinary and Unsplash.
