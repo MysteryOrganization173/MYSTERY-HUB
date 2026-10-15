@@ -64,3 +64,16 @@ test('API refuses missing/stale quote before creating order or initializing paym
   let providerCalls=0;globalThis.fetch=async()=>{providerCalls++;throw new Error('Payment must not be contacted');};
   try{const response=await originalFetch(base+'/api/payments/initialize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productId:`instant-${pkg.id}`,serviceType:'instant_bundle',recipientPhone:'0201234567',amount:10})});assert.equal(response.status,409);assert.equal((await response.json()).code,'INSTANT_QUOTE_CHANGED');assert.equal(OrdersStore.adminDevOrders().length,0);assert.equal(providerCalls,0);}finally{provider.client.checkInstantBundlesService=check;provider.client.getInstantBundles=catalog;}
 });
+
+test('API initializes exactly the approved quote; changed pricing cannot create another payment',async()=>{
+  const provider=FulfilmentService.getProvider(),check=provider.client.checkInstantBundlesService,catalog=provider.client.getInstantBundles;
+  provider.client.checkInstantBundlesService=async()=>({permitted:true,available:true,productCount:1});provider.client.getInstantBundles=async()=>({data:[pkg]});
+  let paymentBody:any;globalThis.fetch=async(url,options)=>{assert.equal(String(url),'https://api.paystack.co/transaction/initialize');paymentBody=JSON.parse(options!.body as string);return new Response(JSON.stringify({status:true,data:{authorization_url:'https://checkout.paystack.com/fixture',access_code:'fixture',reference:paymentBody.reference}}));};
+  const request=(token:string)=>originalFetch(base+'/api/payments/initialize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productId:`instant-${pkg.id}`,serviceType:'instant_bundle',recipientPhone:'0201234567',amount:10,instantQuote:token})});
+  try {
+    const response=await originalFetch(base+'/api/instant-bundles/quote?productId=instant-flexi-fixture&amount=10');assert.equal(response.status,200);const {quote}=await response.json();
+    const initialized=await request(quote.token);assert.equal(initialized.status,200);const body=await initialized.json();assert.equal(body.amountPesewas,quote.totalMinor);assert.equal(paymentBody.amount,quote.totalMinor);assert.equal(paymentBody.currency,'GHS');assert.equal((await OrdersStore.findOrder(body.orderRef))?.amount,quote.totalMinor);
+    INSTANT_BUNDLE_CONFIG.gatewayFeeRate=.04;const changed=await request(quote.token);assert.equal(changed.status,409);assert.equal(OrdersStore.adminDevOrders().length,1);
+  }finally{provider.client.checkInstantBundlesService=check;provider.client.getInstantBundles=catalog;}
+});
+test('a test-domain failure cannot cancel a live pending order',async()=>{const order=fixture();await OrdersStore.createOrder(order);raw(order,'failed',{domain:'test'});assert.equal((await reconcileCheckoutClosure(order.id)).cancelled,false);});

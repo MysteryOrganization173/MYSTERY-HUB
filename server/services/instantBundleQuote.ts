@@ -18,10 +18,13 @@ export function exactFlexiAmount(value:unknown): number {
 export function priceInstantPackage(pkg:SbhInstantBundlePackage, amount:unknown) {
   const isFlexi = !!(pkg.isFlexi || pkg.mode === 'flexi');
   const requestedAmount = isFlexi ? exactFlexiAmount(amount) : undefined;
+  if(isFlexi && (![Number(pkg.minAmountMajor ?? 1),Number(pkg.maxAmountMajor ?? 500),pkg.payableRatio ?? 1].every(v=>typeof v==='number'&&Number.isFinite(v))
+    || Number(pkg.minAmountMajor ?? 1)<=0 || Number(pkg.maxAmountMajor ?? 500)<Number(pkg.minAmountMajor ?? 1))) throw new Error('This package is temporarily unavailable.');
   const pricing = isFlexi
     ? calculateFlexiInstantBundlePrice(pkg.id,requestedAmount!,typeof pkg.payableRatio === 'number' ? pkg.payableRatio : 1,
         Number(pkg.minAmountMajor ?? 1),Number(pkg.maxAmountMajor ?? 500))
     : calculateFixedInstantBundlePrice(pkg.id,pkg.priceMinor);
+  if(![pricing.customerTotalPesewas,pricing.productRetailPricePesewas,pricing.paymentProcessingFeePesewas].every(Number.isSafeInteger)||pricing.customerTotalPesewas<=0)throw new Error('This package is temporarily unavailable.');
   return {isFlexi,requestedAmount,pricing};
 }
 function quotedValues(pkg:SbhInstantBundlePackage, amount:unknown) {
