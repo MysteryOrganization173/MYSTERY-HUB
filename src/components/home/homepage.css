@@ -175,12 +175,13 @@
   .home-template-chips li { flex-shrink: 0; }
 }
 @media (max-width: 767px) {
-  .home-hero-content { grid-template-columns: 1fr; padding-block: 28px 112px; }
-  /* Phones: text sits on a solid top; the artwork shows as a band below the actions. */
-  /* Phones: one continuous scene. The art rises from behind the actions and fades out at every edge. */
-  .home-hero-art img { object-position: 70% center;
-    -webkit-mask-image: radial-gradient(ellipse 130% 62% at 66% 74%, #000 30%, #0009 58%, transparent 86%); mask-image: radial-gradient(ellipse 130% 62% at 66% 74%, #000 30%, #0009 58%, transparent 86%); }
-  .home-hero-art::after { background: linear-gradient(180deg, #070b0ef5 0%, #070b0ee6 30%, #070b0e8c 50%, #070b0e26 70%, #070b0e40 86%, #070b0e 100%), linear-gradient(90deg, #070b0e99 0%, transparent 60%); }
+  .home-hero-content { grid-template-columns: 1fr; padding-block: 32px 40px; }
+  /* Phones: the artwork is a quiet full-bleed backdrop behind the copy, strongest top-right,
+     dissolving well before the buttons end. No band, no extra space, no edge. */
+  .home-hero-art { background: radial-gradient(90% 55% at 90% 8%, #0f3826, transparent 70%), var(--home-bg, #070b0e); }
+  .home-hero-art img { object-position: 72% 55%; opacity: .78;
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 40%, #0007 66%, transparent 88%); mask-image: linear-gradient(180deg, #000 0%, #000 40%, #0007 66%, transparent 88%); }
+  .home-hero-art::after { background: linear-gradient(100deg, #070b0ee6 0%, #070b0eb3 45%, #070b0e40 100%), linear-gradient(180deg, #070b0e66 0%, transparent 30%, #070b0e 92%); }
   .home-hero h1 { font-size: clamp(2.25rem, 9.6vw, 3.25rem); }
   .home-hero-description { font-size: .9375rem; line-height: 1.6; margin-block: 14px 20px; max-width: 450px; }
   .home-hero-caption { display: none; }
