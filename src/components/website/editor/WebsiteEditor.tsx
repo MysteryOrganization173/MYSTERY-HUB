@@ -100,9 +100,14 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const [allSettings, setAllSettings] = useState(false);
   const [visualSelection, setVisualSelection] = useState<string|null>(null);
   const [focusRequest, setFocusRequest] = useState(0);
-  const clearSelection = () => {setVisualSelection(null);setFocusRequest(n=>n+1);};
-  const selectTarget = (id:string|null) => {setAllSettings(false);setVisualSelection(id);};
-  const changeMode = (mode:'edit'|'preview') => {setActiveTab(mode);setVisualSelection(null);setAllSettings(false);};
+  // A tap on content that has no tap-to-edit field explains where to change it.
+  const [settingsNotice, setSettingsNotice] = useState(false);
+  // Rendered targets in reading order, reported by the draft frame, for Previous/Next.
+  const [targetOrder, setTargetOrder] = useState<string[]>([]);
+  const [canvasHintSeen, setCanvasHintSeen] = useState(false);
+  const clearSelection = () => {setVisualSelection(null);setSettingsNotice(false);setFocusRequest(n=>n+1);};
+  const selectTarget = (id:string|null, hint?:'settings') => {setAllSettings(false);setVisualSelection(id);setSettingsNotice(!id && hint==='settings');if(id || hint)setCanvasHintSeen(true);};
+  const changeMode = (mode:'edit'|'preview') => {setActiveTab(mode);setVisualSelection(null);setSettingsNotice(false);setAllSettings(false);};
 
   // Device View in Preview: responsive default based on viewport width
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>(() => {
@@ -150,7 +155,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     serverSiteRef.current = initialSite;
     editVersion.current = 0; savedVersion.current = 0; failedSaveVersion.current = null;
     setIsDirty(false); setSaveStatusText('saved'); setActiveSection('business');
-    setVisualSelection(null);setAllSettings(false);setActiveTab('edit');setFocusRequest(0);
+    setVisualSelection(null);setSettingsNotice(false);setTargetOrder([]);setAllSettings(false);setActiveTab('edit');setFocusRequest(0);
   }, [initialSite.id, initialSite.template_id]);
 
   // Mark dirty on any edit
@@ -280,13 +285,19 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     if(!next)return;
     draftRef.current={...draft,...next};setContent(next.content);setSettings(next.settings);markDirty();
   };
-  const openSettings=()=>{setAllSettings(true);setVisualSelection(null);};
+  const openSettings=()=>{setAllSettings(true);setVisualSelection(null);setSettingsNotice(false);};
+  // Previous/Next walk the page in reading order; fall back to the schema order before the frame reports.
+  const stepIds = (targetOrder.length ? targetOrder : targets.map(t=>t.id)).filter(id=>targets.some(t=>t.id===id && t.source.kind!=='settings'));
+  const stepIndex = selected ? stepIds.indexOf(selected.id) : -1;
+  const step = (delta:number) => {if(stepIndex<0 || !stepIds.length)return;setVisualSelection(stepIds[(stepIndex+delta+stepIds.length)%stepIds.length]);};
+  // Phones and tablets show the panel as a bottom sheet over roughly half of the canvas.
+  const sheetReserve = typeof window!=='undefined' && window.innerWidth<1024 ? 0.5 : 0;
 
   return (
-    <div ref={workspaceRef} role="dialog" aria-modal="true" aria-label="Website editor" className="fixed inset-0 z-[80] bg-[#080d11] text-slate-100 flex flex-col font-sans overflow-hidden">
+    <div ref={workspaceRef} role="dialog" aria-modal="true" aria-label="Website editor" className="visual-workspace fixed inset-0 z-[80] text-slate-100 flex flex-col font-sans overflow-hidden">
       {mediaOpen && <WebsiteImageLibrary siteId={currentSite.id} token={sessionToken} onClose={()=>setMediaOpen(false)} onChoose={url=>{setContent({...content,heroImage:url});markDirty();setMediaOpen(false);}} />}
       <WebsiteEditorToolbar name={content.businessName || siteName} mode={activeTab} device={previewDevice} status={saveStatusText} published={currentSite.status==='published'} saving={isSaving} publishing={isPublishing}
-        onExit={()=>{if(!isDirty || window.confirm('You have unsaved changes. Exit anyway?'))onClose();}} onMode={changeMode} onDevice={setPreviewDevice} onSave={()=>void handleSaveDraft()} onPublish={()=>void handlePublish()} onUnpublish={()=>void handleUnpublish()} onSettings={openSettings} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} liveUrl={`/sites/${currentSite.slug}`}/>
+        onExit={()=>{if(!isDirty || window.confirm('You have unsaved changes. Exit anyway?'))onClose();}} onMode={changeMode} onDevice={setPreviewDevice} onSave={()=>void handleSaveDraft()} onPublish={()=>void handlePublish()} onUnpublish={()=>void handleUnpublish()} onSettings={openSettings} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`}/>
       {/* =========================================================
           WORKSPACE: LEFT EDITOR / RIGHT LIVE PREVIEW
           ========================================================= */}
@@ -925,18 +936,16 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
           </div>
         </div>}
         <div className="visual-canvas">
-          <div className="flex flex-wrap items-center justify-between gap-1 px-3 py-1 border-b border-slate-800 text-xs text-slate-300">
-            <p className="hidden sm:block">{activeTab==='edit'?'Tap a heading, image or contact detail to edit.':'Draft preview · payments are disabled'}</p>
-            <p className="sm:hidden">{activeTab==='edit'?'Tap to edit your website':'Safe draft preview'}</p>
-            <div className="flex"><button type="button" onClick={clearSelection} className="visual-tool-button" disabled={!visualSelection}>Deselect</button><button type="button" onClick={()=>setIsPrivateFullPreviewOpen(true)} className="visual-tool-button">Full Preview</button></div>
-          </div>
+          {activeTab==='edit' && !canvasHintSeen && !visualSelection && !allSettings && <div className="visual-canvas-hint" role="note"><span>Tap a heading, photo or contact detail to change it</span><button type="button" aria-label="Dismiss tip" onClick={()=>setCanvasHintSeen(true)}><X size={15}/></button></div>}
+          {activeTab==='preview' && <div className="visual-canvas-hint is-preview" role="note"><Eye size={15}/><span>Preview of your draft · payments are off</span></div>}
           <div ref={canvasRef} className="visual-canvas-viewport">
-            <div style={{width:effectiveCanvasWidth, flexShrink:0, height:scale<1 ? 'calc(100% / '+scale+')' : '100%', transform:scale<1 ? 'scale('+scale+')' : undefined, transformOrigin:'top center'}} className="bg-white shadow-2xl rounded-lg overflow-hidden">
-              <WebsitePreviewFrame template={previewTemplate} siteId={currentSite.id} viewportWidth={targetWidth} editMode={activeTab==='edit' && !isPublishing} selectedTarget={visualSelection} onSelect={selectTarget} focusRequest={focusRequest}/>
+            <div style={{width:effectiveCanvasWidth, flexShrink:0, height:scale<1 ? 'calc(100% / '+scale+')' : '100%', transform:scale<1 ? 'scale('+scale+')' : undefined, transformOrigin:'top center'}} className="visual-canvas-page">
+              <WebsitePreviewFrame template={previewTemplate} siteId={currentSite.id} viewportWidth={targetWidth} editMode={activeTab==='edit' && !isPublishing} selectedTarget={visualSelection} onSelect={selectTarget} onOrder={setTargetOrder} focusRequest={focusRequest} reserveBottom={contextualTargets.length>0 || settingsNotice ? sheetReserve : 0}/>
             </div>
           </div>
         </div>
-        {activeTab==='edit' && contextualTargets.length>0 && <div className="contents" inert={isPublishing}><VisualContextPanel title={visualSelection==='branding'?'Website colors':selected!.label} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={openSettings}/></div>}
+        {activeTab==='edit' && contextualTargets.length>0 && <div className="contents" inert={isPublishing}><VisualContextPanel title={visualSelection==='branding'?'Website colors':selected!.label} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={openSettings} position={stepIndex>=0?{index:stepIndex,total:stepIds.length}:undefined} onPrevious={()=>step(-1)} onNext={()=>step(1)}/></div>}
+        {activeTab==='edit' && settingsNotice && !contextualTargets.length && <VisualContextPanel notice title="Change this in All Settings" targets={[]} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={openSettings}/>}
       </div>
 
       {/* =========================================================

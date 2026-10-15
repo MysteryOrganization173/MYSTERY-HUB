@@ -3,13 +3,14 @@ import { SafeImage } from '../SafeImage';
 import { listWebsiteAssets, requestWebsiteUpload, uploadWebsiteImage, finalizeWebsiteUpload, deleteWebsiteAsset } from '../../../services/apiClient';
 import { WEBSITE_IMAGE_MIMES, WEBSITE_MEDIA_DEFAULTS, type WebsiteAsset } from '../../../config/websiteMedia';
 
-export function WebsiteImageField({label,value,onChange,siteId,token}: {label:string;value:string;onChange:(url:string)=>void;siteId:string;token:string}) {
+export function WebsiteImageField({label,value,onChange,siteId,token,variant='dark'}: {label:string;value:string;onChange:(url:string)=>void;siteId:string;token:string;variant?:'dark'|'light'}) {
   const [open,setOpen]=useState(false);
+  const light=variant==='light';
   return <div className="space-y-2 min-w-0">
-    <span className="block text-sm font-semibold text-slate-300">{label}</span>
-    {value&&<SafeImage src={value} alt={`${label} current image`} className="w-24 h-24 object-cover rounded-lg border border-slate-700"/>}
-    <div className="flex flex-wrap gap-2"><button type="button" onClick={()=>setOpen(true)} className="min-h-11 px-3 py-2 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs">{value?'Replace image':'Upload Image'}</button><button type="button" onClick={()=>setOpen(true)} className="min-h-11 px-3 text-xs border border-slate-700 rounded-xl text-slate-300">Choose from Media</button>{value && <button type="button" onClick={()=>onChange('')} className="min-h-11 px-3 text-xs text-slate-400">Remove image</button>}</div>
-    <details className="text-xs text-slate-400"><summary className="cursor-pointer">Advanced: image URL</summary><input aria-label={`${label} URL`} type="url" maxLength={500} value={value} onChange={e=>onChange(e.target.value)} className="w-full mt-2 p-2 rounded-lg bg-slate-900 border border-slate-700 text-white" placeholder="https://..." /></details>
+    <span className={`block text-sm font-semibold ${light?'text-slate-700':'text-slate-300'}`}>{label}</span>
+    {value&&<SafeImage src={value} alt={`${label} current image`} className={`w-24 h-24 object-cover rounded-lg border ${light?'border-slate-200':'border-slate-700'}`}/>}
+    <div className="flex flex-wrap gap-2"><button type="button" onClick={()=>setOpen(true)} className={light?'min-h-11 px-4 py-2 rounded-xl bg-[#00c365] text-[#05140c] font-bold text-sm':'min-h-11 px-3 py-2 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs'}>{value?'Replace image':'Upload Image'}</button><button type="button" onClick={()=>setOpen(true)} className={light?'min-h-11 px-4 text-sm font-semibold border border-slate-300 rounded-xl text-slate-800 bg-white':'min-h-11 px-3 text-xs border border-slate-700 rounded-xl text-slate-300'}>Choose from Media</button>{value && <button type="button" onClick={()=>onChange('')} className={`min-h-11 px-3 text-sm ${light?'text-slate-600':'text-xs text-slate-400'}`}>Remove image</button>}</div>
+    <details className={`text-xs ${light?'text-slate-600':'text-slate-400'}`}><summary className="cursor-pointer min-h-8">Advanced: image URL</summary><input aria-label={`${label} URL`} type="url" maxLength={500} value={value} onChange={e=>onChange(e.target.value)} className={light?'w-full mt-2 p-2 rounded-lg bg-white border border-slate-300 text-slate-900 text-base':'w-full mt-2 p-2 rounded-lg bg-slate-900 border border-slate-700 text-white'} placeholder="https://..." /></details>
     {open && <WebsiteImageLibrary siteId={siteId} token={token} onClose={()=>setOpen(false)} onChoose={url=>{onChange(url);setOpen(false);}} />}
   </div>;
 }

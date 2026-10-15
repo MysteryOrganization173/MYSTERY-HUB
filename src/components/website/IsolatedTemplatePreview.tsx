@@ -18,7 +18,7 @@ export const IsolatedTemplatePreview: React.FC<IsolatedTemplatePreviewProps> = (
   const ownerPreview = new URLSearchParams(window.location.search).get('owner_preview') === '1';
   const [ownerTemplate, setOwnerTemplate] = useState<WebsiteTemplate | null>(null);
   const [siteId,setSiteId] = useState<string | undefined>();
-  const [editing,setEditing] = useState(false), [selected,setSelected] = useState<string|null>(null), [focusRequest,setFocusRequest] = useState(0);
+  const [editing,setEditing] = useState(false), [selected,setSelected] = useState<string|null>(null), [focusRequest,setFocusRequest] = useState(0), [reserveBottom,setReserveBottom] = useState(0);
   const params = new URLSearchParams(window.location.search);
   const channel = params.get('editor_channel') || '', expectedSite = params.get('editor_site') || '';
   useEffect(() => {
@@ -34,6 +34,8 @@ export const IsolatedTemplatePreview: React.FC<IsolatedTemplatePreviewProps> = (
         setEditing(edit);
         setSelected(edit && targets.some(t=>t.id===event.data.selectedTarget) ? event.data.selectedTarget : null);
         setFocusRequest(Number.isSafeInteger(event.data.focusRequest) ? event.data.focusRequest : 0);
+        const reserve = Number(event.data.reserveBottom);
+        setReserveBottom(Number.isFinite(reserve) ? Math.min(0.7, Math.max(0, reserve)) : 0);
       }
     };
     const dismissPreview = (event: KeyboardEvent) => {
@@ -72,7 +74,7 @@ export const IsolatedTemplatePreview: React.FC<IsolatedTemplatePreviewProps> = (
       className="min-h-screen w-full text-slate-900 antialiased selection:bg-[#00c365] selection:text-black overflow-x-hidden"
       style={{ backgroundColor: bg }}
     >
-      {ownerPreview ? editing ? <VisualSelectionSurface targets={visualTargets(shownTemplate)} selected={selected} focusRequest={focusRequest} onSelect={targetId=>window.parent.postMessage({type:'MYSTERYHUB_VISUAL_SELECT',channel,siteId,templateId:template.id,targetId},window.location.origin)}><WebsiteSiteRenderer template={shownTemplate} siteId={siteId} preview/></VisualSelectionSurface> : <WebsiteSiteRenderer template={shownTemplate} siteId={siteId} preview/> : renderTemplateLayout(shownTemplate, { onCtaClick: handleCtaClick })}
+      {ownerPreview ? editing ? <VisualSelectionSurface targets={visualTargets(shownTemplate)} selected={selected} focusRequest={focusRequest} reserveBottom={reserveBottom} onSelect={(targetId,hint)=>window.parent.postMessage({type:'MYSTERYHUB_VISUAL_SELECT',channel,siteId,templateId:template.id,targetId,...(hint?{hint}:{})},window.location.origin)} onOrder={targetIds=>window.parent.postMessage({type:'MYSTERYHUB_VISUAL_ORDER',channel,siteId,templateId:template.id,targetIds},window.location.origin)}><WebsiteSiteRenderer template={shownTemplate} siteId={siteId} preview/></VisualSelectionSurface> : <WebsiteSiteRenderer template={shownTemplate} siteId={siteId} preview/> : renderTemplateLayout(shownTemplate, { onCtaClick: handleCtaClick })}
     </div>
   );
 };

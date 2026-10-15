@@ -23,18 +23,18 @@ export function visualTargets(t: WebsiteTemplate): VisualTarget[] {
     targets.push({ id: `content:${name}`, label, control, maxLength, source: { kind: 'content', field: name }, value: String(c[name] ?? fallback) });
   };
   field('businessName', 'Business name', 'text', 100, t.demoBusinessName);
-  field('logoUrl', 'Business logo', 'image', 500);
+  field('logoUrl', 'Logo', 'image', 500);
   field('phone', 'Phone number', 'phone', 30);
   field('whatsapp', 'WhatsApp number', 'phone', 30);
   field('email', 'Email address', 'email', 100);
   field('location', 'Location', 'text', 150, t.location);
   if (!t.composition) {
-    field('tagline', 'Hero heading', 'text', 150, t.demoHeroTagline);
-    field('aboutText', 'Business description', 'body', 2000, t.demoSubtext);
-    field('heroImage', 'Hero image', 'image', 500, t.heroImage);
-    field('ctaLabel', 'Main button', 'text', 50, 'Contact us');
+    field('tagline', 'Main heading', 'text', 150, t.demoHeroTagline);
+    field('aboutText', 'Short description', 'body', 2000, t.demoSubtext);
+    field('heroImage', 'Main photo', 'image', 500, t.heroImage);
+    field('ctaLabel', 'Main button text', 'text', 50, 'Contact us');
     if (t.id !== 'tmpl-data-reseller') {
-      field('ctaTarget', 'Button destination', 'url', 500);
+      field('ctaTarget', 'Button link', 'url', 500);
       targets.find(x => x.id === 'content:ctaLabel')!.destinationId = 'content:ctaTarget';
     }
   } else for (const s of t.composition.sections.filter(s => s.enabled)) {
@@ -48,10 +48,10 @@ export function visualTargets(t: WebsiteTemplate): VisualTarget[] {
     if (s.type !== 'header') add('body', 'Description', 'body', ['hero', 'about'].includes(s.type) ? c.aboutText ?? t.demoSubtext : s.type === 'location' ? c.location ?? '' : s.type === 'footer' ? c.businessName ?? t.demoBusinessName : '');
     if (s.type === 'hero' || s.data.image) add('image', 'Image', 'image', s.type === 'hero' ? c.heroImage || t.heroImage : '');
     if (['hero', 'contact'].includes(s.type) || s.data.ctaLabel) {
-      add('ctaLabel', 'Button', 'text', s.type === 'hero' ? c.ctaLabel ?? 'Contact us' : 'Contact us');
+      add('ctaLabel', 'Button text', 'text', s.type === 'hero' ? c.ctaLabel ?? 'Contact us' : 'Contact us');
       // The managed catalog destination is fixed by the renderer, not editable commerce.
       if (!(t.id === 'tmpl-data-reseller' && s.type === 'hero')) {
-        add('ctaUrl', 'Button destination', 'url', s.type === 'hero' ? c.ctaTarget ?? '' : '');
+        add('ctaUrl', 'Button link', 'url', s.type === 'hero' ? c.ctaTarget ?? '' : '');
         targets.find(x => x.id === sectionTargetId(s.id, 'ctaLabel'))!.destinationId = sectionTargetId(s.id, 'ctaUrl');
       }
     }
