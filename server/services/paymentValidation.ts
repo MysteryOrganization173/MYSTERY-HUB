@@ -28,7 +28,7 @@ export function validateOrderPayment(
 
 /** A failed lookup is not a failed transaction. Require matching provider evidence before closing. */
 export function isDefinitiveUnpaidPayment(order: OrderRecord, payment: PaystackVerifyResult): boolean {
-  return order.payment_provider === 'paystack' && !payment.error && !payment.isSimulated
+  return order.payment_provider === 'paystack' && !payment.error && !payment.isSimulated && !payment.isTestMode
     && ['failed', 'abandoned'].includes(payment.status)
     && payment.reference === order.payment_reference
     && Number.isSafeInteger(payment.amountPesewas) && payment.amountPesewas > 0

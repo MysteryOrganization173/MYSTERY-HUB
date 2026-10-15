@@ -216,3 +216,10 @@ test('definitive AFA initialization rejection closes only the unpaid attempt',as
   const response=await checkout(),body=await response.json();assert.equal(body.code,'INITIALIZATION_REJECTED');
   const order=(await OrdersStore.findOrder(body.existingOrderReference))!;assert.equal(order.status,'cancelled');assert.equal((await AfaStore.find(order.id))!.encrypted_payload,null);
 });
+
+for(const response of ['timeout','server-error','malformed'])test(`raw Paystack ${response} preserves AFA identity for recovery`,async()=>{
+  PaystackServerService.initializeTransaction=originalInitialize;
+  globalThis.fetch=async url=>{assert.equal(String(url),'https://api.paystack.co/transaction/initialize');if(response==='timeout')throw new Error('fixture timeout');return response==='malformed'?new Response('<html>unavailable</html>'):new Response(JSON.stringify({status:false}),{status:503});};
+  const result=await checkout(),body=await result.json();assert.equal(result.status,503);assert.equal(body.code,'INITIALIZATION_UNCERTAIN');
+  const order=(await OrdersStore.findOrder(body.existingOrderReference))!;assert.equal(order.status,'pending_payment');assert.ok((await AfaStore.find(order.id))!.encrypted_payload);assert.equal(posts,0);
+});
