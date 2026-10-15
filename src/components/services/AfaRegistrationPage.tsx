@@ -99,10 +99,18 @@ export const AfaRegistrationPage: React.FC = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmedOrder, setConfirmedOrder] = useState<SafePublicOrderDetails | null>(null);
+  const [paymentConfirmed,setPaymentConfirmed]=useState(false);
+  const [uncertain,setUncertain]=useState(false);
+  const [recoveryReference,setRecoveryReference]=useState<string|null>(null);
+  const submitting=React.useRef(false);
+  const activeSession=React.useRef(sessionToken);activeSession.current=sessionToken;
+  useEffect(()=>{activeSession.current=sessionToken;return()=>{activeSession.current=null;};},[sessionToken]);
   const [copied, setCopied] = useState(false);
   const [tapped, confirmTap] = useTapFeedback();
   // Focus moves to the first error only after a submit, never while the customer is typing.
   const isSubmitAttempt = React.useRef(false);
+  const submitErrorRef=React.useRef<HTMLDivElement>(null);
+  useEffect(()=>{if(submitError)submitErrorRef.current?.focus();},[submitError]);
   const fullNameId = useId(), mtnNumberId = useId(), ghanaCardId = useId(), dobId = useId();
   const regionId = useId(), townId = useId(), occupationId = useId(), consentId = useId(), emailId = useId();
   const fieldIds = { fullName: fullNameId, mtnNumber: mtnNumberId, ghanaCardNumber: ghanaCardId,
@@ -119,7 +127,7 @@ export const AfaRegistrationPage: React.FC = () => {
   useEffect(() => {
     // Identity stays in form memory and is cleared on account change, including logout.
     setFormData({ ...initialFormData, fullName:user?.name || '', mtnNumber:user?.phone ? formatGhanaPhone(user.phone) : '', customerEmail:user?.email || '' });
-    setFormErrors({});
+    setFormErrors({});setConfirmedOrder(null);setPaymentConfirmed(false);setUncertain(false);setRecoveryReference(null);
   }, [user?.id]);
   useEffect(() => {
     const first = Object.keys(formErrors).find(key => formErrors[key as keyof AfaFormData]) as keyof AfaFormData | undefined;
@@ -135,7 +143,7 @@ export const AfaRegistrationPage: React.FC = () => {
     setIsVerifying(true);
     verifyPaymentOnServer(reference).then(result => {
       if (!active) return;
-      if (result.order?.service_type === 'afa') setConfirmedOrder(result.order);
+      if (result.order?.service_type === 'afa') {setConfirmedOrder(result.order);setPaymentConfirmed(result.verified===true);}
       else setSubmitError('Payment has not been confirmed. Check My Orders before trying again.');
     }).catch(() => { if (active) setSubmitError('Payment confirmation is pending. Check My Orders before trying again.'); })
       .finally(() => { if (active) { setIsSubmitting(false); setIsVerifying(false); } });
@@ -165,37 +173,47 @@ export const AfaRegistrationPage: React.FC = () => {
   const [paymentMethod,setPaymentMethod]=React.useState<'paystack'|'wallet'>('paystack');
   const requestKey=React.useRef<string>('');
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitError(null); setFormErrors({});
+    e.preventDefault();
+    if(submitting.current||isSubmitting||uncertain)return;
+    setSubmitError(null); setFormErrors({});
     if (!user || !sessionToken) { openAuth('login', 'Sign in to register your MTN number for AFA.', () => document.getElementById(fullNameId)?.focus()); return; }
     if (user.mustChangePassword) { openAccount(); return; }
     if (!priceAvailable) { showToast('Registration is currently unavailable.', 'warning'); return; }
+    const attemptedSession=sessionToken;
     try {
       const payload = validateAfaPayload({ name:formData.fullName, phone:formData.mtnNumber, idNumber:formData.ghanaCardNumber,
         dateOfBirth:formData.dateOfBirth, region:formData.region, location:formData.town, occupation:formData.occupation });
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.customerEmail.trim()) || formData.customerEmail.trim().length > 254)
         throw Object.assign(new Error('Enter a valid receipt email.'), {field:'customerEmail'});
       if (!formData.consent) throw Object.assign(new Error('Please authorize submission of your registration details.'), {field:'consent'});
-      setIsSubmitting(true);
+      submitting.current=true;setIsSubmitting(true);
       confirmTap();
       if(paymentMethod==='wallet') {
         requestKey.current ||= crypto.randomUUID();
         await walletCheckout(sessionToken,'afa/payments/initialize',{...payload,consent:true,customerEmail:formData.customerEmail,requestId:requestKey.current,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()});
-        window.location.assign('/orders');return;
+        if(activeSession.current===attemptedSession)window.location.assign('/orders');return;
       }
       const result = await initializeAfaPayment(payload, formData.consent, formData.customerEmail, sessionToken);
+      if(activeSession.current!==attemptedSession)return;
       if (!result.authorizationUrl) throw new Error('Payment link unavailable. Check My Orders before trying again.');
       const url = new URL(result.authorizationUrl);
-      if (url.protocol !== 'https:' || url.hostname !== 'checkout.paystack.com') throw new Error('Payment link unavailable. Contact support.');
+      if (url.protocol !== 'https:' || url.hostname !== 'checkout.paystack.com' || !!url.username || !!url.password || !!url.port) throw new Error('Payment link unavailable. Contact support.');
       window.location.assign(url.href);
     } catch (err) {
+      if(activeSession.current!==attemptedSession)return;
       const message = err instanceof Error ? err.message : 'Unable to start AFA registration.';
       const field = canonicalFields[(err as {field?:string}).field || ''];
       isSubmitAttempt.current = true;
       if (field) setFormErrors({ [field]:message });
-      else setSubmitError(/failed to fetch|network|load failed/i.test(message)
-        ? 'We couldn’t reach Mystery Hub, so no payment was started. Check your connection and try again.' : message);
+      else {
+        const error=err as {status?:number;existingOrderReference?:string};
+        if(submitting.current&&(!error.status||error.status>=500))setUncertain(true);
+        if(typeof error.existingOrderReference==='string'&&/^[a-zA-Z0-9_-]{1,128}$/.test(error.existingOrderReference))setRecoveryReference(error.existingOrderReference);
+        setSubmitError(/failed to fetch|network|load failed/i.test(message)
+          ? 'Registration or payment setup could not be confirmed. Check My Orders before trying again. If you approved a payment, keep your payment proof and contact support.' : message);
+      }
       setIsSubmitting(false);
-    }
+    } finally {submitting.current=false;}
   };
 
   const filteredPackages = AFA_PACKAGES.filter((p) => p.period === activePackageTab);
@@ -204,8 +222,8 @@ export const AfaRegistrationPage: React.FC = () => {
 
   // Authoritative order confirmation, from the server's verification of the returning payment.
   if (confirmedOrder) {
-    const journey = afaJourney(confirmedOrder.status, confirmedOrder.manual_review);
-    const label = afaStatusLabel(confirmedOrder.status, confirmedOrder.manual_review);
+    const journey = afaJourney(confirmedOrder.status, confirmedOrder.manual_review,paymentConfirmed);
+    const label = paymentConfirmed ? afaStatusLabel(confirmedOrder.status, confirmedOrder.manual_review) : 'Awaiting payment confirmation';
     const steps = ['Payment confirmed', 'Submitted for registration', 'Registered'];
     const copyReference = () => {
       navigator.clipboard?.writeText(confirmedOrder.public_reference).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); }).catch(() => {});
@@ -221,10 +239,10 @@ export const AfaRegistrationPage: React.FC = () => {
             </span>
             <p className={`text-xs font-bold uppercase tracking-wider ${journey.stopped ? 'text-amber-300' : 'text-[#44df95]'}`}>{label}</p>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              {confirmedOrder.status === 'delivered' ? 'Registered' : journey.stopped ? 'Your registration needs attention' : 'Payment received'}
+              {!paymentConfirmed?'Payment confirmation pending':journey.registered ? 'Registered' : journey.stopped ? 'Your registration needs attention' : 'Payment received'}
             </h1>
             <p className="text-sm text-slate-300 max-w-sm mx-auto leading-relaxed">
-              {confirmedOrder.status === 'delivered' ? 'Your AFA registration is confirmed.' : journey.stopped
+              {!paymentConfirmed?'Payment has not been confirmed. Check My Orders before trying again.':journey.registered ? 'Your AFA registration is confirmed.' : journey.stopped
                 ? 'Our team will follow this order up. Keep your reference if you contact support.'
                 : 'Payment and registration are separate stages. Follow this order for updates.'}
             </p>
@@ -260,12 +278,12 @@ export const AfaRegistrationPage: React.FC = () => {
               </dd>
             </div>
             <div className="flex items-center justify-between gap-3"><dt className="text-slate-400">MTN line</dt><dd className="font-mono font-semibold text-white">{confirmedOrder.recipient_phone}</dd></div>
-            <div className="flex items-center justify-between gap-3"><dt className="text-slate-400">Registration fee paid</dt><dd><Money ghc={confirmedOrder.amount_ghc} size="sm" className="text-white" /></dd></div>
+            <div className="flex items-center justify-between gap-3"><dt className="text-slate-400">{paymentConfirmed?'Registration fee paid':'Registration fee'}</dt><dd><Money ghc={confirmedOrder.amount_ghc} size="sm" className="text-white" /></dd></div>
           </dl>
 
           <div className="space-y-2 text-sm text-slate-300 leading-relaxed">
-            <p className="text-slate-400">The registration fee paid to Mystery Hub covers AFA registration only. Future AFA voice/data packages are purchased directly through MTN.</p>
-            {confirmedOrder.status === 'delivered' && <p className="rounded-xl border border-[#00c365]/30 bg-[#00c365]/[0.07] p-3 text-slate-200">Dial <span className="font-mono font-bold text-[#44df95]">*1848#</span> on your registered MTN number for AFA access.</p>}
+            <p className="text-slate-400">The Mystery Hub registration fee covers AFA registration only. Future AFA voice/data packages are purchased directly through MTN.</p>
+            {journey.registered && <p className="rounded-xl border border-[#00c365]/30 bg-[#00c365]/[0.07] p-3 text-slate-200">Dial <span className="font-mono font-bold text-[#44df95]">*1848#</span> on your registered MTN number for AFA access.</p>}
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2.5">
@@ -330,7 +348,7 @@ export const AfaRegistrationPage: React.FC = () => {
             <h1 className="text-[1.75rem] leading-[1.15] sm:text-4xl font-extrabold text-white tracking-tight">Register your MTN line for AFA</h1>
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed">{afaConfig.tagline}</p>
             <ul className="flex flex-wrap gap-x-4 gap-y-1.5 pt-1 text-[13px] sm:text-sm text-slate-300">
-              <li className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[#44df95]" />Details encrypted</li>
+              <li className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[#44df95]" />Ghana Card & birth date encrypted</li>
               <li className="flex items-center gap-1.5"><Lock className="w-4 h-4 text-[#44df95]" />Mobile Money or Wallet</li>
               <li className="flex items-center gap-1.5"><Check className="w-4 h-4 text-[#44df95]" />Track in Orders</li>
             </ul>
@@ -355,11 +373,11 @@ export const AfaRegistrationPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         <form aria-label="AFA registration" noValidate onSubmit={handleSubmit} className="lg:col-span-7 space-y-4 text-left">
           {submitError && (
-            <div role="alert" className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-sm text-rose-200 flex items-start gap-2.5">
+            <div ref={submitErrorRef} tabIndex={-1} role="alert" className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-sm text-rose-200 flex items-start gap-2.5">
               <AlertCircle className="w-5 h-5 shrink-0 text-rose-300" />
               <div>
-                <p className="font-semibold text-white">We couldn’t start your registration</p>
-                <p className="mt-0.5">{submitError}</p>
+                <p className="font-semibold text-white">{uncertain?'Check your registration before trying again':'We couldn’t start your registration'}</p>
+                <p className="mt-0.5">{submitError}</p>{recoveryReference&&<p className="mt-2 font-mono break-all">{recoveryReference}</p>}{uncertain&&<button type="button" onClick={()=>setActivePage('orders')} className="underline min-h-11">Check My Orders</button>}
               </div>
             </div>
           )}
@@ -424,7 +442,7 @@ export const AfaRegistrationPage: React.FC = () => {
             <WalletPaymentChoice amountMinor={config?.retailPriceMinor || 0} value={paymentMethod} onChange={setPaymentMethod}/>
             <div className="rounded-xl bg-[#090d11] border border-slate-800 p-3.5 text-xs text-slate-400 leading-relaxed space-y-1">
               <p className="flex items-center gap-1.5 text-sm font-semibold text-white"><Lock className="w-4 h-4 text-[#44df95]" />How your details are protected</p>
-              <p>Your registration details are encrypted and shared with our registration provider. Sensitive identity details are deleted after confirmed completion or safe closure. Unresolved cases remain encrypted while we resolve them. Never provide a PIN, password, card photo or selfie.</p>
+              <p>Your Ghana Card number and birth date are encrypted at rest and shared securely with our registration provider. Authorized staff can access operational details such as your name and location. Sensitive identity details are deleted after confirmed completion or safe closure; unresolved cases retain them encrypted. Never provide a PIN, password, card photo or selfie.</p>
             </div>
             <div className="space-y-1.5">
               <label htmlFor={consentId} className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer select-none ${formErrors.consent ? 'border-rose-500/70 bg-rose-500/5' : 'border-slate-700 bg-[#090d11]'}`}>
@@ -442,7 +460,7 @@ export const AfaRegistrationPage: React.FC = () => {
           <div className="lg:hidden">{summary}</div>
 
           <div className="space-y-2.5">
-            <button type="submit" data-tapped={tapped} disabled={isSubmitting || isPriceLoading || !priceAvailable} aria-busy={isSubmitting}
+            <button type="submit" data-tapped={tapped} disabled={uncertain||isSubmitting || isPriceLoading || !priceAvailable} aria-busy={isSubmitting}
               className="mh-buy w-full min-h-14 px-5 rounded-xl font-bold text-base flex items-center justify-center gap-2 cursor-pointer bg-[#00c365] hover:bg-[#00e070] text-[#03160c] disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
               {isSubmitting ? (
                 <><span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin motion-reduce:animate-none" aria-hidden="true" />{paymentMethod === 'wallet' ? 'Confirming wallet payment…' : 'Opening secure payment…'}</>

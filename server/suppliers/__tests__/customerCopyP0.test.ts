@@ -71,5 +71,5 @@ test('account recovery keeps ownership and password protections; AFA retains fee
   assert.match(auth, /confirm ownership/); assert.match(auth, /Never send your password/);
   const afa = source('src/components/services/AfaRegistrationPage.tsx');
   assert.match(afa, /registration only/); assert.match(afa, /Never provide a PIN, password, card photo or selfie/);
-  assert.match(afa, /Unresolved cases remain encrypted/);
+  assert.match(afa, /unresolved cases retain them encrypted/);
 });

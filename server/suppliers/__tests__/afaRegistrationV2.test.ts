@@ -43,8 +43,12 @@ test('identity fields stay out of autofill, storage and URLs; only the POST body
 });
 
 test('payment starts only from a valid submit and the button locks while it starts', () => {
-  assert.match(page, /disabled=\{isSubmitting \|\| isPriceLoading \|\| !priceAvailable\}/);
+  assert.match(page, /disabled=\{uncertain\|\|isSubmitting \|\| isPriceLoading \|\| !priceAvailable\}/);
   assert.match(page, /requestKey.current \|\|= crypto.randomUUID\(\)/);
   assert.match(page, /url.hostname !== 'checkout.paystack.com'/);
   assert.match(page, /Registration starts only after the payment is confirmed/);
 });
+
+test('uncertain registration recovery receives focus above the form',()=>{assert.match(page,/submitErrorRef.current\?\.focus\(\)/);assert.match(page,/ref=\{submitErrorRef\} tabIndex=\{-1\} role="alert"/);});
+
+test('an unverified AFA return never confirms payment, submission or registration',()=>{for(const status of ['pending_payment','delivered','failed','processing']){const journey=afaJourney(status,false,false);assert.equal(journey.reached,0);assert.equal(journey.registered,false);}assert.equal(afaJourney('delivered',false,true).registered,true);});

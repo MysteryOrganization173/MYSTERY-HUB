@@ -12,11 +12,11 @@ export function formatGhanaCardInput(raw: string): string {
 }
 
 /** Server status to the three customer-facing registration steps. */
-export function afaJourney(status?: string, manualReview = false) {
+export function afaJourney(status?: string, manualReview = false, paymentConfirmed?:boolean) {
   const stopped = manualReview || ['failed', 'refund_pending', 'refunded', 'cancelled', 'expired'].includes(status || '');
-  const reached = status === 'delivered' ? 3
+  const reached = paymentConfirmed===false ? 0 : status === 'delivered' ? 3
     : ['submitted', 'processing'].includes(status || '') ? 2
     : ['paid', 'queued', 'failed', 'refund_pending', 'refunded'].includes(status || '') || manualReview ? 1
     : 0;
-  return { stopped, reached, registered: status === 'delivered' && !manualReview };
+  return { stopped, reached, registered: paymentConfirmed!==false && status === 'delivered' && !manualReview };
 }

@@ -10,6 +10,6 @@ export async function getAfaConfig(): Promise<AfaConfig> {
 export async function initializeAfaPayment(payload:AfaPayload, consent:boolean, customerEmail:string, token:string): Promise<InitializePaymentResponse> {
   const res = await fetch(`${API_BASE_URL}/api/afa/payments/initialize`, {method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({...payload,consent,customerEmail,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()})});
   const data = await res.json();
-  if (!res.ok) throw Object.assign(new Error(data.error || 'Unable to start registration.'),{field:data.field,status:res.status});
+  if (!res.ok) throw Object.assign(new Error(data.error || 'Unable to start registration.'),{field:data.field,status:res.status,code:data.code,existingOrderReference:data.existingOrderReference});
   return data;
 }

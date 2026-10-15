@@ -172,7 +172,7 @@ test('Data discovery links to AFA without a hardcoded registration price or avai
   const page=source('src/components/data/DataPage.tsx');assert.match(page,/setActivePage\('afa'\)/);assert.match(page,/aria-label="AFA Registration"/);
 });
 test('USSD access guidance is shown only after supplier-confirmed registration',()=>{
-  assert.match(source('src/components/services/AfaRegistrationPage.tsx'),/confirmedOrder.status === 'delivered' && <p[^>]*>Dial[\s\S]*?\*1848#/);
+  assert.match(source('src/components/services/AfaRegistrationPage.tsx'),/journey.registered && <p[^>]*>Dial[\s\S]*?\*1848#/);
   assert.match(source('src/components/checkout/OrderStatusModal.tsx'),/isAfa && activeOrder.serverStatus === 'delivered' && \([\s\S]*?\*1848#/);
 });
 for(const mismatch of ['reference','currency'] as const)test(`AFA payment ${mismatch} mismatch never dispatches`,async()=>{
