@@ -1,5 +1,6 @@
 import { ORDER_RESOLUTION_SCHEMA } from './orderResolutionSchema.js';
 import { WEBSITE_PUBLISHING_SCHEMA } from './websitePublishingSchema.js';
+import { WEBSITE_CHECKPOINT_SCHEMA } from './websiteCheckpointSchema.js';
 import { COMMERCIAL_SCHEMA } from './commercialSchema.js';
 import { WEBSITE_BUSINESS_SCHEMA } from './websiteBusinessSchema.js';
 import { WEBSITE_FREE_SCHEMA } from './websiteFreeSchema.js';
@@ -371,6 +372,7 @@ export async function initDatabase(): Promise<void> {
       PRIMARY KEY (referrer_user_id, order_id));` });
     baseTables.push({ name: 'order_resolution', sql: ORDER_RESOLUTION_SCHEMA });
     baseTables.push({ name: 'website_publishing_snapshots', sql: WEBSITE_PUBLISHING_SCHEMA });
+    baseTables.push({ name: 'website_draft_checkpoints', sql: WEBSITE_CHECKPOINT_SCHEMA });
     baseTables.push({ name: 'website_free_media_analytics', sql: WEBSITE_FREE_SCHEMA });
     baseTables.push({ name: 'website_ultra_enquiries', sql: ULTRA_ENQUIRY_SCHEMA });
     for (const table of baseTables) {

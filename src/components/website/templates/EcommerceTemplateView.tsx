@@ -216,14 +216,14 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
                   </div>
                 )}
                 <div className="p-4 space-y-2">
-                  <div className="flex items-center gap-1 text-amber-400 text-xs">
+                  {!template.siteContent?.starterVersion && <div className="flex items-center gap-1 text-amber-400 text-xs">
                     <Star className="w-3.5 h-3.5 fill-current" />
                     <Star className="w-3.5 h-3.5 fill-current" />
                     <Star className="w-3.5 h-3.5 fill-current" />
                     <Star className="w-3.5 h-3.5 fill-current" />
                     <Star className="w-3.5 h-3.5 fill-current" />
                     <span className="text-[11px] text-slate-500 font-semibold ml-1">(48)</span>
-                  </div>
+                  </div>}
                   <h3 className="font-bold text-sm text-slate-900 group-hover:text-[var(--website-accent,#2563eb)] transition-colors">
                     {p.name}
                   </h3>

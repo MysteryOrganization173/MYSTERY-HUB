@@ -63,7 +63,9 @@ export function validateWebsiteComposition(value: unknown, userId: string): Webs
 export function validateWebsiteContentPatch(value: unknown): void {
   if (value === undefined) return;
   const content = object(value);
-  keys(content, ['composition','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','social','items','stats','features']);
+  keys(content, ['starterVersion','layoutMode','composition','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','social','items','stats','features']);
+  if(content.starterVersion!==undefined && content.starterVersion!==1)fail('Unsupported starter version.');
+  if(content.layoutMode !== undefined && !['template','sections'].includes(content.layoutMode as string))fail('Invalid website layout mode.');
   const limits = { businessName:100, tagline:150, aboutText:2000, location:150, phone:30, whatsapp:30, email:100, ctaLabel:50 };
   for (const [key, max] of Object.entries(limits)) if (content[key] !== undefined) safeWebsiteText(content[key], max);
   for (const key of ['phone','whatsapp']) {
@@ -100,8 +102,12 @@ export function validateWebsiteContentPatch(value: unknown): void {
   }
   if (content.items !== undefined) {
     if (!Array.isArray(content.items) || content.items.length > 50) fail('Too many business items.');
+    const ids=new Set<string>();
     for (const raw of content.items) {
-      const item = object(raw); keys(item,['id','name','price','category','network','desc','tag','image']);
+      const item = object(raw); keys(item,['id','name','price','category','network','desc','tag','image','isExample']);
+      if(item.isExample!==undefined && typeof item.isExample!=='boolean')fail('Invalid example status.');
+      if(item.isExample===true && (typeof item.id!=='string'||!item.id.trim()))fail('Example items require a stable id.');
+      if(typeof item.id==='string'){if(ids.has(item.id))fail('Duplicate business item id.');ids.add(item.id);}
       for (const [key,max] of Object.entries({ id:64,name:100,price:40,category:50,network:50,desc:300,tag:40 })) if (item[key] !== undefined) safeWebsiteText(item[key],max);
       if (item.image !== undefined) { const url = safeWebsiteText(item.image,500); if (url && (!sanitizeUrl(url) || !/^https?:\/\//.test(url))) fail('Invalid item image.'); }
     }

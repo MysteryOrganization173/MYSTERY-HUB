@@ -105,6 +105,9 @@ export interface SiteSocialLinks {
 }
 
 export interface SiteContent {
+  /** Captured starter generation; absent on legacy websites. */
+  starterVersion?: number;
+  layoutMode?: 'template' | 'sections';
   composition?: WebsiteComposition;
   businessName: string;
   tagline: string;
@@ -173,6 +176,8 @@ export interface TemplateColorScheme {
 }
 
 export interface TemplateItem {
+  /** Owner draft only. Explicit review is required before publication. */
+  isExample?: boolean;
   id?: string;
   name: string;
   price?: string;

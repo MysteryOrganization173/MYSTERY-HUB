@@ -14,6 +14,8 @@ export interface SiteSocialLinks {
 }
 
 export interface SiteContent {
+  starterVersion?: number;
+  layoutMode?: 'template' | 'sections';
   composition?: WebsiteComposition;
   businessName: string;
   tagline: string;
@@ -71,6 +73,8 @@ export interface PublicWebsiteSite {
 }
 
 export interface CreateWebsiteInput {
+  businessName?: string;
+  starterVersion?: number;
   template_id: string;
   name: string;
   slug?: string;
@@ -129,6 +133,7 @@ export function sanitizeTemplateItems(rawItems: unknown): TemplateItem[] {
     const image = sanitizeUrl(r.image);
 
     const item: TemplateItem = { id, name };
+    if (typeof r.isExample === 'boolean') item.isExample = r.isExample;
     if (price) item.price = price;
     if (category) item.category = category;
     if (desc) item.desc = desc;

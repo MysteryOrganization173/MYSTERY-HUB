@@ -12,6 +12,7 @@ import { moneyMinor } from '../../shared/money.js';
 import { STORE_POLICY_DEFAULTS, minimumStorePrice, storeReserve, type StorePolicy, type StoreSnapshot } from '../../shared/storeEconomics.js';
 import { validateAndNormalizeGhanaPhone, canonicalGhanaPhone, getGhanaPhoneLookupVariants } from '../utils/phone.js';
 import { toSafePublicOrder, maskOrderRecipient, type OrderRecord } from '../types/orders.js';
+import {websiteBusinessCapabilities} from '../../src/utils/websiteBusinessCapabilities.js';
 
 interface Wholesale { enabled:boolean; wholesaleMinor:number; version:string; updatedAt:string; actorId:string; supplierCostMinor:number }
 interface Price { enabled:boolean; retailMinor:number }
@@ -157,8 +158,9 @@ export class WebsiteBusinessService {
   }
   static safeStoreOrder(o:OrderRecord) {return {id:o.id,reference:o.public_reference,createdAt:o.created_at,network:o.network,bundle:o.bundle_size_snapshot,recipient:maskOrderRecipient(o.recipient_phone),retailMinor:o.amount,earningMinor:o.store_context!.earningMinor,status:o.status,manualReview:!!o.manual_review,paid:o.payment_status==='success',snapshot:o.store_context};}
   static async ownerSummary(siteId:string,userId:string,offset=0) {
-    await this.owned(siteId,userId);const orders=await this.siteOrders(siteId,offset);for(const order of orders)await this.syncOrder(order);
-    return FinanceStore.transaction(userId,async tx=>{const operations=await tx.operations();return {orders:orders.map(o=>({...this.safeStoreOrder(o),earningState:operations.find(row=>row.idempotency_key===`store-sale:${o.id}`)?.state||(o.payment_status==='success'?'awaiting_reconciliation':'awaiting_payment')})),earnings:await tx.storeEarnings(),policy:await currentPolicy(tx),withdrawals:operations.filter(o=>o.kind==='withdrawal'&&o.payload.source==='store').slice(offset,offset+25).map(maskWithdrawal),ledger:(await tx.ledger()).filter(e=>e.bucket==='store').slice(offset,offset+25),activity:operations.filter(o=>o.payload.siteId===siteId||o.kind==='withdrawal'&&o.payload.source==='store').slice(0,15).map(o=>({id:o.id,kind:o.kind,state:o.state,createdAt:o.created_at,amountMinor:o.amount_minor}))};});
+    const site=await this.owned(siteId,userId);const orders=await this.siteOrders(siteId,offset);for(const order of orders)await this.syncOrder(order);
+    const hasOrders=orders.length>0 || (offset>0 && (await this.siteOrders(siteId,0)).length>0);
+    return FinanceStore.transaction(userId,async tx=>{const operations=await tx.operations(),ledger=await tx.ledger();return {capabilities:websiteBusinessCapabilities(site,hasOrders,operations,ledger.some(e=>e.bucket==='store')),orders:orders.map(o=>({...this.safeStoreOrder(o),earningState:operations.find(row=>row.idempotency_key===`store-sale:${o.id}`)?.state||(o.payment_status==='success'?'awaiting_reconciliation':'awaiting_payment')})),earnings:await tx.storeEarnings(),policy:await currentPolicy(tx),withdrawals:operations.filter(o=>o.kind==='withdrawal'&&o.payload.source==='store').slice(offset,offset+25).map(maskWithdrawal),ledger:ledger.filter(e=>e.bucket==='store').slice(offset,offset+25),activity:operations.filter(o=>o.payload.siteId===siteId||o.kind==='withdrawal'&&o.payload.source==='store').slice(0,15).map(o=>({id:o.id,kind:o.kind,state:o.state,createdAt:o.created_at,amountMinor:o.amount_minor}))};});
   }
   static async withdraw(siteId:string,userId:string,input:Record<string,unknown>){await this.owned(siteId,userId);exact(input,['confirmed','amountMinor','requestId','phone','network','recipientName']);return FinanceService.requestWithdrawal(userId,{...input,source:'store'});}
   static async reconcileReversal(adminId:string,orderId:string,input:Record<string,unknown>) {

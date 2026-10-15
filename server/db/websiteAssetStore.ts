@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { websiteDatabase, withWebsiteLock } from './websiteTransaction.js';
 import { WebsiteStore } from './websiteStore.js';
+import {WebsiteCheckpointStore} from './websiteCheckpointStore.js';
 import { WEBSITE_IMAGE_MIMES, WEBSITE_MEDIA_DEFAULTS, WEBSITE_UPLOAD_REPLAY_GRACE_MS, websiteImageUrl, type WebsiteAsset } from '../../src/config/websiteMedia.js';
 import { WebsiteCloudinary, WebsiteOperationError, websiteMediaLimits } from '../services/websiteCloudinary.js';
 import type { SiteContent } from '../types/website.js';
@@ -128,7 +129,8 @@ export class WebsiteAssetStore {
       const asset = await this.ownedAsset(siteId, userId, assetId);
       if (asset.status === 'deleted') return;
       const site = await this.ownedSite(siteId, userId);
-      const usage = [...websiteImageReferences(site.content_json),...websiteImageReferences(site.published_snapshot_json?.content || {} as SiteContent).map(reference=>({...reference,location:'Published revision: '+reference.location}))].filter(r => managedImagePublicId(r.url) === asset.public_id || r.url === asset.secure_url || r.url === asset.delivery_url);
+      const checkpoints=await WebsiteCheckpointStore.forSite(siteId,userId);
+      const usage = [...websiteImageReferences(site.content_json),...websiteImageReferences(site.published_snapshot_json?.content || {} as SiteContent).map(reference=>({...reference,location:'Published revision: '+reference.location})),...checkpoints.flatMap(c=>websiteImageReferences(c.document.content).map(reference=>({...reference,location:'Recovery checkpoint: '+reference.location})))].filter(r => managedImagePublicId(r.url) === asset.public_id || r.url === asset.secure_url || r.url === asset.delivery_url);
       if (usage.length) throw new WebsiteOperationError(`Remove or replace this image first. In use: ${usage.map(r => r.location).join(', ')}.`, 409);
       await this.save({ ...asset, status: 'deleting', updated_at: new Date().toISOString() });
     });

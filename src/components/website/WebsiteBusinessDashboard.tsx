@@ -20,7 +20,7 @@ export function WebsiteBusinessDashboard({site,token,onEdit,onSettings,requested
   const refresh=async()=>{const expected=identity.current;const next=await websiteBusinessRequest(`websites/${site.id}/business?range=${range}&offset=${offset}`,token);if(identity.current===expected)setData(next);};
   useEffect(()=>{let live=true;setData(null);setError('');void refresh().catch(e=>{if(live)setError(e.message);});return()=>{live=false;};},[site.id,site.template_id,site.updated_at,token,range,offset]);
   const action=async(work:()=>Promise<void>)=>{if(busy)return;setBusy(true);setError('');setNotice('');try{await work();await refresh();}catch(e:any){setError(e.message);}finally{setBusy(false);}};
-  const tabs=['Overview',...(reseller||data?.earnings?.lifetimeMinor?['Orders',...(reseller?['Bundles & Pricing']:[]),'Store Earnings']:[]),'Analytics','Website','Settings'];
+  const tabs=['Overview',...(reseller||data?.capabilities?.hasStoreHistory||data?.capabilities?.hasStoreFundsOrWithdrawals||data?.earnings?.lifetimeMinor?['Orders',...(reseller?['Bundles & Pricing']:[]),'Store Earnings']:[]),'Analytics','Website','Settings'];
   const a=data?.analytics,e=data?.earnings;
   const summaryMetrics = reseller ? {Sales:formatGhs(a?.salesMinor||0),Orders:a?.paidOrders,'Store Earnings':formatGhs(e?.availableMinor||0),Visitors:a?.uniqueVisitors} : {Views:a?.views,Visitors:a?.uniqueVisitors,'Contact / WhatsApp actions':(a?.whatsappClicks||0)+(a?.callClicks||0)+(a?.emailClicks||0)};
   const navigate=(name:string)=>{setTab(name);onTabChange?.(name);};

@@ -1,4 +1,5 @@
 import { websiteBusinessRouter } from './websiteBusinessApi.js';
+import {websiteB1Router} from './websiteB1Api.js';
 import { WebsiteInputError } from '../services/websiteValidation.js';
 import { websiteMediaRouter, websiteActionsRouter, websiteFreeHandler } from './websiteFreeApi.js';
 import { WebsiteAssetStore } from '../db/websiteAssetStore.js';
@@ -14,12 +15,13 @@ import { ultraRouter } from './websiteUltraApi.js';
  */
 
 import { Router, Request, Response } from 'express';
-import { WebsiteStore } from '../db/websiteStore.js';
+import { WebsiteStore,WebsiteReviewRequiredError } from '../db/websiteStore.js';
 import { requireAuth } from '../middleware/authMiddleware.js';
 import { PublicWebsiteSite, sanitizeString, isValidTemplateId } from '../types/website.js';
 
 export const websiteRouter = Router();
 websiteRouter.use("/ultra", ultraRouter);
+websiteRouter.use(websiteB1Router);
 websiteRouter.use('/:siteId/assets', websiteMediaRouter);
 websiteRouter.use(websiteBusinessRouter);
 websiteRouter.use(websiteActionsRouter);
@@ -31,7 +33,7 @@ websiteRouter.use(websiteActionsRouter);
 websiteRouter.post('/', requireAuth, async (req: Request, res: Response) => {
   try {
     const user = req.user!;
-    const { templateId, name, content, settings } = req.body || {};
+    const { templateId, name, businessName, starterVersion, content, settings } = req.body || {};
 
     if (!templateId || typeof templateId !== 'string' || !isValidTemplateId(templateId)) {
       res.status(400).json({ error: 'Valid templateId is required.' });
@@ -43,6 +45,8 @@ websiteRouter.post('/', requireAuth, async (req: Request, res: Response) => {
     const result = await WebsiteStore.createSite(user.id, {
       template_id: templateId,
       name: siteName,
+      businessName,
+      starterVersion,
       content,
       settings,
     });
@@ -165,6 +169,7 @@ websiteRouter.post('/:id/publish', requireAuth, async (req: Request, res: Respon
       publicUrl: `/sites/${published.slug}`,
     });
   } catch (err: any) {
+    if(err instanceof WebsiteReviewRequiredError){res.status(err.status).json({error:err.message,code:err.code,review:err.review});return;}
     if(err instanceof WebsiteOperationError){res.status(err.status).json({error:err.message});return;}
     if(err instanceof WebsiteInputError){res.status(400).json({error:err.message});return;}
     if (err.message && err.message.includes('Forbidden')) {
