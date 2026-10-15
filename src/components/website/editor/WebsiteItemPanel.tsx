@@ -4,8 +4,8 @@ import type {TemplateItem} from '../../../types';
 import {WebsiteImageField} from './WebsiteImageField';
 import './visualEditor.css';
 
-type ItemField = 'name' | 'price' | 'category' | 'desc';
-const LIMITS: Record<ItemField, number> = {name: 100, price: 40, category: 50, desc: 300};
+type ItemField = 'name' | 'price' | 'category' | 'desc' | 'tag';
+const LIMITS: Record<ItemField, number> = {name: 100, price: 40, category: 50, desc: 300, tag: 40};
 const touchFirst = () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
 
 function ItemInput({item, field, label, hint, placeholder, multiline, onChange}: {item: TemplateItem; field: ItemField; label: string; hint?: string; placeholder?: string; multiline?: boolean; onChange: (patch: Partial<TemplateItem>) => void}) {
@@ -29,12 +29,24 @@ function ItemInput({item, field, label, hint, placeholder, multiline, onChange}:
   </div>;
 }
 
+/** The button on every card is one design label, so it is edited once for all of them. */
+function CardButtonInput({value, max, onChange, lower}: {value: string; max: number; onChange: (value: string) => void; lower: string}) {
+  const [text, setText] = useState(value);
+  useEffect(() => {setText(current => current.trim() ? value : current);}, [value]);
+  return <div className="visual-field">
+    <div className="visual-field-label"><label htmlFor="item-card-button">Button on all {lower}</label></div>
+    <input id="item-card-button" type="text" enterKeyHint="done" autoComplete="off" maxLength={max} value={text} onChange={e => {const next = e.target.value.replace(/[<>]/g, ''); setText(next); onChange(next);}} className="visual-input"/>
+    <p className="visual-field-hint">Leave it empty to use the design’s wording.</p>
+  </div>;
+}
+
 /**
  * Edits one menu dish, service, room or product in place on the canvas. Example items carry the
  * explicit keep/remove decision the publish gate asks for, right where the owner is looking.
  */
-export function WebsiteItemPanel({item, index, total, word, fields, siteId, token, busy, onChange, onKeep, onRemove, onAdd, onPrevious, onNext, onDone}: {
+export function WebsiteItemPanel({item, index, total, word, fields, siteId, token, busy, cardButton, onChange, onKeep, onRemove, onAdd, onPrevious, onNext, onDone}: {
   item: TemplateItem; index: number; total: number; word: {singular: string; plural: string; many: string}; fields: string[]; siteId: string; token: string; busy: boolean;
+  cardButton?: {value: string; max: number; onChange: (value: string) => void};
   onChange: (patch: Partial<TemplateItem>) => void; onKeep: () => void; onRemove: () => void; onAdd: () => void; onPrevious: () => void; onNext: () => void; onDone: () => void;
 }) {
   const root = useRef<HTMLElement>(null), heading = useRef<HTMLHeadingElement>(null);
@@ -77,6 +89,8 @@ export function WebsiteItemPanel({item, index, total, word, fields, siteId, toke
       {fields.includes('desc') && <ItemInput item={item} field="desc" label="Description" multiline onChange={onChange}/>}
       {fields.includes('image') && <div className="visual-field"><WebsiteImageField label="Photo" value={item.image || ''} siteId={siteId} token={token} onChange={image => onChange({image})}/></div>}
       {fields.includes('category') && <ItemInput item={item} field="category" label="Group (optional)" hint={`Visitors can filter your ${word.many} by group.`} onChange={onChange}/>}
+      {fields.includes('tag') && <ItemInput item={item} field="tag" label="Label (optional)" placeholder="e.g. New or Popular" hint="A short badge on the card. Only add one that is true." onChange={onChange}/>}
+      {cardButton && <CardButtonInput {...cardButton} lower={word.many}/>}
       <div className="visual-item-footer">
         <button type="button" onClick={onAdd} className="visual-link-button"><Plus size={16}/>Add a {lower}</button>
         {!item.isExample && <button type="button" onClick={onRemove} className="visual-link-button is-danger"><Trash2 size={16}/>Remove this {lower}</button>}

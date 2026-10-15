@@ -184,3 +184,5 @@
  .visual-context-panel,.visual-more{animation:visual-rise .2s cubic-bezier(.2,.8,.2,1)}
 }
 @keyframes visual-rise{from{transform:translateY(16px);opacity:.5}}
+.visual-example-note.is-suggested{border-color:rgba(0,195,101,.32);background:rgba(0,195,101,.07)}
+.visual-example-note.is-suggested strong{color:#8ef0b9}

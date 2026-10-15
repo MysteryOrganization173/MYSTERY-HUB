@@ -16,7 +16,7 @@ import { WebsiteItemsList } from './WebsiteItemsList';
 import { WebsitePublishSheet } from './WebsitePublishSheet';
 import { WebsiteLayoutControl, WebsiteHistoryControl } from './WebsiteLayoutAndHistory';
 import { publishWebsiteB1, reviewWebsiteExamples, setWebsiteLayout, restoreWebsiteDraft, discardWebsiteCheckpoint, WebsiteB1Error } from '../../../services/websiteB1Api';
-import { websiteItemVocabulary } from '../../../config/websiteStarters';
+import { websiteItemVocabulary, websiteStarterWording } from '../../../config/websiteStarters';
 import { websiteTemplateItemFields } from '../../../config/websiteBuilder';
 import { websiteLayoutMode, type WebsiteLayoutMode } from '../../../utils/websiteLayout';
 import type { TemplateItem } from '../../../types';
@@ -379,6 +379,14 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const targets = visualTargets(previewTemplate);
   const selected = targets.find(t=>t.id===visualSelection);
   const contextualTargets = visualSelection==='branding' ? targets.filter(t=>t.source.kind==='settings') : selected ? [selected,...(selected.destinationId ? targets.filter(t=>t.id===selected.destinationId) : [])] : [];
+  // The design's suggested headline and description stay marked until the owner changes them.
+  const starterWording = content.starterVersion ? websiteStarterWording(currentSite.template_id) : undefined;
+  const suggestedFields = starterWording && layoutMode==='template' ? (['tagline','aboutText'] as const).filter(field=>content[field]===starterWording[field]).map(field=>`content:${field}`) : [];
+  const publishSuggestions = [
+    ...suggestedFields.map(id=>({label:id==='content:tagline'?'your headline':'your description',target:id})),
+    ...(layoutMode==='template' && !isDataReseller && content.heroImage && content.heroImage===baseTemplate.heroImage?[{label:'the main photo',target:'content:heroImage'}]:[]),
+  ];
+  const cardButton = targets.find(t=>t.source.kind==='copy' && t.id.endsWith('.itemButton'));
   const editVisualValue = (id:string,value:string) => {
     if(isPublishing)return;
     const draft=draftRef.current;
@@ -401,7 +409,8 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     <div ref={workspaceRef} role="dialog" aria-modal="true" aria-label="Website editor" className="visual-workspace fixed inset-0 z-[80] text-slate-100 flex flex-col font-sans overflow-hidden">
       {publishOpen && <WebsitePublishSheet content={content} published={currentSite.status==='published'} publishedAt={currentSite.published_at} publicUrl={`${window.location.origin}/sites/${currentSite.slug}`} word={word} managed={isDataReseller}
         onReview={reviewItems} onEditItem={openItem} onPublish={handlePublish} onClose={()=>setPublishOpen(false)}
-        onEditField={target=>{setPublishOpen(false);setActiveTab('edit');if(target==='name')selectTarget('content:businessName');else openSettings('contact');}}/>}
+        suggestions={publishSuggestions}
+        onEditField={target=>{setPublishOpen(false);setActiveTab('edit');if(target==='name')selectTarget('content:businessName');else if(target==='contact')openSettings('contact');else selectTarget(target);}}/>}
       {mediaOpen && <WebsiteImageLibrary siteId={currentSite.id} token={sessionToken} onClose={()=>setMediaOpen(false)} onChoose={url=>{setContent({...content,heroImage:url});markDirty();setMediaOpen(false);}} />}
       <WebsiteEditorToolbar name={content.businessName || siteName} mode={activeTab} device={previewDevice} status={saveStatusText} published={currentSite.status==='published'} saving={isSaving} publishing={isPublishing}
         onExit={()=>{if(!isDirty || window.confirm('You have unsaved changes. Exit anyway?'))onClose();}} onMode={changeMode} onDevice={device=>{setPreviewDevice(device);if(isPhone && device!=='mobile')changeMode('preview');}} onSave={()=>void handleSaveDraft()} onPublish={()=>{setVisualSelection(null);setPublishOpen(true);}} onUnpublish={()=>void handleUnpublish()} onSettings={()=>openSettings()} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`}/>
@@ -909,9 +918,9 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             </div>
           </div>
         </div>
-        {activeTab==='edit' && selectedItemIndex>=0 && <WebsiteItemPanel item={items[selectedItemIndex]} index={selectedItemIndex} total={items.length} word={word} fields={itemFields} siteId={currentSite.id} token={sessionToken} busy={locked}
+        {activeTab==='edit' && selectedItemIndex>=0 && <WebsiteItemPanel item={items[selectedItemIndex]} index={selectedItemIndex} total={items.length} word={word} fields={itemFields} siteId={currentSite.id} token={sessionToken} busy={locked} cardButton={cardButton && {value:cardButton.value,max:cardButton.maxLength,onChange:value=>editVisualValue(cardButton.id,value)}}
           onChange={patch=>updateItem(items[selectedItemIndex].id!,patch)} onKeep={()=>void reviewItems([items[selectedItemIndex].id!],'confirm')} onRemove={()=>removeItem(items[selectedItemIndex].id!)} onAdd={addItem} onPrevious={()=>stepItem(-1)} onNext={()=>stepItem(1)} onDone={clearSelection}/>}
-        {activeTab==='edit' && contextualTargets.length>0 && !selectedItemId && <div className="contents" inert={locked}><VisualContextPanel title={visualSelection==='branding'?'Website colors':selected!.label} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()} position={stepIndex>=0?{index:stepIndex,total:stepIds.length}:undefined} onPrevious={()=>step(-1)} onNext={()=>step(1)}/></div>}
+        {activeTab==='edit' && contextualTargets.length>0 && !selectedItemId && <div className="contents" inert={locked}><VisualContextPanel title={visualSelection==='branding'?'Website colors':selected!.label} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()} position={stepIndex>=0?{index:stepIndex,total:stepIds.length}:undefined} onPrevious={()=>step(-1)} onNext={()=>step(1)} suggested={!!selected && suggestedFields.includes(selected.id)}/></div>}
         {activeTab==='edit' && settingsNotice && !contextualTargets.length && <VisualContextPanel notice title="Change this in All Settings" targets={[]} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()}/>}
       </div>
 

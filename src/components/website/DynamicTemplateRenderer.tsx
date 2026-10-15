@@ -1,6 +1,6 @@
 import { ExampleTag } from './ExampleTag';
 import { SiteFooterContact } from './SiteContactDetails';
-import {useVisualEditMarkers} from './editor/VisualEditMarkers';
+import {useVisualEditMarkers, useTemplateCopy} from './editor/VisualEditMarkers';
 import { websiteActionText, readableWebsiteColor } from '../../utils/websiteBrand';
 import { SafeImage } from './SafeImage.js';
 import React, { useState } from 'react';
@@ -59,6 +59,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
   isMobileView,
 }) => {
   const edit = useVisualEditMarkers();
+  const copy = useTemplateCopy(template);
   // Extract and standardize template color scheme with safe fallbacks
   const p = template.colorScheme || {
     primary: '#0f172a',
@@ -788,7 +789,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
             className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-full border border-white/20 text-white"
             style={{ backgroundColor: `${p.secondary}40` }}
           >
-            {template.badgeText || template.categoryLabel}
+            <span {...copy.edit('eyebrow')}>{copy.text('eyebrow')}</span>
           </span>
 
           <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-white" {...edit("content:tagline")}>
@@ -805,7 +806,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
               className={`px-5 py-2.5 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-2 ${btnRadius}`}
               style={{ backgroundColor: p.secondary, color: websiteActionText(p.secondary) }}
             >
-              <span>Explore Offerings</span>
+              <span {...copy.edit('primary')}>{copy.text('primary')}</span>
               <ArrowRight className="w-4 h-4" />
             </a>
           </div>
@@ -832,12 +833,8 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
       <div id="catalog" className="py-10 sm:py-16 px-4 sm:px-12 max-w-6xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <span className="text-xs uppercase tracking-widest font-bold" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }}>
-              Featured Portfolio
-            </span>
-            <h2 className="text-xl sm:text-3xl font-black mt-0.5" style={{ color: p.text }}>
-              Explore Options & Rates
-            </h2>
+            <span className="text-xs uppercase tracking-widest font-bold" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }} {...copy.edit('itemsEyebrow')}>{copy.text('itemsEyebrow')}</span>
+            <h2 className="text-xl sm:text-3xl font-black mt-0.5" style={{ color: p.text }} {...copy.edit('itemsHeading')}>{copy.text('itemsHeading')}</h2>
           </div>
         </div>
 
@@ -918,7 +915,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
                     className={`w-full py-2 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${btnRadius}`}
                     style={{ backgroundColor: p.primary, color: websiteActionText(p.primary) }}
                   >
-                    <span>Select Option</span>
+                    <span>{copy.text('itemButton')}</span>
                   </button>
                 )}
               </div>

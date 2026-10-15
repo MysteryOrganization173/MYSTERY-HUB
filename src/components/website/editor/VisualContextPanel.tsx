@@ -9,8 +9,13 @@ import './visualEditor.css';
 const touchFirst = () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
 
 function VisualField({target, onChange, siteId, token}: {target: VisualTarget; onChange: (id: string, value: string) => void; siteId: string; token: string}) {
-  const [value, setValue] = useState(target.value), [error, setError] = useState('');
-  useEffect(() => {setValue(target.value);setError('');}, [target.id, target.value]);
+  const [value, setValue] = useState(target.value), [error, setError] = useState(''), shownId = useRef(target.id);
+  useEffect(() => {
+    // An emptied design label falls back to the design's wording; keep the field empty while the owner types.
+    const keepEmpty = shownId.current === target.id && target.source.kind === 'copy';
+    shownId.current = target.id;
+    setValue(current => keepEmpty && !current.trim() ? current : target.value);setError('');
+  }, [target.id, target.value]);
   const change = (next: string) => {
     setValue(next);
     const error = visualValueError(target, next);setError(error);
@@ -32,12 +37,13 @@ function VisualField({target, onChange, siteId, token}: {target: VisualTarget; o
     </>}
     {error && <p id={errorId} role="alert" className="visual-field-error">{error} Your draft keeps the last valid value.</p>}
     {target.inherited && <p className="visual-field-hint">Uses your site’s default. Editing changes only this section.</p>}
+    {target.source.kind === 'copy' && !error && <p className="visual-field-hint">Part of the design. Leave it empty to use the design’s wording.</p>}
   </div>;
 }
 
-export function VisualContextPanel({title, targets, siteId, token, onChange, onDone, onAllSettings, position, onPrevious, onNext, notice}: {
+export function VisualContextPanel({title, targets, siteId, token, onChange, onDone, onAllSettings, position, onPrevious, onNext, notice, suggested}: {
   title: string; targets: VisualTarget[]; siteId: string; token: string; onChange: (id:string,value:string)=>void; onDone:()=>void; onAllSettings:()=>void;
-  position?: {index: number; total: number}; onPrevious?: () => void; onNext?: () => void; notice?: boolean;
+  position?: {index: number; total: number}; onPrevious?: () => void; onNext?: () => void; notice?: boolean; suggested?: boolean;
 }) {
   const root=useRef<HTMLElement>(null), heading=useRef<HTMLHeadingElement>(null);
   const firstId=targets[0]?.id;
@@ -72,6 +78,7 @@ export function VisualContextPanel({title, targets, siteId, token, onChange, onD
         <p className="visual-notice-text">Tapping doesn’t edit this part. Galleries, section order and social links are changed in All Settings. A few labels are part of the design and can’t be changed.</p>
         <button type="button" onClick={onAllSettings} className="visual-primary-button"><SlidersHorizontal size={17}/>Open All Settings</button>
       </> : <>
+        {suggested && <div className="visual-example-note is-suggested" role="note"><strong>Suggested wording</strong><p>We wrote this so your page doesn’t start empty. Make it your own, or keep it if it fits your business.</p></div>}
         {targets.map(target=><VisualField key={target.id} target={target} siteId={siteId} token={token} onChange={onChange}/>)}
         <button type="button" onClick={onAllSettings} className="visual-link-button"><SlidersHorizontal size={15}/>More options in All Settings</button>
       </>}

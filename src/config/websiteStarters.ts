@@ -87,6 +87,27 @@ const examples:Record<string,StarterExample[]>={
     {name:'Bookkeeping',desc:'Monthly bookkeeping so your records stay organised.',category:'Accounting'},
   ],
 };
+/**
+ * A headline and short description in each design's voice, so a new website reads as finished.
+ * Suggested wording only: no ratings, prices, hours, places, credentials or achievements. The editor
+ * marks it as suggested until the owner changes it.
+ */
+const wording:Record<string,{tagline:string;aboutText:string}>={
+  'tmpl-buka-bistro':{tagline:'Ghanaian flavours, cooked with care',aboutText:'Take a look at our menu, then message us to ask about a table or to place an order.'},
+  'tmpl-accra-build':{tagline:'Built right, from foundation to handover',aboutText:'See the kind of work we take on, then tell us about your project and ask for an estimate.'},
+  'tmpl-glow-salon':{tagline:'Look good. Feel confident.',aboutText:'Browse our services and message us to book a time that suits you.'},
+  'tmpl-goldcoast-realty':{tagline:'Find a place that feels like home',aboutText:'Browse our listings and message us to ask about a property or arrange a viewing.'},
+  'tmpl-lens-creative':{tagline:'Stories told through the lens',aboutText:'Explore a selection of our work and get in touch to plan your shoot.'},
+  'tmpl-vortex-tech':{tagline:'Technology that works for your business',aboutText:'See how we can help, then tell us what you need and we will get back to you.'},
+  'tmpl-akwaaba-hotel':{tagline:'A warm welcome and a restful stay',aboutText:'Explore our rooms and message us to ask about availability for your dates.'},
+  'tmpl-horizon-edu':{tagline:'Learn new skills with confidence',aboutText:'Explore our courses and classes, then contact us to ask about joining.'},
+  'tmpl-makola-mart':{tagline:'Discover our products and collections',aboutText:'Explore the catalogue and contact us to confirm stock, delivery, payment and warranty terms.'},
+  'tmpl-grace-ministry':{tagline:'A place to belong, worship and grow',aboutText:'Join us for worship and fellowship. Message us to find out more about our gatherings.'},
+  'tmpl-afrochic-threads':{tagline:'African fashion, tailored for you',aboutText:'Explore our pieces and message us to talk about fabric, fit and your measurements.'},
+  'tmpl-legon-consult':{tagline:'Clear advice for growing businesses',aboutText:'Tell us what you need help with and we will explain how we can support you.'},
+};
+/** The suggested headline and description a design starts with, if it has them. */
+export const websiteStarterWording=(templateId:string)=>wording[templateId];
 const itemWords:Record<string,[string,string,string]>={
   restaurant:['Dish','Menu','dishes'],salon:['Service','Services','services'],construction:['Project','Projects','projects'],realestate:['Property','Properties','properties'],
   portfolio:['Work','Portfolio','works'],agency:['Service','Services','services'],hotel:['Room','Rooms','rooms'],education:['Course','Courses','courses'],
@@ -113,7 +134,7 @@ export function websiteStarter(templateId:string,businessName:string) {
       ...(fields.includes('image') && image?{image}:{}),
     };
   });
-  const content:Partial<SiteContent>={starterVersion:WEBSITE_STARTER_VERSION,businessName,tagline:`Welcome to ${businessName}`,aboutText:'',location:'',phone:'',whatsapp:'',email:'',logoUrl:'',heroImage:t.heroImage || '',ctaLabel:templateId==='tmpl-data-reseller'?'Buy Data':'Contact us',ctaTarget:'',social:{},items,stats:[],features:[],...(templateId==='tmpl-start-blank'?{layoutMode:'sections' as const,composition:structuredClone(t.composition!)}:{layoutMode:'template' as const})};
+  const content:Partial<SiteContent>={starterVersion:WEBSITE_STARTER_VERSION,businessName,tagline:wording[templateId]?.tagline || `Welcome to ${businessName}`,aboutText:wording[templateId]?.aboutText || '',location:'',phone:'',whatsapp:'',email:'',logoUrl:'',heroImage:t.heroImage || '',ctaLabel:templateId==='tmpl-data-reseller'?'Buy Data':'Contact us',ctaTarget:'',social:{},items,stats:[],features:[],...(templateId==='tmpl-start-blank'?{layoutMode:'sections' as const,composition:structuredClone(t.composition!)}:{layoutMode:'template' as const})};
   const settings:SiteSettings={primaryColor:t.colorScheme?.primary || '#0f172a',accentColor:t.accentColor || '#00c365',backgroundColor:t.colorScheme?.background || '#ffffff',fontFamily:'font-sans',borderRadius:'rounded-xl'};
   return {starterVersion:WEBSITE_STARTER_VERSION,templateId,content,settings,capabilities:{layoutModes:templateId==='tmpl-start-blank'?['sections']:['template','sections'],itemFields:templateId==='tmpl-data-reseller'?[]:fields,managed:templateId==='tmpl-data-reseller',exampleCount:items.length}};
 }

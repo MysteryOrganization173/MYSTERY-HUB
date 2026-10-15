@@ -1,6 +1,6 @@
 import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
-import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
+import {useVisualEditMarkers, useTemplateCopy} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
@@ -26,6 +26,7 @@ interface TemplateViewProps {
 
 export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
   const edit = useVisualEditMarkers();
+  const copy = useTemplateCopy(template);
   const [booked, setBooked] = useState<boolean>(false);
   const suites = template.items || [];
 
@@ -54,9 +55,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
             <span className="font-extrabold text-base tracking-tight text-[var(--website-primary,#132e23)] block leading-none font-serif" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </span>
-            <span className="text-[10px] text-[var(--website-accent,#10b981)] uppercase tracking-widest font-bold block mt-0.5">
-              {template.siteContent ? template.categoryLabel : 'Eco-Resort & Beachfront Villas'}
-            </span>
+            <span className="text-[10px] text-[var(--website-accent,#10b981)] uppercase tracking-widest font-bold block mt-0.5" {...copy.edit('brand')}>{copy.text('brand')}</span>
           </div>
         </div>
 
@@ -90,7 +89,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
         <div className="relative max-w-3xl space-y-5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#10b981)]/20 border border-[var(--website-accent,#10b981)]/40 text-[#a7f3d0] text-xs font-semibold uppercase tracking-wider">
             <Compass className="w-3.5 h-3.5 text-[var(--website-accent,#10b981)]" />
-            <span>{template.siteContent ? template.location || template.categoryLabel : 'Ada Foah Estuary Sanctuary'}</span>
+            <span {...copy.edit('eyebrow')}>{copy.text('eyebrow')}</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-serif tracking-tight leading-tight text-white" {...edit("content:tagline")}>
@@ -106,19 +105,19 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
               href="#reserve"
               className="px-6 py-3 rounded-full bg-[var(--website-accent,#10b981)] hover:bg-[#059669] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2"
             >
-              <span>Ask about availability</span>
+              <span {...copy.edit('primary')}>{copy.text('primary')}</span>
               <ArrowRight className="w-4 h-4" />
             </a>
             <a
               href="#suites"
               className="px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-xs uppercase tracking-wider border border-white/20 transition-all flex items-center gap-2"
             >
-              <span>Explore Suites</span>
+              <span {...copy.edit('secondary')}>{copy.text('secondary')}</span>
             </a>
           </div>
 
           {/* Key Metrics */}
-          <div className="pt-6 grid grid-cols-3 gap-4 border-t border-white/15 max-w-md">
+          {!!template.stats?.length && <div className="pt-6 grid grid-cols-3 gap-4 border-t border-white/15 max-w-md">
             {template.stats?.map((stat, i) => (
               <div key={i}>
                 <div className="text-xl font-bold text-[#a7f3d0] font-serif">{stat.value}</div>
@@ -127,14 +126,14 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
         </div>
       </div>
 
       {/* Quick Check-in Reservation Bar */}
       <div id="reserve" className="bg-white p-4 sm:p-6 border-b border-[#e8e5dc] shadow-md">
         <div className="max-w-5xl mx-auto">
-          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick}/> : booked ? (
+          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Which room?" dateLabel="Check-in date"/> : booked ? (
             <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-center text-xs text-emerald-800 font-bold">
               Example only. No availability has been confirmed and no dates have been reserved.
             </div>
@@ -188,12 +187,8 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       {/* Chalets & Suites Showcase */}
       <div id="suites" className="py-14 px-4 sm:px-12 max-w-5xl mx-auto space-y-8">
         <div className="text-center max-w-md mx-auto space-y-2">
-          <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#10b981)] font-bold">
-            {template.siteContent ? 'Explore your stay' : 'Private Eco Sanctuary'}
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-serif text-[var(--website-primary,#132e23)]">
-            Rooms & Stays
-          </h2>
+          <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#10b981)] font-bold" {...copy.edit('itemsEyebrow')}>{copy.text('itemsEyebrow')}</span>
+          <h2 className="text-2xl sm:text-3xl font-serif text-[var(--website-primary,#132e23)]" {...copy.edit('itemsHeading')}>{copy.text('itemsHeading')}</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -238,7 +233,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                   onClick={onCtaClick}
                   className="w-full py-2.5 rounded-xl bg-[var(--website-primary,#132e23)] hover:bg-[var(--website-accent,#10b981)] hover:text-black text-white text-xs font-bold text-center block transition-colors cursor-pointer"
                 >
-                  Book This Suite
+                  {copy.text('itemButton')}
                 </button>
               </div>
             </div>

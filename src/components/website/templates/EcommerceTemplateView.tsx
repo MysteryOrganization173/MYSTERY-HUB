@@ -1,6 +1,6 @@
 import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
-import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
+import {useVisualEditMarkers, useTemplateCopy} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
@@ -25,6 +25,7 @@ interface TemplateViewProps {
 
 export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
   const edit = useVisualEditMarkers();
+  const copy = useTemplateCopy(template);
   const [cartCount, setCartCount] = useState<number>(1);
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [notification, setNotification] = useState<string | null>(null);
@@ -100,9 +101,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
       <div className="relative py-12 sm:py-16 px-6 sm:px-12 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 text-white overflow-hidden">
         <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-40  " src={template.heroImage || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-2xl space-y-4">
-          <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30">
-            Explore the collection
-          </span>
+          <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30" {...copy.edit('eyebrow')}>{copy.text('eyebrow')}</span>
 
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight text-white" {...edit("content:tagline")}>
             {template.demoHeroTagline}
@@ -117,7 +116,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
               href="#products"
               className="px-5 py-2.5 rounded-xl bg-[var(--website-accent,#2563eb)] hover:bg-[#1d4ed8] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-2"
             >
-              <span>Browse Catalog</span>
+              <span {...copy.edit('primary')}>{copy.text('primary')}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </a>
             <button
@@ -125,7 +124,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
               className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs uppercase tracking-wider border border-white/20 transition-all flex items-center gap-2 cursor-pointer"
             >
               <Phone className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Contact to order</span>
+              <span {...copy.edit('secondary')}>{copy.text('secondary')}</span>
             </button>
           </div>
         </div>
@@ -169,12 +168,8 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
       <div id="products" className="py-12 px-4 sm:px-12 max-w-6xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-              Trending Hardware & Gadgets
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Contact the business to confirm current stock and delivery options.
-            </p>
+            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight" {...copy.edit('itemsHeading')}>{copy.text('itemsHeading')}</h2>
+            <p className="text-xs text-slate-500 mt-0.5" {...copy.edit('itemsIntro')}>{copy.text('itemsIntro')}</p>
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">

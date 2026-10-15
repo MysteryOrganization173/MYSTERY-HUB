@@ -1,6 +1,6 @@
 import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
-import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
+import {useVisualEditMarkers, useTemplateCopy} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
@@ -27,6 +27,7 @@ interface TemplateViewProps {
 
 export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
   const edit = useVisualEditMarkers();
+  const copy = useTemplateCopy(template);
   const [activeTab, setActiveTab] = useState<string>('All');
   const [quoteSubmitted, setQuoteSubmitted] = useState<boolean>(false);
 
@@ -74,9 +75,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
             <span className="font-black text-base sm:text-lg tracking-tight text-white block uppercase leading-none" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </span>
-            <span className="text-[10px] text-[var(--website-accent,#f97316)] uppercase tracking-widest font-mono font-bold block mt-0.5">
-              {template.siteContent ? template.categoryLabel : 'Civil & Structural Engineers Ghana'}
-            </span>
+            <span className="text-[10px] text-[var(--website-accent,#f97316)] uppercase tracking-widest font-mono font-bold block mt-0.5" {...copy.edit('brand')}>{copy.text('brand')}</span>
           </div>
         </div>
 
@@ -113,7 +112,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
         <div className="relative max-w-3xl space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[var(--website-accent,#f97316)]/15 border border-[var(--website-accent,#f97316)]/40 text-[var(--website-accent,#f97316)] text-xs font-mono font-bold uppercase tracking-wider">
             <Building2 className="w-3.5 h-3.5" />
-            <span>{template.siteContent ? template.categoryLabel : 'Heavy Civil & Commercial Engineering'}</span>
+            <span {...copy.edit('eyebrow')}>{copy.text('eyebrow')}</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-black uppercase tracking-tight text-white leading-[1.08]" {...edit("content:tagline")}>
@@ -129,19 +128,19 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
               href="#quote"
               className="px-6 py-3.5 rounded-lg bg-[var(--website-accent,#f97316)] hover:bg-[#ea580c] text-black font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2"
             >
-              <span>{template.siteContent ? 'Request a Project Estimate' : 'Instant Tender Cost Calculator'}</span>
+              <span {...copy.edit('primary')}>{copy.text('primary')}</span>
               <ArrowRight className="w-4 h-4" />
             </a>
             <a
               href="#projects"
               className="px-6 py-3.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider border border-slate-700 transition-all flex items-center gap-2"
             >
-              <span>View projects</span>
+              <span {...copy.edit('secondary')}>{copy.text('secondary')}</span>
             </a>
           </div>
 
           {/* Industrial Key Statistics Grid */}
-          <div className="pt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-slate-800 max-w-2xl">
+          {!!template.stats?.length && <div className="pt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-slate-800 max-w-2xl">
             {template.stats?.map((stat, idx) => (
               <div key={idx} className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/80">
                 <div className="text-2xl font-black text-[var(--website-accent,#f97316)] font-mono">{stat.value}</div>
@@ -150,7 +149,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -158,12 +157,8 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
       <div id="projects" className="py-16 px-4 sm:px-12 max-w-6xl mx-auto space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#f97316)] font-mono font-bold block">
-              Project portfolio
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black uppercase text-white mt-1">
-              Our projects
-            </h2>
+            <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#f97316)] font-mono font-bold block" {...copy.edit('itemsEyebrow')}>{copy.text('itemsEyebrow')}</span>
+            <h2 className="text-2xl sm:text-3xl font-black uppercase text-white mt-1" {...copy.edit('itemsHeading')}>{copy.text('itemsHeading')}</h2>
           </div>
 
           {/* Category Tabs */}
@@ -236,13 +231,9 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
       <div id="capabilities" className="py-14 px-4 sm:px-12 bg-[#080d13] border-y border-slate-800">
         <div className="max-w-6xl mx-auto space-y-8">
           <div className="text-center max-w-xl mx-auto space-y-1">
-            <span className="text-xs font-mono font-bold text-[var(--website-accent,#f97316)] uppercase">
-              Technical Capabilities
-            </span>
-            <h3 className="text-2xl font-black uppercase text-white">{template.siteContent ? 'Services' : 'Full-Spectrum Contracting'}</h3>
-            <p className="text-xs text-slate-400">
-              {template.siteContent ? 'Contact us to discuss the services and experience needed for your project.' : 'End-to-end engineering, procurement, and construction (EPC) solutions.'}
-            </p>
+            <span className="text-xs font-mono font-bold text-[var(--website-accent,#f97316)] uppercase" {...copy.edit('extraEyebrow')}>{copy.text('extraEyebrow')}</span>
+            <h3 className="text-2xl font-black uppercase text-white" {...copy.edit('extraHeading')}>{copy.text('extraHeading')}</h3>
+            <p className="text-xs text-slate-400" {...copy.edit('extraIntro')}>{copy.text('extraIntro')}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -287,18 +278,12 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
       <div id="quote" className="py-16 px-4 sm:px-12 max-w-4xl mx-auto">
         <div className="bg-[#111923] border border-slate-800 rounded-2xl p-6 sm:p-10 shadow-2xl space-y-6">
           <div className="space-y-1">
-            <span className="text-xs font-mono font-bold text-[var(--website-accent,#f97316)] uppercase">
-              Tender Intake Portal
-            </span>
-            <h3 className="text-2xl font-black uppercase text-white">
-              Request Project Estimate & Feasibility
-            </h3>
-            <p className="text-xs text-slate-400">
-              Contact the business to discuss project scope, qualifications and estimates.
-            </p>
+            <span className="text-xs font-mono font-bold text-[var(--website-accent,#f97316)] uppercase" {...copy.edit('enquiryEyebrow')}>{copy.text('enquiryEyebrow')}</span>
+            <h3 className="text-2xl font-black uppercase text-white" {...copy.edit('enquiryHeading')}>{copy.text('enquiryHeading')}</h3>
+            <p className="text-xs text-slate-400" {...copy.edit('enquiryIntro')}>{copy.text('enquiryIntro')}</p>
           </div>
 
-          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick}/> : quoteSubmitted ? (
+          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Type of project" dateLabel="Planned start date"/> : quoteSubmitted ? (
             <div className="p-6 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-2">
               <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
               <h4 className="font-bold text-emerald-300 text-base">Tender Request Received</h4>

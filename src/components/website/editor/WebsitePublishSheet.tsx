@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {AlertTriangle, Check, CheckCircle2, Copy, ExternalLink, MessageCircle, X} from 'lucide-react';
+import {AlertTriangle, Check, CheckCircle2, Copy, ExternalLink, MessageCircle, PenLine, X} from 'lucide-react';
 import type {SiteContent, TemplateItem} from '../../../types';
 import {SafeImage} from '../SafeImage';
 import '../websiteBuilder.css';
@@ -13,9 +13,11 @@ const formatDate = (value?: string | null) => {
  * One place to decide "is this ready to be public?": the owner's name, a way to be reached and the
  * example items the server will not publish until each is kept or removed. Never confirms for them.
  */
-export function WebsitePublishSheet({content, published, publishedAt, publicUrl, word, managed, onReview, onEditItem, onEditField, onPublish, onClose}: {
+export function WebsitePublishSheet({content, published, publishedAt, publicUrl, word, managed, suggestions = [], onReview, onEditItem, onEditField, onPublish, onClose}: {
   content: SiteContent; published: boolean; publishedAt?: string | null; publicUrl: string; word: {singular: string; plural: string; many: string}; managed: boolean;
-  onReview: (ids: string[], action: 'confirm' | 'remove') => Promise<boolean>; onEditItem: (id: string) => void; onEditField: (target: 'name' | 'contact') => void;
+  /** Design wording and sample photos still in use. Shown for a final look; never blocks publishing. */
+  suggestions?: {label: string; target: string}[];
+  onReview: (ids: string[], action: 'confirm' | 'remove') => Promise<boolean>; onEditItem: (id: string) => void; onEditField: (target: string) => void;
   onPublish: () => Promise<boolean>; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -59,6 +61,12 @@ export function WebsitePublishSheet({content, published, publishedAt, publicUrl,
           <div><strong>How customers reach you</strong><p>{contact || 'No WhatsApp, phone or email yet. Customers will not be able to contact you.'}</p></div>
           <button type="button" onClick={() => onEditField('contact')}>{contact ? 'Change' : 'Add'}</button>
         </li>
+        {suggestions.length > 0 && <li data-state="info">
+          <span className="website-check-icon" aria-hidden="true"><PenLine size={15}/></span>
+          <div><strong>Make it sound like you <span className="font-normal text-slate-400">· optional</span></strong>
+            <p>Still from the design: {suggestions.map(s => s.label).join(', ')}. Fine to publish if they fit your business.</p></div>
+          <button type="button" onClick={() => onEditField(suggestions[0].target)}>Review</button>
+        </li>}
         {!managed && <li data-state={examples.length ? 'todo' : 'ok'} className="website-check-examples">
           <span className="website-check-icon" aria-hidden="true">{examples.length ? examples.length : <Check size={15}/>}</span>
           <div>

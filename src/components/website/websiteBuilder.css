@@ -115,3 +115,4 @@
 .website-owner-review:focus-visible{outline:2px solid #00c365;outline-offset:2px}
 .website-sheet-restore{border-radius:14px;border:1px solid rgba(0,195,101,.4);background:rgba(0,195,101,.08);padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5}
 .website-sheet-restore button{align-self:flex-start;min-height:44px;padding:0 14px;border-radius:12px;background:#00c365;color:#05140c;font-weight:800}
+[data-state="info"] .website-check-icon{background:#1b2730;color:#b8c6c0}
