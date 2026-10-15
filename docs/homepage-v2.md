@@ -6,7 +6,7 @@ Branch `claude/homepage-v2-bl4bst`, based on verified `main` at `95c4fc0`. It is
 
 | Section | Before | After | Why |
 | --- | --- | --- | --- |
-| Hero | The art sat at 60% opacity under a 95% gradient, so it was barely visible on phones. The line under the buttons only covered the builder. The description mixed four messages. | Same headline, same two buttons and the same brand. On phones the art shows as a band below the actions. A single line lists what is live today (Data & airtime, Free business website, Order tracking). The description is tighter. | Keeps the approved character. Phones now see the imagery, and the first screen states what is actually available. |
+| Hero | The art sat at 60% opacity under a 95% gradient, so it was barely visible on phones. The line under the buttons only covered the builder. The description mixed four messages. | Same headline, same two buttons and the same brand. The approved Accra artwork now dissolves into the dark page on every edge using a soft radial mask, with no hard boundary and no separate strip. On desktop it sits to the right of a dark text side. On phones it rises from behind the buttons and fades out before the next section, while the headline stays on the darkest area. A single line lists what is live today (Data & airtime, Free business website, Order tracking). The description is tighter. | Keeps the approved character. The art is clearly visible while the headline and buttons stay dominant, and the first screen states what is actually available. |
 | Services | Four tiles in unrelated colours (amber, green, blue, violet). Builder and Marketplace were missing. | One directory of all six live services (Data, Airtime, Website Builder, Mystery Earn, AFA, Marketplace) in one green system with honest status labels: Available, Free plan, Check Status, Enquiry. | Visitors can find any service right after the hero. The colours read as one product. |
 | Popular bundles | Four BundleCards, each with its own phone field (about 600px on phones). The welcome offer floated as a separate banner above the section. | One quick-buy panel: a network switch, the welcome offer inside the panel, and four compact rows from the Data page's existing `CompactBundleRow`, opening the same checkout. "View all" now carries the chosen network. | The purchase path is easier to scan. Checkout still asks for and checks the recipient's number. BundleCard is no longer used here, so the separate Data buying UX task owns it freely. |
 | Trust | Three columns about 3,000px below the Buy buttons. | Moved next to the bundles as "How buying works": check the total and number, pay with MoMo through Paystack, track your order. | Reassurance appears where people decide to buy. |
@@ -21,8 +21,8 @@ Simplified: the rainbow tiles, four duplicate phone fields, a floating offer ban
 
 | Width | Before | After |
 | --- | --- | --- |
-| 360 | 7,013 | 6,496 |
-| 390 | 6,840 | 6,215 |
+| 360 | 7,013 | 6,479 |
+| 390 | 6,840 | 6,198 |
 | 768 | 4,792 | 5,298 (longer: the service directory and the help card stack at tablet width) |
 | 1024 | 4,368 | 4,160 |
 | 1280 | 4,430 | 4,066 |
