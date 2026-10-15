@@ -2,7 +2,7 @@
 
 ## Decision
 
-INTEGRATED; RELEASE BLOCKED pending an actual Paystack TEST-mode checkout session. Do not merge this candidate into auto-deploying main on synthetic evidence alone.
+GO for the normal release after the remaining safety checks. On 15 October 2026 the founder explicitly waived the valid Paystack TEST-mode popup verification gate and authorized merge, deployment and nonfinancial production smoke checks. The founder reports personally observing the real popup opening behind the Data Business review dialog. That report is founder evidence, not an independently repeated corrected-popup test. Do not request additional credentials, change live Paystack configuration or perform financial transactions.
 
 Starting main: `a60786c314b757de9cd38377199f5a1b81fdf801`. Original repair: `6535c43d4d47033ca8192ab4b173d288d2200602`, based on `5233879079413b6422f829631676b16c3ea81597`. Release branch: `release/reseller-checkout-v1-production`.
 
@@ -16,7 +16,7 @@ The native review dialog closes synchronously before server initialization or SD
 
 Callback settlement and unmount guards suppress duplicate/stale UI effects. SDK success requests backend verification and then authoritative order tracking; pending or failed verification never marks a local order paid. Safe recovery from a server-confirmed payment releases the previous client lock; uncertain attempts remain tracking/support-only. No new public recovery endpoint or financial behavior was added.
 
-## Official SDK evidence and precise blocker
+## Official SDK evidence and founder waiver
 
 Official documentation reviewed: https://paystack.com/docs/payments/accept-payments/ and https://paystack.com/docs/developer-tools/inlinejs/ . Documentation shows server initialization and access-code resume, lifecycle callbacks, and mandatory backend verification.
 
@@ -24,7 +24,7 @@ The actual official script from https://js.paystack.co/v2/inline.js was download
 
 The full official SDK was also loaded in the isolated browser fixture using a deliberately invalid, nontransactional access code. It created its Paystack checkout frame, invoked the loading-error path, restored review, retained the reference and did not claim success. This proves only that error path and callback wiring, not a valid TEST checkout or its cancellation/success lifecycle.
 
-The inspected local application configuration and inherited environment contain no usable Paystack TEST secret/public key. No live key was used or printed. The founder was asked for only the path of a private TEST configuration file. A private Paystack TEST secret key or an appropriately issued TEST access code is needed for a controlled session with an isolated backend, synthetic buyer data and no production database or supplier access. Do not substitute production initialization or a mocked PaystackPop for this release gate.
+The inspected local application configuration and inherited environment contain no usable Paystack TEST secret/public key. No live key was used or printed. The founder explicitly approved proceeding without that configuration and waived only the valid TEST-mode popup gate. Existing automated tests, synthetic overlay interaction, recovery checks and nontransactional preview safeguards remain required. Corrected real popup interaction, actual provider focus/scroll behavior and real payment collection are not claimed as tested. No additional credentials or live transaction are required or authorized for this release.
 
 ## Verification
 
@@ -42,4 +42,4 @@ Source changes remain frontend-only: ManagedDataStorefront, usePaystack and stor
 
 Backend services/routes/database, publishing schema and renderers, payment validation/webhook/fulfilment, pricing/reserve/economics, earnings, withdrawals, refunds, Admin resolution and Welcome Offer behavior match starting main. No production database access or mutation, customer-site/order edit, payment, refund, supplier submission, transfer, migration, Render change, merge or deployment was performed during this integration.
 
-After a valid isolated official TEST session demonstrates popup visibility, interaction, cancellation and callback/recovery behavior, recheck remote main and candidate scope. If main advanced, re-integrate and run affected checks. Otherwise normally fast-forward the release, push without force, verify both Render revisions and health, inspect existing published Data review and confirm owner preview remains nontransactional. No backend contract change or new migration is required by this candidate. A frontend rollback must retain the already deployed V1.2 snapshot model; never restore a pre-V1.2 backend or drop snapshots. No live transaction is authorized by this checklist.
+With the explicit waiver recorded, recheck remote main, candidate scope and the retained verification evidence. If main advanced, re-integrate and run affected checks. Otherwise normally fast-forward the release, push without force, verify both Render revisions and health, inspect existing published Data review and confirm owner preview remains nontransactional. No backend contract change or new migration is required. Existing main and the new frontend use identical server endpoints, so independent frontend/backend deployment does not expose missing contracts. Record `a60786c314b757de9cd38377199f5a1b81fdf801` as the pre-release recovery revision. If presentation recovery is necessary, a scoped frontend rollback to that V1.2 revision preserves publishing snapshots; never restore a pre-V1.2 backend, drop snapshots or destructively restore data. No live transaction is authorized by this checklist.
