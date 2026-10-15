@@ -25,3 +25,15 @@ export function validateOrderPayment(
   }
   return null;
 }
+
+/** A failed lookup is not a failed transaction. Require matching provider evidence before closing. */
+export function isDefinitiveUnpaidPayment(order: OrderRecord, payment: PaystackVerifyResult): boolean {
+  return order.payment_provider === 'paystack' && !payment.error && !payment.isSimulated
+    && ['failed', 'abandoned'].includes(payment.status)
+    && payment.reference === order.payment_reference
+    && Number.isSafeInteger(payment.amountPesewas) && payment.amountPesewas > 0
+    && payment.amountPesewas === order.amount && payment.currency === order.currency
+    && (!order.store_context || (payment.metadata?.purpose === 'website_store_order'
+      && payment.metadata?.store_id === order.store_context.siteId
+      && payment.metadata?.order_id === order.id && payment.metadata?.product_id === order.product_id));
+}

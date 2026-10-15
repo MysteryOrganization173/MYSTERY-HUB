@@ -19,7 +19,7 @@ import { PaystackServerService } from '../services/paystackService.js';
 import { FulfilmentService } from '../services/fulfilmentService.js';
 import { ReferralService } from '../services/referralService.js';
 import type { PoolClient } from 'pg';
-import { validateOrderPayment } from '../services/paymentValidation.js';
+import { validateOrderPayment, isDefinitiveUnpaidPayment } from '../services/paymentValidation.js';
 import { canAdvanceOrderStatus } from '../services/orderTransitions.js';
 
 // In-memory fallback repository for development when DATABASE_URL is omitted
@@ -554,115 +554,49 @@ export class OrdersStore {
    * Safe, authoritative cancellation of an order payment attempt
    * Cannot cancel orders that are already paid, delivered, or processing
    */
-  static async cancelOrder(
-    ref: string,
-    failureReason: string = 'customer_closed_checkout'
-  ): Promise<{ order: OrderRecord | null; cancelled: boolean; alreadyPaid: boolean }> {
-    const existing = await this.findOrder(ref);
-    if (!existing) {
-      return { order: null, cancelled: false, alreadyPaid: false };
-    }
-
-    if (
-      existing.payment_status === 'success' ||
-      ['paid', 'queued', 'submitted', 'processing', 'delivered', 'refund_pending', 'refunded'].includes(existing.status)
-    ) {
-      return { order: existing, cancelled: false, alreadyPaid: true };
-    }
-
-    const nowIso = new Date().toISOString();
-    const updated: OrderRecord = {
-      ...existing,
-      status: 'cancelled',
-      payment_status: 'cancelled',
-      failure_reason: failureReason,
-      payment_closed_at: nowIso,
-      updated_at: nowIso,
-    };
-
+  /** Atomic unpaid transition; never overwrite a concurrent payment or supplier dispatch. */
+  private static async closeUnpaidOrder(ref: string, status: 'cancelled' | 'expired', failureReason: string) {
+    const snapshot = await this.findOrder(ref);
+    if (!snapshot) return {order:null, changed:false, alreadyPaid:false};
     const pool = getPool();
-    if (pool) {
-      const query = `
-        UPDATE orders
-        SET status = $1, payment_status = $2, failure_reason = $3, payment_closed_at = $4, updated_at = $5
-        WHERE id = $6 ${existing.service_type === 'afa' ? "AND status = 'pending_payment' AND payment_status = 'pending' RETURNING *" : ''};
-      `;
-      const result = await pool.query(query, [
-        updated.status,
-        updated.payment_status,
-        updated.failure_reason,
-        updated.payment_closed_at,
-        updated.updated_at,
-        existing.id,
-      ]);
-      if (existing.service_type === 'afa' && !result.rows[0]) { const current=await this.findOrder(ref); return {order:current,cancelled:false,alreadyPaid:current?.payment_status==='success'}; }
-    } else {
-      const current = devMemoryStore.get(existing.id);
-      if (existing.service_type === 'afa' && current?.payment_status === 'success') return {order:current,cancelled:false,alreadyPaid:true};
-      devMemoryStore.set(existing.id, updated);
-      devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
-      devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
+    const release = pool ? () => {} : await acquireLock(`payment:${snapshot.payment_reference}`);
+    let updated: OrderRecord | null = null;
+    try {
+      if (pool) {
+        const result = await pool.query<OrderRecord>(`
+          UPDATE orders SET status=$1, payment_status=$1, failure_reason=$2,
+            payment_closed_at=$3, updated_at=$3
+          WHERE id=$4 AND status='pending_payment' AND payment_status='pending'
+            AND paid_at IS NULL AND supplier_order_id IS NULL AND submitted_at IS NULL AND delivered_at IS NULL
+          RETURNING *`, [status, failureReason, new Date().toISOString(), snapshot.id]);
+        updated = result.rows[0] ?? null;
+      } else {
+        const current = await this.findOrder(snapshot.id);
+        if (current?.status === 'pending_payment' && current.payment_status === 'pending'
+          && !current.paid_at && !current.supplier_order_id && !current.submitted_at && !current.delivered_at) {
+          updated = {...current, status, payment_status:status, failure_reason:failureReason,
+            payment_closed_at:new Date().toISOString(), updated_at:new Date().toISOString()};
+          devMemoryStore.set(current.id, updated);
+          devMemoryStore.set(`payref:${current.payment_reference}`, updated);
+          devMemoryStore.set(`pubref:${current.public_reference}`, updated);
+        }
+      }
+      const current = updated ?? await this.findOrder(ref);
+      return {order:current, changed:!!updated, alreadyPaid:current?.payment_status === 'success'};
+    } finally {
+      release();
+      if (updated) await AfaStore.onOrderTerminal(updated);
     }
-
-    await AfaStore.onOrderTerminal(updated);
-    return { order: updated, cancelled: true, alreadyPaid: false };
   }
 
-  /**
-   * Safe expiration of an unresolved order payment attempt
-   */
-  static async expireOrder(
-    ref: string,
-    failureReason: string = 'payment_expired'
-  ): Promise<{ order: OrderRecord | null; expired: boolean; alreadyPaid: boolean }> {
-    const existing = await this.findOrder(ref);
-    if (!existing) {
-      return { order: null, expired: false, alreadyPaid: false };
-    }
+  static async cancelOrder(ref: string, failureReason = 'customer_cancelled') {
+    const result = await this.closeUnpaidOrder(ref, 'cancelled', failureReason);
+    return {order:result.order, cancelled:result.changed, alreadyPaid:result.alreadyPaid};
+  }
 
-    if (
-      existing.payment_status === 'success' ||
-      ['paid', 'queued', 'submitted', 'processing', 'delivered', 'refund_pending', 'refunded'].includes(existing.status)
-    ) {
-      return { order: existing, expired: false, alreadyPaid: true };
-    }
-
-    const nowIso = new Date().toISOString();
-    const updated: OrderRecord = {
-      ...existing,
-      status: 'expired',
-      payment_status: 'expired',
-      failure_reason: failureReason,
-      payment_closed_at: nowIso,
-      updated_at: nowIso,
-    };
-
-    const pool = getPool();
-    if (pool) {
-      const query = `
-        UPDATE orders
-        SET status = $1, payment_status = $2, failure_reason = $3, payment_closed_at = $4, updated_at = $5
-        WHERE id = $6 ${existing.service_type === 'afa' ? "AND status = 'pending_payment' AND payment_status = 'pending' RETURNING *" : ''};
-      `;
-      const result = await pool.query(query, [
-        updated.status,
-        updated.payment_status,
-        updated.failure_reason,
-        updated.payment_closed_at,
-        updated.updated_at,
-        existing.id,
-      ]);
-      if (existing.service_type === 'afa' && !result.rows[0]) { const current=await this.findOrder(ref); return {order:current,expired:false,alreadyPaid:current?.payment_status==='success'}; }
-    } else {
-      const current = devMemoryStore.get(existing.id);
-      if (existing.service_type === 'afa' && current?.payment_status === 'success') return {order:current,expired:false,alreadyPaid:true};
-      devMemoryStore.set(existing.id, updated);
-      devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
-      devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
-    }
-
-    await AfaStore.onOrderTerminal(updated);
-    return { order: updated, expired: true, alreadyPaid: false };
+  static async expireOrder(ref: string, failureReason = 'payment_expired') {
+    const result = await this.closeUnpaidOrder(ref, 'expired', failureReason);
+    return {order:result.order, expired:result.changed, alreadyPaid:result.alreadyPaid};
   }
 
   private static isReconcilingStalePending = false;
@@ -735,7 +669,7 @@ export class OrdersStore {
       for (const order of candidates) {
         try {
           const txRes = await PaystackServerService.verifyTransaction(order.payment_reference);
-          await CommercialService.paymentFailed(order,txRes);
+
 
           if (txRes.status === 'success') {
             const validationError = validateOrderPayment(order, txRes);
@@ -750,12 +684,10 @@ export class OrdersStore {
               'Auto reconciler paid verification'
             );
             verifiedPaidCount++;
-          } else if (txRes.status === 'abandoned' || txRes.status === 'failed') {
-            await this.cancelOrder(order.id, 'paystack_abandoned_reconciled');
-            cancelledCount++;
-          } else if (txRes.status === 'pending') {
-            await this.expireOrder(order.id, 'stale_pending_payment_expired');
-            expiredCount++;
+          } else if (isDefinitiveUnpaidPayment(order, txRes)) {
+            const closed = await this.cancelOrder(order.id, 'paystack_unpaid_reconciled');
+            if (closed.cancelled) { await CommercialService.paymentFailed(order,txRes); cancelledCount++; }
+            else unresolvedCount++;
           } else {
             unresolvedCount++;
           }

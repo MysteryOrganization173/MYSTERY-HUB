@@ -24,6 +24,7 @@ afaRouter.get('/config', async (_req, res) => {
 afaRouter.post('/payments/initialize', requireAuth, createRateLimiter({windowMs:600_000,max:10}), async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   let orderId: string | undefined;
+  let recoveryRef: string | undefined;
   try {
     if (!req.body || Array.isArray(req.body) || Buffer.byteLength(JSON.stringify(req.body)) > 8192) { res.status(413).json({error:'Registration request is too large.'}); return; }
     if (req.body.consent !== true) { res.status(400).json({error:'Please authorize submission of your registration details.',field:'consent'}); return; }
@@ -54,17 +55,24 @@ afaRouter.post('/payments/initialize', requireAuth, createRateLimiter({windowMs:
       const paid=await FinanceService.payOrder(order,req.body.requestId,(tx,record)=>AfaStore.create(record,payload,tx.client));
       res.json({success:true,paymentMethod:'wallet',orderRef:paid.public_reference,reference:paid.payment_reference,status:paid.status,amountPesewas:paid.amount});return;
     }
-    await AfaStore.create(order, payload); orderId=id;
+    await AfaStore.create(order, payload); orderId=id; recoveryRef=publicRef;
     // Only safe order context enters payment metadata. Identity fields remain encrypted in the AFA store.
     const payment = await PaystackServerService.initializeTransaction({email,amountPesewas:order.amount,reference,
       ...(origin ? {callbackUrl:`${origin}/afa`} : {}),metadata:{public_reference:publicRef,service_type:'afa',product_id:'afa-registration'}});
-    if (!payment.success) { await OrdersStore.cancelOrder(id,'afa_payment_initialization_failed'); res.status(503).json({error:'Unable to start payment. Please try again later.'}); return; }
+    if (!payment.success) {
+      if (payment.definitiveFailure) await OrdersStore.cancelOrder(id,'afa_payment_initialization_failed');
+      res.status(503).json({code:payment.definitiveFailure ? 'INITIALIZATION_REJECTED' : 'INITIALIZATION_UNCERTAIN',
+        existingOrderReference:publicRef,error:payment.definitiveFailure
+          ? 'Payment could not be opened. Check this order before starting again.'
+          : 'Payment setup could not be confirmed. Check this registration in My Orders before trying again.'}); return;
+    }
     res.json({success:true,orderRef:publicRef,reference,authorizationUrl:payment.authorizationUrl,accessCode:payment.accessCode,amountPesewas:order.amount,amountGhc:order.amount/100,currency:'GHS',isSimulated:payment.isSimulated || false});
   } catch (err) {
     if (err instanceof FinanceError) {res.status(err.status).json({error:err.message});return;}
     if (err instanceof AfaValidationError) { res.status(400).json({error:err.message,field:err.field}); return; }
     if (err instanceof AfaDuplicateError || (err as {code?:string}).code === '23505') { res.status(409).json({error:new AfaDuplicateError().message}); return; }
-    if (orderId) await OrdersStore.cancelOrder(orderId,'afa_payment_initialization_failed').catch(() => {});
+    // An uncertain initialization retains encrypted identity and its duplicate guard.
+    if (orderId) { res.status(503).json({code:'INITIALIZATION_UNCERTAIN',existingOrderReference:recoveryRef,error:'Registration setup could not be confirmed. Check My Orders before trying again.'}); return; }
     // Neither request bodies nor supplier/crypto errors are logged or returned.
     res.status(503).json({error:'Unable to start AFA registration. Please try again later.'});
   }
