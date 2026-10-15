@@ -1,3 +1,4 @@
+import { SiteFooterContact } from '../SiteContactDetails';
 import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
@@ -313,7 +314,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Direct Studio Line</h5>
-            <p className="text-pink-200/80 text-xs">{template.hoursOrContact}</p>
+            <SiteFooterContact template={template} className="text-pink-200/80 text-xs" />
           </div>
         </div>
         <div className="border-t border-pink-900/40 mt-8 pt-4 text-center text-pink-300/60 text-[10px]">

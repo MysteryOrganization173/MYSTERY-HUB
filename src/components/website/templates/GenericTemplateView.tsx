@@ -1,3 +1,4 @@
+import { SiteFooterContact } from '../SiteContactDetails';
 import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
@@ -296,7 +297,7 @@ export const GenericTemplateView: React.FC<TemplateViewProps> = ({ template, onC
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Contact Information</h5>
-            <p className="text-xs text-slate-300">{template.hoursOrContact}</p>
+            <SiteFooterContact template={template} className="text-xs text-slate-300" />
           </div>
         </div>
         <div className="border-t border-white/10 mt-8 pt-4 text-center text-slate-400 text-[10px]">

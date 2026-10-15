@@ -1,3 +1,4 @@
+import './websiteBuilder.css';
 import {WebsiteBundlePricing} from './WebsiteBundlePricing';
 import {customerActivityLabel} from '../../utils/customerActivity';
 import React,{useEffect,useRef,useState} from 'react';
@@ -24,9 +25,8 @@ export function WebsiteBusinessDashboard({site,token,onEdit,onSettings,requested
   const summaryMetrics = reseller ? {Sales:formatGhs(a?.salesMinor||0),Orders:a?.paidOrders,'Store Earnings':formatGhs(e?.availableMinor||0),Visitors:a?.uniqueVisitors} : {Views:a?.views,Visitors:a?.uniqueVisitors,'Contact / WhatsApp actions':(a?.whatsappClicks||0)+(a?.callClicks||0)+(a?.emailClicks||0)};
   const navigate=(name:string)=>{setTab(name);onTabChange?.(name);};
   return <section id="website-business-dashboard" aria-label="Website business dashboard" className="min-w-0 bg-[#0b131a] border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-5 text-left">
-    <label className="block sm:hidden text-xs text-slate-400">Manage<select aria-label="Manage website" className={`${field} mt-1 text-white`} value={tab} onChange={event=>navigate(event.target.value)}>{tabs.map(name=><option key={name}>{name}</option>)}</select></label>
-    <nav aria-label="Business dashboard areas" className="hidden sm:flex flex-wrap gap-2">{tabs.map(name=><button key={name} className={`${button} ${name===tab?'bg-emerald-500/15 text-emerald-300 border-emerald-500':''}`} aria-current={tab===name?'page':undefined} onClick={()=>navigate(name)}>{name}</button>)}</nav>
-    <div className="flex justify-between gap-3 items-center"><h2 className="font-bold text-lg">{tab}</h2><button className={button} disabled={busy} onClick={()=>void action(async()=>{})}>Refresh overview</button></div>
+    <nav aria-label="Business dashboard areas" className="website-tabs">{tabs.map(name=><button key={name} aria-current={tab===name?'page':undefined} onClick={()=>navigate(name)}>{name}</button>)}</nav>
+    <div className="flex justify-between gap-3 items-center"><h2 className="font-bold text-lg">{tab}</h2><button className={button} disabled={busy} onClick={()=>void action(async()=>{})}>{busy?'Refreshing…':'Refresh'}</button></div>
     {reseller&&<div hidden={tab!=='Bundles & Pricing'}><WebsiteBundlePricing key={site.id} siteId={site.id} token={token} onDirty={onPricingDirty}/></div>}
     {error&&<div role="alert" className="space-y-2 text-rose-300"><p>{error}</p><button className={button} disabled={busy} onClick={()=>void action(async()=>{})}>Try again</button></div>}{notice&&<p role="status" className="text-emerald-300">{notice}</p>}
     {!data&&!error&&<p role="status">Loading your business overview…</p>}

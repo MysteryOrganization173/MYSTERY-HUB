@@ -1,3 +1,4 @@
+import { SiteFooterContact } from '../SiteContactDetails';
 import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
@@ -260,7 +261,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Concierge Reservations</h5>
-            <p className="text-emerald-200/80 text-xs">{template.hoursOrContact}</p>
+            <SiteFooterContact template={template} className="text-emerald-200/80 text-xs" />
           </div>
         </div>
         <div className="border-t border-emerald-900/60 mt-8 pt-4 text-center text-emerald-400/60 text-[10px]">

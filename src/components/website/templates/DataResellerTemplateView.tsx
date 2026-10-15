@@ -1,3 +1,4 @@
+import { SiteFooterContact } from '../SiteContactDetails';
 import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { websiteActionText, resolveResellerTheme } from '../../../utils/websiteBrand';
 import { SafeImage } from '../SafeImage.js';
@@ -275,8 +276,8 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
               style={{ backgroundColor: p.accent }}
             />
 
-            {/* Artwork Image */}
-            <div className="absolute right-0 bottom-0 top-0 w-full sm:w-3/5 lg:w-1/2 flex items-end justify-end">
+            {/* Artwork Image (wider screens blend it behind the text; phones show it as its own band below) */}
+            <div className="hidden absolute right-0 bottom-0 top-0 sm:w-3/5 lg:w-1/2 sm:flex items-end justify-end">
               <SafeImage
                 src={optimizedHeroSrc}
                 srcSet={heroSrcSet || undefined}
@@ -297,13 +298,22 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
                 background: `linear-gradient(to right, ${p.surface} 0%, ${p.surface} 45%, ${p.surface}e6 65%, ${p.surface}4d 85%, transparent 100%)`,
               }}
             />
-            {/* Mobile Gradient: strong at top/left, soft fade to right/bottom allowing artwork recognition */}
-            <div
-              className="sm:hidden absolute inset-0 pointer-events-none"
-              style={{
-                background: `linear-gradient(to bottom, ${p.surface} 0%, ${p.surface}f2 55%, ${p.surface}b3 100%)`,
-              }}
+          </div>
+
+          {/* Phones: the owner's artwork gets its own clearly visible band instead of a faded backdrop. */}
+          <div className="sm:hidden relative -mx-5 -mt-5 mb-4 aspect-[16/9] overflow-hidden" aria-hidden="true">
+            <SafeImage
+              src={optimizedHeroSrc}
+              srcSet={heroSrcSet || undefined}
+              sizes="100vw"
+              alt=""
+              className="w-full h-full"
+              loading="eager"
+              fetchPriority="high"
+              width={1200}
+              height={675}
             />
+            <div className="absolute inset-x-0 bottom-0 h-1/3 pointer-events-none" style={{ background: `linear-gradient(to bottom, transparent, ${p.surface})` }} />
           </div>
 
           {/* Content Layer (Left-aligned, crisp, high-contrast, fully protected) */}
@@ -676,7 +686,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
 
           <div className="flex items-center gap-4 text-xs font-semibold">
             {contact && (
-              <a href={`tel:${contact}`} className="flex items-center gap-1.5  transition-colors">
+              <a {...edit("content:phone")} href={`tel:${contact}`} className="flex items-center gap-1.5  transition-colors">
                 <Phone className="w-3.5 h-3.5" />
                 <span>{contact}</span>
               </a>
@@ -694,6 +704,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             )}
           </div>
         </div>
+        <SiteFooterContact template={template} only={['email','social']} className="max-w-6xl mx-auto items-center sm:items-start text-xs font-semibold" />
       </footer>
     </div>
   );

@@ -1,3 +1,4 @@
+import { SiteFooterContact } from '../SiteContactDetails';
 import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry';
@@ -239,7 +240,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
           </div>
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase text-xs">Operations Switch</h5>
-            <p className="text-xs">{template.hoursOrContact}</p>
+            <SiteFooterContact template={template} className="text-xs" />
           </div>
         </div>
         <div className="border-t border-slate-900 mt-8 pt-4 text-center text-slate-600 text-[10px]">
