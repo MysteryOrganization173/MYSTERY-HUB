@@ -267,8 +267,14 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const availableWidth = canvasDimensions.width || 800;
   const isMobileScreen = availableWidth < 640;
   const isSmallScreen = availableWidth < 768;
-  const targetWidth = previewDevice === 'mobile' ? 375 : previewDevice === 'tablet' ? 768 : 1280;
-  const paddingX =
+  // Phones always edit at phone size: tapping text on a page shrunk to a third of the screen is not
+  // usable. Tablet and Desktop sizes are previews there.
+  const isPhone = typeof window !== 'undefined' && window.innerWidth < 640;
+  const canvasDevice = isPhone && activeTab === 'edit' ? 'mobile' : previewDevice;
+  // On a phone the phone-size canvas is the screen itself, rendered 1:1 rather than a 375px page
+  // shrunk to fit a 360px screen.
+  const targetWidth = canvasDevice === 'mobile' ? (isPhone && canvasDimensions.width ? Math.max(320, Math.round(canvasDimensions.width)) : 375) : canvasDevice === 'tablet' ? 768 : 1280;
+  const paddingX = isPhone ? 0 :
     previewDevice === 'desktop' || previewDevice === 'tablet' ? (isMobileScreen ? 8 : 16) : 16;
   const usableWidth = Math.max(240, availableWidth - paddingX);
 
@@ -286,6 +292,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     if(!next)return;
     draftRef.current={...draft,...next};setContent(next.content);setSettings(next.settings);markDirty();
   };
+  const settingsAreas: [typeof activeSection, string, typeof Building][] = [['business','Business',Building],['contact','Contact',Phone],['branding','Colors',Palette],['media','Images & Media',ImageIcon],['sections','Sections',Layers],...(isDataReseller?[['bundles','Bundles & pricing',Layers] as [typeof activeSection, string, typeof Building]]:[]),['cta','Main button',MousePointerClick],['social','Social links',Share2]];
   const openSettings=()=>{setAllSettings(true);setVisualSelection(null);setSettingsNotice(false);};
   // Previous/Next walk the page in reading order; fall back to the schema order before the frame reports.
   const stepIds = (targetOrder.length ? targetOrder : targets.map(t=>t.id)).filter(id=>targets.some(t=>t.id===id && t.source.kind!=='settings'));
@@ -298,115 +305,20 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     <div ref={workspaceRef} role="dialog" aria-modal="true" aria-label="Website editor" className="visual-workspace fixed inset-0 z-[80] text-slate-100 flex flex-col font-sans overflow-hidden">
       {mediaOpen && <WebsiteImageLibrary siteId={currentSite.id} token={sessionToken} onClose={()=>setMediaOpen(false)} onChoose={url=>{setContent({...content,heroImage:url});markDirty();setMediaOpen(false);}} />}
       <WebsiteEditorToolbar name={content.businessName || siteName} mode={activeTab} device={previewDevice} status={saveStatusText} published={currentSite.status==='published'} saving={isSaving} publishing={isPublishing}
-        onExit={()=>{if(!isDirty || window.confirm('You have unsaved changes. Exit anyway?'))onClose();}} onMode={changeMode} onDevice={setPreviewDevice} onSave={()=>void handleSaveDraft()} onPublish={()=>void handlePublish()} onUnpublish={()=>void handleUnpublish()} onSettings={openSettings} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`}/>
+        onExit={()=>{if(!isDirty || window.confirm('You have unsaved changes. Exit anyway?'))onClose();}} onMode={changeMode} onDevice={device=>{setPreviewDevice(device);if(isPhone && device!=='mobile')changeMode('preview');}} onSave={()=>void handleSaveDraft()} onPublish={()=>void handlePublish()} onUnpublish={()=>void handleUnpublish()} onSettings={openSettings} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`}/>
       {/* =========================================================
           WORKSPACE: LEFT EDITOR / RIGHT LIVE PREVIEW
           ========================================================= */}
       <div className="flex-1 min-h-0 flex overflow-hidden relative">
         {/* Existing structured controls remain available without a competing draft store. */}
         {allSettings && <div inert={isPublishing} className="visual-all-settings">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-slate-700"><h3 className="font-bold">All Settings</h3><button type="button" className="visual-tool-button" onClick={()=>setAllSettings(false)}>Back to canvas</button></div>
-          <label className="lg:hidden p-3 bg-[#070c10] border-b border-slate-800 text-xs text-slate-400">Editing
-            <select aria-label="Editing area" value={activeSection} onChange={event=>setActiveSection(event.target.value as typeof activeSection)} className="block mt-1 w-full min-h-11 p-2 rounded-lg bg-slate-900 text-white border border-slate-700">
-              {([['business','Business'],['contact','Contact'],['branding','Design'],['media','Images & Media'],['sections','Sections'],...(isDataReseller?[['bundles','Bundles & Pricing']]:[]),['cta','Main button'],['social','Social links']]).map(([id,label])=><option key={id} value={id}>{label}</option>)}
-            </select>
-          </label>
-          {/* Navigation Category Tabs */}
-          <div className="hidden lg:flex p-2.5 sm:p-3 border-b border-slate-800/80 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden shrink-0 bg-[#070c10]">
-            <button
-              type="button"
-              onClick={() => setActiveSection('business')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
-                activeSection === 'business'
-                  ? 'bg-[#00c365] text-black font-bold shadow-sm'
-                  : 'text-slate-400 hover:text-white bg-slate-900/60'
-              }`}
-            >
-              <Building className="w-3.5 h-3.5" />
-              <span>Business</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveSection('contact')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
-                activeSection === 'contact'
-                  ? 'bg-[#00c365] text-black font-bold shadow-sm'
-                  : 'text-slate-400 hover:text-white bg-slate-900/60'
-              }`}
-            >
-              <Phone className="w-3.5 h-3.5" />
-              <span>Contact</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveSection('branding')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
-                activeSection === 'branding'
-                  ? 'bg-[#00c365] text-black font-bold shadow-sm'
-                  : 'text-slate-400 hover:text-white bg-slate-900/60'
-              }`}
-            >
-              <Palette className="w-3.5 h-3.5" />
-              <span>Branding</span>
-            </button>
-
-            <button type="button" onClick={()=>setActiveSection('media')} className={`min-h-11 px-3 rounded-xl text-sm whitespace-nowrap ${activeSection==='media'?'bg-[#00c365] text-black':'bg-slate-900 text-slate-300'}`}><ImageIcon className="inline w-4 h-4 mr-2"/>Images &amp; Media</button>
-
-            <button
-              type="button"
-              onClick={() => setActiveSection('sections')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
-                activeSection === 'sections'
-                  ? 'bg-[#00c365] text-black font-bold shadow-sm'
-                  : 'text-slate-400 hover:text-white bg-slate-900/60'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Sections</span>
-            </button>
-
-            {isDataReseller && (
-              <button
-                type="button"
-                onClick={() => setActiveSection('bundles')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
-                  activeSection === 'bundles'
-                    ? 'bg-[#00c365] text-black font-bold shadow-sm'
-                    : 'text-slate-400 hover:text-white bg-slate-900/60'
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Bundles &amp; Pricing</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setActiveSection('cta')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
-                activeSection === 'cta'
-                  ? 'bg-[#00c365] text-black font-bold shadow-sm'
-                  : 'text-slate-400 hover:text-white bg-slate-900/60'
-              }`}
-            >
-              <MousePointerClick className="w-3.5 h-3.5" />
-              <span>Call To Action</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveSection('social')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
-                activeSection === 'social'
-                  ? 'bg-[#00c365] text-black font-bold shadow-sm'
-                  : 'text-slate-400 hover:text-white bg-slate-900/60'
-              }`}
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>Social</span>
-            </button>
+          <div className="visual-settings-head">
+            <button type="button" className="visual-settings-back" onClick={()=>setAllSettings(false)}><ArrowLeft size={18}/>Back to canvas</button>
+            <h3>All settings</h3>
+          </div>
+          {/* One section row at every width, styled like the canvas tools rather than a native picker. */}
+          <div role="tablist" aria-label="Editing area" className="visual-settings-tabs">
+            {settingsAreas.map(([id,label,Icon])=><button key={id} type="button" role="tab" aria-selected={activeSection===id} onClick={()=>setActiveSection(id)}><Icon size={16} aria-hidden="true"/>{label}</button>)}
           </div>
 
           {/* Form Content Area */}
@@ -938,7 +850,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         </div>}
         <div className="visual-canvas">
           {activeTab==='edit' && !canvasHintSeen && !visualSelection && !allSettings && <div className="visual-canvas-hint" role="note"><span>Tap a heading, photo or contact detail to change it</span><button type="button" aria-label="Dismiss tip" onClick={()=>setCanvasHintSeen(true)}><X size={15}/></button></div>}
-          {activeTab==='preview' && !previewHintSeen && <div className="visual-canvas-hint is-preview" role="note"><Eye size={15}/><span>Preview of your draft · payments are off</span><button type="button" aria-label="Dismiss preview note" onClick={()=>setPreviewHintSeen(true)}><X size={15}/></button></div>}
+          {activeTab==='preview' && !previewHintSeen && <div className="visual-canvas-hint is-preview" role="note"><Eye size={15}/><span>{canvasDevice==='mobile'?'Preview of your draft':`${canvasDevice==='tablet'?'Tablet':'Desktop'} preview, scaled to fit`} · payments are off</span><button type="button" aria-label="Dismiss preview note" onClick={()=>setPreviewHintSeen(true)}><X size={15}/></button></div>}
           <div ref={canvasRef} className="visual-canvas-viewport">
             <div style={{width:effectiveCanvasWidth, flexShrink:0, height:scale<1 ? 'calc(100% / '+scale+')' : '100%', transform:scale<1 ? 'scale('+scale+')' : undefined, transformOrigin:'top center'}} className="visual-canvas-page">
               <WebsitePreviewFrame template={previewTemplate} siteId={currentSite.id} viewportWidth={targetWidth} editMode={activeTab==='edit' && !isPublishing} selectedTarget={visualSelection} onSelect={selectTarget} onOrder={setTargetOrder} focusRequest={focusRequest} reserveBottom={contextualTargets.length>0 || settingsNotice ? sheetReserve : 0}/>

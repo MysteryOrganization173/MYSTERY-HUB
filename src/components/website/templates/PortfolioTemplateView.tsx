@@ -1,3 +1,4 @@
+import { SiteFooterContact } from '../SiteContactDetails';
 import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry';
@@ -269,6 +270,7 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
 
       {/* Minimal Footer */}
       <footer className="bg-black border-t border-zinc-900 py-8 px-6 text-center text-zinc-500 font-mono text-[10px]">
+        <SiteFooterContact template={template} className="mb-5 items-center text-xs text-zinc-300" />
         © 2026 {template.demoBusinessName}. All rights reserved. Powered by Mystery Hub Sites Ghana.
       </footer>
     </div>

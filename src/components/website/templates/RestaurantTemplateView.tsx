@@ -1,3 +1,4 @@
+import { SiteFooterContact } from '../SiteContactDetails';
 import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
@@ -331,9 +332,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
             <h5 className="font-bold text-white uppercase tracking-wider text-[11px]">
               Direct Reservations
             </h5>
-            <p className="text-slate-400 text-xs">
-              {template.hoursOrContact}
-            </p>
+            <SiteFooterContact template={template} className="text-slate-400 text-xs" />
             <div className="pt-1">
               <span className="inline-flex items-center gap-1.5 text-emerald-400 font-semibold text-xs">
                 <Check className="w-3.5 h-3.5" />

@@ -1,3 +1,4 @@
+import { SiteFooterContact } from './SiteContactDetails';
 import {useVisualEditMarkers} from './editor/VisualEditMarkers';
 import { websiteActionText, readableWebsiteColor } from '../../utils/websiteBrand';
 import { SafeImage } from './SafeImage.js';
@@ -434,7 +435,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
             </div>
             <div className="text-slate-300 text-xs">
               <div className="font-bold text-white uppercase text-[10px]">Reservations</div>
-              <div>{template.hoursOrContact}</div>
+              <SiteFooterContact template={template} />
             </div>
           </div>
           <div className="border-t border-white/10 mt-6 pt-4 text-center text-slate-400 text-[10px]">
@@ -646,7 +647,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
               <div className="font-black text-white uppercase text-sm" {...edit("content:businessName")}>{template.demoBusinessName}</div>
               <div className="text-xs text-slate-400 mt-1" {...edit("content:location")}>{template.location}</div>
             </div>
-            <div className="text-xs">{template.hoursOrContact}</div>
+            <SiteFooterContact template={template} className="text-xs" />
           </div>
           <div className="border-t border-slate-800 mt-6 pt-4 text-center text-slate-500 text-[10px]">
             © 2026 {template.demoBusinessName}. Powered by Mystery Hub Sites Ghana.
@@ -936,7 +937,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
             <h4 className="font-bold text-white text-sm" {...edit("content:businessName")}>{template.demoBusinessName}</h4>
             <p className="text-xs opacity-80" {...edit("content:location")}>{template.location}</p>
           </div>
-          <div className="text-xs opacity-90">{template.hoursOrContact}</div>
+          <SiteFooterContact template={template} className="text-xs opacity-90" />
         </div>
         <div className="border-t border-white/10 mt-6 pt-4 text-center opacity-60 text-[10px]">
           © 2026 {template.demoBusinessName}. Powered by Mystery Hub Sites Ghana.

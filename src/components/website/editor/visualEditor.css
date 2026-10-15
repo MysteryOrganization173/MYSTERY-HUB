@@ -82,8 +82,29 @@
 .visual-notice-text{margin:0;font-size:15px;line-height:1.55;color:#cfdad5}
 .visual-primary-button{background:var(--ve-green);color:#05140c;font-weight:800;font-size:15px;padding:0 18px;border-radius:14px;min-height:48px}
 
-/* All Settings keeps its established dark, structured controls. */
-.visual-all-settings{width:420px;min-width:0;max-width:100%;background:var(--ve-bar);color:#f1f5f9;display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;border-right:1px solid var(--ve-line);z-index:45}
+/* All Settings: the same surfaces, type scale and controls as the canvas sheet, so moving between
+   "tap to edit" and "all settings" feels like one editor. Normalises the legacy form markup inside. */
+.visual-all-settings{width:420px;min-width:0;max-width:100%;background:var(--ve-bar);color:var(--ve-text);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;border-right:1px solid var(--ve-line);z-index:45;font-family:var(--font-body)}
+.visual-settings-head{display:flex;align-items:center;gap:8px;min-height:56px;padding:6px 16px 6px 6px;border-bottom:1px solid var(--ve-line);flex-shrink:0}
+.visual-settings-head h3{margin:0 0 0 auto;font-family:var(--font-heading);font-size:15px;font-weight:700;color:var(--ve-muted)}
+.visual-settings-back{min-height:44px;display:inline-flex;align-items:center;gap:6px;padding:0 12px 0 8px;border-radius:12px;font-size:15px;font-weight:700;color:var(--ve-green-text);cursor:pointer}
+.visual-settings-back:hover{background:var(--ve-hover)}
+.visual-settings-tabs{display:flex;gap:6px;overflow-x:auto;padding:10px 12px;border-bottom:1px solid var(--ve-line);background:var(--ve-base);scrollbar-width:none;flex-shrink:0;-webkit-overflow-scrolling:touch}
+.visual-settings-tabs::-webkit-scrollbar{display:none}
+.visual-settings-tabs button{flex-shrink:0;min-height:42px;display:inline-flex;align-items:center;gap:7px;padding:0 14px;border-radius:999px;border:1px solid var(--ve-line);background:var(--ve-raised);color:var(--ve-muted);font:600 14px/1 var(--font-body);white-space:nowrap;cursor:pointer}
+.visual-settings-tabs button:hover{color:var(--ve-text)}
+.visual-settings-tabs button[aria-selected="true"]{background:var(--ve-green-soft);border-color:rgba(0,195,101,.55);color:var(--ve-green-text)}
+.visual-settings-tabs button:focus-visible{outline:2px solid var(--ve-green);outline-offset:2px}
+.visual-all-settings :is(input:not([type="color"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),textarea,select){min-height:48px;border-radius:13px;background:var(--ve-field);border:1.5px solid var(--ve-line-strong);color:var(--ve-text);padding:11px 13px;font-size:16px;line-height:1.45}
+.visual-all-settings textarea{min-height:120px}
+.visual-all-settings :is(input,textarea,select):focus{outline:none;border-color:var(--ve-green);box-shadow:0 0 0 3px rgba(0,195,101,.22)}
+.visual-all-settings :is(input,textarea)::placeholder{color:#6b7c75}
+.visual-all-settings input:disabled{opacity:.6}
+.visual-all-settings input[type="color"]{width:48px;height:48px;border-radius:12px;padding:3px;border:1.5px solid var(--ve-line-strong);background:var(--ve-field)}
+.visual-all-settings label{font-size:14px;color:#dbe4e0}
+.visual-all-settings :is(.text-xs,.text-\[11px\],.text-\[10px\]){font-size:13px;line-height:1.5}
+.visual-all-settings h3.text-sm{font-family:var(--font-heading);font-size:17px}
+.visual-all-settings .space-y-1\.5>label+input,.visual-all-settings .space-y-1\.5>label+textarea{margin-top:2px}
 .visual-tool-button{min-height:44px;min-width:44px;padding:8px 12px;border-radius:10px;font-size:13px;display:inline-flex;justify-content:center;align-items:center;cursor:pointer}
 .visual-tool-button:focus-visible{outline:2px solid #34d399;outline-offset:2px}
 

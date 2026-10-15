@@ -1,13 +1,14 @@
 import { WebsiteBusinessDashboard } from './WebsiteBusinessDashboard';
 import { WebsiteSettingsControls } from './WebsiteSettingsControls';
 import { trackWebsiteEvent } from '../../utils/websiteAnalytics';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { TEMPLATE_CATEGORIES, WEBSITE_TEMPLATES, orderedWebsiteTemplates } from '../../data/templates';
 import { TemplateCategory, WebsiteSiteRecord, WebsiteTemplate } from '../../types';
 import { TemplateCardPreview } from './TemplateCardPreview';
 import { WebsiteEditor } from './editor/WebsiteEditor';
 import { WebsitePlansAndUltra } from './WebsitePlansAndUltra';
+import './websiteBuilder.css';
 import { mergeSiteWithTemplate } from '../../utils/templateRendererUtils';
 import {
   getMyWebsitesOnServer,
@@ -32,6 +33,7 @@ import {
   RefreshCw,
   AlertCircle,
   Settings,
+  Share2,
 } from 'lucide-react';
 
 export const WebsiteBuilderPage: React.FC = () => {
@@ -59,7 +61,23 @@ export const WebsiteBuilderPage: React.FC = () => {
   const confirmPricingLeave=()=>!pricingDirty||window.confirm('You have unsaved bundle prices. Leave without saving them?');
   const editSite=(site:WebsiteSiteRecord)=>{if(confirmPricingLeave()){setPricingDirty(false);openWebsiteEditor(site);}};
   const [dashboardTab, setDashboardTab] = useState('Overview');
-  const openPricing = () => { setDashboardTab('Bundles & Pricing'); closeWebsiteEditor(); requestAnimationFrame(() => document.getElementById('website-business-dashboard')?.scrollIntoView({block:'start'})); };
+  // Leaving the fullscreen editor returns the owner to their website card (or the pricing area they
+  // asked for), never to wherever the collapsed page happened to leave the window scrolled.
+  const exitTarget = useRef<string>('website-owner-card');
+  const wasEditing = useRef(false);
+  const openPricing = () => { setDashboardTab('Bundles & Pricing'); exitTarget.current = 'website-business-dashboard'; closeWebsiteEditor(); };
+  useEffect(() => {
+    if (activeEditorSite) { wasEditing.current = true; return; }
+    if (!wasEditing.current) return;
+    wasEditing.current = false;
+    const id = exitTarget.current; exitTarget.current = 'website-owner-card';
+    requestAnimationFrame(() => {
+      const target = document.getElementById(id);
+      if (id === 'website-owner-card' || !target) window.scrollTo({ top: 0 });
+      else target.scrollIntoView({ block: 'start' });
+      (target?.querySelector('h1,h2') as HTMLElement | null)?.focus({ preventScroll: true });
+    });
+  }, [activeEditorSite]);
   const updateSite = (updated: WebsiteSiteRecord) => {
     setMySites(prev => prev.map(site => site.id === updated.id ? updated : site));
     if (activeEditorSite?.id === updated.id && activeEditorSite.template_id !== updated.template_id) openWebsiteEditor(updated);
@@ -265,6 +283,16 @@ export const WebsiteBuilderPage: React.FC = () => {
     });
   };
 
+  // Phones open the native share sheet (WhatsApp, SMS…); elsewhere the link is copied.
+  const handleShare = async (slug: string) => {
+    const url = `${window.location.origin}/sites/${slug}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: displaySiteName, url }); return; }
+      catch (error: any) { if (error?.name === 'AbortError') return; }
+    }
+    handleCopyLink(slug);
+  };
+
   const handlePreviewCurrentSite = () => {
     if (activeMergedTemplate) {
       openTemplatePreview({...activeMergedTemplate,previewSiteId:activeSite!.id});
@@ -326,15 +354,27 @@ export const WebsiteBuilderPage: React.FC = () => {
             ========================================================= */}
         {user && !isLoadingSites && activeSite ? (
           <div className="space-y-5">
-            <section className="rounded-2xl border border-slate-800 bg-[#0b131a] p-4 sm:p-6 space-y-4 text-left">
-              <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-slate-400 mb-1">My business website · Free plan</p><h1 className="text-2xl sm:text-3xl font-bold break-words">{displaySiteName}</h1><p className="text-sm text-slate-400 break-all mt-1">{publicSiteUrl}</p></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${isPublished?'bg-emerald-500/15 text-emerald-300':'bg-amber-500/15 text-amber-200'}`}>{isPublished?'Live':'Draft'}</span></div>
-              <div className="flex flex-wrap gap-2">
-                <button className="min-h-11 rounded-xl px-4 bg-emerald-500 text-black font-bold text-sm" onClick={()=>editSite(activeSite)}>Edit Website</button>
-                {isPublished?<a className="min-h-11 inline-flex items-center rounded-xl px-4 border border-slate-700 text-sm" href={`/sites/${encodeURIComponent(activeSite.slug)}`} target="_blank" rel="noopener noreferrer">View Site</a>:<button className="min-h-11 rounded-xl px-4 border border-slate-700 text-sm" onClick={handlePreviewCurrentSite}>Preview</button>}
-                {isPublished&&<button className="min-h-11 rounded-xl px-3 border border-slate-700 text-sm" onClick={()=>handleCopyLink(activeSite.slug)}>Copy Link</button>}
-                <button disabled={actionLoadingSiteId===activeSite.id} className="min-h-11 rounded-xl px-3 border border-slate-700 text-sm disabled:opacity-50" onClick={()=>void handleTogglePublish(activeSite)}>{actionLoadingSiteId===activeSite.id?'Updating…':isPublished?'Unpublish':'Publish'}</button>
+            <section id="website-owner-card" data-website-owner-card aria-labelledby="website-owner-name" className="website-owner-card scroll-mt-24 text-left">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ${isPublished?'bg-emerald-500/15 text-emerald-300':'bg-amber-500/15 text-amber-200'}`}><span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${isPublished?'bg-emerald-400':'bg-amber-300'}`}/>{isPublished?'Live':'Draft · not public yet'}</span>
+                <span className="text-slate-400">My business website · Free plan</span>
               </div>
-              {activeSite.template_id==='tmpl-data-reseller'&&<div className="flex flex-wrap gap-3 text-sm"><button className="min-h-11 text-emerald-300" onClick={()=>setDashboardTab('Orders')}>Manage Orders</button><button className="min-h-11 text-emerald-300" onClick={()=>setDashboardTab('Bundles & Pricing')}>Bundles &amp; Pricing</button></div>}
+              <h1 id="website-owner-name" tabIndex={-1} className="mt-3 text-2xl sm:text-3xl font-bold break-words outline-none">{displaySiteName}</h1>
+              <div className="website-owner-address mt-3">
+                <Globe className="w-4 h-4 shrink-0 text-slate-400" aria-hidden="true"/>
+                <span className="min-w-0 truncate" title={publicSiteUrl}>{publicSiteUrl.replace(/^https?:\/\//,'')}</span>
+                {isPublished&&<button type="button" className="website-owner-icon" aria-label="Copy website link" onClick={()=>handleCopyLink(activeSite.slug)}><Copy className="w-4 h-4"/></button>}
+              </div>
+              {!isPublished&&<p className="mt-2 text-xs text-slate-400">Publish when you are ready. This address starts working once your website is live.</p>}
+              <div className="website-owner-actions mt-4">
+                <button className="website-owner-primary" onClick={()=>editSite(activeSite)}>Edit website</button>
+                {isPublished?<a className="website-owner-secondary" href={`/sites/${encodeURIComponent(activeSite.slug)}`} target="_blank" rel="noopener noreferrer"><Eye className="w-4 h-4" aria-hidden="true"/>View site</a>:<button className="website-owner-secondary" onClick={handlePreviewCurrentSite}><Eye className="w-4 h-4" aria-hidden="true"/>Preview</button>}
+                {isPublished?<button className="website-owner-secondary" onClick={()=>void handleShare(activeSite.slug)}><Share2 className="w-4 h-4" aria-hidden="true"/>Share</button>:<button disabled={actionLoadingSiteId===activeSite.id} className="website-owner-secondary" onClick={()=>void handleTogglePublish(activeSite)}><Globe className="w-4 h-4" aria-hidden="true"/>{actionLoadingSiteId===activeSite.id?'Publishing…':'Publish'}</button>}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
+                {activeSite.template_id==='tmpl-data-reseller'&&<><button className="min-h-11 text-emerald-300" onClick={()=>setDashboardTab('Orders')}>Manage orders</button><button className="min-h-11 text-emerald-300" onClick={()=>setDashboardTab('Bundles & Pricing')}>Bundles &amp; pricing</button></>}
+                {isPublished&&<button disabled={actionLoadingSiteId===activeSite.id} className="min-h-11 text-slate-400 hover:text-slate-200 disabled:opacity-50 sm:ml-auto" onClick={()=>void handleTogglePublish(activeSite)}>{actionLoadingSiteId===activeSite.id?'Updating…':'Unpublish'}</button>}
+              </div>
             </section>
             <WebsiteBusinessDashboard site={activeSite} token={sessionToken!} requestedTab={dashboardTab} onTabChange={setDashboardTab} onEdit={()=>editSite(activeSite)} onPricingDirty={setPricingDirty} onPreview={handlePreviewCurrentSite} onSettings={()=>{setShowSettingsDrawer(true);requestAnimationFrame(()=>document.getElementById('website-settings')?.scrollIntoView({block:'start'}));}}/>
             {showSettingsDrawer&&<section id="website-settings" className="scroll-mt-24 rounded-2xl border border-slate-800 bg-[#0b131a] p-4 text-left space-y-3"><div className="flex items-center justify-between"><h2 className="font-bold">Website settings</h2><button className="min-h-11 px-3 text-sm" onClick={()=>setShowSettingsDrawer(false)}>Close settings</button></div><p className="text-sm text-slate-400">Current design: {activeBaseTemplate?.title}. Your site address stays the same when you change design.</p><WebsiteSettingsControls site={activeSite} token={sessionToken!} onUpdated={updated=>{updateSite(updated);setShowSettingsDrawer(false);openWebsiteEditor(updated);}} onDeleted={()=>{setMySites([]);setShowSettingsDrawer(false);showToast('Website deleted. You can create a new Free website.','success');}}/></section>}

@@ -1,8 +1,6 @@
 import {useVisualEditMarkers} from './editor/VisualEditMarkers';
-import { websiteActionText } from '../../utils/websiteBrand';
 import React from 'react';
 import type { SiteContent, WebsiteTemplate } from '../../types';
-import { SafeImage } from './SafeImage';
 import { resolveSectionCtaTarget } from './SectionSiteRenderer';
 export function websiteContactTarget(content?: Partial<SiteContent>): string {
   const phone=(content?.whatsapp || '').replace(/\D/g,'').replace(/^0/,'233');
@@ -20,18 +18,27 @@ export function websiteSocialUrl(network: 'instagram'|'facebook'|'tiktok', value
   if(!/^@?[a-zA-Z0-9_.-]+$/.test(raw))return '';
   return `https://www.${domains[network]}/${network==='tiktok'?'@':''}${raw.replace(/^@/,'')}`;
 }
-/** Existing dedicated layouts share these real saved business/contact fields. No forms/checkout. */
-export function SiteContactDetails({template}:{template:WebsiteTemplate}) {
+const whatsappHref=(value:string)=>`https://wa.me/${value.replace(/\D/g,'').replace(/^0/,'233')}`;
+/**
+ * The saved contact details, rendered inside each legacy template's own footer so the footer
+ * stays the last thing on the page and keeps the template's colours. It inherits text colour
+ * from the footer. Template galleries (no saved content) keep the template's sample line.
+ * The id is the fallback target for main buttons when no WhatsApp number or email is saved.
+ */
+type FooterContactPart='phone'|'whatsapp'|'email'|'social';
+export function SiteFooterContact({template,className='',only}:{template:WebsiteTemplate;className?:string;only?:FooterContactPart[]}) {
   const edit=useVisualEditMarkers();
   const content=template.siteContent;
-  if(!content)return null;
-  return <section id="website-contact-details" aria-label="Business contact details" className="px-5 py-8 border-t" style={{backgroundColor:template.colorScheme?.background || '#fff',color:template.colorScheme?.text || '#0f172a'}}>
-    <div className="max-w-6xl mx-auto space-y-3 break-words">
-      {content.logoUrl && <SafeImage {...edit("content:logoUrl")} src={content.logoUrl} alt={`${content.businessName} logo`} className="w-20 h-20 rounded-lg" style={{objectFit:'contain'}} />}
-      <strong {...edit("content:businessName")} className="block">{content.businessName}</strong>{content.location && <p {...edit("content:location")}>{content.location}</p>}
-      <div className="flex flex-wrap gap-4 text-sm">{content.phone && <a {...edit("content:phone")} href={`tel:${content.phone.replace(/[^\d+]/g,'')}`}>Call {content.phone}</a>}{content.email && <a {...edit("content:email")} href={`mailto:${content.email}`}>{content.email}</a>}{content.whatsapp && <a {...edit("content:whatsapp")} href={`https://wa.me/${content.whatsapp.replace(/\D/g,'').replace(/^0/,'233')}`}>WhatsApp {content.whatsapp}</a>}</div>
-      <a {...edit("content:ctaLabel")} href={template.id==='tmpl-data-reseller'?'#bundle-catalog':websiteContactTarget(content)} className="inline-block px-4 py-3 rounded-xl text-white" style={{backgroundColor:template.accentColor,color:websiteActionText(template.accentColor)}}>{content.ctaLabel || 'Contact us'}</a>
-      <div className="flex flex-wrap gap-4 text-sm">{(['instagram','facebook','tiktok'] as const).map(network=>{const url=websiteSocialUrl(network,content.social?.[network]);return url?<a key={network} href={url} target="_blank" rel="noopener noreferrer" className="underline">{network}</a>:null;})}</div>
-    </div>
-  </section>;
+  if(!content)return template.hoursOrContact && !only ? <p className={className}>{template.hoursOrContact}</p> : null;
+  const show=(part:FooterContactPart)=>!only || only.includes(part);
+  const phone=show('phone')?content.phone:'',whatsapp=show('whatsapp')?content.whatsapp:'',email=show('email')?content.email:'';
+  const social=(['instagram','facebook','tiktok'] as const).map(network=>({network,url:websiteSocialUrl(network,content.social?.[network])})).filter(item=>item.url && show('social'));
+  const link='underline-offset-4 hover:underline focus-visible:underline break-all';
+  if(!phone && !whatsapp && !email && !social.length)return null;
+  return <div id={only?undefined:"website-contact-details"} aria-label="Contact details" className={`flex flex-col gap-1.5 ${className}`}>
+    {phone && <a {...edit("content:phone")} className={link} href={`tel:${phone.replace(/[^\d+]/g,'')}`}>Call {phone}</a>}
+    {whatsapp && <a {...edit("content:whatsapp")} className={link} data-website-event="whatsapp_click" href={whatsappHref(whatsapp)}>WhatsApp {whatsapp}</a>}
+    {email && <a {...edit("content:email")} className={link} href={`mailto:${email}`}>{email}</a>}
+    {social.length>0 && <p className="flex flex-wrap gap-x-4 gap-y-1 pt-1">{social.map(({network,url})=><a key={network} href={url} target="_blank" rel="noopener noreferrer" className={`${link} capitalize`}>{network==='tiktok'?'TikTok':network}</a>)}</p>}
+  </div>;
 }
