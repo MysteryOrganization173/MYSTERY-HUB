@@ -4,6 +4,9 @@ Optional review tooling: Python Playwright and system Chromium, outside npm depe
 Start frontend-only Vite, then run: python scripts/reviewHomepage.py
 HOMEPAGE_PREVIEW_URL defaults to http://localhost:5173.
 HOMEPAGE_REVIEW_DIR defaults to /tmp/mystery-homepage-review.
+HOMEPAGE_REVIEW_STANDINS (optional) is a folder with hero.png, logo.png and generic.png used in place
+of Cloudinary images when the image host is unreachable; screenshots taken that way are not final artwork.
+CHROMIUM_PATH defaults to /usr/bin/chromium.
 Only localhost previews are allowed. Screenshots and fixtures stay outside the repository.
 """
 import json
@@ -20,6 +23,7 @@ URL = os.environ.get('HOMEPAGE_PREVIEW_URL', 'http://localhost:5173')
 assert urllib.parse.urlparse(URL).hostname in ('localhost', '127.0.0.1'), 'Use an isolated local preview'
 OUTPUT = Path(os.environ.get('HOMEPAGE_REVIEW_DIR', '/tmp/mystery-homepage-review'))
 OUTPUT.mkdir(parents=True, exist_ok=True)
+STANDINS = os.environ.get('HOMEPAGE_REVIEW_STANDINS')
 CATALOG = json.loads(subprocess.check_output([
     'node', '--import', 'tsx', '--input-type=module', '-e',
     "import {DATA_BUNDLES} from './src/data/bundles.ts';console.log(JSON.stringify(DATA_BUNDLES))"
@@ -35,7 +39,7 @@ PRODUCT = {
 }
 
 with sync_playwright() as playwright:
-    browser = playwright.chromium.launch(executable_path='/usr/bin/chromium', args=['--no-sandbox'])
+    browser = playwright.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH', '/usr/bin/chromium'), args=['--no-sandbox'])
     context = browser.new_context(reduced_motion='reduce', device_scale_factor=1)
     state = {'marketplace': 'empty', 'offer': True}
     blocked_mutations, page_errors, asset_failures = [], [], []
@@ -63,6 +67,10 @@ with sync_playwright() as playwright:
         # Read actual approved assets through the environment's inherited proxy.
         # This avoids Chromium's separate proxy setup while preserving real image bytes.
         url = route.request.url
+        if STANDINS and 'res.cloudinary.com' in url:
+            name = 'hero.png' if 'baowst' in url else 'logo.png' if 'tvptuc' in url else 'generic.png'
+            route.fulfill(body=(Path(STANDINS) / name).read_bytes(), content_type='image/png')
+            return
         try:
             if url not in cache:
                 with urllib.request.urlopen(url, timeout=20) as response:
@@ -92,6 +100,8 @@ with sync_playwright() as playwright:
         assert dimensions['width'] == dimensions['body'] == dimensions['root'], dimensions
         # Detect offscreen children too; overflow-x:clip alone can conceal a layout defect.
         offscreen = page.locator('.home-page button, .home-page a, header button, nav[aria-label="Mobile Navigation"] a').evaluate_all('''elements => elements.filter(e => {
+          // Items inside an intentional horizontal scroller (template chips) are reachable by scrolling.
+          for (let a=e.parentElement; a; a=a.parentElement) if (['auto','scroll'].includes(getComputedStyle(a).overflowX)) return false;
           const r=e.getBoundingClientRect(); return r.width && (r.left < -.5 || r.right > innerWidth + .5);
         }).map(e=>e.textContent)''')
         assert not offscreen, offscreen
@@ -106,8 +116,11 @@ with sync_playwright() as playwright:
             page.wait_for_timeout(120)
         page.wait_for_timeout(300)
         assert_fits()
-        assert page.locator('.home-utility').count() == 4
-        images = page.locator('.home-page img').evaluate_all('(images)=>images.map(i=>({src:i.currentSrc,ok:i.complete&&i.naturalWidth>0}))')
+        # Phones hide the decorative Marketplace banner; it must not download there.
+        if width < 768:
+            assert page.locator('.home-marketplace-art img').evaluate_all('(i)=>i.filter(x=>x.complete&&x.naturalWidth>0).length') == 0
+        assert page.locator('.home-utility').count() == 6
+        images = page.locator('.home-page img').evaluate_all('(images)=>images.filter(i=>i.getClientRects().length).map(i=>({src:i.currentSrc,ok:i.complete&&i.naturalWidth>0}))')
         assert all(image['ok'] for image in images), images
         page.evaluate('window.scrollTo(0,0)')
         page.screenshot(path=str(OUTPUT / f'after-{width}.png'), full_page=True)
@@ -124,6 +137,8 @@ with sync_playwright() as playwright:
         home()
 
         # Assistant comes from navigation rather than floating above content.
+        if width < 768:  # Phones reach the assistant from the header menu.
+            page.get_by_role('button', name='Toggle menu').click()
         page.get_by_role('button', name='Open Mystery AI Assistant').click()
         expect(page.get_by_role('dialog', name='Mystery AI Assistant')).to_be_visible()
         if width < 768:
@@ -132,7 +147,7 @@ with sync_playwright() as playwright:
         expect(page.get_by_role('dialog', name='Mystery AI Assistant')).to_have_count(0)
 
         # At several scroll offsets, the actual Buy control must receive pointer events.
-        buy = page.get_by_role('button', name='Review order for 1GB MTN bundle')
+        buy = page.get_by_role('button', name=re.compile(r'^Buy 1GB MTN Ghana data'))
         buy.scroll_into_view_if_needed()
         for offset in [0, 80, -80]:
             page.evaluate('(offset)=>window.scrollBy(0,offset)', offset)
@@ -158,7 +173,17 @@ with sync_playwright() as playwright:
     expect(page.get_by_role('dialog', name='Website template preview')).to_be_visible()
     page.keyboard.press('Escape')
     expect(page.get_by_role('dialog', name='Website template preview')).to_have_count(0)
-    for title, path in [('AFA Registration', '/afa'), ('Mystery Earn', '/earn')]:
+    # Template chips open the same preview as the showcase.
+    page.locator('.home-template-chips button').first.click()
+    expect(page.get_by_role('dialog', name='Website template preview')).to_be_visible()
+    page.keyboard.press('Escape')
+    # Network switch shows that network's catalogue rows, and View all keeps the choice.
+    page.get_by_role('button', name='AirtelTigo', exact=True).click()
+    expect(page.get_by_role('button', name='AirtelTigo', exact=True)).to_have_attribute('aria-pressed', 'true')
+    assert page.locator('.home-bundle-list').get_by_role('button', name=re.compile('AirtelTigo')).count() > 0
+    page.get_by_role('button', name=re.compile('^View all AirtelTigo')).click()
+    expect(page).to_have_url(re.compile('/data$'))
+    for title, path in [('AFA Registration', '/afa'), ('Mystery Earn', '/earn'), ('Website Builder', '/website-builder'), ('Marketplace', '/marketplace')]:
         home(); page.locator('.home-utility').filter(has_text=title).click()
         expect(page).to_have_url(re.compile(re.escape(path) + '$'))
     home(); page.get_by_role('link', name='Browse Marketplace', exact=True).click()
@@ -185,7 +210,7 @@ with sync_playwright() as playwright:
     summary = {'layouts': results, 'journeys': 'passed', 'offer_disabled': 'passed',
                'marketplace_empty_error_retry_featured': 'passed', 'page_errors': page_errors,
                'asset_failures': asset_failures, 'blocked_mutations': blocked_mutations,
-               'note': 'Synthetic API responses. Actual approved image bytes. No backend or financial transactions.'}
+               'note': 'Synthetic API responses. ' + ('Stand-in images, not approved artwork. ' if STANDINS else 'Actual approved image bytes. ') + 'No backend or financial transactions.'}
     (OUTPUT / 'results.json').write_text(json.dumps(summary, indent=2))
     print(json.dumps(summary, indent=2))
     browser.close()

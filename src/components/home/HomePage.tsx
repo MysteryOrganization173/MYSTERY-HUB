@@ -42,9 +42,11 @@ export const HomePage: React.FC = () => {
       <HomeFeaturedData />
       <HomeWebsiteSection />
       <HomeMarketplaceSection />
-      <WhyMysteryHub />
       <HomeComingSoonSection />
-      <HomeFaqPreview />
+      <div className="home-container home-help">
+        <WhyMysteryHub />
+        <HomeFaqPreview />
+      </div>
     </div>
   );
 };

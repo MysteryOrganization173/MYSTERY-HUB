@@ -7,7 +7,7 @@ import { HOME_FAQS } from '../../data/helpFaqs';
 export function HomeFaqPreview() {
   const { setActivePage } = useApp();
   return (
-    <section className="home-container home-faq-preview" aria-labelledby="home-faq-heading">
+    <section className="home-faq-preview" aria-labelledby="home-faq-heading">
       <div className="home-section-heading">
         <div>
           <p className="home-eyebrow">A little clarity goes a long way</p>
