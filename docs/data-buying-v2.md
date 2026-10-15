@@ -1,6 +1,6 @@
 # Premium Data Buying Experience V2
 
-Branch: `claude/data-buying-v2-s6j5qn`, stacked on Homepage V2 (`claude/homepage-v2-bl4bst`, PR #11). It will be rebased onto `main` once Homepage V2 ships.
+Branch: `claude/data-buying-v2-s6j5qn`, based on `main` after Homepage V2 (PR #11) merged.
 
 ## Design rationale
 
