@@ -1,373 +1,179 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { AdminEarnPulse } from './AdminEarnPulse';
+import { AdminOverviewMetrics, getAdminSystemOnServer } from '../../../services/apiClient';
+import { loadAdminOverview } from '../adminSignals';
+import { marketplaceControlRequest } from '../../../services/marketplaceControls';
+import { financeRequest } from '../../../services/financeApi';
 import {
-  AdminOverviewMetrics,
-  getAdminOverviewOnServer,
-} from '../../../services/apiClient';
-import {
-  TrendingUp,
-  ShoppingBag,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  Users,
-  ClipboardList,
-  Wallet,
-  ArrowUpRight,
-  RefreshCw,
-  Radio,
-  Zap,
-} from 'lucide-react';
+  AdminPageHeader, AdminStat, AdminPanel, AdminError, AdminLoading, StatusPill, Freshness, RefreshButton, SectionHeading,
+  DefinitionList, AdminButton, ghsMajor, type AdminTone,
+} from '../ui/AdminUi';
+import { AlertTriangle, CheckCircle2, ChevronRight, Truck, Wallet, MessageSquare, PackageSearch, ClipboardList, CreditCard } from 'lucide-react';
 
+type OverviewTab = 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system' | 'earn' | 'finance';
 interface AdminOverviewSectionProps {
   sessionToken: string;
-  onNavigateTab: (tab: 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system' | 'earn', orderFilter?:string) => void;
+  onNavigateTab: (tab: OverviewTab, param?: string) => void;
+  onRefreshed?: () => void;
 }
 
-export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({
-  sessionToken,
-  onNavigateTab,
-}) => {
+interface SystemSnapshot { paystack?: { status: string; mode: string }; database?: { status: string }; successBizHub?: { lowBalanceThresholdGhc?: number }; fulfilmentPipeline?: { status: string; autoDispatch: boolean; uncertainSubmissionCount: number } }
+interface AttentionItem { id: string; tone: AdminTone; icon: React.ReactNode; title: string; detail: string; action: string; open: () => void }
+
+/**
+ * Command centre: answers "what needs me now?" first, then today's numbers, then health,
+ * then longer-range money context. Every figure is server-derived; labels say exactly
+ * what each number counts because several share a name but not a meaning.
+ */
+export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sessionToken, onNavigateTab, onRefreshed }) => {
   const [metrics, setMetrics] = useState<AdminOverviewMetrics | null>(null);
+  const [loadedAt, setLoadedAt] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [system, setSystem] = useState<SystemSnapshot | null>(null);
+  const [marketplace, setMarketplace] = useState<{ newInquiries?: number; needsReview?: number; drafts?: number } | null>(null);
+  const [withdrawals, setWithdrawals] = useState<{ waiting: number; reviewNeeded: number } | null>(null);
+  const [sideErrors, setSideErrors] = useState<string[]>([]);
 
-  const fetchOverview = useCallback(async (showRefreshing = false) => {
-    if (showRefreshing) setIsRefreshing(true);
-    else setIsLoading(true);
+  const fetchOverview = useCallback(async (force = false) => {
+    if (force) setIsRefreshing(true); else setIsLoading(true);
     setError(null);
+    const errors: string[] = [];
+    await Promise.all([
+      loadAdminOverview(sessionToken, force).then(result => { setMetrics(result.metrics); setLoadedAt(result.at); }).catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to fetch overview metrics.')),
+      getAdminSystemOnServer(sessionToken).then(data => setSystem((data.system?.components as unknown as SystemSnapshot) || null)).catch(() => errors.push('System health')),
+      marketplaceControlRequest('metrics', sessionToken).then(data => setMarketplace(data.metrics || null)).catch(() => errors.push('Marketplace')),
+      financeRequest<Array<{ state: string; restricted?: boolean; earn?: { reconciliationRequired?: boolean } }>>(sessionToken, '/withdrawals?offset=0', undefined, true)
+        .then(rows => setWithdrawals({ waiting: rows.filter(r => ['pending_review', 'approved'].includes(r.state)).length, reviewNeeded: rows.filter(r => ['pending_review', 'approved'].includes(r.state) && (r.restricted || r.earn?.reconciliationRequired)).length }))
+        .catch(() => errors.push('Withdrawals')),
+    ]);
+    setSideErrors(errors);
+    setIsLoading(false);
+    setIsRefreshing(false);
+    if (force) onRefreshed?.();
+  }, [sessionToken, onRefreshed]);
 
-    try {
-      const res = await getAdminOverviewOnServer(sessionToken);
-      if (res.success && res.metrics) {
-        setMetrics(res.metrics);
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch overview metrics.');
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [sessionToken]);
+  useEffect(() => { void fetchOverview(); }, [sessionToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    fetchOverview();
-  }, [fetchOverview]);
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-400">
-        <RefreshCw className="w-8 h-8 text-[#00c365] animate-spin mb-3" />
-        <p className="text-sm font-medium">Loading real-time launch metrics...</p>
-      </div>
-    );
-  }
-
-  if (error || !metrics) {
-    return (
-      <div className="p-6 rounded-2xl bg-red-500/10 border border-red-500/30 text-center max-w-xl mx-auto my-8">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <h3 className="text-sm font-bold text-red-400 mb-1">Failed to Load Overview Metrics</h3>
-        <p className="text-xs text-slate-400 mb-4">{error || 'Unknown server response'}</p>
-        <button
-          onClick={() => fetchOverview(true)}
-          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition-colors cursor-pointer"
-        >
-          Try Again
-        </button>
-      </div>
-    );
-  }
+  if (isLoading) return <AdminLoading label="Loading today's operations…" />;
+  if (error || !metrics) return <div className="space-y-4"><AdminPageHeader title="Overview" /><AdminError title="Overview could not load" message={error || 'Unknown server response'} onRetry={() => void fetchOverview(true)} /></div>;
 
   const { today, last7Days, allTime, supplier } = metrics;
+  const threshold = system?.successBizHub?.lowBalanceThresholdGhc;
+  const attention: AttentionItem[] = [];
+  if (supplier.isLowBalance && supplier.balanceGhc !== null) attention.push({ id: 'supplier-low', tone: 'danger', icon: <Wallet className="h-5 w-5" />, title: `Supplier wallet is low: ${ghsMajor(supplier.balanceGhc)}`, detail: `Below the ${threshold != null ? ghsMajor(threshold) : 'configured'} safety threshold. Top up Success Biz Hub so data and airtime keep delivering. This alert only refreshes when the admin loads; there is no push notification yet.`, action: 'Open System Health', open: () => onNavigateTab('system') });
+  if (supplier.status === 'error') attention.push({ id: 'supplier-error', tone: 'danger', icon: <Truck className="h-5 w-5" />, title: 'Supplier balance check failed', detail: 'Mystery Hub could not reach Success Biz Hub just now. Deliveries may be affected.', action: 'Open System Health', open: () => onNavigateTab('system') });
+  if (supplier.status === 'connected' && !supplier.fulfilmentEnabled) attention.push({ id: 'dispatch-off', tone: 'warning', icon: <Truck className="h-5 w-5" />, title: 'Automatic supplier dispatch is off', detail: 'Paid data and airtime orders will wait in the queue until dispatch is enabled.', action: 'Open System Health', open: () => onNavigateTab('system') });
+  if ((system?.fulfilmentPipeline?.uncertainSubmissionCount || 0) > 0) attention.push({ id: 'uncertain', tone: 'danger', icon: <AlertTriangle className="h-5 w-5" />, title: `${system!.fulfilmentPipeline!.uncertainSubmissionCount} supplier submission${system!.fulfilmentPipeline!.uncertainSubmissionCount === 1 ? '' : 's'} uncertain`, detail: 'The supplier may or may not have accepted these. Never resubmit; reconcile them first.', action: 'Review orders', open: () => onNavigateTab('orders', 'needs_attention') });
+  if (allTime.manualReviewPendingCount > 0) attention.push({ id: 'orders', tone: 'warning', icon: <PackageSearch className="h-5 w-5" />, title: `${allTime.manualReviewPendingCount} order${allTime.manualReviewPendingCount === 1 ? '' : 's'} need attention`, detail: `All dates. Includes flagged orders, failed paid orders and open refunds${allTime.unresolvedPaidCount ? `; ${allTime.unresolvedPaidCount} paid customer${allTime.unresolvedPaidCount === 1 ? ' has' : 's have'} no recorded remedy yet` : ''}.`, action: 'Open Needs Attention', open: () => onNavigateTab('orders', 'needs_attention') });
+  if (withdrawals?.waiting) attention.push({ id: 'withdrawals', tone: 'warning', icon: <CreditCard className="h-5 w-5" />, title: `${withdrawals.waiting} withdrawal request${withdrawals.waiting === 1 ? '' : 's'} waiting`, detail: `Based on the first 50 requests. Approving records your decision; you still send the MoMo payout yourself and then mark it paid.${withdrawals.reviewNeeded ? ` ${withdrawals.reviewNeeded} need reconciliation first.` : ''}`, action: 'Open requests', open: () => onNavigateTab('finance', 'requests') });
+  if (marketplace?.newInquiries) attention.push({ id: 'inquiries', tone: 'info', icon: <MessageSquare className="h-5 w-5" />, title: `${marketplace.newInquiries} new marketplace inquir${marketplace.newInquiries === 1 ? 'y' : 'ies'}`, detail: 'Customers are waiting for a reply about a product.', action: 'Open inquiries', open: () => onNavigateTab('marketplace', 'inquiries') });
+  if (allTime.pendingWaitlist > 0) attention.push({ id: 'waitlist', tone: 'neutral', icon: <ClipboardList className="h-5 w-5" />, title: `${allTime.pendingWaitlist} launch request${allTime.pendingWaitlist === 1 ? '' : 's'} pending`, detail: 'People asked to be told when a service launches.', action: 'Open launch requests', open: () => onNavigateTab('waitlist') });
+
+  const paystackLive = system?.paystack?.mode?.startsWith('Live');
+  const recordedMarginGhc = allTime.estimatedGrossMarginGhc;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
+      <AdminPageHeader
+        eyebrow={new Date().toLocaleDateString('en-GH', { weekday: 'long', day: 'numeric', month: 'long' })}
+        title="Overview"
+        description="What needs you now, what happened today and whether payments and the supplier are healthy."
+        actions={<><Freshness at={loadedAt} /><RefreshButton onClick={() => void fetchOverview(true)} busy={isRefreshing} /></>}
+      />
+
+      {/* 1. Attention queue */}
+      <section className="space-y-3" aria-labelledby="attention-heading">
+        <SectionHeading><span id="attention-heading">Needs your attention</span></SectionHeading>
+        {attention.length ? (
+          <ul className="space-y-2">
+            {attention.map(item => (
+              <li key={item.id}>
+                <button type="button" onClick={item.open} className={`flex w-full items-start gap-3 rounded-2xl border bg-[#0d151b] p-4 text-left transition-colors hover:border-slate-600 ${item.tone === 'danger' ? 'border-rose-500/40' : item.tone === 'warning' ? 'border-amber-500/35' : 'border-slate-800'}`}>
+                  <span className={`mt-0.5 shrink-0 ${item.tone === 'danger' ? 'text-rose-300' : item.tone === 'warning' ? 'text-amber-300' : item.tone === 'info' ? 'text-sky-300' : 'text-slate-400'}`}>{item.icon}</span>
+                  <span className="min-w-0 flex-1 space-y-1">
+                    <span className="block text-[15px] font-semibold text-white">{item.title}</span>
+                    <span className="block text-sm leading-relaxed text-slate-400">{item.detail}</span>
+                    <span className="inline-flex items-center gap-1 pt-0.5 text-sm font-semibold text-[#00c365]">{item.action}<ChevronRight className="h-4 w-4" /></span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4 text-sm text-emerald-200">
+            <CheckCircle2 className="h-5 w-5 shrink-0" />{sideErrors.length ? 'No issues were found in the checks that completed. Some checks are unavailable.' : 'Nothing needs action in the loaded records. Check each area for its full queue.'}
+          </div>
+        )}
+        {sideErrors.length > 0 && <p className="text-xs text-amber-300">Could not check: {sideErrors.join(', ')}. Those areas may still need attention.</p>}
+      </section>
+
+      {/* 2. Today */}
+      <section className="space-y-3" aria-labelledby="today-heading">
+        <SectionHeading action={<span className="text-xs text-slate-500">Orders created since midnight, Ghana time (GMT)</span>}><span id="today-heading">Today</span></SectionHeading>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <AdminStat label="Customer payments" value={ghsMajor(today.revenueGhc)} tone="accent" hint={`${today.ordersCount} paid order${today.ordersCount === 1 ? '' : 's'}. Money received, not profit; includes orders later refunded.`} />
+          <AdminStat label="Delivered" value={today.deliveredCount} tone="success" hint="Today's orders confirmed delivered." onClick={() => onNavigateTab('orders', 'delivered')} actionLabel="View delivered" />
+          <AdminStat label="In progress" value={today.processingCount} tone="info" hint="Queued, submitted or processing with the supplier." onClick={() => onNavigateTab('orders', 'processing')} actionLabel="View with supplier" />
+          <AdminStat label="Needs attention" value={today.attentionCount} tone={today.attentionCount ? 'warning' : 'neutral'} hint="Today's orders that are failed, flagged or awaiting a refund." onClick={() => onNavigateTab('orders', 'needs_attention')} actionLabel="Review" />
+        </div>
+      </section>
+
+      {/* 3. Health */}
+      <section className="space-y-3" aria-labelledby="health-heading">
+        <SectionHeading action={<button type="button" onClick={() => onNavigateTab('system')} className="text-xs font-semibold text-[#00c365]">System Health</button>}><span id="health-heading">Payments and fulfilment health</span></SectionHeading>
+        <div className="grid gap-3 md:grid-cols-3">
+          <AdminPanel>
+            <div className="flex items-center justify-between gap-2"><p className="text-sm text-slate-400">Supplier wallet</p><StatusPill tone={supplier.status === 'connected' ? supplier.isLowBalance ? 'danger' : 'success' : supplier.status === 'error' ? 'danger' : 'neutral'}>{supplier.status === 'connected' ? supplier.isLowBalance ? 'Low balance' : 'Connected' : supplier.status === 'error' ? 'Unreachable' : 'Not configured'}</StatusPill></div>
+            <p className="mt-2 text-2xl font-bold tabular-nums text-white">{supplier.balanceGhc !== null ? ghsMajor(supplier.balanceGhc) : 'Unavailable'}</p>
+            <p className="mt-1 text-xs text-slate-500">Success Biz Hub balance, read live when this page loaded.{threshold != null ? ` Alert threshold ${ghsMajor(threshold)}.` : ''}</p>
+          </AdminPanel>
+          <AdminPanel>
+            <div className="flex items-center justify-between gap-2"><p className="text-sm text-slate-400">Automatic dispatch</p><StatusPill tone={supplier.fulfilmentEnabled ? 'success' : 'warning'}>{supplier.fulfilmentEnabled ? 'On' : 'Off'}</StatusPill></div>
+            <p className="mt-2 text-sm text-slate-300">{supplier.fulfilmentEnabled ? (system?.fulfilmentPipeline && !system.fulfilmentPipeline.autoDispatch ? 'Enabled, but held because Paystack is in test mode.' : 'Paid data and airtime orders go to the supplier automatically.') : 'Paid orders wait in the queue until dispatch is switched on.'}</p>
+          </AdminPanel>
+          <AdminPanel>
+            <div className="flex items-center justify-between gap-2"><p className="text-sm text-slate-400">Payments (Paystack)</p><StatusPill tone={!system?.paystack ? 'neutral' : system.paystack.status !== 'configured' ? 'danger' : paystackLive ? 'success' : 'warning'}>{!system?.paystack ? 'Unknown' : system.paystack.status !== 'configured' ? 'Not configured' : paystackLive ? 'Live' : 'Test mode'}</StatusPill></div>
+            <p className="mt-2 text-sm text-slate-300">{system?.paystack ? 'Shows whether keys are configured and which mode they use. It does not prove a transaction succeeded; each order shows its own verified payment.' : 'System Health could not be read.'}</p>
+          </AdminPanel>
+        </div>
+      </section>
+
+      {/* 4. Last 7 days */}
+      <section className="space-y-3" aria-labelledby="week-heading">
+        <SectionHeading><span id="week-heading">Last 7 days</span></SectionHeading>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <AdminStat label="Customer payments" value={ghsMajor(last7Days.revenueGhc)} hint="Paid orders created in the last 7 days." />
+          <AdminStat label="Paid orders" value={last7Days.ordersCount} hint="All services." onClick={() => onNavigateTab('orders')} actionLabel="View orders" />
+          <AdminStat label="Data bundle orders" value={last7Days.dataOrdersCount} hint="Paid, standard data." />
+          <AdminStat label="Airtime orders" value={last7Days.airtimeOrdersCount} hint="Paid airtime top-ups." />
+        </div>
+      </section>
+
+      {/* 5. Money context: all time */}
+      <AdminPanel title="All-time order money" description="Paid orders since launch. Wallet balances, Earn liabilities and withdrawals live in the Financial Control Room."
+        actions={<AdminButton onClick={() => onNavigateTab('finance')}>Open Finance</AdminButton>}>
+        <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
+          <DefinitionList items={[
+            ['Paid orders', allTime.ordersCount.toLocaleString()],
+            ['Customer payments received', ghsMajor(allTime.revenueGhc)],
+            ['Supplier cost recorded', ghsMajor(allTime.supplierCostGhc)],
+            [<span key="m">Payments minus recorded cost <span className="text-slate-500">(estimate)</span></span>, recordedMarginGhc !== null ? ghsMajor(recordedMarginGhc) : 'Not enough cost data'],
+          ]} />
+          <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4 text-sm leading-relaxed text-slate-300">
+            <p className="font-semibold text-amber-200">Read the estimate carefully</p>
+            <p className="mt-1">It is not profit. It still counts payments that were later refunded, and orders with no recorded supplier cost (for example marketplace items) are treated as if they cost nothing. Rewards, fees and wallet liabilities are not deducted.</p>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <AdminStat label="Customer accounts" value={allTime.totalCustomers.toLocaleString()} onClick={() => onNavigateTab('customers')} actionLabel="Customers" />
+          <AdminStat label="Launch requests" value={allTime.totalWaitlist.toLocaleString()} hint={`${allTime.pendingWaitlist} pending`} onClick={() => onNavigateTab('waitlist')} actionLabel="Open" />
+          <AdminStat label="Products needing review" value={marketplace?.needsReview ?? '—'} hint="Missing information before publishing." onClick={() => onNavigateTab('marketplace')} actionLabel="Marketplace" />
+        </div>
+      </AdminPanel>
+
       <AdminEarnPulse sessionToken={sessionToken} onOpen={() => onNavigateTab('earn')} />
-      {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Launch Overview</h2>
-          <p className="text-xs text-slate-400">
-            Real server-derived metrics for today and all-time operations.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => fetchOverview(true)}
-            disabled={isRefreshing}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-medium text-slate-300 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#00c365]' : ''}`} />
-            <span>{isRefreshing ? 'Refreshing...' : 'Refresh Metrics'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Supplier Low Balance Alert Banner */}
-      {supplier.isLowBalance && supplier.balanceGhc !== null && (
-        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-          <div className="space-y-1 flex-1">
-            <h4 className="text-xs font-bold text-amber-300">Supplier Wallet Low Balance Warning</h4>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Current Success Biz Hub wallet balance is <strong className="text-amber-400 font-mono">GH₵ {supplier.balanceGhc.toFixed(2)}</strong>, which is below the operational safety threshold (GH₵ 100). Please top up the supplier account to prevent data delivery disruptions.
-            </p>
-          </div>
-          <button
-            onClick={() => onNavigateTab('system')}
-            className="px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold transition-colors cursor-pointer shrink-0"
-          >
-            View System
-          </button>
-        </div>
-      )}
-
-      {/* Today's Operational Metrics Grid */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-[#00c365]" />
-            <span>Today&apos;s Activity</span>
-          </h3>
-          <span className="text-[11px] text-slate-500 font-mono">Server Time (GMT)</span>
-        </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {/* Today Paid Revenue */}
-          <div className="p-4 rounded-2xl bg-[#0f171d] border border-slate-800/90 space-y-2">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-xs font-medium">Today&apos;s Revenue</span>
-              <TrendingUp className="w-4 h-4 text-[#00c365]" />
-            </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-white font-mono">
-              GH₵ {today.revenueGhc.toFixed(2)}
-            </div>
-            <div className="text-[11px] text-slate-500">
-              From <strong className="text-slate-300">{today.ordersCount}</strong> paid orders today
-            </div>
-          </div>
-
-          {/* Today Delivered */}
-          <div className="p-4 rounded-2xl bg-[#0f171d] border border-slate-800/90 space-y-2">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-xs font-medium">Delivered</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-emerald-400 font-mono">
-              {today.deliveredCount}
-            </div>
-            <div className="text-[11px] text-slate-500">
-              Successfully fulfilled today
-            </div>
-          </div>
-
-          {/* Today In Progress */}
-          <div className="p-4 rounded-2xl bg-[#0f171d] border border-slate-800/90 space-y-2">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-xs font-medium">Processing / Queued</span>
-              <RefreshCw className="w-4 h-4 text-sky-400" />
-            </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-sky-400 font-mono">
-              {today.processingCount}
-            </div>
-            <div className="text-[11px] text-slate-500">
-              Active in supplier pipeline
-            </div>
-          </div>
-
-          {/* Current and historical unresolved paid cases use the same Orders filter. */}
-          <button type="button" onClick={()=>onNavigateTab('orders','needs_attention')} className="p-4 text-left rounded-2xl bg-[#0f171d] border border-slate-800/90 space-y-2">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-xs font-medium">Needs attention today</span>
-              <AlertTriangle className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className={`text-xl sm:text-2xl font-extrabold font-mono ${today.attentionCount > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
-              {today.attentionCount}
-            </div>
-            <div className="text-[11px] text-slate-500">
-              Created today; failed, refund pending or flagged
-            </div><p className="text-xs text-amber-300">{allTime.unresolvedPaidCount||0} paid orders unresolved · all dates</p>
-          </button>
-        </div>
-      </div>
-
-      {/* 7-Day & Business Pulse Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* 7 Days Performance */}
-        <div className="p-5 rounded-2xl bg-[#0f171d] border border-slate-800/90 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-            <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-              <Zap className="w-4 h-4 text-amber-400" />
-              <span>Last 7 Days Activity</span>
-            </h4>
-            <span className="text-xs font-bold text-[#00c365] font-mono">
-              GH₵ {last7Days.revenueGhc.toFixed(2)}
-            </span>
-          </div>
-
-          <div className="space-y-3 text-xs">
-            <div className="flex items-center justify-between text-slate-300">
-              <span className="text-slate-400">Total Orders (7d)</span>
-              <span className="font-bold text-white font-mono">{last7Days.ordersCount}</span>
-            </div>
-
-            <div className="flex items-center justify-between text-slate-300">
-              <span className="text-slate-400">Data Bundle Orders</span>
-              <span className="font-bold text-sky-400 font-mono">{last7Days.dataOrdersCount}</span>
-            </div>
-
-            <div className="flex items-center justify-between text-slate-300">
-              <span className="text-slate-400">Airtime Orders</span>
-              <span className="font-bold text-amber-400 font-mono">{last7Days.airtimeOrdersCount}</span>
-            </div>
-          </div>
-
-          <button
-            onClick={() => onNavigateTab('orders')}
-            className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <span>View All Orders</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {/* Business & Growth */}
-        <div className="p-5 rounded-2xl bg-[#0f171d] border border-slate-800/90 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-            <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-[#00c365]" />
-              <span>Community & Accounts</span>
-            </h4>
-          </div>
-
-          <div className="space-y-3 text-xs">
-            <div className="flex items-center justify-between text-slate-300">
-              <span className="text-slate-400">Registered Customer Accounts</span>
-              <span className="font-bold text-white font-mono">{allTime.totalCustomers}</span>
-            </div>
-
-            <div className="flex items-center justify-between text-slate-300">
-              <span className="text-slate-400">Total Waitlist Registrations</span>
-              <span className="font-bold text-[#00c365] font-mono">{allTime.totalWaitlist}</span>
-            </div>
-
-            <div className="flex items-center justify-between text-slate-300">
-              <span className="text-slate-400">Pending Waitlist Action</span>
-              <span className="font-bold text-amber-400 font-mono">{allTime.pendingWaitlist}</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <button
-              onClick={() => onNavigateTab('customers')}
-              className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center gap-1 transition-colors cursor-pointer"
-            >
-              <Users className="w-3.5 h-3.5 text-[#00c365]" />
-              <span>Customers</span>
-            </button>
-            <button
-              onClick={() => onNavigateTab('waitlist')}
-              className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center gap-1 transition-colors cursor-pointer"
-            >
-              <ClipboardList className="w-3.5 h-3.5 text-amber-400" />
-              <span>Waitlist</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Supplier Wallet & Fulfilment */}
-        <div className="p-5 rounded-2xl bg-[#0f171d] border border-slate-800/90 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-            <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-              <Wallet className="w-4 h-4 text-sky-400" />
-              <span>Supplier & Fulfilment</span>
-            </h4>
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              supplier.status === 'connected'
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                : supplier.status === 'unconfigured'
-                ? 'bg-slate-800 text-slate-400'
-                : 'bg-red-500/10 text-red-400 border border-red-500/30'
-            }`}>
-              <Radio className="w-2.5 h-2.5 animate-pulse" />
-              <span>{supplier.status === 'connected' ? 'Connected' : supplier.status === 'unconfigured' ? 'Not Configured' : 'Error'}</span>
-            </span>
-          </div>
-
-          <div className="space-y-3 text-xs">
-            <div className="flex items-center justify-between text-slate-300">
-              <span className="text-slate-400">Supplier Wallet Balance</span>
-              <span className="font-bold text-white font-mono">
-                {supplier.balanceGhc !== null ? `GH₵ ${supplier.balanceGhc.toFixed(2)}` : 'Unavailable'}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between text-slate-300">
-              <span className="text-slate-400">Auto-Fulfilment Dispatch</span>
-              <span className={`font-bold ${supplier.fulfilmentEnabled ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {supplier.fulfilmentEnabled ? 'Enabled (Active)' : 'Disabled'}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between text-slate-300">
-              <span className="text-slate-400">Manual Review Queue</span>
-              <span className={`font-bold font-mono ${allTime.manualReviewPendingCount > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
-                {allTime.manualReviewPendingCount} orders
-              </span>
-            </div>
-          </div>
-
-          <button
-            onClick={() => onNavigateTab('system')}
-            className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <span>System & delivery settings</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* All-Time Performance & Margins Summary */}
-      <div className="p-5 rounded-2xl bg-[#0f171d] border border-slate-800/90 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-          <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
-            <ShoppingBag className="w-4 h-4 text-[#00c365]" />
-            <span>All-Time Financial & Volume Summary</span>
-          </h3>
-          <span className="text-[11px] text-slate-500 font-mono">Paid-order totals</span>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800/60 space-y-1">
-            <span className="text-[11px] text-slate-400">Total Paid Orders</span>
-            <p className="text-lg font-bold text-white font-mono">{allTime.ordersCount}</p>
-          </div>
-
-          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800/60 space-y-1">
-            <span className="text-[11px] text-slate-400">Gross Revenue Collected</span>
-            <p className="text-lg font-bold text-[#00c365] font-mono">GH₵ {allTime.revenueGhc.toFixed(2)}</p>
-          </div>
-
-          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800/60 space-y-1">
-            <span className="text-[11px] text-slate-400">Recorded Supplier Cost</span>
-            <p className="text-lg font-bold text-slate-300 font-mono">
-              {allTime.supplierCostGhc > 0 ? `GH₵ ${allTime.supplierCostGhc.toFixed(2)}` : 'GH₵ 0.00'}
-            </p>
-          </div>
-
-          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800/60 space-y-1">
-            <span className="text-[11px] text-slate-400">Estimated Gross Margin</span>
-            <p className="text-lg font-bold text-emerald-400 font-mono">
-              {allTime.estimatedGrossMarginGhc !== null
-                ? `GH₵ ${allTime.estimatedGrossMarginGhc.toFixed(2)}`
-                : 'Pending Complete Cost Data'}
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

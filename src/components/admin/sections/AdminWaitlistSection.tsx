@@ -196,8 +196,8 @@ export const AdminWaitlistSection: React.FC<AdminWaitlistSectionProps> = ({ sess
       {/* Header & Export Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Launch requests</h2>
-          <p className="text-xs text-slate-400">
+          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-[1.7rem]">Launch requests</h1>
+          <p className="max-w-2xl text-sm leading-relaxed text-slate-400">
             Manage interest in upcoming utilities, filter demand by service, and export leads.
           </p>
         </div>

@@ -4,6 +4,9 @@ import { MarketplaceControlStore, MarketplaceInputError } from '../db/marketplac
 import { validateProductInput } from '../services/marketplaceProductPolicy.js';
 import { productReadiness } from '../../shared/marketplacePolicy.js';
 import { toAdminMarketplaceProduct } from '../types/marketplace.js';
+import { MarketplaceAssetStore, marketplaceImageMaxBytes } from '../db/marketplaceAssetStore.js';
+import { cloudinaryConfigured } from '../services/websiteCloudinary.js';
+import { createRateLimiter } from '../middleware/rateLimiter.js';
 // Mounted after requireAdmin on adminRouter; none of these routes are public.
 export const adminMarketplaceRouter = Router();
 const handle = (action: (req:Request,res:Response)=>Promise<void>) => async (req:Request,res:Response) => {
@@ -23,6 +26,15 @@ async function metrics() {
     physical:active.filter(p=>p.productKind === 'physical').length,digital:active.filter(p=>p.productKind === 'digital').length,service:active.filter(p=>p.productKind === 'service').length,
     newInquiries:(await MarketplaceControlStore.listInquiries({status:'new',pageSize:1})).total};
 }
+const mediaLimit = createRateLimiter({ windowMs: 60_000, max: 60, key: req => req.user?.id || req.ip || 'unknown' });
+const safeAsset = (a: Awaited<ReturnType<typeof MarketplaceAssetStore.find>>) => a && ({ id: a.id, url: a.secure_url, width: a.width, height: a.height, bytes: a.bytes, format: a.format, filename: a.original_filename, createdAt: a.created_at });
+// Product photos: signed direct-to-Cloudinary uploads. No URL, public ID or provider metadata is accepted from the browser.
+adminMarketplaceRouter.get('/media',handle(async(_req,res)=>{res.json({success:true,configured:cloudinaryConfigured(),maxBytes:marketplaceImageMaxBytes(),assets:(await MarketplaceAssetStore.recent()).map(safeAsset)});}));
+adminMarketplaceRouter.post('/media/upload-intent',mediaLimit,handle(async(req,res)=>{res.status(201).json({success:true,intent:await MarketplaceAssetStore.reserve(req.user!.id,req.body)});}));
+adminMarketplaceRouter.post('/media/:assetId/finalize',mediaLimit,handle(async(req,res)=>{
+  if(req.body && Object.keys(req.body).length) throw new MarketplaceInputError('Finalization does not accept image metadata.');
+  res.json({success:true,asset:safeAsset(await MarketplaceAssetStore.finalize(req.user!.id,req.params.assetId))});
+}));
 adminMarketplaceRouter.get('/metrics',handle(async (_req,res)=>{res.json({success:true,metrics:await metrics()});}));
 adminMarketplaceRouter.get('/products',handle(async(req,res)=>{
   let products = await adminProducts(); const {category,status,search,productKind}=req.query;
