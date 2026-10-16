@@ -4,7 +4,7 @@ import { FULFILMENT_LABELS } from '../../../shared/marketplacePolicy';
 import React, { useState } from 'react';
 import { MarketplaceProduct, MarketplacePickupLocation } from '../../types';
 import { OptimizedImage } from '../common/OptimizedImage';
-import { BUSINESS_CONFIG } from '../../config/business';
+import { PATH_LABELS, isDirectPurchaseSupported, productPath, productPriceText } from '../../utils/marketplaceBrowse';
 import {
   X,
   ShoppingBag,
@@ -37,6 +37,8 @@ interface MarketplaceProductDetailModalProps {
   onBuyNow: (product: MarketplaceProduct, variantId?: string) => void;
   onInquire: (product: MarketplaceProduct) => void;
   onShare: (product: MarketplaceProduct) => void;
+  /** Plain product link sharing (no referral), offered for every product. */
+  onShareLink?: (product: MarketplaceProduct) => void;
   formatGhcReward: (val: number | null | undefined) => string;
 }
 
@@ -46,6 +48,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
   onBuyNow, initialVariantId, onVariantChange,
   onInquire,
   onShare,
+  onShareLink,
   formatGhcReward,
 }) => {
   const [isDescExpanded, setIsDescExpanded] = useState(false);
@@ -58,7 +61,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
   const [selectedVariantId,setSelectedVariantId] = useState(() => initialMarketplaceOption(product.variants || [],initialVariantId));
   const selectedVariant = options.find(v => v.id === selectedVariantId);
   const needsOption = options.length > 0 && !selectedVariant;
-  const displayedPrice = selectedVariant ? 'GH₵' + (selectedVariant.priceMinor / 100).toLocaleString('en-US',{maximumFractionDigits:2}) : product.priceDisplay;
+  const displayedPrice = selectedVariant ? 'GH₵' + (selectedVariant.priceMinor / 100).toLocaleString('en-US',{maximumFractionDigits:2}) : productPriceText(product);
   const getCategoryFallbackIcon = (category: string) => {
     switch (category) {
       case 'laptops_computers':
@@ -99,8 +102,16 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
       style: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
     },
     check_availability: {
-      label: 'Sourced on Request',
+      label: 'Check Availability',
       style: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
+    },
+    limited: {
+      label: 'Limited Stock',
+      style: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+    },
+    coming_soon: {
+      label: 'Coming Soon',
+      style: 'bg-slate-800 text-slate-300 border-slate-700',
     },
   };
 
@@ -131,8 +142,13 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
   const hasDelivery =
     allowedFulfilment !== 'pickup' && product.deliveryAvailable !== false;
 
-  const isPurchaseSupported =
-    product.purchaseEnabled !== false && product.priceType !== 'quote' && product.availability !== 'coming_soon' && (!(product.variants?.length) || options.length > 0) && allowedFulfilment !== 'inquiry_only';
+  const isPurchaseSupported = isDirectPurchaseSupported(product);
+  const path = productPath(product);
+  const nextStep = path === 'buy'
+    ? { tone: 'border-[#00c365]/30 bg-[#00c365]/8 text-emerald-100', title: 'Available to buy online', body: needsOption ? 'Choose an option, then continue to checkout. You will see the final total before paying.' : 'Continue to checkout to enter your details. You will see the final total before paying.' }
+    : path === 'coming_soon'
+    ? { tone: 'border-slate-700 bg-slate-900/70 text-slate-200', title: 'Not available to order yet', body: 'You can still ask us about this item. Sending an enquiry does not place an order or take payment.' }
+    : { tone: 'border-sky-500/30 bg-sky-500/8 text-sky-100', title: 'Order by enquiry', body: 'Send your question and we will confirm price, availability and delivery with you on WhatsApp. No payment is taken.' };
 
   const isLongDescription = (product.description || '').length > 320;
   const displayedDescription =
@@ -160,7 +176,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
               {product.categoryLabel}
             </span>
             <span className="text-xs text-slate-400 hidden sm:inline">
-              · Sourced on Request
+              · {PATH_LABELS[path]}
             </span>
           </div>
 
@@ -177,12 +193,11 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
         {/* Scrollable Product Details Content Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7 space-y-6 text-left">
           {/* 1. Large High-Quality Product Image */}
-          <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] bg-gradient-to-b from-[#080d12] to-[#0f1620] rounded-2xl border border-slate-800/90 overflow-hidden shadow-inner flex items-center justify-center">
+          <div className="relative w-full h-[min(38vh,300px)] sm:h-[300px] bg-gradient-to-b from-[#080d12] to-[#0f1620] rounded-2xl border border-slate-800/90 overflow-hidden shadow-inner flex items-center justify-center">
             <OptimizedImage
               key={photos[photoIndex] || 'none'}
               src={photos[photoIndex] || product.imageUrl}
               alt={product.imageAlt || product.name}
-              aspectRatio="16/10"
               objectFit="cover"
               objectPosition="center center"
               fallbackIcon={getCategoryFallbackIcon(product.category)}
@@ -239,19 +254,34 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
                     ? 'Pricing'
                     : 'Ghana Cedis Price'}
                 </span>
-                <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight tabular-nums">
+                <span className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight tabular-nums">
                   {displayedPrice}
                 </span>
               </div>
 
-              <div className="flex items-center gap-1.5 text-xs text-slate-300 bg-slate-900/90 border border-slate-800 px-3 py-1 rounded-xl">
-                <ShieldCheck className="w-4 h-4 text-[#00c365]" />
-                <span>Mystery Hub Marketplace</span>
-              </div>
+              {onShareLink && (
+                <button
+                  type="button"
+                  data-mh-share
+                  onClick={() => onShareLink(product)}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 bg-slate-900/90 border border-slate-700 hover:border-slate-500 px-3 py-2 rounded-xl transition-colors active:scale-95"
+                >
+                  <Share2 className="w-3.5 h-3.5 text-[#00c365]" />
+                  <span>Share product</span>
+                </button>
+              )}
             </div>
           </div>
 
           {options.length > 0 && <fieldset className="space-y-2"><legend className="font-bold text-sm">Choose an option</legend><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{options.map(option => <button key={option.id} type="button" aria-pressed={selectedVariantId === option.id} onClick={() => {setSelectedVariantId(option.id);onVariantChange?.(option.id);}} className={`rounded-xl border p-3 text-left text-sm ${selectedVariantId === option.id ? 'border-emerald-400 bg-emerald-500/15' : 'border-slate-700 bg-slate-900'}`}><span className="block">{option.name}</span><strong>GH₵{(option.priceMinor/100).toLocaleString()}</strong></button>)}</div>{needsOption && <p className="text-sm text-amber-300">Choose an option before continuing to payment.</p>}</fieldset>}
+
+          <div className={`rounded-2xl border px-4 py-3 flex items-start gap-2.5 ${nextStep.tone}`}>
+            {path === 'buy' ? <ShieldCheck className="w-4 h-4 text-[#00c365] shrink-0 mt-0.5" /> : path === 'coming_soon' ? <Clock className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" /> : <MessageCircle className="w-4 h-4 text-sky-300 shrink-0 mt-0.5" />}
+            <div className="space-y-0.5">
+              <p className="text-sm font-bold">{nextStep.title}</p>
+              <p className="text-xs leading-relaxed opacity-80">{nextStep.body}</p>
+            </div>
+          </div>
 
           {/* 3. Share & Earn Opportunity Section (If eligible) */}
           {isEligibleForShare && rewardGhcFormatted && (
@@ -416,7 +446,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
                   </div>
                 ) : (
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    Sourced on demand; location coordinated upon inquiry.
+                    No pickup point is listed for this item. Ask us about collection.
                   </p>
                 )}
               </div>

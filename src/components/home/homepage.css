@@ -118,18 +118,22 @@
 .home-marketplace-intro > p:not(.home-eyebrow) { max-width: 520px; color: #b4c0ca; font-size: .9375rem; line-height: 1.7; margin-block: 12px 20px; }
 .home-marketplace-items { margin-top: 12px; }
 .home-marketplace-categories { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.home-marketplace-categories button { display: flex; gap: 12px; align-items: center; min-width: 0; padding: 16px; border-radius: var(--radius-card-sm); border: 1px solid #222e38; background: #0b1116; text-align: left; cursor: pointer; color: #a9c8e0; transition: border-color 150ms; }
-.home-marketplace-categories button:hover { border-color: #3d5568; }
-.home-marketplace-categories button > span { flex: 1; min-width: 0; }
+.home-marketplace-categories :is(button, a) { display: flex; gap: 12px; align-items: center; min-width: 0; padding: 16px; border-radius: var(--radius-card-sm); border: 1px solid #222e38; background: #0b1116; text-align: left; cursor: pointer; color: #a9c8e0; transition: border-color 150ms; }
+.home-marketplace-categories :is(button, a):hover { border-color: #3d5568; }
+.home-marketplace-categories :is(button, a) > span { flex: 1; min-width: 0; }
 .home-marketplace-categories strong { display: block; font-size: .875rem; color: #edf1f4; font-weight: 600; line-height: 1.35; }
-.home-marketplace-categories button > span > span { display: block; margin-top: 2px; font-size: .75rem; color: #aab9c6; }
+.home-marketplace-categories :is(button, a) > span > span { display: block; margin-top: 2px; font-size: .75rem; color: #aab9c6; }
 .home-marketplace-categories svg { flex-shrink: 0; }
 .home-marketplace-categories svg:last-child { color: #6f8494; }
 .home-marketplace-state { color: #afbdc8; font-size: .8125rem; display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
 .home-marketplace-loading { min-height: 76px; padding-block: 24px; color: #b4c0ca; font-size: .8125rem; }
 .home-product-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 8px; }
 .home-product { min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 12px; border-radius: var(--radius-card); border: 1px solid #222e38; background: #0b1116; }
-.home-product-image { aspect-ratio: 4/3; overflow: hidden; border-radius: 12px; }
+.home-product-image { display: block; aspect-ratio: 4/3; overflow: hidden; border-radius: 12px; }
+.home-product-details h3 a { color: inherit; text-decoration: none; }
+.home-product-details h3 a:hover, .home-product-category:hover { color: var(--brand-green, #00c365); }
+.home-product-category { color: inherit; text-decoration: none; }
+.home-product a:focus-visible { outline: 2px solid #00c365; outline-offset: 2px; border-radius: 6px; }
 .home-product-details { flex: 1; }
 .home-product-details p { color: #aebecb; font-size: .8125rem; line-height: 1.6; }
 .home-product-details h3 { color: #f1f4f6; font-size: 1rem; font-weight: 650; margin-block: 6px; }
@@ -218,7 +222,7 @@
   .home-website-actions .mh-button { width: 100%; }
   .home-template-label { flex-wrap: wrap; gap: 4px; }
   .home-marketplace-categories { gap: 8px; }
-  .home-marketplace-categories button { padding: 12px; }
+  .home-marketplace-categories :is(button, a) { padding: 12px; }
   .home-product-grid { grid-template-columns: 1fr; }
   .home-support-actions > * { flex: 1 1 100%; }
   .home-utility-desc { display: none; }
@@ -228,8 +232,8 @@
   .home-buy-steps li { align-items: center; }
   .home-buy-steps ol { gap: 10px; margin-block: 14px 4px; }
   .home-marketplace-categories { grid-template-columns: 1fr 1fr; }
-  .home-marketplace-categories button > span > span { display: none; }
-  .home-marketplace-categories button svg:last-child { display: none; }
+  .home-marketplace-categories :is(button, a) > span > span { display: none; }
+  .home-marketplace-categories :is(button, a) svg:last-child { display: none; }
   .home-future-list { gap: 6px; }
   .home-future-list li:nth-child(n+5) { display: none; }
   .home-future-item { padding: 8px 12px; font-size: .75rem; }
@@ -273,3 +277,4 @@
   .help-support { padding: 22px 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .help-question summary svg { transition: none; } }
+.home-marketplace-shortcuts { margin-top: 16px; }
