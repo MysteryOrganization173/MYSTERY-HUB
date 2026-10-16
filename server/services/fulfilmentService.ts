@@ -332,6 +332,12 @@ export class FulfilmentService {
       return { order: paidOrder, alreadyHandled: true };
     }
 
+    return this.dispatchClaimedOrder(claimedOrder);
+  }
+
+  /** Internal continuation of a durably claimed order; never an HTTP status override. */
+  static async dispatchClaimedOrder(claimedOrder:OrderRecord,guarded=false):Promise<{order:OrderRecord|null;alreadyHandled:boolean}> {
+
     if (claimedOrder.service_type === 'afa') return { order: await AfaService.submit(claimedOrder), alreadyHandled: false };
 
     // Step 3: Safety check: Is live fulfilment enabled?
@@ -611,7 +617,7 @@ export class FulfilmentService {
 
       console.info(`[Fulfilment Dispatch] Submitting order ${claimedOrder.public_reference} to Success Biz Hub for ${msisdn} (${sizeLabel})...`);
       // Persist uncertainty before POST: a process crash cannot leave an apparently safe queued sale.
-      if(claimedOrder.store_context)await OrdersStore.saveSupplierUncertainSubmission(claimedOrder.id,'Managed store dispatch started; acceptance is awaiting confirmation.');
+      if(claimedOrder.store_context||guarded)await OrdersStore.saveSupplierUncertainSubmission(claimedOrder.id,'Supplier dispatch started; acceptance is awaiting confirmation.');
       storePostStarted=true;
       const response = await this.provider.client.createOrder(orderPayload);
       const data = response.data || {};
@@ -621,7 +627,7 @@ export class FulfilmentService {
         throw new Error('Success Biz Hub did not return an order identifier.');
       }
 
-      if(claimedOrder.store_context){storeSupplierId=String(supplierOrderId);await OrdersStore.updateOrderStatus(claimedOrder.id,'queued',undefined,storeSupplierId);}
+      if(claimedOrder.store_context||guarded){storeSupplierId=String(supplierOrderId);await OrdersStore.updateOrderStatus(claimedOrder.id,'queued',undefined,storeSupplierId);}
       const supplierDomainStatus = this.provider.mapSupplierStatus(data.status);
       const mappedOrderStatus: OrderStatus =
         supplierDomainStatus === 'delivered'
@@ -638,12 +644,13 @@ export class FulfilmentService {
         supplierCostMinor,
         offerRef,
         mappedOrderStatus,
-        data
+        data,
+        guarded
       );
 
       return { order: submittedOrder || claimedOrder, alreadyHandled: false };
     } catch (err: unknown) {
-      if(claimedOrder.store_context&&storePostStarted) {
+      if((claimedOrder.store_context||guarded)&&storePostStarted) {
         if(storeSupplierId)await OrdersStore.updateOrderStatus(claimedOrder.id,'queued',undefined,storeSupplierId);
         const held=await OrdersStore.saveSupplierUncertainSubmission(claimedOrder.id,'Managed store supplier acceptance needs reconciliation.');
         return {order:held||claimedOrder,alreadyHandled:false};

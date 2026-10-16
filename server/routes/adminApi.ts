@@ -339,20 +339,15 @@ adminRouter.patch('/orders/:reference/status', async (req: Request, res: Respons
     }
 
     const targetStatus = marketplaceStatus || status;
+    if(order.service_type!=='marketplace'){res.status(409).json({error:'Supplier-backed orders require supplier reconciliation or the audited customer-resolution workflow. A manual status is not delivery evidence.'});return;}
     if(targetStatus==='refunded'&&order.payment_status==='success'){res.status(409).json({error:'Use the order-linked customer refund workflow. A status change is not proof of a refund.'});return;}
     if (!targetStatus) {
       res.status(400).json({ error: 'Status is required.' });
       return;
     }
 
-    if (order.service_type === 'afa' && (marketplaceStatus || !['refund_pending','refunded','cancelled','failed'].includes(targetStatus))) { res.status(400).json({error:'AFA completion requires a confirmed supplier registered status. Use supplier refresh.'}); return; }
     let updated: OrderRecord | null = null;
-    if (order.service_type === 'marketplace' || marketplaceStatus) {
-      updated = await OrdersStore.updateMarketplaceStatus(order.id, targetStatus, adminNote);
-    } else {
-      updated = await OrdersStore.updateOrderStatus(order.id, targetStatus, adminNote, undefined, undefined,
-        { explicitReversal: ['refund_pending', 'refunded', 'cancelled', 'failed'].includes(targetStatus) });
-    }
+    updated = await OrdersStore.updateMarketplaceStatus(order.id, targetStatus, adminNote);
 
     if (!updated) {
       res.status(404).json({ error: 'Failed to update order status.' });

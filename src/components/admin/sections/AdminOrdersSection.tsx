@@ -1,4 +1,5 @@
 import { AdminOrderResolution } from './AdminOrderResolution';
+import { AdminOrderRecovery } from './AdminOrderRecovery';
 import { afaStatusLabel } from '../../../../shared/afa';
 import { FULFILMENT_LABELS, FulfilmentMode } from '../../../../shared/marketplacePolicy';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -545,6 +546,7 @@ function OrderDetailSheet({ order, token, onClose, detailError, message, actionE
         )}
 
         {/* Notes and review flag */}
+        {!isMarketplace&&paid&&order.status!=='delivered'&&order.resolution?.stage!=='resolved'&&<AdminOrderRecovery order={order} token={token} onUpdated={onResolutionUpdated}/>}
         <AdminPanel title="Internal note and review flag" actions={<AdminButton onClick={onToggleFlag} className={order.manual_review ? 'border-amber-500/50 text-amber-200' : ''}><Flag className="h-4 w-4" />{order.manual_review ? 'Clear review flag' : 'Flag for review'}</AdminButton>}>
           <label className={adminLabel}>
             <span>Internal note (never shown to the customer)</span>

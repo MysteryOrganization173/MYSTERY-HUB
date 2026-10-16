@@ -1040,15 +1040,17 @@ export class OrdersStore {
    * If already claimed or not in 'paid' status, returns null.
    * Protects against concurrent Paystack webhook and verify requests.
    */
-  static async claimOrderForSupplierDispatch(orderId: string): Promise<OrderRecord | null> {
+  static async claimOrderForSupplierDispatch(orderId: string,client?:PoolClient): Promise<OrderRecord | null> {
     const nowIso = new Date().toISOString();
-    const pool = getPool();
+    const pool = client || getPool();
 
     if (pool) {
       const query = `
         UPDATE orders
         SET status = 'queued', updated_at = $1
         WHERE id = $2 AND status = 'paid' AND payment_status = 'success'
+          AND COALESCE(manual_review,FALSE)=FALSE AND resolution_json IS NULL
+          AND supplier_order_id IS NULL AND submitted_at IS NULL
         RETURNING *;
       `;
       const result = await pool.query(query, [nowIso, orderId]);
@@ -1060,7 +1062,7 @@ export class OrdersStore {
       const release = await acquireLock(`claim:${orderId}`);
       try {
         const existing = await this.findOrder(orderId);
-        if (!existing || existing.status !== 'paid' || existing.payment_status !== 'success') {
+        if (!existing || existing.status !== 'paid' || existing.payment_status !== 'success' || existing.manual_review || existing.resolution_json || existing.supplier_order_id || existing.submitted_at) {
           return null;
         }
         const updated: OrderRecord = {
@@ -1087,7 +1089,8 @@ export class OrdersStore {
     supplierCostMinor: number | null,
     supplierOfferRef: string,
     submittedStatus: OrderStatus,
-    rawSupplierResponse?: unknown
+    rawSupplierResponse?: unknown,
+    clearSubmissionReview=false
   ): Promise<OrderRecord | null> {
     const existing = await this.findOrder(orderId);
     if (!existing) return null;
@@ -1105,7 +1108,7 @@ export class OrdersStore {
       updated_at: nowIso,
       supplier_last_checked_at: nowIso,
       failure_reason: null,
-      ...(existing.store_context&&existing.failure_reason==='supplier_submission_uncertain'?{manual_review:false}:{}),
+      ...((existing.store_context||clearSubmissionReview)&&existing.failure_reason==='supplier_submission_uncertain'?{manual_review:false}:{}),
     };
 
     if (!canAdvanceOrderStatus(existing.status, submittedStatus) && !(existing.service_type === 'afa' && existing.status === submittedStatus && ['submitted','processing'].includes(existing.status))) return existing;
@@ -1116,7 +1119,7 @@ export class OrdersStore {
         UPDATE orders
         SET status = $1, supplier_provider = $2, supplier_order_id = $3,
             supplier_cost_minor = $4, supplier_offer_ref = $5, supplier_response = $6,
-            submitted_at = $7, updated_at = $8, supplier_last_checked_at = $9, manual_review = CASE WHEN store_context IS NOT NULL AND failure_reason='supplier_submission_uncertain' THEN FALSE ELSE manual_review END, failure_reason = NULL
+            submitted_at = $7, updated_at = $8, supplier_last_checked_at = $9, manual_review = CASE WHEN (store_context IS NOT NULL OR $12::boolean) AND failure_reason='supplier_submission_uncertain' THEN FALSE ELSE manual_review END, failure_reason = NULL
         WHERE id = $10 AND status = $11
         RETURNING *;
       `;
@@ -1132,11 +1135,12 @@ export class OrdersStore {
         updated.supplier_last_checked_at,
         existing.id,
         existing.status,
+        clearSubmissionReview,
       ]);
-      if (!result.rows[0]) return this.saveSupplierSubmission(orderId, supplierOrderId, supplierCostMinor, supplierOfferRef, submittedStatus, rawSupplierResponse);
+      if (!result.rows[0]) return this.saveSupplierSubmission(orderId, supplierOrderId, supplierCostMinor, supplierOfferRef, submittedStatus, rawSupplierResponse,clearSubmissionReview);
     } else {
       if (devMemoryStore.get(existing.id)?.status !== existing.status) {
-        return this.saveSupplierSubmission(orderId, supplierOrderId, supplierCostMinor, supplierOfferRef, submittedStatus, rawSupplierResponse);
+        return this.saveSupplierSubmission(orderId, supplierOrderId, supplierCostMinor, supplierOfferRef, submittedStatus, rawSupplierResponse,clearSubmissionReview);
       }
       devMemoryStore.set(existing.id, updated);
       devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
@@ -1568,6 +1572,8 @@ export class OrdersStore {
 
       if (params.status === 'needs_attention') {
         conditions.push(`COALESCE(resolution_json->>'stage','') <> 'resolved' AND (manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status IN ('failed','cancelled','expired','refunded') AND COALESCE(resolution_json->>'stage','') <> 'resolved')) AND (payment_status = 'success' OR failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%'))`);
+      } else if (params.status === 'with_supplier') {
+        conditions.push(`status IN ('submitted','processing')`);
       } else if (params.status === 'abandoned') {
         conditions.push(`status IN ('cancelled', 'expired')`);
       } else if (params.status === 'all') {
@@ -1659,6 +1665,8 @@ export class OrdersStore {
             (o.payment_status === 'success' && ['failed','cancelled','expired','refunded'].includes(o.status))) &&
           (o.payment_status==='success'||!o.failure_reason || (!o.failure_reason.toLowerCase().startsWith('prelaunch') && !o.failure_reason.toLowerCase().startsWith('pre-launch')))
       );
+    } else if (params.status === 'with_supplier') {
+      all = all.filter(o=>['submitted','processing'].includes(o.status));
     } else if (params.status === 'abandoned') {
       all = all.filter((o) => o.status === 'cancelled' || o.status === 'expired');
     } else if (params.status === 'all') {

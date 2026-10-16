@@ -37,3 +37,11 @@ C: Manual-resolution evidence compatibility and fail-closed recovery eligibility
 D: Assisted-order quote, source classification, confirmation, durable dispatch and reconciliation through existing supplier integration.
 
 Release status and exact verification evidence are recorded after implementation. Nothing is production verified solely because a page renders.
+
+## Recovery boundary
+
+Known local payment notices are distinguished from provider responses. Closing a legacy notice case requires independent documented supplier failure/nonacceptance and legitimate customer-remedy evidence. Unknown/malformed supplier responses, active delivery, uncertainty and any linked customer refund still block closure. Original supplier and payment facts remain unchanged. The reported live order was read only, never corrected by this implementation.
+
+The new recovery action supports only direct Data orders still in unclaimed `paid` state. It re-verifies the exact live Paystack payment or original Wallet debit, runs supplier preflight, locks and rechecks the order, atomically claims it with audit and durable history, then continues the existing dispatcher. An intent/crash/ambiguous response cannot be replayed. Queued/failed/submitted orders cannot be blindly resubmitted; refresh an existing supplier ID or reconcile externally. Supplier ID is persisted before ancillary state updates. A status PATCH cannot mark supplier-backed delivery.
+
+Recovery checkpoint evidence: 123/123 focused payment/manual-resolution tests; 8/8 native isolated PostgreSQL tests, including separate-connection claims and audit rollback. TypeScript passed. Full combined regression and compiled browser review remain final-candidate gates.
