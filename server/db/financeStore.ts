@@ -12,9 +12,10 @@ let memory:Memory={accounts:{},operations:[],ledger:[],config:{}};
 let tail = Promise.resolve();
 export class FinanceError extends Error { constructor(message:string, public status=400){super(message);} }
 export class FinanceTx {
-  constructor(public userId:string, public client?:PoolClient, private state?:Memory) {}
-  async account() {
+  constructor(public userId:string, public client?:PoolClient, private state?:Memory,private readOnly=false) {}
+  async account():Promise<{wallet_minor:number;restricted:boolean}> {
     if(this.client) {
+      if(this.readOnly)return (await this.client.query('SELECT wallet_minor::float8 AS wallet_minor,restricted FROM finance_accounts WHERE user_id=$1',[this.userId])).rows[0]||{wallet_minor:0,restricted:false};
       await this.client.query('INSERT INTO finance_accounts(user_id) VALUES($1) ON CONFLICT DO NOTHING',[this.userId]);
       const row=(await this.client.query('SELECT * FROM finance_accounts WHERE user_id=$1 FOR UPDATE',[this.userId])).rows[0];
       return {wallet_minor:Number(row.wallet_minor),restricted:row.restricted};
@@ -53,7 +54,7 @@ export class FinanceTx {
   }
   async earn() {
     // Lock the existing authoritative reward rows. A reversal cannot race consumption.
-    const rewards=this.client ? (await this.client.query('SELECT * FROM reward_ledger WHERE referrer_user_id=$1 FOR UPDATE',[this.userId])).rows : ReferralStore.adminDevSnapshot().ledger.filter(x=>x.referrer_user_id===this.userId);
+    const rewards=this.client ? (await this.client.query(`SELECT * FROM reward_ledger WHERE referrer_user_id=$1 ${this.readOnly?'':'FOR UPDATE'}`,[this.userId])).rows : ReferralStore.adminDevSnapshot().ledger.filter(x=>x.referrer_user_id===this.userId);
     const approved=rewards.filter(x=>x.status==='approved'&&!x.reversal_of_id).reduce((s,x)=>s+Number(x.amount_minor),0);
     const pending=rewards.filter(x=>x.status==='pending').reduce((s,x)=>s+Number(x.amount_minor),0);
     const consumed=-(await this.ledger()).filter(x=>x.bucket==='earn').reduce((s,x)=>s+x.delta_minor,0);
@@ -65,7 +66,7 @@ export class FinanceTx {
   async storeEarnings() {
     const operations=await this.operations(),ledger=(await this.ledger()).filter(x=>x.bucket==='store');
     const credited=operations.filter(x=>x.kind==='store_sale'&&x.state==='available'&&x.payload.orderId);
-    const orders=this.client?(await this.client.query('SELECT id,status,manual_review FROM orders WHERE id=ANY($1::text[]) FOR UPDATE',[credited.map(x=>x.payload.orderId)])).rows:(await import('./ordersStore.js')).OrdersStore.adminDevOrders().filter(o=>credited.some(x=>x.payload.orderId===o.id));
+    const orders=this.client?(await this.client.query(`SELECT id,status,manual_review FROM orders WHERE id=ANY($1::text[]) ${this.readOnly?'':'FOR UPDATE'}`,[credited.map(x=>x.payload.orderId)])).rows:(await import('./ordersStore.js')).OrdersStore.adminDevOrders().filter(o=>credited.some(x=>x.payload.orderId===o.id));
     // Reserve/payout actions lock authoritative orders too. A refund already recorded
     // cannot race a delayed earning reversal and escape as a new withdrawal.
     const unresolved=orders.some(o=>o.status!=='delivered'||o.manual_review);
@@ -101,6 +102,12 @@ export class FinanceTx {
 }
 const normalizeOperation=(row:any):FinanceOperation=>({...row,amount_minor:Number(row.amount_minor),created_at:new Date(row.created_at).toISOString(),updated_at:new Date(row.updated_at).toISOString()});
 export class FinanceStore {
+  /** A passive view never creates accounts, takes mutation locks or commits a reconciliation. */
+  static async read<T>(userId:string,work:(tx:FinanceTx)=>Promise<T>):Promise<T>{
+    const pool=getPool();if(!pool&&process.env.NODE_ENV==='production')throw new FinanceError('Financial database unavailable.',503);
+    if(!pool)return work(new FinanceTx(userId,undefined,structuredClone(memory),true));
+    const client=await pool.connect();try{await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');const result=await work(new FinanceTx(userId,client,undefined,true));await client.query('COMMIT');return result;}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+  }
   static async readConfig(id:string) {
     const pool=getPool();
     if(!pool&&process.env.NODE_ENV==='production')throw new FinanceError('Financial database unavailable.',503);
@@ -130,12 +137,21 @@ export class FinanceStore {
     return [...memory.operations].reverse().filter(x=>!kind||x.kind===kind).slice(offset,offset+limit);
   }
   static async metrics() {
-    const pool=getPool();
-    const ledger:FinanceEntry[]=pool?(await pool.query('SELECT bucket,delta_minor,description FROM finance_ledger')).rows.map((x:any)=>({...x,delta_minor:Number(x.delta_minor)})):memory.ledger;
+    return this.read('admin-report',tx=>this.metricsSnapshot(tx.client));
+  }
+  private static async metricsSnapshot(pool?:PoolClient) {
+    const ledger:FinanceEntry[]=pool?(await pool.query('SELECT user_id,bucket,delta_minor,description FROM finance_ledger')).rows.map((x:any)=>({...x,delta_minor:Number(x.delta_minor)})):memory.ledger;
     const operations:FinanceOperation[]=pool?(await pool.query('SELECT * FROM finance_operations')).rows.map(normalizeOperation):memory.operations;
-    const approved=pool?Number((await pool.query("SELECT COALESCE(SUM(amount_minor),0) AS total FROM reward_ledger WHERE status='approved' AND reversal_of_id IS NULL")).rows[0].total):ReferralStore.adminDevSnapshot().ledger.filter(x=>x.status==='approved'&&!x.reversal_of_id).reduce((s,x)=>s+x.amount_minor,0);
+    const rewards=pool?(await pool.query("SELECT referrer_user_id,amount_minor FROM reward_ledger WHERE status='approved' AND reversal_of_id IS NULL")).rows:ReferralStore.adminDevSnapshot().ledger.filter(x=>x.status==='approved'&&!x.reversal_of_id);
+    const approved=rewards.reduce((s,x)=>s+Number(x.amount_minor),0);
+    const earn=new Map<string,number>(),store=new Map<string,number>();
+    for(const r of rewards)earn.set(r.referrer_user_id,(earn.get(r.referrer_user_id)||0)+Number(r.amount_minor));
+    for(const l of ledger){const map=l.bucket==='earn'?earn:l.bucket==='store'?store:null;if(map)map.set(l.user_id,(map.get(l.user_id)||0)+l.delta_minor);}
+    // One customer's reversal debt must not cancel money owed to another customer.
+    const positive=(map:Map<string,number>)=>[...map.values()].reduce((s,v)=>s+Math.max(0,v),0);
+    const shortfall=(map:Map<string,number>)=>[...map.values()].reduce((s,v)=>s+Math.max(0,-v),0);
     const total=(kind:string,state?:string)=>operations.filter(x=>x.kind===kind&&(!state||x.state===state)).reduce((s,x)=>s+x.amount_minor,0);
-    return {walletLiabilityMinor:ledger.filter(x=>x.bucket==='wallet').reduce((s,x)=>s+x.delta_minor,0),availableEarnLiabilityMinor:Math.max(0,approved+ledger.filter(x=>x.bucket==='earn').reduce((s,x)=>s+x.delta_minor,0)),walletDepositsMinor:total('topup','credited')+total('topup','reversed')+total('topup','reversal_review'),walletSpendingMinor:total('purchase'),walletRefundsMinor:total('refund'),earnTransfersMinor:total('transfer'),achievementCreditsMinor:total('achievement'),reservedWithdrawalsMinor:operations.filter(x=>x.kind==='withdrawal'&&['approved','pending_review'].includes(x.state)).reduce((s,x)=>s+x.amount_minor,0),paidWithdrawalsMinor:operations.filter(x=>x.kind==='withdrawal'&&x.state==='paid').reduce((s,x)=>s+x.payload.netMinor,0),withdrawalFeesMinor:operations.filter(x=>x.kind==='withdrawal'&&x.state==='paid').reduce((s,x)=>s+x.payload.feeMinor,0),referralCreditsMinor:approved,rewardReversalsMinor:operations.filter(x=>x.kind==='reversal'&&x.payload.rewardId).reduce((s,x)=>s+x.amount_minor,0)};
+    return {walletLiabilityMinor:ledger.filter(x=>x.bucket==='wallet').reduce((s,x)=>s+x.delta_minor,0),availableEarnLiabilityMinor:positive(earn),earnReconciliationShortfallMinor:shortfall(earn),storeEarningsLiabilityMinor:positive(store),storeReconciliationShortfallMinor:shortfall(store),walletDepositsMinor:total('topup','credited')+total('topup','reversed')+total('topup','reversal_review'),walletSpendingMinor:total('purchase'),walletRefundsMinor:total('refund'),earnTransfersMinor:total('transfer'),achievementCreditsMinor:total('achievement'),reservedWithdrawalsMinor:operations.filter(x=>x.kind==='withdrawal'&&['approved','pending_review'].includes(x.state)).reduce((s,x)=>s+x.amount_minor,0),paidWithdrawalsMinor:operations.filter(x=>x.kind==='withdrawal'&&x.state==='paid').reduce((s,x)=>s+x.payload.netMinor,0),withdrawalFeesMinor:operations.filter(x=>x.kind==='withdrawal'&&x.state==='paid').reduce((s,x)=>s+x.payload.feeMinor,0),referralCreditsMinor:approved,rewardReversalsMinor:operations.filter(x=>x.kind==='reversal'&&x.payload.rewardId).reduce((s,x)=>s+x.amount_minor,0)};
   }
   static _reset(){memory={accounts:{},operations:[],ledger:[],config:{}};}
 }

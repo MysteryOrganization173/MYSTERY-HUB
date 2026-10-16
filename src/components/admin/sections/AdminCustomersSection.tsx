@@ -1,4 +1,5 @@
 import { SecurityDialog } from '../../auth/SecurityDialog';
+import {AdminGuestHistory} from './AdminGuestHistory';
 import { AdminCustomerSecurity } from './AdminCustomerSecurity';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { earnMoney } from './AdminEarnUi';
@@ -71,7 +72,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
     let active = true; setIsLoadingDetails(true); setEarnSummary(null); setUserOrders([]); setUserWaitlists([]);
     getAdminUserDetailsOnServer(sessionToken, initialUserId).then(res => {
       if (!active || request !== detailRequest.current) return;
-      setSelectedUser({ ...res.user, orderCount: 0, totalSpentGhc: 0 });
+      setSelectedUser(res.user);
       setUserOrders(res.orders); setUserWaitlists(res.waitlist); setEarnSummary(res.earn);
     }).catch(err => { if (active && request === detailRequest.current) setError(err.message); }).finally(() => { if (active && request === detailRequest.current) setIsLoadingDetails(false); });
     return () => { active = false; };
@@ -160,7 +161,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white sm:text-[1.7rem]">Customer Accounts</h1>
           <p className="max-w-2xl text-sm leading-relaxed text-slate-400">
-            Real registered customer profiles, lifetime purchase volume, and account access management.
+            Registered accounts only. Linked orders use account ownership; guest purchases are never assigned by name or phone similarity. Enabled means allowed to sign in, not online. Spending counts verified, delivered purchases excluding refunds.
           </p>
         </div>
 
@@ -182,6 +183,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
         </div>
       )}
 
+      <AdminGuestHistory token={sessionToken}/>
       {/* Search & Filter Bar */}
       <div className="p-4 rounded-2xl bg-[#0f171d] border border-slate-800/90 space-y-3">
         <div className="relative">
@@ -262,10 +264,10 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
                   <th className="py-3 px-4">Contact Info</th>
                   <th className="py-3 px-4">Role</th>
                   <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Orders</th>
-                  <th className="py-3 px-4 text-right">Lifetime Spent</th>
+                  <th className="py-3 px-4 text-right">Linked orders</th>
+                  <th className="py-3 px-4 text-right">Completed spending</th>
                   <th className="py-3 px-4">Registered</th>
-                  <th className="py-3 px-4">Last Active</th>
+                  <th className="py-3 px-4">Last login / observed activity</th>
                   <th className="py-3 px-4 text-center">Controls</th>
                 </tr>
               </thead>
@@ -314,8 +316,8 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
                       <td className="py-3 px-4">
                         {isActive ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            <span>Active</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 " />
+                            <span>Enabled</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/30">
@@ -339,7 +341,8 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
                       <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">
                         {u.lastLoginAt
                           ? new Date(u.lastLoginAt).toLocaleDateString([], { month: 'short', day: 'numeric' })
-                          : 'Never'}
+                          : 'Login not recorded'}
+                        <span className="block text-slate-500">{u.lastObservedActivityAt ? new Date(u.lastObservedActivityAt).toLocaleString('en-GH',{timeZone:'Africa/Accra'}) : 'Session activity not retained'}</span>
                       </td>
 
                       <td className="py-3 px-4 text-center">

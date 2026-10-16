@@ -319,7 +319,7 @@ export class AuthStore {
 
     const pool = getPool();
     if (pool) {
-      await pool.query(`UPDATE sessions SET last_seen_at = $1 WHERE token_hash = $2;`, [
+      await pool.query(`UPDATE sessions SET last_seen_at = $1 WHERE token_hash = $2 AND last_seen_at < $1::timestamptz - INTERVAL '5 minutes';`, [
         nowIso,
         tokenHash,
       ]);
@@ -327,9 +327,16 @@ export class AuthStore {
     }
 
     const s = devSessionsStore.get(tokenHash);
-    if (s) {
+    if (s && Date.parse(s.last_seen_at) < Date.now()-5*60_000) {
       s.last_seen_at = nowIso;
     }
+  }
+
+  /** Observed authenticated activity in retained sessions; never an online indicator. */
+  static async adminSessionActivity(ids:string[]):Promise<Map<string,string>> {
+    const pool=getPool(),result=new Map<string,string>();if(!ids.length)return result;
+    const rows=pool?(await pool.query('SELECT user_id,MAX(last_seen_at) AS last_seen_at FROM sessions WHERE user_id=ANY($1::text[]) GROUP BY user_id',[ids])).rows:[...devSessionsStore.values()].filter(s=>ids.includes(s.user_id));
+    for(const row of rows){const at=new Date(row.last_seen_at).toISOString();if(!result.has(row.user_id)||at>result.get(row.user_id)!)result.set(row.user_id,at);}return result;
   }
 
   /**

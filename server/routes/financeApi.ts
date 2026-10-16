@@ -30,7 +30,7 @@ financeRouter.post('/achievements/:id/claim',sensitive,handler(req=>FinanceServi
 
 export const adminFinanceRouter=Router();
 adminFinanceRouter.use(requireAdmin);
-adminFinanceRouter.get('/control',handler(async req=>({metrics:await FinanceStore.metrics(),...(await FinanceStore.transaction(req.user.id,async tx=>({settings:await FinanceService.config(tx),definitions:await FinanceService.achievementDefinitions(tx)}))),economics:await Promise.all(['data','airtime','afa'].map(async service=>({service,...await economicsPolicy(service)})))})));
+adminFinanceRouter.get('/control',handler(async req=>({metrics:await FinanceStore.metrics(),...(await FinanceStore.read(req.user.id,async tx=>({settings:await FinanceService.config(tx),definitions:await FinanceService.achievementDefinitions(tx)}))),economics:await Promise.all(['data','airtime','afa'].map(async service=>({service,...await economicsPolicy(service)})))})));
 adminFinanceRouter.get('/operations',handler(req=>FinanceStore.adminOperations(typeof req.query.kind==='string'?req.query.kind:undefined,50,Math.max(0,Math.min(100000,Number(req.query.offset)||0)))));
 adminFinanceRouter.get('/customers/:id',handler(async req=>({...await FinanceService.summary(req.params.id,Math.max(0,Math.min(100000,Number(req.query.offset)||0))),earnLedger:await ReferralStore.getLedgerForUser(req.params.id)})));
 adminFinanceRouter.post('/orders/:id/refund',sensitive,handler(async req=>{
@@ -40,7 +40,7 @@ adminFinanceRouter.post('/orders/:id/refund',sensitive,handler(async req=>{
 }));
 adminFinanceRouter.get('/withdrawals',handler(async req=>{
   const requests=await FinanceStore.adminOperations('withdrawal',50,Math.max(0,Math.min(100000,Number(req.query.offset)||0)));
-  return Promise.all(requests.map(async row=>{const summary=await FinanceService.summary(row.user_id);return {...row,source:row.payload.source==='store'?'Store Earnings':'Mystery Earn',earn:row.payload.source==='store'?await FinanceStore.transaction(row.user_id,tx=>tx.storeEarnings()):summary.earn,restricted:summary.restricted,priorWithdrawals:(await FinanceStore.transaction(row.user_id,tx=>tx.operations())).filter(x=>x.kind==='withdrawal'&&x.id!==row.id).length};}));
+  return Promise.all(requests.map(async row=>{const summary=await FinanceService.summary(row.user_id);return {...row,source:row.payload.source==='store'?'Store Earnings':'Mystery Earn',earn:row.payload.source==='store'?await FinanceStore.read(row.user_id,tx=>tx.storeEarnings()):summary.earn,restricted:summary.restricted,priorWithdrawals:(await FinanceStore.read(row.user_id,tx=>tx.operations())).filter(x=>x.kind==='withdrawal'&&x.id!==row.id).length};}));
 }));
 adminFinanceRouter.post('/withdrawals/:id',sensitive,handler(req=>FinanceService.withdrawalAction(req.user.id,req.params.id,req.body)));
 adminFinanceRouter.post('/customers/:id/adjustment',sensitive,handler(req=>FinanceService.adjustment(req.user.id,req.params.id,req.body)));

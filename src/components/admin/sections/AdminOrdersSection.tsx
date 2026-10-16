@@ -43,6 +43,8 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   const pageSize = 20;
+  const listRequest=useRef(0);
+  useEffect(()=>()=>{listRequest.current++;},[]);
 
   // Data state
   const [ordersData, setOrdersData] = useState<AdminOrdersResponse | null>(null);
@@ -93,6 +95,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
 
   const lensParams = ORDER_LENSES.find(l => l.id === lens)?.params || {};
   const fetchOrders = useCallback(async () => {
+    const ticket=++listRequest.current;
     setIsSearching(true);
     setError(null);
     try {
@@ -107,7 +110,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
         page: currentPage,
         limit: pageSize,
       });
-      if (res.success) {
+      if (res.success && ticket===listRequest.current) {
         setOrdersData(res);
         setLoadedAt(Date.now());
         if (selectedOrderRef.current) {
@@ -116,10 +119,9 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
         }
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to retrieve orders.');
+      if(ticket===listRequest.current)setError(err instanceof Error ? err.message : 'Failed to retrieve orders.');
     } finally {
-      setIsLoading(false);
-      setIsSearching(false);
+      if(ticket===listRequest.current){setIsLoading(false);setIsSearching(false);}
     }
   }, [sessionToken, debouncedSearch, serviceTypeFilter, networkFilter, lens, manualReviewFilter, dateFrom, dateTo, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -861,7 +861,7 @@ export class OrdersStore {
       const query = `
         SELECT user_id, 
                COUNT(*)::int as order_count,
-               COALESCE(SUM(CASE WHEN payment_status = 'success' THEN amount ELSE 0 END), 0)::bigint as total_spent_minor
+               COALESCE(SUM(CASE WHEN payment_status = 'success' AND paid_at IS NOT NULL AND status='delivered' AND delivered_at IS NOT NULL AND currency='GHS' AND payment_provider IN ('paystack','wallet') AND COALESCE(resolution_json->>'outcome','') NOT IN ('paystack_refund','wallet_refund','external_compensation') AND COALESCE(marketplace_status,'') NOT IN ('refund_pending','refunded','cancelled') THEN amount ELSE 0 END), 0)::bigint as total_spent_minor
         FROM orders
         WHERE user_id = ANY($1::text[])
         GROUP BY user_id;
@@ -885,7 +885,7 @@ export class OrdersStore {
       if (ord.user_id && map.has(ord.user_id)) {
         const entry = map.get(ord.user_id)!;
         entry.orderCount += 1;
-        if (ord.payment_status === 'success') {
+        if (ord.payment_status === 'success' && ord.paid_at && ord.status==='delivered' && ord.delivered_at && ord.currency==='GHS' && ['paystack','wallet'].includes(ord.payment_provider) && !['paystack_refund','wallet_refund','external_compensation'].includes(ord.resolution_json?.outcome||'') && !['refund_pending','refunded','cancelled'].includes(ord.marketplace_status||'')) {
           entry.totalSpentMinor += ord.amount;
         }
       }
