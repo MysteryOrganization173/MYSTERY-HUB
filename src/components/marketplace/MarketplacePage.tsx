@@ -8,7 +8,8 @@ import { buildReferralUrl } from '../../utils/referralUrl';
 import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
 import { MarketplaceCheckoutModal } from './MarketplaceCheckoutModal';
 import { MarketplaceProductDetailModal } from './MarketplaceProductDetailModal';
-import { MarketplaceCategoryTiles, CategoryArt } from './MarketplaceCategoryTiles';
+import { MarketplaceCategoryTiles } from './MarketplaceCategoryTiles';
+import { ProductPhoto } from './MarketplaceMedia';
 import { MarketplaceProductCard } from './MarketplaceProductCard';
 import { MarketplaceRefineSheet, refineAvailability } from './MarketplaceRefineSheet';
 import { useMarketplaceDialog } from './useMarketplaceDialog';
@@ -52,7 +53,9 @@ const findProduct = (list: MarketplaceProduct[], slug: string) => list.find(p =>
 export const MarketplacePage: React.FC = () => {
   const { openMarketplaceInquiry, marketplaceOverlay, openMarketplaceOverlay, closeMarketplaceOverlay, dismissMarketplaceOverlay, user, sessionToken, openAuth, showToast } = useApp();
   const [categories, setCategories] = useState<ManagedCategory[]>([]);
-  useEffect(() => { let active = true; marketplaceControlRequest('categories').then(data => { if (active) setCategories(data.categories || []); }).catch(() => {}); return () => { active = false; }; }, []);
+  // Settled (loaded or failed) so scroll restoration waits for the tile row, which sits above the grid.
+  const [categoriesSettled, setCategoriesSettled] = useState(false);
+  useEffect(() => { let active = true; marketplaceControlRequest('categories').then(data => { if (active) setCategories(data.categories || []); }).catch(() => {}).finally(() => { if (active) setCategoriesSettled(true); }); return () => { active = false; }; }, []);
 
   // Browsing state lives in the URL so refresh, sharing and Back all keep the customer's place.
   const [browse, setBrowse] = useState<MarketplaceBrowseState>(() => typeof window === 'undefined' ? DEFAULT_BROWSE_STATE : parseBrowseState(window.location.search));
@@ -188,11 +191,11 @@ export const MarketplacePage: React.FC = () => {
   }, []);
   const restoredScroll = useRef(false);
   useEffect(() => {
-    if (loading || restoredScroll.current) return;
+    if (loading || !categoriesSettled || restoredScroll.current) return;
     restoredScroll.current = true;
     const y = historyState().mhScroll;
     if (typeof y === 'number' && y > 0 && !productParamFromUrl()) requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }));
-  }, [loading]);
+  }, [loading, categoriesSettled]);
 
   const openedDeepLink = useRef<string | null>(null);
   // Deep-link landing & spotlight behavior (also auto-opens product detail modal if link points to product)
@@ -292,7 +295,6 @@ export const MarketplacePage: React.FC = () => {
     handleNativeShare(p, url, 'Product link copied.');
   };
 
-  const getCategoryFallbackIcon = (p: MarketplaceProduct) => <CategoryArt iconKey={categoryIconKey(p.category, p.categoryLabel)} size="chip" />;
 
   const heroBannerUrl = BUSINESS_CONFIG.marketplaceHeroImageUrl;
   const heroSrc = getCloudinaryUrl(heroBannerUrl, { format: 'auto', quality: 'auto' });
@@ -323,7 +325,7 @@ export const MarketplacePage: React.FC = () => {
 
   return (
     <div className="py-4 sm:py-6 text-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5 sm:space-y-7">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-7">
 
         {/* =========================================================
             1. COMPACT MARKETPLACE HERO WITH SEARCH
@@ -355,19 +357,19 @@ export const MarketplacePage: React.FC = () => {
             </div>
           )}
 
-          <div className="relative z-10 w-full p-4 sm:p-7 lg:p-9 space-y-3 sm:space-y-4 text-left">
+          <div className="relative z-10 w-full px-4 pt-4 pb-4 sm:p-7 lg:p-9 space-y-3 sm:space-y-4 text-left">
             <div className="max-w-xl lg:max-w-2xl space-y-1.5 sm:space-y-3">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#111e18]/90 border border-[#00c365]/30 text-xs font-semibold text-[#00c365] backdrop-blur-sm">
+              <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#111e18]/90 border border-[#00c365]/30 text-xs font-semibold text-[#00c365] backdrop-blur-sm">
                 <Sparkles className="w-3 h-3" />
                 <span>Tech &amp; Digital Marketplace</span>
               </div>
-              <h1 className="text-xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight">
+              <h1 className="text-[19px] sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-[1.2]">
                 Technology, Creator Gear &amp;{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E575] via-[#00c365] to-[#38bdf8]">
                   Business Essentials
                 </span>
               </h1>
-              <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-md sm:max-w-xl">
+              <p className="hidden sm:block text-slate-300 text-sm leading-relaxed max-w-md sm:max-w-xl">
                 Buy online where it says so, or send an enquiry and we&apos;ll confirm price and availability in Ghana.
               </p>
             </div>
@@ -384,7 +386,7 @@ export const MarketplacePage: React.FC = () => {
                   autoComplete="off"
                   value={browse.q}
                   onChange={(e) => updateBrowse({ q: e.target.value.slice(0, 80) })}
-                  placeholder="Search laptops, phones, microphones, software…"
+                  placeholder="Search laptops, phones, mics…"
                   className="w-full bg-[#0b1116]/95 border border-slate-700/80 rounded-xl pl-10 pr-10 py-2.5 sm:py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365] focus:ring-2 focus:ring-[#00c365]/25 [&::-webkit-search-cancel-button]:hidden"
                 />
                 {browse.q && (
@@ -400,7 +402,7 @@ export const MarketplacePage: React.FC = () => {
               </form>
             )}
 
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs text-slate-300 font-medium">
+            <div className="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-300 font-medium">
               <div className="flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-[#00c365]" />
                 <span>Clear price or enquiry on every item</span>
@@ -426,7 +428,7 @@ export const MarketplacePage: React.FC = () => {
         <div ref={resultsRef} className="space-y-3 sm:space-y-4 scroll-mt-20">
         {!loading && !error && products.length > 0 && (
           <div className="space-y-2.5">
-            <div className="flex items-end justify-between gap-3">
+            <div className="flex items-end justify-between gap-2 sm:gap-3">
               <div className="min-w-0">
                 <h2 className="text-base sm:text-xl font-bold text-white tracking-tight truncate">{activeCategoryLabel}</h2>
                 <p className="text-xs text-slate-400" aria-live="polite">
@@ -434,15 +436,15 @@ export const MarketplacePage: React.FC = () => {
                   {browse.q.trim() && <> for <span className="text-slate-200">“{browse.q.trim()}”</span></>}
                 </p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <label className="relative">
                   <span className="sr-only">Sort products</span>
-                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 absolute left-2 sm:left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
                   <select
                     value={browse.sort}
                     onChange={e => updateBrowse({ sort: e.target.value as MarketplaceSort })}
                     data-mh-sort
-                    className="appearance-none bg-[#0e141a] border border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs sm:text-sm font-semibold text-slate-100 focus:outline-none focus:border-[#00c365] max-w-[9.5rem] sm:max-w-none"
+                    className="appearance-none bg-[#0e141a] border border-slate-700 rounded-xl pl-7 sm:pl-8 pr-2 sm:pr-3 h-10 text-xs sm:text-sm font-semibold text-slate-100 focus:outline-none focus:border-[#00c365] min-w-[7.5rem]"
                   >
                     {SORT_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
                   </select>
@@ -452,7 +454,7 @@ export const MarketplacePage: React.FC = () => {
                     type="button"
                     data-mh-refine-open
                     onClick={() => setRefineOpen(true)}
-                    className={`relative inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs sm:text-sm font-semibold transition-colors active:scale-95 ${refinementCount ? 'border-[#00c365] text-white bg-[#00c365]/10' : 'border-slate-700 text-slate-100 bg-[#0e141a] hover:border-slate-500'}`}
+                    className={`relative inline-flex items-center gap-1.5 rounded-xl border px-2.5 sm:px-3 h-10 text-xs sm:text-sm font-semibold transition-colors active:scale-95 ${refinementCount ? 'border-[#00c365] text-white bg-[#00c365]/10' : 'border-slate-700 text-slate-100 bg-[#0e141a] hover:border-slate-500'}`}
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
                     <span>Refine</span>
@@ -465,7 +467,7 @@ export const MarketplacePage: React.FC = () => {
             {activeChips.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5" aria-label="Active filters">
                 {activeChips.map(chip => (
-                  <button key={chip.key} type="button" onClick={chip.clear} className="inline-flex items-center gap-1 max-w-full rounded-full border border-slate-700 bg-[#0e141a] pl-2.5 pr-1.5 py-1 text-xs text-slate-200 hover:border-slate-500" aria-label={`Remove filter ${chip.label}`}>
+                  <button key={chip.key} type="button" onClick={chip.clear} className="inline-flex items-center gap-1 max-w-full rounded-full border border-slate-700 bg-[#0e141a] pl-3 pr-2 min-h-[32px] text-xs text-slate-200 hover:border-slate-500" aria-label={`Remove filter ${chip.label}`}>
                     <span className="truncate">{chip.label}</span>
                     <X className="w-3 h-3 text-slate-400 shrink-0" aria-hidden="true" />
                   </button>
@@ -484,12 +486,15 @@ export const MarketplacePage: React.FC = () => {
             {[1, 2, 3, 4].map((n) => (
               <div
                 key={n}
-                className="rounded-2xl bg-[#0f151b] border border-slate-800 p-2.5 sm:p-4 space-y-2.5 animate-pulse"
+                className="rounded-2xl bg-[#0f151b] border border-slate-800 overflow-hidden animate-pulse"
               >
-                <div className="w-full aspect-square rounded-xl bg-slate-800/50" />
-                <div className="h-3 bg-slate-800 rounded w-1/2" />
-                <div className="h-4 bg-slate-800 rounded w-3/4" />
-                <div className="h-4 bg-slate-800 rounded w-1/3" />
+                <div className="w-full aspect-square bg-slate-800/50" />
+                <div className="p-2.5 sm:p-3.5 space-y-2">
+                  <div className="h-3.5 bg-slate-800 rounded w-4/5" />
+                  <div className="h-3 bg-slate-800/70 rounded w-1/2" />
+                  <div className="h-4 bg-slate-800 rounded w-1/3 mt-3" />
+                  <div className="h-5 bg-slate-800/70 rounded-full w-20" />
+                </div>
               </div>
             ))}
           </div>
@@ -561,7 +566,7 @@ export const MarketplacePage: React.FC = () => {
         ) : filteredProducts.length === 0 ? (
           /* FILTERED-ZERO STATE: explain why, offer the nearest useful step */
           <div className="text-center py-8 px-4 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-3 max-w-lg mx-auto">
-            <Search className="w-7 h-7 text-slate-500 mx-auto" />
+            <Search className="w-7 h-7 text-slate-400 mx-auto" />
             <h3 className="text-sm sm:text-base font-bold text-white">
               {browse.q.trim() ? `No results for “${browse.q.trim()}”` : browse.category !== 'all' && !products.some(p => p.category === browse.category) ? `No products in ${activeCategoryLabel} yet` : 'No products match these filters'}
             </h3>
@@ -594,10 +599,11 @@ export const MarketplacePage: React.FC = () => {
         ) : (
           /* LIVE PRODUCTS GRID (2 columns on phones) */
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-5">
-            {filteredProducts.map((p) => (
+            {filteredProducts.map((p, index) => (
               <MarketplaceProductCard
                 key={p.id}
                 product={p}
+                priority={index < 2}
                 highlighted={highlightedProductId === p.id}
                 onOpen={setSelectedProduct}
                 onShareEarn={handleOpenShareModal}
@@ -758,16 +764,15 @@ export const MarketplacePage: React.FC = () => {
             <div className="p-5 sm:p-6 overflow-y-auto space-y-5 text-left">
               {/* Product Preview Card */}
               <div className="p-3.5 rounded-xl bg-[#121921] border border-slate-800 flex items-center gap-3">
-                <div className="w-14 h-14 rounded-lg bg-[#080d11] border border-slate-800 shrink-0 overflow-hidden flex items-center justify-center">
-                  {shareModalProduct.imageUrl ? (
-                    <img
-                      src={shareModalProduct.imageUrl}
-                      alt={shareModalProduct.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    getCategoryFallbackIcon(shareModalProduct)
-                  )}
+                <div className="w-14 h-14 rounded-lg border border-slate-800 shrink-0 overflow-hidden">
+                  <ProductPhoto
+                    src={shareModalProduct.imageUrl}
+                    alt={shareModalProduct.imageAlt || shareModalProduct.name}
+                    iconKey={categoryIconKey(shareModalProduct.category, shareModalProduct.categoryLabel)}
+                    widths={[112, 168]}
+                    sizes="56px"
+                    iconSize="sm"
+                  />
                 </div>
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider block">

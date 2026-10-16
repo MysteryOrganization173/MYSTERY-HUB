@@ -278,3 +278,8 @@
 }
 @media (prefers-reduced-motion: reduce) { .help-question summary svg { transition: none; } }
 .home-marketplace-shortcuts { margin-top: 16px; }
+.home-product .home-product-cta { font-size: .75rem; padding-inline: 8px; text-decoration: none; }
+.home-product-path { display: inline-flex; align-items: center; margin-bottom: 4px; font-size: .6875rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.home-product-path-buy { background: rgba(0, 195, 101, .14); color: #3ee08f; }
+.home-product-path-enquire { background: rgba(56, 189, 248, .12); color: #bae6fd; }
+.home-product-path-coming_soon { background: rgba(100, 116, 139, .2); color: #cbd5e1; }

@@ -241,3 +241,21 @@ test('enquiry modal explains what happens after sending', () => {
   assert.ok(inquiry.includes('What happens next'));
   assert.ok(inquiry.includes('does not place an order or require payment'));
 });
+
+test('refinement: photos sit on one studio surface, uncropped; option counts and path chips are explicit', () => {
+  const withPhoto = card(product({ imageUrl: 'https://res.cloudinary.com/demo/image/upload/v1/box.png', variants }));
+  assert.ok(withPhoto.includes('object-contain') || withPhoto.includes('contain'), 'real photos are contained, never cropped');
+  assert.ok(withPhoto.includes('#f7f8fa'), 'photos share the studio surface');
+  assert.ok(withPhoto.includes('2 options'));
+  const noPhoto = card(product({ imageUrl: undefined }));
+  assert.ok(!noPhoto.includes('#f7f8fa'), 'missing images keep the dark icon tile, not an empty light box');
+  const enquire = card(product({ purchaseEnabled: false }));
+  assert.ok(enquire.includes('>Enquire<') && !enquire.includes('>Buy online<'), 'enquiry-only products never show the buy chip');
+});
+
+test('refinement: homepage featured CTA follows the real purchase path', () => {
+  const home = source('src/components/home/HomeMarketplaceSection.tsx');
+  assert.ok(home.includes("productPath(p) === 'buy' ?"));
+  assert.ok(home.includes('View &amp; Buy'));
+  assert.ok(home.includes('PATH_LABELS[productPath(p)]'));
+});

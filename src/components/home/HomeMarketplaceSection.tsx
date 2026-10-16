@@ -5,8 +5,9 @@ import { marketplaceControlRequest, ManagedCategory } from '../../services/marke
 import { BUSINESS_CONFIG } from '../../config/business';
 import { MarketplaceProduct } from '../../types';
 import { OptimizedImage } from '../common/OptimizedImage';
-import { Laptop, Mic, Cpu, Store, ArrowRight, FileQuestion, Image as ImageIcon } from 'lucide-react';
-import { marketplaceHref, openMarketplaceAt, productPriceText } from '../../utils/marketplaceBrowse';
+import { Laptop, Mic, Cpu, Store, ArrowRight, FileQuestion, ShoppingBag } from 'lucide-react';
+import { ProductPhoto } from '../marketplace/MarketplaceMedia';
+import { PATH_LABELS, categoryIconKey, marketplaceHref, openMarketplaceAt, productPath, productPriceText } from '../../utils/marketplaceBrowse';
 
 export const HomeMarketplaceSection: React.FC = () => {
   const { setActivePage, openMarketplaceInquiry } = useApp();
@@ -50,7 +51,7 @@ export const HomeMarketplaceSection: React.FC = () => {
         <div className="home-marketplace-intro">
           <p className="home-eyebrow">Tech & Digital Marketplace</p>
           <h2 id="marketplace-heading">Find your next <span>work companion.</span></h2>
-          <p>Browse technology and digital tools. Send an enquiry to check availability, pricing and delivery before deciding.</p>
+          <p>Browse technology and digital tools. Buy online where an item says so, or send an enquiry to confirm price, availability and delivery.</p>
           <a href="/marketplace" onClick={(e) => { e.preventDefault(); setActivePage('marketplace'); }} className="mh-button-secondary">Browse Marketplace<ArrowRight className="w-4 h-4" /></a>
         </div>
       </div>
@@ -59,9 +60,14 @@ export const HomeMarketplaceSection: React.FC = () => {
           <>
           <div className="home-product-grid">{featuredProducts.map(p => (
             <article key={p.id} className="home-product">
-              <a href={marketplaceHref({ product: p.slug || p.id })} onClick={e => go(e, { product: p.slug || p.id })} className="home-product-image" aria-label={`View ${p.name}`}><OptimizedImage src={p.imageUrl} alt={p.imageAlt || p.name} aspectRatio="4/3" objectFit="contain" responsiveWidths={[320, 480, 640]} sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" fallbackIcon={<ImageIcon className="w-8 h-8" />} /></a>
-              <div className="home-product-details"><p><a href={marketplaceHref({ category: p.category })} onClick={e => go(e, { category: p.category })} className="home-product-category">{p.categoryLabel}</a></p><h3><a href={marketplaceHref({ product: p.slug || p.id })} onClick={e => go(e, { product: p.slug || p.id })}>{p.name}</a></h3><strong>{productPriceText(p)}</strong>{p.tagline && <p>{p.tagline}</p>}</div>
-              <button type="button" onClick={() => openMarketplaceInquiry(p)} className="mh-button-secondary"><FileQuestion className="w-4 h-4" />Ask About This Item</button>
+              <a href={marketplaceHref({ product: p.slug || p.id })} onClick={e => go(e, { product: p.slug || p.id })} className="home-product-image" aria-label={`View ${p.name}`}><ProductPhoto src={p.imageUrl} alt={p.imageAlt || p.name} iconKey={categoryIconKey(p.category, p.categoryLabel)} widths={[320, 480, 640]} sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" /></a>
+              <div className="home-product-details"><p><a href={marketplaceHref({ category: p.category })} onClick={e => go(e, { category: p.category })} className="home-product-category">{p.categoryLabel}</a></p><h3><a href={marketplaceHref({ product: p.slug || p.id })} onClick={e => go(e, { product: p.slug || p.id })}>{p.name}</a></h3><strong>{productPriceText(p)}</strong><span className={`home-product-path home-product-path-${productPath(p)}`}>{PATH_LABELS[productPath(p)]}</span>{p.tagline && <p>{p.tagline}</p>}</div>
+              {/* The shortcut matches what the product really supports: buyable items open their product sheet. */}
+              {productPath(p) === 'buy' ? (
+                <a href={marketplaceHref({ product: p.slug || p.id })} onClick={e => go(e, { product: p.slug || p.id })} className="mh-button home-product-cta"><ShoppingBag className="w-4 h-4" />View &amp; Buy</a>
+              ) : (
+                <button type="button" onClick={() => openMarketplaceInquiry(p)} className="mh-button-secondary"><FileQuestion className="w-4 h-4" />Ask About This Item</button>
+              )}
             </article>
           ))}</div>
           {shortcutRow && <div className="home-marketplace-shortcuts">{shortcutRow}</div>}

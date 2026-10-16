@@ -3,7 +3,8 @@ import { useMarketplaceDialog } from './useMarketplaceDialog';
 import { FULFILMENT_LABELS } from '../../../shared/marketplacePolicy';
 import React, { useState } from 'react';
 import { MarketplaceProduct, MarketplacePickupLocation } from '../../types';
-import { OptimizedImage } from '../common/OptimizedImage';
+import { ProductPhoto } from './MarketplaceMedia';
+import { categoryIconKey } from '../../utils/marketplaceBrowse';
 import { PATH_LABELS, isDirectPurchaseSupported, productPath, productPriceText } from '../../utils/marketplaceBrowse';
 import {
   X,
@@ -21,12 +22,6 @@ import {
   ChevronUp,
   MessageCircle,
   Clock,
-  Box,
-  Laptop,
-  Smartphone,
-  Mic,
-  Cpu,
-  Printer,
 } from 'lucide-react';
 
 interface MarketplaceProductDetailModalProps {
@@ -62,24 +57,6 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
   const selectedVariant = options.find(v => v.id === selectedVariantId);
   const needsOption = options.length > 0 && !selectedVariant;
   const displayedPrice = selectedVariant ? 'GH₵' + (selectedVariant.priceMinor / 100).toLocaleString('en-US',{maximumFractionDigits:2}) : productPriceText(product);
-  const getCategoryFallbackIcon = (category: string) => {
-    switch (category) {
-      case 'laptops_computers':
-        return <Laptop className="w-12 h-12 text-sky-400 opacity-80" />;
-      case 'phones_accessories':
-        return <Smartphone className="w-12 h-12 text-emerald-400 opacity-80" />;
-      case 'creator_tools':
-        return <Mic className="w-12 h-12 text-pink-400 opacity-80" />;
-      case 'ai_productivity':
-      case 'business_software':
-        return <Cpu className="w-12 h-12 text-[#00c365] opacity-80" />;
-      case 'business_essentials':
-        return <Printer className="w-12 h-12 text-amber-400 opacity-80" />;
-      default:
-        return <Box className="w-12 h-12 text-slate-400 opacity-80" />;
-    }
-  };
-
   const availabilityBadgeMap: Record<string, { label: string; style: string }> = {
     in_stock: {
       label: 'In Stock',
@@ -166,7 +143,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
       aria-labelledby="product-detail-title"
     >
       <div
-        className="relative w-full max-w-full sm:max-w-2xl lg:max-w-3xl h-[92vh] sm:h-auto sm:max-h-[90vh] bg-[#0c1218] border-t sm:border border-slate-700/80 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-100"
+        className="relative w-full max-w-full sm:max-w-2xl lg:max-w-5xl h-[92vh] sm:h-auto sm:max-h-[90vh] bg-[#0c1218] border-t sm:border border-slate-700/80 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-100"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header / Close Action */}
@@ -175,7 +152,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
             <span className="text-[11px] font-bold text-[#00c365] bg-[#00c365]/10 border border-[#00c365]/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider truncate">
               {product.categoryLabel}
             </span>
-            <span className="text-xs text-slate-400 hidden sm:inline">
+            <span className="text-xs text-slate-400 whitespace-nowrap">
               · {PATH_LABELS[path]}
             </span>
           </div>
@@ -192,44 +169,49 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
 
         {/* Scrollable Product Details Content Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7 space-y-6 text-left">
-          {/* 1. Large High-Quality Product Image */}
-          <div className="relative w-full h-[min(38vh,300px)] sm:h-[300px] bg-gradient-to-b from-[#080d12] to-[#0f1620] rounded-2xl border border-slate-800/90 overflow-hidden shadow-inner flex items-center justify-center">
-            <OptimizedImage
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-8 lg:items-start space-y-6 lg:space-y-0">
+          {/* 1. Product photography (studio surface: never cropped, any proportion) */}
+          <div className="space-y-2.5 lg:sticky lg:top-0">
+          <div className="relative w-full h-[min(32vh,250px)] sm:h-[320px] lg:h-auto lg:aspect-square rounded-2xl border border-slate-800/90 overflow-hidden">
+            <ProductPhoto
               key={photos[photoIndex] || 'none'}
               src={photos[photoIndex] || product.imageUrl}
               alt={product.imageAlt || product.name}
-              objectFit="cover"
-              objectPosition="center center"
-              fallbackIcon={getCategoryFallbackIcon(product.category)}
-              className="w-full h-full object-cover transition-transform duration-300 hover:scale-102"
+              iconKey={categoryIconKey(product.category, product.categoryLabel)}
+              iconSize="lg"
+              priority
+              widths={[480, 720, 960]}
+              sizes="(min-width: 1024px) 480px, 100vw"
             />
 
             {/* Promo Badge */}
             {product.badge && (
-              <span className="absolute top-3 right-3 text-xs font-bold text-white bg-black/80 backdrop-blur-md border border-slate-700 px-3 py-1 rounded-lg shadow-md">
+              <span className="absolute top-3 left-3 max-w-[70%] truncate text-xs font-bold text-[#00e575] bg-[#0b1116]/85 backdrop-blur-sm px-2.5 py-1 rounded-lg">
                 {product.badge}
               </span>
             )}
 
-            {/* Availability Pill on Image */}
-            <span
-              className={`absolute bottom-3 left-3 text-xs font-bold px-3 py-1 rounded-lg backdrop-blur-md border shadow-md ${availabilityBadge.style}`}
+            {/* Availability pill only when it says something beyond plain "Available", matching the cards. */}
+            {product.availability !== 'available' && <span
+              className={`absolute bottom-3 left-3 text-xs font-bold px-2.5 py-1 rounded-lg backdrop-blur-md border ${availabilityBadge.style}`}
             >
               {product.availabilityLabel || availabilityBadge.label}
-            </span>
+            </span>}
           </div>
 
           {photos.length > 1 && (
-            <div role="group" aria-label="Product photos" className="-mt-3 flex gap-2 overflow-x-auto pb-1">
+            <div role="group" aria-label="Product photos" className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
               {photos.map((url, index) => (
                 <button key={url} type="button" onClick={() => setPhotoIndex(index)} aria-label={`Show photo ${index + 1} of ${photos.length}`} aria-pressed={photoIndex === index}
-                  className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 ${photoIndex === index ? 'border-[#00c365]' : 'border-slate-800 opacity-70 hover:opacity-100'}`}>
-                  <img src={url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                  className={`h-14 w-14 sm:h-16 sm:w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-[#eef1f4] ${photoIndex === index ? 'border-[#00c365]' : 'border-slate-800 opacity-75 hover:opacity-100'}`}>
+                  <img src={url} alt="" loading="lazy" className="h-full w-full object-contain p-1 mix-blend-multiply" />
                 </button>
               ))}
             </div>
           )}
+          </div>
 
+          <div className="space-y-6">
           {/* 2. Product Title, Tagline & Price */}
           <div className="space-y-2 border-b border-slate-800/80 pb-5">
             <h2
@@ -252,7 +234,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
                     ? 'Starting Price'
                     : product.priceType === 'quote'
                     ? 'Pricing'
-                    : 'Ghana Cedis Price'}
+                    : 'Price'}
                 </span>
                 <span className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight tabular-nums">
                   {displayedPrice}
@@ -273,7 +255,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
             </div>
           </div>
 
-          {options.length > 0 && <fieldset className="space-y-2"><legend className="font-bold text-sm">Choose an option</legend><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{options.map(option => <button key={option.id} type="button" aria-pressed={selectedVariantId === option.id} onClick={() => {setSelectedVariantId(option.id);onVariantChange?.(option.id);}} className={`rounded-xl border p-3 text-left text-sm ${selectedVariantId === option.id ? 'border-emerald-400 bg-emerald-500/15' : 'border-slate-700 bg-slate-900'}`}><span className="block">{option.name}</span><strong>GH₵{(option.priceMinor/100).toLocaleString()}</strong></button>)}</div>{needsOption && <p className="text-sm text-amber-300">Choose an option before continuing to payment.</p>}</fieldset>}
+          {options.length > 0 && <fieldset className="space-y-2"><legend className="font-bold text-sm">Choose an option</legend><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{options.map(option => <button key={option.id} type="button" aria-pressed={selectedVariantId === option.id} onClick={() => {setSelectedVariantId(option.id);onVariantChange?.(option.id);}} className={`relative min-h-[52px] rounded-xl border px-3.5 py-2.5 pr-9 text-left text-sm transition-colors active:scale-[0.99] ${selectedVariantId === option.id ? 'border-[#00c365] bg-[#00c365]/10 text-white' : 'border-slate-700 bg-[#0b1116] text-slate-200 hover:border-slate-500'}`}><span className="block font-medium">{option.name}</span><strong className="tabular-nums">GH₵{(option.priceMinor/100).toLocaleString()}</strong>{selectedVariantId === option.id && <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#00c365]" aria-hidden="true" />}</button>)}</div>{needsOption && <p className="text-sm text-amber-300">Choose an option before continuing to payment.</p>}</fieldset>}
 
           <div className={`rounded-2xl border px-4 py-3 flex items-start gap-2.5 ${nextStep.tone}`}>
             {path === 'buy' ? <ShieldCheck className="w-4 h-4 text-[#00c365] shrink-0 mt-0.5" /> : path === 'coming_soon' ? <Clock className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" /> : <MessageCircle className="w-4 h-4 text-sky-300 shrink-0 mt-0.5" />}
@@ -463,13 +445,16 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
           </div>
 
 
+          </div>
+          </div>
+
           {/* Spacing safeguard so bottom content is never hidden behind sticky bar */}
           <div className="h-16 sm:h-20" />
         </div>
 
         {/* 7. Sticky Bottom Action Bar (Reachable at all scroll positions) */}
         <div className="sticky bottom-0 left-0 right-0 z-20 bg-[#090e13]/95 backdrop-blur-md border-t border-slate-800/90 p-3 sm:p-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] shadow-2xl">
-          <div className="flex items-center gap-2 sm:gap-2.5 max-w-2xl mx-auto">
+          <div className="flex items-center gap-2 sm:gap-2.5 max-w-2xl lg:max-w-none lg:w-[calc(51.2%-1rem)] lg:ml-auto">
             {isPurchaseSupported ? (
               <>
                 <button
