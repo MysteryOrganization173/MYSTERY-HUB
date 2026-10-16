@@ -233,6 +233,7 @@ export class OrdersStore {
     devMemoryStore.clear();
     devWebhookEventsStore.clear();
   }
+  static removeDevOrder(id:string){if(getPool()||process.env.NODE_ENV==='production')throw new Error('Memory-only rollback helper.');for(const [key,order] of devMemoryStore)if(order.id===id)devMemoryStore.delete(key);}
 
   static async hasEarlierQualifyingReferralOrder(order: OrderRecord, params: {
     referrerId: string; userId?: string | null; attributionId?: string | null; attributionFirstSeen?: string | null;

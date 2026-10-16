@@ -2,7 +2,7 @@ import type {OrderRecord} from '../types/orders.js';
 
 // Old payment handlers stored their local notice in supplier_response. These are
 // not provider evidence, and missing publicId alone never proves nonacceptance.
-const localPaymentNotices = new Set(['Paystack verify API','Paystack payment confirmed','Paystack webhook','Wallet payment confirmed','Direct payment recovery','Managed store payment recovery']);
+const localPaymentNotices = new Set(['Paystack verify API','Paystack payment confirmed','Paystack webhook','Wallet payment confirmed','Wallet payment committed','Direct payment recovery','Managed store payment recovery']);
 export function manualClosureBlock(order:Pick<OrderRecord,'resolution_json'|'status'|'delivered_at'|'failure_reason'|'supplier_response'>):string|null {
   const r=order.resolution_json;
   if(r?.outcome||r?.refundId||r?.lastAttemptAt||r?.providerStatus||r?.stage==='refund_pending'||order.status==='refunded'||order.delivered_at)

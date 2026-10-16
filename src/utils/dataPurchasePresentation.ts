@@ -21,8 +21,8 @@ export function dataRecipientDisplay(phone: string, buyerVisible = false): strin
 }
 
 // Presentation only: a popup callback or local order never confirms payment.
-export function dataOrderPresentation(status?: string, manualReview = false, customerResolution?:import('../../server/types/orderResolution').CustomerResolution) {
-  const paymentConfirmed = Boolean(customerResolution) || ['paid', 'queued', 'submitted', 'processing', 'delivered', 'refund_pending', 'refunded'].includes(status || '');
+export function dataOrderPresentation(status?: string, manualReview = false, customerResolution?:import('../../server/types/orderResolution').CustomerResolution,paymentBasis?:'complimentary'|'operator_recorded') {
+  const paymentConfirmed = !paymentBasis&&(Boolean(customerResolution) || ['paid', 'queued', 'submitted', 'processing', 'delivered', 'refund_pending', 'refunded'].includes(status || ''));
   const delivered = status === 'delivered' || customerResolution==='manual_fulfillment';
   const processing = ['submitted', 'processing'].includes(status || '');
   let title = paymentConfirmed ? 'Payment confirmed' : 'Confirming your payment';
@@ -41,7 +41,8 @@ export function dataOrderPresentation(status?: string, manualReview = false, cus
   if(customerResolution==='manual_fulfillment'){title='Service completed manually';label='Manually resolved';next='Support has confirmed that your service was completed through another channel. This does not claim delivery by the original supplier. Contact support with your reference if you need help.';}
   if(customerResolution==='external_compensation'){title='External remedy recorded';label='Manually resolved';next='Support has recorded an external customer remedy. This is an operator confirmation, not a Paystack-verified refund. Contact support with your reference if you need help.';}
   if (manualReview && !['refund_confirmed','manual_fulfillment','external_compensation'].includes(customerResolution||'')) { title = 'Your order needs support review'; label = 'Manual review'; next = 'Support needs to check this order. Keep your reference and avoid placing the same order again.'; }
-  return { paymentConfirmed, delivered, processing, title, label, next };
+  if(paymentBasis){title=delivered?'Your data has been delivered':manualReview||['failed','refund_pending'].includes(status||'')?'Assisted order needs review':'Your assisted order';label=delivered?'Delivered':manualReview?'Support review':processing?'With supplier':'Awaiting supplier';next=paymentBasis==='complimentary'?'This is a complimentary order. No customer payment was taken. Contact support with this reference for delivery help.':'Support recorded a payment collected outside Mystery Hub checkout. This is not a Paystack-verified payment. Contact support with this reference for delivery help.';}
+  return { paymentConfirmed, delivered, processing, title, label, next,paymentLabel:paymentBasis==='complimentary'?'Complimentary':paymentBasis==='operator_recorded'?'External payment recorded':'Payment confirmed',paymentStageComplete:!!paymentBasis||paymentConfirmed };
 }
 
 /** Display only an actual validity; legacy delivery/routing labels are not durations. */

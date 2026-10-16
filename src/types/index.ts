@@ -60,6 +60,7 @@ export interface OrderRecord {
   status: OrderStatus;
   manualReview?: boolean;
   customerResolution?:import('../../server/types/orderResolution').CustomerResolution;
+  paymentBasis?:'complimentary'|'operator_recorded';
   serverStatus?: string; // Raw backend status e.g. 'refund_pending', 'delivered'
   statusMessage?: string; // Customer-friendly status message (e.g. for refund pending)
   paymentReference?: string;

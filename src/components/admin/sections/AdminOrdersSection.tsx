@@ -1,5 +1,6 @@
 import { AdminOrderResolution } from './AdminOrderResolution';
 import { AdminOrderRecovery } from './AdminOrderRecovery';
+import { AdminAssistedOrders,AdminAssistedEvidence } from './AdminAssistedOrders';
 import { afaStatusLabel } from '../../../../shared/afa';
 import { FULFILMENT_LABELS, FulfilmentMode } from '../../../../shared/marketplacePolicy';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -230,7 +231,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
       <AdminPageHeader
         title="Orders & delivery"
         description="Find any order, see exactly where the customer stands, and act on what needs attention."
-        actions={<><Freshness at={loadedAt} /><RefreshButton onClick={() => void fetchOrders()} busy={isSearching} /></>}
+        actions={<><AdminAssistedOrders token={sessionToken} onCreated={order=>{setSelected(order);afterAction();}}/><Freshness at={loadedAt} /><RefreshButton onClick={() => void fetchOrders()} busy={isSearching} /></>}
       />
 
       {/* Lenses: one tap to the situation the founder is asking about */}
@@ -455,7 +456,7 @@ function OrderDetailSheet({ order, token, onClose, detailError, message, actionE
           <DefinitionList items={[
             ['Payment', <StatusPill key="p" tone={order.payment_status === 'success' ? 'success' : order.payment_status === 'pending' ? 'warning' : 'neutral'}>{order.payment_status === 'success' ? 'Verified paid' : order.payment_status === 'pending' ? 'Not confirmed' : order.payment_status}</StatusPill>],
             ['Amount', <span key="a">{ghs(order.amount)}{order.service_fee_ghc ? <span className="text-slate-500"> · fee GH₵{order.service_fee_ghc.toFixed(2)}</span> : null}</span>],
-            ['Paid with', order.payment_provider === 'wallet' ? 'Mystery Wallet' : 'Paystack'],
+            ['Payment basis', order.payment_provider === 'wallet' ? 'Mystery Wallet' : order.payment_provider==='complimentary'?'Complimentary · no customer payment':order.payment_provider==='admin_external'?'External collection · operator attested':'Paystack'],
             ['Payment reference', <span key="r" className="inline-flex items-center gap-1 font-mono text-xs">{order.payment_reference || '—'}{order.payment_reference && copyButton(order.payment_reference, 'pay', 'Copy payment reference')}</span>],
             ['Recipient', <span key="rc" className="inline-flex items-center gap-1 font-mono">{order.recipient_phone}{copyButton(order.recipient_phone, 'phone', 'Copy recipient phone')}</span>],
             ['Customer', order.customer_name || 'Guest checkout'],
@@ -538,6 +539,7 @@ function OrderDetailSheet({ order, token, onClose, detailError, message, actionE
           </AdminPanel>
         )}
 
+        {['complimentary','admin_external'].includes(order.payment_provider)&&<AdminAssistedEvidence id={order.id} token={token}/>}
         {/* Customer resolution (existing audited workflow) */}
         {(resolutionEligible || order.resolution) && (
           <AdminPanel title="Customer resolution" description="Refunds and documented remedies for paid orders that were not delivered.">

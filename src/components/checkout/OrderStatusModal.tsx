@@ -62,7 +62,7 @@ export const OrderStatusModal: React.FC = () => {
             mappedStatus = 'placed';
           } else if (serverStatus === 'refund_pending' || serverStatus === 'refunded') {
             mappedStatus = 'failed';
-            statusMessage = dataOrderPresentation(serverStatus,res.order.manual_review,res.order.customer_resolution).next;
+            statusMessage = dataOrderPresentation(serverStatus,res.order.manual_review,res.order.customer_resolution,res.order.payment_basis).next;
           } else if (serverStatus === 'failed') {
             mappedStatus = 'failed';
             statusMessage = res.order.service_type === 'afa' ? 'Registration needs support review. Do not start another registration until support confirms it is safe.' : 'The mobile network was unable to complete the delivery. Please contact support or retry.';
@@ -70,7 +70,7 @@ export const OrderStatusModal: React.FC = () => {
             mappedStatus = 'verifying';
           }
 
-          if(res.order.customer_resolution)statusMessage=dataOrderPresentation(serverStatus,res.order.manual_review,res.order.customer_resolution).next;
+          if(res.order.customer_resolution)statusMessage=dataOrderPresentation(serverStatus,res.order.manual_review,res.order.customer_resolution,res.order.payment_basis).next;
           if (
             mappedStatus !== activeOrder?.status ||
             serverStatus !== activeOrder?.serverStatus ||
@@ -82,6 +82,7 @@ export const OrderStatusModal: React.FC = () => {
               serverStatus,
               manualReview: res.order.manual_review,
               customerResolution:res.order.customer_resolution,
+              paymentBasis:res.order.payment_basis,
               statusMessage,
             });
           }
@@ -113,7 +114,7 @@ export const OrderStatusModal: React.FC = () => {
   const currentNetwork = GHANA_NETWORKS[activeOrder.network];
   const displayRef = activeOrder.publicReference || activeOrder.id;
   const isDataOrder = Boolean(activeOrder.customerResolution) || activeOrder.serviceType === 'data' || (!activeOrder.serviceType && !/^(airtime|instant|marketplace)/.test(activeOrder.bundle.id));
-  const dataView = dataOrderPresentation(activeOrder.serverStatus, activeOrder.manualReview,activeOrder.customerResolution);
+  const dataView = dataOrderPresentation(activeOrder.serverStatus, activeOrder.manualReview,activeOrder.customerResolution,activeOrder.paymentBasis);
   const isRefundIssue = activeOrder.serverStatus === 'refund_pending' || activeOrder.serverStatus === 'refunded';
 
   const handleCopyOrderId = () => {
@@ -249,7 +250,7 @@ export const OrderStatusModal: React.FC = () => {
           {isDataOrder ? <div className="border-y border-slate-800 py-3 text-left space-y-3" aria-label="Order journey">
             <p role="status" className="text-sm font-semibold text-white">Current status: {dataView.label}</p>
             <ol className="grid grid-cols-3 gap-2 text-xs">
-              {[['Payment confirmed',dataView.paymentConfirmed],['Processing',dataView.processing||dataView.delivered],['Delivered',dataView.delivered]].map(([label,complete])=><li key={String(label)} className={complete?'text-[#00c365]':'text-slate-400'}><span aria-hidden="true">{complete?'✓':'○'} </span>{label}<span className="sr-only">{complete?' — confirmed':' — not confirmed'}</span></li>)}
+              {[[dataView.paymentLabel,dataView.paymentStageComplete],['Processing',dataView.processing||dataView.delivered],['Delivered',dataView.delivered]].map(([label,complete])=><li key={String(label)} className={complete?'text-[#00c365]':'text-slate-400'}><span aria-hidden="true">{complete?'✓':'○'} </span>{label}<span className="sr-only">{complete?' — confirmed':' — not confirmed'}</span></li>)}
             </ol>
           </div> : <div className="bg-[#090d10] p-4 rounded-xl border border-slate-800 space-y-2">
             <div className="flex justify-between text-xs text-slate-400 font-medium">
@@ -357,7 +358,7 @@ export const OrderStatusModal: React.FC = () => {
             </div>
 
             <div className="bg-[#0a0e12] p-3 rounded-xl border border-slate-800">
-              <div className="text-xs text-slate-400">{isDataOrder&&!dataView.paymentConfirmed?'Order Total':'Amount Paid'}</div>
+              <div className="text-xs text-slate-400">{activeOrder.paymentBasis==='complimentary'?'Complimentary':activeOrder.paymentBasis==='operator_recorded'?'Recorded amount':isDataOrder&&!dataView.paymentConfirmed?'Order Total':'Amount Paid'}</div>
               <div className="font-bold text-sm text-[#00c365] mt-0.5 tabular-nums">
                 GH₵{activeOrder.amountGhc.toFixed(2)}
               </div>
@@ -373,7 +374,7 @@ export const OrderStatusModal: React.FC = () => {
                   </div>
                 </div>
                 <span className={`max-w-[45%] text-right text-[10px] px-2 py-0.5 rounded font-medium shrink-0 border ${isDataOrder&&!dataView.paymentConfirmed?'text-amber-300 bg-amber-500/10 border-amber-500/20':'text-emerald-400/90 bg-emerald-500/10 border-emerald-500/20'}`}>
-                  {isDataOrder ? dataView.paymentConfirmed?'Confirmed':'Awaiting confirmation' : 'Verified'}
+                  {activeOrder.paymentBasis?dataView.paymentLabel:isDataOrder ? dataView.paymentConfirmed?'Confirmed':'Awaiting confirmation' : 'Verified'}
                 </span>
               </details>
             )}

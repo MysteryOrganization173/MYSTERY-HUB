@@ -336,13 +336,19 @@ export class FulfilmentService {
   }
 
   /** Internal continuation of a durably claimed order; never an HTTP status override. */
-  static async dispatchClaimedOrder(claimedOrder:OrderRecord,guarded=false):Promise<{order:OrderRecord|null;alreadyHandled:boolean}> {
+  static async dispatchClaimedOrder(claimedOrder:OrderRecord,guarded=false,expectedSupplierCostMinor?:number):Promise<{order:OrderRecord|null;alreadyHandled:boolean}> {
+    const assisted=['complimentary','admin_external'].includes(claimedOrder.payment_provider);
+    if(assisted){
+      const {AdminAssistedStore}=await import('../db/adminAssistedStore.js');
+      const intent=await AdminAssistedStore.decision({order:claimedOrder.id}),q=intent?.snapshot;
+      if(!guarded||!q||intent?.source!==claimedOrder.payment_provider||claimedOrder.status!=='queued'||claimedOrder.supplier_order_id||claimedOrder.payment_status!==(q.source==='complimentary'?'not_required':'recorded')||claimedOrder.amount!==(q.source==='complimentary'?0:q.product.retailMinor)||q.recipient!==claimedOrder.recipient_phone||q.product.id!==claimedOrder.product_id||expectedSupplierCostMinor!==q.product.supplierCostMinor)throw new FinanceError('Assisted dispatch requires its exact durable operator authorization.',409);
+    }
 
     if (claimedOrder.service_type === 'afa') return { order: await AfaService.submit(claimedOrder), alreadyHandled: false };
 
     // Step 3: Safety check: Is live fulfilment enabled?
     const isFulfillmentEnabled = this.provider.client.isFulfillmentEnabled();
-    const isTestPayment = this.isTestPaymentEnvironment();
+    const isTestPayment = !assisted&&this.isTestPaymentEnvironment();
 
     // NEVER spend real supplier money from test payments!
     if (!isFulfillmentEnabled || isTestPayment) {
@@ -597,6 +603,10 @@ export class FulfilmentService {
       }
 
       const { offerSlug, offerId, sizeLabel, supplierCostMinor } = resolution.resolved;
+      if(expectedSupplierCostMinor!==undefined&&supplierCostMinor!==expectedSupplierCostMinor){
+        const held=await OrdersStore.updateOrderReview(claimedOrder.id,true,'Supplier cost changed after confirmation. Nothing was sent; reconcile this authorization before creating another order.');
+        return {order:held||claimedOrder,alreadyHandled:false};
+      }
       if(claimedOrder.store_context && (!Number.isSafeInteger(supplierCostMinor) || supplierCostMinor <= 0 || supplierCostMinor > claimedOrder.store_context.wholesaleMinor)) {
         const held=await OrdersStore.saveSupplierUncertainSubmission(claimedOrder.id,'Store supplier cost exceeds the economic snapshot; Admin reconciliation required.');
         return {order:held||claimedOrder,alreadyHandled:false};
@@ -622,6 +632,8 @@ export class FulfilmentService {
       const response = await this.provider.client.createOrder(orderPayload);
       const data = response.data || {};
       const supplierOrderId = data.publicId || data.id;
+
+      if(guarded&&(typeof supplierOrderId!=='string'||!/^[A-Za-z0-9_-]{1,160}$/.test(supplierOrderId)))throw new Error('Supplier identifier is missing or malformed; acceptance requires reconciliation.');
 
       if (!supplierOrderId) {
         throw new Error('Success Biz Hub did not return an order identifier.');
