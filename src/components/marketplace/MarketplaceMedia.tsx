@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Laptop, Smartphone, Mic, Camera, Cpu, Printer, Globe, Home, Gamepad2, Box } from 'lucide-react';
 import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
 import type { CategoryIconKey } from '../../utils/marketplaceBrowse';
@@ -61,9 +61,14 @@ export function photoTreatment(natural: { width: number; height: number }, frame
  * frame never shows pale empty bands and nothing is stretched or replaced.
  */
 export const ProductPhoto: React.FC<PhotoProps> = ({ src, alt, iconKey, widths, sizes, priority, fit = 'adaptive', iconSize, className = '' }) => {
-  const [treatment, setTreatment] = useState<'cover' | 'contain' | null>(fit === 'cover' ? 'cover' : null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => { setTreatment(fit === 'cover' ? 'cover' : null); setFailed(false); }, [src, fit]);
+  // Results are keyed to the photo they were measured for, so a new src starts fresh
+  // without an effect that could race a cached image's load event.
+  const [measured, setMeasured] = useState<{ src?: string; treatment: 'cover' | 'contain' | null; failed?: boolean }>({ src, treatment: null });
+  const current = measured.src === src ? measured : { src, treatment: null, failed: false };
+  const treatment = fit === 'cover' ? 'cover' : current.treatment;
+  const failed = !!current.failed;
+  const setTreatment = (value: 'cover' | 'contain') => setMeasured({ src, treatment: value });
+  const setFailed = () => setMeasured({ src, treatment: null, failed: true });
 
   if (!src || failed) {
     return <div className={`relative w-full h-full overflow-hidden ${className}`}><CategoryIcon iconKey={iconKey} size={iconSize} /></div>;
@@ -95,7 +100,7 @@ export const ProductPhoto: React.FC<PhotoProps> = ({ src, alt, iconKey, widths, 
         fetchPriority={priority ? 'high' : 'auto'}
         decoding="async"
         onLoad={onLoad}
-        onError={() => setFailed(true)}
+        onError={setFailed}
         className={`absolute inset-0 w-full h-full transition-opacity duration-300 motion-reduce:transition-none ${treatment ? 'opacity-100' : 'opacity-0'} ${contained ? 'object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.45)]' : 'object-cover object-[50%_42%]'}`}
       />
     </div>
