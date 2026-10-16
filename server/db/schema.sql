@@ -543,3 +543,7 @@ CREATE TABLE IF NOT EXISTS marketplace_assets (
 CREATE INDEX IF NOT EXISTS idx_marketplace_assets_status ON marketplace_assets (status, created_at DESC);
 ALTER TABLE marketplace_assets ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON marketplace_assets FROM PUBLIC;
+DO $$ BEGIN
+ IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN EXECUTE 'REVOKE ALL ON marketplace_assets FROM anon'; END IF;
+ IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN EXECUTE 'REVOKE ALL ON marketplace_assets FROM authenticated'; END IF;
+END $$;

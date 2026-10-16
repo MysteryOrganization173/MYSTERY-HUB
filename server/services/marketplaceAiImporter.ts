@@ -38,7 +38,7 @@ export function extractLocations(advert:string):{pickupLocations:ExtractedLocati
   if(pickup&&!/\bdeliver/i.test(withoutPhones.slice(0,pickup.index))){
    const place=pickup[1].replace(/^[:\-–\s]+/,'').replace(/[.;,]+$/,'').trim();
    if(place.length>=3&&/[a-z]/i.test(place)&&!/^(only|available|possible|is available|and delivery)$/i.test(place)&&pickupLocations.length<5){
-    const city=findWord(place,MAJOR_TOWNS)||(findWord(place,ACCRA_AREAS)?'Accra':findWord(place,KUMASI_AREAS)?'Kumasi':'');
+    const city=findWord(place,MAJOR_TOWNS);
     const area=findWord(place,[...ACCRA_AREAS,...KUMASI_AREAS].filter(a=>a!==city))||'';
     pickupLocations.push({name:place.slice(0,150),city,area,addressOrLandmark:place.slice(0,300),evidence:line.slice(0,300)});
     if(/^(?:location|located)/i.test(pickup[0].trim()))warnings.push(`The advert gives a shop location ("${place.slice(0,60)}"). Confirm customers can pick up there before offering pickup.`);
@@ -57,10 +57,11 @@ export function extractLocations(advert:string):{pickupLocations:ExtractedLocati
 }
 /** Keeps only AI locations whose evidence is an exact advert quote containing the stated place. */
 export function groundLocations(raw:unknown,advert:string):ExtractedLocation[] {
- if(!Array.isArray(raw))return [];const source=normalise(advert);
+ if(!Array.isArray(raw))return [];const evidenceLines=extractLocations(advert).pickupLocations.map(l=>normalise(l.evidence));
  return raw.flatMap((l:any)=>{const loc={name:text(l?.name,150),city:text(l?.city,100),area:text(l?.area,150),addressOrLandmark:text(l?.addressOrLandmark,300),evidence:text(l?.evidence,300)};
-  if(!loc.name||!loc.evidence||!source.includes(normalise(loc.evidence))||!normalise(loc.evidence).includes(normalise(loc.name)))return [];
-  for(const key of ['city','area','addressOrLandmark'] as const)if(loc[key]&&!source.includes(normalise(loc[key])))loc[key]='';
+  const evidence=normalise(loc.evidence);
+  if(!loc.name||!evidence||!evidenceLines.includes(evidence)||!evidence.includes(normalise(loc.name)))return [];
+  for(const key of ['city','area','addressOrLandmark'] as const)if(loc[key]&&!evidence.includes(normalise(loc[key])))loc[key]='';
   return [loc];}).slice(0,5);
 }
 function sanitizeDelivery(raw:unknown):ExtractedDelivery {
@@ -121,8 +122,9 @@ export function groundAiExtraction(result:MarketplaceAiExtractionResult,advert:s
  const located=extractLocations(advert);const grounded=groundLocations(result.pickupLocations,advert);
  if(grounded.length<result.pickupLocations.length)output.warnings.push('A pickup location the advert does not state was removed.');
  output.pickupLocations=grounded.length?grounded:located.pickupLocations;
- const deliveryGrounded=result.delivery.evidence&&normalise(advert).includes(normalise(result.delivery.evidence));
- output.delivery=deliveryGrounded?{...result.delivery,areas:result.delivery.areas.filter(a=>normalise(advert).includes(normalise(a))||a==='Nationwide')}:located.delivery;
+ // A genuine quote cannot validate invented availability, areas or terms. Derive
+ // delivery only from explicit delivery wording, never other lines in the advert.
+ output.delivery=located.delivery;
  for(const w of located.warnings)if(!output.warnings.includes(w))output.warnings.push(w);
  if(result.fulfilmentIdentifierLabel&&!/account\s*(?:email|id)|apple\s*id|username|customer\s*identifier/i.test(advert)) {output.fulfilmentIdentifierLabel=null;output.fulfilmentIdentifierPlaceholder=null;output.fulfilmentIdentifierRequired=false;output.warnings.push('Unsupported account requirement removed.');}
  return output;

@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { adminRouter } from '../../routes/adminApi.js';
 import { AuthStore } from '../../db/authStore.js';
 import { MarketplaceAssetStore } from '../../db/marketplaceAssetStore.js';
+import { WebsiteCloudinary } from '../../services/websiteCloudinary.js';
 import { extractProductHeuristically, extractLocations, groundAiExtraction, sanitizeExtractionResult } from '../../services/marketplaceAiImporter.js';
 
 let server: Server, base: string;
@@ -138,7 +139,7 @@ Call 0244000000`;
 test('Mystery AI extracts only explicitly stated pickup points and delivery terms', () => {
   const result = extractProductHeuristically(ADVERT);
   assert.equal(result.pickupLocations.length, 1);
-  assert.equal(result.pickupLocations[0].city, 'Accra');
+  assert.equal(result.pickupLocations[0].city, ''); // The pickup quote does not state a city.
   assert.equal(result.pickupLocations[0].area, 'Kwame Nkrumah Circle');
   assert.ok(ADVERT.includes(result.pickupLocations[0].evidence.replace('Pickup: ', '')));
   assert.equal(result.delivery.available, true);
@@ -167,7 +168,7 @@ test('AI locations without an exact advert quote are removed', () => {
   const grounded = groundAiExtraction(ai, ADVERT);
   assert.ok(!grounded.pickupLocations.some(l => l.name === 'Accra Mall'));
   assert.equal(grounded.pickupLocations[0].area, 'Kwame Nkrumah Circle');
-  assert.deepEqual(grounded.delivery.areas, ['Accra']);
+  assert.deepEqual(grounded.delivery.areas, ['Accra', 'Nationwide']);
   assert.ok(grounded.warnings.some(w => /pickup location the advert does not state/i.test(w)));
 });
 
@@ -177,4 +178,40 @@ test('admin editor applies price options as purchasable options only, never as d
   assert.ok(!editor.includes('window.confirm'));
   assert.ok(editor.includes('capture="environment"'));
   assert.ok(!/CLOUDINARY_API_SECRET|api_secret/i.test(editor));
+});
+
+test('simultaneous reservations cannot exceed the per-admin pending limit', async () => {
+  const requests = await Promise.all(Array.from({length: 32}, () => MarketplaceAssetStore.reserve('admin', {filename:'x.jpg',mime:'image/jpeg',bytes:100}).then(() => 201, (error: any) => error.status)));
+  assert.equal(requests.filter(status => status === 201).length,24);
+  assert.equal(requests.filter(status => status === 429).length,8);
+});
+
+test('finalization cannot cross the reservation expiry during provider inspection', async () => {
+  const {body} = await reserve(); const realNow=Date.now, inspect=WebsiteCloudinary.inspect;
+  const asset=(await MarketplaceAssetStore.find(body.intent.assetId))!;
+  // The initial check passes but the verification completes beyond its capability window.
+  Date.now=()=>Date.parse(asset.expires_at)-1;
+  WebsiteCloudinary.inspect=async()=>{Date.now=()=>Date.parse(asset.expires_at)+1;return resourceFor(asset.public_id) as any;};
+  try {await assert.rejects(()=>MarketplaceAssetStore.finalize('admin',asset.id),(error:any)=>error.status===409);}
+  finally {Date.now=realNow;WebsiteCloudinary.inspect=inspect;}
+  assert.equal((await MarketplaceAssetStore.find(body.intent.assetId))!.status,'pending');
+});
+
+test('concurrent repeated finalization returns one verified asset',async()=>{
+ const {body}=await reserve();cloudinaryResource=resourceFor(body.intent.parameters.public_id);
+ const results=await Promise.all(Array.from({length:6},()=>call(`/${body.intent.assetId}/finalize`,{})));
+ assert.ok(results.every(r=>r.status===200));assert.equal((await MarketplaceAssetStore.recent()).length,1);
+});
+
+test('AI cannot borrow a city from delivery, invent nationwide delivery or reverse pickup-only terms',()=>{
+ const advert='Camera GHC 3000\nPickup: Circle\nDelivery within Tema available';
+ const ai=sanitizeExtractionResult({pickupLocations:[{name:'Circle',city:'Tema',area:'Circle',evidence:'Pickup: Circle'}],delivery:{available:true,areas:['Nationwide'],terms:'Free nationwide delivery',evidence:'Camera GHC 3000'}});
+ const output=groundAiExtraction(ai,advert);assert.equal(output.pickupLocations[0].city,'');assert.deepEqual(output.delivery.areas,['Tema']);assert.doesNotMatch(output.delivery.terms,/free|nationwide/i);
+ const only=groundAiExtraction(ai,'Camera GHC 3000\nPickup only');assert.equal(only.delivery.available,false);
+ const none=groundAiExtraction(ai,'Camera GHC 3000');assert.equal(none.delivery.available,null);assert.deepEqual(none.pickupLocations,[]);
+});
+
+test('ordinary descriptive places are not AI-created pickup points',()=>{
+ const result=groundAiExtraction(sanitizeExtractionResult({pickupLocations:[{name:'Accra',city:'Accra',area:'Circle',evidence:'Designed in Accra'}]}),'Camera GHC 3000\nDesigned in Accra\nDelivery to Circle');
+ assert.deepEqual(result.pickupLocations,[]);
 });

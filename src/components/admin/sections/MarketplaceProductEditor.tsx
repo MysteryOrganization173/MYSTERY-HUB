@@ -161,7 +161,10 @@ export function MarketplaceProductEditor({ token, product, categories, products,
       const fresh = x.pickupLocations.filter(l => !known.has(locationKey(l))).map(l => ({ id: newId('loc'), name: l.name.slice(0, 150), city: l.city, area: l.area, addressOrLandmark: l.addressOrLandmark, active: Boolean(l.city && l.area) }));
       if (fresh.length) setPickups(list => [...list, ...fresh]);
       if (x.delivery.available !== null) { setDeliveryAvailable(x.delivery.available); if (x.delivery.terms) setDeliveryNote(x.delivery.terms.slice(0, 300)); }
-      if (!x.fulfilmentMode && (x.productKind || kind) === 'physical') setMode(x.delivery.available === false ? 'pickup' : fresh.length || pickups.length ? 'both' : 'delivery');
+      if (!x.fulfilmentMode && (x.productKind || kind) === 'physical') {
+        if (x.delivery.available === true) setMode(fresh.length || pickups.length ? 'both' : 'delivery');
+        else if (fresh.length || pickups.length) setMode('pickup');
+      }
     }
     setPublished(false);
     setExtraction(null); setAiOpen(false);
