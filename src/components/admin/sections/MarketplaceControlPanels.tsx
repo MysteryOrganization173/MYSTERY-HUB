@@ -3,13 +3,14 @@ import { MessageCircle, Mail, Phone } from 'lucide-react';
 import { marketplaceControlRequest,ManagedCategory,MarketplaceInquiry } from '../../../services/marketplaceControls';
 import { whatsappLink } from '../../../../shared/marketplacePolicy';
 import { MarketplaceProduct } from '../../../types';
+import { categoryMismatches } from '../../../utils/marketplaceCategoryCheck';
 import { AdminButton,AdminEmpty,AdminLoading,AdminNotice,AdminPanel,ConfirmAction,StatusPill,adminField as field,adminLabel,type AdminTone } from '../ui/AdminUi';
 
 const INQUIRY_STATUS:Record<string,{label:string;tone:AdminTone}>={new:{label:'New',tone:'warning'},contacted:{label:'Contacted',tone:'info'},resolved:{label:'Resolved',tone:'success'},closed:{label:'Closed',tone:'neutral'}};
 const STATUS_FILTERS=[{id:'new',label:'New'},{id:'contacted',label:'Contacted'},{id:'resolved',label:'Resolved'},{id:'closed',label:'Closed'},{id:'',label:'All'}];
 
 /** Inquiries inbox and category manager. `view` is controlled by the Marketplace tabs. */
-export function MarketplaceControlPanels({token,view,categories,onCategoriesChanged,products,onChanged}:{token:string;view:'categories'|'inquiries';categories:ManagedCategory[];onCategoriesChanged:()=>void;products:MarketplaceProduct[];onChanged:()=>void}) {
+export function MarketplaceControlPanels({token,view,categories,onCategoriesChanged,products,onChanged,onEditProduct}:{token:string;view:'categories'|'inquiries';categories:ManagedCategory[];onCategoriesChanged:()=>void;products:MarketplaceProduct[];onChanged:()=>void;onEditProduct?:(product:MarketplaceProduct)=>void}) {
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false);
  const [slug,setSlug]=useState(''),[label,setLabel]=useState('');
  const [rows,setRows]=useState<MarketplaceInquiry[]>([]),[status,setStatus]=useState('new'),[search,setSearch]=useState(''),[searchDraft,setSearchDraft]=useState(''),[product,setProduct]=useState(''),[page,setPage]=useState(1),[total,setTotal]=useState(0);
@@ -18,7 +19,7 @@ export function MarketplaceControlPanels({token,view,categories,onCategoriesChan
  async function load(){const params=new URLSearchParams({page:String(page),pageSize:'10'});if(status)params.set('status',status);if(search)params.set('search',search);if(product)params.set('productId',product);const data=await marketplaceControlRequest(`inquiries?${params}`,token);setRows(data.inquiries);setTotal(data.total);}
  useEffect(()=>{if(view!=='inquiries')return;setLoading(true);run(load).finally(()=>setLoading(false));},[view,status,search,product,page,token]);
  useEffect(()=>{const timer=setTimeout(()=>{if(searchDraft!==search){setSearch(searchDraft);setPage(1);}},350);return()=>clearTimeout(timer);},[searchDraft]);
- useEffect(()=>{let active=true;if(view==='inquiries')marketplaceControlRequest('products',token).then(data=>{if(active)setInquiryProducts(data.products);}).catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to load products.');});return()=>{active=false;};},[view,token]);
+ useEffect(()=>{let active=true;if(view==='inquiries'||view==='categories')marketplaceControlRequest('products',token).then(data=>{if(active)setInquiryProducts(data.products);}).catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to load products.');});return()=>{active=false;};},[view,token,products]);
  async function categorySave(c:ManagedCategory,body:unknown){await marketplaceControlRequest(`categories/${encodeURIComponent(c.slug)}`,token,'PATCH',body);onCategoriesChanged();onChanged();}
 
  if(view==='categories')return <AdminPanel title="Categories" description="Deactivating a category hides its customer filter. Existing products and links remain; drafts need an active category before publishing.">
@@ -29,7 +30,8 @@ export function MarketplaceControlPanels({token,view,categories,onCategoriesChan
    <AdminButton variant="primary" disabled={busy}>Create Category</AdminButton>
   </form>
   <p className="mt-2 text-xs text-slate-500">The slug is permanent and used in links; you can rename the display label later.</p>
-  <div className="mt-4 space-y-2">{categories.map(c=><CategoryRow key={`${c.slug}-${c.label}-${c.sort_order}-${c.active}`} category={c} busy={busy} save={body=>run(()=>categorySave(c,body))} />)}</div>
+  <CategoryCheck products={inquiryProducts} categories={categories} onEdit={onEditProduct} />
+  <div className="mt-4 space-y-2">{categories.map(c=><CategoryRow key={`${c.slug}-${c.label}-${c.sort_order}-${c.active}`} category={c} live={inquiryProducts.filter(p=>p.category===c.slug&&p.published&&!p.archived).length} busy={busy} save={body=>run(()=>categorySave(c,body))} />)}</div>
  </AdminPanel>;
 
  return <AdminPanel title="Customer inquiries" description="Questions and quote requests from product pages. Contact the customer, then mark where the conversation stands." actions={<AdminButton disabled={busy} onClick={()=>run(load)}>Refresh inquiries</AdminButton>}>
@@ -48,10 +50,24 @@ export function MarketplaceControlPanels({token,view,categories,onCategoriesChan
 }
 const toSlug=(value:string)=>value.toLowerCase().trim().replace(/[^a-z0-9]+/g,'_').replace(/^[^a-z]+/,'').replace(/_+$/,'').slice(0,64);
 
-function CategoryRow({category:c,busy,save}:{category:ManagedCategory;busy:boolean;save:(body:unknown)=>void}) {
+/** Flags products whose own name points at another category; the admin decides in the editor. */
+function CategoryCheck({products,categories,onEdit}:{products:MarketplaceProduct[];categories:ManagedCategory[];onEdit?:(product:MarketplaceProduct)=>void}) {
+ const rows=categoryMismatches(products,categories);const label=(slug:string)=>categories.find(c=>c.slug===slug)?.label||slug;
+ const live=new Set(products.filter(p=>p.published&&!p.archived).map(p=>p.category)).size;
+ return <section aria-label="Category check" className="mt-4 rounded-2xl border border-slate-800 bg-[#0b1116] p-3 text-sm">
+  <p className="font-semibold text-white">Category check</p>
+  <p className="mt-0.5 text-xs text-slate-400">Customers see category tiles once live products sit in at least two categories. Live products now use {live} {live===1?'category':'categories'}.</p>
+  {!rows.length?<p className="mt-2 text-xs text-slate-300">No product names point at a different category.</p>:<ul className="mt-3 space-y-2">{rows.map(r=>{const product=products.find(p=>p.id===r.productId)!;return <li key={r.productId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.04] p-2.5">
+   <div className="min-w-0"><p className="truncate font-medium text-slate-100">{r.productName}</p><p className="text-xs text-slate-400">{label(r.current)} → suggested <span className="text-amber-200">{r.suggestedLabel}</span> · {r.reason}</p></div>
+   {onEdit&&<AdminButton onClick={()=>onEdit(product)}>Review</AdminButton>}
+  </li>;})}</ul>}
+ </section>;
+}
+
+function CategoryRow({category:c,live,busy,save}:{category:ManagedCategory;live:number;busy:boolean;save:(body:unknown)=>void}) {
  const [label,setLabel]=useState(c.label),[position,setPosition]=useState(c.sort_order),[confirm,setConfirm]=useState(false);
  return <form className="grid grid-cols-[1fr_5rem] gap-2 rounded-2xl border border-slate-800 p-3 sm:grid-cols-[1fr_6rem_auto_auto] sm:items-end" onSubmit={e=>{e.preventDefault();save({label,sortOrder:position});}}>
-  <label className={`${adminLabel} min-w-0`}><span className="flex items-center gap-2 text-xs"><span className="font-mono text-slate-400">{c.slug}</span>{!c.active&&<StatusPill tone="neutral" dot={false}>Hidden</StatusPill>}</span><input aria-label={`Label for ${c.slug}`} className={field} maxLength={100} required value={label} onChange={e=>setLabel(e.target.value)} /></label>
+  <label className={`${adminLabel} min-w-0`}><span className="flex items-center gap-2 text-xs"><span className="font-mono text-slate-400">{c.slug}</span><span className="text-slate-500">{live} live</span>{!c.active&&<StatusPill tone="neutral" dot={false}>Hidden</StatusPill>}</span><input aria-label={`Label for ${c.slug}`} className={field} maxLength={100} required value={label} onChange={e=>setLabel(e.target.value)} /></label>
   <label className={adminLabel}><span className="text-xs">Position</span><input className={field} type="number" min={0} max={1000000} value={position} onChange={e=>setPosition(Number(e.target.value))} /></label>
   <AdminButton disabled={busy}>Save</AdminButton><AdminButton type="button" variant={c.active?'ghost':'secondary'} disabled={busy} onClick={()=>{if(c.active)setConfirm(true);else save({active:true});}}>{c.active?'Deactivate':'Activate'}</AdminButton>
   {confirm&&<ConfirmAction title={`Hide "${c.label}"?`} summary="Hide this category filter? Live products retain their category and stay accessible." confirmLabel="Deactivate category" busy={busy} onClose={()=>setConfirm(false)} onConfirm={()=>{setConfirm(false);save({active:false});}}/>}

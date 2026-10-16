@@ -15,7 +15,7 @@ import { MarketplaceRefineSheet, refineAvailability } from './MarketplaceRefineS
 import { useMarketplaceDialog } from './useMarketplaceDialog';
 import {
   DEFAULT_BROWSE_STATE, KIND_LABELS, PRICE_BANDS, SORT_OPTIONS, MarketplaceBrowseState, MarketplaceSort,
-  activeRefinementCount, applyRefinements, categoryIconKey, categoryLabel, parseBrowseState, serializeBrowseState, sortProducts, summariseCategories,
+  activeRefinementCount, applyRefinements, categoryIconKey, categoryLabel, parseBrowseState, serializeBrowseState, sortProducts, summariseCategories, summariseBrands, brandLabel,
 } from '../../utils/marketplaceBrowse';
 import {
   Search,
@@ -228,12 +228,21 @@ export const MarketplacePage: React.FC = () => {
   }, [loading, products]);
 
   const categoryTiles = useMemo(() => summariseCategories(categories, products), [categories, products]);
+  const brandTiles = useMemo(() => summariseBrands(products), [products]);
   const activeCategoryLabel = categoryLabel(browse.category, categories, products);
   const filteredProducts = useMemo(() => sortProducts(applyRefinements(products, browse), browse.sort), [products, browse]);
   const refinementCount = activeRefinementCount(browse);
   const canRefine = refinementCount > 0 || (() => { const o = refineAvailability(applyRefinements(products, browse, ['buy', 'kind', 'price'])); return o.buy || o.kinds.length > 0 || o.bands.length > 0; })();
-  const isFiltered = browse.category !== 'all' || !!browse.q.trim() || refinementCount > 0;
+  const isFiltered = browse.category !== 'all' || !!browse.brand || !!browse.q.trim() || refinementCount > 0;
   const resetAll = () => setBrowse(prev => ({ ...DEFAULT_BROWSE_STATE, sort: prev.sort }));
+
+  const selectBrand = (id: string) => {
+    updateBrowse({ brand: id });
+    requestAnimationFrame(() => {
+      const top = resultsRef.current?.getBoundingClientRect().top;
+      if (top !== undefined && top > window.innerHeight * 0.65) resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
 
   const selectCategory = (slug: string) => {
     updateBrowse({ category: slug });
@@ -317,6 +326,7 @@ export const MarketplacePage: React.FC = () => {
 
   const activeChips: { key: string; label: string; clear: () => void }[] = [
     ...(browse.category !== 'all' ? [{ key: 'category', label: activeCategoryLabel, clear: () => updateBrowse({ category: 'all' }) }] : []),
+    ...(browse.brand ? [{ key: 'brand', label: brandLabel(browse.brand), clear: () => updateBrowse({ brand: '' }) }] : []),
     ...(browse.q.trim() ? [{ key: 'q', label: `“${browse.q.trim()}”`, clear: () => updateBrowse({ q: '' }) }] : []),
     ...(browse.buyOnline ? [{ key: 'buy', label: 'Buy online', clear: () => updateBrowse({ buyOnline: false }) }] : []),
     ...(browse.kind ? [{ key: 'kind', label: KIND_LABELS[browse.kind], clear: () => updateBrowse({ kind: '' }) }] : []),
@@ -419,7 +429,7 @@ export const MarketplacePage: React.FC = () => {
             2. VISUAL CATEGORY DISCOVERY (admin categories, live counts, real product photos)
             ========================================================= */}
         {!loading && !error && products.length > 0 && (
-          <MarketplaceCategoryTiles tiles={categoryTiles} total={products.length} selected={browse.category} onSelect={selectCategory} />
+          <MarketplaceCategoryTiles tiles={categoryTiles} total={products.length} selected={browse.category} onSelect={selectCategory} brands={brandTiles} selectedBrand={browse.brand} onSelectBrand={selectBrand} />
         )}
 
         {/* =========================================================
@@ -430,7 +440,7 @@ export const MarketplacePage: React.FC = () => {
           <div className="space-y-2.5">
             <div className="flex items-end justify-between gap-2 sm:gap-3">
               <div className="min-w-0">
-                <h2 className="text-base sm:text-xl font-bold text-white tracking-tight truncate">{activeCategoryLabel}</h2>
+                <h2 className="text-base sm:text-xl font-bold text-white tracking-tight truncate">{browse.brand ? `${brandLabel(browse.brand)}${browse.category !== 'all' ? ` · ${activeCategoryLabel}` : ''}` : activeCategoryLabel}</h2>
                 <p className="text-xs text-slate-400" aria-live="polite">
                   <span className="font-semibold text-slate-200 tabular-nums">{filteredProducts.length}</span> {filteredProducts.length === 1 ? 'product' : 'products'}
                   {browse.q.trim() && <> for <span className="text-slate-200">“{browse.q.trim()}”</span></>}
@@ -769,6 +779,7 @@ export const MarketplacePage: React.FC = () => {
                     src={shareModalProduct.imageUrl}
                     alt={shareModalProduct.imageAlt || shareModalProduct.name}
                     iconKey={categoryIconKey(shareModalProduct.category, shareModalProduct.categoryLabel)}
+                    fit="cover"
                     widths={[112, 168]}
                     sizes="56px"
                     iconSize="sm"

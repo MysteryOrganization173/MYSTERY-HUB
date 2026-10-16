@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Laptop, Smartphone, Mic, Camera, Cpu, Printer, Globe, Home, Gamepad2, Box } from 'lucide-react';
-import { OptimizedImage } from '../common/OptimizedImage';
+import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
 import type { CategoryIconKey } from '../../utils/marketplaceBrowse';
 
 const ICONS: Record<CategoryIconKey, React.ComponentType<{ className?: string }>> = {
@@ -30,37 +30,74 @@ interface PhotoProps {
   widths: number[];
   sizes: string;
   priority?: boolean;
-  fit?: 'studio' | 'cover';
+  /**
+   * adaptive: fill the frame when the photo is close to its shape, otherwise show it whole.
+   * contain: always show the whole photo (product detail).
+   * cover: always fill (small thumbnails, where a crop is harmless).
+   */
+  fit?: 'adaptive' | 'contain' | 'cover';
   iconSize?: 'sm' | 'md' | 'lg';
   className?: string;
 }
 
+/** A photo may lose at most this share of its width or height to fill a frame. */
+export const COVER_TOLERANCE = 0.16;
+
 /**
- * Product photography on a neutral "studio" surface. Real catalogue photos arrive
- * in every shape: white-background shots, transparent PNG electronics, tall boxes,
- * wide banners. Containing them on one soft light surface keeps the whole grid
- * consistent; multiply blending lets white backgrounds melt into the surface
- * instead of showing as hard rectangles. Nothing is cropped or replaced.
+ * Chooses how a photo sits in its frame. Vendor photos are mostly 3:4 phone shots, so
+ * they fill a 4:5 card with only a sliver trimmed; wide banners, square shots in tall
+ * frames and other mismatches are shown whole instead of losing part of the product.
  */
-export const ProductPhoto: React.FC<PhotoProps> = ({ src, alt, iconKey, widths, sizes, priority, fit = 'studio', iconSize, className = '' }) => {
-  const studio = fit === 'studio';
+export function photoTreatment(natural: { width: number; height: number }, frame: { width: number; height: number }): 'cover' | 'contain' {
+  if (!natural.width || !natural.height || !frame.width || !frame.height) return 'contain';
+  const photo = natural.width / natural.height;
+  const box = frame.width / frame.height;
+  return 1 - Math.min(photo / box, box / photo) <= COVER_TOLERANCE ? 'cover' : 'contain';
+}
+
+/**
+ * Real catalogue photography on a dark surface. Photos close to the frame's shape fill
+ * it; anything else is shown whole over a dimmed, blurred copy of the same photo, so the
+ * frame never shows pale empty bands and nothing is stretched or replaced.
+ */
+export const ProductPhoto: React.FC<PhotoProps> = ({ src, alt, iconKey, widths, sizes, priority, fit = 'adaptive', iconSize, className = '' }) => {
+  const [treatment, setTreatment] = useState<'cover' | 'contain' | null>(fit === 'cover' ? 'cover' : null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setTreatment(fit === 'cover' ? 'cover' : null); setFailed(false); }, [src, fit]);
+
+  if (!src || failed) {
+    return <div className={`relative w-full h-full overflow-hidden ${className}`}><CategoryIcon iconKey={iconKey} size={iconSize} /></div>;
+  }
+
+  const onLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    if (fit === 'cover') return;
+    const img = event.currentTarget;
+    if (fit === 'contain') { setTreatment('contain'); return; }
+    const frame = img.parentElement?.getBoundingClientRect();
+    setTreatment(photoTreatment({ width: img.naturalWidth, height: img.naturalHeight }, { width: frame?.width || 0, height: frame?.height || 0 }));
+  };
+  const contained = treatment === 'contain';
+
   return (
-    <div className={`relative w-full h-full overflow-hidden ${studio && src ? 'bg-[radial-gradient(120%_90%_at_50%_35%,#f7f8fa_0%,#e9edf1_70%,#dde2e7_100%)]' : 'bg-[#0b1116]'} ${className}`}>
-      {/* Absolute so a tall photo can never stretch its frame (e.g. a portrait box in a square card). */}
-      <div className="absolute inset-0">
-      <OptimizedImage
-        src={src}
-        alt={alt}
-        priority={priority}
-        objectFit={studio ? 'contain' : 'cover'}
-        objectPosition="center center"
-        responsiveWidths={widths}
+    <div className={`relative w-full h-full overflow-hidden bg-[#0f171d] ${className}`} data-photo-fit={fit}>
+      {treatment === null && <div className="absolute inset-0 bg-slate-800/40 motion-safe:animate-pulse" aria-hidden="true" />}
+      {/* A tiny (≈2KB) copy of the same photo, blurred and dimmed, fills the frame around a contained photo. */}
+      {contained && (
+        <img src={getCloudinaryUrl(src, { width: 48 })} alt="" aria-hidden="true" loading="lazy" decoding="async"
+          className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl brightness-[.42] saturate-[1.2]" />
+      )}
+      <img
+        src={getCloudinaryUrl(src)}
+        srcSet={getCloudinarySrcSet(src, widths) || undefined}
         sizes={sizes}
-        containerClassName="bg-transparent!"
-        className={studio ? 'p-[7%] mix-blend-multiply' : ''}
-        fallbackIcon={<CategoryIcon iconKey={iconKey} size={iconSize} />}
+        alt={alt}
+        loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : 'auto'}
+        decoding="async"
+        onLoad={onLoad}
+        onError={() => setFailed(true)}
+        className={`absolute inset-0 w-full h-full transition-opacity duration-300 motion-reduce:transition-none ${treatment ? 'opacity-100' : 'opacity-0'} ${contained ? 'object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.45)]' : 'object-cover object-[50%_42%]'}`}
       />
-      </div>
     </div>
   );
 };

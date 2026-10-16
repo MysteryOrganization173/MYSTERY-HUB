@@ -4,6 +4,7 @@ import { FULFILMENT_LABELS } from '../../../shared/marketplacePolicy';
 import React, { useState } from 'react';
 import { MarketplaceProduct, MarketplacePickupLocation } from '../../types';
 import { ProductPhoto } from './MarketplaceMedia';
+import { getCloudinaryUrl } from '../../utils/cloudinary';
 import { categoryIconKey } from '../../utils/marketplaceBrowse';
 import { PATH_LABELS, isDirectPurchaseSupported, productPath, productPriceText } from '../../utils/marketplaceBrowse';
 import {
@@ -170,15 +171,16 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
         {/* Scrollable Product Details Content Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7 space-y-6 text-left">
           <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-8 lg:items-start space-y-6 lg:space-y-0">
-          {/* 1. Product photography (studio surface: never cropped, any proportion) */}
+          {/* 1. Product photography: always shown whole, any proportion */}
           <div className="space-y-2.5 lg:sticky lg:top-0">
-          <div className="relative w-full h-[min(32vh,250px)] sm:h-[320px] lg:h-auto lg:aspect-square rounded-2xl border border-slate-800/90 overflow-hidden">
+          <div className="relative w-full h-[min(46vh,360px)] sm:h-[380px] lg:h-auto lg:aspect-[4/5] lg:max-h-[560px] rounded-2xl border border-slate-800/90 overflow-hidden">
             <ProductPhoto
               key={photos[photoIndex] || 'none'}
               src={photos[photoIndex] || product.imageUrl}
               alt={product.imageAlt || product.name}
               iconKey={categoryIconKey(product.category, product.categoryLabel)}
               iconSize="lg"
+              fit="contain"
               priority
               widths={[480, 720, 960]}
               sizes="(min-width: 1024px) 480px, 100vw"
@@ -203,8 +205,8 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
             <div role="group" aria-label="Product photos" className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
               {photos.map((url, index) => (
                 <button key={url} type="button" onClick={() => setPhotoIndex(index)} aria-label={`Show photo ${index + 1} of ${photos.length}`} aria-pressed={photoIndex === index}
-                  className={`h-14 w-14 sm:h-16 sm:w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-[#eef1f4] ${photoIndex === index ? 'border-[#00c365]' : 'border-slate-800 opacity-75 hover:opacity-100'}`}>
-                  <img src={url} alt="" loading="lazy" className="h-full w-full object-contain p-1 mix-blend-multiply" />
+                  className={`h-14 w-14 sm:h-16 sm:w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-[#0f171d] ${photoIndex === index ? 'border-[#00c365]' : 'border-slate-800 opacity-75 hover:opacity-100'}`}>
+                  <img src={getCloudinaryUrl(url, { width: 128 })} alt="" loading="lazy" className="h-full w-full object-cover" />
                 </button>
               ))}
             </div>
