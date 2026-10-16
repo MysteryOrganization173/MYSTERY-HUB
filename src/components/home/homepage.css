@@ -183,10 +183,11 @@
      full strength, so its subject sits in the open rather than behind the copy. The headline
      rises over its lower edge, where a scrim and mask dissolve it into the page; the
      description and buttons sit on plain page colour, so nothing follows below them. */
-  .home-hero-content { grid-template-columns: 1fr; padding-block: clamp(128px, 36vw, 168px) 36px; }
-  .home-hero-art { bottom: auto; height: clamp(300px, 84vw, 380px); background: var(--home-bg, #070b0e); }
+  .home-hero-content { grid-template-columns: 1fr; padding-block: clamp(128px, min(40vw, 19svh), 176px) 36px; }
+  /* Height-aware: tall phones give the artwork more room, short ones keep both buttons on the first screen. */
+  .home-hero-art { bottom: auto; height: clamp(300px, min(88vw, 45svh), 400px); background: var(--home-bg, #070b0e); }
   .home-hero-art img { object-position: 70% 50%;
-    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 50%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 50%, transparent 100%); }
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 58%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 58%, transparent 100%); }
   .home-hero-art::after { background: linear-gradient(180deg, #070b0e40 0%, #070b0e00 8%, #070b0e00 30%, #070b0e80 42%, #070b0eb3 56%, #070b0ee6 78%, #070b0e 100%); }
   .home-hero h1 { font-size: clamp(2.25rem, 9.6vw, 3.25rem); }
   .home-hero-description { font-size: .9375rem; line-height: 1.6; margin-block: 14px 20px; max-width: 450px; }
