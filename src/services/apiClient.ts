@@ -541,7 +541,7 @@ export interface AdminSystemStatus {
 }
 
 export async function getAdminOverviewOnServer(token: string): Promise<{ success: boolean; metrics: AdminOverviewMetrics }> {
-  const url = `${API_BASE_URL}/api/admin/overview`;
+  const url = `${API_BASE_URL}/api/admin/overview?readOnly=true`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -558,6 +558,7 @@ export async function getAdminOrdersOnServer(
   for (const [key, val] of Object.entries(params)) {
     if (val !== undefined && val !== '') searchParams.set(key, String(val));
   }
+  searchParams.set('readOnly','true');
   const url = `${API_BASE_URL}/api/admin/orders?${searchParams.toString()}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
