@@ -49,6 +49,9 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
   formatGhcReward,
 }) => {
   const [isDescExpanded, setIsDescExpanded] = useState(false);
+  // Main photo first, then the admin's gallery photos (deduplicated, https only).
+  const photos = [product.imageUrl, ...(product.galleryUrls || [])].filter((url, index, list): url is string => typeof url === 'string' && /^https?:\/\//.test(url) && list.indexOf(url) === index);
+  const [photoIndex, setPhotoIndex] = useState(0);
 
   const dialogRef = useMarketplaceDialog(true,onClose);
   const options = purchasableOptions(product.variants);
@@ -176,7 +179,8 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
           {/* 1. Large High-Quality Product Image */}
           <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] bg-gradient-to-b from-[#080d12] to-[#0f1620] rounded-2xl border border-slate-800/90 overflow-hidden shadow-inner flex items-center justify-center">
             <OptimizedImage
-              src={product.imageUrl}
+              key={photos[photoIndex] || 'none'}
+              src={photos[photoIndex] || product.imageUrl}
               alt={product.imageAlt || product.name}
               aspectRatio="16/10"
               objectFit="cover"
@@ -199,6 +203,17 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
               {product.availabilityLabel || availabilityBadge.label}
             </span>
           </div>
+
+          {photos.length > 1 && (
+            <div role="group" aria-label="Product photos" className="-mt-3 flex gap-2 overflow-x-auto pb-1">
+              {photos.map((url, index) => (
+                <button key={url} type="button" onClick={() => setPhotoIndex(index)} aria-label={`Show photo ${index + 1} of ${photos.length}`} aria-pressed={photoIndex === index}
+                  className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 ${photoIndex === index ? 'border-[#00c365]' : 'border-slate-800 opacity-70 hover:opacity-100'}`}>
+                  <img src={url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* 2. Product Title, Tagline & Price */}
           <div className="space-y-2 border-b border-slate-800/80 pb-5">
