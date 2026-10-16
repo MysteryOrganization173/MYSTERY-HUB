@@ -27,7 +27,7 @@ test('production confirmation stays with recipient ahead of payment choices and 
   assert.match(checkout,/value=\{phone\}/);
   assert.match(checkout,/Pay GH₵/);
   assert.match(checkout,/submissionPending.current \|\| isInitializing \|\| walletBusy/);
-  assert.match(checkout,/disabled=\{walletBusy \|\| isInitializing \|\| isRegularData && !commercial\}/);
+  assert.match(checkout,/disabled=\{walletBusy \|\| isInitializing \|\| isRegularData && !commercial \|\| flexiPending\}/);
 });
 test('production bundle card stays first with compact receipt and payment controls',()=>{
   assert.match(checkout,/Bundle \/ Airtime Summary Card/);
