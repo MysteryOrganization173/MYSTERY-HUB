@@ -198,6 +198,16 @@ export const MarketplaceInquiryModal: React.FC = () => {
             </p>
           </div>
 
+          {/* What happens after sending */}
+          <ol className="grid grid-cols-3 gap-2 text-[11px] leading-snug text-slate-300" aria-label="What happens next">
+            {['We save your enquiry for our team', 'WhatsApp opens with your message ready to send', 'We reply with price, availability and delivery'].map((step, i) => (
+              <li key={step} className="rounded-xl border border-slate-800 bg-[#0b1116] p-2.5 space-y-1">
+                <span className="w-5 h-5 rounded-full bg-[#00c365]/15 text-[#00c365] text-[10px] font-extrabold flex items-center justify-center">{i + 1}</span>
+                <span className="block">{step}</span>
+              </li>
+            ))}
+          </ol>
+
           {submitError && (
             <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
