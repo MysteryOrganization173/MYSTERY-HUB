@@ -44,10 +44,11 @@ export const AdminFinanceSection:React.FC<{sessionToken:string;initialView?:stri
  const [queueOffset,setQueueOffset]=useState(0),[operationsOffset,setOperationsOffset]=useState(0),[customerOffset,setCustomerOffset]=useState(0);
  const [requestFilter,setRequestFilter]=useState<RequestFilter>('open');
  const [pending,setPending]=useState<PendingConfirm|null>(null),[confirmError,setConfirmError]=useState<string|null>(null);
+ const customerRequest=useRef(0);
  const adjustmentRequest=useRef<{fingerprint:string;id:string}|null>(null);
  const load=async()=>{setLoadError('');try{const [c,q,o]=await Promise.all([financeRequest(sessionToken,'/control',undefined,true),financeRequest(sessionToken,`/withdrawals?offset=${queueOffset}`,undefined,true),financeRequest(sessionToken,`/operations?offset=${operationsOffset}`,undefined,true)]);setControl(c);setPolicy((current:any)=>({...current,...c.economics.find((x:any)=>x.service===current.service)}));setSettings(c.settings);setDefinitions(c.definitions);setQueue(q);setOperations(o);setLoadedAt(Date.now());}catch(e){setLoadError((e as Error).message);}};
  useEffect(()=>{void load();},[sessionToken,queueOffset,operationsOffset]);
- const loadCustomer=async(id:string,offset:number)=>{try{setCustomer(await financeRequest(sessionToken,`/customers/${encodeURIComponent(id)}?offset=${offset}`,undefined,true));setError('');}catch(e){setError((e as Error).message);}};
+ const loadCustomer=async(id:string,offset:number)=>{const ticket=++customerRequest.current;try{const result=await financeRequest(sessionToken,`/customers/${encodeURIComponent(id)}?offset=${offset}`,undefined,true);if(ticket===customerRequest.current){setCustomer(result);setError('');}}catch(e){if(ticket===customerRequest.current)setError((e as Error).message);}};
  /** Every write goes through the existing finance endpoints, which re-check auth, state and confirmation. */
  const mutate=async(path:string,body:any)=>{if(busy)return false;setBusy(true);setError('');setConfirmError(null);try{await financeRequest(sessionToken,path,body,true);await load();if(customerId&&customer)await loadCustomer(customerId,customerOffset);onChanged?.();return true;}catch(e){const message=(e as Error).message;setError(message);setConfirmError(message);return false;}finally{setBusy(false);}};
  const ask=(next:PendingConfirm)=>{setConfirmError(null);setPending(next);};
@@ -120,7 +121,7 @@ export const AdminFinanceSection:React.FC<{sessionToken:string;initialView?:stri
   </div>}
 
   {view==='customers'&&<AdminPanel title="Customer finance history" description="Wallet, Earn and withdrawal records for one customer. Paste a customer ID, or open it from a withdrawal request or the Customers page.">
-   <form className="flex flex-col gap-2 sm:flex-row sm:items-end" onSubmit={e=>{e.preventDefault();if(customerId.trim()){setCustomerOffset(0);void loadCustomer(customerId.trim(),0);}}}><label className={`${adminLabel} flex-1`}><span>Customer ID</span><input className={field} value={customerId} autoComplete="off" onChange={e=>{setCustomerId(e.target.value);setCustomer(null);setCustomerOffset(0);}}/></label><AdminButton variant="primary" type="submit" disabled={!customerId.trim()}>Inspect</AdminButton></form>
+   <form className="flex flex-col gap-2 sm:flex-row sm:items-end" onSubmit={e=>{e.preventDefault();if(customerId.trim()){setCustomerOffset(0);void loadCustomer(customerId.trim(),0);}}}><label className={`${adminLabel} flex-1`}><span>Customer ID</span><input className={field} value={customerId} autoComplete="off" onChange={e=>{customerRequest.current++;setCustomerId(e.target.value);setCustomer(null);setCustomerOffset(0);}}/></label><AdminButton variant="primary" type="submit" disabled={!customerId.trim()}>Inspect</AdminButton></form>
    {customer&&<div className="mt-4 space-y-4">
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><AdminStat label="Wallet balance" value={formatGhs(customer.walletMinor)}/><AdminStat label="Mystery Earn available" value={formatGhs(customer.earn.availableMinor)}/><AdminStat label="Reserved for withdrawals" value={formatGhs(customer.earn.reservedMinor)} tone={customer.restricted?'danger':'neutral'} hint={customer.restricted?'Account restricted':undefined}/></div>
     <div className="grid gap-4 lg:grid-cols-3">

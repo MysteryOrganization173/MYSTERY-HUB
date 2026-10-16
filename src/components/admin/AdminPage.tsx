@@ -1,3 +1,4 @@
+import {decodeAdminHash} from '../../utils/adminNavigation';
 import {AdminCommercialSection} from './sections/AdminCommercialSection';
 import {AdminFinanceSection} from './sections/AdminFinanceSection';
 import { AdminWebsiteBuilderSection } from './sections/AdminWebsiteBuilderSection';
@@ -57,7 +58,7 @@ const QUICK: AdminTab[] = ['overview', 'orders', 'marketplace', 'finance'];
 /** Admin location lives in the URL hash (#orders/needs_attention) so Android back works and alerts can deep link. */
 function readHash(): { tab: AdminTab; param: string } {
   if (typeof window === 'undefined') return { tab: 'overview', param: '' };
-  const [rawTab = '', ...rest] = decodeURIComponent(window.location.hash.replace(/^#/, '')).split('/');
+  const [rawTab = '', ...rest] = decodeAdminHash(window.location.hash);
   const tab = (Object.keys(ADMIN_AREAS) as AdminTab[]).includes(rawTab as AdminTab) ? rawTab as AdminTab : 'overview';
   return { tab, param: rest.join('/') };
 }

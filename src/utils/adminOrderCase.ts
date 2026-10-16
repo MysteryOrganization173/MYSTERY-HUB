@@ -75,12 +75,13 @@ export function describeOrderCase(order: AdminOrderCaseInput): OrderCase {
   if (resolution?.stage === 'resolved') {
     if (resolution.outcome === 'manual_fulfillment') return make('resolved_manual_fulfilment', 'Resolved · fulfilled outside Mystery Hub', 'info', 'An operator recorded that the customer received the service through another legitimate channel, with evidence.', 'No action needed. The original payment and supplier facts are kept unchanged for audit.');
     if (resolution.outcome === 'external_compensation') return make('resolved_compensated', 'Resolved · compensated externally', 'info', 'An operator recorded an external remedy (for example a MoMo transfer) with its reference.', 'No action needed. This is operator-attested, not a verified provider refund.');
+    if(!['paystack_refund','wallet_refund'].includes(resolution.outcome||''))return make('failed_remedy_open','Resolution needs review','warning','The recorded resolution does not identify a verified refund or documented remedy.','Review the resolution evidence before describing this order as refunded.');
     return make('resolved_refunded', 'Resolved · customer refunded', 'success', resolution.outcome === 'wallet_refund' ? 'The original Mystery Wallet purchase was refunded through the ledger.' : 'Paystack confirmed the customer refund for this exact payment.', 'No action needed.');
   }
 
   if (!paid) {
     if (order.payment_status === 'pending') return make('awaiting_payment', 'Payment not confirmed', 'neutral', 'The customer started checkout, but no successful payment has been verified.', 'Nothing to fulfil. If the customer says they paid, search the Paystack reference before acting.');
-    return make('payment_not_completed', 'Payment not completed', 'neutral', `Payment ended as "${order.payment_status}". No money was received for this order.`, 'Nothing to fulfil or refund.');
+    return make('payment_not_completed', 'Payment not completed', 'neutral', `Payment is recorded as "${order.payment_status}". No successful payment has been verified for this order.`, 'If the customer reports a debit, verify the provider reference before deciding what happened.');
   }
 
   if (order.status === 'delivered' || order.delivered_at) return make('delivered', 'Delivered', 'success', 'The supplier (or the marketplace fulfilment flow) confirmed delivery.', flagged ? 'It is still flagged for review. Read the note, then clear the flag if nothing is outstanding.' : 'No action needed.');
