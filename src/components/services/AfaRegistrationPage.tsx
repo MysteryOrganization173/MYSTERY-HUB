@@ -322,26 +322,37 @@ export const AfaRegistrationPage: React.FC = () => {
   return (
     <div className="py-5 sm:py-10 pb-24 sm:pb-12 text-slate-100 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
       {/* Hero: what this is, what it costs, how it works. */}
-      <section className="relative overflow-hidden rounded-3xl border border-slate-800 bg-[#0a0f14] p-5 sm:p-8">
+      {/* Phones: title, fee and a one-line route, so the form starts on the first screen. */}
+      <section className="relative overflow-hidden rounded-3xl border border-slate-800 bg-[#0a0f14] p-4 sm:p-8">
         <div aria-hidden="true" className="pointer-events-none absolute -top-24 -right-16 w-72 h-72 rounded-full bg-[#00c365]/10 blur-3xl" />
-        <div className="relative grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-end">
-          <div className="space-y-3 max-w-xl">
+        <div className="relative grid gap-3 sm:gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-end">
+          <div className="space-y-2 sm:space-y-3 max-w-xl">
             <p className="text-xs font-semibold text-[#44df95]">MTN AFA</p>
-            <h1 className="text-[1.75rem] leading-[1.15] sm:text-4xl font-extrabold text-white tracking-tight">Register your MTN line for AFA</h1>
-            <p className="text-sm sm:text-base text-slate-300 leading-relaxed">{afaConfig.tagline}</p>
-            <ul className="flex flex-wrap gap-x-4 gap-y-1.5 pt-1 text-[13px] sm:text-sm text-slate-300">
+            <h1 className="text-[1.5rem] leading-[1.15] sm:text-4xl font-extrabold text-white tracking-tight">Register your MTN line for AFA</h1>
+            <p className="hidden sm:block text-base text-slate-300 leading-relaxed">{afaConfig.tagline}</p>
+            <ul className="hidden sm:flex flex-wrap gap-x-4 gap-y-1.5 pt-1 text-sm text-slate-300">
               <li className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[#44df95]" />Details encrypted</li>
               <li className="flex items-center gap-1.5"><Lock className="w-4 h-4 text-[#44df95]" />Mobile Money or Wallet</li>
               <li className="flex items-center gap-1.5"><Check className="w-4 h-4 text-[#44df95]" />Track in Orders</li>
             </ul>
           </div>
-          <div className="rounded-2xl border border-slate-800 bg-[#0e141a] p-4 sm:p-5">
-            <p className="text-xs font-semibold text-slate-400 mb-2">One-time registration fee</p>
-            {feeBlock}
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">Paid to Mystery Hub once. AFA call and data packages are bought from MTN afterwards. <a href="#afa-packages" className="text-[#44df95] underline underline-offset-2">See what they include</a></p>
+          <div className="rounded-2xl border border-[#00c365]/25 sm:border-slate-800 bg-[#0e141a] p-3.5 sm:p-5">
+            <div className="flex items-center justify-between gap-3 sm:block">
+              <p className="text-sm sm:text-xs font-semibold text-slate-200 sm:text-slate-400 sm:mb-2">One-time registration fee</p>
+              {feeBlock}
+            </div>
+            <p className="text-xs text-slate-400 mt-1.5 sm:mt-2 leading-relaxed">Paid to Mystery Hub once. AFA call and data packages are bought from MTN afterwards. <a href="#afa-packages" className="text-[#44df95] underline underline-offset-2">See what they include</a></p>
           </div>
         </div>
-        <ol className="relative mt-5 sm:mt-6 grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3" aria-label="How AFA registration works">
+        <ol className="relative mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-300 sm:hidden" aria-label="How AFA registration works">
+          {['Your details', 'Pay', 'We submit it', 'Track in Orders'].map((label, i) => (
+            <li key={label} className="flex items-center gap-1.5">
+              {i > 0 && <span aria-hidden="true" className="text-slate-600">›</span>}
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#00c365]/15 text-[11px] font-bold text-[#44df95]">{i + 1}</span>{label}
+            </li>
+          ))}
+        </ol>
+        <ol className="relative mt-6 hidden sm:grid grid-cols-2 lg:grid-cols-4 gap-3" aria-label="How AFA registration works">
           {afaConfig.howItWorks.map((step) => (
             <li key={step.step} className="rounded-xl border border-slate-800/80 bg-[#0e141a]/80 p-2.5 sm:p-3 flex gap-2 sm:block">
               <span className="text-xs font-bold text-[#44df95] leading-5"><span className="sm:hidden">{step.step}</span><span className="hidden sm:inline">Step {step.step}</span></span>

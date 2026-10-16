@@ -84,6 +84,12 @@ with sync_playwright() as playwright:
             return route.fulfill(json={'product': product, 'regularMinor': minor, 'discountMinor': 0, 'totalMinor': minor,
                                        'pricingRevision': 'review', 'promotionRevision': 'review',
                                        'offer': {'enabled': False, 'discountMinor': 0, 'state': 'disabled'}})
+        if path.startswith('/api/instant-bundles/') and path.endswith('/quote'):
+            # Server-priced Flexi amount (same rule as initialization); synthetic figures here.
+            amount = float(urllib.parse.parse_qs(urllib.parse.urlparse(request.url).query).get('amount', ['0'])[0])
+            fee = round(-(-(round(amount * 100) + 10) // 0.98) / 100 - amount, 2)
+            return route.fulfill(json={'success': True, 'productKey': path.split('/')[3], 'amountGhc': amount, 'retailPriceGhc': amount,
+                                       'paymentProcessingFeeGhc': fee, 'totalGhc': round(amount + fee, 2), 'totalPesewas': round((amount + fee) * 100)})
         if path == '/api/instant-bundles':
             if state['instant'] == 'error':
                 return route.abort('internetdisconnected')
