@@ -158,8 +158,8 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Customer Accounts</h2>
-          <p className="text-xs text-slate-400">
+          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-[1.7rem]">Customer Accounts</h1>
+          <p className="max-w-2xl text-sm leading-relaxed text-slate-400">
             Real registered customer profiles, lifetime purchase volume, and account access management.
           </p>
         </div>
