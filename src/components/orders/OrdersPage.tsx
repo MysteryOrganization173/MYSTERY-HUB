@@ -7,6 +7,8 @@ import { lookupOrderOnServer, getAccountOrdersOnServer } from '../../services/ap
 import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
 import { OrderRecord } from '../../types';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
+import { PendingPaymentBanner } from '../checkout/PendingPaymentBanner';
+import { orderRecordFromLookup } from '../../utils/checkoutRecovery';
 import { Clock, Search, ArrowRight, CheckCircle2, RefreshCw, AlertTriangle, Smartphone, ShieldCheck, ShoppingBag, X } from 'lucide-react';
 
 export const OrdersPage: React.FC = () => {
@@ -98,55 +100,7 @@ export const OrdersPage: React.FC = () => {
     try {
       const res = await lookupOrderOnServer(query);
       if (res.success && res.order) {
-        const orderData = res.order;
-        const isDelivered = orderData.status === 'delivered';
-        const isProcessing = orderData.status === 'processing' || orderData.status === 'submitted';
-        const isPlaced = orderData.status === 'paid' || orderData.status === 'queued';
-        const isFailed =
-          orderData.status === 'failed' ||
-          orderData.status === 'refund_pending' ||
-          orderData.status === 'refunded';
-
-        openOrderStatus({
-          id: orderData.public_reference,
-          publicReference: orderData.public_reference,
-          serverReference: orderData.public_reference,
-          serverStatus: orderData.status,
-          customerResolution:orderData.customer_resolution,
-          serviceType: orderData.service_type,
-          manualReview: orderData.manual_review,
-          commercialPricing: orderData.commercial_pricing,
-          statusMessage:
-            orderData.status === 'refund_pending' || orderData.status === 'refunded'
-              ? dataOrderPresentation(orderData.status,orderData.manual_review,orderData.customer_resolution).next
-              : undefined,
-          bundle: {
-            id: 'lookup-bundle',
-            network: orderData.network,
-            dataAmount: orderData.bundle_size_snapshot,
-            dataBytesValue: 0,
-            validity: 'Standard',
-            validityCategory: 'Daily',
-            priceGhc: orderData.amount_ghc,
-            description: orderData.product_name_snapshot,
-          },
-          recipientPhone: orderData.recipient_phone,
-          network: orderData.network,
-          paymentMethod: 'paystack',
-          amountGhc: orderData.amount_ghc,
-          status: isDelivered
-            ? 'delivered'
-            : isProcessing
-            ? 'processing'
-            : isPlaced
-            ? 'placed'
-            : isFailed
-            ? 'failed'
-            : 'verifying',
-          paymentReference: orderData.public_reference,
-          createdAt: orderData.created_at,
-          updatedAt: orderData.created_at,
-        });
+        openOrderStatus(orderRecordFromLookup(res.order));
       } else {
         showToast('We couldn’t find that order. Check the reference and try again.', 'warning');
       }
@@ -196,6 +150,8 @@ export const OrdersPage: React.FC = () => {
             Buy Data
           </button>
         </div>
+
+        <PendingPaymentBanner />
 
         {/* Search Filter & Server Lookup Form */}
         <form onSubmit={handleServerLookup} className="flex gap-2">

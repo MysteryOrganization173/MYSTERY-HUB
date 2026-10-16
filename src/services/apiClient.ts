@@ -780,6 +780,35 @@ export async function getAdminSystemOnServer(token: string): Promise<{ success: 
   return data;
 }
 
+export interface InstantFlexiQuote {
+  success: boolean;
+  error?: string;
+  amountGhc?: number;
+  retailPriceGhc?: number;
+  paymentProcessingFeeGhc?: number;
+  totalGhc?: number;
+  totalPesewas?: number;
+}
+
+/** Server price for a typed Flexi amount; read-only, uses the same rule as payment initialization. */
+export async function getInstantFlexiQuote(productKey: string, amountGhc: number, timeoutMs = 15000): Promise<InstantFlexiQuote> {
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/instant-bundles/${encodeURIComponent(productKey)}/quote?amount=${encodeURIComponent(String(amountGhc))}`, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) return { success: false, error: data.error || 'We could not confirm the price right now.' };
+    return data;
+  } catch {
+    return { success: false, error: 'We could not confirm the price. Check your connection and try again. Nothing has been charged.' };
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
+
 /**
  * Public Instant Bundles Catalogue Discovery
  * Fetches live sellable Instant Bundles with server-calculated retail prices.

@@ -55,14 +55,9 @@ describe('Mystery Hub Mobile Bundle Card Compression Verification', () => {
     );
   });
 
-  test('4. Delivery status is merged into a concise single line (Row 2)', () => {
-    assert.ok(
-      cardCode.includes('Direct SIM Credit'),
-      'Card must display direct SIM credit status'
-    );
-    assert.ok(
-      cardCode.includes('dataDeliveryNote(bundle.network)'),
-      'Card must use the centrally configured delivery information'
-    );
+  test('4. Row 2 shows only a real validity; delivery timing stays at page level', () => {
+    // Superseded copy: "Direct SIM Credit" is a routing label, not a validity (see dataCheckoutRescue).
+    assert.ok(cardCode.includes('dataValidityLabel(bundle.validity)'), 'Card must show validity through dataValidityLabel');
+    assert.ok(!cardCode.includes('dataDeliveryNote'), 'Delivery timing is shown once on the Data page, not on every card');
   });
 });

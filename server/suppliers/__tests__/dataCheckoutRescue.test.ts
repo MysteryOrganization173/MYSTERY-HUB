@@ -27,14 +27,16 @@ test('production confirmation stays with recipient ahead of payment choices and 
   assert.match(checkout,/value=\{phone\}/);
   assert.match(checkout,/Pay GH₵/);
   assert.match(checkout,/submissionPending.current \|\| isInitializing \|\| walletBusy/);
-  assert.match(checkout,/disabled=\{walletBusy \|\| isInitializing \|\| isRegularData && !commercial\}/);
+  assert.match(checkout,/disabled=\{walletBusy \|\| isInitializing \|\| isRegularData && !commercial \|\| flexiPending\}/);
 });
 test('production bundle card stays first with compact receipt and payment controls',()=>{
   assert.match(checkout,/Bundle \/ Airtime Summary Card/);
   assert.match(checkout,/bg-slate-900\/90/);
   assert.match(checkout,/checkoutBundle.dataAmount} Data Bundle/);
-  assert.ok(checkout.indexOf('Bundle / Airtime Summary Card')<checkout.indexOf('Receipt email'));
-  assert.ok(checkout.indexOf('Receipt email')<checkout.indexOf('id="checkout-phone"'));
+  // Data buying V2: the recipient comes straight after the product; receipt email follows the payment choice.
+  assert.ok(checkout.indexOf('Bundle / Airtime Summary Card')<checkout.indexOf('id="checkout-phone"'));
+  assert.ok(checkout.indexOf('id="checkout-phone"')<checkout.indexOf('<WalletPaymentChoice'));
+  assert.ok(checkout.indexOf('<WalletPaymentChoice')<checkout.indexOf('Receipt email'));
   const choice=source('src/components/finance/WalletPaymentChoice.tsx');
   assert.match(choice,/grid grid-cols-2/);
   assert.match(choice,/formatGhs\(balance\)\+' available'/);
@@ -62,7 +64,7 @@ test('MTN notice appears once at network level with caveats in disclosure',()=>{
   const page=source('src/components/data/DataPage.tsx');
   assert.equal(page.split('MTN delivery').length-1,1);
   assert.match(page,/Most orders arrive within 15–45 minutes/);
-  assert.match(page,/<details><summary[^>]*>Details/);
+  assert.match(page,/<details>\s*<summary[\s\S]*?Most orders arrive[\s\S]*?Details<\/span>\s*<\/summary>/);
   assert.match(page,/mtnNotice.message/);
   for(const card of ['BundleCard','CompactBundleRow']) assert.ok(!source(`src/components/data/${card}.tsx`).includes('dataDeliveryNote'));
 });

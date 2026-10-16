@@ -167,7 +167,7 @@ with sync_playwright() as playwright:
     home()
     page.get_by_role('button', name='Airtime Top-Up', exact=False).click()
     expect(page).to_have_url(re.compile('/data$'))
-    expect(page.get_by_text('1. Select Network', exact=True)).to_be_visible()
+    expect(page.get_by_label('Recipient number')).to_be_visible()
     home()
     page.locator('.home-template-showcase').get_by_role('button', name='Preview', exact=True).click()
     expect(page.get_by_role('dialog', name='Website template preview')).to_be_visible()

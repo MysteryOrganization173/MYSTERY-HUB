@@ -1,18 +1,30 @@
 import {useDialogFocus} from '../../hooks/useDialogFocus';
+import {useVisualViewport} from '../../hooks/useVisualViewport';
 import {commercialRequest} from '../../services/commercialApi';
 import { WalletPaymentChoice } from '../finance/WalletPaymentChoice';
 import { dataValidityLabel } from '../../utils/dataPurchasePresentation';
 import { walletCheckout } from '../../services/financeApi';
 import { getStoredReferralCode, getOrGenerateVisitorKey } from '../../utils/referralCapture';
+import {
+  formatGhanaPhone,
+  ghanaPhoneDigits,
+  isCompleteGhanaPhone,
+  isConnectivityError,
+  savePendingCheckout,
+  clearPendingCheckout,
+  orderRecordFromLookup,
+} from '../../utils/checkoutRecovery';
+import { dataOrderPresentation } from '../../utils/dataPurchasePresentation';
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { NetworkId } from '../../types';
 import { GHANA_NETWORKS, detectGhanaNetwork } from '../../data/bundles';
 import { usePaystack } from '../../hooks/usePaystack';
 import { BUSINESS_CONFIG } from '../../config/business';
-import { lookupOrderOnServer, cancelPaymentOnServer } from '../../services/apiClient';
+import { lookupOrderOnServer, cancelPaymentOnServer, getInstantFlexiQuote, type InstantFlexiQuote } from '../../services/apiClient';
 import { smoothScrollToElement } from '../../utils/scroll';
 import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
+import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import {
   X,
   ShieldCheck,
@@ -25,6 +37,7 @@ import {
   AlertTriangle,
   Info,
   Zap,
+  RefreshCw,
   Phone as PhoneIcon,
 } from 'lucide-react';
 
@@ -35,13 +48,12 @@ export const CheckoutModal: React.FC = () => {
     checkoutBundle,
     checkoutInitialPhone,
     createOrder,
-    showToast,
     user,
     openOrderStatus,
     openDataPage,
     sessionToken,
   } = useApp();
-  const { initializeServerPayment, isInitializing, loadingPhase, isConfigured } = usePaystack();
+  const { initializeServerPayment, isInitializing, loadingPhase } = usePaystack();
 
   const [phone, setPhone] = useState('');
   const [receiptEmail,setReceiptEmail]=useState('');
@@ -51,6 +63,19 @@ export const CheckoutModal: React.FC = () => {
   const [quoteRefresh,setQuoteRefresh]=useState(0);
   const directRequest=useRef(crypto.randomUUID());
   useEffect(()=>{if(!isCheckoutOpen||!checkoutBundle||checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data'||checkoutBundle.id.startsWith('instant-')||checkoutBundle.id.startsWith('airtime-')){setCommercial(null);return;}let active=true;setCommercial(null);setQuoteError('');commercialRequest('commercial/quote/'+encodeURIComponent(checkoutBundle.id),sessionToken).then(r=>{if(active)setCommercial(r);}).catch(e=>{if(active)setQuoteError(e.message);});return()=>{active=false;};},[isCheckoutOpen,checkoutBundle?.id,sessionToken,quoteRefresh,user?.phone]);
+  // A typed Flexi amount has no catalogue price, so checkout asks the server before Pay is offered.
+  const needsFlexiQuote = Boolean(isCheckoutOpen && checkoutBundle?.isFlexi && checkoutBundle.serviceFeeGhc === undefined
+    && (checkoutBundle.serviceType === 'instant_bundle' || checkoutBundle.id.startsWith('instant-')));
+  const [flexiQuote, setFlexiQuote] = useState<{ key: string; loading: boolean; quote?: InstantFlexiQuote }>({ key: '', loading: false });
+  const [flexiRetry, setFlexiRetry] = useState(0);
+  const flexiKey = needsFlexiQuote && checkoutBundle ? `${checkoutBundle.id}:${checkoutBundle.faceValueGhc ?? checkoutBundle.priceGhc}` : '';
+  useEffect(() => {
+    if (!flexiKey || !checkoutBundle) return;
+    let active = true;
+    setFlexiQuote({ key: flexiKey, loading: true });
+    getInstantFlexiQuote(checkoutBundle.id, checkoutBundle.faceValueGhc ?? checkoutBundle.priceGhc).then(quote => { if (active) setFlexiQuote({ key: flexiKey, loading: false, quote }); });
+    return () => { active = false; };
+  }, [flexiKey, flexiRetry]);
   const submissionPending = useRef(false);
   const [paymentMethod,setPaymentMethod]=useState<'paystack'|'wallet'>('paystack');
   const [walletBusy,setWalletBusy]=useState(false);
@@ -59,6 +84,10 @@ export const CheckoutModal: React.FC = () => {
   const [phoneError, setPhoneError] = useState('');
   const [serverError, setServerError] = useState('');
   const [isSlowPreparation, setIsSlowPreparation] = useState(false);
+  // The order reference the server created for this attempt; recovery checks use it, never a guess.
+  const [attemptRef, setAttemptRef] = useState<string | null>(null);
+  const [paymentClosed, setPaymentClosed] = useState(false);
+  const [recovery, setRecovery] = useState<{ checking: boolean; message: string }>({ checking: false, message: '' });
   const [activeMtnConflict, setActiveMtnConflict] = useState<{
     orderRef?: string;
     status?: string;
@@ -97,11 +126,14 @@ export const CheckoutModal: React.FC = () => {
       setPaymentMethod('paystack');
       walletRequest.current=null;
       const initial = checkoutInitialPhone !== undefined ? checkoutInitialPhone : (user?.phone || '');
-      setPhone(initial);
+      setPhone(formatGhanaPhone(initial));
       setPhoneError('');
       setServerError('');
       setActiveMtnConflict(null);
       setPreflightIssue(null);
+      setAttemptRef(null);
+      setPaymentClosed(false);
+      setRecovery({ checking: false, message: '' });
     }
   }, [isCheckoutOpen,checkoutBundle, checkoutInitialPhone, user?.phone]);
 
@@ -135,6 +167,7 @@ export const CheckoutModal: React.FC = () => {
   }, [serverError]);
 
   const dialogRef = useDialogFocus(isCheckoutOpen, () => { if (!isInitializing && !walletBusy) closeCheckout(); });
+  const viewport = useVisualViewport(isCheckoutOpen);
   if (!isCheckoutOpen || !checkoutBundle) return null;
 
   const currentNetwork = GHANA_NETWORKS[checkoutBundle.network];
@@ -150,22 +183,36 @@ export const CheckoutModal: React.FC = () => {
       })
     : null;
   const isRegularData = !isAirtime && !isInstantBundle;
-  const faceValue = checkoutBundle.faceValueGhc ?? checkoutBundle.priceGhc;
-  const serviceFee =
-    checkoutBundle.serviceFeeGhc ??
-    (isAirtime
-      ? 0
-      : isInstantBundle
-      ? Number((Math.ceil((Math.round(faceValue * 100) + 10) / 0.98) / 100 - faceValue).toFixed(2))
-      : 0);
+  const quoteForThis = needsFlexiQuote && flexiQuote.key === flexiKey ? flexiQuote : null;
+  const confirmedFlexi = quoteForThis?.quote?.success ? quoteForThis.quote : null;
+  const flexiPending = needsFlexiQuote && !confirmedFlexi; // loading, or failed: Pay stays unavailable
+  const flexiError = needsFlexiQuote && quoteForThis && !quoteForThis.loading && !confirmedFlexi ? (quoteForThis.quote?.error || 'We could not confirm the price.') : '';
+  // The amount the customer asked for; the server prices it, so this is what initialization receives.
+  const requestedAmount = checkoutBundle.faceValueGhc ?? checkoutBundle.priceGhc;
+  const faceValue = confirmedFlexi?.retailPriceGhc ?? requestedAmount;
+  const serviceFee = confirmedFlexi?.paymentProcessingFeeGhc ?? checkoutBundle.serviceFeeGhc ?? 0;
   const totalAmount =
-    isAirtime || isInstantBundle
+    confirmedFlexi?.totalGhc !== undefined
+      ? confirmedFlexi.totalGhc
+      : isAirtime || isInstantBundle
       ? Number((faceValue + serviceFee).toFixed(2))
       : commercial?.totalMinor/100 || checkoutBundle.priceGhc;
 
+  const productLabel = isInstantBundle && instantInfo
+    ? `${instantInfo.formattedAmount} ${instantInfo.categoryLabel}`
+    : isAirtime
+    ? `GH₵${faceValue.toFixed(2)} Airtime Top-Up`
+    : `${checkoutBundle.dataAmount} Data Bundle`;
+  const validity = isRegularData ? dataValidityLabel(checkoutBundle.validity) : '';
+  const phoneComplete = isCompleteGhanaPhone(phone);
+  const networkMismatch = Boolean(phoneComplete && detectedNet && detectedNet !== checkoutBundle.network);
+  const busy = walletBusy || isInitializing;
+  // Paystack's window is open: the customer approves on their phone or in the window.
+  const awaitingPayment = isInitializing && loadingPhase === 'opening';
+
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    const clean = val.replace(/[^\d\s]/g, '');
+    const clean = formatGhanaPhone(val.replace(/[^\d\s+]/g, ''));
     setPhone(clean);
     if (activeMtnConflict) setActiveMtnConflict(null);
     if (preflightIssue) setPreflightIssue(null);
@@ -178,33 +225,7 @@ export const CheckoutModal: React.FC = () => {
     try {
       const res = await lookupOrderOnServer(orderRef);
       if (res.success && res.order) {
-        openOrderStatus({
-          id: res.order.public_reference,
-          publicReference: res.order.public_reference,
-          serverReference: res.order.public_reference,
-          serverStatus: res.order.status,
-          serviceType: res.order.service_type,
-          statusMessage:
-            res.order.status === 'refund_pending' || res.order.status === 'refunded'
-              ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
-              : undefined,
-          bundle: {
-            id: 'mtn-active',
-            network: res.order.network,
-            dataAmount: res.order.bundle_size_snapshot,
-            dataBytesValue: 1024,
-            validity: 'Direct Credit',
-            validityCategory: 'Monthly',
-            priceGhc: res.order.amount_ghc,
-          },
-          recipientPhone: res.order.recipient_phone,
-          network: res.order.network,
-          paymentMethod: 'paystack',
-          amountGhc: res.order.amount_ghc,
-          status: res.order.status === 'delivered' ? 'delivered' : 'processing',
-          createdAt: res.order.created_at,
-          updatedAt: res.order.created_at,
-        });
+        openOrderStatus(orderRecordFromLookup(res.order));
         return;
       }
     } catch {
@@ -234,6 +255,18 @@ export const CheckoutModal: React.FC = () => {
     });
   };
 
+  const orderToCreate = () => ({
+    ...checkoutBundle,
+    priceGhc: totalAmount,
+    faceValueGhc: faceValue,
+    serviceFeeGhc: serviceFee,
+    serviceType: isInstantBundle
+      ? ('instant_bundle' as const)
+      : isAirtime
+      ? ('airtime' as const)
+      : ('data' as const),
+  });
+
   const submitPayment = () => {
     const rawDigits = phone.replace(/\D/g, '');
 
@@ -248,8 +281,11 @@ export const CheckoutModal: React.FC = () => {
 
     setActiveMtnConflict(null);
     setServerError('');
+    setPaymentClosed(false);
+    setRecovery({ checking: false, message: '' });
 
     if(isRegularData&&!commercial){setServerError('Refresh the current price before paying.');return;}
+    if(flexiPending){setServerError('We are still confirming the price. Please wait a moment.');return;}
     return initializeServerPayment({
       commercial:isRegularData?{requestId:directRequest.current,expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:undefined,
       productId: checkoutBundle.id,
@@ -258,25 +294,21 @@ export const CheckoutModal: React.FC = () => {
       customerName: user?.name || undefined,
       serviceType: isInstantBundle ? 'instant_bundle' : isAirtime ? 'airtime' : 'data',
       network: checkoutBundle.network,
-      amount: faceValue,
+      amount: requestedAmount,
+      onOrderCreated: (orderRef) => {
+        // Kept on this device so a customer who leaves for the MoMo prompt can check it later.
+        setAttemptRef(orderRef);
+        savePendingCheckout({ orderRef, label: `${currentNetwork.name} ${productLabel}`, network: checkoutBundle.network, startedAt: new Date().toISOString() });
+      },
       onPaymentReceived: (orderRef, reference) => {
-        const orderToCreate = {
-          ...checkoutBundle,
-          priceGhc: totalAmount,
-          faceValueGhc: faceValue,
-          serviceFeeGhc: serviceFee,
-          serviceType: isInstantBundle
-            ? ('instant_bundle' as const)
-            : isAirtime
-            ? ('airtime' as const)
-            : ('data' as const),
-        };
-        const newOrder = createOrder(orderToCreate, phone.trim(), 'paystack', reference, orderRef);
+        clearPendingCheckout(orderRef);
+        const newOrder = createOrder(orderToCreate(), phone.trim(), 'paystack', reference, orderRef);
         closeCheckout();
         openOrderStatus(newOrder);
       },
       onCancel: (orderRef) => {
-        showToast('Payment window closed.', 'info');
+        // No toast: the sheet itself explains what happened and how to check.
+        setPaymentClosed(true);
         if (orderRef) {
           cancelPaymentOnServer(orderRef).catch((err) => {
             console.warn('Failed to cancel order on server:', err);
@@ -346,30 +378,55 @@ export const CheckoutModal: React.FC = () => {
           return;
         }
 
+        if (isConnectivityError(err)) {
+          setServerError('We couldn’t reach Mystery Hub, so no payment window was opened and nothing was charged. Check your connection and try again.');
+          return;
+        }
+
         setServerError(err.message || 'Payment initiation failed. Please try again.');
       },
     });
   };
 
+  // Customer-initiated check after the payment window closed. Server status decides; nothing is retried.
+  const checkPaymentStatus = async () => {
+    if (!attemptRef || recovery.checking) return;
+    setRecovery({ checking: true, message: '' });
+    try {
+      const res = await lookupOrderOnServer(attemptRef);
+      const view = dataOrderPresentation(res.order?.status, res.order?.manual_review, res.order?.customer_resolution);
+      if (res.success && res.order && view.paymentConfirmed) {
+        clearPendingCheckout(attemptRef);
+        closeCheckout();
+        openOrderStatus({ ...orderRecordFromLookup(res.order), recipientPhone: phone.trim(), buyerRecipientVisible: true });
+        return;
+      }
+      setRecovery({ checking: false, message: 'No payment has been confirmed for this order yet. If you approved the prompt, it can take a minute to arrive. Check again before paying a second time.' });
+    } catch {
+      setRecovery({ checking: false, message: 'We couldn’t reach Mystery Hub to check. Your reference is saved on this device; check again when you are back online.' });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submissionPending.current || isInitializing || walletBusy) return;
-    if(isRegularData&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(receiptEmail.trim())){setServerError('Enter a valid receipt email before paying.');return;}
-    if (phone.replace(/\D/g, '').length < 10) {
-      setPhoneError('Enter the recipient’s Ghana phone number before paying.');
+    if (!isCompleteGhanaPhone(phone)) {
+      setPhoneError(ghanaPhoneDigits(phone).length ? 'Enter all 10 digits of the Ghana number, like 024 123 4567.' : 'Enter the recipient’s Ghana phone number before paying.');
       phoneInputRef.current?.focus(); return;
     }
+    if(isRegularData&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(receiptEmail.trim())){setServerError('Enter a valid receipt email before paying.');return;}
     if(paymentMethod!=='wallet'){submissionPending.current=true;try{await submitPayment();}finally{submissionPending.current=false;}return;}
     if(walletBusy||!sessionToken)return;
     if(isRegularData&&!commercial){setServerError('Refresh the current price before paying.');return;}
+    if(flexiPending){setServerError('We are still confirming the price. Please wait a moment.');return;}
     submissionPending.current=true;setWalletBusy(true);setServerError('');
     try {
-      const body={productId:checkoutBundle.id,recipientPhone:phone.trim(),customerEmail:receiptEmail||user?.email,customerName:user?.name,serviceType:isAirtime?'airtime':'data',network:checkoutBundle.network,amount:faceValue,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()};
+      const body={productId:checkoutBundle.id,recipientPhone:phone.trim(),customerEmail:receiptEmail||user?.email,customerName:user?.name,serviceType:isAirtime?'airtime':'data',network:checkoutBundle.network,amount:requestedAmount,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()};
       const fingerprint=JSON.stringify(body);if(walletRequest.current?.fingerprint!==fingerprint)walletRequest.current={fingerprint,id:crypto.randomUUID()};
       const result=await walletCheckout(sessionToken,'payments/initialize',{...body,requestId:walletRequest.current!.id,...(isRegularData&&commercial?{expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:{})});
       const newOrder=createOrder({...checkoutBundle,priceGhc:result.amountPesewas/100},phone.trim(),'wallet',result.reference,result.orderRef);
       closeCheckout();openOrderStatus(newOrder);
-    }catch(error){setServerError((error as Error).message);}finally{submissionPending.current=false;setWalletBusy(false);}
+    }catch(error){setServerError(isConnectivityError(error as Error)?'We couldn’t reach Mystery Hub to confirm this Wallet payment. Check Track Order before trying again; repeating with the same details reuses this request.':(error as Error).message);}finally{submissionPending.current=false;setWalletBusy(false);}
   };
 
   const handleViewInstantBundles = () => {
@@ -399,106 +456,112 @@ export const CheckoutModal: React.FC = () => {
     }, 120);
   };
 
+  const detectedName = detectedNet ? GHANA_NETWORKS[detectedNet as keyof typeof GHANA_NETWORKS]?.name || detectedNet.toUpperCase() : '';
+
   return (
-    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Review your purchase" className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-[calc(100vw-1rem)] sm:max-w-lg bg-[#0f151b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-100 max-h-[94dvh] flex flex-col">
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Review your purchase"
+      style={{ top: viewport.top, height: viewport.height || undefined }}
+      className="mh-sheet-backdrop fixed inset-x-0 top-0 h-dvh z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/75 backdrop-blur-sm"
+    >
+      <div className="mh-sheet relative w-full max-w-[calc(100vw-1rem)] mx-auto sm:max-w-md bg-[#0f151b] border border-slate-700/70 border-b-0 sm:border-b rounded-t-[1.5rem] sm:rounded-[1.5rem] shadow-2xl overflow-hidden text-slate-100 max-h-[calc(100%-0.75rem)] sm:max-h-[92dvh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-3.5 border-b border-slate-800 bg-[#0c1116] shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-[#00c365]/10 border border-[#00c365]/30 flex items-center justify-center text-[#00c365] shrink-0">
-              <Smartphone className="w-4 h-4" />
-            </div>
-            <div className="min-w-0 truncate">
-              <h3 className="font-semibold text-sm sm:text-base text-white truncate">
-                {isInstantBundle && instantInfo
-                  ? `${currentNetwork.name} ${instantInfo.categoryLabel} ⚡`
-                  : isAirtime
-                  ? `${currentNetwork.name} Airtime Top-Up`
-                  : 'Data Bundle Checkout'}
-              </h3>
-              <p className="text-[11px] sm:text-xs text-slate-400 truncate">
-                Direct to your recipient’s SIM
-              </p>
-            </div>
+        <div className="relative flex items-center justify-between gap-3 px-4 sm:px-5 pt-3 pb-2 shrink-0">
+          <span aria-hidden="true" className="sm:hidden absolute left-1/2 top-1.5 -translate-x-1/2 h-1 w-10 rounded-full bg-slate-700" />
+          <div className="min-w-0 pt-1">
+            <h3 className="font-semibold text-base text-white truncate">
+              {awaitingPayment ? 'Complete your payment' : paymentClosed ? 'Payment not completed' : 'Review your purchase'}
+            </h3>
           </div>
           <button
             type="button"
             onClick={closeCheckout}
-            className="w-11 h-11 flex items-center justify-center rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0 ml-2"
+            disabled={walletBusy}
+            className="w-11 h-11 flex items-center justify-center rounded-full bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0 disabled:opacity-40"
             aria-label="Close checkout"
           >
-            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Scrollable Body */}
-        <form onSubmit={handleSubmit} className="overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-3 flex-1 overscroll-contain pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <form id="checkout-form" onSubmit={handleSubmit} noValidate className="overflow-y-auto px-4 sm:px-5 pb-4 space-y-4 flex-1 overscroll-contain">
           {walletBusy&&<p role="status" className="text-sm text-[#00c365]">Placing your order…</p>}
           {/* 1. Bundle / Airtime Summary Card */}
-          <div className="p-3 sm:p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3">
+          <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div
-                className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-sm"
-                style={{
-                  backgroundColor:
-                    checkoutBundle.network === 'mtn'
-                      ? '#FFCC00'
-                      : checkoutBundle.network === 'telecel'
-                      ? '#E60000'
-                      : '#004B93',
-                  color: checkoutBundle.network === 'mtn' ? '#000' : '#fff',
-                }}
-              >
-                {checkoutBundle.network === 'mtn' ? 'MTN' : checkoutBundle.network === 'telecel' ? 'Telecel' : 'AT'}
-              </div>
+              <NetworkBrandBadge network={checkoutBundle.network} size="lg" />
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h4 className="font-bold text-white text-sm sm:text-base truncate">
-                    {isInstantBundle && instantInfo
-                      ? `${instantInfo.formattedAmount} ${instantInfo.categoryLabel}`
-                      : isAirtime
-                      ? `GH₵${faceValue.toFixed(2)} Airtime Top-Up`
-                      : `${checkoutBundle.dataAmount} Data Bundle`}
-                  </h4>
-                  {isInstantBundle ? (
-                    <span className="text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded font-bold shrink-0">
-                      Delivery
-                    </span>
-                  ) : isAirtime ? (
-                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-bold shrink-0">
-                      Delivery
-                    </span>
-                  ) : checkoutBundle.network === 'airteltigo' ? (
-                    <span className="text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded font-bold shrink-0">
-                      Delivery
-                    </span>
-                  ) : null}
-                </div>
-                <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-                  {currentNetwork.name} ·{' '}
-                  {isInstantBundle && instantInfo
-                    ? instantInfo.restrictionNote || 'Delivery after confirmed payment'
-                    : isAirtime
-                    ? 'Airtime sent to your recipient number'
-                    : checkoutBundle.network === 'airteltigo'
-                    ? 'Delivery to your AirtelTigo number'
-                    : checkoutBundle.description || 'Track delivery in Orders'}
+                <h4 className="font-bold text-white text-base leading-tight">
+                  {isRegularData ? <>{checkoutBundle.dataAmount} Data Bundle</> : productLabel}
+                  {isInstantBundle && <Zap aria-hidden="true" className="inline w-3.5 h-3.5 ml-1 text-amber-400 fill-amber-400 align-[-2px]" />}
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5 truncate">
+                  {currentNetwork.name}
+                  {validity ? ` · ${validity}` : isInstantBundle && instantInfo?.restrictionNote ? ` · ${instantInfo.restrictionNote}` : isAirtime ? ' · Airtime credit' : ''}
                 </p>
               </div>
             </div>
-
             <div className="text-right shrink-0">
-              <div className="text-[10px] text-slate-400 font-medium">{isAirtime ? 'Total' : 'Price'}</div>
-              <div className="text-base sm:text-lg font-bold text-[#00c365] tabular-nums">
-                GH₵{totalAmount.toFixed(2)}
-              </div>
+              <div className="text-lg font-bold text-white tabular-nums">GH₵{faceValue.toFixed(2)}</div>
+              {!awaitingPayment && !busy && !paymentClosed && (
+                <button type="button" onClick={closeCheckout} className="mh-compact-control text-xs text-[#44df95] hover:text-white min-h-8 px-1 cursor-pointer">Change</button>
+              )}
             </div>
           </div>
 
+          {/* Payment window open: tell the customer exactly what to do and what not to do. */}
+          {awaitingPayment && (
+            <div role="status" className="rounded-2xl border border-[#00c365]/30 bg-[#00c365]/[0.07] p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#00c365]/15 text-[#44df95]">
+                  <Smartphone className="w-5 h-5" />
+                  <span aria-hidden="true" className="absolute inset-0 rounded-full border-2 border-[#00c365]/40 motion-safe:animate-ping" />
+                </span>
+                <div className="min-w-0 space-y-1">
+                  <p className="font-semibold text-white">Finish in the Paystack window</p>
+                  <p className="text-sm text-slate-300 leading-relaxed">For Mobile Money, approve the prompt on your phone with your PIN. Keep this page open until payment is confirmed.</p>
+                </div>
+              </div>
+              <ul className="text-xs text-slate-400 space-y-1.5 pl-1">
+                <li className="flex gap-2"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />Never share your MoMo PIN with anyone, including support.</li>
+                {attemptRef && <li className="flex gap-2"><Info className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" /><span>Order reference <span className="font-mono text-slate-200 break-all">{attemptRef}</span></span></li>}
+              </ul>
+            </div>
+          )}
+
+          {/* Payment window closed: the customer may still have approved MoMo, so offer a server check. */}
+          {paymentClosed && !busy && (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.07] p-4 space-y-3" aria-live="polite">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1 min-w-0">
+                  <p className="font-semibold text-white">The payment window was closed</p>
+                  <p className="text-sm text-slate-300 leading-relaxed">If you already approved the prompt on your phone, check the status before paying again. Otherwise you can try again.</p>
+                  {attemptRef && <p className="text-xs text-slate-400">Reference <span className="font-mono text-slate-200 break-all">{attemptRef}</span></p>}
+                </div>
+              </div>
+              {recovery.message && <p role="status" className="text-xs text-amber-100/90 leading-relaxed border-t border-amber-500/20 pt-2.5">{recovery.message}</p>}
+              <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2">
+                {attemptRef && (
+                  <button type="button" onClick={checkPaymentStatus} disabled={recovery.checking} aria-busy={recovery.checking} className="mh-button-secondary w-full text-sm">
+                    <RefreshCw className={`w-4 h-4 ${recovery.checking ? 'animate-spin' : ''}`} />
+                    {recovery.checking ? 'Checking…' : 'Check payment status'}
+                  </button>
+                )}
+                <button type="button" onClick={() => setPaymentClosed(false)} className="mh-button-secondary w-full text-sm">Edit details</button>
+              </div>
+            </div>
+          )}
+
           {/* Instant Bundle Safety & Restriction Notice */}
-          {isInstantBundle && instantInfo && instantInfo.restrictionNote && (
+          {!awaitingPayment && isInstantBundle && instantInfo && instantInfo.restrictionNote && (
             <div
-              className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 animate-in fade-in ${
+              className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 ${
                 instantInfo.isMidnight
                   ? 'bg-amber-500/15 border-amber-500/40 text-amber-200'
                   : instantInfo.isVideo
@@ -537,37 +600,36 @@ export const CheckoutModal: React.FC = () => {
           {activeMtnConflict && (
             <div
               ref={conflictRef}
-              className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/35 text-left space-y-2.5 animate-in fade-in"
+              role="alert"
+              className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/35 text-left space-y-3"
             >
               <div className="flex items-start gap-2.5">
-                <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
-                  <AlertTriangle className="w-4 h-4" />
-                </div>
+                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="font-semibold text-xs sm:text-sm text-amber-200">
+                  <h4 className="font-semibold text-sm text-amber-100">
                     An MTN bundle is already being processed for this number.
                   </h4>
-                  <p className="text-[11px] sm:text-xs text-amber-300/90 mt-0.5 leading-relaxed">
-                    Please wait for your current order to be completed before buying another MTN bundle for this number.
+                  <p className="text-xs text-amber-200/90 mt-1 leading-relaxed">
+                    Please wait for your current order to be completed before buying another MTN bundle for this number. No payment has been taken for this one.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-0.5">
+              <div className="flex flex-wrap items-center gap-2">
                 {activeMtnConflict.orderRef && (
                   <button
                     type="button"
                     onClick={() => handleTrackCurrentOrder(activeMtnConflict.orderRef!)}
-                    className="px-2.5 py-1 rounded-lg bg-amber-500/25 hover:bg-amber-500/35 text-amber-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                    className="min-h-11 px-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-sm font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <span>Track current order</span>
-                    <ArrowRight className="w-3 h-3" />
+                    <ArrowRight className="w-4 h-4" />
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => setActiveMtnConflict(null)}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+                  className="min-h-11 px-3 rounded-xl text-slate-300 hover:text-white text-sm transition-colors cursor-pointer"
                 >
                   Dismiss
                 </button>
@@ -579,17 +641,16 @@ export const CheckoutModal: React.FC = () => {
           {preflightIssue && (
             <div
               ref={preflightRef}
-              className="p-3.5 sm:p-4 rounded-xl bg-slate-900/95 border border-slate-700/80 text-left space-y-3 animate-in fade-in"
+              role="alert"
+              className="p-4 rounded-2xl bg-slate-900/95 border border-slate-700/80 text-left space-y-3"
             >
               <div className="flex items-start gap-2.5">
-                <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400 shrink-0 mt-0.5">
-                  <Info className="w-4 h-4" />
-                </div>
+                <Info className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                 <div className="space-y-2 min-w-0 flex-1">
-                  <h4 className="font-semibold text-xs sm:text-sm text-white">
+                  <h4 className="font-semibold text-sm text-white">
                     {preflightIssue.title}
                   </h4>
-                  <div className="text-[11px] sm:text-xs text-slate-300 leading-relaxed whitespace-pre-line">
+                  <div className="text-xs text-slate-300 leading-relaxed whitespace-pre-line">
                     {preflightIssue.message}
                   </div>
 
@@ -606,81 +667,76 @@ export const CheckoutModal: React.FC = () => {
                   )}
 
                   {preflightIssue.supportingNote && (
-                    <p className="text-[10px] sm:text-[11px] text-slate-400 pt-1 leading-relaxed border-t border-slate-800/80">
+                    <p className="text-[11px] text-slate-400 pt-1 leading-relaxed">
                       {preflightIssue.supportingNote}
                     </p>
                   )}
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-slate-800/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-                {/* Primary Actions */}
-                <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreflightIssue(null);
+                    if (phoneInputRef.current) {
+                      smoothScrollToElement(phoneInputRef.current, { block: 'center' });
+                      phoneInputRef.current.focus();
+                      phoneInputRef.current.select();
+                    }
+                  }}
+                  className="min-h-11 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold transition-colors cursor-pointer"
+                >
+                  Try Another Number
+                </button>
+
+                {preflightIssue.canViewInstant && (
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={handleViewInstantBundles}
+                    className="min-h-11 px-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-sm font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Zap className="w-4 h-4 fill-black text-black" />
+                    <span>View Instant Bundles</span>
+                  </button>
+                )}
+
+                {preflightIssue.code === 'SUPPLIER_WALLET_LOW' && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
                       setPreflightIssue(null);
-                      if (phoneInputRef.current) {
-                        smoothScrollToElement(phoneInputRef.current, { block: 'center' });
-                        phoneInputRef.current.focus();
-                        phoneInputRef.current.select();
-                      }
+                      (event.currentTarget.form)?.requestSubmit();
                     }}
-                    className="px-3 py-2 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                    className="min-h-11 px-3.5 rounded-xl border border-amber-500/30 text-amber-200 text-sm font-semibold transition-colors cursor-pointer"
                   >
-                    <span>Try Another Number</span>
+                    Try Again
                   </button>
-
-                  {preflightIssue.canViewInstant && (
-                    <button
-                      type="button"
-                      onClick={handleViewInstantBundles}
-                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-                    >
-                      <Zap className="w-3.5 h-3.5 fill-black text-black" />
-                      <span>View Instant Bundles</span>
-                    </button>
-                  )}
-
-                  {preflightIssue.code === 'SUPPLIER_WALLET_LOW' && (
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        setPreflightIssue(null);
-                        (event.currentTarget.form)?.requestSubmit();
-                      }}
-                      className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-semibold border border-amber-500/30 transition-all cursor-pointer flex items-center justify-center gap-1"
-                    >
-                      <span>Try Again</span>
-                    </button>
-                  )}
-                </div>
-
-                {/* Secondary Support Action */}
-                <div className="flex items-center gap-2 justify-end shrink-0">
-                  <a
-                    href={`${BUSINESS_CONFIG.contact.supportWhatsAppUrl}?text=${encodeURIComponent(
-                      `Hello Mystery Hub Support, I am ordering ${checkoutBundle.network.toUpperCase()} bundle (${
-                        checkoutBundle.dataAmount || 'Airtime'
-                      }) for ${phone.trim()}, but preflight verification indicates: ${preflightIssue.title} (Code: ${
-                        preflightIssue.code
-                      }). Please assist me.`
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1 cursor-pointer py-1 px-1.5"
-                  >
-                    <MessageSquare className="w-3 h-3 text-emerald-400" />
-                    <span>Report Issue</span>
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => setPreflightIssue(null)}
-                    className="px-2 py-1 rounded text-slate-400 hover:text-white text-xs transition-colors cursor-pointer"
-                  >
-                    Dismiss
-                  </button>
-                </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-2 border-t border-slate-800 pt-2">
+                <a
+                  href={`${BUSINESS_CONFIG.contact.supportWhatsAppUrl}?text=${encodeURIComponent(
+                    `Hello Mystery Hub Support, I am ordering ${checkoutBundle.network.toUpperCase()} bundle (${
+                      checkoutBundle.dataAmount || 'Airtime'
+                    }) for ${phone.trim()}, but preflight verification indicates: ${preflightIssue.title} (Code: ${
+                      preflightIssue.code
+                    }). Please assist me.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-h-11 text-xs text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1.5"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Report Issue</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreflightIssue(null)}
+                  className="min-h-11 px-2 text-slate-400 hover:text-white text-xs transition-colors cursor-pointer"
+                >
+                  Dismiss
+                </button>
               </div>
             </div>
           )}
@@ -690,208 +746,164 @@ export const CheckoutModal: React.FC = () => {
             <div
               ref={serverErrorRef}
               role="alert"
-              className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5 animate-in fade-in"
+              className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-100 text-sm flex items-start gap-2.5"
             >
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <span className="font-semibold text-rose-200">Payment Error: </span>
-                {serverError}
+              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0 space-y-1">
+                <p className="leading-relaxed">{serverError}</p>
+                {!/no payment window was opened/.test(serverError)&&<p className="text-xs text-rose-200/70">If payment was deducted, check Track Order before retrying. You can edit the recipient or contact support.</p>}
+                {commercial&&/price|pricing|quote|welcome offer|promotion/i.test(serverError)&&<button type="button" disabled={walletBusy||isInitializing} onClick={()=>setQuoteRefresh(x=>x+1)} className="rounded-lg border border-slate-600 px-3 min-h-11 text-emerald-400">Refresh price</button>}
               </div>
               <button
                 type="button"
                 onClick={() => setServerError('')}
                 aria-label="Dismiss payment error"
-                className="min-w-11 min-h-11 text-slate-400 hover:text-white text-xs cursor-pointer"
+                className="min-w-11 min-h-11 -mt-2 -mr-2 flex items-center justify-center text-rose-200/70 hover:text-white cursor-pointer"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
           )}
 
-          {/* Network Mismatch Warning Banner */}
-          {detectedNet && checkoutBundle.network && detectedNet !== checkoutBundle.network && (
-            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-300 flex items-start gap-2 animate-in fade-in">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-              <span className="text-[11px] leading-relaxed">
-                Number prefix indicates <strong>{GHANA_NETWORKS[detectedNet as keyof typeof GHANA_NETWORKS]?.name || detectedNet.toUpperCase()}</strong>, while this checkout is for <strong>{currentNetwork.name}</strong>. If this number was ported via MNP, you can proceed safely.
-              </span>
-            </div>
-          )}
-
-          {isRegularData&&<div className="text-xs text-slate-400">
-            {editingReceipt ? <label className="block">Receipt email<input type="email" value={receiptEmail} onChange={e=>setReceiptEmail(e.target.value)} maxLength={128} className="w-full mt-1 min-h-11 p-2 rounded-lg bg-slate-950 border border-slate-700" disabled={walletBusy||isInitializing} required/></label> : <div className="flex items-center gap-2"><span className="min-w-0 break-all">Receipt: {receiptEmail}</span><button type="button" disabled={walletBusy||isInitializing} onClick={()=>setEditingReceipt(true)} className="shrink-0 min-h-11 px-2 text-emerald-400">Change</button></div>}
-            {commercial?.offer.state==='phone_required'&&<p>Add your phone in Account to check your Welcome Offer.</p>}
-            {commercial&&/price|pricing|quote|welcome offer|promotion/i.test(serverError)&&<button type="button" disabled={walletBusy||isInitializing} onClick={()=>setQuoteRefresh(x=>x+1)} className="rounded-lg border border-slate-600 px-3 min-h-11 text-emerald-400">Refresh price</button>}
-            {!commercial&&<div role="status">{quoteError||'Loading current price…'}{quoteError&&<button type="button" onClick={()=>setQuoteRefresh(x=>x+1)} className="ml-2 rounded-lg border border-slate-600 px-3 min-h-11 text-emerald-400">Retry</button>}</div>}
-          </div>}
-
+          {!awaitingPayment && <>
           {/* 2. Recipient Phone Input */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label htmlFor="checkout-phone" className="text-xs font-semibold text-slate-200">
-                Send to
-              </label>
-              {detectedNet && (
-                <span className="text-[11px] font-medium text-emerald-400 flex items-center gap-1">
-                  <Check className="w-3 h-3" />
-                  Detected: {GHANA_NETWORKS[detectedNet as keyof typeof GHANA_NETWORKS]?.name || detectedNet.toUpperCase()}
-                </span>
-              )}
-            </div>
-
+          <div className="space-y-2">
+            <label htmlFor="checkout-phone" className="block text-sm font-semibold text-slate-100">
+              {isAirtime ? 'Send airtime to' : 'Send data to'}
+            </label>
             <div className="relative">
+              <PhoneIcon aria-hidden="true" className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 ref={phoneInputRef}
                 id="checkout-phone"
                 type="tel"
                 inputMode="tel"
-                autoComplete="tel"
+                autoComplete="tel-national"
+                enterKeyHint="go"
                 disabled={walletBusy||isInitializing}
                 aria-invalid={Boolean(phoneError)}
                 aria-describedby="checkout-phone-help"
                 value={phone}
                 onChange={handlePhoneChange}
-                placeholder="e.g. 024 XXX XXXX"
+                placeholder="024 123 4567"
                 required
-                className="w-full bg-[#0a0e12] border border-slate-700 rounded-xl pl-4 pr-20 py-2.5 sm:py-3 text-white text-sm sm:text-base tracking-wide focus:outline-none focus:border-[#00c365] focus:ring-1 focus:ring-[#00c365] transition-colors"
+                className={`w-full bg-[#0a0e12] border rounded-2xl pl-10 pr-24 min-h-14 text-white text-lg font-semibold tracking-wide tabular-nums placeholder:font-normal placeholder:text-slate-600 focus:outline-none focus:ring-2 transition-colors ${phoneError ? 'border-rose-500/70 focus:ring-rose-500/40' : networkMismatch ? 'border-amber-500/60 focus:ring-amber-500/30' : 'border-slate-700 focus:border-[#00c365] focus:ring-[#00c365]/30'}`}
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 bg-slate-800 px-2 py-1 rounded">
-                +233
-              </div>
+              {phoneComplete && detectedNet && (
+                <span className={`absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-xs font-semibold ${networkMismatch ? 'text-amber-300' : 'text-emerald-400'}`}>
+                  {networkMismatch ? <AlertTriangle className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+                  {detectedNet === 'airteltigo' ? 'AT' : detectedName.replace(' Ghana', '')}
+                </span>
+              )}
             </div>
 
             {phoneError ? (
-              <p id="checkout-phone-help" role="alert" className="text-xs text-rose-400 flex items-center gap-1 mt-1">
+              <p id="checkout-phone-help" role="alert" className="text-xs text-rose-300 flex items-center gap-1.5">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>{phoneError}</span>
               </p>
+            ) : networkMismatch ? (
+              <p id="checkout-phone-help" className="text-xs text-amber-200/90 leading-relaxed">
+                This number usually belongs to <strong>{detectedName}</strong>, but this is a <strong>{currentNetwork.name}</strong> {isAirtime ? 'top-up' : 'bundle'}. Continue only if the number was moved to {currentNetwork.name}.
+              </p>
             ) : (
-              <p id="checkout-phone-help" className="text-[11px] text-slate-400">
-                Check this number before paying.
+              <p id="checkout-phone-help" className="text-xs text-slate-400">
+                Check this number before paying. Data sent to a wrong number may not be recoverable.
               </p>
             )}
           </div>
 
           {!isInstantBundle&&<fieldset disabled={walletBusy||isInitializing}><WalletPaymentChoice amountMinor={Math.round(totalAmount*100)} value={paymentMethod} onChange={setPaymentMethod}/></fieldset>}
 
+          {isRegularData&&<div className="text-xs text-slate-400">
+            {editingReceipt ? <label className="block text-sm font-semibold text-slate-100">Receipt email<span className="block text-xs font-normal text-slate-400 mt-0.5">Paystack sends your payment receipt here.</span><input type="email" inputMode="email" autoComplete="email" value={receiptEmail} onChange={e=>setReceiptEmail(e.target.value)} maxLength={128} placeholder="you@example.com" className="w-full mt-2 min-h-12 px-3.5 rounded-xl bg-[#0a0e12] border border-slate-700 text-base font-normal text-white placeholder:text-slate-600 focus:outline-none focus:border-[#00c365]" disabled={walletBusy||isInitializing} required/></label> : <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-800 px-3"><span className="min-w-0 break-all">Receipt to <span className="text-slate-200">{receiptEmail}</span></span><button type="button" disabled={walletBusy||isInitializing} onClick={()=>setEditingReceipt(true)} className="shrink-0 min-h-11 px-1 text-emerald-400 font-semibold">Change</button></div>}
+            {commercial?.offer.state==='phone_required'&&<p className="mt-2">Add your phone in Account to check your Welcome Offer.</p>}
+            {!commercial&&<div role="status" className="mt-2 flex flex-wrap items-center gap-2">{quoteError?<span className="text-amber-300">{quoteError}</span>:<span className="inline-flex items-center gap-1.5"><RefreshCw className="w-3.5 h-3.5 animate-spin" />Loading current price…</span>}{quoteError&&<button type="button" onClick={()=>setQuoteRefresh(x=>x+1)} className="rounded-lg border border-slate-600 px-3 min-h-11 text-emerald-400">Retry</button>}</div>}
+          </div>}
+
           {/* 3. Network Notice (if required) */}
           {checkoutBundle.network === 'mtn' && !activeMtnConflict && (
-            <div className="p-2.5 sm:p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300 flex items-start gap-2">
+            <p className="text-xs text-slate-400 flex items-start gap-2 leading-relaxed">
               <Info className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-              <span>
-                MTN orders are queued and processed automatically. Please allow processing to complete before placing another order for this number.
-              </span>
-            </div>
+              <span>MTN orders are queued and processed automatically. Please allow processing to complete before placing another order for this number.</span>
+            </p>
           )}
 
           {/* 4. Price / Total Summary Breakdown */}
-          <div className="p-3 sm:p-3.5 rounded-xl bg-[#090d10] border border-slate-800/80 space-y-1.5 text-xs">
-            {isInstantBundle ? (
-              <>
-                <div className="flex items-center justify-between text-slate-400">
-                  <span>Bundle Price</span>
-                  <span className="text-white tabular-nums font-medium">GH₵{faceValue.toFixed(2)}</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-400">
-                  <div className="flex items-center gap-1">
-                    <span>Checkout fee</span>
-                    <span className="text-[10px] text-slate-500"></span>
-                  </div>
-                  <span className="text-slate-300 tabular-nums font-medium">GH₵{serviceFee.toFixed(2)}</span>
-                </div>
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-sm font-bold text-white">
-                  <span>Total Amount</span>
-                  <span className="text-[#00c365] text-base tabular-nums font-black">
-                    GH₵{totalAmount.toFixed(2)}
-                  </span>
-                </div>
-              </>
-            ) : isAirtime ? (
-              <>
-                <div className="flex items-center justify-between text-slate-400">
-                  <span>Airtime value</span>
-                  <span className="text-white tabular-nums font-medium">GH₵{faceValue.toFixed(2)}</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-400">
-                  <span>Service Fee (0%)</span>
-                  <span className="text-slate-300 tabular-nums font-medium">GH₵{serviceFee.toFixed(2)}</span>
-                </div>
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-sm font-bold text-white">
-                  <span>Total Amount</span>
-                  <span className="text-[#00c365] text-base tabular-nums font-black">
-                    GH₵{totalAmount.toFixed(2)}
-                  </span>
-                </div>
-              </>
-            ) : (
-              <>
-                {<div className="space-y-3 pb-3 border-b border-slate-800">
-                  <h4 className="text-base font-semibold text-white">Confirm your order</h4>
-                  <dl className="space-y-2">
-                    <div className="flex justify-between gap-3"><dt className="text-slate-400">Network</dt><dd className="font-semibold text-white">{currentNetwork.name}</dd></div>
-                    <div className="flex justify-between gap-3"><dt className="text-slate-400">Bundle</dt><dd className="font-semibold text-white">{checkoutBundle.dataAmount}{dataValidityLabel(checkoutBundle.validity) && ` · ${dataValidityLabel(checkoutBundle.validity)}`}</dd></div>
-                    <div className="flex justify-between gap-3"><dt className="text-slate-400">Recipient</dt><dd className="font-mono text-base text-white break-all text-right min-w-0">{phone}</dd></div>
-                  </dl>
-                  <div className="flex flex-wrap gap-3">
-                    <button type="button" disabled={isInitializing||walletBusy} className="min-h-11 text-[#00c365] font-semibold underline" onClick={()=>phoneInputRef.current?.focus()}>Edit recipient</button>
-                    <button type="button" disabled={isInitializing||walletBusy} className="min-h-11 text-slate-300 underline" onClick={closeCheckout}>Change package</button>
-                  </div>
-                </div>}
-                {commercial?.discountMinor>0&&<><div className="flex justify-between text-slate-400"><span>Regular price</span><span>GH₵{(commercial.regularMinor/100).toFixed(2)}</span></div><div className="flex justify-between text-emerald-400"><span>Welcome Offer</span><span>−GH₵{(commercial.discountMinor/100).toFixed(2)}</span></div></>}
-                <div className="flex items-center justify-between gap-3 py-2 text-white">
-                  <span className="font-semibold">Total</span>
-                  <span className="text-[#00c365] text-2xl tabular-nums font-extrabold">GH₵{totalAmount.toFixed(2)}</span>
-                </div>
-                <p className="text-slate-400">No hidden Mystery Hub checkout fee.</p>
-                <p className="text-slate-300 leading-relaxed">Delivered orders sent to the wrong number may not be reversible. Keep your reference to Track Order.</p>
-              </>
-            )}
-          </div>
+          <section aria-labelledby="checkout-confirm" className="rounded-2xl border border-slate-800 bg-[#0a0f14] p-4 space-y-2.5 text-sm">
+            <h4 id="checkout-confirm" className="text-xs font-semibold uppercase tracking-wider text-slate-400">Confirm your order</h4>
+            <dl className="space-y-2">
+              <div className="flex justify-between gap-3"><dt className="text-slate-400">Recipient</dt><dd className="font-semibold text-white tabular-nums text-right min-w-0 break-all">{phoneComplete ? phone : <span className="font-normal text-slate-500">Not entered yet</span>}</dd></div>
+              {isInstantBundle || isAirtime ? <>
+                <div className="flex justify-between gap-3"><dt className="text-slate-400">{isAirtime ? 'Airtime value' : confirmedFlexi && faceValue !== requestedAmount ? `Bundle price (GH₵${requestedAmount.toFixed(2)} value)` : 'Bundle Price'}</dt><dd className="text-white tabular-nums">GH₵{faceValue.toFixed(2)}</dd></div>
+                <div className="flex justify-between gap-3"><dt className="text-slate-400">{isAirtime ? 'Service Fee (0%)' : 'Checkout fee'}</dt><dd className="text-slate-300 tabular-nums">{flexiPending ? <span className="text-slate-500">{flexiError ? 'Not confirmed' : 'Confirming…'}</span> : `GH₵${serviceFee.toFixed(2)}`}</dd></div>
+              </> : <>
+                {commercial?.discountMinor>0&&<><div className="flex justify-between gap-3"><dt className="text-slate-400">Regular price</dt><dd className="tabular-nums text-slate-300">GH₵{(commercial.regularMinor/100).toFixed(2)}</dd></div><div className="flex justify-between gap-3 text-emerald-400"><dt>Welcome Offer</dt><dd className="tabular-nums">−GH₵{(commercial.discountMinor/100).toFixed(2)}</dd></div></>}
+              </>}
+              <div className="flex items-baseline justify-between gap-3 border-t border-slate-800 pt-2.5">
+                <dt className="font-semibold text-white">Total</dt>
+                <dd className="text-[#00c365] text-xl tabular-nums font-extrabold">{flexiPending ? <span className="text-base font-semibold text-slate-400">{flexiError ? 'Not confirmed' : 'Confirming price…'}</span> : `GH₵${totalAmount.toFixed(2)}`}</dd>
+              </div>
+            </dl>
+            {flexiError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-3 text-xs text-amber-100">
+              <span className="min-w-0 flex-1">{flexiError}</span>
+              <button type="button" onClick={() => setFlexiRetry(x => x + 1)} className="shrink-0 min-h-11 rounded-lg border border-amber-400/40 px-3 font-semibold text-amber-200">Try again</button>
+            </div>}
+            {isRegularData && <p className="text-xs text-slate-400">No hidden Mystery Hub checkout fee.</p>}
+            <p className="text-xs text-slate-400 leading-relaxed">Delivered orders sent to the wrong number may not be reversible. Keep your reference to Track Order.</p>
+          </section>
+          </>}
+        </form>
 
-          <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 text-center">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>{paymentMethod==='wallet'?'Pay from your Mystery Wallet.':'Secure checkout powered by Paystack.'}</span>
-          </div>
-
-          {/* 6. Proceed to Secure Payment CTA */}
+        {/* 6. Proceed to Secure Payment CTA, pinned above the keyboard */}
+        <div className="shrink-0 border-t border-slate-800 bg-[#0c1116] px-4 sm:px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-2">
+          {awaitingPayment ? (
+            <div role="status" className="flex items-center justify-center gap-2 min-h-12 text-sm text-slate-300">
+              <span className="w-4 h-4 border-2 border-[#00c365] border-t-transparent rounded-full animate-spin" />
+              Waiting for payment confirmation…
+            </div>
+          ) : (
           <button
             type="submit"
-            disabled={walletBusy || isInitializing || isRegularData && !commercial}
+            form="checkout-form"
+            disabled={walletBusy || isInitializing || isRegularData && !commercial || flexiPending}
             aria-busy={walletBusy||isInitializing}
-            className="w-full py-3.5 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-sm tracking-wide transition-all shadow-[0_0_20px_rgba(0,195,101,0.3)] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed cursor-pointer"
+            className="w-full min-h-12 px-4 rounded-2xl bg-[#00c365] hover:bg-[#16d577] text-[#03160c] font-bold text-base transition-colors active:translate-y-px flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           >
             {walletBusy || isInitializing ? (
               <span className="flex items-center gap-2">
                 <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                {walletBusy ? 'Placing your order…' : loadingPhase === 'opening'
-                  ? 'Opening secure checkout…'
-                  : isSlowPreparation
+                {walletBusy ? 'Placing your order…' : isSlowPreparation
                   ? 'Still preparing your checkout...'
                   : 'Preparing checkout…'}
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                {`Pay GH₵${totalAmount.toFixed(2)}`}
+                {flexiPending ? (flexiError ? 'Price not confirmed' : 'Confirming price…') : `Pay GH₵${totalAmount.toFixed(2)}`}
                 <ArrowRight className="w-4 h-4" />
               </span>
             )}
           </button>
-
-          {isInitializing&&<p role="status" className="text-xs text-center text-slate-300">Your checkout is being prepared. Please wait and avoid starting another payment.</p>}
-          {serverError&&<p className="text-xs text-slate-400">If payment was deducted, check Track Order before retrying. You can edit the recipient or contact support.</p>}
-          {/* 7. WhatsApp Help */}
-          <div className="text-center pt-0.5">
+          )}
+          {isInitializing && !awaitingPayment && <p role="status" className="text-xs text-center text-slate-400">{isSlowPreparation ? 'Your connection seems slow. Please wait and avoid starting another payment.' : 'Your checkout is being prepared. Please wait and avoid starting another payment.'}</p>}
+          <div className="flex items-center justify-between gap-3 text-[11px] text-slate-500">
+            <span className="inline-flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              {paymentMethod==='wallet'?'Pay from your Mystery Wallet.':'Secure checkout powered by Paystack.'}
+            </span>
+            {/* 7. WhatsApp Help */}
             <a
               href={BUSINESS_CONFIG.getCheckoutSupportWhatsAppUrl(isAirtime ? `GH₵${faceValue.toFixed(2)} Airtime` : checkoutBundle.dataAmount, currentNetwork.name)}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+              aria-label="Need help? Contact us on WhatsApp"
+              className="inline-flex items-center gap-1 min-h-8 text-slate-400 hover:text-white transition-colors"
             >
               <MessageSquare className="w-3.5 h-3.5 text-[#00c365]" />
-              <span>Need help? Contact us on WhatsApp</span>
+              <span>Help</span>
             </a>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
