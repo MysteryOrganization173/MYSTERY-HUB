@@ -8,8 +8,10 @@ import type { MarketplaceProduct } from '../../../src/types/index.js';
 import {
   DEFAULT_BROWSE_STATE, applyRefinements, cardSpecLine, categoryIconKey, categoryLabel, fulfilmentHint, isDirectPurchaseSupported,
   marketplaceHref, matchesSearch, openMarketplaceAt, parseBrowseState, productPath, productPriceMinor, productPriceText,
-  referralRewardGhc, serializeBrowseState, sortProducts, summariseCategories,
+  referralRewardGhc, serializeBrowseState, sortProducts, summariseCategories, summariseBrands, productBrand,
 } from '../../../src/utils/marketplaceBrowse.js';
+import { categoryMismatches } from '../../../src/utils/marketplaceCategoryCheck.js';
+import { photoTreatment, COVER_TOLERANCE } from '../../../src/components/marketplace/MarketplaceMedia.js';
 import { MarketplaceProductCard } from '../../../src/components/marketplace/MarketplaceProductCard.js';
 import { MarketplaceCategoryTiles } from '../../../src/components/marketplace/MarketplaceCategoryTiles.js';
 import { refineAvailability } from '../../../src/components/marketplace/MarketplaceRefineSheet.js';
@@ -242,15 +244,74 @@ test('enquiry modal explains what happens after sending', () => {
   assert.ok(inquiry.includes('does not place an order or require payment'));
 });
 
-test('refinement: photos sit on one studio surface, uncropped; option counts and path chips are explicit', () => {
+test('real-photo treatment: dark frame, near-fit photos fill, mismatched shapes are shown whole', () => {
   const withPhoto = card(product({ imageUrl: 'https://res.cloudinary.com/demo/image/upload/v1/box.png', variants }));
-  assert.ok(withPhoto.includes('object-contain') || withPhoto.includes('contain'), 'real photos are contained, never cropped');
-  assert.ok(withPhoto.includes('#f7f8fa'), 'photos share the studio surface');
+  assert.ok(withPhoto.includes('data-photo-fit="adaptive"'), 'cards choose the treatment per photo');
+  assert.ok(withPhoto.includes('aspect-[4/5]'), 'card frame matches 3:4 phone photography');
+  assert.ok(!withPhoto.includes('#f7f8fa') && !withPhoto.includes('mix-blend-multiply') && !withPhoto.includes('p-[7%]'), 'no pale studio surface, padding or multiply blending');
   assert.ok(withPhoto.includes('2 options'));
+  // 3:4 vendor shots lose only ~6% in a 4:5 frame, so they fill it.
+  assert.equal(photoTreatment({ width: 810, height: 1080 }, { width: 160, height: 200 }), 'cover');
+  assert.equal(photoTreatment({ width: 960, height: 1280 }, { width: 160, height: 200 }), 'cover');
+  // Square-ish shots in a tall frame, and wide banners, would lose part of the product.
+  assert.equal(photoTreatment({ width: 810, height: 755 }, { width: 160, height: 200 }), 'contain');
+  assert.equal(photoTreatment({ width: 1672, height: 941 }, { width: 160, height: 200 }), 'contain');
+  assert.equal(photoTreatment({ width: 0, height: 0 }, { width: 160, height: 200 }), 'contain', 'unknown sizes never crop');
+  assert.ok(1 - Math.min((810 / 1080) / 0.8, 0.8 / (810 / 1080)) <= COVER_TOLERANCE);
+  const detail = source('src/components/marketplace/MarketplaceProductDetailModal.tsx');
+  assert.ok(detail.includes('fit="contain"'), 'the product sheet always shows the whole photo');
+  assert.ok(!detail.includes('mix-blend-multiply'));
   const noPhoto = card(product({ imageUrl: undefined }));
-  assert.ok(!noPhoto.includes('#f7f8fa'), 'missing images keep the dark icon tile, not an empty light box');
+  assert.ok(!noPhoto.includes('<img'), 'missing images keep the dark icon tile');
   const enquire = card(product({ purchaseEnabled: false }));
   assert.ok(enquire.includes('>Enquire<') && !enquire.includes('>Buy online<'), 'enquiry-only products never show the buy chip');
+});
+
+test('single-category catalogue: brands from product names become the discovery row with exact counts', () => {
+  const laptops = [
+    product({ name: 'HP EliteBook 840 G6', imageUrl: 'https://res.cloudinary.com/x/hp1.jpg' }),
+    product({ name: 'Hp ProBook 450', imageUrl: 'https://res.cloudinary.com/x/hp2.jpg' }),
+    product({ name: 'Dell Latitude 7490' }),
+    product({ name: 'Apple MacBook Air M1', imageUrl: 'https://res.cloudinary.com/x/mac.jpg', featured: true }),
+    product({ name: 'Core i5 office laptop' }),
+  ];
+  assert.equal(productBrand({ name: 'ThinkPad T480 by Lenovo' }), 'lenovo');
+  assert.equal(productBrand({ name: 'Chip-level repairs' }), null, 'whole words only');
+  assert.equal(productBrand({ name: 'Core i5 office laptop' }), null, 'no brand is assumed');
+  const brands = summariseBrands(laptops);
+  assert.deepEqual(brands.map(b => [b.id, b.count]), [['hp', 2], ['apple', 1], ['dell', 1]]);
+  assert.equal(brands.find(b => b.id === 'apple')!.imageUrl, 'https://res.cloudinary.com/x/mac.jpg');
+  assert.equal(brands.find(b => b.id === 'dell')!.imageUrl, undefined, 'no photo, no stock art');
+  const state = parseBrowseState('?brand=hp');
+  assert.equal(state.brand, 'hp');
+  assert.equal(parseBrowseState('?brand=<script>').brand, '', 'unknown brands are ignored');
+  assert.equal(applyRefinements(laptops, state).length, 2, 'the filter count equals the tile count');
+  assert.equal(serializeBrowseState(state), '?brand=hp');
+  const tiles = summariseCategories(cats, laptops);
+  assert.equal(tiles.length, 1);
+  const out = html(React.createElement(MarketplaceCategoryTiles, { tiles, total: laptops.length, selected: 'all', onSelect: () => {}, brands, selectedBrand: 'hp', onSelectBrand: () => {} }));
+  assert.ok(out.includes('Shop Laptops &amp; Computers by brand'));
+  assert.ok(out.includes('href="/marketplace?brand=hp"') && out.includes('HP, 2 items') && out.includes('All brands, 5 items'));
+  assert.ok(out.includes('aria-current="true"'));
+  assert.ok(!out.includes('Phones'), 'empty categories are never shown');
+  assert.equal(html(React.createElement(MarketplaceCategoryTiles, { tiles, total: 5, selected: 'all', onSelect: () => {}, brands: brands.slice(0, 1), onSelectBrand: () => {} })), '', 'one brand is not worth a row');
+});
+
+test('admin category check flags clear name mismatches and never edits on its own', () => {
+  const rows = categoryMismatches([
+    product({ id: 'a', name: 'iPhone 13 Pro 256GB' }),
+    product({ id: 'b', name: 'HP EliteBook 840' }),
+    product({ id: 'c', name: 'Blue Yeti USB microphone' }),
+    product({ id: 'd', name: 'Mystery gadget', tagline: 'Wireless webcam for meetings' }),
+    product({ id: 'e', name: 'Laptop with phone charger' }),
+    product({ id: 'f', name: 'iPhone case', archived: true }),
+  ], [...cats, { slug: 'creator_tools', label: 'Creator Tools', active: true, sort_order: 4 }]);
+  assert.deepEqual(rows.map(r => [r.productId, r.suggested]), [['a', 'phones_accessories'], ['c', 'creator_tools'], ['d', 'creator_tools']]);
+  assert.match(rows[2].reason, /tagline/);
+  assert.equal(categoryMismatches([product({ name: 'Ring light' })], cats).length, 0, 'never suggests an inactive or missing category');
+  const panel = source('src/components/admin/sections/MarketplaceControlPanels.tsx');
+  assert.ok(panel.includes('<CategoryCheck') && panel.includes('onEdit(product)'), 'fixes go through the audited product editor');
+  assert.ok(!/categoryMismatches[^\n]*PATCH/.test(panel));
 });
 
 test('refinement: homepage featured CTA follows the real purchase path', () => {

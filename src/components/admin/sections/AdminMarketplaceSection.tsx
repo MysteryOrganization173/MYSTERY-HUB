@@ -420,7 +420,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
       )}
       </>}
 
-      {view!=='products'&&<MarketplaceControlPanels token={sessionToken} view={view} categories={categories} onCategoriesChanged={loadCategories} products={products} onChanged={()=>{void fetchProducts();onChanged?.();}} />}
+      {view!=='products'&&<MarketplaceControlPanels token={sessionToken} view={view} categories={categories} onCategoriesChanged={loadCategories} products={products} onChanged={()=>{void fetchProducts();onChanged?.();}} onEditProduct={openEditModal} />}
       {preview&&<MarketplaceProductDetailModal product={preview} onClose={()=>setPreview(null)} onBuyNow={()=>showToast('Internal draft preview: purchasing is disabled.','info')} onInquire={()=>showToast('Internal draft preview.','info')} onShare={()=>showToast('Drafts cannot be shared publicly.','info')} formatGhcReward={n=>'GH₵'+(n ?? 0).toFixed(2)} />}
       {publishWarnings && (
         <ConfirmAction

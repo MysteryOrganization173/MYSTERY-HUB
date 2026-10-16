@@ -51,7 +51,7 @@ export const MarketplaceProductCard: React.FC<Props> = ({ product: p, highlighte
         highlighted ? 'border-[#00c365] ring-2 ring-[#00c365]/50 ring-offset-2 ring-offset-[#070b0e]' : 'border-slate-800 hover:border-slate-600'
       }`}
     >
-      <div className={`relative w-full aspect-square ${path === 'coming_soon' ? 'opacity-75 saturate-50' : ''}`}>
+      <div className={`relative w-full aspect-[4/5] ${path === 'coming_soon' ? 'opacity-75 saturate-50' : ''}`}>
         <ProductPhoto
           src={p.imageUrl}
           alt={p.imageAlt || p.name}
@@ -86,7 +86,7 @@ export const MarketplaceProductCard: React.FC<Props> = ({ product: p, highlighte
         </h3>
         {spec && <p className="mt-0.5 text-[11px] sm:text-xs text-slate-400 line-clamp-1">{spec}</p>}
 
-        <div className="mt-auto pt-2">
+        <div className="pt-2">
           <p className={`tabular-nums tracking-tight leading-tight ${p.priceType === 'quote' ? 'text-[13px] sm:text-sm font-semibold text-slate-200' : 'text-[15px] sm:text-lg font-extrabold text-white'}`}>
             {productPriceText(p)}
           </p>

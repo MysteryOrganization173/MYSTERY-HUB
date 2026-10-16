@@ -18,9 +18,10 @@ export interface MarketplaceBrowseState {
   buyOnline: boolean;
   kind: MarketplaceKindFilter | '';
   price: MarketplacePriceBand | '';
+  brand: string; // '' or a BRANDS id, read from product names
 }
 
-export const DEFAULT_BROWSE_STATE: MarketplaceBrowseState = { category: 'all', q: '', sort: 'recommended', buyOnline: false, kind: '', price: '' };
+export const DEFAULT_BROWSE_STATE: MarketplaceBrowseState = { category: 'all', q: '', sort: 'recommended', buyOnline: false, kind: '', price: '', brand: '' };
 
 export const SORT_OPTIONS: { id: MarketplaceSort; label: string }[] = [
   { id: 'recommended', label: 'Recommended' },
@@ -45,6 +46,54 @@ const KIND_IDS = new Set(Object.keys(KIND_LABELS));
 const BAND_IDS = new Set(PRICE_BANDS.map(b => b.id));
 const SLUG = /^[a-z][a-z0-9_]{1,63}$/;
 
+/* ---------------- Brands (derived from product names) ---------------- */
+
+/**
+ * Brands a Ghanaian electronics shopper looks for, matched as whole words in the
+ * product name (model lines count, e.g. "EliteBook" is HP). Nothing is assumed when a
+ * name names no brand.
+ */
+export const BRANDS: { id: string; label: string; pattern: RegExp }[] = [
+  { id: 'apple', label: 'Apple', pattern: /\b(apple|mac ?book|imac|iphone|ipad|airpods)\b/i },
+  { id: 'hp', label: 'HP', pattern: /\b(hp|hewlett[- ]packard|elitebook|probook|zbook|pavilion|spectre|omen)\b/i },
+  { id: 'dell', label: 'Dell', pattern: /\b(dell|latitude|inspiron|xps|vostro|alienware)\b/i },
+  { id: 'lenovo', label: 'Lenovo', pattern: /\b(lenovo|thinkpad|ideapad|thinkbook|legion)\b/i },
+  { id: 'asus', label: 'Asus', pattern: /\b(asus|zenbook|vivobook)\b/i },
+  { id: 'acer', label: 'Acer', pattern: /\b(acer|aspire|predator)\b/i },
+  { id: 'microsoft', label: 'Microsoft', pattern: /\b(microsoft|surface (?:pro|laptop|go|book))\b/i },
+  { id: 'samsung', label: 'Samsung', pattern: /\b(samsung|galaxy)\b/i },
+  { id: 'toshiba', label: 'Toshiba', pattern: /\b(toshiba|dynabook)\b/i },
+  { id: 'huawei', label: 'Huawei', pattern: /\b(huawei|matebook)\b/i },
+  { id: 'msi', label: 'MSI', pattern: /\bmsi\b/i },
+  { id: 'infinix', label: 'Infinix', pattern: /\binfinix\b/i },
+  { id: 'tecno', label: 'Tecno', pattern: /\btecno\b/i },
+  { id: 'xiaomi', label: 'Xiaomi', pattern: /\b(xiaomi|redmi)\b/i },
+];
+const BRAND_IDS = new Set(BRANDS.map(b => b.id));
+
+/** The brand a product's name names first, or null. */
+export function productBrand(product: Pick<MarketplaceProduct, 'name'>): string | null {
+  let best: { id: string; at: number } | null = null;
+  for (const brand of BRANDS) {
+    const at = product.name.search(brand.pattern);
+    if (at >= 0 && (!best || at < best.at)) best = { id: brand.id, at };
+  }
+  return best?.id ?? null;
+}
+
+export interface BrandSummary { id: string; label: string; count: number; imageUrl?: string }
+
+/** Brand tiles with exact counts and a real photo from that brand, most stocked first. */
+export function summariseBrands(products: MarketplaceProduct[]): BrandSummary[] {
+  return BRANDS.map(brand => {
+    const items = products.filter(p => productBrand(p) === brand.id);
+    const cover = items.find(p => p.featured && p.imageUrl) || items.find(p => p.imageUrl);
+    return { id: brand.id, label: brand.label, count: items.length, imageUrl: cover?.imageUrl };
+  }).filter(b => b.count > 0).sort((a, b) => b.count - a.count);
+}
+
+export const brandLabel = (id: string) => BRANDS.find(b => b.id === id)?.label || id;
+
 /** Reads browse state from a query string, ignoring anything malformed. */
 export function parseBrowseState(search: string): MarketplaceBrowseState {
   const params = new URLSearchParams(search);
@@ -59,6 +108,7 @@ export function parseBrowseState(search: string): MarketplaceBrowseState {
     buyOnline: params.get('buy') === '1',
     kind: KIND_IDS.has(kind) ? kind : '',
     price: BAND_IDS.has(price) ? price : '',
+    brand: BRAND_IDS.has(params.get('brand') || '') ? params.get('brand')! : '',
   };
 }
 
@@ -72,6 +122,7 @@ export function serializeBrowseState(state: MarketplaceBrowseState, currentSearc
   set('buy', state.buyOnline && '1');
   set('type', state.kind);
   set('price', state.price);
+  set('brand', state.brand);
   const out = params.toString();
   return out ? `?${out}` : '';
 }
@@ -172,9 +223,10 @@ function inBand(product: MarketplaceProduct, bandId: MarketplacePriceBand): bool
 }
 
 /** Applies every active refinement except the ones named in `skip` (used for live counts). */
-export function applyRefinements(products: MarketplaceProduct[], state: MarketplaceBrowseState, skip: Array<'category' | 'q' | 'buy' | 'kind' | 'price'> = []): MarketplaceProduct[] {
+export function applyRefinements(products: MarketplaceProduct[], state: MarketplaceBrowseState, skip: Array<'category' | 'q' | 'buy' | 'kind' | 'price' | 'brand'> = []): MarketplaceProduct[] {
   return products.filter(p =>
     (skip.includes('category') || state.category === 'all' || p.category === state.category)
+    && (skip.includes('brand') || !state.brand || productBrand(p) === state.brand)
     && (skip.includes('q') || matchesSearch(p, state.q))
     && (skip.includes('buy') || !state.buyOnline || productPath(p) === 'buy')
     && (skip.includes('kind') || !state.kind || productKind(p) === state.kind)
