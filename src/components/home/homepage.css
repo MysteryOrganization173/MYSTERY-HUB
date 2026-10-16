@@ -118,18 +118,22 @@
 .home-marketplace-intro > p:not(.home-eyebrow) { max-width: 520px; color: #b4c0ca; font-size: .9375rem; line-height: 1.7; margin-block: 12px 20px; }
 .home-marketplace-items { margin-top: 12px; }
 .home-marketplace-categories { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.home-marketplace-categories button { display: flex; gap: 12px; align-items: center; min-width: 0; padding: 16px; border-radius: var(--radius-card-sm); border: 1px solid #222e38; background: #0b1116; text-align: left; cursor: pointer; color: #a9c8e0; transition: border-color 150ms; }
-.home-marketplace-categories button:hover { border-color: #3d5568; }
-.home-marketplace-categories button > span { flex: 1; min-width: 0; }
+.home-marketplace-categories :is(button, a) { display: flex; gap: 12px; align-items: center; min-width: 0; padding: 16px; border-radius: var(--radius-card-sm); border: 1px solid #222e38; background: #0b1116; text-align: left; cursor: pointer; color: #a9c8e0; transition: border-color 150ms; }
+.home-marketplace-categories :is(button, a):hover { border-color: #3d5568; }
+.home-marketplace-categories :is(button, a) > span { flex: 1; min-width: 0; }
 .home-marketplace-categories strong { display: block; font-size: .875rem; color: #edf1f4; font-weight: 600; line-height: 1.35; }
-.home-marketplace-categories button > span > span { display: block; margin-top: 2px; font-size: .75rem; color: #aab9c6; }
+.home-marketplace-categories :is(button, a) > span > span { display: block; margin-top: 2px; font-size: .75rem; color: #aab9c6; }
 .home-marketplace-categories svg { flex-shrink: 0; }
 .home-marketplace-categories svg:last-child { color: #6f8494; }
 .home-marketplace-state { color: #afbdc8; font-size: .8125rem; display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
 .home-marketplace-loading { min-height: 76px; padding-block: 24px; color: #b4c0ca; font-size: .8125rem; }
 .home-product-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 8px; }
 .home-product { min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 12px; border-radius: var(--radius-card); border: 1px solid #222e38; background: #0b1116; }
-.home-product-image { aspect-ratio: 4/3; overflow: hidden; border-radius: 12px; }
+.home-product-image { display: block; aspect-ratio: 4/3; overflow: hidden; border-radius: 12px; }
+.home-product-details h3 a { color: inherit; text-decoration: none; }
+.home-product-details h3 a:hover, .home-product-category:hover { color: var(--brand-green, #00c365); }
+.home-product-category { color: inherit; text-decoration: none; }
+.home-product a:focus-visible { outline: 2px solid #00c365; outline-offset: 2px; border-radius: 6px; }
 .home-product-details { flex: 1; }
 .home-product-details p { color: #aebecb; font-size: .8125rem; line-height: 1.6; }
 .home-product-details h3 { color: #f1f4f6; font-size: 1rem; font-weight: 650; margin-block: 6px; }
@@ -175,12 +179,16 @@
   .home-template-chips li { flex-shrink: 0; }
 }
 @media (max-width: 767px) {
-  .home-hero-content { grid-template-columns: 1fr; padding-block: 28px 112px; }
-  /* Phones: text sits on a solid top; the artwork shows as a band below the actions. */
-  /* Phones: one continuous scene. The art rises from behind the actions and fades out at every edge. */
-  .home-hero-art img { object-position: 70% center;
-    -webkit-mask-image: radial-gradient(ellipse 130% 62% at 66% 74%, #000 30%, #0009 58%, transparent 86%); mask-image: radial-gradient(ellipse 130% 62% at 66% 74%, #000 30%, #0009 58%, transparent 86%); }
-  .home-hero-art::after { background: linear-gradient(180deg, #070b0ef5 0%, #070b0ee6 30%, #070b0e8c 50%, #070b0e26 70%, #070b0e40 86%, #070b0e 100%), linear-gradient(90deg, #070b0e99 0%, transparent 60%); }
+  /* Phones: the artwork is a cinematic band across the top of the hero, shown whole and at
+     full strength, so its subject sits in the open rather than behind the copy. The headline
+     rises over its lower edge, where a scrim and mask dissolve it into the page; the
+     description and buttons sit on plain page colour, so nothing follows below them. */
+  .home-hero-content { grid-template-columns: 1fr; padding-block: clamp(128px, min(40vw, 19svh), 176px) 36px; }
+  /* Height-aware: tall phones give the artwork more room, short ones keep both buttons on the first screen. */
+  .home-hero-art { bottom: auto; height: clamp(300px, min(88vw, 45svh), 400px); background: var(--home-bg, #070b0e); }
+  .home-hero-art img { object-position: 70% 50%;
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 58%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 58%, transparent 100%); }
+  .home-hero-art::after { background: linear-gradient(180deg, #070b0e40 0%, #070b0e00 8%, #070b0e00 30%, #070b0e80 42%, #070b0eb3 56%, #070b0ee6 78%, #070b0e 100%); }
   .home-hero h1 { font-size: clamp(2.25rem, 9.6vw, 3.25rem); }
   .home-hero-description { font-size: .9375rem; line-height: 1.6; margin-block: 14px 20px; max-width: 450px; }
   .home-hero-caption { display: none; }
@@ -212,13 +220,13 @@
 @media (max-width: 479px) {
   .home-hero-actions { flex-direction: column; gap: 10px; }
   .home-hero-actions a { width: 100%; }
-  .home-hero .home-eyebrow { font-size: .6875rem; }
+  .home-hero .home-eyebrow { font-size: .6875rem; width: fit-content; padding: 5px 10px; border-radius: 999px; background: #070b0ecc; }
   .home-utility-grid { gap: 10px; }
   .home-network-switch button { font-size: .75rem; gap: 6px; }
   .home-website-actions .mh-button { width: 100%; }
   .home-template-label { flex-wrap: wrap; gap: 4px; }
   .home-marketplace-categories { gap: 8px; }
-  .home-marketplace-categories button { padding: 12px; }
+  .home-marketplace-categories :is(button, a) { padding: 12px; }
   .home-product-grid { grid-template-columns: 1fr; }
   .home-support-actions > * { flex: 1 1 100%; }
   .home-utility-desc { display: none; }
@@ -228,8 +236,8 @@
   .home-buy-steps li { align-items: center; }
   .home-buy-steps ol { gap: 10px; margin-block: 14px 4px; }
   .home-marketplace-categories { grid-template-columns: 1fr 1fr; }
-  .home-marketplace-categories button > span > span { display: none; }
-  .home-marketplace-categories button svg:last-child { display: none; }
+  .home-marketplace-categories :is(button, a) > span > span { display: none; }
+  .home-marketplace-categories :is(button, a) svg:last-child { display: none; }
   .home-future-list { gap: 6px; }
   .home-future-list li:nth-child(n+5) { display: none; }
   .home-future-item { padding: 8px 12px; font-size: .75rem; }
@@ -273,3 +281,9 @@
   .help-support { padding: 22px 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .help-question summary svg { transition: none; } }
+.home-marketplace-shortcuts { margin-top: 16px; }
+.home-product .home-product-cta { font-size: .75rem; padding-inline: 8px; text-decoration: none; }
+.home-product-path { display: inline-flex; align-items: center; margin-bottom: 4px; font-size: .6875rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.home-product-path-buy { background: rgba(0, 195, 101, .14); color: #3ee08f; }
+.home-product-path-enquire { background: rgba(56, 189, 248, .12); color: #bae6fd; }
+.home-product-path-coming_soon { background: rgba(100, 116, 139, .2); color: #cbd5e1; }

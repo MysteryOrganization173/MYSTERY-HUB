@@ -68,3 +68,9 @@ Backend note 5 (for Codex): the catalogue prices a Flexi bundle only at its mini
 ## Not yet checked
 
 A real Android device: the keyboard covering the sheet (handled through `visualViewport`) and switching to the MoMo prompt and back. Live Paystack and telecom behaviour were not exercised, by design.
+
+## Release train update (2026-10-16)
+
+- Flexi amounts no longer reach checkout with a client-side fee estimate. Checkout calls `GET /api/instant-bundles/:productKey/quote?amount=`, a read-only route that runs the same catalogue lookup and `calculateFlexiInstantBundlePrice` as `/api/payments/initialize`. Pay stays unavailable until the quote arrives; a failed quote shows "Price not confirmed" with Try again. `instantFlexiQuote.test.ts` checks quote total equals the initialized Paystack amount for several payable ratios.
+- Initialization still receives the amount the customer typed (`requestedAmount`), never the quoted retail price.
+- Still open for Codex: closing Paystack cancels the order immediately, so a late MoMo approval lands as paid + manual_review. Unchanged by this release.

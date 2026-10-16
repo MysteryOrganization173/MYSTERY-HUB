@@ -20,14 +20,14 @@ test('money keeps exact cedis and pesewas with one consistent mark', () => {
   assert.match(html, /GH₵<\/span>23<span[^>]*>\.99/);
 });
 
-test('Flexi fee estimate matches the server default gross-up it describes', () => {
+test('Flexi card hint estimate matches the server default gross-up it describes', () => {
   for (const amount of [1, 5, 20, 49.5, 100, 500]) {
     const server = calculateFlexiInstantBundlePrice('pkg', amount, 0.95, 1, 500);
     assert.equal(server.productRetailPriceGhc, amount);
     assert.equal(estimateInstantCheckoutFeeGhc(amount), server.paymentProcessingFeeGhc, `amount ${amount}`);
   }
-  assert.match(source('src/components/checkout/CheckoutModal.tsx'), /estimateInstantCheckoutFeeGhc\(faceValue\)/);
-  assert.match(source('src/components/checkout/CheckoutModal.tsx'), /Checkout fee \(estimate\)/);
+  // The card's hint is an estimate; checkout shows the server quote (see instantFlexiQuote.test.ts).
+  assert.match(source('src/components/data/InstantBundleCard.tsx'), /You see the final total before paying/);
 });
 
 test('Instant cards state conditions and the fee before the tap, and take no phone number', () => {

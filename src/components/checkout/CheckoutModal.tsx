@@ -1,6 +1,5 @@
 import {useDialogFocus} from '../../hooks/useDialogFocus';
 import {useVisualViewport} from '../../hooks/useVisualViewport';
-import { estimateInstantCheckoutFeeGhc } from '../../utils/instantFee';
 import {commercialRequest} from '../../services/commercialApi';
 import { WalletPaymentChoice } from '../finance/WalletPaymentChoice';
 import { dataValidityLabel } from '../../utils/dataPurchasePresentation';
@@ -22,7 +21,7 @@ import { NetworkId } from '../../types';
 import { GHANA_NETWORKS, detectGhanaNetwork } from '../../data/bundles';
 import { usePaystack } from '../../hooks/usePaystack';
 import { BUSINESS_CONFIG } from '../../config/business';
-import { lookupOrderOnServer, cancelPaymentOnServer } from '../../services/apiClient';
+import { lookupOrderOnServer, cancelPaymentOnServer, getInstantFlexiQuote, type InstantFlexiQuote } from '../../services/apiClient';
 import { smoothScrollToElement } from '../../utils/scroll';
 import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
@@ -64,6 +63,19 @@ export const CheckoutModal: React.FC = () => {
   const [quoteRefresh,setQuoteRefresh]=useState(0);
   const directRequest=useRef(crypto.randomUUID());
   useEffect(()=>{if(!isCheckoutOpen||!checkoutBundle||checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data'||checkoutBundle.id.startsWith('instant-')||checkoutBundle.id.startsWith('airtime-')){setCommercial(null);return;}let active=true;setCommercial(null);setQuoteError('');commercialRequest('commercial/quote/'+encodeURIComponent(checkoutBundle.id),sessionToken).then(r=>{if(active)setCommercial(r);}).catch(e=>{if(active)setQuoteError(e.message);});return()=>{active=false;};},[isCheckoutOpen,checkoutBundle?.id,sessionToken,quoteRefresh,user?.phone]);
+  // A typed Flexi amount has no catalogue price, so checkout asks the server before Pay is offered.
+  const needsFlexiQuote = Boolean(isCheckoutOpen && checkoutBundle?.isFlexi && checkoutBundle.serviceFeeGhc === undefined
+    && (checkoutBundle.serviceType === 'instant_bundle' || checkoutBundle.id.startsWith('instant-')));
+  const [flexiQuote, setFlexiQuote] = useState<{ key: string; loading: boolean; quote?: InstantFlexiQuote }>({ key: '', loading: false });
+  const [flexiRetry, setFlexiRetry] = useState(0);
+  const flexiKey = needsFlexiQuote && checkoutBundle ? `${checkoutBundle.id}:${checkoutBundle.faceValueGhc ?? checkoutBundle.priceGhc}` : '';
+  useEffect(() => {
+    if (!flexiKey || !checkoutBundle) return;
+    let active = true;
+    setFlexiQuote({ key: flexiKey, loading: true });
+    getInstantFlexiQuote(checkoutBundle.id, checkoutBundle.faceValueGhc ?? checkoutBundle.priceGhc).then(quote => { if (active) setFlexiQuote({ key: flexiKey, loading: false, quote }); });
+    return () => { active = false; };
+  }, [flexiKey, flexiRetry]);
   const submissionPending = useRef(false);
   const [paymentMethod,setPaymentMethod]=useState<'paystack'|'wallet'>('paystack');
   const [walletBusy,setWalletBusy]=useState(false);
@@ -171,16 +183,18 @@ export const CheckoutModal: React.FC = () => {
       })
     : null;
   const isRegularData = !isAirtime && !isInstantBundle;
-  const faceValue = checkoutBundle.faceValueGhc ?? checkoutBundle.priceGhc;
-  const serviceFee =
-    checkoutBundle.serviceFeeGhc ??
-    (isAirtime
-      ? 0
-      : isInstantBundle
-      ? estimateInstantCheckoutFeeGhc(faceValue)
-      : 0);
+  const quoteForThis = needsFlexiQuote && flexiQuote.key === flexiKey ? flexiQuote : null;
+  const confirmedFlexi = quoteForThis?.quote?.success ? quoteForThis.quote : null;
+  const flexiPending = needsFlexiQuote && !confirmedFlexi; // loading, or failed: Pay stays unavailable
+  const flexiError = needsFlexiQuote && quoteForThis && !quoteForThis.loading && !confirmedFlexi ? (quoteForThis.quote?.error || 'We could not confirm the price.') : '';
+  // The amount the customer asked for; the server prices it, so this is what initialization receives.
+  const requestedAmount = checkoutBundle.faceValueGhc ?? checkoutBundle.priceGhc;
+  const faceValue = confirmedFlexi?.retailPriceGhc ?? requestedAmount;
+  const serviceFee = confirmedFlexi?.paymentProcessingFeeGhc ?? checkoutBundle.serviceFeeGhc ?? 0;
   const totalAmount =
-    isAirtime || isInstantBundle
+    confirmedFlexi?.totalGhc !== undefined
+      ? confirmedFlexi.totalGhc
+      : isAirtime || isInstantBundle
       ? Number((faceValue + serviceFee).toFixed(2))
       : commercial?.totalMinor/100 || checkoutBundle.priceGhc;
 
@@ -271,6 +285,7 @@ export const CheckoutModal: React.FC = () => {
     setRecovery({ checking: false, message: '' });
 
     if(isRegularData&&!commercial){setServerError('Refresh the current price before paying.');return;}
+    if(flexiPending){setServerError('We are still confirming the price. Please wait a moment.');return;}
     return initializeServerPayment({
       commercial:isRegularData?{requestId:directRequest.current,expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:undefined,
       productId: checkoutBundle.id,
@@ -279,7 +294,7 @@ export const CheckoutModal: React.FC = () => {
       customerName: user?.name || undefined,
       serviceType: isInstantBundle ? 'instant_bundle' : isAirtime ? 'airtime' : 'data',
       network: checkoutBundle.network,
-      amount: faceValue,
+      amount: requestedAmount,
       onOrderCreated: (orderRef) => {
         // Kept on this device so a customer who leaves for the MoMo prompt can check it later.
         setAttemptRef(orderRef);
@@ -403,9 +418,10 @@ export const CheckoutModal: React.FC = () => {
     if(paymentMethod!=='wallet'){submissionPending.current=true;try{await submitPayment();}finally{submissionPending.current=false;}return;}
     if(walletBusy||!sessionToken)return;
     if(isRegularData&&!commercial){setServerError('Refresh the current price before paying.');return;}
+    if(flexiPending){setServerError('We are still confirming the price. Please wait a moment.');return;}
     submissionPending.current=true;setWalletBusy(true);setServerError('');
     try {
-      const body={productId:checkoutBundle.id,recipientPhone:phone.trim(),customerEmail:receiptEmail||user?.email,customerName:user?.name,serviceType:isAirtime?'airtime':'data',network:checkoutBundle.network,amount:faceValue,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()};
+      const body={productId:checkoutBundle.id,recipientPhone:phone.trim(),customerEmail:receiptEmail||user?.email,customerName:user?.name,serviceType:isAirtime?'airtime':'data',network:checkoutBundle.network,amount:requestedAmount,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()};
       const fingerprint=JSON.stringify(body);if(walletRequest.current?.fingerprint!==fingerprint)walletRequest.current={fingerprint,id:crypto.randomUUID()};
       const result=await walletCheckout(sessionToken,'payments/initialize',{...body,requestId:walletRequest.current!.id,...(isRegularData&&commercial?{expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:{})});
       const newOrder=createOrder({...checkoutBundle,priceGhc:result.amountPesewas/100},phone.trim(),'wallet',result.reference,result.orderRef);
@@ -819,16 +835,20 @@ export const CheckoutModal: React.FC = () => {
             <dl className="space-y-2">
               <div className="flex justify-between gap-3"><dt className="text-slate-400">Recipient</dt><dd className="font-semibold text-white tabular-nums text-right min-w-0 break-all">{phoneComplete ? phone : <span className="font-normal text-slate-500">Not entered yet</span>}</dd></div>
               {isInstantBundle || isAirtime ? <>
-                <div className="flex justify-between gap-3"><dt className="text-slate-400">{isAirtime ? 'Airtime value' : 'Bundle Price'}</dt><dd className="text-white tabular-nums">GH₵{faceValue.toFixed(2)}</dd></div>
-                <div className="flex justify-between gap-3"><dt className="text-slate-400">{isAirtime ? 'Service Fee (0%)' : checkoutBundle.isFlexi ? 'Checkout fee (estimate)' : 'Checkout fee'}</dt><dd className="text-slate-300 tabular-nums">GH₵{serviceFee.toFixed(2)}</dd></div>
+                <div className="flex justify-between gap-3"><dt className="text-slate-400">{isAirtime ? 'Airtime value' : confirmedFlexi && faceValue !== requestedAmount ? `Bundle price (GH₵${requestedAmount.toFixed(2)} value)` : 'Bundle Price'}</dt><dd className="text-white tabular-nums">GH₵{faceValue.toFixed(2)}</dd></div>
+                <div className="flex justify-between gap-3"><dt className="text-slate-400">{isAirtime ? 'Service Fee (0%)' : 'Checkout fee'}</dt><dd className="text-slate-300 tabular-nums">{flexiPending ? <span className="text-slate-500">{flexiError ? 'Not confirmed' : 'Confirming…'}</span> : `GH₵${serviceFee.toFixed(2)}`}</dd></div>
               </> : <>
                 {commercial?.discountMinor>0&&<><div className="flex justify-between gap-3"><dt className="text-slate-400">Regular price</dt><dd className="tabular-nums text-slate-300">GH₵{(commercial.regularMinor/100).toFixed(2)}</dd></div><div className="flex justify-between gap-3 text-emerald-400"><dt>Welcome Offer</dt><dd className="tabular-nums">−GH₵{(commercial.discountMinor/100).toFixed(2)}</dd></div></>}
               </>}
               <div className="flex items-baseline justify-between gap-3 border-t border-slate-800 pt-2.5">
                 <dt className="font-semibold text-white">Total</dt>
-                <dd className="text-[#00c365] text-xl tabular-nums font-extrabold">GH₵{totalAmount.toFixed(2)}</dd>
+                <dd className="text-[#00c365] text-xl tabular-nums font-extrabold">{flexiPending ? <span className="text-base font-semibold text-slate-400">{flexiError ? 'Not confirmed' : 'Confirming price…'}</span> : `GH₵${totalAmount.toFixed(2)}`}</dd>
               </div>
             </dl>
+            {flexiError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-3 text-xs text-amber-100">
+              <span className="min-w-0 flex-1">{flexiError}</span>
+              <button type="button" onClick={() => setFlexiRetry(x => x + 1)} className="shrink-0 min-h-11 rounded-lg border border-amber-400/40 px-3 font-semibold text-amber-200">Try again</button>
+            </div>}
             {isRegularData && <p className="text-xs text-slate-400">No hidden Mystery Hub checkout fee.</p>}
             <p className="text-xs text-slate-400 leading-relaxed">Delivered orders sent to the wrong number may not be reversible. Keep your reference to Track Order.</p>
           </section>
@@ -846,7 +866,7 @@ export const CheckoutModal: React.FC = () => {
           <button
             type="submit"
             form="checkout-form"
-            disabled={walletBusy || isInitializing || isRegularData && !commercial}
+            disabled={walletBusy || isInitializing || isRegularData && !commercial || flexiPending}
             aria-busy={walletBusy||isInitializing}
             className="w-full min-h-12 px-4 rounded-2xl bg-[#00c365] hover:bg-[#16d577] text-[#03160c] font-bold text-base transition-colors active:translate-y-px flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           >
@@ -859,7 +879,7 @@ export const CheckoutModal: React.FC = () => {
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                {`Pay GH₵${totalAmount.toFixed(2)}`}
+                {flexiPending ? (flexiError ? 'Price not confirmed' : 'Confirming price…') : `Pay GH₵${totalAmount.toFixed(2)}`}
                 <ArrowRight className="w-4 h-4" />
               </span>
             )}

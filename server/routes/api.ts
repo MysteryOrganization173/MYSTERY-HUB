@@ -80,6 +80,66 @@ apiRouter.get('/health', (_req: Request, res: Response) => {
 });
 
 /**
+ * 0a. GET /api/instant-bundles/:productKey/quote?amount=
+ * Read-only price for a Flexi amount the customer typed, computed by the same
+ * catalogue lookup and calculateFlexiInstantBundlePrice that payment initialization uses,
+ * so checkout shows the real charge before Paystack opens. Creates nothing.
+ */
+apiRouter.get('/instant-bundles/:productKey/quote', async (req: Request, res: Response) => {
+  try {
+    const amount = Number(req.query.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      res.status(400).json({ success: false, error: 'Please enter a valid flexi amount.' });
+      return;
+    }
+    const provider = FulfilmentService.getProvider();
+    const serviceCheck = await provider.client.checkInstantBundlesService();
+    if (!serviceCheck.permitted || !serviceCheck.available) {
+      res.status(503).json({ success: false, error: serviceCheck.reason || 'Instant Bundles are temporarily unavailable.' });
+      return;
+    }
+    const catalogRes = await provider.client.getInstantBundles();
+    const data = catalogRes.data as SbhInstantBundlePackage[] | { packages?: SbhInstantBundlePackage[]; products?: SbhInstantBundlePackage[] } | undefined;
+    const rawList: SbhInstantBundlePackage[] = Array.isArray(data) ? data : data?.packages || data?.products || [];
+    const productKey = String(req.params.productKey || '');
+    const target = productKey.startsWith('instant-') ? productKey.replace('instant-', '') : productKey;
+    const pkg = rawList.find((p) => p.id === target || p.id === productKey || `instant-${p.id}` === productKey);
+    if (!pkg || pkg.enabled === false) {
+      res.status(404).json({ success: false, error: 'Selected Instant Bundle package is no longer available.' });
+      return;
+    }
+    if (!(pkg.isFlexi || pkg.mode === 'flexi')) {
+      res.status(400).json({ success: false, error: 'This package has a fixed price.' });
+      return;
+    }
+    // Same parsing as the initialize route, so the quote and the charge cannot drift apart.
+    const minVal = typeof pkg.minAmountMajor === 'number' ? pkg.minAmountMajor : parseFloat(String(pkg.minAmountMajor || '1')) || 1;
+    const maxVal = typeof pkg.maxAmountMajor === 'number' ? pkg.maxAmountMajor : parseFloat(String(pkg.maxAmountMajor || '500')) || 500;
+    const ratio = typeof pkg.payableRatio === 'number' ? pkg.payableRatio : 1.0;
+    let pricing;
+    try {
+      pricing = calculateFlexiInstantBundlePrice(pkg.id, amount, ratio, minVal, maxVal);
+    } catch (err: unknown) {
+      res.status(400).json({ success: false, error: err instanceof Error ? err.message : 'Invalid flexi package amount.' });
+      return;
+    }
+    // Public totals only: no supplier cost, payable ratio or margins.
+    res.json({
+      success: true,
+      productKey: `instant-${pkg.id}`,
+      amountGhc: Number(amount.toFixed(2)),
+      retailPriceGhc: pricing.productRetailPriceGhc,
+      paymentProcessingFeeGhc: pricing.paymentProcessingFeeGhc,
+      totalGhc: pricing.customerTotalGhc,
+      totalPesewas: pricing.customerTotalPesewas,
+    });
+  } catch (err) {
+    console.error('Error in GET /api/instant-bundles/:productKey/quote:', err);
+    res.status(503).json({ success: false, error: 'We could not confirm the price right now. Please try again.' });
+  }
+});
+
+/**
  * 0b. GET /api/instant-bundles
  * Returns live Instant Bundle offers with server-calculated Mystery Hub retail pricing.
  * Wholesale supplier costs, API keys, and accounting internals are NEVER returned.

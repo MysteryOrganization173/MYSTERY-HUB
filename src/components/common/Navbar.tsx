@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { BrandLogo } from './BrandLogo';
 import { ActivePage } from '../../types';
+import { openMarketplaceAt } from '../../utils/marketplaceBrowse';
 import {
   Search,
   ShoppingBag,
@@ -85,7 +86,8 @@ export const Navbar: React.FC = () => {
     } else if (q.includes('web') || q.includes('site') || q.includes('build') || q.includes('template')) {
       setActivePage('website');
     } else if (q.includes('market') || q.includes('laptop') || q.includes('tech') || q.includes('tool') || q.includes('mic') || q.includes('phone') || q.includes('charger')) {
-      setActivePage('marketplace');
+      // Land on matching products rather than the full feed ("marketplace" itself is just navigation).
+      openMarketplaceAt(setActivePage, { q: /market/.test(q) ? '' : searchQuery.trim() });
     } else {
       setActivePage('services');
     }
