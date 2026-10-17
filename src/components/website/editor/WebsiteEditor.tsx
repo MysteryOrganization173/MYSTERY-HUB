@@ -6,11 +6,20 @@ import { WebsiteImageLibrary, WebsiteImageField } from './WebsiteImageField';
 import { trackWebsiteEvent } from '../../../utils/websiteAnalytics';
 import React, { useState, useEffect, useRef } from 'react';
 import { WebsiteSiteRecord, SiteContent, SiteSettings, WebsiteTemplate } from '../../../types';
-import { updateWebsiteOnServer, publishWebsiteOnServer, unpublishWebsiteOnServer } from '../../../services/apiClient';
+import { updateWebsiteOnServer, unpublishWebsiteOnServer } from '../../../services/apiClient';
 import { getTemplateById, mergeSiteWithTemplate, renderTemplateLayout } from '../../../utils/templateRendererUtils';
 import { useApp } from '../../../context/AppContext';
 import { WebsiteSectionsControl } from './WebsiteSectionsControl';
 import { SafeImage } from '../SafeImage';
+import { WebsiteItemPanel } from './WebsiteItemPanel';
+import { WebsiteItemsList } from './WebsiteItemsList';
+import { WebsitePublishSheet } from './WebsitePublishSheet';
+import { WebsiteLayoutControl, WebsiteHistoryControl } from './WebsiteLayoutAndHistory';
+import { publishWebsiteB1, reviewWebsiteExamples, setWebsiteLayout, restoreWebsiteDraft, discardWebsiteCheckpoint, WebsiteB1Error } from '../../../services/websiteB1Api';
+import { websiteItemVocabulary, websiteStarterWording } from '../../../config/websiteStarters';
+import { websiteTemplateItemFields } from '../../../config/websiteBuilder';
+import { websiteLayoutMode, type WebsiteLayoutMode } from '../../../utils/websiteLayout';
+import type { TemplateItem } from '../../../types';
 import {
   ArrowLeft,
   Save,
@@ -34,6 +43,8 @@ import {
   Layers,
   X,
   ImageIcon,
+  UtensilsCrossed,
+  History,
 } from 'lucide-react';
 
 interface WebsiteEditorProps {
@@ -42,6 +53,8 @@ interface WebsiteEditorProps {
   onClose: () => void;
   onOpenPricing?: () => void;
   onSiteUpdated: (updatedSite: WebsiteSiteRecord) => void;
+  /** Open the publish checklist straight away (the dashboard's Publish button). */
+  openPublish?: boolean;
   showToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
 }
 
@@ -51,6 +64,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   onClose,
   onOpenPricing,
   onSiteUpdated,
+  openPublish = false,
   showToast,
 }) => {
   const { openMysteryAi } = useApp();
@@ -146,8 +160,14 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
   // Active editor section
   const [activeSection, setActiveSection] = useState<
-    'business' | 'contact' | 'branding' | 'media' | 'sections' | 'bundles' | 'cta' | 'social'
+    'business' | 'contact' | 'items' | 'branding' | 'media' | 'sections' | 'bundles' | 'cta' | 'social' | 'history'
   >('business');
+  const [publishOpen, setPublishOpen] = useState(openPublish);
+  // B1 server actions (review, layout, restore) run against the saved draft; the editor waits for them.
+  const [serverBusy, setServerBusy] = useState(false);
+  const word = websiteItemVocabulary(currentSite.template_id);
+  const itemFields = websiteTemplateItemFields(currentSite.template_id);
+  const layoutMode: WebsiteLayoutMode = websiteLayoutMode(currentSite.template_id, content);
 
   // Template identity changes must discard old template-specific controls and draft state.
   useEffect(() => {
@@ -224,21 +244,95 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   }, [isDirty, siteName, content, settings, isSaving, isPublishing]);
 
   // Publish / Unpublish Handlers
-  const handlePublish = async () => {
-    if(publicationJob.current)return;
+  const handlePublish = async (): Promise<boolean> => {
+    if(publicationJob.current)return false;
     publicationJob.current=true;setIsPublishing(true);
     try {
       if(savingJob.current && !(await savingJob.current))throw new Error('Save failed. Publishing was stopped.');
       if(editVersion.current!==savedVersion.current && !(await handleSaveDraft()))throw new Error('Save failed. Publishing was stopped.');
       if(editVersion.current!==savedVersion.current)throw new Error('Your draft changed during saving. Save it before publishing.');
       const version=savedVersion.current;
-      const res=await publishWebsiteOnServer(sessionToken,currentSite.id,serverSiteRef.current.updated_at);
+      // The B1 publisher returns the example-review gate as structured detail, not a bare failure.
+      const res=await publishWebsiteB1(sessionToken,currentSite.id,serverSiteRef.current.updated_at);
       if(!res.success || !res.site)throw new Error('Publication was not confirmed. Check your website before retrying.');
       serverSiteRef.current=res.site;setCurrentSite(res.site);onSiteUpdated(res.site);
       const unchanged=editVersion.current===version;setIsDirty(!unchanged);setSaveStatusText(unchanged?'saved':'unsaved');
-      showToast('Your saved revision is now live.','success');
-    } catch(err:any){showToast(err.message || 'Failed to publish website.','warning');}
+      return true;
+    } catch(err:any){
+      if(err instanceof WebsiteB1Error && err.code==='EXAMPLE_REVIEW_REQUIRED'){setPublishOpen(true);showToast('Keep or remove the example items first. Your live website has not changed.','info');}
+      else showToast(err.message || 'Failed to publish website.','warning');
+      return false;
+    }
     finally{publicationJob.current=false;setIsPublishing(false);}
+  };
+
+  // Adopt a server-returned draft. Local edits made while the request ran are never overwritten.
+  const adoptServerSite = (site: WebsiteSiteRecord, version: number) => {
+    serverSiteRef.current=site;setCurrentSite(site);onSiteUpdated(site);
+    if(editVersion.current!==version)return false;
+    draftRef.current={name:site.name,content:site.content_json,settings:site.settings_json};
+    setSiteName(site.name);setContent(site.content_json);setSettings(site.settings_json);
+    savedVersion.current=version;setIsDirty(false);setSaveStatusText('saved');
+    return true;
+  };
+  // B1 actions are checked against the saved revision, so pending edits are saved first.
+  const withSavedDraft = async <T,>(work: (revision: string, version: number) => Promise<T>): Promise<T> => {
+    if(publicationJob.current)throw new Error('Wait for publishing to finish.');
+    setServerBusy(true);
+    try {
+      if(savingJob.current)await savingJob.current;
+      if(editVersion.current!==savedVersion.current && !(await handleSaveDraft()))throw new Error('Your latest changes could not be saved. Try again.');
+      return await work(serverSiteRef.current.updated_at, editVersion.current);
+    } finally {setServerBusy(false);}
+  };
+  const reviewItems = async (ids: string[], action: 'confirm' | 'remove') => {
+    try {
+      await withSavedDraft(async (revision, version) => {
+        const {site} = await reviewWebsiteExamples(sessionToken, currentSite.id, revision, ids, action);
+        if(!adoptServerSite(site, version)){
+          // Edits arrived meanwhile: apply only the review decision to the local draft.
+          const items=(draftRef.current.content.items||[]).flatMap(item=>!item.id||!ids.includes(item.id)?[item]:action==='remove'?[]:[{...item,isExample:false}]);
+          const next={...draftRef.current.content,items};draftRef.current={...draftRef.current,content:next};setContent(next);
+        }
+      });
+      if(action==='remove' && visualSelection && ids.includes(visualSelection.slice(5)))setVisualSelection(null);
+      showToast(action==='confirm' ? (ids.length===1?'Kept. It will appear on your website.':'Kept.') : 'Removed.', 'success');
+      return true;
+    } catch(err:any){showToast(err.message || 'That did not work. Try again.','warning');return false;}
+  };
+  const changeLayout = (mode: WebsiteLayoutMode) => withSavedDraft(async (revision, version) => {
+    const {site} = await setWebsiteLayout(sessionToken, currentSite.id, revision, mode);
+    adoptServerSite(site, version);
+    showToast(mode==='sections'?'Custom sections are on. Your designed layout is kept.':'Your page is back to the designed layout.','success');
+  });
+
+  // Menu dishes, services, rooms and products: edited in place, saved through the normal draft.
+  const items = content.items || [];
+  const selectedItemId = visualSelection?.startsWith('item:') ? visualSelection.slice(5) : null;
+  const selectedItemIndex = selectedItemId ? items.findIndex(item => item.id === selectedItemId) : -1;
+  const updateItems = (next: TemplateItem[]) => {
+    const draft=draftRef.current, nextContent={...draft.content,items:next};
+    draftRef.current={...draft,content:nextContent};setContent(nextContent);markDirty();
+  };
+  const updateItem = (id: string, patch: Partial<TemplateItem>) => updateItems((draftRef.current.content.items||[]).map(item=>item.id===id?{...item,...patch}:item));
+  const addItem = () => {
+    const current=draftRef.current.content.items||[];
+    if(current.length>=50){showToast(`You can add up to 50 ${word.many}.`,'info');return;}
+    const id=`item-${crypto.randomUUID()}`;
+    updateItems([...current,{id,name:`New ${word.singular.toLowerCase()}`}]);
+    setAllSettings(false);setActiveTab('edit');setVisualSelection(`item:${id}`);
+  };
+  const removeItem = (id: string) => {
+    const item=items.find(item=>item.id===id);
+    if(item?.isExample){void reviewItems([id],'remove');return;}
+    if(!window.confirm(`Remove "${item?.name || word.singular}" from your website?`))return;
+    updateItems((draftRef.current.content.items||[]).filter(item=>item.id!==id));setVisualSelection(null);
+  };
+  const openItem = (id: string) => {setPublishOpen(false);setAllSettings(false);setActiveTab('edit');setVisualSelection(`item:${id}`);setCanvasHintSeen(true);};
+  const stepItem = (delta: number) => {
+    if(selectedItemIndex<0 || !items.length)return;
+    const next=items[(selectedItemIndex+delta+items.length)%items.length];
+    if(next?.id)setVisualSelection(`item:${next.id}`);
   };
   const handleUnpublish = async () => {
     if(publicationJob.current)return;
@@ -285,6 +379,14 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const targets = visualTargets(previewTemplate);
   const selected = targets.find(t=>t.id===visualSelection);
   const contextualTargets = visualSelection==='branding' ? targets.filter(t=>t.source.kind==='settings') : selected ? [selected,...(selected.destinationId ? targets.filter(t=>t.id===selected.destinationId) : [])] : [];
+  // The design's suggested headline and description stay marked until the owner changes them.
+  const starterWording = content.starterVersion ? websiteStarterWording(currentSite.template_id) : undefined;
+  const suggestedFields = starterWording && layoutMode==='template' ? (['tagline','aboutText'] as const).filter(field=>content[field]===starterWording[field]).map(field=>`content:${field}`) : [];
+  const publishSuggestions = [
+    ...suggestedFields.map(id=>({label:id==='content:tagline'?'your headline':'your description',target:id})),
+    ...(layoutMode==='template' && !isDataReseller && content.heroImage && content.heroImage===baseTemplate.heroImage?[{label:'the main photo',target:'content:heroImage'}]:[]),
+  ];
+  const cardButton = targets.find(t=>t.source.kind==='copy' && t.id.endsWith('.itemButton'));
   const editVisualValue = (id:string,value:string) => {
     if(isPublishing)return;
     const draft=draftRef.current;
@@ -292,8 +394,10 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     if(!next)return;
     draftRef.current={...draft,...next};setContent(next.content);setSettings(next.settings);markDirty();
   };
-  const settingsAreas: [typeof activeSection, string, typeof Building][] = [['business','Business',Building],['contact','Contact',Phone],['branding','Colors',Palette],['media','Images & Media',ImageIcon],['sections','Sections',Layers],...(isDataReseller?[['bundles','Bundles & pricing',Layers] as [typeof activeSection, string, typeof Building]]:[]),['cta','Main button',MousePointerClick],['social','Social links',Share2]];
-  const openSettings=()=>{setAllSettings(true);setVisualSelection(null);setSettingsNotice(false);};
+  type Area = [typeof activeSection, string, typeof Building];
+  const settingsAreas: Area[] = [['business','Business',Building],['contact','Contact',Phone],...(isDataReseller||currentSite.template_id==='tmpl-start-blank'?[]:[['items',word.plural,UtensilsCrossed] as Area]),['branding','Colors',Palette],['media','Images',ImageIcon],...(isDataReseller?[['bundles','Bundles & pricing',Layers] as Area]:[]),['sections','Layout',Layers],['cta','Main button',MousePointerClick],['social','Social links',Share2],['history','History',History]];
+  const openSettings=(section?: typeof activeSection)=>{setAllSettings(true);setVisualSelection(null);setSettingsNotice(false);if(section)setActiveSection(section);};
+  const locked = isPublishing || serverBusy;
   // Previous/Next walk the page in reading order; fall back to the schema order before the frame reports.
   const stepIds = (targetOrder.length ? targetOrder : targets.map(t=>t.id)).filter(id=>targets.some(t=>t.id===id && t.source.kind!=='settings'));
   const stepIndex = selected ? stepIds.indexOf(selected.id) : -1;
@@ -303,15 +407,19 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
   return (
     <div ref={workspaceRef} role="dialog" aria-modal="true" aria-label="Website editor" className="visual-workspace fixed inset-0 z-[80] text-slate-100 flex flex-col font-sans overflow-hidden">
+      {publishOpen && <WebsitePublishSheet content={content} published={currentSite.status==='published'} publishedAt={currentSite.published_at} publicUrl={`${window.location.origin}/sites/${currentSite.slug}`} word={word} managed={isDataReseller}
+        onReview={reviewItems} onEditItem={openItem} onPublish={handlePublish} onClose={()=>setPublishOpen(false)}
+        suggestions={publishSuggestions}
+        onEditField={target=>{setPublishOpen(false);setActiveTab('edit');if(target==='name')selectTarget('content:businessName');else if(target==='contact')openSettings('contact');else selectTarget(target);}}/>}
       {mediaOpen && <WebsiteImageLibrary siteId={currentSite.id} token={sessionToken} onClose={()=>setMediaOpen(false)} onChoose={url=>{setContent({...content,heroImage:url});markDirty();setMediaOpen(false);}} />}
       <WebsiteEditorToolbar name={content.businessName || siteName} mode={activeTab} device={previewDevice} status={saveStatusText} published={currentSite.status==='published'} saving={isSaving} publishing={isPublishing}
-        onExit={()=>{if(!isDirty || window.confirm('You have unsaved changes. Exit anyway?'))onClose();}} onMode={changeMode} onDevice={device=>{setPreviewDevice(device);if(isPhone && device!=='mobile')changeMode('preview');}} onSave={()=>void handleSaveDraft()} onPublish={()=>void handlePublish()} onUnpublish={()=>void handleUnpublish()} onSettings={openSettings} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`}/>
+        onExit={()=>{if(!isDirty || window.confirm('You have unsaved changes. Exit anyway?'))onClose();}} onMode={changeMode} onDevice={device=>{setPreviewDevice(device);if(isPhone && device!=='mobile')changeMode('preview');}} onSave={()=>void handleSaveDraft()} onPublish={()=>{setVisualSelection(null);setPublishOpen(true);}} onUnpublish={()=>void handleUnpublish()} onSettings={()=>openSettings()} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`}/>
       {/* =========================================================
           WORKSPACE: LEFT EDITOR / RIGHT LIVE PREVIEW
           ========================================================= */}
       <div className="flex-1 min-h-0 flex overflow-hidden relative">
         {/* Existing structured controls remain available without a competing draft store. */}
-        {allSettings && <div inert={isPublishing} className="visual-all-settings">
+        {allSettings && <div inert={locked} className="visual-all-settings">
           <div className="visual-settings-head">
             <button type="button" className="visual-settings-back" onClick={()=>setAllSettings(false)}><ArrowLeft size={18}/>Back to canvas</button>
             <h3>All settings</h3>
@@ -322,60 +430,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
           </div>
 
           {/* Form Content Area */}
-          <div inert={isPublishing} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-            {/* First-Use Onboarding Guidance Card */}
-            {showOnboarding && (
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0c1824] to-[#0d141b] border border-[#00c365]/35 shadow-xl relative animate-in fade-in slide-in-from-top-2 text-left">
-                <button
-                  type="button"
-                  onClick={dismissOnboarding}
-                  className="absolute top-3 right-3 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                  aria-label="Dismiss guide"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-
-                <div className="flex items-center gap-2 mb-2 pr-6">
-                  <div className="w-6 h-6 rounded-lg bg-[#00c365]/20 text-[#00c365] flex items-center justify-center shrink-0">
-                    <Sparkles className="w-3.5 h-3.5" />
-                  </div>
-                  <h3 className="font-bold text-sm text-white">Your website is ready to customise</h3>
-                </div>
-
-                <ol className="space-y-1.5 text-xs text-slate-300 ml-1 mb-3.5 list-decimal list-inside">
-                  <li>Add your business details</li>
-                  <li>Update your WhatsApp & contact numbers</li>
-                  <li>Adjust branding colours and imagery</li>
-                  <li>Preview your website across devices</li>
-                  <li>Publish whenever you are ready</li>
-                </ol>
-
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      dismissOnboarding();
-                      setActiveTab('edit');
-                    }}
-                    className="px-3.5 py-1.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs cursor-pointer active:scale-95 transition-all shadow-sm"
-                  >
-                    Start Editing
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      dismissOnboarding();
-                      openMysteryAi('How do I customise and publish my new website?');
-                    }}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 cursor-pointer flex items-center gap-1.5 transition-colors"
-                  >
-                    <Sparkles className="w-3 h-3 text-[#00c365]" />
-                    <span>Ask Mystery AI</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
             {/* 1. BUSINESS SECTION */}
             {activeSection === 'business' && (
               <div className="space-y-4 animate-in fade-in">
@@ -709,7 +764,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
             {/* 4. SECTIONS TAB */}
             {activeSection === 'sections' && (
-              <div className="animate-in fade-in">
+              <WebsiteLayoutControl mode={layoutMode} templateTitle={baseTemplate.title} startBlank={currentSite.template_id==='tmpl-start-blank'} plural={word.plural} onSwitch={changeLayout} onOpenHistory={()=>setActiveSection('history')}>
                 <WebsiteSectionsControl
                   templateId={currentSite.template_id}
                   siteId={currentSite.id}
@@ -720,8 +775,14 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     markDirty();
                   }}
                 />
-              </div>
+              </WebsiteLayoutControl>
             )}
+
+            {activeSection === 'items' && !isDataReseller && <WebsiteItemsList items={items} word={word} sectionsMode={layoutMode==='sections'} onOpen={openItem} onAdd={addItem}/>}
+
+            {activeSection === 'history' && <WebsiteHistoryControl siteId={currentSite.id} token={sessionToken} revision={currentSite.updated_at}
+              onRestore={checkpoint=>withSavedDraft(async(revision,version)=>{const {site}=await restoreWebsiteDraft(sessionToken,currentSite.id,revision,checkpoint.id);adoptServerSite(site,version);showToast('Earlier version restored to your draft.','success');})}
+              onDiscard={checkpoint=>withSavedDraft(async revision=>{await discardWebsiteCheckpoint(sessionToken,currentSite.id,revision,checkpoint.id);showToast('Saved version removed.','success');})}/>}
 
             {/* Managed bundle prices are authoritative business settings, not template content. */}
             {isDataReseller && activeSection === 'bundles' && <div className="space-y-4">
@@ -849,7 +910,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
           </div>
         </div>}
         <div className="visual-canvas">
-          {activeTab==='edit' && !canvasHintSeen && !visualSelection && !allSettings && <div className="visual-canvas-hint" role="note"><span>Tap a heading, photo or contact detail to change it</span><button type="button" aria-label="Dismiss tip" onClick={()=>setCanvasHintSeen(true)}><X size={15}/></button></div>}
+          {activeTab==='edit' && !canvasHintSeen && !visualSelection && !allSettings && <div className="visual-canvas-hint" role="note"><span>{isDataReseller||layoutMode==='sections'?'Tap a heading, photo or contact detail to change it':`Tap any heading, photo or ${word.singular.toLowerCase()} to change it`}</span><button type="button" aria-label="Dismiss tip" onClick={()=>setCanvasHintSeen(true)}><X size={15}/></button></div>}
           {activeTab==='preview' && !previewHintSeen && <div className="visual-canvas-hint is-preview" role="note"><Eye size={15}/><span>{canvasDevice==='mobile'?'Preview of your draft':`${canvasDevice==='tablet'?'Tablet':'Desktop'} preview, scaled to fit`} · payments are off</span><button type="button" aria-label="Dismiss preview note" onClick={()=>setPreviewHintSeen(true)}><X size={15}/></button></div>}
           <div ref={canvasRef} className="visual-canvas-viewport">
             <div style={{width:effectiveCanvasWidth, flexShrink:0, height:scale<1 ? 'calc(100% / '+scale+')' : '100%', transform:scale<1 ? 'scale('+scale+')' : undefined, transformOrigin:'top center'}} className="visual-canvas-page">
@@ -857,8 +918,10 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             </div>
           </div>
         </div>
-        {activeTab==='edit' && contextualTargets.length>0 && <div className="contents" inert={isPublishing}><VisualContextPanel title={visualSelection==='branding'?'Website colors':selected!.label} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={openSettings} position={stepIndex>=0?{index:stepIndex,total:stepIds.length}:undefined} onPrevious={()=>step(-1)} onNext={()=>step(1)}/></div>}
-        {activeTab==='edit' && settingsNotice && !contextualTargets.length && <VisualContextPanel notice title="Change this in All Settings" targets={[]} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={openSettings}/>}
+        {activeTab==='edit' && selectedItemIndex>=0 && <WebsiteItemPanel item={items[selectedItemIndex]} index={selectedItemIndex} total={items.length} word={word} fields={itemFields} siteId={currentSite.id} token={sessionToken} busy={locked} cardButton={cardButton && {value:cardButton.value,max:cardButton.maxLength,onChange:value=>editVisualValue(cardButton.id,value)}}
+          onChange={patch=>updateItem(items[selectedItemIndex].id!,patch)} onKeep={()=>void reviewItems([items[selectedItemIndex].id!],'confirm')} onRemove={()=>removeItem(items[selectedItemIndex].id!)} onAdd={addItem} onPrevious={()=>stepItem(-1)} onNext={()=>stepItem(1)} onDone={clearSelection}/>}
+        {activeTab==='edit' && contextualTargets.length>0 && !selectedItemId && <div className="contents" inert={locked}><VisualContextPanel title={visualSelection==='branding'?'Website colors':selected!.label} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()} position={stepIndex>=0?{index:stepIndex,total:stepIds.length}:undefined} onPrevious={()=>step(-1)} onNext={()=>step(1)} suggested={!!selected && suggestedFields.includes(selected.id)}/></div>}
+        {activeTab==='edit' && settingsNotice && !contextualTargets.length && <VisualContextPanel notice title="Change this in All Settings" targets={[]} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()}/>}
       </div>
 
       {/* =========================================================

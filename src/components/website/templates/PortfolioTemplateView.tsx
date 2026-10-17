@@ -1,5 +1,6 @@
+import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
-import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
+import {useVisualEditMarkers, useTemplateCopy} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry';
 import { SafeImage } from '../SafeImage.js';
@@ -23,6 +24,7 @@ interface TemplateViewProps {
 
 export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
   const edit = useVisualEditMarkers();
+  const copy = useTemplateCopy(template);
   const [filter, setFilter] = useState<string>('All');
   const [commissionBooked, setCommissionBooked] = useState<boolean>(false);
 
@@ -90,7 +92,7 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
         <div className="relative max-w-4xl mx-auto space-y-6 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs font-mono">
             <Camera className="w-3.5 h-3.5 text-[var(--website-accent,#00c365)]" />
-            <span>{template.siteContent ? template.categoryLabel : 'Documentary & Fashion Cinematography'}</span>
+            <span {...copy.edit('eyebrow')}>{copy.text('eyebrow')}</span>
           </div>
 
           <h1 className="text-3xl sm:text-6xl font-black tracking-tight leading-[1.05] text-white" {...edit("content:tagline")}>
@@ -106,19 +108,19 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
               href="#work"
               className="px-6 py-3 rounded-full bg-[var(--website-accent,#00c365)] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-2"
             >
-              <span>Explore Selected Work</span>
+              <span {...copy.edit('primary')}>{copy.text('primary')}</span>
               <ArrowRight className="w-4 h-4" />
             </a>
             <a
               href="#commission"
               className="px-6 py-3 rounded-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs uppercase tracking-wider border border-zinc-700 transition-all flex items-center gap-2"
             >
-              <span>Request Rate Card</span>
+              <span {...copy.edit('secondary')}>{copy.text('secondary')}</span>
             </a>
           </div>
 
           {/* Exhibition Metrics */}
-          <div className="pt-8 grid grid-cols-3 gap-4 border-t border-zinc-800/80 max-w-md mx-auto font-mono">
+          {!!template.stats?.length && <div className="pt-8 grid grid-cols-3 gap-4 border-t border-zinc-800/80 max-w-md mx-auto font-mono">
             {template.stats?.map((stat, i) => (
               <div key={i}>
                 <div className="text-2xl font-bold text-white">{stat.value}</div>
@@ -127,7 +129,7 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -135,10 +137,8 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
       <div id="work" className="py-16 px-4 sm:px-12 max-w-6xl mx-auto space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 font-mono">
           <div>
-            <span className="text-xs uppercase text-[var(--website-accent,#00c365)] tracking-widest block">
-              {template.siteContent ? 'Our work' : 'Archive 2024 \u2014 2026'}
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-white mt-1">Selected Projects</h2>
+            <span className="text-xs uppercase text-[var(--website-accent,#00c365)] tracking-widest block" {...copy.edit('itemsEyebrow')}>{copy.text('itemsEyebrow')}</span>
+            <h2 className="text-2xl sm:text-3xl font-black text-white mt-1" {...copy.edit('itemsHeading')}>{copy.text('itemsHeading')}</h2>
           </div>
 
           <div className="flex items-center gap-2">
@@ -161,10 +161,11 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {template.siteContent && !filteredWorks.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {filteredWorks.map((work) => (
-            <div
+            <div {...edit(`item:${work.id}`)}
               key={work.id}
               className="group relative bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 hover:border-zinc-600 transition-all"
             >
+              <ExampleTag item={work} corner="left" flow={!work.image}/>
               {work.image && (
                 <div className="h-72 overflow-hidden bg-zinc-950">
                   <SafeImage
@@ -190,22 +191,18 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
       <div id="gear" className="py-14 px-4 sm:px-12 bg-zinc-950 border-y border-zinc-800 font-mono text-xs">
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="text-center space-y-1">
-            <span className="text-xs uppercase text-[var(--website-accent,#00c365)] tracking-widest">Production Setup</span>
-            <h3 className="text-2xl font-black text-white">Commercial Kit & Day Rates</h3>
+            <span className="text-xs uppercase text-[var(--website-accent,#00c365)] tracking-widest" {...copy.edit('extraEyebrow')}>{copy.text('extraEyebrow')}</span>
+            <h3 className="text-2xl font-black text-white" {...copy.edit('extraHeading')}>{copy.text('extraHeading')}</h3>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-5 bg-zinc-900/60 rounded-xl border border-zinc-800 space-y-2">
-              <h4 className="font-bold text-white text-sm">Cinema & Stills Package</h4>
-              <p className="text-zinc-400 leading-relaxed">
-                {template.siteContent ? 'Contact us to discuss the equipment and production setup for your project.' : 'Sony FX6 Full-Frame Cinema Line, Leica M11 Rangefinder, G-Master f/1.2 primes, Aputure 600d lighting kit, and DJI Ronin 4D stabilization.'}
-              </p>
+              <h4 className="font-bold text-white text-sm" {...copy.edit('kitOneTitle')}>{copy.text('kitOneTitle')}</h4>
+              <p className="text-zinc-400 leading-relaxed" {...copy.edit('kitOneText')}>{copy.text('kitOneText')}</p>
             </div>
             <div className="p-5 bg-zinc-900/60 rounded-xl border border-zinc-800 space-y-2">
-              <h4 className="font-bold text-white text-sm">Standard Commercial Day Rate</h4>
-              <p className="text-zinc-400 leading-relaxed">
-                {template.siteContent ? 'Confirm scope, rates, licensing and deliverables with us before booking.' : 'Full-day shoot (up to 8 hours), master color grading, commercial licensing release, and RAW deliverables archived via cloud storage.'}
-              </p>
+              <h4 className="font-bold text-white text-sm" {...copy.edit('kitTwoTitle')}>{copy.text('kitTwoTitle')}</h4>
+              <p className="text-zinc-400 leading-relaxed" {...copy.edit('kitTwoText')}>{copy.text('kitTwoText')}</p>
             </div>
           </div>
         </div>
@@ -215,16 +212,12 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
       <div id="commission" className="py-16 px-4 sm:px-12 max-w-2xl mx-auto font-mono">
         <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-10 shadow-2xl space-y-6">
           <div className="text-center space-y-1">
-            <span className="text-xs font-bold text-[var(--website-accent,#00c365)] uppercase tracking-widest">
-              Direct Booking
-            </span>
-            <h3 className="text-2xl font-black text-white">Commission a Shoot</h3>
-            <p className="text-xs text-zinc-400 font-sans">
-              Editorial campaigns, documentary features, and high-impact commercial imagery.
-            </p>
+            <span className="text-xs font-bold text-[var(--website-accent,#00c365)] uppercase tracking-widest" {...copy.edit('enquiryEyebrow')}>{copy.text('enquiryEyebrow')}</span>
+            <h3 className="text-2xl font-black text-white" {...copy.edit('enquiryHeading')}>{copy.text('enquiryHeading')}</h3>
+            <p className="text-xs text-zinc-400 font-sans" {...copy.edit('enquiryIntro')}>{copy.text('enquiryIntro')}</p>
           </div>
 
-          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} /> : commissionBooked ? (
+          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Type of work" dateLabel="Shoot date"/> : commissionBooked ? (
             <div className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-2">
               <CheckCircle className="w-10 h-10 text-emerald-400 mx-auto" />
               <h4 className="font-bold text-emerald-300 text-base">Example enquiry</h4>

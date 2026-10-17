@@ -35,7 +35,9 @@ for(const id of ['tmpl-buka-bistro','tmpl-salon','tmpl-hotel','tmpl-construction
  const t=WEBSITE_TEMPLATES.find(t=>t.id===id || (id==='tmpl-salon'&&t.layoutType==='salon') || (id==='tmpl-hotel'&&t.layoutType==='hotel') || (id==='tmpl-construction'&&t.layoutType==='construction') || (id==='tmpl-real-estate'&&t.layoutType==='realestate') || (id==='tmpl-tech-agency'&&t.layoutType==='agency') || (id==='tmpl-portfolio'&&t.layoutType==='portfolio'))!;
  assert.ok(t,id);
  const html=renderToStaticMarkup(renderTemplateLayout(mergeSiteWithTemplate(t,{businessName:'Owner Business',phone:'0240000888',whatsapp:'0240000888',tagline:'Owner heading',aboutText:'Owner introduction',location:'Owner location',items:[]})));
- assert.ok(html.includes('Contact the business'));assert.ok(!html.includes('<form'));for(const text of ['certified bill of quantities','Est. 2018','Reserve Your Table in Osu','Premier Luxury Studio','Ada Foah, Ghana'])assert.ok(!html.includes(text),text);
+ // A WhatsApp number turns the design's form into a pre-written chat message; nothing is submitted or booked here.
+ assert.ok(html.includes('Send on WhatsApp'));assert.ok(html.includes('https://wa.me/233240000888?text='));assert.ok(html.includes('must be confirmed directly'));assert.ok(!html.includes('<form'));
+ const noWhatsapp=renderToStaticMarkup(renderTemplateLayout(mergeSiteWithTemplate(t,{businessName:'Owner Business',phone:'0240000888',items:[]} as any)));assert.ok(noWhatsapp.includes('Contact the business'));assert.ok(!noWhatsapp.includes('wa.me'));for(const text of ['certified bill of quantities','Est. 2018','Reserve Your Table in Osu','Premier Luxury Studio','Ada Foah, Ghana'])assert.ok(!html.includes(text),text);
 });
 test('template switch changes inherited Data CTA but keeps a custom owner action',()=>{
  const from=WEBSITE_TEMPLATES.find(t=>t.id==='tmpl-data-reseller')!,target=WEBSITE_TEMPLATES.find(t=>t.id==='tmpl-buka-bistro')!;

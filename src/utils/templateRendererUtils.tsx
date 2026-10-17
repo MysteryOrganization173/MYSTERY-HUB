@@ -2,6 +2,7 @@ import { WebsiteContrastBoundary } from '../components/website/WebsiteContrastBo
 import { normalizeWebsiteColor, normalizeWebsitePalette, readableWebsiteColor, websiteActionText } from './websiteBrand.js';
 import { SectionSiteRenderer } from '../components/website/SectionSiteRenderer.js';
 import { websiteContactTarget } from '../components/website/SiteContactDetails.js';
+import {websiteLayoutMode} from './websiteLayout.js';
 /**
  * Shared Template & Site Rendering Utilities
  * Ensures Editor Preview, Template Preview, and Published Live Sites
@@ -50,7 +51,7 @@ export function mergeSiteWithTemplate(
 
   return {
     ...baseTemplate,
-    composition: content?.composition ?? baseTemplate.composition,
+    composition: websiteLayoutMode(baseTemplate.id,content)==='sections' ? content?.composition ?? baseTemplate.composition : undefined,
     siteContent: content,
     demoBusinessName: content?.businessName ?? baseTemplate.demoBusinessName,
     demoHeroTagline: content?.tagline ?? baseTemplate.demoHeroTagline,

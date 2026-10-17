@@ -1,5 +1,6 @@
+import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
-import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
+import {useVisualEditMarkers, useTemplateCopy} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
@@ -26,6 +27,7 @@ interface TemplateViewProps {
 
 export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
   const edit = useVisualEditMarkers();
+  const copy = useTemplateCopy(template);
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [selectedPartySize, setSelectedPartySize] = useState<number>(2);
   const [reservationDate, setReservationDate] = useState<string>('2026-10-02');
@@ -101,7 +103,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
         <div className="relative max-w-3xl space-y-5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#c99a45)]/20 border border-[var(--website-accent,#c99a45)]/40 text-[var(--website-accent,#c99a45)] text-xs font-sans font-semibold tracking-wider uppercase">
             <Utensils className="w-3.5 h-3.5" />
-            <span>{template.siteContent ? template.categoryLabel : 'Modern Ghanaian Gastronomy'}</span>
+            <span {...copy.edit('eyebrow')}>{copy.text('eyebrow')}</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-normal tracking-tight leading-[1.15] text-white" {...edit("content:tagline")}>
@@ -117,18 +119,18 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
               href="#reserve"
               className="px-6 py-3 rounded-full bg-[var(--website-accent,#c99a45)] hover:bg-[#b58735] text-[#1c1917] font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2"
             >
-              <span>Ask about a table</span>
+              <span {...copy.edit('primary')}>{copy.text('primary')}</span>
             </a>
             <a
               href="#menu"
               className="px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-xs uppercase tracking-wider border border-white/20 transition-all flex items-center gap-2"
             >
-              <span>Explore Digital Menu</span>
+              <span {...copy.edit('secondary')}>{copy.text('secondary')}</span>
             </a>
           </div>
 
           {/* Key Restaurant Statistics */}
-          <div className="pt-6 grid grid-cols-3 gap-4 border-t border-white/15 max-w-md font-sans">
+          {!!template.stats?.length && <div className="pt-6 grid grid-cols-3 gap-4 border-t border-white/15 max-w-md font-sans">
             {template.stats?.map((stat, i) => (
               <div key={i}>
                 <div className="text-xl font-bold text-[var(--website-accent,#c99a45)] font-serif">{stat.value}</div>
@@ -137,22 +139,16 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
         </div>
       </div>
 
       {/* Interactive Food Menu Section */}
       <div id="menu" className="py-14 px-4 sm:px-12 max-w-5xl mx-auto space-y-8 font-sans">
         <div className="text-center max-w-lg mx-auto space-y-2">
-          <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#c99a45)] font-bold">
-            Curated Culinary Selection
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-serif text-[var(--website-primary,#7a1c28)]">
-            Explore our menu
-          </h2>
-          <p className="text-xs text-[#78716c]">
-            Contact us for current menu details, ingredients and availability.
-          </p>
+          <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#c99a45)] font-bold" {...copy.edit('itemsEyebrow')}>{copy.text('itemsEyebrow')}</span>
+          <h2 className="text-2xl sm:text-3xl font-serif text-[var(--website-primary,#7a1c28)]" {...copy.edit('itemsHeading')}>{copy.text('itemsHeading')}</h2>
+          <p className="text-xs text-[#78716c]" {...copy.edit('itemsIntro')}>{copy.text('itemsIntro')}</p>
         </div>
 
         {/* Menu Category Filter Pills */}
@@ -176,10 +172,11 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {template.siteContent && !filteredItems.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {filteredItems.map((item) => (
-            <div
+            <div {...edit(`item:${item.id}`)}
               key={item.id}
-              className="bg-white p-4 rounded-2xl border border-[#f3ece2] shadow-sm hover:shadow-md transition-shadow flex gap-4 items-start"
+              className="relative bg-white p-4 rounded-2xl border border-[#f3ece2] shadow-sm hover:shadow-md transition-shadow flex gap-4 items-start"
             >
+              <ExampleTag item={item} corner="left"/>
               {item.image && (
                 <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-slate-100">
                   <SafeImage
@@ -214,16 +211,12 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <div id="reserve" className="py-12 px-4 sm:px-12 bg-[#f3ece2]/60 border-y border-[#e7ded1] font-sans">
         <div className="max-w-3xl mx-auto bg-white rounded-3xl p-6 sm:p-10 shadow-lg border border-[#e2d5c3] space-y-6">
           <div className="text-center space-y-1">
-            <span className="text-xs font-bold text-[var(--website-primary,#7a1c28)] uppercase tracking-widest">
-              {template.siteContent ? 'Reservation Enquiry' : 'Reservation enquiry'}
-            </span>
-            <h3 className="text-2xl font-serif text-[#1c1917]">Ask about a table</h3>
-            <p className="text-xs text-[#78716c]">
-              {template.siteContent ? 'Contact the business to confirm availability and arrange your reservation.' : 'Contact the business to arrange a reservation. No booking is made on this page.'}
-            </p>
+            <span className="text-xs font-bold text-[var(--website-primary,#7a1c28)] uppercase tracking-widest" {...copy.edit('enquiryEyebrow')}>{copy.text('enquiryEyebrow')}</span>
+            <h3 className="text-2xl font-serif text-[#1c1917]" {...copy.edit('enquiryHeading')}>{copy.text('enquiryHeading')}</h3>
+            <p className="text-xs text-[#78716c]" {...copy.edit('enquiryIntro')}>{copy.text('enquiryIntro')}</p>
           </div>
 
-          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick}/> : isBooked ? (
+          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Ask about" dateLabel="Date of your visit"/> : isBooked ? (
             <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-center space-y-2">
               <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto">
                 <Check className="w-5 h-5" />

@@ -1,5 +1,6 @@
+import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
-import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
+import {useVisualEditMarkers, useTemplateCopy} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry';
 import { SafeImage } from '../SafeImage.js';
@@ -24,6 +25,7 @@ interface TemplateViewProps {
 
 export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
   const edit = useVisualEditMarkers();
+  const copy = useTemplateCopy(template);
   const [scheduled, setScheduled] = useState<boolean>(false);
   const products = template.items || [];
 
@@ -55,9 +57,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
             <span className="font-extrabold text-base tracking-tight text-white block leading-none font-mono" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </span>
-            <span className="text-[10px] text-[#06b6d4] uppercase tracking-widest font-mono font-bold block mt-0.5">
-              Cloud & Fintech Infrastructure
-            </span>
+            <span className="text-[10px] text-[#06b6d4] uppercase tracking-widest font-mono font-bold block mt-0.5" {...copy.edit('brand')}>{copy.text('brand')}</span>
           </div>
         </div>
 
@@ -88,7 +88,7 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
         <div className="relative max-w-3xl space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#8b5cf6)]/15 border border-[var(--website-accent,#8b5cf6)]/40 text-[#c084fc] text-xs font-mono font-bold uppercase tracking-wider">
             <Zap className="w-3.5 h-3.5 text-[#06b6d4]" />
-            <span>Mission-Critical African Enterprise Engineering</span>
+            <span {...copy.edit('eyebrow')}>{copy.text('eyebrow')}</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-[1.08] text-white" {...edit("content:tagline")}>
@@ -104,19 +104,19 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
               href="#discovery"
               className="px-6 py-3.5 rounded-xl bg-[#06b6d4] hover:bg-[#0891b2] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center gap-2"
             >
-              <span>Schedule Architecture Audit</span>
+              <span {...copy.edit('primary')}>{copy.text('primary')}</span>
               <ArrowRight className="w-4 h-4" />
             </a>
             <a
               href="#solutions"
               className="px-6 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider border border-slate-700 transition-all flex items-center gap-2"
             >
-              <span>Explore Tech Stack</span>
+              <span {...copy.edit('secondary')}>{copy.text('secondary')}</span>
             </a>
           </div>
 
           {/* Live Metrics */}
-          <div id="metrics" className="pt-8 grid grid-cols-3 gap-4 border-t border-slate-800/90 max-w-lg font-mono">
+          {!!template.stats?.length && <div id="metrics" className="pt-8 grid grid-cols-3 gap-4 border-t border-slate-800/90 max-w-lg font-mono">
             {template.stats?.map((stat, idx) => (
               <div key={idx} className="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
                 <div className="text-2xl font-bold text-[#06b6d4]">{stat.value}</div>
@@ -125,26 +125,25 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
         </div>
       </div>
 
       {/* Case Studies / Solutions Showcase */}
       <div id="solutions" className="py-16 px-4 sm:px-12 max-w-6xl mx-auto space-y-8 font-mono">
         <div className="space-y-1">
-          <span className="text-xs uppercase text-[var(--website-accent,#8b5cf6)] tracking-widest font-bold">
-            Flagship Systems
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-black text-white">Engineered for Scale</h2>
+          <span className="text-xs uppercase text-[var(--website-accent,#8b5cf6)] tracking-widest font-bold" {...copy.edit('itemsEyebrow')}>{copy.text('itemsEyebrow')}</span>
+          <h2 className="text-2xl sm:text-3xl font-black text-white" {...copy.edit('itemsHeading')}>{copy.text('itemsHeading')}</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-sans">
           {template.siteContent && !products.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {products.map((item) => (
-            <div
+            <div {...edit(`item:${item.id}`)}
               key={item.id}
-              className="bg-[#0f141c] rounded-2xl border border-slate-800 p-6 space-y-4 hover:border-[var(--website-accent,#8b5cf6)]/50 transition-colors"
+              className="relative bg-[#0f141c] rounded-2xl border border-slate-800 p-6 space-y-4 hover:border-[var(--website-accent,#8b5cf6)]/50 transition-colors"
             >
+              <ExampleTag item={item} corner="right"/>
               <div className="flex items-center justify-between text-xs font-mono">
                 <span className="text-[#06b6d4] font-bold">{item.category}</span>
                 {!template.siteContent && <span className="text-slate-500">Sub-second Latency</span>}
@@ -171,16 +170,12 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <div id="discovery" className="py-16 px-4 sm:px-12 max-w-3xl mx-auto font-mono">
         <div className="bg-[#0f141c] border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl space-y-6">
           <div className="space-y-1">
-            <span className="text-xs font-bold text-[#06b6d4] uppercase tracking-widest">
-              Direct Engagement
-            </span>
-            <h3 className="text-2xl font-black text-white">Discuss your project</h3>
-            <p className="text-xs text-slate-400 font-sans">
-              Contact us to discuss your project and arrange a conversation.
-            </p>
+            <span className="text-xs font-bold text-[#06b6d4] uppercase tracking-widest" {...copy.edit('enquiryEyebrow')}>{copy.text('enquiryEyebrow')}</span>
+            <h3 className="text-2xl font-black text-white" {...copy.edit('enquiryHeading')}>{copy.text('enquiryHeading')}</h3>
+            <p className="text-xs text-slate-400 font-sans" {...copy.edit('enquiryIntro')}>{copy.text('enquiryIntro')}</p>
           </div>
 
-          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} /> : scheduled ? (
+          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Which service?" dateLabel="Preferred date for a call"/> : scheduled ? (
             <div className="p-6 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 text-center space-y-2">
               <CheckCircle className="w-10 h-10 text-cyan-400 mx-auto" />
               <h4 className="font-bold text-cyan-300 text-base">Example conversation</h4>

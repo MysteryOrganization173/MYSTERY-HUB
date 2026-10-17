@@ -105,6 +105,9 @@ export interface SiteSocialLinks {
 }
 
 export interface SiteContent {
+  /** Captured starter generation; absent on legacy websites. */
+  starterVersion?: number;
+  layoutMode?: 'template' | 'sections';
   composition?: WebsiteComposition;
   businessName: string;
   tagline: string;
@@ -121,6 +124,8 @@ export interface SiteContent {
   items?: TemplateItem[];
   stats?: Array<{ label: string; value: string }>;
   features?: string[];
+  /** Owner wording for a designed template's headings and labels, keyed `${layout}.${slot}`. */
+  copy?: Record<string, string>;
 }
 
 export interface SiteSettings {
@@ -173,6 +178,8 @@ export interface TemplateColorScheme {
 }
 
 export interface TemplateItem {
+  /** Owner draft only. Explicit review is required before publication. */
+  isExample?: boolean;
   id?: string;
   name: string;
   price?: string;
