@@ -20,7 +20,6 @@ import {
 } from '../../services/apiClient';
 import {
   Globe,
-  Sparkles,
   Smartphone,
   Eye,
   ArrowRight,

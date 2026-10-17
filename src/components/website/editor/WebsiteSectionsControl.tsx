@@ -15,7 +15,6 @@ import {
   Layers,
   CheckCircle2,
   ChevronDown,
-  Sparkles,
 } from 'lucide-react';
 
 export function WebsiteSectionsControl({

@@ -14,7 +14,7 @@ import {
   Church,
   Shirt,
   Briefcase,
-  Sparkles,
+  Globe,
   Eye,
   CheckCircle2,
   ArrowRight,
@@ -85,7 +85,7 @@ export const TemplateCardPreview: React.FC<TemplateCardPreviewProps> = ({
       case 'services':
         return <Briefcase className="w-2.5 h-2.5" />;
       default:
-        return <Sparkles className="w-2.5 h-2.5" />;
+        return <Globe className="w-2.5 h-2.5" />;
     }
   };
 

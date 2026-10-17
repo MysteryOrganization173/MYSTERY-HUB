@@ -21,8 +21,8 @@ import { TechAgencyTemplateView } from '../components/website/templates/TechAgen
 import { HotelTemplateView } from '../components/website/templates/HotelTemplateView.js';
 import { EcommerceTemplateView } from '../components/website/templates/EcommerceTemplateView.js';
 import { DataResellerTemplateView, type ResellerStoreSummary } from '../components/website/templates/DataResellerTemplateView.js';
-import { GenericTemplateView } from '../components/website/templates/GenericTemplateView.js';
 import { DynamicTemplateRenderer } from '../components/website/DynamicTemplateRenderer.js';
+import { PersonalityTemplateView, personalityPreset } from '../components/website/templates/PersonalityTemplateView';
 import { WEBSITE_TEMPLATES } from '../data/templates.js';
 
 /**
@@ -130,7 +130,9 @@ function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: 
     case 'ecommerce':
     case 'retail':
       return <EcommerceTemplateView template={template} onCtaClick={onCtaClick} />;
-    default:
+    default: {
+      const preset = personalityPreset(layout);
+      if (preset) return <PersonalityTemplateView template={template} onCtaClick={onCtaClick} preset={preset} />;
       return (
         <DynamicTemplateRenderer
           template={template}
@@ -138,5 +140,6 @@ function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: 
           isMobileView={isMobileView}
         />
       );
+    }
   }
 }
