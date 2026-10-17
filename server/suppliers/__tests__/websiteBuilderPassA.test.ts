@@ -25,10 +25,10 @@ test('template galleries without saved content keep their sample contact line',(
   for(const base of WEBSITE_TEMPLATES.filter(t=>!t.composition && t.hoursOrContact && t.id!=='tmpl-data-reseller'))assert.ok(renderToStaticMarkup(renderTemplateLayout(base)).includes(base.hoursOrContact!),base.id);
 });
 
-test('Data hero shows owner artwork as its own band on phones, not only as a faded backdrop',()=>{
+test('Data hero shows owner artwork in its own framed band, not only as a faded backdrop',()=>{
   const base=WEBSITE_TEMPLATES.find(t=>t.id==='tmpl-data-reseller')!;
   const html=renderToStaticMarkup(renderTemplateLayout(mergeSiteWithTemplate(base,content)));
-  const band=html.indexOf('sm:hidden relative -mx-5 -mt-5 mb-4 aspect-[16/9]');
+  const band=html.indexOf('class="store-art"');
   assert.ok(band>0);assert.ok(html.slice(band,band+1500).includes('example.test/hero.jpg'));
 });
 

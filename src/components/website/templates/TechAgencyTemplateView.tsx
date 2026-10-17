@@ -15,7 +15,6 @@ import {
   ShieldCheck,
   CheckCircle,
   Calendar,
-  Sparkles,
 } from 'lucide-react';
 
 interface TemplateViewProps {

@@ -41,9 +41,9 @@ function VisualField({target, onChange, siteId, token}: {target: VisualTarget; o
   </div>;
 }
 
-export function VisualContextPanel({title, targets, siteId, token, onChange, onDone, onAllSettings, position, onPrevious, onNext, notice, suggested}: {
+export function VisualContextPanel({title, targets, siteId, token, onChange, onDone, onAllSettings, position, onPrevious, onNext, notice, noticeText, noticeAction, suggested}: {
   title: string; targets: VisualTarget[]; siteId: string; token: string; onChange: (id:string,value:string)=>void; onDone:()=>void; onAllSettings:()=>void;
-  position?: {index: number; total: number}; onPrevious?: () => void; onNext?: () => void; notice?: boolean; suggested?: boolean;
+  position?: {index: number; total: number}; onPrevious?: () => void; onNext?: () => void; notice?: boolean; noticeText?: string; noticeAction?: string; suggested?: boolean;
 }) {
   const root=useRef<HTMLElement>(null), heading=useRef<HTMLHeadingElement>(null);
   const firstId=targets[0]?.id;
@@ -75,8 +75,8 @@ export function VisualContextPanel({title, targets, siteId, token, onChange, onD
     </div>
     <div className="visual-context-fields">
       {notice ? <>
-        <p className="visual-notice-text">Tapping doesn’t edit this part. Galleries, section order and social links are changed in All Settings. A few labels are part of the design and can’t be changed.</p>
-        <button type="button" onClick={onAllSettings} className="visual-primary-button"><SlidersHorizontal size={17}/>Open All Settings</button>
+        <p className="visual-notice-text">{noticeText || 'Tapping doesn’t edit this part. Galleries, section order and social links are changed in All Settings. A few labels are part of the design and can’t be changed.'}</p>
+        <button type="button" onClick={onAllSettings} className="visual-primary-button"><SlidersHorizontal size={17}/>{noticeAction || 'Open All Settings'}</button>
       </> : <>
         {suggested && <div className="visual-example-note is-suggested" role="note"><strong>Suggested wording</strong><p>We wrote this so your page doesn’t start empty. Make it your own, or keep it if it fits your business.</p></div>}
         {targets.map(target=><VisualField key={target.id} target={target} siteId={siteId} token={token} onChange={onChange}/>)}

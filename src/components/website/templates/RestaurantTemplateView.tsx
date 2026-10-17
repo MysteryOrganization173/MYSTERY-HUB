@@ -13,7 +13,6 @@ import {
   Calendar,
   Users,
   MessageSquare,
-  Sparkles,
   Check,
   Star,
   Phone,
@@ -55,7 +54,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
       {/* A slim location ribbon; published sites omit it until the owner adds a location. */}
       {(template.location || editing) && (
         <div className="bg-[var(--website-primary,#7a1c28)] text-[var(--website-background,#fcf9f5)] px-4 py-2 text-center text-xs tracking-wider uppercase font-sans flex items-center justify-center gap-2">
-          <Sparkles className="w-3.5 h-3.5 text-[var(--website-accent,#c99a45)]" />
+          <MapPin className="w-3.5 h-3.5 text-[var(--website-accent,#c99a45)]" aria-hidden="true" />
           <span {...edit("content:location")}>{template.location}</span>
         </div>
       )}
@@ -316,14 +315,14 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
               {template.demoSubtext}
             </p>
           </div>
-          <div className="space-y-2">
+          {(template.location || editing) && <div className="space-y-2">
             <h5 className="font-bold text-white uppercase tracking-wider text-[11px]">
               Location & Hours
             </h5>
             <p className="text-slate-400 text-xs" {...edit("content:location")}>
               {template.location}
             </p>
-          </div>
+          </div>}
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase tracking-wider text-[11px]">
               Direct Reservations

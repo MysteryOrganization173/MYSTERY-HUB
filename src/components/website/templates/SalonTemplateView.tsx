@@ -7,7 +7,6 @@ import { SafeImage } from '../SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
 import {
-  Sparkles,
   Scissors,
   Clock,
   MapPin,
@@ -46,7 +45,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       {/* A slim location ribbon; published sites omit it until the owner adds a location. */}
       {(template.location || editing) && (
         <div className="bg-[var(--website-accent,#ec4899)] text-white text-xs px-4 py-2 text-center tracking-wider font-semibold flex items-center justify-center gap-2">
-          <Sparkles className="w-3.5 h-3.5" />
+          <MapPin className="w-3.5 h-3.5" aria-hidden="true" />
           <span {...edit("content:location")}>{template.location}</span>
         </div>
       )}

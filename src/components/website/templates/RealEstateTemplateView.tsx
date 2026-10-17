@@ -232,21 +232,17 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
               </div>
 
               <div className="p-5 pt-0 space-y-4">
-                {/* Bed/Bath/SqFt Metrics */}
-                <div className="grid grid-cols-3 gap-2 py-2 border-y border-slate-100 text-center text-slate-600 text-xs font-semibold">
-                  <span className="flex items-center justify-center gap-1">
-                    <Bed className="w-3.5 h-3.5 text-[var(--website-accent,#0ea5e9)]" />
-                    <span>{prop.specs?.[0] || 'Not specified'}</span>
-                  </span>
-                  <span className="flex items-center justify-center gap-1">
-                    <Bath className="w-3.5 h-3.5 text-[var(--website-accent,#0ea5e9)]" />
-                    <span>{prop.specs?.[1] || 'Not specified'}</span>
-                  </span>
-                  <span className="flex items-center justify-center gap-1">
-                    <Maximize2 className="w-3.5 h-3.5 text-[var(--website-accent,#0ea5e9)]" />
-                    <span>{prop.specs?.[2] || 'Not specified'}</span>
-                  </span>
-                </div>
+                {/* Bed/Bath/SqFt Metrics: only the details the owner gave; blanks are left out, not labelled. */}
+                {(prop.specs || []).slice(0, 3).some(Boolean) && (
+                  <div className="grid grid-cols-3 gap-2 py-2 border-y border-slate-100 text-center text-slate-600 text-xs font-semibold">
+                    {[Bed, Bath, Maximize2].map((Icon, index) => prop.specs?.[index] ? (
+                      <span key={index} className="flex items-center justify-center gap-1">
+                        <Icon className="w-3.5 h-3.5 text-[var(--website-accent,#0ea5e9)]" aria-hidden="true" />
+                        <span>{prop.specs[index]}</span>
+                      </span>
+                    ) : <span key={index} aria-hidden="true" />)}
+                  </div>
+                )}
 
                 <a
                   href="#tour"

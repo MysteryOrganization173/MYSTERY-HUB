@@ -113,6 +113,16 @@ export const TEMPLATE_COPY: Record<string, Slots> = {
     itemsHeading: s('Products heading', 'Trending Hardware & Gadgets', 'Our products'),
     itemsIntro: intro('Products introduction', 'Contact the business to confirm current stock and delivery options.'),
   },
+  // Data stores: the storefront's own wording. Bundles, prices, payment and delivery notices stay platform-managed.
+  reseller: {
+    brand: s('Line under your name', 'Data bundle store', undefined, 50),
+    secondary: s('Second page button', 'Track an order', undefined, 40),
+    catalogueEyebrow: s('Bundles label', 'Data bundles', undefined, 50),
+    catalogueHeading: s('Bundles heading', 'Choose your bundle'),
+    stepsHeading: s('Steps heading', 'How buying works'),
+    helpHeading: s('Help heading', 'Need help with an order?'),
+    helpIntro: intro('Help introduction', 'Message or call us and have your order reference ready, so we can check it quickly.'),
+  },
   education: dynamic('Learning & training', 'Explore our courses', 'Learn with us', 'Courses & classes', 'Ask about this course'),
   church: dynamic('Faith & community', 'Explore our gatherings', 'Gather with us', 'Services & activities', 'Find out more'),
   fashion: dynamic('Fashion & tailoring', 'Explore the collection', 'Featured pieces', 'Explore the collection', 'Ask about this piece', 'Luxury Fashion'),
@@ -120,9 +130,9 @@ export const TEMPLATE_COPY: Record<string, Slots> = {
 };
 
 export const templateCopyLayout = (t: Pick<WebsiteTemplate, 'layoutType' | 'category'>) => String(t.layoutType || t.category || '').toLowerCase();
-/** Slots this design shows, as `${layout}.${slot}` keys. Custom sections and Data have none. */
+/** Slots this design shows, as `${layout}.${slot}` keys. Custom sections have none. */
 export function templateCopySlots(t: WebsiteTemplate): [string, TemplateCopySlot][] {
-  if (t.composition || t.id === 'tmpl-data-reseller') return [];
+  if (t.composition) return [];
   const layout = templateCopyLayout(t);
   return Object.entries(TEMPLATE_COPY[layout] || {}).map(([slot, def]) => [`${layout}.${slot}`, def]);
 }

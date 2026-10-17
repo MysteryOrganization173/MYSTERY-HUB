@@ -3,6 +3,7 @@ import { normalizeWebsiteColor, normalizeWebsitePalette, readableWebsiteColor, w
 import { SectionSiteRenderer } from '../components/website/SectionSiteRenderer.js';
 import { websiteContactTarget } from '../components/website/SiteContactDetails.js';
 import {websiteLayoutMode} from './websiteLayout.js';
+import {websiteTypePreset} from '../config/websiteTypography.js';
 /**
  * Shared Template & Site Rendering Utilities
  * Ensures Editor Preview, Template Preview, and Published Live Sites
@@ -19,9 +20,9 @@ import { PortfolioTemplateView } from '../components/website/templates/Portfolio
 import { TechAgencyTemplateView } from '../components/website/templates/TechAgencyTemplateView.js';
 import { HotelTemplateView } from '../components/website/templates/HotelTemplateView.js';
 import { EcommerceTemplateView } from '../components/website/templates/EcommerceTemplateView.js';
-import { DataResellerTemplateView } from '../components/website/templates/DataResellerTemplateView.js';
-import { GenericTemplateView } from '../components/website/templates/GenericTemplateView.js';
+import { DataResellerTemplateView, type ResellerStoreSummary } from '../components/website/templates/DataResellerTemplateView.js';
 import { DynamicTemplateRenderer } from '../components/website/DynamicTemplateRenderer.js';
+import { PersonalityTemplateView, personalityPreset } from '../components/website/templates/PersonalityTemplateView';
 import { WEBSITE_TEMPLATES } from '../data/templates.js';
 
 /**
@@ -95,21 +96,22 @@ export function renderTemplateLayout(
     isMobileView?: boolean;
     managedCheckout?: React.ReactNode;
     managedAvailability?: 'loading' | 'available' | 'empty' | 'error';
+    managedSummary?: ResellerStoreSummary;
   }
 ): React.ReactElement {
   const legacy = renderLegacyLayout(template, { ...options, onCtaClick: options?.onCtaClick || (template.siteContent && template.layoutType !== 'reseller' ? () => { window.location.assign(websiteContactTarget(template.siteContent)); } : undefined) });
   if (template.composition) return legacy;
   const variables = { '--website-primary':template.colorScheme?.primary, '--website-accent':template.accentColor, '--website-background':template.colorScheme?.background, '--website-text':template.colorScheme?.text, '--website-on-primary':websiteActionText(template.colorScheme?.primary || '#0f172a'), '--website-on-accent':websiteActionText(template.accentColor) } as React.CSSProperties;
-  return <WebsiteContrastBoundary style={variables}>{legacy}</WebsiteContrastBoundary>;
+  return <WebsiteContrastBoundary style={variables} typeface={websiteTypePreset(template)}>{legacy}</WebsiteContrastBoundary>;
 }
-function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: () => void; isMobileView?: boolean; managedCheckout?: React.ReactNode; managedAvailability?: 'loading' | 'available' | 'empty' | 'error' }): React.ReactElement {
+function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: () => void; isMobileView?: boolean; managedCheckout?: React.ReactNode; managedAvailability?: 'loading' | 'available' | 'empty' | 'error'; managedSummary?: ResellerStoreSummary }): React.ReactElement {
   if (template.composition) return <SectionSiteRenderer template={template} onCtaClick={options?.onCtaClick} managedCheckout={options?.managedCheckout} />;
   const layout = (template.layoutType || template.category || '').toLowerCase();
   const { onCtaClick, isMobileView } = options || {};
 
   switch (layout) {
     case 'reseller':
-      return <DataResellerTemplateView template={template} onCtaClick={onCtaClick} managedCheckout={options?.managedCheckout} managedAvailability={options?.managedAvailability} />;
+      return <DataResellerTemplateView template={template} onCtaClick={onCtaClick} managedCheckout={options?.managedCheckout} managedAvailability={options?.managedAvailability} managedSummary={options?.managedSummary} />;
     case 'restaurant':
       return <RestaurantTemplateView template={template} onCtaClick={onCtaClick} />;
     case 'construction':
@@ -128,7 +130,9 @@ function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: 
     case 'ecommerce':
     case 'retail':
       return <EcommerceTemplateView template={template} onCtaClick={onCtaClick} />;
-    default:
+    default: {
+      const preset = personalityPreset(layout);
+      if (preset) return <PersonalityTemplateView template={template} onCtaClick={onCtaClick} preset={preset} />;
       return (
         <DynamicTemplateRenderer
           template={template}
@@ -136,5 +140,6 @@ function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: 
           isMobileView={isMobileView}
         />
       );
+    }
   }
 }

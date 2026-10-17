@@ -6,7 +6,6 @@ import { SafeImage } from './SafeImage.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate, TemplateItem } from '../../types';
 import {
-  Sparkles,
   ArrowRight,
   CheckCircle2,
   Calendar,
@@ -156,7 +155,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
           className="px-3 sm:px-4 py-2 text-center text-xs tracking-wider uppercase font-sans flex items-center justify-center gap-2 text-white"
           style={{ backgroundColor: p.primary, color: websiteActionText(p.primary) }}
         >
-          <Sparkles className="w-3.5 h-3.5" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }} />
+          <MapPin className="w-3.5 h-3.5" aria-hidden="true" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }} />
           <span className="truncate">Weekend Live Jazz & Osu Night Market Grills · Reserve Early</span>
         </div>
 
@@ -442,7 +441,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
             </div>
           </div>
           <div className="border-t border-white/10 mt-6 pt-4 text-center text-slate-400 text-[10px]">
-            © 2026 {template.demoBusinessName}. Powered by Mystery Hub Sites Ghana.
+            © {new Date().getFullYear()} {template.demoBusinessName}
           </div>
         </footer>
       </div>
@@ -654,7 +653,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
             <SiteFooterContact template={template} className="text-xs" />
           </div>
           <div className="border-t border-slate-800 mt-6 pt-4 text-center text-slate-500 text-[10px]">
-            © 2026 {template.demoBusinessName}. Powered by Mystery Hub Sites Ghana.
+            © {new Date().getFullYear()} {template.demoBusinessName}
           </div>
         </footer>
       </div>
@@ -677,18 +676,18 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
         className="px-3 sm:px-6 py-2 text-center text-xs tracking-wider font-semibold text-white flex items-center justify-center gap-2"
         style={{ backgroundColor: p.primary, color: websiteActionText(p.primary) }}
       >
-        <Sparkles className="w-3.5 h-3.5" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }} />
+        <MapPin className="w-3.5 h-3.5" aria-hidden="true" style={{ color: readableWebsiteColor(p.secondary, [p.background,p.surface]) }} />
         <span className="truncate">
           {template.siteContent ? template.location || template.categoryLabel : layout === 'ecommerce' || layout === 'retail'
             ? 'Explore products and contact the business'
             : layout === 'hotel'
-            ? '🌴 Ada Foah Beachfront Eco Chalets Booking Open'
+            ? 'Ada Foah Beachfront Eco Chalets Booking Open'
             : layout === 'church'
             ? 'Worship, fellowship and community'
             : layout === 'agency'
             ? 'Digital services and enquiries'
             : layout === 'salon' || layout === 'beauty'
-            ? '✨ Luxury Hair & Barbering Sessions Now Booking in East Legon'
+            ? 'Luxury Hair & Barbering Sessions Now Booking in East Legon'
             : template.industry}
         </span>
       </div>
@@ -719,7 +718,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
             ) : layout === 'ecommerce' || layout === 'retail' ? (
               <ShoppingBag className="w-4 h-4 text-white" />
             ) : (
-              <Sparkles className="w-4 h-4 text-white" />
+              <span aria-hidden="true" className="text-xs font-black">{template.demoBusinessName.split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase()}</span>
             )}
           </div>
           <div>
@@ -941,7 +940,7 @@ export const DynamicTemplateRenderer: React.FC<DynamicTemplateRendererProps> = (
           <SiteFooterContact template={template} className="text-xs opacity-90" />
         </div>
         <div className="border-t border-white/10 mt-6 pt-4 text-center opacity-60 text-[10px]">
-          © 2026 {template.demoBusinessName}. Powered by Mystery Hub Sites Ghana.
+          © {new Date().getFullYear()} {template.demoBusinessName}
         </div>
       </footer>
     </div>

@@ -116,3 +116,20 @@
 .website-sheet-restore{border-radius:14px;border:1px solid rgba(0,195,101,.4);background:rgba(0,195,101,.08);padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5}
 .website-sheet-restore button{align-self:flex-start;min-height:44px;padding:0 14px;border-radius:12px;background:#00c365;color:#05140c;font-weight:800}
 [data-state="info"] .website-check-icon{background:#1b2730;color:#b8c6c0}
+
+/* V3 command centre: what needs the owner, then how the site is doing. */
+.website-attention{border:1px solid #1e2a33;border-radius:16px;padding:14px;background:#0d171f}
+.website-attention ul{margin-top:10px;display:grid;gap:8px}
+.website-attention li{display:grid;grid-template-columns:8px minmax(0,1fr);gap:4px 12px;align-items:start;padding:12px;border-radius:12px;background:#0a1218;border:1px solid #1a252d}
+.website-attention li>span{width:8px;height:8px;border-radius:50%;margin-top:6px;background:#38bdf8}
+.website-attention li[data-tone="warn"]>span{background:#fbbf24}
+.website-attention strong{display:block;font-size:14px}
+.website-attention p{font-size:13px;color:#94a3b8;margin-top:2px;line-height:1.45}
+.website-attention li>button{grid-column:2;justify-self:start;min-height:44px;margin-top:6px;padding:0 14px;border-radius:10px;font-size:13px;font-weight:700;background:#00c365;color:#04120b;transition:transform .15s ease,background-color .15s ease}
+.website-attention li>button:active{transform:scale(.97)}
+.website-attention li>button:focus-visible,.website-period button:focus-visible{outline:2px solid #00c365;outline-offset:2px}
+@media (min-width:640px){.website-attention li{grid-template-columns:8px minmax(0,1fr) auto;align-items:center}.website-attention li>span{margin-top:0}.website-attention li>button{grid-column:auto;margin-top:0}}
+.website-period{display:inline-flex;gap:4px;padding:4px;border-radius:12px;background:#0a1218;border:1px solid #1e2a33;max-width:100%;overflow-x:auto}
+.website-period button{min-height:40px;padding:0 12px;border-radius:9px;font-size:13px;font-weight:600;color:#94a3b8;white-space:nowrap}
+.website-period button[aria-pressed="true"]{background:#1b2a33;color:#fff}
+@media (prefers-reduced-motion:reduce){.website-attention li>button{transition:none}}

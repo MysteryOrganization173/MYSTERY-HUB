@@ -4,7 +4,7 @@ import {VisualEditContext} from './VisualEditMarkers';
 
 /** Visible site content that has no tap-to-edit field yet. Empty layout space is not included. */
 const CONTENT_SELECTOR = 'img,picture,svg,video,h1,h2,h3,h4,h5,h6,p,a,button,li,label,span,strong,em,small,blockquote,figure,input,select,textarea';
-export type VisualSelectHint = 'settings';
+export type VisualSelectHint = 'settings' | 'pricing';
 
 /**
  * Owner-only selection layer inside the draft frame. `reserveBottom` is the fraction of the frame
@@ -63,7 +63,8 @@ export function VisualSelectionSurface({targets, selected, onSelect, onOrder, fo
     if (content && root.current?.contains(content)) {
       content.setAttribute('data-visual-locked', '');
       setTimeout(() => content.removeAttribute('data-visual-locked'), 1400);
-      return onSelect(null, 'settings');
+      // Managed bundles and prices come from Bundles & Pricing, not the page content.
+      return onSelect(null, content.closest('#bundle-catalog') ? 'pricing' : 'settings');
     }
     onSelect(null);
   };
