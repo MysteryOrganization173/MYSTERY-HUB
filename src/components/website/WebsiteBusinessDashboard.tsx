@@ -1,6 +1,7 @@
 import './websiteBuilder.css';
 import {WebsiteBundlePricing} from './WebsiteBundlePricing';
 import {customerActivityLabel,activityDigest} from '../../utils/customerActivity';
+import {ownerAttention,type OwnerAttentionAction} from '../../utils/websiteOwnerAttention';
 import React,{useEffect,useRef,useState} from 'react';
 import type { WebsiteSiteRecord } from '../../types';
 import { websiteBusinessRequest } from '../../services/websiteBusinessApi';
@@ -8,7 +9,7 @@ import { formatGhs, parseGhs } from '../../../shared/money';
 
 const button='min-h-11 px-4 py-2 rounded-lg border border-slate-700 text-sm disabled:opacity-50';
 const field='w-full min-h-11 rounded-lg p-3 bg-slate-900 border border-slate-700';
-export function WebsiteBusinessDashboard({site,token,onEdit,onSettings,requestedTab,onTabChange,onPricingDirty,onPreview}:{site:WebsiteSiteRecord;token:string;onEdit:()=>void;onSettings:()=>void;requestedTab?:string;onTabChange?:(tab:string)=>void;onPricingDirty?:(dirty:boolean)=>void;onPreview?:()=>void}) {
+export function WebsiteBusinessDashboard({site,token,onEdit,onSettings,requestedTab,onTabChange,onPricingDirty,onPreview,onPublish,onShare}:{site:WebsiteSiteRecord;token:string;onEdit:()=>void;onSettings:()=>void;requestedTab?:string;onTabChange?:(tab:string)=>void;onPricingDirty?:(dirty:boolean)=>void;onPreview?:()=>void;onPublish?:()=>void;onShare?:()=>void}) {
   const reseller=site.template_id==='tmpl-data-reseller';
   const [tab,setTab]=useState('Overview'),[range,setRange]=useState('30'),[offset,setOffset]=useState(0),[data,setData]=useState<any>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
   useEffect(()=>{setTab('Overview');},[site.id,site.template_id]);
@@ -19,11 +20,16 @@ export function WebsiteBusinessDashboard({site,token,onEdit,onSettings,requested
   const [confirmed,setConfirmed]=useState(false),[requestId,setRequestId]=useState(()=>crypto.randomUUID());
   const refresh=async()=>{const expected=identity.current;const next=await websiteBusinessRequest(`websites/${site.id}/business?range=${range}&offset=${offset}`,token);if(identity.current===expected)setData(next);};
   useEffect(()=>{let live=true;setData(null);setError('');void refresh().catch(e=>{if(live)setError(e.message);});return()=>{live=false;};},[site.id,site.template_id,site.updated_at,token,range,offset]);
+  // Read-only: how many bundles customers can buy right now, from the owner's existing bundle catalogue.
+  const [sellable,setSellable]=useState<number|null>(null);
+  useEffect(()=>{if(!reseller){setSellable(null);return;}let live=true;void websiteBusinessRequest(`websites/${site.id}/bundles`,token).then((r:any)=>{if(live)setSellable((r?.products||[]).filter((p:any)=>p.eligible).length);}).catch(()=>{if(live)setSellable(null);});return()=>{live=false;};},[site.id,reseller,token,site.updated_at,tab==='Overview']);
   const action=async(work:()=>Promise<void>)=>{if(busy)return;setBusy(true);setError('');setNotice('');try{await work();await refresh();}catch(e:any){setError(e.message);}finally{setBusy(false);}};
   const tabs=['Overview',...(reseller||data?.capabilities?.hasStoreHistory||data?.capabilities?.hasStoreFundsOrWithdrawals||data?.earnings?.lifetimeMinor?['Orders',...(reseller?['Bundles & Pricing']:[]),'Store Earnings']:[]),'Analytics','Website','Settings'];
   const a=data?.analytics,e=data?.earnings;
   const summaryMetrics = reseller ? {Sales:formatGhs(a?.salesMinor||0),Orders:a?.paidOrders,'Store Earnings':formatGhs(e?.availableMinor||0),Visitors:a?.uniqueVisitors} : {Views:a?.views,Visitors:a?.uniqueVisitors,'Contact / WhatsApp actions':(a?.whatsappClicks||0)+(a?.callClicks||0)+(a?.emailClicks||0)};
   const navigate=(name:string)=>{setTab(name);onTabChange?.(name);};
+  const attention=data?ownerAttention({reseller,published:site.status==='published',content:site.content_json as any,sellableBundles:sellable,reconciliationRequired:!!e?.reconciliationRequired,views:a?.views??null}):[];
+  const act=(action:OwnerAttentionAction)=>{if(action==='edit')onEdit();else if(action==='pricing')navigate('Bundles & Pricing');else if(action==='earnings')navigate('Store Earnings');else if(action==='publish')(onPublish||onEdit)();else onShare?.();};
   return <section id="website-business-dashboard" aria-label="Website business dashboard" className="min-w-0 bg-[#0b131a] border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-5 text-left">
     <nav aria-label="Business dashboard areas" className="website-tabs">{tabs.map(name=><button key={name} aria-current={tab===name?'page':undefined} onClick={()=>navigate(name)}>{name}</button>)}</nav>
     <div className="flex justify-between gap-3 items-center"><h2 className="font-bold text-lg">{tab}</h2><button className={button} disabled={busy} onClick={()=>void action(async()=>{})}>{busy?'Refreshing…':'Refresh'}</button></div>
@@ -35,7 +41,8 @@ export function WebsiteBusinessDashboard({site,token,onEdit,onSettings,requested
       {tab==='Orders'&&!reseller&&<p className="text-sm text-slate-300 rounded-xl border border-slate-800 bg-slate-900/60 p-3">These orders are from when this website was a Data store. Your current design does not sell data, and these records are kept for your history.</p>}
       {tab==='Store Earnings'&&<p className="text-sm text-slate-300 rounded-xl border border-slate-800 bg-slate-900/60 p-3">Store Earnings cover your whole Mystery Hub account, not only this website.{!reseller?' Your current design does not sell data.':''}</p>}
       {['Overview','Analytics'].includes(tab)&&<>
-        <label className="inline-flex items-center gap-3 text-sm">Period<select aria-label="Analytics period" className={field} value={range} onChange={event=>setRange(event.target.value)}>{['7','30','90','all'].map(r=><option key={r} value={r}>{r==='all'?'All time':`Last ${r} days`}</option>)}</select></label>
+        {tab==='Overview'&&<div className="website-attention" aria-labelledby="website-attention-title"><h3 id="website-attention-title" className="font-semibold">{attention.length?'Needs your attention':'Everything looks good'}</h3>{attention.length?<ul>{attention.filter(item=>item.action!=='share'||onShare).map(item=><li key={item.id} data-tone={item.tone}><span aria-hidden="true"/><div className="min-w-0"><strong>{item.title}</strong><p>{item.detail}</p></div><button type="button" onClick={()=>act(item.action)}>{item.label}</button></li>)}</ul>:<p className="text-sm text-slate-400">Your website is live, reachable and {reseller?'selling bundles':'ready for customers'}. Keep sharing your link to bring in visitors.</p>}</div>}
+        <div role="group" aria-label="Analytics period" className="website-period">{['7','30','90','all'].map(r=><button key={r} type="button" aria-pressed={range===r} onClick={()=>setRange(r)}>{r==='all'?'All time':`${r} days`}</button>)}</div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{Object.entries(tab==='Overview'?summaryMetrics:{Views:a.views,'Unique visitors':a.uniqueVisitors,'WhatsApp clicks':a.whatsappClicks,'Contact clicks':a.callClicks+a.emailClicks,'Main button clicks':a.primaryCtaClicks,...(reseller?{'Checkout starts':a.checkoutStarts,'Paid orders':a.paidOrders,'Delivered orders':a.deliveredOrders,'Sales':formatGhs(a.salesMinor),'Available earnings':formatGhs(e.availableMinor),'Pending earnings':formatGhs(e.pendingMinor),'Orders / checkout starts':a.conversion===null?'—':`${a.conversion.toFixed(1)}%`}:{})}).map(([label,value])=><div key={label} className="border-b border-slate-800 py-3 min-w-0"><p className="text-xs text-slate-400">{label}</p><strong className="block mt-1 text-xl break-words">{String(value)}</strong></div>)}</div>
         {tab==='Analytics'&&<p className="text-xs text-slate-400">Visitors are anonymous browser identities. Repeat views in the same session are deduplicated for 24 hours. Sales and delivery come from verified order records. Conversion compares paid orders with observed checkout starts; missing analytics may affect this ratio.</p>}
         {tab==='Analytics'&&<div className="space-y-2"><h3 className="font-semibold">Daily observed views (UTC)</h3>{a.trend.length?a.trend.map((day:any)=><div key={day.day} className="flex items-center gap-3 text-sm"><span>{day.day}</span><progress max={Math.max(1,...a.trend.map((x:any)=>x.views))} value={day.views} className="min-w-0 flex-1"/><span>{day.views}</span></div>):<p className="text-slate-400">No visits yet in this period. Share your published website to reach customers.</p>}</div>}
