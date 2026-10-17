@@ -40,9 +40,9 @@ export interface OrderRecord {
   service_fee_minor?: number | null; // Service fee in pesewas (e.g. 20 for GH₵0.20)
   currency: 'GHS';
   status: OrderStatus;
-  payment_provider: 'paystack' | 'wallet';
+  payment_provider: 'paystack' | 'wallet' | 'complimentary' | 'admin_external';
   payment_reference: string;
-  payment_status: 'pending' | 'success' | 'failed' | 'cancelled' | 'expired';
+  payment_status: 'pending' | 'success' | 'failed' | 'cancelled' | 'expired' | 'not_required' | 'recorded';
   supplier_provider: string | null;
   supplier_order_id: string | null;
   supplier_response: string | null;
@@ -85,6 +85,7 @@ export type SafePublicOrderDetails = Pick<
   | 'paid_at'
   | 'delivered_at'
 > & {
+  payment_basis?: 'complimentary'|'operator_recorded';
   commercial_pricing?: {regularMinor:number;discountMinor:number;paidMinor:number};
   customer_resolution?: import('./orderResolution.js').CustomerResolution;
   amount_ghc: number;
@@ -179,6 +180,7 @@ export function toSafePublicOrder(order: OrderRecord): SafePublicOrderDetails {
 
   return {
     public_reference: order.public_reference,
+    ...(['complimentary','admin_external'].includes(order.payment_provider)?{payment_basis:order.payment_provider==='complimentary'?'complimentary' as const:'operator_recorded' as const}:{}),
     ...(order.resolution_json?.outcome ? {customer_resolution: order.resolution_json.stage==='resolved'?(order.resolution_json.outcome==='manual_fulfillment'?'manual_fulfillment' as const:order.resolution_json.outcome==='external_compensation'?'external_compensation' as const:'refund_confirmed' as const):order.resolution_json.stage==='refund_pending'?'refund_pending' as const:'review' as const} : ['refund_pending','failed','refunded','cancelled','expired'].includes(order.status)&&order.payment_status==='success'?{customer_resolution:'review' as const}:{}),
     manual_review: Boolean(order.manual_review),
     recipient_phone: maskOrderRecipient(order.recipient_phone),

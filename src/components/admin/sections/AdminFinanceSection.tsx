@@ -12,6 +12,9 @@ const METRIC_GROUPS:Array<{title:string;description:string;tone:AdminTone;items:
  {title:'What Mystery Hub currently owes customers',description:'Balances customers can spend or withdraw. These are obligations, not revenue.',tone:'warning',items:[
   ['walletLiabilityMinor','Customer wallet balances','Sum of every Mystery Wallet balance.'],
   ['availableEarnLiabilityMinor','Mystery Earn available to withdraw','Approved rewards not yet withdrawn, reserved or moved to a wallet.'],
+  ['storeEarningsLiabilityMinor','Store earnings available','Positive seller balances from the Store Earnings ledger, excluding reservations.'],
+  ['earnReconciliationShortfallMinor','Earn reversal shortfall','Separate reconciliation exposure. Never deducted from another customer’s available balance.'],
+  ['storeReconciliationShortfallMinor','Store reconciliation shortfall','Negative seller balances requiring review. Separate from positive liabilities.'],
   ['reservedWithdrawalsMinor','Reserved by open withdrawal requests','Waiting for review or approved and not yet marked paid.'],
  ]},
  {title:'Wallet money movement (all time)',description:'Ledger totals recorded by Mystery Hub.',tone:'neutral',items:[

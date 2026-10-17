@@ -1,4 +1,5 @@
 import React,{useEffect,useMemo,useState} from 'react';
+import {AdminCustomerChampions} from './AdminCustomerChampions';
 import {adminEarnRequest,type EarnOverview,type EarnReferrer,type EarnDetail,type EarnLedgerRow} from '../../../services/apiClient';
 import type {EarnPage} from '../../../../server/types/adminEarn';
 import {AdminEarnRules} from './AdminEarnRules';
@@ -32,6 +33,7 @@ function Ledger({data}:{data:EarnPage<EarnLedgerRow>}) {return <div className="s
   <p className="text-slate-400">Created {new Date(row.createdAt).toISOString()} · Approved {row.approvedAt?new Date(row.approvedAt).toISOString():'—'} · Reversed {row.reversedAt?new Date(row.reversedAt).toISOString():'—'}</p>
 </article>)}</div>;}
 export const AdminMysteryEarnSection:React.FC<{sessionToken:string;initialReferrerId?:string|null;onOpenCustomer:(id:string)=>void}>=({sessionToken,initialReferrerId,onOpenCustomer})=>{
+  const [championsOpen,setChampionsOpen]=useState(false);
   const [view,setView]=useState<'leaderboard'|'rules'|'ledger'>('leaderboard');const [period,setPeriod]=useState('30d');const [start,setStart]=useState('');const [end,setEnd]=useState('');
   const [overview,setOverview]=useState<EarnOverview|null>(null);const [board,setBoard]=useState<EarnPage<EarnReferrer>|null>(null);const [ledger,setLedger]=useState<EarnPage<EarnLedgerRow>|null>(null);
   const [search,setSearch]=useState('');const [sort,setSort]=useState('conversions');const [page,setPage]=useState(1);const [giveaway,setGiveaway]=useState(false);
@@ -63,18 +65,20 @@ export const AdminMysteryEarnSection:React.FC<{sessionToken:string;initialReferr
     {enabled:!detail.referrer.enabled,confirm:true},'PATCH');setConfirmStatus(false);setRefresh(n=>n+1);}catch(e){setDetailError(e instanceof Error?e.message:'Could not update profile.');}finally{setBusy(false);}};
   return <div className="space-y-5">
     <AdminPageHeader title="Mystery Earn" description="Direct referrals from link visit to purchase and reward. Server-derived figures, UTC periods." actions={<RefreshButton onClick={()=>setRefresh(n=>n+1)}/>}/>
+    <button className={earnButton} aria-expanded={championsOpen} onClick={()=>setChampionsOpen(v=>!v)}>{championsOpen?'Close Customer Champions':'Customer Champions · purchase giveaways'}</button>
+    {championsOpen&&<AdminCustomerChampions token={sessionToken}/>}
     <div className="flex flex-wrap items-end gap-3"><label className="text-xs">Period<select className={earnInput} value={period} onChange={e=>setPeriod(e.target.value)}><option value="today">Today</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="all">All time</option><option value="custom">Custom range</option></select></label>
       {period==='custom'&&<><label className="text-xs">Start date (UTC)<input className={earnInput} type="date" value={start} onChange={e=>setStart(e.target.value)}/></label><label className="text-xs">End date (inclusive UTC)<input className={earnInput} type="date" value={end} onChange={e=>setEnd(e.target.value)}/></label></>}
     </div>
     {!validRange&&<p className="text-amber-300 text-sm">Choose both custom dates to load the selected period.</p>}
     {overviewError&&<p role="alert" className="text-red-400 text-sm">Overview: {overviewError}</p>}{!overview&&!overviewError&&validRange&&<AdminLoading label="Loading referral metrics…"/>}{overview&&<><p className="text-sm text-slate-300"><strong className="text-white">{overview.lifetimeEnabledProfiles.toLocaleString()}</strong> active referral profiles of {overview.lifetimeProfiles.toLocaleString()} created (lifetime).</p><Metrics metrics={overview.metrics}/></>}
     <details className="text-xs text-slate-400"><summary className="cursor-pointer font-semibold text-slate-300">How these numbers are counted</summary><p className="mt-2">Conversions are paid/delivered purchases, classified using lifetime relationship + service history. Guest relationships require a stable attribution. Revenue excludes cancelled/refunded/failed orders. Rewards use ledger creation date and current status; expense is approved liability, not cash withdrawals. Gross margin excludes unknown costs and does not deduct rewards.</p></details>
-    <AdminTabs label="Mystery Earn views" value={view} onChange={setView} tabs={[{id:'leaderboard',label:'Leaderboard / Giveaway'},{id:'ledger',label:'Reward Ledger'},{id:'rules',label:'Reward Rules'}]}/>
+    <AdminTabs label="Mystery Earn views" value={view} onChange={setView} tabs={[{id:'leaderboard',label:'Referrer rankings'},{id:'ledger',label:'Reward Ledger'},{id:'rules',label:'Reward Rules'}]}/>
     {error&&<p role="alert" className="text-red-400 text-sm">{error}</p>}{notice&&<p role="status" className="text-[#00c365] text-sm">{notice}</p>}
     {view==='rules'?<AdminEarnRules sessionToken={sessionToken} refreshKey={refresh}/>:view==='leaderboard'?<div className="space-y-3">
       <div className="flex flex-wrap gap-3"><label className="flex-1 min-w-48 text-xs">Find referrer<input className={earnInput} maxLength={200} placeholder="Name, email, phone or referral code" value={search} onChange={e=>setSearch(e.target.value)}/></label>
         <label className="text-xs">Rank by<select className={earnInput} value={sort} onChange={e=>setSort(e.target.value)}><option value="conversions">Most qualifying conversions</option><option value="firstConversions">Most first-time conversions</option><option value="convertedCustomers">Most successful referred relationships</option><option value="deliveredRevenueMinor">Most referral revenue</option><option value="approvedRewardsMinor">Most approved rewards</option><option value="referredCustomers">Most people referred</option><option value="uniqueVisitors">Most unique visitors</option></select></label></div>
-      <div className="flex flex-wrap items-center gap-3"><button className={earnButton} onClick={()=>{setGiveaway(!giveaway);if(!giveaway){setExcludeDisabled(true);setExcludeSuspended(true);setExcludeZero(true);setSort('convertedCustomers');}}}>{giveaway?'Exit Giveaway Ranking':'Giveaway Ranking'}</button>
+      <div className="flex flex-wrap items-center gap-3"><button className={earnButton} onClick={()=>{setGiveaway(!giveaway);if(!giveaway){setExcludeDisabled(true);setExcludeSuspended(true);setExcludeZero(true);setSort('convertedCustomers');}}}>{giveaway?'Exit referrer shortlist':'Referrer shortlist'}</button>
         {giveaway&&<button className={earnButton} disabled={loading||!board?.items.length} onClick={()=>void copy()}>Copy shortlist (this page)</button>}
         <label className="text-xs min-h-10 flex items-center gap-2"><input type="checkbox" checked={excludeDisabled} onChange={e=>setExcludeDisabled(e.target.checked)}/>Exclude disabled accounts</label>
         <label className="text-xs min-h-10 flex items-center gap-2"><input type="checkbox" checked={excludeSuspended} onChange={e=>setExcludeSuspended(e.target.checked)}/>Exclude suspended profiles</label>

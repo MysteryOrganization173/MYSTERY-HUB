@@ -81,13 +81,14 @@ export function isSettledForRecovery(status?: string): boolean {
 /** Receipt record for an order found by public reference; the receipt keeps polling the server. */
 export function orderRecordFromLookup(order: import('../services/apiClient').LookupOrderResponse['order']): import('../types').OrderRecord {
   const status = order.status;
-  const presentation = dataOrderPresentation(status, order.manual_review, order.customer_resolution);
+  const presentation = dataOrderPresentation(status, order.manual_review, order.customer_resolution, order.payment_basis);
   return {
     id: order.public_reference,
     publicReference: order.public_reference,
     serverReference: order.public_reference,
     serverStatus: status,
     customerResolution: order.customer_resolution,
+    paymentBasis: order.payment_basis,
     serviceType: order.service_type,
     manualReview: order.manual_review,
     commercialPricing: order.commercial_pricing,

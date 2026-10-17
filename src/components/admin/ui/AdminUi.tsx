@@ -84,7 +84,7 @@ export function AdminPanel({ title, description, actions, children, tone = 'neut
 }
 
 /** A metric. Pass onClick only when the metric opens the place where the operator acts on it. */
-export function AdminStat({ label, value, hint, tone = 'neutral', onClick, actionLabel, icon }: { label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: AdminTone; onClick?: () => void; actionLabel?: string; icon?: React.ReactNode }) {
+export function AdminStat({ label, value, hint, tone = 'neutral', onClick, actionLabel, icon,compact=false }: { label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: AdminTone; onClick?: () => void; actionLabel?: string; icon?: React.ReactNode;compact?:boolean }) {
   const body = (
     <>
       <span className="flex items-center justify-between gap-2 text-sm text-slate-400">
@@ -92,8 +92,8 @@ export function AdminStat({ label, value, hint, tone = 'neutral', onClick, actio
         {icon}
       </span>
       <span className={`block text-2xl font-bold tabular-nums tracking-tight ${tone === 'neutral' ? 'text-white' : toneText[tone]}`}>{value}</span>
-      {hint && <span className="block text-xs leading-relaxed text-slate-500">{hint}</span>}
-      {onClick && <span className="inline-flex items-center gap-1 pt-1 text-xs font-semibold text-[#00c365]">{actionLabel || 'Open'}<ArrowUpRight className="h-3.5 w-3.5" aria-hidden /></span>}
+      {hint && <span className={`${compact?'sr-only sm:not-sr-only sm:block':'block'} text-xs leading-relaxed text-slate-500`}>{hint}</span>}
+      {onClick && <span className={`${compact?'hidden sm:inline-flex':'inline-flex'} items-center gap-1 pt-1 text-xs font-semibold text-[#00c365]`}>{actionLabel || 'Open'}<ArrowUpRight className="h-3.5 w-3.5" aria-hidden /></span>}
     </>
   );
   const cls = `min-w-0 space-y-1.5 rounded-2xl border bg-[#0d151b] p-4 text-left ${toneBorder[tone]}`;

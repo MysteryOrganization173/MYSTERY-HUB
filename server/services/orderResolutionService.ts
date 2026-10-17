@@ -7,6 +7,7 @@ import {FinanceService} from './financeService.js';
 import {PaystackServerService} from './paystackService.js';
 import {toAdminOrderDetails} from '../types/orders.js';
 import type {ManualResolutionOutcome,OrderResolution} from '../types/orderResolution.js';
+import {manualClosureBlock} from './manualClosureEligibility.js';
 const allowed=['begin_review','supplier_evidence','verify_external','refund_wallet','resolve_manual'];
 const manualOutcomes:ManualResolutionOutcome[]=['manual_fulfillment','external_compensation','supplier_failed_pending_remedy'];
 function evidenceText(value:unknown,label:string,min=5,max=1000){
@@ -15,7 +16,7 @@ function evidenceText(value:unknown,label:string,min=5,max=1000){
  return text;
 }
 export class OrderResolutionService {
- static async details(reference:string){const order=await OrdersStore.findOrder(reference);if(!order)throw new FinanceError('Order not found.',404);return {order:toAdminOrderDetails(order),history:await OrderResolutionStore.history(order.id)};}
+ static async details(reference:string){const order=await OrdersStore.findOrder(reference);if(!order)throw new FinanceError('Order not found.',404);return {order:toAdminOrderDetails(order),manualClosureBlock:manualClosureBlock(order),history:await OrderResolutionStore.history(order.id)};}
  static async action(reference:string,adminId:string,input:Record<string,unknown>){
    for(const key of Object.keys(input))if(!['action','confirmed','requestId','expectedUpdatedAt','expectedVersion','note','evidenceStatus','refundId','manualOutcome','evidence','method','reference'].includes(key))throw new FinanceError('Unexpected resolution field.');
    const action=String(input.action||'');if(!allowed.includes(action)||input.confirmed!==true)throw new FinanceError('Explicitly confirm an available resolution action.');
@@ -62,11 +63,7 @@ export class OrderResolutionService {
        // A linked/attempted customer refund cannot be replaced with an operator attestation.
        if(resolution.outcome||resolution.refundId||resolution.lastAttemptAt||resolution.providerStatus||resolution.stage==='refund_pending'||order.status==='refunded'||order.delivered_at)throw new FinanceError('Reconcile the existing customer refund or delivery evidence first; manual resolution cannot replace it.',409);
        if(manual.outcome!=='supplier_failed_pending_remedy'){
-         if(order.failure_reason==='supplier_submission_uncertain'||resolution.supplierEvidence?.status==='uncertain')throw new FinanceError('Supplier acceptance is uncertain. Reconcile it before closing this customer case.',409);
-         if(order.supplier_response){
-           let status='';try{const raw=JSON.parse(order.supplier_response);status=String(raw?.data?.status||raw?.status||'').toLowerCase();}catch{}
-           if(!['failed','refund_pending','refunded','rejected','cancelled','expired'].includes(status))throw new FinanceError('Supplier evidence is active, completed or unverifiable. Reconcile it before manual closure.',409);
-         }else if(order.supplier_order_id&&!resolution.supplierEvidence)throw new FinanceError('Document a confirmed supplier failure before manual closure.',409);
+         const blocked=manualClosureBlock(order);if(blocked)throw new FinanceError(blocked,409);
        }
        resolution.manual={...manual,at:now};
        resolution.stage=manual.outcome==='supplier_failed_pending_remedy'?'under_review':'resolved';

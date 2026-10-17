@@ -7,6 +7,7 @@ export function validateOrderPayment(
   payment: Pick<PaystackVerifyResult, 'isVerified' | 'status' | 'amountPesewas' | 'currency' | 'reference' | 'isSimulated' | 'metadata'>
 ): string | null {
   if (order.payment_provider === 'wallet') return 'wallet_payment_not_external';
+  if (order.payment_provider !== 'paystack') return 'order_payment_not_provider_verified';
   if (!payment.isVerified || payment.status !== 'success') return 'payment_not_successful';
   if (payment.reference !== order.payment_reference) return 'payment_reference_mismatch';
   if (typeof payment.currency !== 'string' || payment.currency.toUpperCase() !== order.currency) {
