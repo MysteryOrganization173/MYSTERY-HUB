@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import {AdminBusinessSummary} from './AdminBusinessSummary';
 import { AdminEarnPulse } from './AdminEarnPulse';
 import { AdminOverviewMetrics, getAdminSystemOnServer } from '../../../services/apiClient';
 import { loadAdminOverview } from '../adminSignals';
@@ -83,7 +84,8 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
         actions={<><Freshness at={loadedAt} /><RefreshButton onClick={() => void fetchOverview(true)} busy={isRefreshing} /></>}
       />
 
-      {/* 1. Attention queue */}
+      <AdminBusinessSummary token={sessionToken} onOpenOrder={ref=>onNavigateTab('orders','ref/'+ref)}/>
+      {/* Attention remains available directly after the primary business figures. */}
       <section className="space-y-3" aria-labelledby="attention-heading">
         <SectionHeading><span id="attention-heading">Needs your attention</span></SectionHeading>
         {attention.length ? (
@@ -109,17 +111,6 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
         {sideErrors.length > 0 && <p className="text-xs text-amber-300">Could not check: {sideErrors.join(', ')}. Those areas may still need attention.</p>}
       </section>
 
-      {/* 2. Today */}
-      <section className="space-y-3" aria-labelledby="today-heading">
-        <SectionHeading action={<span className="text-xs text-slate-500">Orders created since midnight, Ghana time (GMT)</span>}><span id="today-heading">Today</span></SectionHeading>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <AdminStat label="Customer payments" value={ghsMajor(today.revenueGhc)} tone="accent" hint={`${today.ordersCount} paid order${today.ordersCount === 1 ? '' : 's'}. Money received, not profit; includes orders later refunded.`} />
-          <AdminStat label="Delivered" value={today.deliveredCount} tone="success" hint="Today's orders confirmed delivered." onClick={() => onNavigateTab('orders', 'delivered')} actionLabel="View delivered" />
-          <AdminStat label="In progress" value={today.processingCount} tone="info" hint="Queued, submitted or processing with the supplier." onClick={() => onNavigateTab('orders', 'processing')} actionLabel="View with supplier" />
-          <AdminStat label="Needs attention" value={today.attentionCount} tone={today.attentionCount ? 'warning' : 'neutral'} hint="Today's orders that are failed, flagged or awaiting a refund." onClick={() => onNavigateTab('orders', 'needs_attention')} actionLabel="Review" />
-        </div>
-      </section>
-
       {/* 3. Health */}
       <section className="space-y-3" aria-labelledby="health-heading">
         <SectionHeading action={<button type="button" onClick={() => onNavigateTab('system')} className="text-xs font-semibold text-[#00c365]">System Health</button>}><span id="health-heading">Payments and fulfilment health</span></SectionHeading>
@@ -139,39 +130,6 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
           </AdminPanel>
         </div>
       </section>
-
-      {/* 4. Last 7 days */}
-      <section className="space-y-3" aria-labelledby="week-heading">
-        <SectionHeading><span id="week-heading">Last 7 days</span></SectionHeading>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <AdminStat label="Customer payments" value={ghsMajor(last7Days.revenueGhc)} hint="Paid orders created in the last 7 days." />
-          <AdminStat label="Paid orders" value={last7Days.ordersCount} hint="All services." onClick={() => onNavigateTab('orders')} actionLabel="View orders" />
-          <AdminStat label="Data bundle orders" value={last7Days.dataOrdersCount} hint="Paid, standard data." />
-          <AdminStat label="Airtime orders" value={last7Days.airtimeOrdersCount} hint="Paid airtime top-ups." />
-        </div>
-      </section>
-
-      {/* 5. Money context: all time */}
-      <AdminPanel title="All-time order money" description="Paid orders since launch. Wallet balances, Earn liabilities and withdrawals live in the Financial Control Room."
-        actions={<AdminButton onClick={() => onNavigateTab('finance')}>Open Finance</AdminButton>}>
-        <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
-          <DefinitionList items={[
-            ['Paid orders', allTime.ordersCount.toLocaleString()],
-            ['Customer payments received', ghsMajor(allTime.revenueGhc)],
-            ['Supplier cost recorded', ghsMajor(allTime.supplierCostGhc)],
-            [<span key="m">Payments minus recorded cost <span className="text-slate-500">(estimate)</span></span>, recordedMarginGhc !== null ? ghsMajor(recordedMarginGhc) : 'Not enough cost data'],
-          ]} />
-          <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4 text-sm leading-relaxed text-slate-300">
-            <p className="font-semibold text-amber-200">Read the estimate carefully</p>
-            <p className="mt-1">It is not profit. It still counts payments that were later refunded, and orders with no recorded supplier cost (for example marketplace items) are treated as if they cost nothing. Rewards, fees and wallet liabilities are not deducted.</p>
-          </div>
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <AdminStat label="Customer accounts" value={allTime.totalCustomers.toLocaleString()} onClick={() => onNavigateTab('customers')} actionLabel="Customers" />
-          <AdminStat label="Launch requests" value={allTime.totalWaitlist.toLocaleString()} hint={`${allTime.pendingWaitlist} pending`} onClick={() => onNavigateTab('waitlist')} actionLabel="Open" />
-          <AdminStat label="Products needing review" value={marketplace?.needsReview ?? '—'} hint="Missing information before publishing." onClick={() => onNavigateTab('marketplace')} actionLabel="Marketplace" />
-        </div>
-      </AdminPanel>
 
       <AdminEarnPulse sessionToken={sessionToken} onOpen={() => onNavigateTab('earn')} />
     </div>

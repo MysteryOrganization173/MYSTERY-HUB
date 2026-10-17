@@ -505,6 +505,7 @@ export interface AdminWaitlistResponse {
 }
 
 export interface AdminCustomerProfile extends SafeUserProfile {
+  lastObservedActivityAt?:string|null;
   orderCount: number;
   totalSpentGhc: number;
 }
@@ -741,7 +742,7 @@ export async function getAdminUsersOnServer(
 export async function getAdminUserDetailsOnServer(
   token: string,
   userId: string
-): Promise<{ success: boolean; user: SafeUserProfile; orders: AdminOrderDetails[]; waitlist: WaitlistRecord[]; earn: import('../../server/types/adminEarn').EarnCustomerSummary | null }> {
+): Promise<{ success: boolean; user: AdminCustomerProfile; orders: AdminOrderDetails[]; waitlist: WaitlistRecord[]; earn: import('../../server/types/adminEarn').EarnCustomerSummary | null }> {
   const url = `${API_BASE_URL}/api/admin/users/${encodeURIComponent(userId)}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },

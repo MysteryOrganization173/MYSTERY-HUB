@@ -55,8 +55,8 @@ export function AdminCustomerSecurity({ user, token, adminId, onUpdate, onStatus
   const [action, setAction] = useState<Action | null>(null);
   return <section className="space-y-3 rounded-xl border border-slate-700 bg-slate-900/60 p-4">
     <h4 className="font-bold text-white">Security &amp; Access</h4>
-    <p className="break-words">User ID: {user.id} · Status: {user.status}</p>
-    <p>Last Login: {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never'}</p>
+    <p className="break-words">User ID: {user.id} · Account access: {user.status==='active'?'Enabled':'Disabled'}</p>
+    <p>Last recorded login: {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('en-GH',{timeZone:'Africa/Accra'}) : 'Login not recorded'}</p>
     <p>Password Changed At: {user.passwordChangedAt ? new Date(user.passwordChangedAt).toLocaleString() : 'Not recorded'}</p>
     <p>Must Change Password: {user.mustChangePassword ? 'Yes' : 'No'}</p>
     {user.role === 'customer' && user.id !== adminId && <div className="flex flex-wrap gap-2"><button className={accountButton} onClick={() => setAction('reset')}>Reset Password</button><button className={accountButton} onClick={() => setAction('revoke')}>Revoke Sessions</button><button className={accountButton} onClick={() => setAction('edit')}>Edit Account Details</button><button className={`${accountButton} !text-amber-200`} onClick={onStatusToggle}>{user.status === 'active' ? 'Disable Account' : 'Enable Account'}</button></div>}

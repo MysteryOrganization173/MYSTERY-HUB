@@ -10,6 +10,7 @@ import type { AdminTone } from '../components/admin/ui/AdminUi';
 export interface AdminOrderCaseInput {
   status: string;
   payment_status: string;
+  payment_provider?: string;
   service_type?: string | null;
   supplier_order_id?: string | null;
   supplier_response?: string | null;
@@ -72,6 +73,13 @@ export function describeOrderCase(order: AdminOrderCaseInput): OrderCase {
   const resolution = order.resolution;
   const paid = order.payment_status === 'success';
 
+  if(['complimentary','admin_external'].includes(order.payment_provider||'')){
+    const source=order.payment_provider==='complimentary'?'Complimentary order':'External payment recorded by admin';
+    if(order.status==='delivered')return make('delivered',`${source} · Delivered`,'success','The supplier confirmed delivery. This is not a Paystack payment.','Inspect the assisted authorization for its cost and source evidence.');
+    if(order.manual_review||['failed','refund_pending'].includes(order.status))return make('supplier_uncertain',`${source} · Needs reconciliation`,'warning','No provider-verified payment is implied. Check original supplier acceptance before another order.','Refresh an existing supplier identifier or reconcile with supplier support. Do not resend blindly.');
+    return make(order.supplier_order_id?'with_supplier':'queued_for_supplier',source,'info','This assisted order has a separate immutable authorization. No Wallet debit, referral reward or Paystack success was created.','Track its real supplier identifier.');
+  }
+
   if (resolution?.stage === 'resolved') {
     if (resolution.outcome === 'manual_fulfillment') return make('resolved_manual_fulfilment', 'Resolved · fulfilled outside Mystery Hub', 'info', 'An operator recorded that the customer received the service through another legitimate channel, with evidence.', 'No action needed. The original payment and supplier facts are kept unchanged for audit.');
     if (resolution.outcome === 'external_compensation') return make('resolved_compensated', 'Resolved · compensated externally', 'info', 'An operator recorded an external remedy (for example a MoMo transfer) with its reference.', 'No action needed. This is operator-attested, not a verified provider refund.');
@@ -101,7 +109,7 @@ export function describeOrderCase(order: AdminOrderCaseInput): OrderCase {
   if (order.status === 'paid') return make('paid_not_dispatched', 'Paid · not dispatched to supplier', flagged ? 'warning' : 'info', 'Payment is confirmed but the order has not been sent to the supplier yet.', flagged ? 'It is flagged. Check whether it was fulfilled another way before anything is dispatched.' : 'Automatic dispatch normally picks this up within moments.');
 
   if (order.status === 'queued') {
-    if (!order.supplier_order_id) return make('queued_for_supplier', 'Paid · held before supplier', flagged ? 'warning' : 'info', 'Payment is confirmed. The order is held in the queue and has no supplier reference yet (for example while auto-dispatch is off or another MTN order for the same number is active).', flagged ? 'It is flagged. If you fulfilled it outside the system, add a note. Closing it as fulfilled needs a new server action that is not built yet.' : 'Check System Health for dispatch status.');
+    if (!order.supplier_order_id) return make('queued_for_supplier', 'Paid · supplier acceptance not recorded', flagged ? 'warning' : 'info', 'Payment is confirmed and dispatch was claimed, but no supplier identifier was recorded. This does not prove that the supplier rejected the request.', 'Inspect recovery eligibility and supplier evidence. Never resend solely because the identifier is missing.');
     return make('with_supplier', 'With supplier · awaiting delivery', 'info', 'The supplier holds this order and Mystery Hub is waiting for delivery confirmation.', 'Refresh supplier status if it has been waiting unusually long.');
   }
 
@@ -118,9 +126,9 @@ export function orderTimeline(order: AdminOrderCaseInput & { updated_at?: string
   const dispatched = Boolean(order.supplier_order_id || order.submitted_at);
   const steps: OrderTimelineStep[] = [
     { label: 'Order created', at: order.created_at, state: 'done' },
-    { label: paid ? 'Payment confirmed' : 'Payment', at: order.paid_at, state: paid ? 'done' : 'current' },
+    { label: order.payment_provider==='complimentary'?'Complimentary authorization':order.payment_provider==='admin_external'?'External collection recorded':paid ? 'Payment confirmed' : 'Payment', at: order.paid_at||(['complimentary','admin_external'].includes(order.payment_provider||'')?order.created_at:null), state: paid||['complimentary','admin_external'].includes(order.payment_provider||'') ? 'done' : 'current' },
   ];
-  if (order.service_type !== 'marketplace') steps.push({ label: dispatched ? 'Sent to supplier' : 'Not sent to supplier', at: order.submitted_at, state: dispatched ? 'done' : paid && !resolved && !delivered ? 'current' : 'pending' });
+  if (order.service_type !== 'marketplace') steps.push({ label: dispatched ? 'Sent to supplier' : 'Supplier acceptance not recorded', at: order.submitted_at, state: dispatched ? 'done' : paid && !resolved && !delivered ? 'current' : 'pending' });
   steps.push({ label: delivered ? 'Delivered' : failed ? 'Not delivered' : 'Delivery', at: order.delivered_at, state: delivered ? 'done' : failed ? 'failed' : dispatched && paid && !resolved ? 'current' : 'pending' });
   if (failed || resolved) steps.push({ label: resolved ? kase.label.replace('Resolved · ', 'Resolved: ') : 'Customer remedy', at: resolved ? order.resolution?.updatedAt ?? null : null, state: resolved ? 'done' : 'current' });
   return steps;
@@ -132,8 +140,8 @@ export const ORDER_LENSES = [
   { id: 'needs_attention', label: 'Needs attention', params: { status: 'needs_attention' } },
   { id: 'awaiting_payment', label: 'Payment not confirmed', params: { paymentStatus: 'pending', status: 'all' } },
   { id: 'paid', label: 'Paid · not dispatched', params: { status: 'paid' } },
-  { id: 'queued', label: 'Held before supplier', params: { status: 'queued' } },
-  { id: 'processing', label: 'With supplier', params: { status: 'processing' } },
+  { id: 'queued', label: 'Claimed / queued', params: { status: 'queued' } },
+  { id: 'processing', label: 'With supplier', params: { status: 'with_supplier' } },
   { id: 'delivered', label: 'Delivered', params: { status: 'delivered' } },
   { id: 'refund_pending', label: 'Failed · refund pending', params: { status: 'refund_pending' } },
   { id: 'failed', label: 'Failed', params: { status: 'failed' } },

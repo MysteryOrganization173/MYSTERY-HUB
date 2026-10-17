@@ -1,4 +1,6 @@
 import { OrderResolutionService } from '../services/orderResolutionService.js';
+import {adminOperationsRouter} from './adminOperationsApi.js';
+import {adminPeriod,financialReport,reportingOrders} from '../services/adminReporting.js';
 import { FinanceError } from '../db/financeStore.js';
 import { adminCommercialRouter } from './commercialApi.js';
 import { AfaStore } from '../db/afaStore.js';
@@ -43,6 +45,7 @@ adminRouter.use((_req,res,next)=>{res.setHeader('Cache-Control','no-store');next
 
 // Apply strict admin authentication and authorization to all admin routes
 adminRouter.use(requireAdmin);
+adminRouter.use('/operations',adminOperationsRouter);
 adminRouter.use('/finance', adminFinanceRouter);
 adminRouter.use('/commercial',adminCommercialRouter);
 adminRouter.use('/website-builder', adminWebsiteRouter);
@@ -94,11 +97,15 @@ adminRouter.get('/overview', async (req: Request, res: Response) => {
     // Passive workspace reads must not initiate financial/supplier recovery. Explicit and scheduled recovery remain unchanged.
     if (req.query.readOnly !== 'true') await FulfilmentService.reconcileActiveSupplierOrders(isForce);
 
-    const [orderMetrics, customerCount, waitlistStats] = await Promise.all([
+    const [orderMetrics, customerCount, waitlistStats,reportOrders] = await Promise.all([
       OrdersStore.getOverviewMetrics(),
       AuthStore.countCustomers(),
       WaitlistStore.getWaitlistGroupedStats(),
+      reportingOrders(),
     ]);
+    const allMoney=financialReport(reportOrders,adminPeriod({period:'all'}));
+    const todayMoney=financialReport(reportOrders,adminPeriod({period:'today'}));
+    const weekMoney=financialReport(reportOrders,adminPeriod({period:'last7'}));
 
     // Query supplier balance safely if available
     let supplierBalanceGhc: number | null = null;
@@ -121,10 +128,13 @@ adminRouter.get('/overview', async (req: Request, res: Response) => {
     res.json({
       success: true,
       metrics: {
-        today: orderMetrics.today,
-        last7Days: orderMetrics.last7Days,
+        today: {...orderMetrics.today,revenueMinor:todayMoney.externalReceiptsMinor,revenueGhc:todayMoney.externalReceiptsMinor/100},
+        last7Days: {...orderMetrics.last7Days,revenueMinor:weekMoney.externalReceiptsMinor,revenueGhc:weekMoney.externalReceiptsMinor/100},
         allTime: {
           ...orderMetrics.allTime,
+          revenueMinor:allMoney.externalReceiptsMinor,revenueGhc:allMoney.externalReceiptsMinor/100,
+          supplierCostMinor:allMoney.recordedSupplierCostMinor,supplierCostGhc:allMoney.recordedSupplierCostMinor/100,
+          estimatedGrossMarginGhc:allMoney.grossMarginMinor/100,
           totalCustomers: customerCount,
           totalWaitlist: waitlistStats.totalAll,
           pendingWaitlist: waitlistStats.totalPending,
@@ -330,19 +340,15 @@ adminRouter.patch('/orders/:reference/status', async (req: Request, res: Respons
 
     const targetStatus = marketplaceStatus || status;
     if(targetStatus==='refunded'&&order.payment_status==='success'){res.status(409).json({error:'Use the order-linked customer refund workflow. A status change is not proof of a refund.'});return;}
+    if(order.service_type==='afa'){res.status(400).json({error:'AFA completion requires a confirmed supplier registered status. Use supplier refresh or the audited customer-resolution workflow.'});return;}
+    if(order.service_type!=='marketplace'){res.status(409).json({error:'Supplier-backed orders require supplier reconciliation or the audited customer-resolution workflow. A manual status is not delivery evidence.'});return;}
     if (!targetStatus) {
       res.status(400).json({ error: 'Status is required.' });
       return;
     }
 
-    if (order.service_type === 'afa' && (marketplaceStatus || !['refund_pending','refunded','cancelled','failed'].includes(targetStatus))) { res.status(400).json({error:'AFA completion requires a confirmed supplier registered status. Use supplier refresh.'}); return; }
     let updated: OrderRecord | null = null;
-    if (order.service_type === 'marketplace' || marketplaceStatus) {
-      updated = await OrdersStore.updateMarketplaceStatus(order.id, targetStatus, adminNote);
-    } else {
-      updated = await OrdersStore.updateOrderStatus(order.id, targetStatus, adminNote, undefined, undefined,
-        { explicitReversal: ['refund_pending', 'refunded', 'cancelled', 'failed'].includes(targetStatus) });
-    }
+    updated = await OrdersStore.updateMarketplaceStatus(order.id, targetStatus, adminNote);
 
     if (!updated) {
       res.status(404).json({ error: 'Failed to update order status.' });
@@ -617,11 +623,13 @@ adminRouter.get('/users', async (req: Request, res: Response) => {
 
     const userIds = result.users.map((u) => u.id);
     const aggregates = await OrdersStore.getUserOrderAggregates(userIds);
+    const activity=await AuthStore.adminSessionActivity(userIds);
 
     const safeUsers = result.users.map((u) => {
       const agg = aggregates.get(u.id) || { orderCount: 0, totalSpentMinor: 0 };
       return {
         ...toSafeUserProfile(u),
+        lastObservedActivityAt:activity.get(u.id)||null,
         orderCount: agg.orderCount,
         totalSpentGhc: Number((agg.totalSpentMinor / 100).toFixed(2)),
       };
@@ -656,15 +664,16 @@ adminRouter.get('/users/:id', async (req: Request, res: Response) => {
       return;
     }
 
-    const [orders, waitlist, earn] = await Promise.all([
-      OrdersStore.findOrdersByUserId(userId),
+    const [orders, waitlist, earn,aggregates,activity] = await Promise.all([
+      OrdersStore.findAdminOrdersByUserId(userId),
       WaitlistStore.findUserWaitlists(userId),
       AdminEarnStore.customerSummary(userId),
+      OrdersStore.getUserOrderAggregates([userId]),AuthStore.adminSessionActivity([userId]),
     ]);
 
     res.json({
       success: true,
-      user: toSafeUserProfile(user),
+      user: {...toSafeUserProfile(user),lastObservedActivityAt:activity.get(userId)||null,orderCount:aggregates.get(userId)?.orderCount||0,totalSpentGhc:(aggregates.get(userId)?.totalSpentMinor||0)/100},
       orders: orders.map(toAdminOrderDetails),
       waitlist,
       earn,

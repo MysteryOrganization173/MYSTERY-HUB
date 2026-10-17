@@ -1,4 +1,6 @@
 import { ORDER_RESOLUTION_SCHEMA } from './orderResolutionSchema.js';
+import {ADMIN_OPERATIONS_SCHEMA} from './adminOperationsSchema.js';
+import {ADMIN_ASSISTED_SCHEMA} from './adminAssistedSchema.js';
 import { WEBSITE_PUBLISHING_SCHEMA } from './websitePublishingSchema.js';
 import { WEBSITE_CHECKPOINT_SCHEMA } from './websiteCheckpointSchema.js';
 import { COMMERCIAL_SCHEMA } from './commercialSchema.js';
@@ -592,6 +594,8 @@ export async function initDatabase(): Promise<void> {
     await client.query(FINANCE_SCHEMA);
     await client.query(WEBSITE_BUSINESS_SCHEMA);
     await client.query(COMMERCIAL_SCHEMA);
+    await client.query(ADMIN_OPERATIONS_SCHEMA);
+    await client.query(ADMIN_ASSISTED_SCHEMA);
 
     // 3. INDEX CREATION (Non-critical failures logged as warnings)
     const indexStatements = [

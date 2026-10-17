@@ -72,7 +72,7 @@ export const OrderStatusModal: React.FC = () => {
             mappedStatus = 'placed';
           } else if (serverStatus === 'refund_pending' || serverStatus === 'refunded') {
             mappedStatus = 'failed';
-            statusMessage = dataOrderPresentation(serverStatus,res.order.manual_review,res.order.customer_resolution).next;
+            statusMessage = dataOrderPresentation(serverStatus,res.order.manual_review,res.order.customer_resolution,res.order.payment_basis).next;
           } else if (serverStatus === 'failed') {
             mappedStatus = 'failed';
             statusMessage = res.order.service_type === 'afa' ? 'Registration needs support review. Do not start another registration until support confirms it is safe.' : 'The mobile network was unable to complete the delivery. Please contact support or retry.';
@@ -80,18 +80,20 @@ export const OrderStatusModal: React.FC = () => {
             mappedStatus = 'verifying';
           }
 
-          if(res.order.customer_resolution)statusMessage=dataOrderPresentation(serverStatus,res.order.manual_review,res.order.customer_resolution).next;
+          if(res.order.customer_resolution)statusMessage=dataOrderPresentation(serverStatus,res.order.manual_review,res.order.customer_resolution,res.order.payment_basis).next;
           if (
             mappedStatus !== activeOrder?.status ||
             serverStatus !== activeOrder?.serverStatus ||
             res.order.manual_review !== activeOrder?.manualReview ||
             res.order.customer_resolution !== activeOrder?.customerResolution ||
+            res.order.payment_basis !== activeOrder?.paymentBasis ||
             statusMessage !== activeOrder?.statusMessage
           ) {
             updateOrderStatus(activeOrder!.id, mappedStatus, {
               serverStatus,
               manualReview: res.order.manual_review,
               customerResolution:res.order.customer_resolution,
+              paymentBasis:res.order.payment_basis,
               statusMessage,
             });
           }
@@ -124,7 +126,7 @@ export const OrderStatusModal: React.FC = () => {
   const currentNetwork = GHANA_NETWORKS[activeOrder.network];
   const displayRef = activeOrder.publicReference || activeOrder.id;
   const isDataOrder = Boolean(activeOrder.customerResolution) || activeOrder.serviceType === 'data' || (!activeOrder.serviceType && !/^(airtime|instant|marketplace)/.test(activeOrder.bundle.id));
-  const dataView = dataOrderPresentation(activeOrder.serverStatus, activeOrder.manualReview,activeOrder.customerResolution);
+  const dataView = dataOrderPresentation(activeOrder.serverStatus, activeOrder.manualReview,activeOrder.customerResolution,activeOrder.paymentBasis);
   const isRefundIssue = activeOrder.serverStatus === 'refund_pending' || activeOrder.serverStatus === 'refunded';
 
   const handleCopyOrderId = () => {
@@ -238,7 +240,7 @@ export const OrderStatusModal: React.FC = () => {
   // Data journey steps come only from verified server state; a stopped order marks where it stopped.
   const stopped = Boolean(activeOrder.manualReview) || ['failed', 'refund_pending', 'refunded', 'cancelled', 'expired'].includes(activeOrder.serverStatus || '') || Boolean(activeOrder.customerResolution && !dataView.delivered);
   const journey: { label: string; detail: string; complete: boolean }[] = [
-    { label: 'Payment confirmed', detail: dataView.paymentConfirmed ? 'Confirmed by Paystack' : 'Waiting for Paystack to confirm', complete: dataView.paymentConfirmed },
+    { label: dataView.paymentLabel, detail: activeOrder.paymentBasis === 'complimentary' ? 'No customer payment required' : activeOrder.paymentBasis === 'operator_recorded' ? 'Collection recorded by support' : dataView.paymentConfirmed ? 'Confirmed by Paystack' : 'Waiting for Paystack to confirm', complete: dataView.paymentStageComplete },
     { label: 'Processing', detail: dataView.processing || dataView.delivered ? 'Sent to the network' : 'Queued after payment', complete: dataView.delivered },
     { label: 'Delivered', detail: dataView.delivered ? 'Check the recipient’s balance' : 'Timing depends on the network', complete: dataView.delivered },
   ];
@@ -355,7 +357,7 @@ export const OrderStatusModal: React.FC = () => {
                 <div className="font-semibold text-white break-words">{productName}</div>
               </div>
               <div className="text-right shrink-0">
-                <div className="text-xs text-slate-400">{isDataOrder&&!dataView.paymentConfirmed?'Order Total':'Amount Paid'}</div>
+                <div className="text-xs text-slate-400">{activeOrder.paymentBasis==='complimentary'?'Complimentary':activeOrder.paymentBasis==='operator_recorded'?'Recorded amount':isDataOrder&&!dataView.paymentConfirmed?'Order Total':'Amount Paid'}</div>
                 <div className="font-bold text-white tabular-nums">GH₵{activeOrder.amountGhc.toFixed(2)}</div>
               </div>
             </div>
@@ -385,7 +387,7 @@ export const OrderStatusModal: React.FC = () => {
                     {activeOrder.paymentMethod==='wallet'?'Wallet':'Payment'} Ref: {activeOrder.paymentReference}
                   </div>
                   <span className={`text-[10px] px-2 py-0.5 rounded font-medium shrink-0 border ${isDataOrder&&!dataView.paymentConfirmed?'text-amber-300 bg-amber-500/10 border-amber-500/20':'text-emerald-400/90 bg-emerald-500/10 border-emerald-500/20'}`}>
-                    {isDataOrder ? dataView.paymentConfirmed?'Confirmed':'Awaiting confirmation' : 'Verified'}
+                    {activeOrder.paymentBasis ? dataView.paymentLabel : isDataOrder ? dataView.paymentConfirmed?'Confirmed':'Awaiting confirmation' : 'Verified'}
                   </span>
                 </div>
               </details>

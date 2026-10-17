@@ -9,6 +9,7 @@ import {
 } from '../../../src/utils/checkoutRecovery';
 import {CompactBundleRow} from '../../../src/components/data/CompactBundleRow';
 import {DATA_BUNDLES} from '../../../src/data/bundles';
+import {dataOrderPresentation} from '../../../src/utils/dataPurchasePresentation';
 
 const source = (path: string) => readFileSync(path, 'utf8');
 const checkout = source('src/components/checkout/CheckoutModal.tsx');
@@ -86,7 +87,19 @@ test('checkout keeps the pay action pinned and server pricing authoritative', ()
 
 test('receipt timeline only advances from server-derived presentation', () => {
   const journey = status.slice(status.indexOf('const journey'), status.indexOf('const currentStep'));
-  assert.match(journey, /complete: dataView.paymentConfirmed/);
+  assert.match(journey, /complete: dataView.paymentStageComplete/);
+  // Ordinary receipts still wait for server payment state. Assisted receipts
+  // complete a differently labelled source step, never a Paystack payment.
+  for (const state of ['pending_payment', 'failed', 'cancelled', 'expired']) {
+    assert.equal(dataOrderPresentation(state).paymentStageComplete, false);
+  }
+  assert.equal(dataOrderPresentation('paid').paymentStageComplete, true);
+  for (const basis of ['complimentary', 'operator_recorded'] as const) {
+    const view = dataOrderPresentation('queued', false, undefined, basis);
+    assert.equal(view.paymentConfirmed, false);
+    assert.equal(view.paymentStageComplete, true);
+    assert.notEqual(view.paymentLabel, 'Payment confirmed');
+  }
   assert.equal((journey.match(/complete: dataView.delivered/g) || []).length, 2);
   assert.doesNotMatch(journey, /activeOrder.status ===/);
   assert.match(status, /last checked/);
@@ -112,4 +125,18 @@ test('lookup receipts keep public masking and map server states', () => {
   assert.equal(map('delivered').status, 'delivered');
   assert.equal(map('refund_pending').status, 'failed');
   assert.equal(map('queued').buyerRecipientVisible, undefined);
+});
+
+test('lookup receipts preserve assisted payment basis without inventing a checkout payment', () => {
+  const base = {public_reference: 'MH-ASSISTED', recipient_phone: '024 *** 4567', network: 'mtn' as const, product_name_snapshot: 'MTN 5GB', bundle_size_snapshot: '5GB', amount: 0, amount_ghc: 0, currency: 'GHS' as const, created_at: '2026-10-15T12:00:00Z', paid_at: null, delivered_at: null, status: 'processing' as const};
+  for (const basis of ['complimentary', 'operator_recorded'] as const) {
+    const record = orderRecordFromLookup({...base, payment_basis: basis});
+    assert.equal(record.paymentBasis, basis);
+    assert.equal(record.buyerRecipientVisible, undefined);
+    assert.match(record.recipientPhone, /\*/);
+    assert.equal(dataOrderPresentation(record.serverStatus, record.manualReview, record.customerResolution, record.paymentBasis).paymentConfirmed, false);
+  }
+  const ordinary = orderRecordFromLookup(base);
+  assert.equal(ordinary.paymentBasis, undefined);
+  assert.equal(dataOrderPresentation(ordinary.serverStatus).paymentConfirmed, true);
 });

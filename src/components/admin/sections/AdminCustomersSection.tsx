@@ -1,4 +1,5 @@
 import { SecurityDialog } from '../../auth/SecurityDialog';
+import {AdminGuestHistory} from './AdminGuestHistory';
 import { AdminCustomerSecurity } from './AdminCustomerSecurity';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { earnMoney } from './AdminEarnUi';
@@ -64,14 +65,15 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [earnSummary, setEarnSummary] = useState<EarnCustomerSummary | null>(null);
   const detailRequest = useRef(0);
-  useEffect(() => () => { detailRequest.current++; }, []);
+  const listRequest = useRef(0);
+  useEffect(() => () => { detailRequest.current++;listRequest.current++; }, []);
   useEffect(() => {
     if (!initialUserId) return;
     const request = ++detailRequest.current;
     let active = true; setIsLoadingDetails(true); setEarnSummary(null); setUserOrders([]); setUserWaitlists([]);
     getAdminUserDetailsOnServer(sessionToken, initialUserId).then(res => {
       if (!active || request !== detailRequest.current) return;
-      setSelectedUser({ ...res.user, orderCount: 0, totalSpentGhc: 0 });
+      setSelectedUser(res.user);
       setUserOrders(res.orders); setUserWaitlists(res.waitlist); setEarnSummary(res.earn);
     }).catch(err => { if (active && request === detailRequest.current) setError(err.message); }).finally(() => { if (active && request === detailRequest.current) setIsLoadingDetails(false); });
     return () => { active = false; };
@@ -82,6 +84,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
 
   const fetchUsers = useCallback(async () => {
+    const request=++listRequest.current;
     setIsSearching(true);
     setError(null);
 
@@ -94,14 +97,13 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
         limit: pageSize,
       });
 
-      if (res.success) {
+      if (res.success&&request===listRequest.current) {
         setUsersData(res);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to retrieve registered customer accounts.');
+      if(request===listRequest.current)setError(err instanceof Error ? err.message : 'Failed to retrieve registered customer accounts.');
     } finally {
-      setIsLoading(false);
-      setIsSearching(false);
+      if(request===listRequest.current){setIsLoading(false);setIsSearching(false);}
     }
   }, [sessionToken, searchTerm, roleFilter, statusFilter, currentPage]);
 
@@ -160,7 +162,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white sm:text-[1.7rem]">Customer Accounts</h1>
           <p className="max-w-2xl text-sm leading-relaxed text-slate-400">
-            Real registered customer profiles, lifetime purchase volume, and account access management.
+            Registered accounts only. Linked orders use account ownership; guest purchases are never assigned by name or phone similarity. Enabled means allowed to sign in, not online. Spending counts verified, delivered purchases excluding refunds.
           </p>
         </div>
 
@@ -182,6 +184,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
         </div>
       )}
 
+      <AdminGuestHistory token={sessionToken}/>
       {/* Search & Filter Bar */}
       <div className="p-4 rounded-2xl bg-[#0f171d] border border-slate-800/90 space-y-3">
         <div className="relative">
@@ -226,7 +229,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
               className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 focus:border-[#00c365] focus:outline-none"
             >
               <option value="">All Statuses</option>
-              <option value="active">Active</option>
+              <option value="active">Enabled</option>
               <option value="disabled">Disabled</option>
             </select>
           </div>
@@ -262,10 +265,10 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
                   <th className="py-3 px-4">Contact Info</th>
                   <th className="py-3 px-4">Role</th>
                   <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Orders</th>
-                  <th className="py-3 px-4 text-right">Lifetime Spent</th>
+                  <th className="py-3 px-4 text-right">Linked orders</th>
+                  <th className="py-3 px-4 text-right">Completed spending</th>
                   <th className="py-3 px-4">Registered</th>
-                  <th className="py-3 px-4">Last Active</th>
+                  <th className="py-3 px-4">Last login / observed activity</th>
                   <th className="py-3 px-4 text-center">Controls</th>
                 </tr>
               </thead>
@@ -314,8 +317,8 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
                       <td className="py-3 px-4">
                         {isActive ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            <span>Active</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 " />
+                            <span>Enabled</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/30">
@@ -339,7 +342,8 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
                       <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">
                         {u.lastLoginAt
                           ? new Date(u.lastLoginAt).toLocaleDateString([], { month: 'short', day: 'numeric' })
-                          : 'Never'}
+                          : 'Login not recorded'}
+                        <span className="block text-slate-500">{u.lastObservedActivityAt ? new Date(u.lastObservedActivityAt).toLocaleString('en-GH',{timeZone:'Africa/Accra'}) : 'Session activity not retained'}</span>
                       </td>
 
                       <td className="py-3 px-4 text-center">
@@ -393,10 +397,9 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
               return (
                 <div
                   key={u.id}
-                  onClick={() => openUserDetails(u)}
                   className="p-4 rounded-2xl bg-[#0f171d] border border-slate-800/90 active:bg-slate-900 transition-colors space-y-2.5 cursor-pointer"
                 >
-                  <div className="flex items-center justify-between">
+                  <button type="button" aria-label={`View customer ${u.name}`} onClick={() => openUserDetails(u)} className="flex min-h-11 w-full items-center justify-between text-left">
                     <div>
                       <h4 className="font-bold text-white text-xs flex items-center gap-1.5">
                         <span>{u.name}</span>
@@ -417,13 +420,13 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
                       </span>
                       <span className="block text-[10px] text-slate-500">{u.orderCount} orders</span>
                     </div>
-                  </div>
+                  </button>
 
                   <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 text-xs">
                     <div className="flex items-center gap-1.5">
                       {isActive ? (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                          Active
+                          Enabled
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/30">
@@ -496,7 +499,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
                   <span>{selectedUser.name}</span>
                   {selectedUser.status === 'active' ? (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                      Active
+                      Enabled
                     </span>
                   ) : (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/30">
@@ -539,6 +542,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
               </div>
 
               <AdminCustomerSecurity key={selectedUser.id} user={selectedUser} token={sessionToken} adminId={currentAdminId} onStatusToggle={() => setStatusTargetUser({ id: selectedUser.id, name: selectedUser.name, currentStatus: selectedUser.status })} onUpdate={profile => { setSelectedUser(prev => prev ? { ...prev, ...profile } : null); void fetchUsers(); }} />
+              <div className="space-y-1 text-slate-400"><p>Last recorded login: {selectedUser.lastLoginAt?new Date(selectedUser.lastLoginAt).toLocaleString('en-GH',{timeZone:'Africa/Accra'}):'Login not recorded'}</p><p>Last observed authenticated activity: {selectedUser.lastObservedActivityAt?new Date(selectedUser.lastObservedActivityAt).toLocaleString('en-GH',{timeZone:'Africa/Accra'}):'Session activity not retained'}</p><p>Enabled means the account can sign in. These timestamps do not indicate online presence.</p></div>
               {/* Order History */}
               <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
                 <h4 className="font-bold text-white">Mystery Earn</h4>
