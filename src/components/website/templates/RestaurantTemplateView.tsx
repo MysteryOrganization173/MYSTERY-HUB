@@ -1,6 +1,6 @@
 import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
-import {useVisualEditMarkers, useTemplateCopy} from '../editor/VisualEditMarkers';
+import {useVisualEditMarkers, useIsVisualEditing, useTemplateCopy} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
@@ -27,6 +27,7 @@ interface TemplateViewProps {
 
 export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
   const edit = useVisualEditMarkers();
+  const editing = useIsVisualEditing();
   const copy = useTemplateCopy(template);
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [selectedPartySize, setSelectedPartySize] = useState<number>(2);
@@ -51,11 +52,13 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
   return (
     <div className="bg-[var(--website-background,#fcf9f5)] text-[#1c1917] font-serif min-h-full">
-      {/* Editorial Announcement Bar */}
-      <div className="bg-[var(--website-primary,#7a1c28)] text-[var(--website-background,#fcf9f5)] px-4 py-2 text-center text-xs tracking-wider uppercase font-sans flex items-center justify-center gap-2">
-        <Sparkles className="w-3.5 h-3.5 text-[var(--website-accent,#c99a45)]" />
-        <span {...edit("content:location")}>{template.location}</span>
-      </div>
+      {/* A slim location ribbon; published sites omit it until the owner adds a location. */}
+      {(template.location || editing) && (
+        <div className="bg-[var(--website-primary,#7a1c28)] text-[var(--website-background,#fcf9f5)] px-4 py-2 text-center text-xs tracking-wider uppercase font-sans flex items-center justify-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 text-[var(--website-accent,#c99a45)]" />
+          <span {...edit("content:location")}>{template.location}</span>
+        </div>
+      )}
 
       {/* Restaurant Navigation */}
       <nav className="bg-[var(--website-background,#fcf9f5)]/95 backdrop-blur-md border-b border-[#f3ece2] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30 font-sans">

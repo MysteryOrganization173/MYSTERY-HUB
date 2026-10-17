@@ -18,7 +18,7 @@ export class WebsiteCheckpointStore {
     return (await db.query('SELECT * FROM mysteryhub_builder_private.website_draft_checkpoints WHERE site_id=$1 AND user_id=$2 ORDER BY created_at DESC,id DESC',[siteId,userId])).rows.map(c=>({...c,created_at:new Date(c.created_at).toISOString()}));
   }
   static async capture<T>(site:WebsiteSiteRecord,reason:WebsiteDraftCheckpoint['reason'],action:()=>Promise<T>):Promise<T> {
-    if((await this.forSite(site.id,site.user_id)).length>=WEBSITE_CHECKPOINT_LIMIT)throw new WebsiteOperationError('Draft recovery history is full. Review saved checkpoints before another design change. No content was changed.',409);
+    if((await this.forSite(site.id,site.user_id)).length>=WEBSITE_CHECKPOINT_LIMIT)throw new WebsiteOperationError('Draft recovery history is full. Review saved checkpoints before another design change. No content was changed.',409,'HISTORY_FULL');
     const row:WebsiteDraftCheckpoint={id:randomUUID(),site_id:site.id,user_id:site.user_id,template_id:site.template_id,source_revision:site.updated_at,reason,created_at:new Date().toISOString(),document:structuredClone({name:site.name,content:site.content_json,settings:site.settings_json})};
     if(Buffer.byteLength(JSON.stringify(row.document),'utf8')>500000)throw new WebsiteOperationError('This draft exceeds the recovery size limit. No content was changed.',409);
     const db=websiteDatabase();

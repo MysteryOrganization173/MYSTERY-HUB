@@ -73,3 +73,22 @@ Native checks cover exact additive SQL twice and after populated history, privat
 Final engineering evidence (15 October 2026): native PostgreSQL 17.6 **8/8 passed**; focused Builder contracts/business/publishing/managed preview **139/139 passed**, plus visual editor/migration/SQL-boundary focused run **96/96 passed** before the final additional disabled-section case. The final full isolated run covers that case and all latest source changes: **1,850 total; 1,842 passed; 3 inherited failures; 5 skipped**. Compared with the verified unchanged-main baseline (1,818 total; 1,811 passed; 3 failed; 4 skipped), there are 31 additional passing tests and one additional opt-in PostgreSQL test skipped by default. That PostgreSQL test was also run separately and passed all seven subchecks plus its parent (eight reported passes). No new unresolved failure remains.
 
 The inherited failures are the obsolete Direct SIM card expectation, the stale websiteBuilderV1 test-file/template expectation, and the existing websiteFreeV1 schema-mirror assertion. Main's existing release evidence independently reproduces the same three. The new checkpoint SQL mirror has its own passing normalized comparison and native SQL execution. TypeScript, production build and diff-check pass; existing Vite configuration/chunk-size warnings remain. No dependencies were added. Native tests used only new local synthetic data; no public site was changed and no provider request was performed. Production backend-role permissions and the final Claude owner UI remain release gates, not completed production checks.
+
+## Release train (17 October 2026)
+
+- Merged with main. The only conflict was `schema.sql`, where the marketplace assets block and the draft-recovery block were both kept.
+- **Native PostgreSQL 16** ran on a disposable loopback cluster as a non-superuser, non-bypass role.
+  - `websiteB1Postgres.test.ts`: 8/8 passed.
+  - Full `initDatabase()` ran twice on an empty database without errors.
+  - It also ran on a database first initialised by main's code (the upgrade path), with existing tables and rows kept.
+- **The schema can fail without taking the backend down.** If the deployment role cannot create `mysteryhub_builder_private`:
+  - Startup logs a CRITICAL line and continues, so orders and payments stay online.
+  - Template, layout and restore actions then fail closed, and the draft is unchanged. This was proven against a role with no CREATE on the database.
+- The full recovery history now returns `code: "HISTORY_FULL"` with a 409.
+- **Owner-site polish:**
+  - The hotel, restaurant and salon location ribbons are omitted on published sites when the location is empty. The editor still shows them as tap targets.
+  - Designed-site menus hide in-page links whose section isn't on the page, such as the salon's "Our Stylists".
+  - The dashboard Overview shows a five-row activity digest with repeats collapsed, plus "See all activity". Analytics keeps the full list.
+- **Deploy order:** the backend first, then the frontend.
+  - A frontend served before the backend fails closed: B1 actions get "unexpected response" and write nothing.
+  - But a new website created in that window would be named after the template's demo business.

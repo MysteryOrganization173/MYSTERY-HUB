@@ -125,7 +125,7 @@ test('history is bounded; explicit removal frees a slot, never automatic evictio
   let site=(await WebsiteStore.createSite('owner',{template_id:'tmpl-buka-bistro',name:'Owner'})).site;
   for(let n=0;n<WEBSITE_CHECKPOINT_LIMIT;n++)site=await WebsiteStore.transitionLayout(site.id,'owner',n%2?'template':'sections',site.updated_at);
   const checkpoints=await WebsiteCheckpointStore.forSite(site.id,'owner');assert.equal(checkpoints.length,WEBSITE_CHECKPOINT_LIMIT);
-  await assert.rejects(()=>WebsiteStore.transitionLayout(site.id,'owner','sections',site.updated_at),/history is full/);assert.deepEqual(await WebsiteStore.findSiteById(site.id),site);
+  await assert.rejects(()=>WebsiteStore.transitionLayout(site.id,'owner','sections',site.updated_at),(error:any)=>/history is full/.test(error.message)&&error.code==='HISTORY_FULL'&&error.status===409);assert.deepEqual(await WebsiteStore.findSiteById(site.id),site);
   assert.equal((await api(`/${site.id}/checkpoints/${checkpoints[0].id}`,'DELETE',{expectedUpdatedAt:site.updated_at,confirmed:true})).status,200);
   assert.equal((await WebsiteCheckpointStore.forSite(site.id,'owner')).length,WEBSITE_CHECKPOINT_LIMIT-1);
 });

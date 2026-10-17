@@ -39,5 +39,12 @@ export function WebsiteContrastBoundary({children,style}:{children:React.ReactNo
     const observer=new MutationObserver(schedule);observer.observe(scope,{childList:true,subtree:true});window.addEventListener('resize',schedule);
     return()=>{observer.disconnect();window.removeEventListener('resize',schedule);cancelAnimationFrame(frame);restore();};
   },[children,style]);
+  useLayoutEffect(()=>{
+    // Designed menus link to fixed sections (e.g. a salon's "Our Stylists"). Hide a link while its section isn't on the page.
+    const scope=root.current;if(!scope)return;
+    const sync=()=>{for(const link of scope.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')){const id=link.getAttribute('href')!.slice(1);if(!id)continue;const missing=!scope.querySelector(`[id="${CSS.escape(id)}"]`);if(link.hidden!==missing)link.hidden=missing;}};
+    sync();const observer=new MutationObserver(sync);observer.observe(scope,{childList:true,subtree:true});
+    return()=>observer.disconnect();
+  },[children]);
   return <div ref={root} className="website-presentation" style={style}>{children}</div>;
 }

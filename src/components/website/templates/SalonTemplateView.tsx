@@ -1,6 +1,6 @@
 import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
-import {useVisualEditMarkers, useTemplateCopy} from '../editor/VisualEditMarkers';
+import {useVisualEditMarkers, useIsVisualEditing, useTemplateCopy} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
@@ -26,6 +26,7 @@ interface TemplateViewProps {
 
 export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
   const edit = useVisualEditMarkers();
+  const editing = useIsVisualEditing();
   const copy = useTemplateCopy(template);
   const [selectedStylist, setSelectedStylist] = useState<string>('Abena - Braiding Artisan');
   const [selectedService, setSelectedService] = useState<string>('Goddess Knotless Box Braids (Mid-Back)');
@@ -42,11 +43,13 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
 
   return (
     <div className="bg-[var(--website-background,#fff9fa)] text-[#2e1020] font-sans min-h-full">
-      {/* Top Rose Gold Announcement */}
-      <div className="bg-[var(--website-accent,#ec4899)] text-white text-xs px-4 py-2 text-center tracking-wider font-semibold flex items-center justify-center gap-2">
-        <Sparkles className="w-3.5 h-3.5" />
-        <span {...edit("content:location")}>{template.location}</span>
-      </div>
+      {/* A slim location ribbon; published sites omit it until the owner adds a location. */}
+      {(template.location || editing) && (
+        <div className="bg-[var(--website-accent,#ec4899)] text-white text-xs px-4 py-2 text-center tracking-wider font-semibold flex items-center justify-center gap-2">
+          <Sparkles className="w-3.5 h-3.5" />
+          <span {...edit("content:location")}>{template.location}</span>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="bg-white/95 backdrop-blur-md border-b border-[#fae3ec] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">

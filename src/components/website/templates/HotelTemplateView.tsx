@@ -1,6 +1,6 @@
 import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
-import {useVisualEditMarkers, useTemplateCopy} from '../editor/VisualEditMarkers';
+import {useVisualEditMarkers, useIsVisualEditing, useTemplateCopy} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
@@ -26,6 +26,7 @@ interface TemplateViewProps {
 
 export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
   const edit = useVisualEditMarkers();
+  const editing = useIsVisualEditing();
   const copy = useTemplateCopy(template);
   const [booked, setBooked] = useState<boolean>(false);
   const suites = template.items || [];
@@ -39,11 +40,13 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
 
   return (
     <div className="bg-[var(--website-background,#f8f6f0)] text-[#192b23] font-sans min-h-full">
-      {/* Top Banner */}
-      <div className="bg-[var(--website-primary,#132e23)] text-[var(--website-background,#f8f6f0)] text-xs px-4 py-2 text-center tracking-wider flex items-center justify-center gap-2">
-        <Palmtree className="w-3.5 h-3.5 text-[var(--website-accent,#10b981)]" />
-        <span {...edit("content:location")}>{template.location}</span>
-      </div>
+      {/* A slim location ribbon; published sites omit it until the owner adds a location. */}
+      {(template.location || editing) && (
+        <div className="bg-[var(--website-primary,#132e23)] text-[var(--website-background,#f8f6f0)] text-xs px-4 py-2 text-center tracking-wider flex items-center justify-center gap-2">
+          <Palmtree className="w-3.5 h-3.5 text-[var(--website-accent,#10b981)]" />
+          <span {...edit("content:location")}>{template.location}</span>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="bg-white/95 backdrop-blur-md border-b border-[#e8e5dc] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">

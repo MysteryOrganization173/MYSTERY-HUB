@@ -14,6 +14,11 @@ export function useVisualEditMarkers() {
   };
 }
 
+/** True only inside the owner's editor, where empty slots render as tap prompts. */
+export function useIsVisualEditing() {
+  return useContext(VisualEditContext).length > 0;
+}
+
 /** A designed template's headings and labels: the wording to show and, in the editor, its tap target. */
 export function useTemplateCopy(template: WebsiteTemplate) {
   const edit = useVisualEditMarkers(), layout = templateCopyLayout(template);
