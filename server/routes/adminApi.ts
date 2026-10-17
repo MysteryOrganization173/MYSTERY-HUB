@@ -339,8 +339,9 @@ adminRouter.patch('/orders/:reference/status', async (req: Request, res: Respons
     }
 
     const targetStatus = marketplaceStatus || status;
-    if(order.service_type!=='marketplace'){res.status(409).json({error:'Supplier-backed orders require supplier reconciliation or the audited customer-resolution workflow. A manual status is not delivery evidence.'});return;}
     if(targetStatus==='refunded'&&order.payment_status==='success'){res.status(409).json({error:'Use the order-linked customer refund workflow. A status change is not proof of a refund.'});return;}
+    if(order.service_type==='afa'){res.status(400).json({error:'AFA completion requires a confirmed supplier registered status. Use supplier refresh or the audited customer-resolution workflow.'});return;}
+    if(order.service_type!=='marketplace'){res.status(409).json({error:'Supplier-backed orders require supplier reconciliation or the audited customer-resolution workflow. A manual status is not delivery evidence.'});return;}
     if (!targetStatus) {
       res.status(400).json({ error: 'Status is required.' });
       return;
@@ -664,7 +665,7 @@ adminRouter.get('/users/:id', async (req: Request, res: Response) => {
     }
 
     const [orders, waitlist, earn,aggregates,activity] = await Promise.all([
-      OrdersStore.findOrdersByUserId(userId),
+      OrdersStore.findAdminOrdersByUserId(userId),
       WaitlistStore.findUserWaitlists(userId),
       AdminEarnStore.customerSummary(userId),
       OrdersStore.getUserOrderAggregates([userId]),AuthStore.adminSessionActivity([userId]),

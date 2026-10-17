@@ -18,6 +18,7 @@ beforeEach(()=>{
   sql=sql.replace(/\s+/g,' ').trim();statements.push({sql,args});if(fail&&sql.includes(fail))throw Error('Mock financial write failure');
   if(sql.startsWith('INSERT INTO finance_accounts'))return {rows:[]};
   if(sql.startsWith('SELECT * FROM finance_accounts'))return {rows:[{...state.account}]};
+  if(sql==='SELECT wallet_minor::float8 AS wallet_minor,restricted FROM finance_accounts WHERE user_id=$1')return {rows:[{...state.account}]};
   if(sql.startsWith('UPDATE finance_accounts SET wallet_minor')){state.account.wallet_minor=args[0];return {rows:[]};}
   if(sql.startsWith('UPDATE finance_accounts SET restricted')){state.account.restricted=sql.includes('TRUE');return {rows:[]};}
   if(sql.startsWith('SELECT * FROM finance_operations'))return {rows:structuredClone(state.operations.filter((x:any)=>sql.includes('WHERE id=')?x.id===args[0]:x.user_id===args[0]))};
@@ -33,7 +34,7 @@ beforeEach(()=>{
   if(sql.startsWith('INSERT INTO admin_audit_log')){state.audit.push(args);return {rows:[{id:args[0]}]};}
   if(sql.startsWith('INSERT INTO orders')){const columns=sql.match(/INSERT INTO orders \((.*?)\) VALUES/)![1].split(',').map(x=>x.trim());const row=Object.fromEntries(columns.map((key,index)=>[key,args[index]]));state.orders.push(row);return {rows:[row]};}
   if(sql.startsWith('SELECT * FROM orders'))return {rows:structuredClone(state.orders.filter((x:any)=>[x.id,x.payment_reference,x.public_reference].includes(args[0])))};
-  if(['BEGIN','COMMIT','ROLLBACK'].includes(sql))return {rows:[]};
+  if(['BEGIN','BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY','COMMIT','ROLLBACK'].includes(sql))return {rows:[]};
   throw Error(`Unexpected mocked SQL: ${sql}`);
  };
  pg.Pool.prototype.query=query as any;
@@ -59,4 +60,4 @@ const wallet=()=>FinanceService.adjustment('admin','owner',{...request(),directi
 test('PostgreSQL purchase commits debit, ledger and truthful Wallet order together',async()=>{await wallet();statements=[];await FinanceService.payOrder(purchase(),randomUUID());assert.equal(state.account.wallet_minor,400);assert.equal(state.orders[0].payment_provider,'wallet');assert.equal(state.orders[0].payment_status,'success');assert.ok(statements.findIndex(s=>s.sql.startsWith('INSERT INTO orders'))<statements.findIndex(s=>s.sql==='COMMIT'));assert.equal(statements.filter(s=>s.sql==='BEGIN').length,1);});
 test('PostgreSQL order insert failure rolls back the purchase debit and operation',async()=>{await wallet();fail='INSERT INTO orders';await assert.rejects(()=>FinanceService.payOrder(purchase(),randomUUID()));assert.equal(state.account.wallet_minor,1000);assert.equal(state.operations.filter((x:any)=>x.kind==='purchase').length,0);assert.equal(state.ledger.length,1);assert.equal(state.orders.length,0);});
 test('AFA creation callback shares financial transaction and failure rolls back order and debit',async()=>{await wallet();await assert.rejects(()=>FinanceService.payOrder({...purchase(),service_type:'afa'},randomUUID(),async(tx,order)=>{assert.ok(tx.client);await OrdersStore.createOrder(order,tx.client);throw Error('Synthetic encrypted registration insert failure');}));assert.equal(state.account.wallet_minor,1000);assert.equal(state.orders.length,0);assert.equal(state.ledger.length,1);});
-test('PostgreSQL financial summary reuses transaction client for qualified visitor reads',async()=>{await wallet();pg.Pool.prototype.query=(async()=>{throw Error('Secondary connection prohibited');}) as any;const summary=await FinanceService.summary('owner');assert.equal(summary.walletMinor,1000);assert.equal(summary.achievements[1].progress,0);});
+test('PostgreSQL financial summary reuses one read-only transaction client without creating accounts or taking write locks',async()=>{await wallet();statements=[];pg.Pool.prototype.query=(async()=>{throw Error('Secondary connection prohibited');}) as any;const summary=await FinanceService.summary('owner');assert.equal(summary.walletMinor,1000);assert.equal(summary.achievements[1].progress,0);assert.equal(statements[0].sql,'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');assert.ok(statements.every(s=>! /^(INSERT|UPDATE|DELETE)|FOR UPDATE|pg_advisory/i.test(s.sql)));assert.equal(statements.at(-1)?.sql,'COMMIT');});

@@ -92,6 +92,7 @@ export class FinanceTx {
     return entry;
   }
   async audit(adminId:string,action:string,entityId:string,metadata:Record<string,unknown>) {
+    if(this.readOnly)throw new FinanceError('Financial inspection cannot write an audit event.',409);
     await AdminAuditStore.record({adminUserId:adminId,action,entityType:'finance',entityId,metadata},this.client);
   }
   async config(id:string) {return this.client ? (await this.client.query('SELECT value FROM finance_config WHERE id=$1',[id])).rows[0]?.value : this.state!.config[id];}

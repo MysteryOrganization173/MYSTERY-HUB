@@ -109,7 +109,7 @@ export function describeOrderCase(order: AdminOrderCaseInput): OrderCase {
   if (order.status === 'paid') return make('paid_not_dispatched', 'Paid · not dispatched to supplier', flagged ? 'warning' : 'info', 'Payment is confirmed but the order has not been sent to the supplier yet.', flagged ? 'It is flagged. Check whether it was fulfilled another way before anything is dispatched.' : 'Automatic dispatch normally picks this up within moments.');
 
   if (order.status === 'queued') {
-    if (!order.supplier_order_id) return make('queued_for_supplier', 'Paid · held before supplier', flagged ? 'warning' : 'info', 'Payment is confirmed. The order is held in the queue and has no supplier reference yet (for example while auto-dispatch is off or another MTN order for the same number is active).', flagged ? 'It is flagged. If you fulfilled it outside the system, add a note. Closing it as fulfilled needs a new server action that is not built yet.' : 'Check System Health for dispatch status.');
+    if (!order.supplier_order_id) return make('queued_for_supplier', 'Paid · supplier acceptance not recorded', flagged ? 'warning' : 'info', 'Payment is confirmed and dispatch was claimed, but no supplier identifier was recorded. This does not prove that the supplier rejected the request.', 'Inspect recovery eligibility and supplier evidence. Never resend solely because the identifier is missing.');
     return make('with_supplier', 'With supplier · awaiting delivery', 'info', 'The supplier holds this order and Mystery Hub is waiting for delivery confirmation.', 'Refresh supplier status if it has been waiting unusually long.');
   }
 
@@ -128,7 +128,7 @@ export function orderTimeline(order: AdminOrderCaseInput & { updated_at?: string
     { label: 'Order created', at: order.created_at, state: 'done' },
     { label: order.payment_provider==='complimentary'?'Complimentary authorization':order.payment_provider==='admin_external'?'External collection recorded':paid ? 'Payment confirmed' : 'Payment', at: order.paid_at||(['complimentary','admin_external'].includes(order.payment_provider||'')?order.created_at:null), state: paid||['complimentary','admin_external'].includes(order.payment_provider||'') ? 'done' : 'current' },
   ];
-  if (order.service_type !== 'marketplace') steps.push({ label: dispatched ? 'Sent to supplier' : 'Not sent to supplier', at: order.submitted_at, state: dispatched ? 'done' : paid && !resolved && !delivered ? 'current' : 'pending' });
+  if (order.service_type !== 'marketplace') steps.push({ label: dispatched ? 'Sent to supplier' : 'Supplier acceptance not recorded', at: order.submitted_at, state: dispatched ? 'done' : paid && !resolved && !delivered ? 'current' : 'pending' });
   steps.push({ label: delivered ? 'Delivered' : failed ? 'Not delivered' : 'Delivery', at: order.delivered_at, state: delivered ? 'done' : failed ? 'failed' : dispatched && paid && !resolved ? 'current' : 'pending' });
   if (failed || resolved) steps.push({ label: resolved ? kase.label.replace('Resolved · ', 'Resolved: ') : 'Customer remedy', at: resolved ? order.resolution?.updatedAt ?? null : null, state: resolved ? 'done' : 'current' });
   return steps;

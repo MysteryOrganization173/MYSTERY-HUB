@@ -164,7 +164,7 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
         </ul>
       </AdminPanel>
 
-      <AdminPanel title={<span className="inline-flex items-center gap-2"><History className="h-4 w-4 text-[#00c365]" />Administrative Audit Trail</span>} description="The 50 most recent admin actions. Metadata is the server's safe summary, never personal data or credentials.">
+      <AdminPanel title={<span className="inline-flex items-center gap-2"><History className="h-4 w-4 text-[#00c365]" />Administrative Audit Trail</span>} description="The 50 most recent admin actions. Operational evidence is private staff information. Do not paste passwords, keys or tokens into notes.">
         {auditError && <p className="mb-3 text-xs text-amber-300">The audit trail could not be loaded. Check again to retry.</p>}
         {!auditError && auditLogs.length === 0 ? (
           <p className="py-4 text-center text-xs text-slate-500">No administrative actions recorded yet. Status changes, review notes and finance actions are logged here.</p>

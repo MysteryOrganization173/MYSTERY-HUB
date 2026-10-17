@@ -551,6 +551,11 @@ export class OrdersStore {
     return sorted;
   }
 
+  /** Staff history includes every linked record, including abandoned payment attempts. */
+  static async findAdminOrdersByUserId(userId:string):Promise<OrderRecord[]>{
+    const db=getPool();return db?(await db.query<OrderRecord>('SELECT * FROM orders WHERE user_id=$1 ORDER BY created_at DESC,id DESC',[userId])).rows:this.adminDevOrders().filter(o=>o.user_id===userId).sort((a,b)=>b.created_at.localeCompare(a.created_at)||b.id.localeCompare(a.id));
+  }
+
   /**
    * Safe, authoritative cancellation of an order payment attempt
    * Cannot cancel orders that are already paid, delivered, or processing

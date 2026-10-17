@@ -77,7 +77,7 @@ export class AdminAssistedOrders {
      await AdminAuditStore.record({adminUserId:actor,action:'admin_assisted_order_authorized',entityType:'order',entityId:id,metadata:{source:locked.source,quote_id:quoteId,retail_minor:locked.product.retailMinor,quoted_cost_minor:locked.product.supplierCostMinor,reason:locked.reason}},client);
      return {id,dispatch:true};
    });
-   if(created.dispatch){const order=(await OrdersStore.findOrder(created.id))!;try{await FulfilmentService.dispatchClaimedOrder(order,true,quote.product.supplierCostMinor);}catch{await OrdersStore.saveSupplierUncertainSubmission(order.id,'Assisted submission interrupted. Reconcile original acceptance; never resend blindly.');}}
+   if(created.dispatch){const order=(await OrdersStore.findOrder(created.id))!;try{await FulfilmentService.dispatchClaimedOrder(order,true,quote.product.supplierCostMinor,quote.product.offerRef);}catch{await OrdersStore.saveSupplierUncertainSubmission(order.id,'Assisted submission interrupted. Reconcile original acceptance; never resend blindly.');}}
    return this.inspect(created.id);
  }
  static async inspect(id:string){const decision=await AdminAssistedStore.decision({order:id});if(!decision)throw new FinanceError('Assisted order not found.',404);const order=await OrdersStore.findOrder(decision.order_id);if(!order)throw new FinanceError('Assisted order record unavailable.',503);return {order:toAdminOrderDetails(order),authorization:decision};}

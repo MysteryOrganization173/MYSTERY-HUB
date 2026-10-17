@@ -65,7 +65,8 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [earnSummary, setEarnSummary] = useState<EarnCustomerSummary | null>(null);
   const detailRequest = useRef(0);
-  useEffect(() => () => { detailRequest.current++; }, []);
+  const listRequest = useRef(0);
+  useEffect(() => () => { detailRequest.current++;listRequest.current++; }, []);
   useEffect(() => {
     if (!initialUserId) return;
     const request = ++detailRequest.current;
@@ -83,6 +84,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
 
   const fetchUsers = useCallback(async () => {
+    const request=++listRequest.current;
     setIsSearching(true);
     setError(null);
 
@@ -95,14 +97,13 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
         limit: pageSize,
       });
 
-      if (res.success) {
+      if (res.success&&request===listRequest.current) {
         setUsersData(res);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to retrieve registered customer accounts.');
+      if(request===listRequest.current)setError(err instanceof Error ? err.message : 'Failed to retrieve registered customer accounts.');
     } finally {
-      setIsLoading(false);
-      setIsSearching(false);
+      if(request===listRequest.current){setIsLoading(false);setIsSearching(false);}
     }
   }, [sessionToken, searchTerm, roleFilter, statusFilter, currentPage]);
 
@@ -228,7 +229,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
               className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 focus:border-[#00c365] focus:outline-none"
             >
               <option value="">All Statuses</option>
-              <option value="active">Active</option>
+              <option value="active">Enabled</option>
               <option value="disabled">Disabled</option>
             </select>
           </div>
@@ -396,10 +397,9 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
               return (
                 <div
                   key={u.id}
-                  onClick={() => openUserDetails(u)}
                   className="p-4 rounded-2xl bg-[#0f171d] border border-slate-800/90 active:bg-slate-900 transition-colors space-y-2.5 cursor-pointer"
                 >
-                  <div className="flex items-center justify-between">
+                  <button type="button" aria-label={`View customer ${u.name}`} onClick={() => openUserDetails(u)} className="flex min-h-11 w-full items-center justify-between text-left">
                     <div>
                       <h4 className="font-bold text-white text-xs flex items-center gap-1.5">
                         <span>{u.name}</span>
@@ -420,13 +420,13 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
                       </span>
                       <span className="block text-[10px] text-slate-500">{u.orderCount} orders</span>
                     </div>
-                  </div>
+                  </button>
 
                   <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 text-xs">
                     <div className="flex items-center gap-1.5">
                       {isActive ? (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                          Active
+                          Enabled
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/30">
@@ -499,7 +499,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
                   <span>{selectedUser.name}</span>
                   {selectedUser.status === 'active' ? (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                      Active
+                      Enabled
                     </span>
                   ) : (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/30">
@@ -542,6 +542,7 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
               </div>
 
               <AdminCustomerSecurity key={selectedUser.id} user={selectedUser} token={sessionToken} adminId={currentAdminId} onStatusToggle={() => setStatusTargetUser({ id: selectedUser.id, name: selectedUser.name, currentStatus: selectedUser.status })} onUpdate={profile => { setSelectedUser(prev => prev ? { ...prev, ...profile } : null); void fetchUsers(); }} />
+              <div className="space-y-1 text-slate-400"><p>Last recorded login: {selectedUser.lastLoginAt?new Date(selectedUser.lastLoginAt).toLocaleString('en-GH',{timeZone:'Africa/Accra'}):'Login not recorded'}</p><p>Last observed authenticated activity: {selectedUser.lastObservedActivityAt?new Date(selectedUser.lastObservedActivityAt).toLocaleString('en-GH',{timeZone:'Africa/Accra'}):'Session activity not retained'}</p><p>Enabled means the account can sign in. These timestamps do not indicate online presence.</p></div>
               {/* Order History */}
               <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
                 <h4 className="font-bold text-white">Mystery Earn</h4>

@@ -237,7 +237,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
       {/* Lenses: one tap to the situation the founder is asking about */}
       <div role="tablist" aria-label="Order situation" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
         {ORDER_LENSES.map(item => (
-          <button key={item.id} type="button" role="tab" aria-selected={lens === item.id} onClick={() => { setLens(item.id); setCurrentPage(1); }}
+          <button key={item.id} type="button" role="tab" aria-selected={lens === item.id} onClick={() => { setLens(item.id); setCurrentPage(1);if(initialReference){setSearchTerm('');setDebouncedSearch('');} }}
             className={`min-h-11 shrink-0 rounded-xl border px-3.5 text-sm font-semibold ${lens === item.id ? item.id === 'needs_attention' ? 'border-amber-400/60 bg-amber-400/10 text-amber-100' : 'border-[#00c365]/50 bg-[#00c365]/12 text-white' : 'border-slate-800 bg-[#0d151b] text-slate-400 hover:text-white'}`}>
             {item.label}
           </button>
@@ -446,15 +446,15 @@ function OrderDetailSheet({ order, token, onClose, detailError, message, actionE
         {/* Paid but never sent to the supplier: explain the real limits honestly */}
         {paidButHeld && (
           <AdminNotice tone="info" title="Fulfilled this order outside Mystery Hub?">
-            <p>Mystery Hub cannot yet close a paid order that was never sent to the supplier as "fulfilled externally". Clearing the flag would only hide it, and "Close as test order" would wrongly record it as a failed test.</p>
-            <p className="mt-1">Until that server action exists: save an internal note with what you delivered, when and how you checked it, and keep the order flagged so it stays visible.</p>
+            <p>Supplier acceptance is not recorded. Inspect recovery eligibility or reconcile the supplier outcome before another dispatch. A documented customer remedy can close a failed case through Customer resolution; clearing a flag or closing a test order is not a remedy.</p>
+            <p className="mt-1">An active or uncertain supplier outcome cannot be replaced with a manual remedy. Save the evidence and keep the order flagged while it is reconciled.</p>
           </AdminNotice>
         )}
 
         {/* Payment and customer */}
         <AdminPanel title="Payment and customer">
           <DefinitionList items={[
-            ['Payment', <StatusPill key="p" tone={order.payment_status === 'success' ? 'success' : order.payment_status === 'pending' ? 'warning' : 'neutral'}>{order.payment_status === 'success' ? 'Verified paid' : order.payment_status === 'pending' ? 'Not confirmed' : order.payment_status}</StatusPill>],
+            ['Payment', <StatusPill key="p" tone={order.payment_status === 'success' ? 'success' : order.payment_status === 'pending' ? 'warning' : 'neutral'}>{order.payment_status === 'success' ? 'Verified paid' : order.payment_status === 'pending' ? 'Not confirmed' : order.payment_status==='not_required'?'No customer payment':order.payment_status==='recorded'?'External collection recorded':order.payment_status}</StatusPill>],
             ['Amount', <span key="a">{ghs(order.amount)}{order.service_fee_ghc ? <span className="text-slate-500"> · fee GH₵{order.service_fee_ghc.toFixed(2)}</span> : null}</span>],
             ['Payment basis', order.payment_provider === 'wallet' ? 'Mystery Wallet' : order.payment_provider==='complimentary'?'Complimentary · no customer payment':order.payment_provider==='admin_external'?'External collection · operator attested':'Paystack'],
             ['Payment reference', <span key="r" className="inline-flex items-center gap-1 font-mono text-xs">{order.payment_reference || '—'}{order.payment_reference && copyButton(order.payment_reference, 'pay', 'Copy payment reference')}</span>],
@@ -522,7 +522,7 @@ function OrderDetailSheet({ order, token, onClose, detailError, message, actionE
         ) : (
           <AdminPanel title="Supplier" description="Success Biz Hub" actions={(order.supplier_order_id || order.service_type === 'afa') && <AdminButton onClick={onRefreshSupplier} busy={refreshingSupplier} disabled={order.status === 'delivered' || order.resolution?.stage === 'resolved'}><RefreshCw className="h-4 w-4" />Check supplier now</AdminButton>}>
             <DefinitionList items={[
-              ['Supplier order ID', order.supplier_order_id ? <span key="s" className="inline-flex items-center gap-1 font-mono text-xs">{order.supplier_order_id}{copyButton(order.supplier_order_id, 'sup', 'Copy supplier order ID')}</span> : 'Never sent to supplier'],
+              ['Supplier order ID', order.supplier_order_id ? <span key="s" className="inline-flex items-center gap-1 font-mono text-xs">{order.supplier_order_id}{copyButton(order.supplier_order_id, 'sup', 'Copy supplier order ID')}</span> : 'No supplier identifier recorded'],
               ['Last supplier status', supplierStatus || (order.supplier_response ? 'Unreadable response' : 'No response recorded')],
               ['Last checked', order.supplier_last_checked_at ? new Date(order.supplier_last_checked_at).toLocaleString() : 'Not recorded'],
               ['Recorded supplier cost', order.supplier_cost_minor != null ? ghs(order.supplier_cost_minor) : 'Not recorded'],
