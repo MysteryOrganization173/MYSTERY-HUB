@@ -115,7 +115,8 @@ export const RESELLER_STORE_CSS = `
 .store-hero-facts strong{font-weight:700}
 .store-art{position:relative;border-radius:24px;overflow:hidden;border:1px solid;aspect-ratio:16/11}
 .store-art img{width:100%;height:100%;object-fit:cover}
-@media (max-width:899px){.store-art{aspect-ratio:16/10}}
+@media (max-width:899px){.store-art{aspect-ratio:16/9}}
+@media (max-width:639px){.store-art{aspect-ratio:2/1;border-radius:18px}}
 .store-section{padding-top:36px;padding-bottom:12px}
 .store-section-head{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:10px 16px;margin-bottom:16px}
 .store-section-head h2,.store-section-head h3{font-size:clamp(1.4rem,4.6vw,2rem);font-weight:700;line-height:1.15;margin:0}
