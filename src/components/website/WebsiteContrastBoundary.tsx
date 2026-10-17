@@ -1,12 +1,14 @@
 import React, {useLayoutEffect, useRef} from 'react';
 import {readableWebsiteColor} from '../../utils/websiteBrand.js';
+import {websiteTypefaceCss, websiteTypefaceHref, type WebsiteTypePreset} from '../../config/websiteTypography.js';
 
 /** Legacy layouts contain fixed artwork/card colors as well as owner theme colors.
  * Resolve text against its real solid surface instead of replacing the entire design.
  * Image/gradient artwork is deliberately excluded; its template owns that foreground.
  */
-export function WebsiteContrastBoundary({children,style}:{children:React.ReactNode;style:React.CSSProperties}) {
+export function WebsiteContrastBoundary({children,style,typeface}:{children:React.ReactNode;style:React.CSSProperties;typeface?:WebsiteTypePreset|null}) {
   const root=useRef<HTMLDivElement>(null);
+  useWebsiteTypeface(typeface);
   useLayoutEffect(()=>{
     const scope=root.current;if(!scope)return;
     const canvas=document.createElement('canvas');canvas.width=canvas.height=1;
@@ -46,5 +48,13 @@ export function WebsiteContrastBoundary({children,style}:{children:React.ReactNo
     sync();const observer=new MutationObserver(sync);observer.observe(scope,{childList:true,subtree:true});
     return()=>observer.disconnect();
   },[children]);
-  return <div ref={root} className="website-presentation" style={style}>{children}</div>;
+  return <div ref={root} className={`website-presentation${typeface?` website-type-${typeface}`:''}`} style={style}>{typeface&&<style>{websiteTypefaceCss(typeface)}</style>}{children}</div>;
+}
+
+/** Loads a design's display face once per document (the public page and the editor's draft frame). */
+export function useWebsiteTypeface(preset?:WebsiteTypePreset|null) {
+  useLayoutEffect(()=>{
+    if(!preset||typeof document==='undefined'||document.head.querySelector(`link[data-website-typeface="${preset}"]`))return;
+    const link=document.createElement('link');link.rel='stylesheet';link.href=websiteTypefaceHref(preset);link.dataset.websiteTypeface=preset;document.head.appendChild(link);
+  },[preset]);
 }

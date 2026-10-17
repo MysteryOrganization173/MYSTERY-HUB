@@ -93,6 +93,7 @@ const examples:Record<string,StarterExample[]>={
  * marks it as suggested until the owner changes it.
  */
 const wording:Record<string,{tagline:string;aboutText:string}>={
+  'tmpl-data-reseller':{tagline:'Data bundles, bought in a few taps',aboutText:'Choose a bundle, enter the number that should receive it and pay securely. Keep your order reference to track your order here.'},
   'tmpl-buka-bistro':{tagline:'Ghanaian flavours, cooked with care',aboutText:'Take a look at our menu, then message us to ask about a table or to place an order.'},
   'tmpl-accra-build':{tagline:'Built right, from foundation to handover',aboutText:'See the kind of work we take on, then tell us about your project and ask for an estimate.'},
   'tmpl-glow-salon':{tagline:'Look good. Feel confident.',aboutText:'Browse our services and message us to book a time that suits you.'},

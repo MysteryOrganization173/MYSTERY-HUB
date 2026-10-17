@@ -115,13 +115,13 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const [visualSelection, setVisualSelection] = useState<string|null>(null);
   const [focusRequest, setFocusRequest] = useState(0);
   // A tap on content that has no tap-to-edit field explains where to change it.
-  const [settingsNotice, setSettingsNotice] = useState(false);
+  const [settingsNotice, setSettingsNotice] = useState<false|'settings'|'pricing'>(false);
   // Rendered targets in reading order, reported by the draft frame, for Previous/Next.
   const [targetOrder, setTargetOrder] = useState<string[]>([]);
   const [canvasHintSeen, setCanvasHintSeen] = useState(false);
   const [previewHintSeen, setPreviewHintSeen] = useState(false);
   const clearSelection = () => {setVisualSelection(null);setSettingsNotice(false);setFocusRequest(n=>n+1);};
-  const selectTarget = (id:string|null, hint?:'settings') => {setAllSettings(false);setVisualSelection(id);setSettingsNotice(!id && hint==='settings');if(id || hint)setCanvasHintSeen(true);};
+  const selectTarget = (id:string|null, hint?:'settings'|'pricing') => {setAllSettings(false);setVisualSelection(id);setSettingsNotice(!id && hint ? (hint==='pricing' && isDataReseller ? 'pricing' : 'settings') : false);if(id || hint)setCanvasHintSeen(true);};
   const changeMode = (mode:'edit'|'preview') => {setActiveTab(mode);setVisualSelection(null);setSettingsNotice(false);setAllSettings(false);};
 
   // Device View in Preview: responsive default based on viewport width
@@ -921,7 +921,8 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         {activeTab==='edit' && selectedItemIndex>=0 && <WebsiteItemPanel item={items[selectedItemIndex]} index={selectedItemIndex} total={items.length} word={word} fields={itemFields} siteId={currentSite.id} token={sessionToken} busy={locked} cardButton={cardButton && {value:cardButton.value,max:cardButton.maxLength,onChange:value=>editVisualValue(cardButton.id,value)}}
           onChange={patch=>updateItem(items[selectedItemIndex].id!,patch)} onKeep={()=>void reviewItems([items[selectedItemIndex].id!],'confirm')} onRemove={()=>removeItem(items[selectedItemIndex].id!)} onAdd={addItem} onPrevious={()=>stepItem(-1)} onNext={()=>stepItem(1)} onDone={clearSelection}/>}
         {activeTab==='edit' && contextualTargets.length>0 && !selectedItemId && <div className="contents" inert={locked}><VisualContextPanel title={visualSelection==='branding'?'Website colors':selected!.label} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()} position={stepIndex>=0?{index:stepIndex,total:stepIds.length}:undefined} onPrevious={()=>step(-1)} onNext={()=>step(1)} suggested={!!selected && suggestedFields.includes(selected.id)}/></div>}
-        {activeTab==='edit' && settingsNotice && !contextualTargets.length && <VisualContextPanel notice title="Change this in All Settings" targets={[]} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()}/>}
+        {activeTab==='edit' && settingsNotice==="settings" && !contextualTargets.length && <VisualContextPanel notice title="Change this in All Settings" targets={[]} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()}/>}
+        {activeTab==='edit' && settingsNotice==="pricing" && !contextualTargets.length && <VisualContextPanel notice title="Bundles come from Bundles & Pricing" noticeText="The bundles and prices on your store are the ones you enable in Bundles & Pricing, so customers only see bundles you can sell. Headings above the bundles can be tapped and edited here." noticeAction="Open Bundles & Pricing" targets={[]} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings('bundles')}/>}
       </div>
 
       {/* =========================================================

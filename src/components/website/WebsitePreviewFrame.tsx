@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useRef} from 'react';
 import type { WebsiteTemplate } from '../../types';
 import {matchesVisualMessage, visualTargets} from '../../utils/websiteVisualEditing';
 /** A real iframe viewport applies the same media queries as a public browser. */
-export function WebsitePreviewFrame({template,siteId,viewportWidth,editMode=false,selectedTarget=null,onSelect,onOrder,focusRequest=0,reserveBottom=0}:{template:WebsiteTemplate;siteId:string;viewportWidth?:number;editMode?:boolean;selectedTarget?:string|null;onSelect?:(id:string|null,hint?:'settings')=>void;onOrder?:(ids:string[])=>void;focusRequest?:number;reserveBottom?:number}) {
+export function WebsitePreviewFrame({template,siteId,viewportWidth,editMode=false,selectedTarget=null,onSelect,onOrder,focusRequest=0,reserveBottom=0}:{template:WebsiteTemplate;siteId:string;viewportWidth?:number;editMode?:boolean;selectedTarget?:string|null;onSelect?:(id:string|null,hint?:'settings'|'pricing')=>void;onOrder?:(ids:string[])=>void;focusRequest?:number;reserveBottom?:number}) {
   const frame=useRef<HTMLIFrameElement>(null);
   const identity=useMemo(()=>({siteId,templateId:template.id,channel:crypto.randomUUID()}),[siteId,template.id]);
   const latest=useRef({template,editMode,selectedTarget,onSelect,onOrder,focusRequest,reserveBottom,identity});latest.current={template,editMode,selectedTarget,onSelect,onOrder,focusRequest,reserveBottom,identity};
@@ -21,7 +21,7 @@ export function WebsitePreviewFrame({template,siteId,viewportWidth,editMode=fals
       }
       if(!matchesVisualMessage(event,window.location.origin,source,v.identity,'MYSTERYHUB_VISUAL_SELECT'))return;
       const id=event.data.targetId;
-      if(id===null)v.onSelect?.(null,event.data.hint==='settings'?'settings':undefined);
+      if(id===null)v.onSelect?.(null,event.data.hint==='settings'||event.data.hint==='pricing'?event.data.hint:undefined);
       else if(editable(id))v.onSelect?.(id);
     };
     window.addEventListener('message',receive);return()=>window.removeEventListener('message',receive);

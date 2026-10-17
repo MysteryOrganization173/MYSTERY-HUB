@@ -41,9 +41,9 @@ export function visualTargets(t: WebsiteTemplate): VisualTarget[] {
       // Menu dishes, services, rooms and products open the item editor, not a single text field.
       const word = websiteItemVocabulary(t.id).singular;
       for (const item of c.items || []) if (item.id) targets.push({ id: `item:${item.id}`, label: `${word} · ${item.name}`, control: 'item', maxLength: 0, source: { kind: 'item', itemId: item.id }, value: item.name });
-      // The design's own headings and labels. Leaving one empty brings back the design's wording.
-      for (const [key, slot] of templateCopySlots(t)) targets.push({ id: `copy:${key}`, label: slot.label, control: slot.max > 100 ? 'body' : 'text', maxLength: slot.max, source: { kind: 'copy', key }, value: templateCopyText(t, key.slice(key.indexOf('.') + 1)) });
     }
+    // The design's own headings and labels. Leaving one empty brings back the design's wording.
+    for (const [key, slot] of templateCopySlots(t)) targets.push({ id: `copy:${key}`, label: slot.label, control: slot.max > 100 ? 'body' : 'text', maxLength: slot.max, source: { kind: 'copy', key }, value: templateCopyText(t, key.slice(key.indexOf('.') + 1)) });
   } else for (const s of t.composition.sections.filter(s => s.enabled)) {
     const add = (name: keyof SectionData, label: string, control: VisualControl, fallback = '') => targets.push({
       id: sectionTargetId(s.id, name), label: `${SECTION_REGISTRY[s.type].label} · ${label}`, control,
