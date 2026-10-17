@@ -1,5 +1,6 @@
 import { SECTION_REGISTRY, sectionEligible, resolveWebsitePlan, type WebsiteComposition, type WebsiteSectionType, type SectionData, type UltraEnquiryInput } from '../../src/config/websiteBuilder.js';
 import { sanitizeUrl } from '../types/website.js';
+import { TEMPLATE_COPY } from '../../src/config/websiteTemplateCopy.js';
 export class WebsiteInputError extends Error {}
 function fail(message: string): never { throw new WebsiteInputError(message); }
 function object(value: unknown): Record<string, unknown> {
@@ -63,7 +64,9 @@ export function validateWebsiteComposition(value: unknown, userId: string): Webs
 export function validateWebsiteContentPatch(value: unknown): void {
   if (value === undefined) return;
   const content = object(value);
-  keys(content, ['composition','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','social','items','stats','features']);
+  keys(content, ['starterVersion','layoutMode','composition','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','social','items','stats','features','copy']);
+  if(content.starterVersion!==undefined && content.starterVersion!==1)fail('Unsupported starter version.');
+  if(content.layoutMode !== undefined && !['template','sections'].includes(content.layoutMode as string))fail('Invalid website layout mode.');
   const limits = { businessName:100, tagline:150, aboutText:2000, location:150, phone:30, whatsapp:30, email:100, ctaLabel:50 };
   for (const [key, max] of Object.entries(limits)) if (content[key] !== undefined) safeWebsiteText(content[key], max);
   for (const key of ['phone','whatsapp']) {
@@ -94,14 +97,26 @@ export function validateWebsiteContentPatch(value: unknown): void {
       if(!comparison)safeWebsiteText(stat.value,50);
     }
   }
+  if (content.copy !== undefined) {
+    // Only the finite heading and label slots a designed template declares; never a free-form map.
+    for (const [key, text] of Object.entries(object(content.copy))) {
+      const [layout, slot, extra] = key.split('.'), def = extra === undefined ? TEMPLATE_COPY[layout]?.[slot] : undefined;
+      if (!def || !Object.hasOwn(TEMPLATE_COPY, layout) || !Object.hasOwn(TEMPLATE_COPY[layout], slot)) fail('Unsupported template text.');
+      safeWebsiteText(text, def.max);
+    }
+  }
   if (content.features !== undefined) {
     if (!Array.isArray(content.features) || content.features.length > 10) fail('Too many features.');
     content.features.forEach(value => safeWebsiteText(value,80));
   }
   if (content.items !== undefined) {
     if (!Array.isArray(content.items) || content.items.length > 50) fail('Too many business items.');
+    const ids=new Set<string>();
     for (const raw of content.items) {
-      const item = object(raw); keys(item,['id','name','price','category','network','desc','tag','image']);
+      const item = object(raw); keys(item,['id','name','price','category','network','desc','tag','image','isExample']);
+      if(item.isExample!==undefined && typeof item.isExample!=='boolean')fail('Invalid example status.');
+      if(item.isExample===true && (typeof item.id!=='string'||!item.id.trim()))fail('Example items require a stable id.');
+      if(typeof item.id==='string'){if(ids.has(item.id))fail('Duplicate business item id.');ids.add(item.id);}
       for (const [key,max] of Object.entries({ id:64,name:100,price:40,category:50,network:50,desc:300,tag:40 })) if (item[key] !== undefined) safeWebsiteText(item[key],max);
       if (item.image !== undefined) { const url = safeWebsiteText(item.image,500); if (url && (!sanitizeUrl(url) || !/^https?:\/\//.test(url))) fail('Invalid item image.'); }
     }

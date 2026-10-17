@@ -1,15 +1,17 @@
 import type { SiteContent, SiteSettings, WebsiteTemplate } from '../types';
 import { SECTION_REGISTRY, type SectionData } from '../config/websiteBuilder';
 import { sanitizeUrl } from '../../server/types/website';
+import { websiteItemVocabulary } from '../config/websiteStarters';
+import { templateCopySlots, templateCopyText } from '../config/websiteTemplateCopy';
 import {safeWebsiteText, safeWebsiteUrl, validateWebsiteContentPatch} from '../../server/services/websiteValidation';
 
-export type VisualControl = 'text' | 'body' | 'image' | 'email' | 'phone' | 'url' | 'color';
+export type VisualControl = 'text' | 'body' | 'image' | 'email' | 'phone' | 'url' | 'color' | 'item';
 export interface VisualTarget {
   id: string;
   label: string;
   control: VisualControl;
   maxLength: number;
-  source: { kind: 'content'; field: keyof SiteContent } | { kind: 'section'; sectionId: string; field: keyof SectionData } | { kind: 'settings'; field: keyof SiteSettings };
+  source: { kind: 'content'; field: keyof SiteContent } | { kind: 'section'; sectionId: string; field: keyof SectionData } | { kind: 'settings'; field: keyof SiteSettings } | { kind: 'item'; itemId: string } | { kind: 'copy'; key: string };
   value: string;
   inherited?: boolean;
   destinationId?: string;
@@ -36,6 +38,11 @@ export function visualTargets(t: WebsiteTemplate): VisualTarget[] {
     if (t.id !== 'tmpl-data-reseller') {
       field('ctaTarget', 'Button link', 'url', 500);
       targets.find(x => x.id === 'content:ctaLabel')!.destinationId = 'content:ctaTarget';
+      // Menu dishes, services, rooms and products open the item editor, not a single text field.
+      const word = websiteItemVocabulary(t.id).singular;
+      for (const item of c.items || []) if (item.id) targets.push({ id: `item:${item.id}`, label: `${word} · ${item.name}`, control: 'item', maxLength: 0, source: { kind: 'item', itemId: item.id }, value: item.name });
+      // The design's own headings and labels. Leaving one empty brings back the design's wording.
+      for (const [key, slot] of templateCopySlots(t)) targets.push({ id: `copy:${key}`, label: slot.label, control: slot.max > 100 ? 'body' : 'text', maxLength: slot.max, source: { kind: 'copy', key }, value: templateCopyText(t, key.slice(key.indexOf('.') + 1)) });
     }
   } else for (const s of t.composition.sections.filter(s => s.enabled)) {
     const add = (name: keyof SectionData, label: string, control: VisualControl, fallback = '') => targets.push({
@@ -62,6 +69,7 @@ export function visualTargets(t: WebsiteTemplate): VisualTarget[] {
   return targets;
 }
 export function visualValueError(target: VisualTarget, value: string): string {
+  if (target.control === 'item') return '';
   if (value.length > target.maxLength) return `Use no more than ${target.maxLength} characters.`;
   if (/[<>]/.test(value)) return 'Use plain text without HTML tags.';
   if (target.control === 'color' && !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value)) return 'Use a hex color such as #2563eb.';
@@ -69,6 +77,7 @@ export function visualValueError(target: VisualTarget, value: string): string {
   if (['url', 'image'].includes(target.control) && value && (!sanitizeUrl(value) || (target.control === 'image' && !/^(https?:\/\/|\/(?!\/))/.test(value)))) return 'Use a safe website address or supported relative link.';
   try {
     if (target.source.kind === 'content') validateWebsiteContentPatch({[target.source.field]:value});
+    if (target.source.kind === 'copy') validateWebsiteContentPatch({copy: {[target.source.key]: value}});
     if (target.source.kind === 'section') {
       safeWebsiteText(value,target.maxLength);
       if (target.control === 'image') safeWebsiteUrl(value);
@@ -78,9 +87,14 @@ export function visualValueError(target: VisualTarget, value: string): string {
 }
 export function applyVisualValue(content: SiteContent, settings: SiteSettings, template: WebsiteTemplate, id: string, value: string): {content: SiteContent; settings: SiteSettings} | null {
   const target = visualTargets(template).find(t => t.id === id);
-  if (!target || visualValueError(target, value)) return null;
+  if (!target || target.source.kind === 'item' || visualValueError(target, value)) return null;
   if (target.source.kind === 'settings') return {content, settings: {...settings, [target.source.field]: value}};
   if (target.source.kind === 'content') return {content: {...content, [target.source.field]: value}, settings};
+  if (target.source.kind === 'copy') {
+    const copy = {...content.copy};
+    if (value.trim()) copy[target.source.key] = value; else delete copy[target.source.key];
+    return {content: {...content, copy}, settings};
+  }
   const {sectionId, field} = target.source;
   const composition = content.composition ?? template.composition;
   if (!composition?.sections.some(s => s.id === sectionId && s.enabled)) return null;

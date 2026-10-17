@@ -4,11 +4,19 @@ const pick=(value:unknown,keys:readonly string[])=>{const input=object(value);re
 const items=(value:unknown,keys:readonly string[])=>Array.isArray(value)?value.map(item=>pick(item,keys)):[];
 /** Public field projection also removes historical unknown/editor-only nested keys. */
 export function publicWebsiteContent(value:unknown):SiteContent {
- const input=object(value),result=pick(input,['businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','features']);
- if(Object.hasOwn(input,'items'))result.items=items(input.items,['id','name','price','category','tag','desc','image']);
+ const input=object(value),result=pick(input,['starterVersion','layoutMode','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','features','copy']);
+ if(Object.hasOwn(input,'items'))result.items=items(Array.isArray(input.items)?input.items.filter(item=>object(item).isExample!==true):[],['id','name','price','category','tag','desc','image']);
  if(Object.hasOwn(input,'stats'))result.stats=items(input.stats,['label','value']);
  if(Object.hasOwn(input,'social'))result.social=pick(input.social,['instagram','facebook','tiktok']);
- if(input.composition){const c=object(input.composition);result.composition={version:c.version,sections:items(c.sections,['id','type','enabled','variant','order','data']).map(section=>{const data=pick(section.data,['heading','body','image','alt','ctaLabel','ctaUrl']);if(Object.hasOwn(object(section.data),'items'))data.items=items(section.data.items,['title','text','image','price']);return {...section,data};})};}
+ if(input.composition && input.layoutMode!=='template'){const c=object(input.composition);result.composition={version:c.version,sections:items(c.sections,['id','type','enabled','variant','order','data']).map(section=>{const data=pick(section.data,['heading','body','image','alt','ctaLabel','ctaUrl']);if(Object.hasOwn(object(section.data),'items'))data.items=items(section.data.items,['title','text','image','price']);return {...section,data};})};}
+ if(input.layoutMode==='sections' && result.composition){
+   const sections=result.composition.sections.filter((s:any)=>s.enabled);
+   // Public validation still requires contiguous order after private disabled sections are removed.
+   result.composition.sections=sections.map((section:any,order:number)=>({...section,order}));
+   if(!sections.some((s:any)=>['products','services','pricing'].includes(s.type)&&!Object.hasOwn(s.data,'items')))delete result.items;
+   if(!sections.some((s:any)=>s.type==='trust'&&!Object.hasOwn(s.data,'items')))delete result.stats;
+   delete result.features;
+ }
  return result as SiteContent;
 }
 export function publicWebsiteSettings(value:unknown):SiteSettings{return pick(value,['primaryColor','accentColor','backgroundColor','fontFamily','borderRadius']) as SiteSettings;}

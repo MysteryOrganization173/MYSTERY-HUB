@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { WEBSITE_MEDIA_DEFAULTS, type WebsiteUploadIntent } from '../../src/config/websiteMedia.js';
 export class WebsiteOperationError extends Error {
-  constructor(message: string, public status = 400) { super(message); }
+  constructor(message: string, public status = 400, public code?: string) { super(message); }
 }
 function boundedEnv(name: string, fallback: number, ceiling: number) {
   const value = Number(process.env[name]);

@@ -74,6 +74,7 @@ export function VisualSelectionSurface({targets, selected, onSelect, onOrder, fo
     <style>{`.visual-selection-surface [data-visual-target]{cursor:pointer;scroll-margin:24px;transition:outline-color .15s}
 @media (hover:hover){.visual-selection-surface [data-visual-target]:hover{outline:2px dashed #00c365;outline-offset:3px}}
 .visual-selection-surface [data-visual-selected],.visual-selection-surface [data-visual-target]:focus-visible{outline:3px solid #00c365!important;outline-offset:3px;box-shadow:0 0 0 3px #fff}
+.visual-selection-surface [data-visual-target]:empty::before{content:attr(data-visual-empty);opacity:.6;font-style:italic;font-weight:500}
 .visual-selection-surface [data-visual-locked]{outline:2px dashed #94a3b8!important;outline-offset:3px}
 .visual-selected-tag{position:absolute;z-index:2147483000;transform:translateY(calc(-100% - 8px));background:#0a0e11;color:#fff;font:600 12px/1 'Plus Jakarta Sans',system-ui,sans-serif;padding:6px 9px;border-radius:8px;pointer-events:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.25)}
 .visual-selected-tag::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#00c365;margin-right:6px;vertical-align:1px}

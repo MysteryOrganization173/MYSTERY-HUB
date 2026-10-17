@@ -1,5 +1,6 @@
+import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
-import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
+import {useVisualEditMarkers, useIsVisualEditing, useTemplateCopy} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
@@ -25,6 +26,8 @@ interface TemplateViewProps {
 
 export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
   const edit = useVisualEditMarkers();
+  const editing = useIsVisualEditing();
+  const copy = useTemplateCopy(template);
   const [selectedStylist, setSelectedStylist] = useState<string>('Abena - Braiding Artisan');
   const [selectedService, setSelectedService] = useState<string>('Goddess Knotless Box Braids (Mid-Back)');
   const [bookingConfirmed, setBookingConfirmed] = useState<boolean>(false);
@@ -40,11 +43,13 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
 
   return (
     <div className="bg-[var(--website-background,#fff9fa)] text-[#2e1020] font-sans min-h-full">
-      {/* Top Rose Gold Announcement */}
-      <div className="bg-[var(--website-accent,#ec4899)] text-white text-xs px-4 py-2 text-center tracking-wider font-semibold flex items-center justify-center gap-2">
-        <Sparkles className="w-3.5 h-3.5" />
-        <span {...edit("content:location")}>{template.location}</span>
-      </div>
+      {/* A slim location ribbon; published sites omit it until the owner adds a location. */}
+      {(template.location || editing) && (
+        <div className="bg-[var(--website-accent,#ec4899)] text-white text-xs px-4 py-2 text-center tracking-wider font-semibold flex items-center justify-center gap-2">
+          <Sparkles className="w-3.5 h-3.5" />
+          <span {...edit("content:location")}>{template.location}</span>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="bg-white/95 backdrop-blur-md border-b border-[#fae3ec] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
@@ -56,9 +61,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
             <span className="font-bold text-base sm:text-lg tracking-tight text-[var(--website-primary,#3b1828)] block leading-none font-serif" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </span>
-            <span className="text-[10px] text-[var(--website-accent,#ec4899)] uppercase tracking-widest font-semibold block mt-0.5">
-              Hair · Barbershop · Esthetics
-            </span>
+            <span className="text-[10px] text-[var(--website-accent,#ec4899)] uppercase tracking-widest font-semibold block mt-0.5" {...copy.edit('brand')}>{copy.text('brand')}</span>
           </div>
         </div>
 
@@ -92,7 +95,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
         <div className="relative max-w-2xl space-y-5">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-[#fbcfe8] text-xs font-semibold uppercase tracking-wider">
             <Heart className="w-3.5 h-3.5 text-[var(--website-accent,#ec4899)]" />
-            <span>{template.categoryLabel}</span>
+            <span {...copy.edit('eyebrow')}>{copy.text('eyebrow')}</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-serif tracking-tight leading-tight text-white" {...edit("content:tagline")}>
@@ -108,18 +111,18 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
               href="#book"
               className="px-6 py-3 rounded-full bg-[var(--website-accent,#ec4899)] hover:bg-[#db2777] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2"
             >
-              <span>Schedule Your Glow Up</span>
+              <span {...copy.edit('primary')}>{copy.text('primary')}</span>
             </a>
             <a
               href="#services"
               className="px-6 py-3 rounded-full bg-white/15 hover:bg-white/25 text-white font-semibold text-xs uppercase tracking-wider border border-white/20 transition-all flex items-center gap-2"
             >
-              <span>View Service Rate Card</span>
+              <span {...copy.edit('secondary')}>{copy.text('secondary')}</span>
             </a>
           </div>
 
           {/* Salon Metrics */}
-          <div className="pt-6 grid grid-cols-3 gap-4 border-t border-pink-400/20 max-w-md">
+          {!!template.stats?.length && <div className="pt-6 grid grid-cols-3 gap-4 border-t border-pink-400/20 max-w-md">
             {template.stats?.map((stat, i) => (
               <div key={i}>
                 <div className="text-xl font-bold text-[#fbcfe8] font-serif">{stat.value}</div>
@@ -128,31 +131,26 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
         </div>
       </div>
 
       {/* Services & Treatment Menu */}
       <div id="services" className="py-14 px-4 sm:px-12 max-w-5xl mx-auto space-y-8">
         <div className="text-center max-w-md mx-auto space-y-2">
-          <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#ec4899)] font-bold">
-            Transparent Pricing in Ghana Cedis
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-serif text-[var(--website-primary,#3b1828)]">
-            Luxury Hair & Grooming Menu
-          </h2>
-          <p className="text-xs text-[#836574]">
-            Contact us to confirm services, prices and what is included.
-          </p>
+          <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#ec4899)] font-bold" {...copy.edit('itemsEyebrow')}>{copy.text('itemsEyebrow')}</span>
+          <h2 className="text-2xl sm:text-3xl font-serif text-[var(--website-primary,#3b1828)]" {...copy.edit('itemsHeading')}>{copy.text('itemsHeading')}</h2>
+          <p className="text-xs text-[#836574]" {...copy.edit('itemsIntro')}>{copy.text('itemsIntro')}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {template.siteContent && !services.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {services.map((item) => (
-            <div
+            <div {...edit(`item:${item.id}`)}
               key={item.id}
-              className="bg-white rounded-2xl border border-[#fae3ec] overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between"
+              className="relative bg-white rounded-2xl border border-[#fae3ec] overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between"
             >
+              <ExampleTag item={item} corner="left" flow={!item.image}/>
               <div>
                 {item.image && (
                   <div className="h-44 overflow-hidden relative">
@@ -161,9 +159,9 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                       alt={item.name}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute top-2.5 right-2.5 bg-black/70 backdrop-blur-sm px-2.5 py-0.5 rounded-full text-xs font-bold text-pink-200">
+                    {item.price && <div className="absolute top-2.5 right-2.5 bg-black/70 backdrop-blur-sm px-2.5 py-0.5 rounded-full text-xs font-bold text-pink-200">
                       {item.price}
-                    </div>
+                    </div>}
                   </div>
                 )}
                 <div className="p-5 space-y-2">
@@ -191,7 +189,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                   onClick={() => setSelectedService(item.name)}
                   className="w-full py-2 rounded-xl bg-[#fdf2f6] hover:bg-[var(--website-accent,#ec4899)] hover:text-white text-[var(--website-accent,#ec4899)] text-xs font-bold text-center block transition-colors cursor-pointer"
                 >
-                  Book This Treatment
+                  {copy.text('itemButton')}
                 </a>
               </div>
             </div>
@@ -203,16 +201,12 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       <div id="book" className="py-14 px-4 sm:px-12 bg-[#fdf2f6] border-y border-[#fae3ec]">
         <div className="max-w-2xl mx-auto bg-white rounded-3xl p-6 sm:p-10 shadow-lg border border-[#f5d0e0] space-y-6">
           <div className="text-center space-y-1">
-            <span className="text-xs font-bold text-[var(--website-accent,#ec4899)] uppercase tracking-widest">
-              {template.siteContent ? 'Appointment Enquiry' : 'Appointment enquiry'}
-            </span>
-            <h3 className="text-2xl font-serif text-[var(--website-primary,#3b1828)]">Book Your Glow Session</h3>
-            <p className="text-xs text-[#836574]">
-              Contact us to discuss your preferred service and appointment time.
-            </p>
+            <span className="text-xs font-bold text-[var(--website-accent,#ec4899)] uppercase tracking-widest" {...copy.edit('enquiryEyebrow')}>{copy.text('enquiryEyebrow')}</span>
+            <h3 className="text-2xl font-serif text-[var(--website-primary,#3b1828)]" {...copy.edit('enquiryHeading')}>{copy.text('enquiryHeading')}</h3>
+            <p className="text-xs text-[#836574]" {...copy.edit('enquiryIntro')}>{copy.text('enquiryIntro')}</p>
           </div>
 
-          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick}/> : bookingConfirmed ? (
+          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Which service?" dateLabel="Preferred date"/> : bookingConfirmed ? (
             <div className="p-6 rounded-2xl bg-pink-50 border border-pink-200 text-center space-y-2">
               <div className="w-10 h-10 rounded-full bg-[var(--website-accent,#ec4899)] text-white flex items-center justify-center mx-auto">
                 <Check className="w-5 h-5" />

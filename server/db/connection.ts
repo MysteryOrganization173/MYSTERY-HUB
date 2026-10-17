@@ -1,5 +1,6 @@
 import { ORDER_RESOLUTION_SCHEMA } from './orderResolutionSchema.js';
 import { WEBSITE_PUBLISHING_SCHEMA } from './websitePublishingSchema.js';
+import { WEBSITE_CHECKPOINT_SCHEMA } from './websiteCheckpointSchema.js';
 import { COMMERCIAL_SCHEMA } from './commercialSchema.js';
 import { WEBSITE_BUSINESS_SCHEMA } from './websiteBusinessSchema.js';
 import { WEBSITE_FREE_SCHEMA } from './websiteFreeSchema.js';
@@ -372,6 +373,7 @@ export async function initDatabase(): Promise<void> {
       PRIMARY KEY (referrer_user_id, order_id));` });
     baseTables.push({ name: 'order_resolution', sql: ORDER_RESOLUTION_SCHEMA });
     baseTables.push({ name: 'website_publishing_snapshots', sql: WEBSITE_PUBLISHING_SCHEMA });
+    baseTables.push({ name: 'website_draft_checkpoints', sql: WEBSITE_CHECKPOINT_SCHEMA });
     baseTables.push({ name: 'website_free_media_analytics', sql: WEBSITE_FREE_SCHEMA });
     baseTables.push({ name: 'website_ultra_enquiries', sql: ULTRA_ENQUIRY_SCHEMA });
     baseTables.push({ name: 'marketplace_assets', sql: MARKETPLACE_ASSET_SCHEMA });
@@ -379,6 +381,12 @@ export async function initDatabase(): Promise<void> {
       try {
         await client.query(table.sql);
       } catch (err) {
+        // Draft recovery history is additive. If the deployment role cannot create its private schema,
+        // keep payments and orders online; design transitions then fail closed without changing content.
+        if (table.name === 'website_draft_checkpoints') {
+          console.error('[DB] CRITICAL: Website draft recovery schema unavailable; template/layout changes and restores are disabled until fixed:', err);
+          continue;
+        }
         console.error(`[DB] CRITICAL: Failed creating base table "${table.name}":`, err);
         throw new Error(`Database base table creation failed for "${table.name}": ${err instanceof Error ? err.message : String(err)}`);
       }

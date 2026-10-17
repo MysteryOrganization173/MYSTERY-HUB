@@ -23,6 +23,8 @@ export function migrateWebsiteTemplate(content: SiteContent, fromId: string, tar
   const defaultCta = (id:string) => id==='tmpl-data-reseller'?'Buy Data':id==='tmpl-start-blank'?'Contact us':'Order via WhatsApp';
   const genericAction = /^(contact|message|talk|call)\b/i.test(content.ctaLabel || '');
   const migrated: SiteContent = compatible ? structuredClone(content) : {
+    ...(content.starterVersion!==undefined?{starterVersion:content.starterVersion}:{}),
+    layoutMode: target.composition ? 'sections' : 'template',
     businessName: content.businessName, logoUrl: content.logoUrl,
     location: content.location, phone: content.phone, whatsapp: content.whatsapp, email: content.email,
     social: structuredClone(content.social || {}),

@@ -11,17 +11,20 @@ const originalQuery=pg.Pool.prototype.query,originalConnect=pg.Pool.prototype.co
 const originalInspect=WebsiteCloudinary.inspect,originalDestroy=WebsiteCloudinary.destroy;
 const names=['DATABASE_URL','CLOUDINARY_CLOUD_NAME','CLOUDINARY_API_KEY','CLOUDINARY_API_SECRET'];
 const env=Object.fromEntries(names.map(name=>[name,process.env[name]]));
-let sites:any[],assets:any[],events:any[],audit:any[],snapshot:any,statements:{sql:string;values:any[]}[],fail:string;
+let sites:any[],assets:any[],events:any[],audit:any[],checkpoints:any[],snapshot:any,statements:{sql:string;values:any[]}[],fail:string;
 const clone=<T>(value:T):T=>structuredClone(value);
 before(()=>{
   assert.equal(process.env.NODE_ENV,'test');process.env.DATABASE_URL='postgresql://fixture.invalid/never-contacted';
   process.env.CLOUDINARY_CLOUD_NAME='fixture-cloud';process.env.CLOUDINARY_API_KEY='fake-key';process.env.CLOUDINARY_API_SECRET='fake-secret';
   pg.Pool.prototype.query=(async(sql:string,values:any[]=[])=>{
     statements.push({sql,values:clone(values)});
-    if(sql==='BEGIN'){snapshot=clone({sites,assets,events,audit});return {rows:[]};}
-    if(sql==='ROLLBACK'){({sites,assets,events,audit}=snapshot);return {rows:[]};}
+    if(sql==='BEGIN'){snapshot=clone({sites,assets,events,audit,checkpoints});return {rows:[]};}
+    if(sql==='ROLLBACK'){({sites,assets,events,audit,checkpoints}=snapshot);return {rows:[]};}
     if(fail && sql.includes(fail))throw new Error('Mock transactional write failure');
     if(sql==='COMMIT' || sql.includes('pg_advisory_xact_lock'))return {rows:[]};
+    if(/^(SAVEPOINT|RELEASE SAVEPOINT) website_slug_insert$/.test(sql))return {rows:[]};
+    if(sql.startsWith('SELECT * FROM mysteryhub_builder_private.website_draft_checkpoints'))return {rows:clone(checkpoints.filter(c=>c.site_id===values[0]&&c.user_id===values[1]))};
+    if(sql.startsWith('INSERT INTO mysteryhub_builder_private.website_draft_checkpoints')){const columns=['id','site_id','user_id','template_id','source_revision','reason','document'];checkpoints.push({...Object.fromEntries(columns.map((key,n)=>[key,key==='document'?JSON.parse(values[n]):values[n]])),created_at:new Date().toISOString()});return {rows:[],rowCount:1};}
     if(sql.startsWith('SELECT COUNT(*) FROM website_sites'))return {rows:[{count:String(sites.filter(s=>s.slug===values[0]).length)}]};
     if(sql.startsWith('SELECT * FROM website_sites WHERE user_id'))return {rows:clone(sites.filter(s=>s.user_id===values[0]))};
     if(sql.startsWith('SELECT * FROM website_sites WHERE id'))return {rows:clone(sites.filter(s=>s.id===values[0]))};
@@ -44,7 +47,7 @@ before(()=>{
   WebsiteCloudinary.destroy=async()=>{throw new Error('Remote mutation is prohibited in this test');};
 });
 after(()=>{pg.Pool.prototype.query=originalQuery;pg.Pool.prototype.connect=originalConnect;WebsiteCloudinary.inspect=originalInspect;WebsiteCloudinary.destroy=originalDestroy;for(const name of names){if(env[name]===undefined)delete process.env[name];else process.env[name]=env[name];}});
-beforeEach(()=>{sites=[];assets=[];events=[];audit=[];statements=[];fail='';});
+beforeEach(()=>{sites=[];assets=[];events=[];audit=[];checkpoints=[];statements=[];fail='';});
 const site=()=>WebsiteStore.createSite('owner',{template_id:'tmpl-start-blank',name:"Ama's Site"});
 const asset=async(siteId:string)=>{const intent=await WebsiteAssetStore.reserve(siteId,'owner',{filename:'shop.png',mime:'image/png',bytes:6000});return WebsiteAssetStore.finalize(siteId,'owner',intent.assetId);};
 test('creation locks owner inside transaction BEFORE checking site count, uses bound SQL',async()=>{const result=await site();const lock=statements.findIndex(s=>s.sql.includes('pg_advisory_xact_lock')),check=statements.findIndex(s=>s.sql.includes('WHERE user_id'));assert.equal(statements[0].sql,'BEGIN');assert.ok(lock<check);assert.deepEqual(statements[lock].values,['website:owner']);assert.equal(statements.at(-1)?.sql,'COMMIT');const insert=statements.find(s=>s.sql.startsWith('INSERT INTO website_sites'))!;assert.equal(insert.values[3],"Ama's Site");assert.ok(!insert.sql.includes("Ama's"));assert.equal((await WebsiteStore.findSiteById(result.site.id))?.content_json.businessName,"Ama's Site");});

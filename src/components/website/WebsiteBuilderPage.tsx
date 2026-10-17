@@ -6,6 +6,8 @@ import { useApp } from '../../context/AppContext';
 import { TEMPLATE_CATEGORIES, WEBSITE_TEMPLATES, orderedWebsiteTemplates } from '../../data/templates';
 import { TemplateCategory, WebsiteSiteRecord, WebsiteTemplate } from '../../types';
 import { TemplateCardPreview } from './TemplateCardPreview';
+import { WebsiteStartSheet } from './WebsiteStartSheet';
+import { websiteItemVocabulary } from '../../config/websiteStarters';
 import { WebsiteEditor } from './editor/WebsiteEditor';
 import { WebsitePlansAndUltra } from './WebsitePlansAndUltra';
 import './websiteBuilder.css';
@@ -57,9 +59,12 @@ export const WebsiteBuilderPage: React.FC = () => {
   const [actionLoadingSiteId, setActionLoadingSiteId] = useState<string | null>(null);
   const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
   const [changeTarget,setChangeTarget]=useState('');
+  const [startTemplate,setStartTemplate]=useState('');
+  // The dashboard's Publish opens the editor's publish checklist, never a blind publish.
+  const [editorPublish,setEditorPublish]=useState(false);
   const [pricingDirty,setPricingDirty]=useState(false);
   const confirmPricingLeave=()=>!pricingDirty||window.confirm('You have unsaved bundle prices. Leave without saving them?');
-  const editSite=(site:WebsiteSiteRecord)=>{if(confirmPricingLeave()){setPricingDirty(false);openWebsiteEditor(site);}};
+  const editSite=(site:WebsiteSiteRecord,publish=false)=>{if(confirmPricingLeave()){setPricingDirty(false);setEditorPublish(publish);openWebsiteEditor(site);}};
   const [dashboardTab, setDashboardTab] = useState('Overview');
   // Leaving the fullscreen editor returns the owner to their website card (or the pricing area they
   // asked for), never to wherever the collapsed page happened to leave the window scrolled.
@@ -84,7 +89,8 @@ export const WebsiteBuilderPage: React.FC = () => {
   };
 
   // A switch started in the global template preview must also update the owner dashboard.
-  useEffect(()=>{if(activeEditorSite)setMySites(prev=>prev.map(site=>site.id===activeEditorSite.id?activeEditorSite:site));},[activeEditorSite]);
+  // A website created from the template preview joins the dashboard too.
+  useEffect(()=>{if(activeEditorSite)setMySites(prev=>prev.some(site=>site.id===activeEditorSite.id)?prev.map(site=>site.id===activeEditorSite.id?activeEditorSite:site):[activeEditorSite,...prev]);},[activeEditorSite]);
 
   useEffect(() => { trackWebsiteEvent('website_builder_viewed', {source:'builder'}, sessionToken || undefined); }, [sessionToken]);
 
@@ -178,46 +184,10 @@ export const WebsiteBuilderPage: React.FC = () => {
   const isFiltering = selectedCategory !== 'all' || searchQuery.trim().length > 0;
   const displayedTemplates = isFiltering || showAllTemplates ? filteredTemplates : filteredTemplates.slice(0, 6);
 
-  const handleCreateSite = async (templateId: string, templateName?: string) => {
+  const handleCreateSite = async (templateId: string, _templateName?: string) => {
     if(activeSite && activeSite.template_id!==templateId){if(!confirmPricingLeave())return;setChangeTarget(templateId);return;}
-    const doCreate = async (token: string) => {
-      trackWebsiteEvent('website_build_started', {templateId,source:'builder'}, token);
-      try {
-        const res = await createWebsiteOnServer(token, {
-          templateId,
-          name: 'My Business',
-        });
-
-        if (res.success && res.site) {
-          if (res.alreadyExists) {
-            showToast('Opening your website.', 'info');
-          } else {
-            setMySites([res.site]);
-            showToast('Your website is ready to personalise.', 'success');
-          }
-          openWebsiteEditor(res.site);
-        }
-      } catch (err: any) {
-        showToast(err.message || 'We couldn’t create your website. Please try again.', 'warning');
-      }
-    };
-
-    if (user && sessionToken) {
-      await doCreate(sessionToken);
-    } else {
-      openAuth(
-        'signup',
-        'Create your free Mystery Hub account to save and publish your website.',
-        () => {
-          const freshToken =
-            localStorage.getItem('mystery_hub_session_token') ||
-            sessionStorage.getItem('mystery_hub_session_token');
-          if (freshToken) {
-            doCreate(freshToken);
-          }
-        }
-      );
-    }
+    if(activeSite){editSite(activeSite);return;}
+    setStartTemplate(templateId);
   };
 
   const handlePrimaryHeroAction = () => {
@@ -309,7 +279,8 @@ export const WebsiteBuilderPage: React.FC = () => {
         site={activeEditorSite}
         onOpenPricing={openPricing}
         sessionToken={sessionToken}
-        onClose={closeWebsiteEditor}
+        openPublish={editorPublish}
+        onClose={()=>{setEditorPublish(false);closeWebsiteEditor();}}
         onSiteUpdated={updateSite}
         showToast={showToast}
       />
@@ -317,6 +288,10 @@ export const WebsiteBuilderPage: React.FC = () => {
   }
 
   const isPublished = activeSite?.status === 'published';
+  // Publishing stamps published_at; any later draft save moves updated_at past it.
+  const draftAhead = !!activeSite?.published_at && Date.parse(activeSite.updated_at) - Date.parse(activeSite.published_at) > 1000;
+  const exampleCount = (activeSite?.content_json?.items || []).filter(item => item.isExample).length;
+  const itemWord = websiteItemVocabulary(activeSite?.template_id || '');
   const displaySiteName =
     activeSite?.content_json?.businessName || activeSite?.name || 'My Business Website';
   const publicSiteUrl = activeSite
@@ -327,6 +302,7 @@ export const WebsiteBuilderPage: React.FC = () => {
     <div className="py-6 sm:py-10 text-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
 
+        {startTemplate&&<WebsiteStartSheet templateId={startTemplate} onClose={()=>setStartTemplate('')} onCreated={(site,alreadyExists)=>{const requested=startTemplate;setStartTemplate('');setMySites([site]);if(alreadyExists&&site.template_id!==requested){setChangeTarget(requested);return;}setEditorPublish(false);openWebsiteEditor(site);showToast(alreadyExists?'Opening your existing website.':'Your website is ready. Tap anything to change it.',alreadyExists?'info':'success');}}/>}
         {activeSite&&sessionToken&&changeTarget&&<WebsiteSettingsControls site={activeSite} token={sessionToken} requestedTemplateId={changeTarget} selectionOnly onClosed={()=>setChangeTarget('')} onDeleted={()=>setMySites([])} onUpdated={updated=>{setMySites([updated]);setChangeTarget('');openWebsiteEditor(updated);}}/>}
         {/* =========================================================
             LOADING / ERROR STATE FOR AUTHENTICATED USERS
@@ -357,7 +333,8 @@ export const WebsiteBuilderPage: React.FC = () => {
             <section id="website-owner-card" data-website-owner-card aria-labelledby="website-owner-name" className="website-owner-card scroll-mt-24 text-left">
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ${isPublished?'bg-emerald-500/15 text-emerald-300':'bg-amber-500/15 text-amber-200'}`}><span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${isPublished?'bg-emerald-400':'bg-amber-300'}`}/>{isPublished?'Live':'Draft · not public yet'}</span>
-                <span className="text-slate-400">My business website · Free plan</span>
+                {isPublished&&draftAhead&&<span className="inline-flex items-center rounded-full px-2.5 py-1 font-semibold bg-sky-500/15 text-sky-200">Draft has unpublished changes</span>}
+                <span className="text-slate-400">{activeBaseTemplate?.title} · Free plan</span>
               </div>
               <h1 id="website-owner-name" tabIndex={-1} className="mt-3 text-2xl sm:text-3xl font-bold break-words outline-none">{displaySiteName}</h1>
               <div className="website-owner-address mt-3">
@@ -366,10 +343,12 @@ export const WebsiteBuilderPage: React.FC = () => {
                 {isPublished&&<button type="button" className="website-owner-icon" aria-label="Copy website link" onClick={()=>handleCopyLink(activeSite.slug)}><Copy className="w-4 h-4"/></button>}
               </div>
               {!isPublished&&<p className="mt-2 text-xs text-slate-400">Publish when you are ready. This address starts working once your website is live.</p>}
+              {isPublished&&activeSite.published_at&&<p className="mt-2 text-xs text-slate-400">Last published {new Intl.DateTimeFormat(undefined,{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}).format(new Date(activeSite.published_at))}.{draftAhead?' Your newer edits are saved as a draft until you update the live site.':''}</p>}
+              {exampleCount>0&&<button type="button" className="website-owner-review" onClick={()=>editSite(activeSite,true)}><span aria-hidden="true">{exampleCount}</span><span><strong>{exampleCount} example {exampleCount===1?itemWord.singular.toLowerCase():itemWord.many} to review</strong><small>Keep the ones that fit your business and remove the rest before publishing.</small></span></button>}
               <div className="website-owner-actions mt-4">
                 <button className="website-owner-primary" onClick={()=>editSite(activeSite)}>Edit website</button>
                 {isPublished?<a className="website-owner-secondary" href={`/sites/${encodeURIComponent(activeSite.slug)}`} target="_blank" rel="noopener noreferrer"><Eye className="w-4 h-4" aria-hidden="true"/>View site</a>:<button className="website-owner-secondary" onClick={handlePreviewCurrentSite}><Eye className="w-4 h-4" aria-hidden="true"/>Preview</button>}
-                {isPublished?<button className="website-owner-secondary" onClick={()=>void handleShare(activeSite.slug)}><Share2 className="w-4 h-4" aria-hidden="true"/>Share</button>:<button disabled={actionLoadingSiteId===activeSite.id} className="website-owner-secondary" onClick={()=>void handleTogglePublish(activeSite)}><Globe className="w-4 h-4" aria-hidden="true"/>{actionLoadingSiteId===activeSite.id?'Publishing…':'Publish'}</button>}
+                {isPublished&&!draftAhead?<button className="website-owner-secondary" onClick={()=>void handleShare(activeSite.slug)}><Share2 className="w-4 h-4" aria-hidden="true"/>Share</button>:<button className="website-owner-secondary" onClick={()=>editSite(activeSite,true)}><Globe className="w-4 h-4" aria-hidden="true"/>{isPublished?'Update live site':'Publish'}</button>}
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
                 {activeSite.template_id==='tmpl-data-reseller'&&<><button className="min-h-11 text-emerald-300" onClick={()=>setDashboardTab('Orders')}>Manage orders</button><button className="min-h-11 text-emerald-300" onClick={()=>setDashboardTab('Bundles & Pricing')}>Bundles &amp; pricing</button></>}
@@ -529,7 +508,8 @@ export const WebsiteBuilderPage: React.FC = () => {
         <details id="plans" open={!activeSite} className="scroll-mt-20"><summary className="min-h-11 cursor-pointer text-sm text-slate-400">Website plans &amp; services</summary>
           <WebsitePlansAndUltra
             sessionToken={sessionToken || undefined}
-            onStartBlank={() => handleCreateSite('tmpl-start-blank', 'My Business')}
+            // "Start free" leads to the designed templates: owners begin from a finished design, not a blank page.
+            onStartBlank={scrollToTemplates}
           />
         </details>
 

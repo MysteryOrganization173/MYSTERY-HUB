@@ -7,6 +7,7 @@ import {createRequire} from 'node:module';
 import pg from 'pg';
 import {WebsiteStore} from '../../db/websiteStore';
 import {WEBSITE_PUBLISHING_SCHEMA as sql} from '../../db/websitePublishingSchema';
+import {WEBSITE_CHECKPOINT_SCHEMA} from '../../db/websiteCheckpointSchema';
 import {publicWebsiteContent,publicWebsiteSettings} from '../../services/websitePublication';
 import {createWebsiteComposition} from '../../../src/config/websiteBuilder';
 const modulePath=process.env.MYSTERY_TEST_PGLITE_PATH;
@@ -19,7 +20,7 @@ test('real embedded PostgreSQL migration, legacy isolation and transactional pub
 const db=new PGlite();database=db;let checks=0;const pass=(name:string)=>{checks++;console.log('PASS '+name);};
 await db.exec('CREATE TABLE users(id VARCHAR(64) PRIMARY KEY); INSERT INTO users VALUES (\'legacy-owner\'),(\'current-owner\'); CREATE TABLE untouched_finance(id TEXT PRIMARY KEY,balance_minor INTEGER,ledger JSONB,orders JSONB); INSERT INTO untouched_finance VALUES (\'sentinel\',12345,\'["legacy-entry"]\',\'["legacy-order"]\');');
 const schema=fs.readFileSync(path.join(repo,'server/db/schema.sql'),'utf8');const start=schema.indexOf('CREATE TABLE IF NOT EXISTS website_sites (');await db.exec(schema.slice(start,schema.indexOf('\n);',start)+4));
-await db.exec(sql);pass('empty website database migration succeeds');
+await db.exec(sql);await db.exec(WEBSITE_CHECKPOINT_SCHEMA);pass('empty website database migration succeeds');
 const original:any={businessName:'Existing public business',tagline:'Existing headline',aboutText:'Existing body',heroImage:'/legacy-image.svg',logoUrl:'/legacy-logo.svg',phone:'0241234567',whatsapp:'0241234567',email:'fixture@example.test',location:'Accra',ctaLabel:'Contact',ctaTarget:'https://example.test/contact',items:[{id:'item-1',name:'Saved item',image:'/legacy-item.svg',price:'9.00',supplierSecret:'never-copy'}],stats:[{label:'Owner fact',value:'1',secret:'never-copy'}],social:{instagram:'existing',secret:'never-copy'},composition:createWebsiteComposition(['header','hero','about','footer']),privateNote:'never-copy'};
 original.composition.sections[1].data={heading:'Saved section hero',body:'Existing section text',items:[{title:'Saved section item',secret:'never-copy'}],secret:'never-copy'};original.composition.sections[1].secret='never-copy';original.composition.secret='never-copy';
 const settings={primaryColor:'#123456',accentColor:'#7c3aed',backgroundColor:'#ffffff',fontFamily:'font-serif',borderRadius:'rounded-lg',providerKey:'never-copy'};

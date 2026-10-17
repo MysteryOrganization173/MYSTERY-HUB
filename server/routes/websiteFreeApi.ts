@@ -13,7 +13,7 @@ export function websiteFreeHandler(action: (req: Request, res: Response) => Prom
   return async (req: Request, res: Response, _next?: NextFunction) => {
     try { await action(req,res); }
     catch(error) {
-      if(error instanceof WebsiteOperationError || error instanceof WebsiteInputError) { res.status(error instanceof WebsiteOperationError ? error.status : 400).json({error:error.message}); return; }
+      if(error instanceof WebsiteOperationError || error instanceof WebsiteInputError) { res.status(error instanceof WebsiteOperationError ? error.status : 400).json({error:error.message,...(error instanceof WebsiteOperationError && error.code ? {code:error.code} : {})}); return; }
       console.error('[Website Free] Operation failed');
       res.status(503).json({error:'Website services are temporarily unavailable. Please retry.'});
     }

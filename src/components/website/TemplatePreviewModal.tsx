@@ -2,7 +2,11 @@ import {useDialogFocus} from '../../hooks/useDialogFocus';
 import { WebsiteSettingsControls } from './WebsiteSettingsControls';
 import type { WebsiteSiteRecord } from '../../types';
 import { trackWebsiteEvent } from '../../utils/websiteAnalytics';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { WebsiteStartSheet } from './WebsiteStartSheet';
+import { websiteStarter } from '../../config/websiteStarters';
+import { mergeSiteWithTemplate } from '../../utils/templateRendererUtils';
+import type { SiteContent } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { createWebsiteOnServer } from '../../services/apiClient';
 import {
@@ -47,6 +51,22 @@ export const TemplatePreviewModal: React.FC = () => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [changeSite,setChangeSite]=useState<WebsiteSiteRecord|null>(null);
   const [changeTarget,setChangeTarget]=useState('');
+  const [previewName,setPreviewName]=useState('');
+  const [starting,setStarting]=useState(false);
+  // Gallery previews show the real starter a new owner receives, not the demonstration business.
+  // Managed Data stores keep their existing catalogue preview (real bundles, no starter items).
+  const starterTemplate = useMemo(() => {
+    const t = selectedTemplatePreview;
+    if (!t || t.siteContent || t.id === 'tmpl-data-reseller') return null;
+    const starter = websiteStarter(t.id, previewName.trim() || 'Your business');
+    return mergeSiteWithTemplate(t, starter.content as SiteContent, starter.settings);
+  }, [selectedTemplatePreview, previewName]);
+  const shownTemplate = selectedTemplatePreview?.siteContent ? selectedTemplatePreview : starterTemplate;
+  const shownRef = useRef(shownTemplate); shownRef.current = shownTemplate;
+  useEffect(() => { setPreviewName(''); setStarting(false); }, [selectedTemplatePreview?.id]);
+  useEffect(() => {
+    if (starterTemplate) iframeRef.current?.contentWindow?.postMessage({type:'MYSTERYHUB_PREVIEW_CONTENT',template:starterTemplate},window.location.origin);
+  }, [starterTemplate]);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -132,8 +152,8 @@ export const TemplatePreviewModal: React.FC = () => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin || event.source !== iframeRef.current?.contentWindow) return;
-      if (selectedTemplatePreview && event.data?.type === 'MYSTERYHUB_TEMPLATE_LOADED' && event.data.templateId === selectedTemplatePreview.id && selectedTemplatePreview.siteContent) {
-        iframeRef.current?.contentWindow?.postMessage({type:'MYSTERYHUB_PREVIEW_CONTENT',template:selectedTemplatePreview,siteId:selectedTemplatePreview.previewSiteId},window.location.origin);
+      if (selectedTemplatePreview && event.data?.type === 'MYSTERYHUB_TEMPLATE_LOADED' && event.data.templateId === selectedTemplatePreview.id && shownRef.current) {
+        iframeRef.current?.contentWindow?.postMessage({type:'MYSTERYHUB_PREVIEW_CONTENT',template:shownRef.current,siteId:selectedTemplatePreview.previewSiteId},window.location.origin);
       }
       if (event.data?.type === 'MYSTERYHUB_PREVIEW_CLOSE') handleClose();
       if (event.data?.type === 'MYSTERYHUB_TEMPLATE_CTA') {
@@ -146,6 +166,10 @@ export const TemplatePreviewModal: React.FC = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [selectedTemplatePreview]);
 
+  const startSheet = starting && selectedTemplatePreview ? <WebsiteStartSheet templateId={selectedTemplatePreview.id} initialName={previewName.trim()} onClose={()=>setStarting(false)} onCreated={(site,alreadyExists)=>{setStarting(false);
+    // An owner who already has a website on another design is offered the change, never switched silently.
+    if(alreadyExists&&site.template_id!==selectedTemplatePreview.id){setChangeSite(site);setChangeTarget(selectedTemplatePreview.id);return;}
+    handleClose();openWebsiteEditor(site);showToast(alreadyExists?'Opening your existing website.':'Your website is ready. Tap anything to change it.',alreadyExists?'info':'success');}}/> : null;
   if(changeSite&&sessionToken)return <WebsiteSettingsControls site={changeSite} token={sessionToken} requestedTemplateId={changeTarget} selectionOnly onClosed={()=>setChangeSite(null)} onDeleted={()=>setChangeSite(null)} onUpdated={updated=>{setChangeSite(null);openWebsiteEditor(updated);}}/>;
   if (!selectedTemplatePreview) return null;
 
@@ -175,46 +199,21 @@ export const TemplatePreviewModal: React.FC = () => {
     .slice(0, 16);
 
   const handleStartBuilding = async () => {
-    handleClose();
-    if (t.siteContent) return;
-
-    const doCreate = async (token: string) => {
-      trackWebsiteEvent('website_build_started',{templateId:t.id,source:'builder'},token);
-      try {
-        const res = await createWebsiteOnServer(token, {
-          templateId: t.id,
-          name: t.demoBusinessName,
-        });
-        if (res.success && res.site) {
-          if(res.alreadyExists&&res.site.template_id!==t.id){setChangeSite(res.site);setChangeTarget(t.id);closeTemplatePreview();return;}
-          openWebsiteEditor(res.site);
-          if (res.alreadyExists) {
-            showToast('Opening your active website project.', 'info');
-          } else {
-            showToast(`Website project created from "${t.title}"!`, 'success');
-          }
-        }
-      } catch (err: any) {
-        showToast(err.message || 'Failed to initialize website project.', 'warning');
-      }
-    };
-
+    if (t.siteContent) { handleClose(); return; }
+    // An owner who already has a website changes design instead of creating a second one.
     if (user && sessionToken) {
-      await doCreate(sessionToken);
-    } else {
-      openAuth(
-        'signup',
-        'Create your free Mystery Hub account to save and publish your website.',
-        () => {
-          const freshToken =
-            localStorage.getItem('mystery_hub_session_token') ||
-            sessionStorage.getItem('mystery_hub_session_token');
-          if (freshToken) {
-            doCreate(freshToken);
-          }
+      try {
+        const {getMyWebsitesOnServer} = await import('../../services/apiClient');
+        const mine = (await getMyWebsitesOnServer(sessionToken)).sites || [];
+        if (mine[0]) {
+          handleClose();
+          if (mine[0].template_id !== t.id) { setChangeSite(mine[0]); setChangeTarget(t.id); }
+          else { openWebsiteEditor(mine[0]); showToast('Opening your website.', 'info'); }
+          return;
         }
-      );
+      } catch { /* Fall through: the server still refuses a second website. */ }
     }
+    setStarting(true);
   };
 
   // Direct share action with native navigator.share or clipboard fallback
@@ -308,7 +307,8 @@ export const TemplatePreviewModal: React.FC = () => {
       {/* Main Modal Container: Full Screen on Mobile, Windowed on Desktop */}
       <div className="relative w-full h-[100dvh] sm:h-[95vh] sm:max-w-7xl bg-[#0a0f14] border-0 sm:border border-slate-800 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 z-10">
         
-        <p className="px-4 py-2 text-xs text-slate-300 bg-slate-900">{t.siteContent ? 'Your website preview · Saved content. Preview actions do not place orders or bookings.' : 'Design preview · Sample content and interactions. Reservations and purchases are not submitted.'}</p>
+        {startSheet}
+        <p className="px-4 py-2 text-xs text-slate-300 bg-slate-900">{t.siteContent ? 'Your website preview · Saved content. Preview actions do not place orders or bookings.' : starterTemplate ? `This is exactly how your website starts.${starterTemplate.items?.length ? ' Items marked Example are there for you to edit, keep or remove.' : ''}` : 'Design preview · Sample content and interactions. Reservations and purchases are not submitted.'}</p>
         {/* =========================================================
             TOP CONTROL BAR: Clean, Aggressively Simplified
             - Mobile: [ Back ]  Template Name  [ Share ] [ Use ]
@@ -501,7 +501,7 @@ export const TemplatePreviewModal: React.FC = () => {
                   className="truncate font-semibold"
                   style={{ color: isDarkBackground ? '#f8fafc' : '#0f172a' }}
                 >
-                  {t.siteContent ? t.demoBusinessName : siteSlug}
+                  {t.siteContent ? t.demoBusinessName : starterTemplate ? (previewName.trim() || 'your-business').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24) || 'your-business' : siteSlug}
                 </span>
               </div>
 
@@ -538,7 +538,7 @@ export const TemplatePreviewModal: React.FC = () => {
                 <iframe
                   ref={iframeRef}
                   key={`${t.id}-${deviceView}-${iframeKey}`}
-                  src={`/?isolated_template_preview=${encodeURIComponent(t.id)}${t.siteContent ? '&owner_preview=1' : ''}`}
+                  src={`/?isolated_template_preview=${encodeURIComponent(t.id)}${shownTemplate ? '&owner_preview=1' : ''}`}
                   title={`${t.title} ${deviceView} preview`}
                   className="w-full h-full border-0 block bg-white"
                   sandbox="allow-scripts allow-same-origin"
@@ -553,6 +553,11 @@ export const TemplatePreviewModal: React.FC = () => {
             - Subtly guides visitor to compare plans or explore Ultra
             - Does not overlay customer template body
             ========================================================= */}
+        {starterTemplate ? <form className="website-preview-namebar" onSubmit={event=>{event.preventDefault();void handleStartBuilding();}}>
+          <label className="sr-only" htmlFor="website-preview-name">Your business name</label>
+          <input id="website-preview-name" value={previewName} maxLength={100} onChange={event=>setPreviewName(event.target.value.replace(/[<>]/g,''))} placeholder="Type your business name to see it" autoComplete="organization" enterKeyHint="go"/>
+          <button type="submit">Use this design<ArrowRight className="w-4 h-4" aria-hidden="true"/></button>
+        </form> :
         <div className="px-3 sm:px-5 py-2 bg-[#06090d] border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-1.5 text-xs text-slate-400 shrink-0 select-none">
           <div className="flex items-center gap-2 text-[11px] sm:text-xs">
             <span className="text-slate-300 font-medium">Ready to launch your website in Ghana?</span>
@@ -589,7 +594,7 @@ export const TemplatePreviewModal: React.FC = () => {
               Need custom build? Explore Ultra
             </button>
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   );

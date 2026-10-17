@@ -1,5 +1,6 @@
+import { ExampleTag } from '../ExampleTag';
 import { SiteFooterContact } from '../SiteContactDetails';
-import {useVisualEditMarkers} from '../editor/VisualEditMarkers';
+import {useVisualEditMarkers, useTemplateCopy} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
@@ -26,6 +27,7 @@ interface TemplateViewProps {
 
 export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
   const edit = useVisualEditMarkers();
+  const copy = useTemplateCopy(template);
   const [propertyType, setPropertyType] = useState<string>('All');
   const [selectedLocation, setSelectedLocation] = useState<string>('All Locations');
   const [tourScheduled, setTourScheduled] = useState<boolean>(false);
@@ -69,9 +71,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
             <span className="font-extrabold text-base tracking-tight text-[var(--website-primary,#0f172a)] block leading-none" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </span>
-            <span className="text-[10px] text-[var(--website-accent,#0ea5e9)] uppercase tracking-widest font-bold block mt-0.5">
-              Luxury Property & Estates Ghana
-            </span>
+            <span className="text-[10px] text-[var(--website-accent,#0ea5e9)] uppercase tracking-widest font-bold block mt-0.5" {...copy.edit('brand')}>{copy.text('brand')}</span>
           </div>
         </div>
 
@@ -104,7 +104,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
         <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-45  " src={template.heroImage || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
         <div className="relative max-w-4xl mx-auto space-y-6 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#0ea5e9)]/20 border border-[var(--website-accent,#0ea5e9)]/40 text-[#38bdf8] text-xs font-semibold uppercase tracking-wider">
-            <span>Prime Real Estate in Ghana</span>
+            <span {...copy.edit('eyebrow')}>{copy.text('eyebrow')}</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight text-white" {...edit("content:tagline")}>
@@ -116,7 +116,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
           </p>
 
           {/* Embedded Real Estate Search Box */}
-          {template.siteContent ? <a href="#featured" className="inline-block rounded-xl px-5 py-3 bg-white text-slate-900 font-bold">Browse listings</a> : <div id="search" className="bg-white p-3 sm:p-4 rounded-2xl shadow-2xl text-left max-w-3xl mx-auto text-slate-900 grid grid-cols-1 sm:grid-cols-4 gap-3 mt-6">
+          {template.siteContent ? <a href="#featured" className="inline-block rounded-xl px-5 py-3 bg-white text-slate-900 font-bold" {...copy.edit('primary')}>{copy.text('primary')}</a> : <div id="search" className="bg-white p-3 sm:p-4 rounded-2xl shadow-2xl text-left max-w-3xl mx-auto text-slate-900 grid grid-cols-1 sm:grid-cols-4 gap-3 mt-6">
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
                 Location
@@ -178,12 +178,8 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <div id="featured" className="py-14 px-4 sm:px-12 max-w-6xl mx-auto space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#0ea5e9)] font-bold block">
-              Curated Portfolio
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-[var(--website-primary,#0f172a)] mt-1">
-              Featured Luxury Residences
-            </h2>
+            <span className="text-xs uppercase tracking-widest text-[var(--website-accent,#0ea5e9)] font-bold block" {...copy.edit('itemsEyebrow')}>{copy.text('itemsEyebrow')}</span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-[var(--website-primary,#0f172a)] mt-1" {...copy.edit('itemsHeading')}>{copy.text('itemsHeading')}</h2>
           </div>
 
           <div className="flex items-center gap-2">
@@ -206,10 +202,11 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {template.siteContent && !filteredListings.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {filteredListings.map((prop) => (
-            <div
+            <div {...edit(`item:${prop.id}`)}
               key={prop.id}
-              className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
+              className="relative bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
             >
+              <ExampleTag item={prop} corner="right" flow={!prop.image}/>
               <div>
                 {prop.image && (
                   <div className="h-48 overflow-hidden relative bg-slate-100">
@@ -221,9 +218,9 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
                     <div className="absolute top-3 left-3 bg-[var(--website-primary,#0f172a)]/90 backdrop-blur-sm px-2.5 py-1 rounded-md text-[10px] font-bold text-white uppercase tracking-wider">
                       {prop.category}
                     </div>
-                    <div className="absolute bottom-3 right-3 bg-[var(--website-accent,#0ea5e9)] text-white px-3 py-1 rounded-lg text-xs font-black shadow-md">
+                    {prop.price && <div className="absolute bottom-3 right-3 bg-[var(--website-accent,#0ea5e9)] text-white px-3 py-1 rounded-lg text-xs font-black shadow-md">
                       {prop.price}
-                    </div>
+                    </div>}
                   </div>
                 )}
                 <div className="p-5 space-y-2">
@@ -255,7 +252,7 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
                   href="#tour"
                   className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-[var(--website-accent,#0ea5e9)] hover:text-white text-[var(--website-primary,#0f172a)] text-xs font-bold text-center block transition-colors cursor-pointer"
                 >
-                  Schedule Private Tour
+                  {copy.text('itemButton')}
                 </a>
               </div>
             </div>
@@ -267,16 +264,12 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
       <div id="tour" className="py-14 px-4 sm:px-12 bg-slate-100 border-t border-slate-200">
         <div className="max-w-2xl mx-auto bg-white rounded-3xl p-6 sm:p-10 shadow-lg border border-slate-200 space-y-6">
           <div className="text-center space-y-1">
-            <span className="text-xs font-bold text-[var(--website-accent,#0ea5e9)] uppercase tracking-widest">
-              VIP Buyer Concierge
-            </span>
-            <h3 className="text-2xl font-extrabold text-[var(--website-primary,#0f172a)]">Schedule a Viewing</h3>
-            <p className="text-xs text-slate-500">
-              Contact us to discuss available properties and arrange a viewing.
-            </p>
+            <span className="text-xs font-bold text-[var(--website-accent,#0ea5e9)] uppercase tracking-widest" {...copy.edit('enquiryEyebrow')}>{copy.text('enquiryEyebrow')}</span>
+            <h3 className="text-2xl font-extrabold text-[var(--website-primary,#0f172a)]" {...copy.edit('enquiryHeading')}>{copy.text('enquiryHeading')}</h3>
+            <p className="text-xs text-slate-500" {...copy.edit('enquiryIntro')}>{copy.text('enquiryIntro')}</p>
           </div>
 
-          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick}/> : tourScheduled ? (
+          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Which property?" dateLabel="Preferred viewing date"/> : tourScheduled ? (
             <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-center space-y-2">
               <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto" />
               <h4 className="font-bold text-emerald-900 text-base">Example viewing</h4>
