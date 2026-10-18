@@ -19,8 +19,8 @@ function component(preview=false,siteId='site-a') {
   };
   const tile=()=>null,tabs=()=>null,colors={accent:'#7c3aed',background:'#07101e',surface:'#0b1220',text:'#fff',mutedText:'#bbb',border:'#566',focus:'#fff'};
   const modules:any={react,'../../data/templates':{WEBSITE_TEMPLATES:[]},'../../data/bundles':{detectGhanaNetwork:()=>'mtn'},
-    './storefront/ResellerCatalogue':{BundleTile:tile,NetworkTabs:tabs,lowestPrice:(b:any[])=>b.length?Math.min(...b.map(x=>x.priceMinor)):null,sortBundles:(b:any[])=>b,storeNetworkColor:()=>'#ffcc00',storeNetworkName:(n:string)=>n.toUpperCase(),storeNetworksIn:(b:any[])=>[...new Set(b.map(x=>x.network))]},
-    '../../utils/websiteBrand':{websiteActionText:()=> '#fff',resolveResellerTheme:()=>colors},
+    './storefront/ResellerCatalogue':{BundleTile:tile,NetworkTabs:tabs,lowestPrice:(b:any[])=>b.length?Math.min(...b.map(x=>x.priceMinor)):null,sortBundles:(b:any[])=>b,storeNetworkColor:()=>'#ffcc00',storeNetworkName:(n:string)=>n.toUpperCase(),storeNetworksIn:(b:any[])=>[...new Set(b.map(x=>x.network))],networkSummaries:()=>[]},
+    '../../utils/websiteBrand':{websiteActionText:()=> '#fff',resolveResellerTheme:()=>colors,resolveStoreTheme:()=>colors},
     '../../utils/templateRendererUtils':{renderTemplateLayout:(_template:any,slots:any)=>({type:'layout',props:slots})},
     '../../hooks/usePaystack':{usePaystack:()=>({loadingPhase:'opening',initializeServerPayment:async(options:any)=>{calls.payments.push(options);}})},
     '../../services/websiteBusinessApi':{websiteBusinessRequest:async(path:string)=>{calls.requests.push(path);return path.endsWith('/storefront')?{products:[{id:'mtn-1gb',network:'mtn',dataAmount:'1GB',retailMinor:521}]}:{status:'pending_payment',manual_review:false};},trackPublicWebsite:(_id:string,event:string)=>calls.events.push(event)},

@@ -1,8 +1,8 @@
 import { WEBSITE_TEMPLATES } from '../../data/templates';
 import { detectGhanaNetwork } from '../../data/bundles';
-import { websiteActionText, resolveResellerTheme } from '../../utils/websiteBrand';
+import { websiteActionText, resolveStoreTheme } from '../../utils/websiteBrand';
 import React,{useEffect,useRef,useState} from 'react';
-import { BundleTile, NetworkTabs, lowestPrice, sortBundles, storeNetworkColor, storeNetworkName, storeNetworksIn, type StoreBundle, type StoreNetwork } from './storefront/ResellerCatalogue';
+import { BundleTile, NetworkTabs, lowestPrice, networkSummaries, sortBundles, storeNetworkColor, storeNetworkName, storeNetworksIn, type StoreBundle, type StoreNetwork } from './storefront/ResellerCatalogue';
 import { renderTemplateLayout } from '../../utils/templateRendererUtils';
 import { usePaystack } from '../../hooks/usePaystack';
 import { websiteBusinessRequest,trackPublicWebsite } from '../../services/websiteBusinessApi';
@@ -31,7 +31,7 @@ function StorefrontCheckout({siteId,template,preview}:{siteId:string;template:We
     return()=>{mounted.current=false;lifecycle.current.dispose();++trackingGeneration.current;};
   },[siteId]);
   const payment=usePaystack();
-  const colors=resolveResellerTheme(template.colorScheme || WEBSITE_TEMPLATES.find(t=>t.id==='tmpl-data-reseller')!.colorScheme!);
+  const colors=resolveStoreTheme(template.colorScheme || WEBSITE_TEMPLATES.find(t=>t.id==='tmpl-data-reseller')!.colorScheme!);
   const neutral={backgroundColor:colors.background,borderColor:colors.border,color:colors.text};
   const primary={backgroundColor:colors.accent,borderColor:colors.border,color:websiteActionText(colors.accent)};
   const muted={color:colors.mutedText};
@@ -86,7 +86,7 @@ function StorefrontCheckout({siteId,template,preview}:{siteId:string;template:We
   const onNetwork=sortBundles(bundles.filter(b=>b.network===shown));
   const toBundle=(b:StoreBundle):DataBundle=>({id:b.id,network:b.network,dataAmount:b.dataAmount,dataBytesValue:0,priceGhc:b.priceMinor/100,validity:b.validity||'',validityCategory:'Monthly',description:'',serviceType:'data'});
   const detected=selected&&phone?detectGhanaNetwork(phone):null;
-  const summary={networks,fromMinor:lowestPrice(bundles),count:bundles.length};
+  const summary={networks,fromMinor:lowestPrice(bundles),count:bundles.length,byNetwork:networkSummaries(bundles),onPickNetwork:(n:StoreNetwork)=>setNetwork(n)};
   const storefront=<div className="space-y-4" style={{color:colors.text, '--website-focus':colors.focus, '--website-placeholder':colors.mutedText} as React.CSSProperties}>
     {preview&&<p role="status" className="store-card store-note" style={{...neutral,backgroundColor:colors.surface,color:colors.surfaceText}}><strong>Draft preview.</strong> Checkout and order tracking are turned off. Customers can buy once your store is live.</p>}
     <p className="sr-only">Data bundles from {template.demoBusinessName}</p>

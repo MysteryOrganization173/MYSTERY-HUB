@@ -10,7 +10,7 @@ import {formatGhs} from '../../../../shared/money';
  */
 export type StoreNetwork = 'mtn' | 'telecel' | 'airteltigo';
 export interface StoreBundle {id: string; network: StoreNetwork; dataAmount: string; validity?: string; priceMinor: number}
-export type StoreTheme = {background: string; surface: string; text: string; mutedText: string; surfaceText: string; surfaceMutedText: string; accent: string; surfaceAccentText: string; border: string; focus: string};
+export type StoreTheme = {background: string; surface: string; text: string; mutedText: string; surfaceText: string; surfaceMutedText: string; accent: string; surfaceAccentText: string; border: string; focus: string; hairline?: string};
 
 export const STORE_NETWORKS: readonly StoreNetwork[] = ['mtn', 'telecel', 'airteltigo'];
 export const storeNetworkName = (network: StoreNetwork) => network === 'mtn' ? 'MTN' : network === 'telecel' ? 'Telecel' : 'AirtelTigo';
@@ -39,9 +39,35 @@ export function storeNetworksIn(bundles: StoreBundle[]): StoreNetwork[] {
 export function lowestPrice(bundles: StoreBundle[]): number | null {
   return bundles.length ? Math.min(...bundles.map(bundle => bundle.priceMinor)) : null;
 }
+export interface NetworkSummary {network: StoreNetwork; count: number; fromMinor: number | null}
+/** Counts and lowest prices per network, computed only from the bundles actually shown. */
+export function networkSummaries(bundles: StoreBundle[]): NetworkSummary[] {
+  return storeNetworksIn(bundles).map(network => {
+    const own = bundles.filter(bundle => bundle.network === network);
+    return {network, count: own.length, fromMinor: lowestPrice(own)};
+  });
+}
+
+/** Hero shortcut: one card per network on sale, with its real bundle count and lowest price. */
+export function NetworkPicker({networks, theme, onPick, example = false}: {networks: NetworkSummary[]; theme: StoreTheme; onPick: (network: StoreNetwork) => void; example?: boolean}) {
+  return <div className="store-picker">
+    <p className="store-eyebrow" style={{color: theme.mutedText}}>{example ? 'Shop by network (example prices)' : 'Shop by network'}</p>
+    <div className="store-picker-grid">
+      {networks.map(({network, count, fromMinor}) => <button key={network} type="button" onClick={() => onPick(network)} className="store-picker-card"
+        style={{backgroundColor: theme.surface, borderColor: theme.hairline || theme.border, color: theme.surfaceText, '--store-network': storeNetworkColor(network)} as React.CSSProperties}
+        aria-label={`${storeNetworkName(network)}: ${count} bundle${count === 1 ? '' : 's'}${fromMinor !== null ? `, from ${formatGhs(fromMinor)}` : ''}`}>
+        <span className="store-picker-mark" aria-hidden="true" style={{backgroundColor: storeNetworkColor(network), color: websiteActionText(storeNetworkColor(network))}}>{storeNetworkName(network).slice(0, 1)}</span>
+        <span className="min-w-0">
+          <strong>{storeNetworkName(network)}</strong>
+          <small style={{color: theme.surfaceMutedText}}>{count} bundle{count === 1 ? '' : 's'}{fromMinor !== null ? <> · from <b style={{color: theme.surfaceText}}>{formatGhs(fromMinor)}</b></> : null}</small>
+        </span>
+      </button>)}
+    </div>
+  </div>;
+}
 
 export function NetworkTabs({networks, value, onChange, bundles, theme}: {networks: StoreNetwork[]; value: StoreNetwork; onChange: (network: StoreNetwork) => void; bundles: StoreBundle[]; theme: StoreTheme}) {
-  return <nav aria-label="Store networks" className="store-network-tabs" style={{backgroundColor: theme.surface, borderColor: theme.border}}>
+  return <nav aria-label="Store networks" className="store-network-tabs" style={{backgroundColor: theme.surface, borderColor: theme.hairline || theme.border}}>
     {networks.map(network => {
       const active = network === value, brand = storeNetworkColor(network), count = bundles.filter(bundle => bundle.network === network).length;
       return <button key={network} type="button" aria-pressed={active} onClick={() => onChange(network)}
@@ -58,14 +84,19 @@ export function BundleTile({bundle, theme, onChoose, example = false}: {bundle: 
   const perGb = pricePerGb(bundle), price = formatGhs(bundle.priceMinor);
   return <button type="button" className="store-bundle" onClick={() => onChoose(bundle)}
     aria-label={`${example ? 'Example: ' : 'Buy '}${storeNetworkName(bundle.network)} ${bundle.dataAmount}${bundle.validity ? `, ${bundle.validity}` : ''}, ${price}`}
-    style={{backgroundColor: theme.surface, borderColor: theme.border, color: theme.surfaceText, '--store-network': storeNetworkColor(bundle.network)} as React.CSSProperties}>
-    <span className="store-bundle-size site-display">{bundle.dataAmount}</span>
-    <span className="store-bundle-meta" style={{color: theme.surfaceMutedText}}>{storeNetworkName(bundle.network)}{bundle.validity ? ` · ${bundle.validity}` : ''}</span>
-    <span className="store-bundle-foot">
-      <strong className="store-bundle-price" style={{color: theme.surfaceAccentText}}>{price}</strong>
-      {perGb && <small style={{color: theme.surfaceMutedText}}>{perGb}</small>}
+    style={{backgroundColor: theme.surface, borderColor: theme.hairline || theme.border, color: theme.surfaceText, '--store-network': storeNetworkColor(bundle.network)} as React.CSSProperties}>
+    <span className="store-bundle-top">
+      <span className="store-bundle-network" style={{color: theme.surfaceMutedText}}><i aria-hidden="true"/>{storeNetworkName(bundle.network)}</span>
+      {bundle.validity && <span className="store-bundle-validity" style={{color: theme.surfaceMutedText, borderColor: theme.hairline || theme.border}}>{bundle.validity}</span>}
     </span>
-    <span aria-hidden="true" className="store-bundle-cta" style={{backgroundColor: theme.accent, color: websiteActionText(theme.accent)}}>{example ? 'Example' : 'Buy'}</span>
+    <span className="store-bundle-size site-display">{bundle.dataAmount}</span>
+    <span className="store-bundle-foot" style={{borderColor: theme.hairline || theme.border}}>
+      <span className="min-w-0">
+        <strong className="store-bundle-price" style={{color: theme.surfaceText}}>{price}</strong>
+        {perGb && <small style={{color: theme.surfaceMutedText}}>{perGb}</small>}
+      </span>
+      <span aria-hidden="true" className="store-bundle-cta" style={{backgroundColor: theme.accent, color: websiteActionText(theme.accent)}}>{example ? 'Example' : 'Buy'}</span>
+    </span>
   </button>;
 }
 
@@ -74,12 +105,12 @@ export function HowBuyingWorks({theme, managed}: {theme: StoreTheme; managed: bo
   const steps = [
     ['Choose a bundle', 'Pick the network and the bundle size you need.'],
     ['Pay securely', managed ? 'Enter the number to receive the data, then pay in the secure Paystack window.' : 'Enter the number to receive the data, then pay securely.'],
-    ['Track your order', 'Keep your order reference. You can check its status on this page at any time.'],
+    ['Track your order', managed ? 'Keep your order reference. You can check its status on this page at any time.' : 'Keep your order reference so the store can check your order.'],
   ];
   return <ol className="store-steps" aria-label="How buying works">
-    {steps.map(([title, text], index) => <li key={title} style={{borderColor: theme.border}}>
-      <span aria-hidden="true" className="store-step-number site-display" style={{color: theme.accent === theme.surfaceAccentText ? theme.accent : theme.surfaceAccentText, borderColor: theme.border}}>{index + 1}</span>
-      <span><strong>{title}</strong><small style={{color: theme.mutedText}}>{text}</small></span>
+    {steps.map(([title, text], index) => <li key={title}>
+      <span aria-hidden="true" className="store-step-number site-display" style={{backgroundColor: theme.accent, color: websiteActionText(theme.accent)}}>{index + 1}</span>
+      <span><strong>{title}</strong><small style={{color: theme.surfaceMutedText}}>{text}</small></span>
     </li>)}
   </ol>;
 }
@@ -90,45 +121,65 @@ export const RESELLER_STORE_CSS = `
 .reseller-storefront button,.reseller-storefront a{min-height:44px}
 .reseller-storefront :is(button,a,input):focus-visible{outline:2px solid var(--website-focus);outline-offset:3px}
 .reseller-storefront input::placeholder{color:var(--website-placeholder);opacity:1}
-.store-wrap{width:100%;max-width:72rem;margin:0 auto;padding-left:16px;padding-right:16px}
+.store-wrap{width:100%;max-width:74rem;margin:0 auto;padding-left:16px;padding-right:16px}
 @media (min-width:640px){.store-wrap{padding-left:32px;padding-right:32px}}
-.store-header{position:sticky;top:0;z-index:30;border-bottom:1px solid;backdrop-filter:blur(10px)}
-.store-header-inner{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:64px}
-.store-brand{display:flex;align-items:center;gap:10px;min-width:0}
-.store-mark{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:15px;letter-spacing:.02em;flex-shrink:0;overflow:hidden}
+.store-header{position:sticky;top:0;z-index:30;border-bottom:1px solid;backdrop-filter:saturate(1.4) blur(12px)}
+.store-header-inner{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:68px}
+.store-brand{display:flex;align-items:center;gap:12px;min-width:0}
+.store-mark{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:16px;letter-spacing:.02em;flex-shrink:0;overflow:hidden}
 .store-mark img{width:100%;height:100%;object-fit:contain}
-.store-brand-name{font-weight:700;font-size:16px;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0}
-.store-brand-line{font-size:12px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.store-chat{display:inline-flex;align-items:center;gap:8px;padding:0 14px;border-radius:999px;font-weight:700;font-size:13px;flex-shrink:0}
-.store-hero{display:grid;gap:22px;padding-top:28px;padding-bottom:12px}
-@media (min-width:900px){.store-hero{grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);align-items:center;gap:48px;padding-top:56px;padding-bottom:40px}}
-.store-hero-badge{display:inline-flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;border:1px solid}
-.store-hero-badge i{width:8px;height:8px;border-radius:50%;display:inline-block}
-.store-hero-title{font-size:clamp(2rem,7vw,3.6rem);line-height:1.04;font-weight:700;margin:16px 0 0;overflow-wrap:anywhere}
-.store-hero-text{font-size:15px;line-height:1.6;margin-top:14px;max-width:34rem}
-.store-hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
-.store-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 22px;min-height:50px!important;border-radius:14px;font-weight:700;font-size:15px;border:1px solid transparent;transition:transform .15s ease,box-shadow .15s ease}
-.store-primary:hover{box-shadow:0 10px 28px -12px var(--website-accent)}
+.store-brand-name{font-weight:700;font-size:17px;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0;letter-spacing:-.01em}
+.store-brand-line{font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.store-nav{display:none;align-items:center;gap:4px;font-size:14px;font-weight:600}
+.store-nav a{display:inline-flex;align-items:center;padding:0 12px;border-radius:999px;opacity:.82;transition:opacity .15s ease,background-color .15s ease}
+.store-nav a:hover{opacity:1;background:var(--store-surface)}
+@media (min-width:860px){.store-nav{display:flex}}
+.store-chat{display:inline-flex;align-items:center;gap:8px;padding:0 16px;border-radius:999px;font-weight:700;font-size:14px;flex-shrink:0;transition:transform .15s ease}
+.store-chat:active{transform:scale(.97)}
+.store-hero{display:grid;gap:20px;padding-top:16px;padding-bottom:8px}
+@media (min-width:900px){.store-hero{grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);align-items:center;gap:56px;padding-top:56px;padding-bottom:28px}.store-hero .store-art{order:2}}
+.store-hero-copy{display:flex;flex-direction:column;align-items:flex-start}
+.store-hero-badge{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid;margin:0 0 14px;letter-spacing:.01em}
+.store-hero-title{font-size:clamp(2rem,6.6vw,3.7rem);line-height:1.02;font-weight:700;margin:0;overflow-wrap:anywhere;letter-spacing:-.025em}
+.store-hero-text{font-size:15.5px;line-height:1.6;margin-top:14px;max-width:36rem}
+.store-hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px;width:100%}
+.store-hero-actions>*{flex:1 1 auto}
+@media (min-width:480px){.store-hero-actions>*{flex:0 0 auto}}
+.store-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 24px;min-height:52px!important;border-radius:14px;font-weight:700;font-size:15.5px;border:1px solid transparent;transition:transform .15s ease,box-shadow .2s ease,filter .15s ease}
+.store-primary:hover{box-shadow:0 12px 30px -14px var(--website-accent);filter:brightness(1.06)}
 .store-primary:active{transform:scale(.98)}
-.store-secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 18px;min-height:50px!important;border-radius:14px;font-weight:600;font-size:15px;border:1px solid}
-.store-hero-facts{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:20px;font-size:13px}
+.store-secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 18px;min-height:52px!important;border-radius:14px;font-weight:600;font-size:15px;border:1px solid;transition:transform .15s ease,background-color .15s ease}
+.store-secondary:active{transform:scale(.98)}
+.store-hero-facts{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:18px;font-size:13.5px}
 .store-hero-facts strong{font-weight:700}
-.store-art{position:relative;border-radius:24px;overflow:hidden;border:1px solid;aspect-ratio:16/11}
-.store-art img{width:100%;height:100%;object-fit:cover}
-@media (max-width:899px){.store-art{aspect-ratio:16/9}}
-@media (max-width:639px){.store-art{aspect-ratio:2/1;border-radius:18px}}
-.store-section{padding-top:36px;padding-bottom:12px}
-.store-section-head{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:10px 16px;margin-bottom:16px}
-.store-section-head h2,.store-section-head h3{font-size:clamp(1.4rem,4.6vw,2rem);font-weight:700;line-height:1.15;margin:0}
-.store-eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px}
-.store-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-@media (min-width:720px){.store-steps{gap:14px}}
-.store-steps li{display:flex;flex-direction:column;gap:8px;align-items:flex-start;padding:12px 0 0;border-top:1px solid}
-@media (min-width:720px){.store-steps li{flex-direction:row;gap:12px;padding:16px 0 0}}
-.store-steps strong{display:block;font-size:14px;line-height:1.25}
-.store-steps small{display:none;font-size:13px;line-height:1.5;margin-top:3px}
-@media (min-width:720px){.store-steps strong{font-size:15px}.store-steps small{display:block}}
-.store-step-number{width:28px;height:28px;border-radius:50%;border:1px solid;display:grid;place-items:center;font-weight:700;font-size:13px;flex-shrink:0}
+.store-art{position:relative;border-radius:22px;overflow:hidden;border:1px solid;aspect-ratio:3/2;box-shadow:0 30px 60px -40px rgba(0,0,0,.7)}
+.store-art img{width:100%;height:100%;object-fit:cover;object-position:center}
+@media (max-width:899px){.store-art{aspect-ratio:16/9;border-radius:18px}}
+.store-picker-wrap{padding-top:12px}
+.store-picker-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+/* On phones the network tabs directly below do the same job, so the picker would only add length. */
+.store-picker{display:none}
+@media (min-width:640px){.store-picker{display:block}}
+.store-picker-card{position:relative;display:flex;align-items:center;gap:12px;text-align:left;padding:12px 14px;border:1px solid;border-radius:16px;overflow:hidden;transition:transform .15s ease,border-color .15s ease}
+.store-picker-card::after{content:"";position:absolute;inset:auto 0 0 0;height:3px;background:var(--store-network)}
+.store-picker-card:hover{transform:translateY(-1px);border-color:var(--store-network)}
+.store-picker-card:active{transform:scale(.985)}
+.store-picker-card strong{display:block;font-size:15px;line-height:1.2}
+.store-picker-card small{display:block;font-size:12.5px;margin-top:2px}
+.store-picker-card b{font-weight:700}
+.store-picker-mark{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:15px;flex-shrink:0}
+.store-section{padding-top:40px;padding-bottom:4px}
+.store-section-head{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:8px 24px;margin-bottom:16px}
+.store-section-head h2,.store-section-head h3{font-size:clamp(1.5rem,4.6vw,2.2rem);font-weight:700;line-height:1.1;margin:0;letter-spacing:-.02em}
+.store-head-note{max-width:22rem}
+.store-eyebrow{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;margin:0 0 8px}
+.store-steps-card{display:grid;gap:4px}
+.store-steps{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+@media (min-width:720px){.store-steps{grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}}
+.store-steps li{display:flex;gap:12px;align-items:flex-start}
+.store-steps strong{display:block;font-size:15px;line-height:1.25}
+.store-steps small{display:block;font-size:13.5px;line-height:1.5;margin-top:3px}
+.store-step-number{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;flex-shrink:0}
 .store-network-tabs{display:flex;gap:4px;padding:4px;border:1px solid;border-radius:16px;overflow-x:auto;scrollbar-width:none}
 .store-network-tabs::-webkit-scrollbar{display:none}
 .store-network-tabs button{flex:1 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 14px;border-radius:12px;font-weight:700;font-size:14px;border:1px solid;transition:background-color .2s ease,color .2s ease}
@@ -138,22 +189,28 @@ export const RESELLER_STORE_CSS = `
 .store-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
 @media (min-width:640px){.store-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}}
 @media (min-width:1024px){.store-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
-.store-bundle{position:relative;display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:16px 14px 14px;border:1px solid;border-radius:var(--store-radius);overflow:hidden;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;cursor:pointer}
-.store-bundle::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--store-network)}
-.store-bundle:hover{transform:translateY(-2px);border-color:var(--website-accent);box-shadow:0 14px 30px -18px rgba(0,0,0,.6)}
+.store-bundle{position:relative;display:flex;flex-direction:column;align-items:stretch;text-align:left;padding:14px 14px 12px;border:1px solid;border-radius:var(--store-radius);overflow:hidden;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;cursor:pointer}
+.store-bundle::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--store-network)}
+.store-bundle:hover{transform:translateY(-2px);border-color:var(--website-accent);box-shadow:0 16px 32px -22px rgba(0,0,0,.65)}
 .store-bundle:active{transform:scale(.985)}
-.store-bundle-size{font-size:clamp(1.65rem,7vw,2.1rem);font-weight:700;line-height:1;letter-spacing:-.02em}
-.store-bundle-meta{font-size:12px;line-height:1.35;margin-top:6px}
-.store-bundle-foot{display:flex;flex-direction:column;margin-top:14px}
-.store-bundle-price{font-size:17px;font-weight:800;line-height:1.1}
-.store-bundle-foot small{font-size:11px;margin-top:3px}
-.store-bundle-cta{position:absolute;right:12px;bottom:14px;font-size:12px;font-weight:700;padding:6px 11px;border-radius:999px}
-.store-note{font-size:13px;line-height:1.55}
+.store-bundle-top{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0}
+.store-bundle-network{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}
+.store-bundle-network i{width:8px;height:8px;border-radius:50%;background:var(--store-network)}
+.store-bundle-validity{font-size:11px;font-weight:600;padding:2px 8px;border:1px solid;border-radius:999px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.store-bundle-size{font-size:clamp(1.75rem,7.4vw,2.35rem);font-weight:700;line-height:1;letter-spacing:-.03em;margin:14px 0 16px}
+.store-bundle-foot{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;border-top:1px solid;padding-top:10px;margin-top:auto}
+.store-bundle-price{display:block;font-size:17px;font-weight:800;line-height:1.1}
+.store-bundle-foot small{display:block;font-size:11px;margin-top:3px}
+.store-bundle-cta{font-size:12.5px;font-weight:700;padding:7px 12px;border-radius:999px;flex-shrink:0}
+@media (max-width:379px){.store-bundle{padding:12px 11px 11px}.store-bundle-validity{display:none}.store-bundle-cta{padding:6px 10px}}
+.store-note{font-size:13.5px;line-height:1.55}
 .store-card{border:1px solid;border-radius:20px;padding:18px}
-@media (min-width:640px){.store-card{padding:22px}}
-.store-field{width:100%;min-height:48px;padding:12px 14px;border-radius:12px;border:1px solid;min-width:0}
-.store-help{display:grid;gap:14px}
-@media (min-width:900px){.store-help{grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr)}}
+@media (min-width:640px){.store-card{padding:24px}}
+.store-field{width:100%;min-height:50px;padding:12px 14px;border-radius:12px;border:1px solid;min-width:0}
+.store-help{display:grid;gap:16px}
+@media (min-width:900px){.store-help{grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);align-items:center}}
+.store-help-actions{display:flex;flex-wrap:wrap;gap:8px}
+@media (min-width:900px){.store-help-actions{justify-content:flex-end}}
 .store-sheet{position:fixed;inset:auto 0 0 0;margin:0 auto;width:100%;max-width:32rem;max-height:92dvh;overflow:auto;border:1px solid;border-radius:24px 24px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom))}
 @media (min-width:640px){.store-sheet{inset:0;margin:auto;border-radius:24px;max-height:90dvh;padding:24px}}
 .store-sheet::backdrop{background:rgba(2,6,12,.72)}
@@ -161,9 +218,13 @@ export const RESELLER_STORE_CSS = `
 @keyframes store-rise{from{transform:translateY(16px);opacity:.4}to{transform:none;opacity:1}}
 .store-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid;border-radius:16px;padding:14px;margin-top:14px;position:relative;overflow:hidden}
 .store-summary::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--store-network)}
-.store-footer{margin-top:40px;border-top:1px solid;padding:28px 0}
-.store-footer-grid{display:grid;gap:18px}
-@media (min-width:720px){.store-footer-grid{grid-template-columns:1.2fr 1fr 1fr}}
+.store-footer{margin-top:48px;border-top:1px solid;padding:32px 0 0}
+.store-footer-grid{display:grid;gap:22px}
+@media (min-width:720px){.store-footer-grid{grid-template-columns:1.3fr .7fr 1fr 1.2fr}}
 .store-footer h3{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px}
+.store-footer-links{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.store-footer-links a{display:inline-flex;align-items:center;font-weight:600}
+.store-footer-links a:hover{text-decoration:underline;text-underline-offset:3px}
+.store-footer-base{border-top:1px solid;margin-top:24px;padding-top:14px;padding-bottom:16px;font-size:12px}
 @media (prefers-reduced-motion:reduce){.reseller-storefront *{transition:none!important;animation:none!important}}
 `;
