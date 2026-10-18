@@ -5,6 +5,7 @@ import { getPublicSiteBySlug } from '../../services/apiClient';
 import { PublicWebsiteSite } from '../../types';
 import { getTemplateById, mergeSiteWithTemplate, renderTemplateLayout } from '../../utils/templateRendererUtils';
 import { Globe, AlertCircle, ArrowRight } from 'lucide-react';
+import { applyPublicSiteHead, publicSiteHead } from '../../utils/publicSiteHead';
 
 interface PublicPublishedSiteProps {
   slug: string;
@@ -27,9 +28,7 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
         if (res.success && res.site) {
           setSite(res.site);
           trackPublicWebsite(res.site.id,'site_view');
-          if (res.site.content?.businessName) {
-            document.title = `${res.site.content.businessName} · Official Website`;
-          }
+          applyPublicSiteHead(publicSiteHead(res.site, window.location.origin));
         } else {
           setError('Website not found or not currently published.');
         }
