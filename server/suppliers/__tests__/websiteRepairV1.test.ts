@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {DATA_RESELLER_STARTER_HERO_IMAGE} from '../../../src/utils/dataResellerArtwork';
 import {test} from 'node:test';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
@@ -15,7 +16,7 @@ const content:SiteContent={businessName:'Ama Business',logoUrl:'https://example.
 for(const target of WEBSITE_TEMPLATES.filter(t=>t.id!=='tmpl-buka-bistro'))test(`cross-industry migration to ${target.id} preserves identity and resets semantic content`,()=>{
  const before=structuredClone(content),next=migrateWebsiteTemplate(content,'tmpl-buka-bistro',target.id);
  for(const key of ['businessName','logoUrl','phone','whatsapp','email','location','social'] as const)assert.deepEqual(next[key],content[key]);
- assert.equal(next.heroImage,'');assert.equal(next.tagline,'');assert.equal(next.aboutText,'');assert.equal(next.ctaTarget,'');
+ assert.equal(next.heroImage,target.id==='tmpl-data-reseller'?DATA_RESELLER_STARTER_HERO_IMAGE:'');assert.equal(next.tagline,'');assert.equal(next.aboutText,'');assert.equal(next.ctaTarget,'');
  assert.deepEqual(next.items,[]);assert.deepEqual(next.stats,[]);assert.deepEqual(next.features,[]);assert.deepEqual(content,before);
  const html=renderToStaticMarkup(renderTemplateLayout(mergeSiteWithTemplate(target,next)));
  for(const old of ['Jollof','old-food.jpg','restaurant.jpg','Restaurant food only','Restaurant story only','restaurant-booking'])assert.ok(!html.includes(old),old);

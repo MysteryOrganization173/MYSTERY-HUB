@@ -6,7 +6,7 @@ import React, { useMemo, useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
 import { ArrowRight, MessageCircle, Phone, MapPin, ShieldCheck } from 'lucide-react';
 import { getCloudinarySrcSet } from '../../../utils/cloudinary';
-import { DATA_RESELLER_STARTER_HERO_IMAGE } from '../../../data/templates';
+import { resolveDataResellerHeroImage } from '../../../utils/dataResellerArtwork';
 import { DATA_BUNDLES } from '../../../data/bundles';
 import { formatGhs } from '../../../../shared/money';
 import {
@@ -23,22 +23,7 @@ interface TemplateViewProps {
   managedSummary?: ResellerStoreSummary;
 }
 
-/**
- * Resolves the Data Reseller hero image.
- * Protects custom images while smoothly migrating old placeholders or missing URLs
- * to the official starter artwork.
- */
-export function resolveDataResellerHeroImage(heroImage?: string): string {
-  if (
-    !heroImage ||
-    heroImage.trim() === '' ||
-    heroImage.includes('photo-1556742049-0a67e5572293') ||
-    heroImage.includes('Neon_Data_Bundles_in_Accra')
-  ) {
-    return DATA_RESELLER_STARTER_HERO_IMAGE;
-  }
-  return heroImage;
-}
+export { resolveDataResellerHeroImage } from '../../../utils/dataResellerArtwork';
 
 /** Up to two letters from the business name, for a store that has not added a logo. */
 export function storeInitials(name: string): string {
@@ -72,7 +57,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
   });
   const onAccent = websiteActionText(p.accent);
 
-  const heroImageSrc = resolveDataResellerHeroImage(template.heroImage);
+  const heroImageSrc = resolveDataResellerHeroImage(template.heroImage, owner);
   const heroSrcSet = getCloudinarySrcSet(heroImageSrc, [360, 430, 640, 768, 1024, 1280], { format: 'auto', quality: 'auto' });
 
   // Gallery: example bundles. An owner's site without managed checkout (a design-switch preview) shows its empty state.

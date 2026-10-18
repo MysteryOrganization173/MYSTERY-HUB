@@ -20,6 +20,7 @@ import { websiteItemVocabulary, websiteStarterWording } from '../../../config/we
 import { websiteTemplateItemFields } from '../../../config/websiteBuilder';
 import { websiteLayoutMode, type WebsiteLayoutMode } from '../../../utils/websiteLayout';
 import type { TemplateItem } from '../../../types';
+import { DATA_RESELLER_STARTER_HERO_IMAGE, resolveDataResellerHeroImage, showsLegacyDataResellerArtwork } from '../../../utils/dataResellerArtwork';
 import {
   ArrowLeft,
   Save,
@@ -494,7 +495,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     }}
                     placeholder={
                       isDataReseller
-                        ? 'e.g. Buy MTN, Telecel and AT bundles from one simple storefront. Choose your package, enter recipient phone number, and place your order through WhatsApp.'
+                        ? 'e.g. MTN, Telecel and AirtelTigo bundles at fair prices. Choose a bundle, pay securely on this page and track your order. Message us on WhatsApp if you need help.'
                         : 'Describe your story, specialities, offerings, or mission...'
                     }
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl p-3 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365] leading-relaxed resize-none"
@@ -601,7 +602,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
             {activeSection === 'media' && <section className="space-y-5">
               <div><h3 className="text-lg font-semibold">Images &amp; Media</h3><p className="text-sm text-slate-400 mt-2">Upload once, reuse across your website. Choose your cover image and logo here.</p></div>
-              <WebsiteImageField label="Cover image" value={content.heroImage} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,heroImage:url});markDirty();}} />
+              <WebsiteImageField label="Cover image" value={content.heroImage} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,heroImage:isDataReseller&&!url?DATA_RESELLER_STARTER_HERO_IMAGE:url});markDirty();}} />
               <WebsiteImageField label="Business logo" value={content.logoUrl||''} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,logoUrl:url});markDirty();}} />
               <button type="button" className="mh-button-secondary" onClick={()=>setMediaOpen(true)}>Open media library for cover image</button>
               <p className="text-sm text-slate-400">Images used on a published website are public. Keep identity documents and private photos out of your library.</p>
@@ -683,7 +684,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          setContent({ ...content, heroImage: '' });
+                          setContent({ ...content, heroImage: isDataReseller ? DATA_RESELLER_STARTER_HERO_IMAGE : '' });
                           markDirty();
                         }}
                         className="text-[11px] text-rose-400 hover:underline cursor-pointer"
@@ -695,9 +696,9 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
                   {/* Image Preview Box */}
                   <div className="relative h-32 rounded-xl overflow-hidden border border-slate-800 bg-[#060a0e] flex items-center justify-center">
-                    {content.heroImage ? (
+                    {content.heroImage || isDataReseller ? (
                       <SafeImage
-                        src={content.heroImage}
+                        src={isDataReseller ? resolveDataResellerHeroImage(content.heroImage, true) : content.heroImage}
                         alt="Hero banner preview"
                         className="w-full h-full object-cover"
                       />
@@ -722,7 +723,13 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     )}
                   </div>
 
-                  <WebsiteImageField label="Hero / Cover Image" value={content.heroImage} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,heroImage:url});markDirty();}} />
+                  {isDataReseller && showsLegacyDataResellerArtwork(content.heroImage) && (
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-300 space-y-2">
+                      <p>Your store shows the original QuickByte-style banner. It stays unless you change it. A plain starter image without another brand's name is also available.</p>
+                      <button type="button" className="min-h-11 px-3 rounded-xl border border-emerald-500/40 text-emerald-300" onClick={() => { setContent({ ...content, heroImage: DATA_RESELLER_STARTER_HERO_IMAGE }); markDirty(); }}>Use the neutral starter image</button>
+                    </div>
+                  )}
+                  <WebsiteImageField label="Hero / Cover Image" value={content.heroImage} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,heroImage:isDataReseller&&!url?DATA_RESELLER_STARTER_HERO_IMAGE:url});markDirty();}} />
                 </div>
 
                 {/* Brand Logo Asset Container */}

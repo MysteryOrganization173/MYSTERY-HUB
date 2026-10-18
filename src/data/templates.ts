@@ -1,8 +1,9 @@
 import { createWebsiteComposition, RESELLER_INTEGRATIONS } from '../config/websiteBuilder.js';
 import { WebsiteTemplate, TemplateCategory } from '../types';
 
-export const DATA_RESELLER_STARTER_HERO_IMAGE =
-  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791053950/ChatGPT_Image_Oct_3_2026_06_58_33_PM_jr9ait.png';
+import { DATA_RESELLER_STARTER_HERO_IMAGE } from '../utils/dataResellerArtwork.js';
+// New Data Business sites start with the brand-neutral artwork. Existing sites keep theirs: see dataResellerArtwork.ts.
+export { DATA_RESELLER_STARTER_HERO_IMAGE, DATA_RESELLER_LEGACY_HERO_IMAGE } from '../utils/dataResellerArtwork.js';
 
 export const TEMPLATE_CATEGORIES: { id: TemplateCategory; label: string }[] = [
   { id: 'all', label: 'All Templates' },
