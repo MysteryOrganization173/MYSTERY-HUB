@@ -302,11 +302,11 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
             </p>
           </div>
           <div className="space-y-2">
-            <h5 className="font-bold text-white uppercase text-xs">Studio Location</h5>
+            <h5 className="font-bold text-white uppercase text-xs">Find the studio</h5>
             <p className="text-pink-200/80 text-xs" {...edit("content:location")}>{template.location}</p>
           </div>
           <div className="space-y-2">
-            <h5 className="font-bold text-white uppercase text-xs">Direct Studio Line</h5>
+            <h5 className="font-bold text-white uppercase text-xs">Book or ask</h5>
             <SiteFooterContact template={template} className="text-pink-200/80 text-xs" />
           </div>
         </div>

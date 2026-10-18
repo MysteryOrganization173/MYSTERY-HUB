@@ -7,6 +7,7 @@ import { TEMPLATE_CATEGORIES, WEBSITE_TEMPLATES, orderedWebsiteTemplates } from 
 import { TemplateCategory, WebsiteSiteRecord, WebsiteTemplate } from '../../types';
 import { TemplateCardPreview } from './TemplateCardPreview';
 import { WebsiteStartSheet } from './WebsiteStartSheet';
+import { SafeImage } from './SafeImage';
 import { websiteItemVocabulary } from '../../config/websiteStarters';
 import { WebsiteEditor } from './editor/WebsiteEditor';
 import { WebsitePlansAndUltra } from './WebsitePlansAndUltra';
@@ -179,6 +180,9 @@ export const WebsiteBuilderPage: React.FC = () => {
       t.features.some((f) => f.toLowerCase().includes(q))
     );
   });
+
+  // Real gallery designs, one per industry, for the visitor showcase strip.
+  const showcaseTemplates = orderedWebsiteTemplates().filter(t => t.id !== 'tmpl-start-blank' && t.heroImage).slice(0, 6);
 
   const isFiltering = selectedCategory !== 'all' || searchQuery.trim().length > 0;
   const displayedTemplates = isFiltering || showAllTemplates ? filteredTemplates : filteredTemplates.slice(0, 6);
@@ -400,63 +404,34 @@ export const WebsiteBuilderPage: React.FC = () => {
             <div className="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#00c365]/15 rounded-full blur-[100px] pointer-events-none" />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center relative z-10">
-              <div className="lg:col-span-7 space-y-6 text-left">
-                {/* Badge */}
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/30 text-xs font-semibold text-[#00c365]">
-                  <Globe className="w-3.5 h-3.5" />
-                  <span>Mystery Hub Website Builder</span>
-                </div>
-
-                {/* Headline */}
-                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1]">
-                  Build a Professional Website for Free
-                </h1>
-
-                {/* Subheadline */}
-                <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-lg">
-                  Pick a design, add your business details and photos, then publish for free. No coding needed.
+              <div className="lg:col-span-7 space-y-5 text-left">
+                <p className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/30 text-xs font-semibold text-[#4ade80]">
+                  <Globe className="w-3.5 h-3.5" aria-hidden="true" />
+                  Website Builder · Free plan
                 </p>
-
-                {/* Supporting Benefits */}
-                <div className="grid grid-cols-2 gap-2 max-w-md pt-1 text-xs text-slate-200">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[#00c365] font-bold">✓</span>
-                    <span>Start free</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[#00c365] font-bold">✓</span>
-                    <span>No coding required</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[#00c365] font-bold">✓</span>
-                    <span>Mobile responsive</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[#00c365] font-bold">✓</span>
-                    <span>Built for Ghanaian businesses</span>
-                  </div>
-                </div>
-
-                {/* CTAs */}
-                <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handlePrimaryHeroAction}
-                    className="px-6 py-3.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,195,101,0.35)] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <span>Create My Free Website</span>
-                    <ArrowRight className="w-4 h-4" />
+                <h1 className="text-[34px] sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.05]">
+                  Your business,<br />online today.
+                </h1>
+                <p className="text-slate-300 text-base leading-relaxed max-w-md">
+                  Choose a design made for your kind of business, add your details and photos, and publish for free. No coding.
+                </p>
+                <ol className="website-hero-steps" aria-label="How it works">
+                  <li><span>1</span>Choose a design</li>
+                  <li><span>2</span>Add your details</li>
+                  <li><span>3</span>Publish free</li>
+                </ol>
+                <div className="pt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <button type="button" onClick={handlePrimaryHeroAction} className="website-hero-primary">
+                    Choose a free design
+                    <ArrowRight className="w-4 h-4" aria-hidden="true" />
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={scrollToPlans}
-                    className="px-6 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-wider border border-slate-700/80 transition-colors flex items-center justify-center gap-2 backdrop-blur-sm cursor-pointer"
-                  >
-                    <Layers className="w-4 h-4 text-[#00c365]" />
-                    <span>View Plans</span>
+                  <button type="button" onClick={scrollToPlans} className="website-hero-secondary">
+                    See plans
                   </button>
                 </div>
+                <p className="text-sm text-slate-400">
+                  Prefer we build it for you? <button type="button" className="text-[#4ade80] font-semibold underline-offset-4 hover:underline min-h-11" onClick={() => document.getElementById('ultra')?.scrollIntoView({ behavior: 'smooth' })}>See Ultra, our done-for-you service</button>
+                </p>
               </div>
 
               <div className="hidden lg:block lg:col-span-5 pointer-events-none min-h-[380px]" aria-hidden="true" />
@@ -465,55 +440,26 @@ export const WebsiteBuilderPage: React.FC = () => {
         )}
 
         {/* =========================================================
-            3. COMPACT TRUST / VALUE STRIP (For Visitors)
+            3. MADE FOR: real designs from the gallery (visitors only)
             ========================================================= */}
         {(!user || !activeSite) && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-            <div className="p-5 sm:p-6 rounded-2xl bg-[#0f151b] border border-slate-800/80 space-y-2.5 text-left">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-[#00c365]">
-                <Smartphone className="w-4 h-4" />
-              </div>
-              <h3 className="font-bold text-sm sm:text-base text-white">Made for Ghanaian Businesses</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Choose a design for your business, then make it yours with your own colors, photos and contact details.
-              </p>
-            </div>
-
-            <div className="p-5 sm:p-6 rounded-2xl bg-[#0f151b] border border-slate-800/80 space-y-2.5 text-left">
-              <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
-                <Zap className="w-4 h-4" />
-              </div>
-              <h3 className="font-bold text-sm sm:text-base text-white">Customer Enquiries on WhatsApp</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Let customers contact your business through WhatsApp links on your website.
-              </p>
-            </div>
-
-            <div className="p-5 sm:p-6 rounded-2xl bg-[#0f151b] border border-slate-800/80 space-y-2.5 text-left">
-              <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
-                <Layout className="w-4 h-4" />
-              </div>
-              <h3 className="font-bold text-sm sm:text-base text-white">13+ Handcrafted Designs</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Browse designs for data resellers, agencies, salons, restaurants, churches and more.
-              </p>
-            </div>
-          </div>
+          <section aria-labelledby="website-made-for" className="text-left">
+            <h2 id="website-made-for" className="text-sm font-bold text-slate-300">Made for businesses like yours <span className="font-normal text-slate-500">· tap to preview</span></h2>
+            <ul className="website-made-for">
+              {showcaseTemplates.map(t => (
+                <li key={t.id}>
+                  <button type="button" aria-label={`Preview the ${t.categoryLabel} design`} onClick={() => openTemplatePreview(t)}>
+                    {t.heroImage && <SafeImage src={t.heroImage} alt="" loading="lazy" className="website-made-for-photo" />}
+                    <span>{t.categoryLabel}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         {/* =========================================================
-            4. PLANS / PRICING & ULTRA PREMIER SERVICE
-            ========================================================= */}
-        <details id="plans" open={!activeSite} className="scroll-mt-20"><summary className="min-h-11 cursor-pointer text-sm text-slate-400">Website plans &amp; services</summary>
-          <WebsitePlansAndUltra
-            sessionToken={sessionToken || undefined}
-            // "Start free" leads to the designed templates: owners begin from a finished design, not a blank page.
-            onStartBlank={scrollToTemplates}
-          />
-        </details>
-
-        {/* =========================================================
-            5. TEMPLATES SHOWCASE / DESIGN DISCOVERY SECTION
+            4. TEMPLATES SHOWCASE / DESIGN DISCOVERY SECTION
                (REFRAMED AS "EXPLORE OTHER DESIGNS" FOR WEBSITE OWNERS)
             ========================================================= */}
         <div id="templates-showcase" className="space-y-6 scroll-mt-24">
@@ -521,21 +467,15 @@ export const WebsiteBuilderPage: React.FC = () => {
             <div className="text-left">
               <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#00c365] uppercase tracking-wider mb-1">
                 <Compass className="w-3.5 h-3.5" />
-                <span>{activeSite ? 'Explore Other Designs' : 'Handcrafted Website Templates'}</span>
+                <span>{activeSite ? 'Other designs' : 'Designs'}</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                {activeSite
-                  ? isFiltering
-                    ? 'Matching Design Templates'
-                    : 'Explore Design Inspirations'
-                  : isFiltering
-                  ? 'Matching Industry Templates'
-                  : 'Featured Industry Templates'}
+                {activeSite ? 'Explore other designs' : isFiltering ? 'Matching designs' : 'Choose your design'}
               </h2>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-sm text-slate-400 mt-1 max-w-xl">
                 {activeSite
-                  ? 'Choose a design to review what stays and what resets before switching.'
-                  : 'Click "Preview" to test on any device or "Use" to create your free website immediately.'}
+                  ? 'Switching keeps your business details. You will see exactly what stays and what resets before anything changes.'
+                  : `${WEBSITE_TEMPLATES.filter(t => t.id !== 'tmpl-start-blank').length} designs, all included in Free. Preview any of them on phone and desktop before you start.`}
               </p>
             </div>
 
@@ -546,7 +486,8 @@ export const WebsiteBuilderPage: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search templates (e.g. data, restaurant)..."
+                placeholder="Search designs, e.g. data, salon"
+                aria-label="Search designs"
                 className="w-full bg-[#10171f] border border-slate-800 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
               />
               {searchQuery && (
@@ -583,7 +524,7 @@ export const WebsiteBuilderPage: React.FC = () => {
           <div className="text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
             <span>
               Showing <strong>{displayedTemplates.length}</strong> of{' '}
-              <strong>{filteredTemplates.length}</strong> template{filteredTemplates.length === 1 ? '' : 's'}
+              <strong>{filteredTemplates.length}</strong> design{filteredTemplates.length === 1 ? '' : 's'}
               {searchQuery && ` matching "${searchQuery}"`}
             </span>
 
@@ -604,7 +545,7 @@ export const WebsiteBuilderPage: React.FC = () => {
                   onClick={() => setShowAllTemplates((prev) => !prev)}
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-[#00c365] hover:text-[#00e575] transition-colors cursor-pointer"
                 >
-                  <span>{showAllTemplates ? 'Show Top 6 Featured' : `View All ${filteredTemplates.length} Templates`}</span>
+                  <span>{showAllTemplates ? 'Show fewer' : `View all ${filteredTemplates.length}`}</span>
                   {showAllTemplates ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </button>
               )}
@@ -614,7 +555,7 @@ export const WebsiteBuilderPage: React.FC = () => {
           {/* Templates Cards Grid */}
           {filteredTemplates.length === 0 ? (
             <div className="p-12 text-center bg-[#0d1217] rounded-3xl border border-slate-800 space-y-3">
-              <p className="text-slate-400 text-sm">No templates matched your search.</p>
+              <p className="text-slate-400 text-sm">No designs match that search.</p>
               <button
                 type="button"
                 onClick={() => {
@@ -627,7 +568,7 @@ export const WebsiteBuilderPage: React.FC = () => {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {displayedTemplates.map((t) => (
                 <TemplateCardPreview
                   key={t.id}
@@ -652,12 +593,23 @@ export const WebsiteBuilderPage: React.FC = () => {
                 }}
                 className="px-6 py-3 rounded-2xl bg-[#0f171e] hover:bg-[#15202a] text-slate-200 border border-slate-700/80 font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-md hover:border-[#00c365]/40"
               >
-                <span>{showAllTemplates ? 'Show Fewer Templates' : `View All ${filteredTemplates.length} Templates`}</span>
+                <span>{showAllTemplates ? 'Show fewer designs' : `View all ${filteredTemplates.length} designs`}</span>
                 {showAllTemplates ? <ChevronUp className="w-4 h-4 text-[#00c365]" /> : <ChevronDown className="w-4 h-4 text-[#00c365]" />}
               </button>
             </div>
           )}
         </div>
+        {/* =========================================================
+            5. PLANS / PRICING & ULTRA PREMIER SERVICE
+            ========================================================= */}
+        <details id="plans" open={!activeSite} className="scroll-mt-20"><summary className="min-h-11 cursor-pointer text-sm text-slate-400">Plans and Ultra, our done-for-you service</summary>
+          <WebsitePlansAndUltra
+            sessionToken={sessionToken || undefined}
+            // "Start free" leads to the designed templates: owners begin from a finished design, not a blank page.
+            onStartBlank={scrollToTemplates}
+          />
+        </details>
+
       </div>
     </div>
   );

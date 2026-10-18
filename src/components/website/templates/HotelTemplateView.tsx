@@ -64,7 +64,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
 
         <div className="hidden md:flex items-center gap-6 text-xs font-semibold text-[#687e74] uppercase tracking-wider">
           <a href="#suites" className="hover:text-[var(--website-primary,#132e23)] transition-colors">
-            Villas & Suites
+            Rooms & Stays
           </a>
           <a href="#experiences" className="hover:text-[var(--website-primary,#132e23)] transition-colors">
             Experiences
@@ -256,11 +256,11 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
             </p>
           </div>
           <div className="space-y-2">
-            <h5 className="font-bold text-white uppercase text-xs">Resort Location</h5>
+            <h5 className="font-bold text-white uppercase text-xs">Find us</h5>
             <p className="text-emerald-200/80 text-xs" {...edit("content:location")}>{template.location}</p>
           </div>
           <div className="space-y-2">
-            <h5 className="font-bold text-white uppercase text-xs">Concierge Reservations</h5>
+            <h5 className="font-bold text-white uppercase text-xs">Reservations</h5>
             <SiteFooterContact template={template} className="text-emerald-200/80 text-xs" />
           </div>
         </div>

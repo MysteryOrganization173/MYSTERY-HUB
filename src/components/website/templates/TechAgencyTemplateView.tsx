@@ -229,11 +229,11 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
             </p>
           </div>
           <div className="space-y-2">
-            <h5 className="font-bold text-white uppercase text-xs">Engineering HQ</h5>
+            <h5 className="font-bold text-white uppercase text-xs">Office</h5>
             <p className="text-xs" {...edit("content:location")}>{template.location}</p>
           </div>
           <div className="space-y-2">
-            <h5 className="font-bold text-white uppercase text-xs">Operations Switch</h5>
+            <h5 className="font-bold text-white uppercase text-xs">Contact</h5>
             <SiteFooterContact template={template} className="text-xs" />
           </div>
         </div>

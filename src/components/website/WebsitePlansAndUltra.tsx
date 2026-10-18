@@ -12,19 +12,26 @@ import {
   ShieldCheck,
   ChevronRight,
   ChevronLeft,
-  ChevronDown,
-  ChevronUp,
   Send,
 } from 'lucide-react';
 
-const FREE_TIER_ARTWORK =
-  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791055733/ChatGPT_Image_Oct_3_2026_06_52_28_PM-1_exdift.png';
-const PLUS_TIER_ARTWORK =
-  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791055761/ChatGPT_Image_Oct_3_2026_06_52_48_PM-3_pznnrh.png';
-const PRO_TIER_ARTWORK =
-  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791055780/ChatGPT_Image_Oct_3_2026_06_52_40_PM-2_fpgsbq.png';
 const ULTRA_TIER_ARTWORK =
   'https://res.cloudinary.com/da6oeat7m/image/upload/v1791055793/ChatGPT_Image_Oct_3_2026_06_52_54_PM-4_glzvrg.png';
+
+const FREE_FEATURES = [
+  'One live business website',
+  'Every design in the gallery',
+  'Your logo, colours, photos and contact details',
+  'WhatsApp and call buttons',
+  'Your own address on mysterybundlehub.com',
+  'Data Business stores with managed checkout',
+  'Publish and update whenever you like',
+];
+// Proposed prices for plans that do not exist yet; listed so owners know what is coming, never sold.
+const PLANNED_PLANS = [
+  { name: 'Plus', price: 'GH₵49', line: 'For growing businesses that want more control over their brand.', items: ['More design and branding controls', 'Premium designs', 'Connect your own domain'] },
+  { name: 'Pro', price: 'GH₵199', line: 'For established businesses and teams.', items: ['Advanced business tools', 'Bigger catalogues', 'Priority support'] },
+];
 
 const initialForm: UltraEnquiryInput = {
   businessName: '',
@@ -53,30 +60,6 @@ export function WebsitePlansAndUltra({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState<{ reference: string; whatsappUrl: string } | null>(null);
-
-  // Progressive disclosure for mobile pricing cards
-  const [expandedFeatures, setExpandedFeatures] = useState<{ [planKey: string]: boolean }>({
-    free: false,
-    plus: false,
-    pro: false,
-  });
-
-  const toggleFeatures = (planKey: string) => {
-    setExpandedFeatures((prev) => ({
-      ...prev,
-      [planKey]: !prev[planKey],
-    }));
-  };
-
-  // Transformed Cloudinary URLs and responsive srcSets for pricing card artwork
-  const freeArtworkUrl = getCloudinaryUrl(FREE_TIER_ARTWORK, { format: 'auto', quality: 'auto', width: 800 });
-  const freeArtworkSrcSet = getCloudinarySrcSet(FREE_TIER_ARTWORK, [360, 600, 800]);
-
-  const plusArtworkUrl = getCloudinaryUrl(PLUS_TIER_ARTWORK, { format: 'auto', quality: 'auto', width: 900 });
-  const plusArtworkSrcSet = getCloudinarySrcSet(PLUS_TIER_ARTWORK, [360, 600, 900]);
-
-  const proArtworkUrl = getCloudinaryUrl(PRO_TIER_ARTWORK, { format: 'auto', quality: 'auto', width: 900 });
-  const proArtworkSrcSet = getCloudinarySrcSet(PRO_TIER_ARTWORK, [360, 600, 900]);
 
   const ultraArtworkUrl = getCloudinaryUrl(ULTRA_TIER_ARTWORK, { format: 'auto', quality: 'auto', width: 1200 });
   const ultraArtworkSrcSet = getCloudinarySrcSet(ULTRA_TIER_ARTWORK, [480, 800, 1200]);
@@ -195,331 +178,41 @@ export function WebsitePlansAndUltra({
       {/* =========================================================
           PLANS STUDIO AMBIENT ENVIRONMENT WRAPPER
           ========================================================= */}
-      <section className="relative rounded-3xl bg-gradient-to-b from-[#0a1310] via-[#080d11] to-[#070b0e] border border-slate-800/90 p-5 sm:p-8 lg:p-10 overflow-hidden shadow-2xl space-y-6 sm:space-y-8 text-white text-left">
-        {/* Subtle Architectural Blueprint Grid */}
-        <div
-          className="absolute inset-0 opacity-[0.06] pointer-events-none select-none"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 1px 1px, #00c365 1px, transparent 0)',
-            backgroundSize: '24px 24px',
-          }}
-          aria-hidden="true"
-        />
-
-        {/* Ambient Glows */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#00c365]/10 rounded-full blur-[120px] pointer-events-none" />
-
-        {/* Section Header */}
-        <div className="relative z-10 space-y-2 text-center max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/35 text-xs font-bold text-[#00c365] uppercase tracking-wider">
-            <span>Website Studio Plans</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white">
-            Simple, Transparent Pricing
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-400">
-            Create and publish your business website for free today, or explore upcoming premium capabilities as you grow.
-          </p>
+      <section aria-labelledby="plans-heading" className="website-plans text-left">
+        <div className="website-plans-head">
+          <p className="website-plans-eyebrow">Plans</p>
+          <h2 id="plans-heading">Start free today</h2>
+          <p>Free is live today and includes every design. Plus and Pro are planned; their prices are proposals and nothing is charged for them.</p>
         </div>
-
-        {/* =========================================================
-            COMMERCIAL PRICING GRID (TRUTHFUL & ARTWORK-PREPARED)
-            ========================================================= */}
-        <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 items-stretch">
-          {/* PLAN 1: FREE */}
-          <article className="relative rounded-2xl sm:rounded-3xl bg-[#0b1218]/95 border border-slate-800/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm overflow-hidden">
-            {/* Integrated Background-Right Artwork (Free Tier) — Clearly visible yet restrained */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl sm:rounded-3xl" aria-hidden="true">
-              <div className="absolute right-0 bottom-0 top-0 w-3/4 sm:w-2/3 flex items-end justify-end overflow-hidden">
-                <SafeImage
-                  src={freeArtworkUrl}
-                  srcSet={freeArtworkSrcSet || undefined}
-                  sizes="(max-width: 640px) 240px, 320px"
-                  alt=""
-                  className="w-full h-full object-cover sm:object-contain object-right-bottom opacity-48 sm:opacity-52 transition-opacity"
-                  loading="lazy"
-                />
-              </div>
-              {/* Continuous text-protection gradient: Left (strong dark), Center (medium fade), Right (light overlay) */}
-              <div className="absolute inset-0 bg-gradient-to-r from-[#0b1218] from-30% via-[#0b1218]/85 via-65% to-[#0b1218]/20 pointer-events-none" />
-              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0b1218]/90 via-[#0b1218]/50 to-transparent pointer-events-none" />
-            </div>
-
-            <div className="relative z-10 space-y-3.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-extrabold text-lg sm:text-xl text-white tracking-tight">FREE</h3>
-                  <p className="text-xs text-slate-400 font-medium">Start building for free.</p>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-[#00c365] border border-emerald-500/25 shrink-0">
-                  Live Today
-                </span>
-              </div>
-
-              <div className="flex items-baseline gap-1">
-                <span className="text-3xl sm:text-4xl font-black text-white font-mono">GH₵0</span>
-                <span className="text-xs text-slate-400">/ month</span>
-              </div>
-
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Essential tools to create and publish a live business website with zero upfront cost.
-              </p>
-
-              {/* Core Features Strip */}
-              <div className="pt-2 border-t border-slate-800/80 space-y-2 text-xs text-slate-200">
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>1 live business website</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Standard Ghana-focused templates</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Core business sections</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>WhatsApp &amp; contact integration</span>
-                </div>
-
-                {/* Progressive Disclosure for Extra Features */}
-                {expandedFeatures.free && (
-                  <div className="space-y-2 pt-1 animate-in fade-in duration-200">
-                    <div className="flex items-center gap-2 text-slate-300">
-                      <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Essential branding &amp; contact setup</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-300">
-                      <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Mystery Hub hosted publishing</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-300">
-                      <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Clean responsive mobile view</span>
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => toggleFeatures('free')}
-                  className="pt-1 text-[11px] font-semibold text-[#00c365] hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span>{expandedFeatures.free ? 'Show fewer features' : 'View all features'}</span>
-                  {expandedFeatures.free ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="relative z-10 pt-2">
-              <button
-                type="button"
-                onClick={onStartBlank}
-                className="w-full py-3 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,195,101,0.2)] active:scale-98 cursor-pointer"
-              >
-                <span>Start Free</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
+        <div className="website-plans-grid">
+          <article className="website-plan website-plan-live">
+            <div className="website-plan-top"><h3>Free</h3><span className="website-plan-badge website-plan-badge-live">Live today</span></div>
+            <p className="website-plan-price"><strong>GH₵0</strong><span>/ month</span></p>
+            <p className="website-plan-line">Everything you need to publish one business website.</p>
+            <ul className="website-plan-list">
+              {FREE_FEATURES.map(item => <li key={item}><Check className="w-4 h-4" aria-hidden="true" />{item}</li>)}
+            </ul>
+            <button type="button" onClick={onStartBlank} className="website-plan-cta">Choose a free design<ArrowRight className="w-4 h-4" aria-hidden="true" /></button>
           </article>
-
-          {/* PLAN 2: PLUS (HERO TIER — FUTURE PREMIUM BUILDER) */}
-          <article className="relative rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#0e1d17] via-[#0b1411] to-[#09100d] border-2 border-[#00c365] p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-[0_0_30px_rgba(0,195,101,0.18)] ring-1 ring-[#00c365]/35 overflow-visible">
-            {/* Integrated Background-Right Artwork (Plus Tier) — Vibrant, multi-device creative cluster */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl sm:rounded-3xl" aria-hidden="true">
-              <div className="absolute right-0 bottom-0 top-0 w-3/4 sm:w-2/3 flex items-end justify-end overflow-hidden">
-                <SafeImage
-                  src={plusArtworkUrl}
-                  srcSet={plusArtworkSrcSet || undefined}
-                  sizes="(max-width: 640px) 260px, 340px"
-                  alt=""
-                  className="w-full h-full object-cover sm:object-contain object-right-bottom opacity-55 sm:opacity-65 transition-opacity"
-                  loading="lazy"
-                />
-              </div>
-              {/* Continuous text-protection gradient: strong emerald-dark on left, subtle light overlay on artwork right */}
-              <div className="absolute inset-0 bg-gradient-to-r from-[#0e1d17] from-30% via-[#0b1411]/85 via-65% to-[#09100d]/15 pointer-events-none" />
-              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#09100d]/90 via-[#09100d]/50 to-transparent pointer-events-none" />
-            </div>
-
-            {/* Coming soon Badge — Classic overlapping badge (half inside / half above the card edge) */}
-            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-              <span className="inline-flex items-center px-3.5 py-1 rounded-full bg-[#00c365] text-black text-[10px] font-black uppercase tracking-wider shadow-md border border-[#00e575]">
-                Coming soon
-              </span>
-            </div>
-
-            <div className="relative z-10 space-y-3.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-extrabold text-lg sm:text-xl text-white tracking-tight">PLUS</h3>
-                  <p className="text-xs text-emerald-400 font-medium">For growing businesses that want more control over their brand and website.</p>
-                </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 shrink-0">
-                  Coming Soon
-                </span>
-              </div>
-
-              <div className="flex items-baseline gap-1">
-                <span className="text-3xl sm:text-4xl font-black text-white font-mono">GH₵49</span>
-                <span className="text-xs text-slate-400">/ month</span>
-              </div>
-
-              <p className="text-xs text-slate-200 leading-relaxed">
-                Enhanced creative freedom, AI editing tools, and custom branding for growing Ghanaian businesses.
-              </p>
-
-              {/* Core Features Strip */}
-              <div className="pt-2 border-t border-[#00c365]/25 space-y-2 text-xs text-slate-100">
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Premium website designs</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Expanded branding &amp; design controls</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Custom domain connection</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Mystery AI editing tools</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Expanded project capacity</span>
-                </div>
-
-                {/* Progressive Disclosure for Extra Features */}
-                {expandedFeatures.plus && (
-                  <div className="space-y-2 pt-1 animate-in fade-in duration-200">
-                    <div className="flex items-center gap-2 text-slate-200">
-                      <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Extended typography &amp; styling</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-200">
-                      <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Priority CDN asset hosting</span>
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => toggleFeatures('plus')}
-                  className="pt-1 text-[11px] font-semibold text-emerald-300 hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span>{expandedFeatures.plus ? 'Hide features' : 'View all features'}</span>
-                  {expandedFeatures.plus ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                </button>
-              </div>
-            </div>
-          </article>
-
-          {/* PLAN 3: PRO (SERIOUS BUSINESSES & TEAMS) */}
-          <article className="relative rounded-2xl sm:rounded-3xl bg-[#0b1016]/95 border border-slate-800/90 p-5 sm:p-6 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all shadow-sm overflow-hidden">
-            {/* Integrated Background-Right Artwork (Pro Tier) — Serious commercial analytics & operations UI */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none select-none rounded-2xl sm:rounded-3xl" aria-hidden="true">
-              <div className="absolute right-0 bottom-0 top-0 w-3/4 sm:w-2/3 flex items-end justify-end overflow-hidden">
-                <SafeImage
-                  src={proArtworkUrl}
-                  srcSet={proArtworkSrcSet || undefined}
-                  sizes="(max-width: 640px) 260px, 340px"
-                  alt=""
-                  className="w-full h-full object-cover sm:object-contain object-right-bottom opacity-52 sm:opacity-58 transition-opacity"
-                  loading="lazy"
-                />
-              </div>
-              {/* Slate/corporate continuous text-protection gradient */}
-              <div className="absolute inset-0 bg-gradient-to-r from-[#0b1016] from-30% via-[#0b1016]/85 via-65% to-[#0b1016]/15 pointer-events-none" />
-              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0b1016]/90 via-[#0b1016]/50 to-transparent pointer-events-none" />
-            </div>
-
-            <div className="relative z-10 space-y-3.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-extrabold text-lg sm:text-xl text-white tracking-tight">PRO</h3>
-                  <p className="text-xs text-slate-400 font-medium">For serious businesses and teams.</p>
-                </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
-                  Coming Soon
-                </span>
-              </div>
-
-              <div className="flex items-baseline gap-1">
-                <span className="text-3xl sm:text-4xl font-black text-white font-mono">GH₵199</span>
-                <span className="text-xs text-slate-400">/ month</span>
-              </div>
-
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Complete commercial power, advanced integrations, high-volume catalogs, and priority support.
-              </p>
-
-              {/* Core Features Strip */}
-              <div className="pt-2 border-t border-slate-800/80 space-y-2 text-xs text-slate-200">
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Advanced commerce &amp; business tools</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Custom forms &amp; advanced workflows</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Third-party business integrations</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Higher-capacity catalogs and assets</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                  <span>Priority technical &amp; account support</span>
-                </div>
-
-                {/* Progressive Disclosure for Extra Features */}
-                {expandedFeatures.pro && (
-                  <div className="space-y-2 pt-1 animate-in fade-in duration-200">
-                    <div className="flex items-center gap-2 text-slate-300">
-                      <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Team collaboration capabilities</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-300">
-                      <Check className="w-4 h-4 text-[#00c365] shrink-0" />
-                      <span>Dedicated infrastructure scaling</span>
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => toggleFeatures('pro')}
-                  className="pt-1 text-[11px] font-semibold text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
-                >
-                  <span>{expandedFeatures.pro ? 'Hide features' : 'View all features'}</span>
-                  {expandedFeatures.pro ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                </button>
-              </div>
-            </div>
-          </article>
+          {PLANNED_PLANS.map(plan => (
+            <article key={plan.name} className="website-plan">
+              <div className="website-plan-top"><h3>{plan.name}</h3><span className="website-plan-badge">Planned</span></div>
+              <p className="website-plan-price"><strong>{plan.price}</strong><span>/ month · proposed</span></p>
+              <p className="website-plan-line">{plan.line}</p>
+              <p className="website-plan-subhead">What we plan to include</p>
+              <ul className="website-plan-list website-plan-list-planned">
+                {plan.items.map(item => <li key={item}><span aria-hidden="true" />{item}</li>)}
+              </ul>
+              <p className="website-plan-note">Not available yet. Your Free website keeps working as it is.</p>
+            </article>
+          ))}
         </div>
-
-        {/* Availability Footnote */}
-        <p className="text-center text-[11px] sm:text-xs text-slate-500 max-w-xl mx-auto pt-1">
-          Free stays free. Plus and Pro are coming soon.
-        </p>
       </section>
 
       {/* =========================================================
           ULTRA — SEPARATE DISTINCT SERVICE BLOCK (RICH VISUALS)
           ========================================================= */}
-      <section className="rounded-3xl bg-gradient-to-r from-[#0c1813] via-[#091216] to-[#0d161d] border border-slate-700/80 p-5 sm:p-7 lg:p-8 shadow-2xl relative overflow-hidden text-left">
+      <section id="ultra" aria-label="Ultra done-for-you website service" className="scroll-mt-24 rounded-3xl bg-gradient-to-r from-[#0c1813] via-[#091216] to-[#0d161d] border border-slate-700/80 p-5 sm:p-7 lg:p-8 shadow-2xl relative overflow-hidden text-left">
         <div className="absolute top-0 right-0 w-96 h-96 bg-[#00c365]/10 rounded-full blur-[110px] pointer-events-none" />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 lg:gap-8 items-center relative z-10">

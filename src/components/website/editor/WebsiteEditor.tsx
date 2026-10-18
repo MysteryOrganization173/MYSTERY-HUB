@@ -451,7 +451,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                       setContent({ ...content, businessName: e.target.value });
                       markDirty();
                     }}
-                    placeholder={isDataReseller ? 'e.g. QuickByte Data' : 'e.g. Gold Coast Kitchen'}
+                    placeholder={isDataReseller ? 'e.g. Ama Data Hub' : 'e.g. Gold Coast Kitchen'}
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />
                   <p className="text-[11px] text-slate-500">

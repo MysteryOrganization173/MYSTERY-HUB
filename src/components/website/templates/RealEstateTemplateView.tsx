@@ -338,11 +338,11 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
             </p>
           </div>
           <div className="space-y-2">
-            <h5 className="font-bold text-white uppercase text-xs">Office Suite</h5>
+            <h5 className="font-bold text-white uppercase text-xs">Visit us</h5>
             <p className="text-xs" {...edit("content:location")}>{template.location}</p>
           </div>
           <div className="space-y-2">
-            <h5 className="font-bold text-white uppercase text-xs">Direct Broker Contact</h5>
+            <h5 className="font-bold text-white uppercase text-xs">Contact</h5>
             <SiteFooterContact template={template} className="text-xs" />
           </div>
         </div>
