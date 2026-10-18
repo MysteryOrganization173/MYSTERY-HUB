@@ -20,11 +20,26 @@ export function AdminResellerControls({token,siteId,defaultOpen=false}:{token:st
           {([['reserveBps','Processing reserve (%)'],['reserveFixed','Fixed processing reserve (GH₵)'],['minimum','Store withdrawal minimum (GH₵)'],['withdrawalFeeBps','Store withdrawal fee (%)']] as const).map(([name,label])=><label key={name} className="text-sm">{label}<input className={field} type="number" min="0" step="0.01" inputMode="decimal" value={policy[name]} onChange={event=>setPolicy({...policy,[name]:event.target.value})}/></label>)}<button className={button} disabled={busy}>Save policy with confirmation</button>
         </form>
         <AdminResellerBulk key={JSON.stringify(data)} token={token} products={data.products} busy={busy} refresh={refresh}/>
-        <details><summary className="cursor-pointer min-h-11">Recent reseller pricing audit</summary>{data.audit?.map((entry:any)=><details key={entry.id} className="p-2 text-sm"><summary>{entry.created_at} · {entry.action} · Admin {entry.admin_user_id}</summary><pre className="whitespace-pre-wrap break-words text-xs">{entry.metadata_safe_json}</pre></details>)}</details>
+        <details><summary className="cursor-pointer min-h-11">Recent reseller pricing audit</summary>{data.audit?.map((entry:any)=><ResellerAudit key={entry.id} entry={entry}/>)}</details>
         <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">{data.products.map((p:any)=><WholesaleProduct key={p.id+data.policy.version+(p.wholesale?.version||'')} product={p} busy={busy} save={input=>run(()=>websiteBusinessRequest('admin/website-builder/reseller-wholesale',token,input,'PUT'))}/>)}</div>
       </>}
     </>}
   </section>;
+}
+function ResellerAudit({entry}:{entry:any}) {
+  let lines:string[]=[];
+  const cash=(n:number|undefined)=>n===undefined?'Unconfigured':formatGhs(n);
+  const status=(row:any)=>row?.enabled?'Enabled':'Disabled';
+  try {
+    const metadata=JSON.parse(entry.metadata_safe_json||'{}');
+    if(Array.isArray(metadata.changes))lines=metadata.changes.map((c:any)=>`${c.productId}: ${cash(c.previous?.wholesaleMinor)} → ${cash(c.next?.wholesaleMinor)}; ${status(c.previous)} → ${status(c.next)}`);
+    else if(entry.action==='store_wholesale_changed')lines=[`${entry.entity_id}: ${cash(metadata.previous?.wholesaleMinor)} → ${cash(metadata.next?.wholesaleMinor)}; ${status(metadata.previous)} → ${status(metadata.next)}`];
+    else for(const [key,label] of [['enabled','Managed payments'],['reserveBps','Processing reserve (%)'],['reserveFixedMinor','Fixed reserve'],['withdrawalMinimumMinor','Withdrawal minimum'],['withdrawalFeeBps','Withdrawal fee (%)']]) {
+      const show=(row:any)=>row?.[key]===undefined?'Unconfigured':key==='enabled'?status(row):key.endsWith('Bps')?String(row[key]/100):cash(row[key]);
+      if(metadata.previous?.[key]!==metadata.next?.[key])lines.push(`${label}: ${show(metadata.previous)} → ${show(metadata.next)}`);
+    }
+  }catch {lines=['Audit details unavailable.'];}
+  return <details className="p-2 text-sm"><summary>{new Date(entry.created_at).toLocaleString()} · {entry.action==='store_policy_changed'?'Policy updated':entry.action==='store_wholesale_bulk_changed'?'Bulk wholesale update':'Plan wholesale update'} · Admin {entry.admin_user_id}</summary>{lines.map((line,i)=><p key={i} className="break-words py-1">{line}</p>)}</details>;
 }
 function WholesaleProduct({product:p,busy,save}:{product:any;busy:boolean;save:(input:any)=>void}) {
   const [price,setPrice]=useState(p.wholesale?(p.wholesale.wholesaleMinor/100).toFixed(2):''),[enabled,setEnabled]=useState(p.wholesale?.enabled||false),[error,setError]=useState('');
