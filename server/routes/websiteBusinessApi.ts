@@ -32,6 +32,8 @@ adminWebsiteBusinessRouter.use(requireAdmin);
 adminWebsiteBusinessRouter.get('/reseller-config',handler(()=>Business.adminConfig()));
 adminWebsiteBusinessRouter.put('/reseller-policy',sensitive,handler(req=>Business.savePolicy(req.user.id,req.body)));
 adminWebsiteBusinessRouter.put('/reseller-wholesale',sensitive,handler(req=>Business.saveWholesale(req.user.id,req.body)));
+adminWebsiteBusinessRouter.post('/reseller-wholesale/preview',sensitive,handler(req=>Business.resellerBulkPreview(req.user.id,req.body)));
+adminWebsiteBusinessRouter.post('/reseller-wholesale/apply',sensitive,handler(req=>Business.resellerBulkApply(req.user.id,req.body)));
 adminWebsiteBusinessRouter.post('/store-orders/:id/reconcile',sensitive,handler(req=>Business.reconcileReversal(req.user.id,req.params.id,req.body)));
 adminWebsiteBusinessRouter.get('/:id/business',handler(async req=>{
   const site=await WebsiteStore.findSiteById(req.params.id);if(!site)throw new FinanceError('Website not found.',404);

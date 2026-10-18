@@ -1,6 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import { websiteBusinessRequest } from '../../../services/websiteBusinessApi';
 import { formatGhs,parseGhs } from '../../../../shared/money';
+import { AdminResellerBulk } from './AdminResellerBulk';
 const field='w-full min-h-11 p-3 bg-slate-900 border border-slate-700 rounded-lg';
 const button='min-h-11 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 disabled:opacity-50';
 export function AdminResellerControls({token,siteId,defaultOpen=false}:{token:string;siteId?:string;defaultOpen?:boolean}) {
@@ -18,6 +19,8 @@ export function AdminResellerControls({token,siteId,defaultOpen=false}:{token:st
           <label className="min-h-11 flex gap-2 items-center"><input type="checkbox" checked={policy.enabled} onChange={event=>setPolicy({...policy,enabled:event.target.checked})}/>Enable managed store payments</label>
           {([['reserveBps','Processing reserve (%)'],['reserveFixed','Fixed processing reserve (GH₵)'],['minimum','Store withdrawal minimum (GH₵)'],['withdrawalFeeBps','Store withdrawal fee (%)']] as const).map(([name,label])=><label key={name} className="text-sm">{label}<input className={field} type="number" min="0" step="0.01" inputMode="decimal" value={policy[name]} onChange={event=>setPolicy({...policy,[name]:event.target.value})}/></label>)}<button className={button} disabled={busy}>Save policy with confirmation</button>
         </form>
+        <AdminResellerBulk key={JSON.stringify(data)} token={token} products={data.products} busy={busy} refresh={refresh}/>
+        <details><summary className="cursor-pointer min-h-11">Recent reseller pricing audit</summary>{data.audit?.map((entry:any)=><details key={entry.id} className="p-2 text-sm"><summary>{entry.created_at} · {entry.action} · Admin {entry.admin_user_id}</summary><pre className="whitespace-pre-wrap break-words text-xs">{entry.metadata_safe_json}</pre></details>)}</details>
         <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">{data.products.map((p:any)=><WholesaleProduct key={p.id+data.policy.version+(p.wholesale?.version||'')} product={p} busy={busy} save={input=>run(()=>websiteBusinessRequest('admin/website-builder/reseller-wholesale',token,input,'PUT'))}/>)}</div>
       </>}
     </>}

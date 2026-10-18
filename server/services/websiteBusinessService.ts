@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { FinanceStore, FinanceError, type FinanceTx } from '../db/financeStore.js';
 import { FinanceService, operationKey, maskWithdrawal } from './financeService.js';
 import { WebsiteStore } from '../db/websiteStore.js';
@@ -13,6 +13,7 @@ import { STORE_POLICY_DEFAULTS, minimumStorePrice, storeReserve, type StorePolic
 import { validateAndNormalizeGhanaPhone, canonicalGhanaPhone, getGhanaPhoneLookupVariants } from '../utils/phone.js';
 import { toSafePublicOrder, maskOrderRecipient, type OrderRecord } from '../types/orders.js';
 import {websiteBusinessCapabilities} from '../../src/utils/websiteBusinessCapabilities.js';
+import {AdminAuditStore} from '../db/adminAuditStore.js';
 
 interface Wholesale { enabled:boolean; wholesaleMinor:number; version:string; updatedAt:string; actorId:string; supplierCostMinor:number }
 interface Price { enabled:boolean; retailMinor:number }
@@ -24,6 +25,59 @@ const priceConfig=async(id:string,tx?:FinanceTx):Promise<Prices>=>await(tx?tx.co
 async function configLock(tx:FinanceTx,exclusive=false){if(tx.client)await tx.client.query(`SELECT pg_advisory_xact_lock${exclusive?'':'_shared'}(hashtextextended($1,0))`,['store-config']);}
 
 export class WebsiteBusinessService {
+  /** Read-only preview and apply share the same calculation; client prices are never accepted. */
+  static async resellerBulkPreview(adminId:string,input:Record<string,unknown>,tx?:FinanceTx) {
+    exact(input,['productIds','perGbMinor','discountFromGb','discountBps','activation']);
+    if(!Array.isArray(input.productIds)||!input.productIds.length||input.productIds.length>Object.keys(AUTHORITATIVE_PRODUCTS).length||new Set(input.productIds).size!==input.productIds.length)throw new FinanceError('Select unique configured plans.');
+    if(!['preserve','enable','disable'].includes(String(input.activation)))throw new FinanceError('Choose an activation action.');
+    const rate=input.perGbMinor===null?null:moneyMinor(input.perGbMinor);
+    const discount=input.discountBps as number,threshold=input.discountFromGb as number;
+    if(!Number.isInteger(discount)||discount<0||discount>5000||!Number.isInteger(threshold)||threshold<1||threshold>10000||rate===null&&discount!==0)throw new FinanceError('Invalid larger-bundle discount.');
+    const policy=await currentPolicy(tx),costs=await wholesale(tx);
+    // Resolve every plan against one fresh supplier snapshot. Never fall back to stale cached cost.
+    const provider=FulfilmentService.getProvider();
+    const catalogSnapshot=await provider.getRawCatalog(true).catch(()=>null);
+    const rows=await Promise.all((input.productIds as unknown[]).map(async id=>{
+      if(typeof id!=='string')throw new FinanceError('Invalid plan.');
+      const p=getAuthoritativeProduct(id);if(!p||!p.isActive||p.id!==id)throw new FinanceError('Plan is no longer available. Refresh.');
+      const previous=costs[id]||null;
+      const resolved=catalogSnapshot===null?null:await provider.resolvePackage(p.network,p.dataAmount,catalogSnapshot).catch(()=>null);
+      const rawCost=resolved?.resolved?.supplierCostMinor;
+      const supplierCostMinor=Number.isSafeInteger(rawCost)&&Number(rawCost)>0?Number(rawCost):null;
+      const size=/^(\d+(?:\.\d+)?)GB$/i.exec(p.dataAmount),gb=size?Number(size[1]):null;
+      const enabled=input.activation==='preserve'?previous?.enabled||false:input.activation==='enable';
+      let proposedMinor=previous?.wholesaleMinor??null;
+      if(rate!==null){if(gb===null)throw new FinanceError('Plan size cannot be priced per GB. Use manual pricing.');proposedMinor=moneyMinor(Math.round(rate*gb*(gb>=threshold?10000-discount:10000)/10000));}
+      const errors:string[]=[];
+      if((enabled||rate!==null)&&(supplierCostMinor===null||proposedMinor===null||proposedMinor<supplierCostMinor))errors.push('Wholesale must cover this plan’s current supplier cost.');
+      if(enabled&&(!policy.enabled||policy.reserveBps===0&&policy.reserveFixedMinor===0))errors.push('Configure and enable the processing policy first.');
+      let minimumRetailMinor:number|null=null;
+      try {minimumRetailMinor=proposedMinor===null?null:minimumStorePrice(proposedMinor,policy);}catch {if(enabled||rate!==null)errors.push('No permitted retail price exists under the current reserve policy.');}
+      return {productId:id,network:p.network,dataAmount:p.dataAmount,previous,enabled,proposedMinor,supplierCostMinor,minimumWholesaleMinor:supplierCostMinor,minimumRetailMinor,reserveAtMinimumMinor:minimumRetailMinor===null?null:storeReserve(minimumRetailMinor,policy),platformSpreadMinor:proposedMinor===null||supplierCostMinor===null?null:proposedMinor-supplierCostMinor,errors};
+    }));
+    if(rate!==null&&new Set(rows.map(r=>r.network)).size!==1)throw new FinanceError('Set a per-GB rate for one network at a time.');
+    rows.sort((a,b)=>a.productId.localeCompare(b.productId));
+    const revision=createHash('sha256').update(JSON.stringify({adminId,input,policy,rows})).digest('hex');
+    return {revision,policy,rows,valid:rows.every(r=>!r.errors.length)};
+  }
+  static async resellerBulkApply(adminId:string,input:Record<string,unknown>) {
+    exact(input,['confirmed','revision','proposal']);
+    if(input.confirmed!==true||typeof input.revision!=='string'||!input.proposal||typeof input.proposal!=='object'||Array.isArray(input.proposal))throw new FinanceError('Preview and confirm the proposed changes.');
+    return FinanceStore.transaction(adminId,async tx=>{
+      await configLock(tx,true);
+      const preview=await this.resellerBulkPreview(adminId,input.proposal as Record<string,unknown>,tx);
+      if(preview.revision!==input.revision)throw new FinanceError('Pricing, supplier costs or policy changed. Preview again.',409);
+      if(!preview.valid)throw new FinanceError('Resolve every validation error before applying.');
+      const costs={...await wholesale(tx)};
+      for(const row of preview.rows){
+        if(row.proposedMinor===null)continue; // Disabling an unconfigured plan creates no financial setting.
+        costs[row.productId]={enabled:row.enabled,wholesaleMinor:row.proposedMinor,version:randomUUID(),updatedAt:new Date().toISOString(),actorId:adminId,supplierCostMinor:row.supplierCostMinor??row.previous?.supplierCostMinor??0};
+      }
+      await tx.saveConfig('store-wholesale',costs);
+      await tx.audit(adminId,'store_wholesale_bulk_changed','store-wholesale',{revision:preview.revision,proposal:input.proposal,policyVersion:preview.policy.version,changes:preview.rows.map(row=>({productId:row.productId,previous:row.previous,next:costs[row.productId]||null,supplierCostMinor:row.supplierCostMinor}))});
+      return {applied:preview.rows.length};
+    });
+  }
   static async owned(siteId:string,userId:string){return WebsiteAssetStore.ownedSite(siteId,userId);}
   static async catalog(siteId:string,userId?:string) {
     const site=userId?await this.owned(siteId,userId):await WebsiteStore.findPublishedSiteById(siteId);
@@ -65,7 +119,7 @@ export class WebsiteBusinessService {
     const products=await Promise.all(Object.values(AUTHORITATIVE_PRODUCTS).filter(p=>p.isActive).map(async p=>{
       const resolved=await FulfilmentService.getProvider().resolvePackage(p.network,p.dataAmount).catch(()=>null);
       return {id:p.id,network:p.network,dataAmount:p.dataAmount,supplierCostMinor:resolved?.resolved?.supplierCostMinor??null,wholesale:costs[p.id]||null};
-    }));return {policy,products};
+    }));return {policy,products,audit:(await AdminAuditStore.findRecent(100)).filter(a=>['store_wholesale_bulk_changed','store_wholesale_changed','store_policy_changed'].includes(a.action)).slice(0,25)};
   }
   static async savePolicy(adminId:string,input:Record<string,unknown>) {
     exact(input,['confirmed','expectedVersion','enabled','reserveBps','reserveFixedMinor','withdrawalMinimumMinor','withdrawalFeeBps']);
