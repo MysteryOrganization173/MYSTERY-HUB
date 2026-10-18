@@ -58,7 +58,8 @@ export class WebsiteBusinessService {
     if(rate!==null&&new Set(rows.map(r=>r.network)).size!==1)throw new FinanceError('Set a per-GB rate for one network at a time.');
     rows.sort((a,b)=>a.productId.localeCompare(b.productId));
     const revision=createHash('sha256').update(JSON.stringify({adminId,input,policy,rows})).digest('hex');
-    return {revision,policy,rows,valid:rows.every(r=>!r.errors.length)};
+    const changeCount=rows.filter(row=>row.proposedMinor!==null&&(!row.previous||row.previous.wholesaleMinor!==row.proposedMinor||row.previous.enabled!==row.enabled)).length;
+    return {revision,policy,rows,changeCount,valid:changeCount>0&&rows.every(r=>!r.errors.length)};
   }
   static async resellerBulkApply(adminId:string,input:Record<string,unknown>) {
     exact(input,['confirmed','revision','proposal']);
@@ -67,15 +68,17 @@ export class WebsiteBusinessService {
       await configLock(tx,true);
       const preview=await this.resellerBulkPreview(adminId,input.proposal as Record<string,unknown>,tx);
       if(preview.revision!==input.revision)throw new FinanceError('Pricing, supplier costs or policy changed. Preview again.',409);
+      if(!preview.changeCount)throw new FinanceError('No prices or activation states would change.');
       if(!preview.valid)throw new FinanceError('Resolve every validation error before applying.');
       const costs={...await wholesale(tx)};
-      for(const row of preview.rows){
-        if(row.proposedMinor===null)continue; // Disabling an unconfigured plan creates no financial setting.
+      const changes=preview.rows.filter(row=>row.proposedMinor!==null&&(!row.previous||row.previous.wholesaleMinor!==row.proposedMinor||row.previous.enabled!==row.enabled));
+      for(const row of changes){
+        if(row.proposedMinor===null)continue;
         costs[row.productId]={enabled:row.enabled,wholesaleMinor:row.proposedMinor,version:randomUUID(),updatedAt:new Date().toISOString(),actorId:adminId,supplierCostMinor:row.supplierCostMinor??row.previous?.supplierCostMinor??0};
       }
       await tx.saveConfig('store-wholesale',costs);
-      await tx.audit(adminId,'store_wholesale_bulk_changed','store-wholesale',{revision:preview.revision,proposal:input.proposal,policyVersion:preview.policy.version,changes:preview.rows.map(row=>({productId:row.productId,previous:row.previous,next:costs[row.productId]||null,supplierCostMinor:row.supplierCostMinor}))});
-      return {applied:preview.rows.length};
+      await tx.audit(adminId,'store_wholesale_bulk_changed','store-wholesale',{revision:preview.revision,proposal:input.proposal,policyVersion:preview.policy.version,changes:changes.map(row=>({productId:row.productId,previous:row.previous,next:costs[row.productId]||null,supplierCostMinor:row.supplierCostMinor}))});
+      return {applied:changes.length};
     });
   }
   static async owned(siteId:string,userId:string){return WebsiteAssetStore.ownedSite(siteId,userId);}

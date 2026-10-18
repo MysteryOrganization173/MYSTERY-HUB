@@ -31,7 +31,7 @@ test('Published designed sites omit an empty location ribbon; the editor keeps i
     assert.match(source, /\{\(template\.location \|\| editing\) && \(/, name);
     assert.match(source, /const editing = useIsVisualEditing\(\);/, name);
   }
-  assert.match(readFileSync('src/components/website/editor/VisualEditMarkers.tsx', 'utf8'), /export function useIsVisualEditing\(\) \{\n  return useContext\(VisualEditContext\)\.length > 0;/);
+  assert.match(readFileSync('src/components/website/editor/VisualEditMarkers.tsx', 'utf8').replace(/\r\n/g, '\n'), /export function useIsVisualEditing\(\) \{\n  return useContext\(VisualEditContext\)\.length > 0;/);
 });
 
 test('Designed-site menus hide in-page links whose section is not on the page', () => {

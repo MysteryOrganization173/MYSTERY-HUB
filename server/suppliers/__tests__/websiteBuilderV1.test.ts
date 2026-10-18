@@ -36,6 +36,7 @@ import {
   sanitizeTemplateItems,
 } from '../../types/website.js';
 import { WEBSITE_TEMPLATES } from '../../../src/data/templates.js';
+import { WEBSITE_STARTER_VERSION } from '../../../src/config/websiteStarters.js';
 import { mergeSiteWithTemplate, getTemplateById } from '../../../src/utils/templateRendererUtils.js';
 
 async function runWebsiteBuilderTests() {
@@ -90,12 +91,14 @@ async function runWebsiteBuilderTests() {
     const site = (await WebsiteStore.findSitesByUserId(userA))[0];
     const templateDef = WEBSITE_TEMPLATES.find((t) => t.id === 'tmpl-data-reseller')!;
 
-    assert.strictEqual(site.content_json.businessName, templateDef.demoBusinessName);
-    assert.strictEqual(site.content_json.tagline, templateDef.demoHeroTagline);
-    assert.strictEqual(site.content_json.aboutText, templateDef.demoSubtext);
+    assert.strictEqual(site.content_json.businessName, 'Ghana Data Express', 'The supplied owner business name replaces the template demo identity');
+    assert.strictEqual(site.name, 'Ghana Data Express');
+    assert.strictEqual(site.content_json.tagline, 'Welcome to our business', 'Legacy creation uses neutral wording rather than claiming the demo business identity');
+    assert.strictEqual(site.content_json.aboutText, '');
     assert.strictEqual(site.content_json.heroImage, templateDef.heroImage);
     assert.strictEqual(site.content_json.ctaLabel, 'Buy Data');
-    assert.ok(site.content_json.items && site.content_json.items.length > 0, 'Starter items must be populated');
+    assert.deepStrictEqual(site.content_json.items, [], 'Managed Data availability must come from the live catalogue, never demo bundles');
+    for (const field of ['phone', 'whatsapp', 'email'] as const) assert.strictEqual(site.content_json[field], '');
 
     console.log('✓ 3. Chosen template starter content is preserved');
     passed++;
@@ -118,10 +121,17 @@ async function runWebsiteBuilderTests() {
     const resultB = await WebsiteStore.createSite(userB, {
       template_id: 'tmpl-buka-bistro',
       name: 'Accra Gold Grill',
+      businessName: 'Accra Gold Grill',
+      starterVersion: WEBSITE_STARTER_VERSION,
     });
 
     assert.ok(resultB.site);
     assert.strictEqual(resultB.site.user_id, userB);
+    assert.strictEqual(resultB.site.content_json.businessName, 'Accra Gold Grill');
+    assert.strictEqual(resultB.site.content_json.starterVersion, WEBSITE_STARTER_VERSION);
+    assert.strictEqual(resultB.site.content_json.items?.length, 3, 'The versioned non-Data contract retains editable industry starter content');
+    assert.ok(resultB.site.content_json.items?.every(item => item.isExample && item.name && item.desc));
+    assert.ok(resultB.site.content_json.items?.some(item => item.image), 'Registered starter imagery is retained');
     assert.strictEqual(resultB.site.template_id, 'tmpl-buka-bistro');
 
     console.log('✓ 5. Authenticated member can create');
@@ -188,6 +198,7 @@ async function runWebsiteBuilderTests() {
       name: 'Ghana Data Express Fast',
       content: {
         tagline: 'High-Speed Non-Expiry Bundles in Ghana',
+        heroImage: 'https://images.unsplash.com/photo-owner-fixture',
         location: 'Accra Mall & East Legon',
         whatsapp: '+233 24 999 8888',
       },
@@ -199,6 +210,7 @@ async function runWebsiteBuilderTests() {
     assert.ok(updated);
     assert.strictEqual(updated.name, 'Ghana Data Express Fast');
     assert.strictEqual(updated.content_json.tagline, 'High-Speed Non-Expiry Bundles in Ghana');
+    assert.strictEqual((await WebsiteStore.findSiteById(siteA.id))?.content_json.heroImage, 'https://images.unsplash.com/photo-owner-fixture');
     assert.strictEqual(updated.content_json.location, 'Accra Mall & East Legon');
     assert.strictEqual(updated.content_json.whatsapp, '+233 24 999 8888');
     assert.strictEqual(updated.settings_json.accentColor, '#00e575');
@@ -292,6 +304,14 @@ async function runWebsiteBuilderTests() {
 
   // 14. MTN filter returns only MTN products
   {
+    // Explicit owner-entered legacy presentation items, never seeded purchasable availability.
+    // The managed catalogue/checkout contract is independently covered in websiteBusinessV1.
+    const draft = (await WebsiteStore.findSitesByUserId(userA))[0];
+    await WebsiteStore.updateSite(draft.id, userA, { content: { items: [
+      { id: 'fixture-mtn', name: 'Synthetic MTN item', category: 'MTN' },
+      { id: 'fixture-telecel', name: 'Synthetic Telecel item', category: 'Telecel' },
+      { id: 'fixture-at', name: 'Synthetic AT item', category: 'AirtelTigo' },
+    ] } });
     const siteA = (await WebsiteStore.findSitesByUserId(userA))[0];
     const items = siteA.content_json.items || [];
     const mtnOnly = items.filter((item) => (item.category || '').toLowerCase().includes('mtn'));
@@ -438,11 +458,15 @@ async function runWebsiteBuilderTests() {
   // 20. Public Data Reseller site uses edited content
   {
     const siteA = (await WebsiteStore.findSitesByUserId(userA))[0];
+    const originalPublic = await WebsiteStore.findPublishedSiteBySlug(siteA.slug);
+    assert.deepStrictEqual(originalPublic?.content_json.items, [], 'Draft item edits must not change the published snapshot');
+    await WebsiteStore.publishSite(siteA.id, userA);
     const publicSite = await WebsiteStore.findPublishedSiteBySlug(siteA.slug);
 
     assert.ok(publicSite, 'Published site must be publicly accessible');
     assert.strictEqual(publicSite.content_json.tagline, 'High-Speed Non-Expiry Bundles in Ghana');
     assert.strictEqual(publicSite.content_json.location, 'Accra Mall & East Legon');
+    assert.strictEqual(publicSite.content_json.heroImage, 'https://images.unsplash.com/photo-owner-fixture');
     assert.strictEqual(publicSite.content_json.items?.[0].name, '15GB Super Bundle');
 
     const merged = mergeSiteWithTemplate(

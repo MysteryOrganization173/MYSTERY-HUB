@@ -168,3 +168,28 @@ test('bulk reads one fresh catalog snapshot and never substitutes cached costs o
 test('bulk uses real resolver with one nonlinear supplier catalog snapshot',async()=>{FulfilmentService.getProvider().resolvePackage=originals.resolve;FulfilmentService.getProvider().getRawCatalog=async()=>[{slug:'mtn-fixture',kind:'data',network:'mtn',name:'MTN',packages:[{sizeLabel:'1GB',priceMinor:400},{sizeLabel:'2GB',priceMinor:850}]} as any];const preview=await Business.resellerBulkPreview('admin',bulkProposal());assert.equal(preview.rows[0].supplierCostMinor,400);assert.equal(preview.rows[1].supplierCostMinor,850);assert.equal(preview.valid,false);});
 test('all-network disable retains every configured price and can run without supplier access',async()=>{await configure();const ids=(await Business.adminConfig()).products.map(p=>p.id);FulfilmentService.getProvider().getRawCatalog=async()=>{throw Error('Supplier offline');};await applyBulk(bulkProposal({productIds:ids,perGbMinor:null,activation:'disable'}));const config=await FinanceStore.readConfig('store-wholesale');assert.equal(Object.keys(config).length,1);assert.equal(config['mtn-1gb'].enabled,false);assert.equal(config['mtn-1gb'].wholesaleMinor,300);});
 test('bulk enable requires existing processing policy and does not activate it implicitly',async()=>{const preview=await Business.resellerBulkPreview('admin',bulkProposal({activation:'enable'}));assert.equal(preview.valid,false);assert.equal(await FinanceStore.readConfig('store-policy'),undefined);});
+
+test('unconfigured disable is a no-op and cannot create repeatable audit-only applies',async()=>{
+  const proposal=bulkProposal({perGbMinor:null,activation:'disable'}),preview=await Business.resellerBulkPreview('admin',proposal);
+  assert.equal(preview.changeCount,0);assert.equal(preview.valid,false);
+  for(let i=0;i<2;i++)await assert.rejects(()=>Business.resellerBulkApply('admin',{confirmed:true,revision:preview.revision,proposal}),/No prices or activation states would change/);
+  assert.equal(await FinanceStore.readConfig('store-wholesale'),undefined);
+});
+test('unchanged configured rows retain versions and only actual changes count',async()=>{
+  await configure();const previous=await FinanceStore.readConfig('store-wholesale');
+  const proposal=bulkProposal({perGbMinor:300}),preview=await Business.resellerBulkPreview('admin',proposal);
+  assert.equal(preview.changeCount,1);assert.equal((await Business.resellerBulkApply('admin',{confirmed:true,revision:preview.revision,proposal})).applied,1);
+  const next=await FinanceStore.readConfig('store-wholesale');assert.deepEqual(next['mtn-1gb'],previous['mtn-1gb']);assert.equal(next['mtn-2gb'].wholesaleMinor,600);
+  const unchanged=bulkProposal({productIds:['mtn-1gb'],perGbMinor:null}),noop=await Business.resellerBulkPreview('admin',unchanged);
+  assert.equal(noop.valid,false);await assert.rejects(()=>Business.resellerBulkApply('admin',{confirmed:true,revision:noop.revision,proposal:unchanged}),/No prices/);
+});
+test('activation-only apply preserves two-percent policy and every price',async()=>{
+  await configure();await FinanceStore.transaction('admin',tx=>tx.saveConfig('store-policy',{...STORE_POLICY_DEFAULTS,enabled:true,reserveBps:200,reserveFixedMinor:7,version:'two-percent'}));
+  const policy=await FinanceStore.readConfig('store-policy'),previous=await FinanceStore.readConfig('store-wholesale');
+  const result=await applyBulk(bulkProposal({perGbMinor:null,activation:'disable'}));assert.equal(result.applied,1);
+  assert.deepEqual(await FinanceStore.readConfig('store-policy'),policy);assert.equal((await FinanceStore.readConfig('store-wholesale'))['mtn-1gb'].wholesaleMinor,previous['mtn-1gb'].wholesaleMinor);
+});
+test('bulk discount uses half-up pesewa rounding at the threshold',async()=>{
+  await configure();const preview=await Business.resellerBulkPreview('admin',bulkProposal({productIds:['mtn-3gb'],perGbMinor:415,discountFromGb:3,discountBps:5000}));
+  assert.equal(preview.rows[0].proposedMinor,623);
+});
