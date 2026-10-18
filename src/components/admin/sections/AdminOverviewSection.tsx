@@ -101,9 +101,6 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
   const paystackLive = system?.paystack?.mode?.startsWith('Live');
   const paystackTone: AdminTone = !system?.paystack ? 'neutral' : system.paystack.status !== 'configured' ? 'danger' : paystackLive ? 'success' : 'warning';
   const supplierTone: AdminTone = supplier.status === 'connected' ? supplier.isLowBalance ? 'danger' : 'success' : supplier.status === 'error' ? 'danger' : 'neutral';
-  // The progress bar is drawn only when its parts belong to the same population (paid orders created today).
-  const pipelineFits = today.ordersCount > 0 && today.deliveredCount + today.processingCount <= today.ordersCount;
-  const share = (n: number) => `${(n / today.ordersCount) * 100}%`;
 
   const attentionPanel = (
     <AdminPanel
@@ -175,19 +172,12 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
           <p className="text-xs text-slate-500">Since midnight, Ghana time (GMT)</p>
         </div>
         <div className="grid grid-cols-2 divide-slate-800/80 lg:grid-cols-4 [&>*]:border-slate-800/80 [&>*:nth-child(odd)]:border-r [&>*:nth-child(-n+2)]:border-b lg:[&>*]:border-b-0 lg:[&>*:not(:last-child)]:border-r">
-          <TodayFigure label="Paid orders" value={today.ordersCount.toLocaleString()} action="Today's orders" onOpen={() => onNavigateTab('orders', 'active/today')}
-            detail={`Created today. ${today.deliveredCount} delivered · ${today.processingCount} with supplier`}>
-            {pipelineFits && (
-              <span className="my-1 flex h-1.5 w-full overflow-hidden rounded-full bg-slate-800" aria-hidden>
-                <span className="bg-emerald-400" style={{ width: share(today.deliveredCount) }} />
-                <span className="bg-sky-400" style={{ width: share(today.processingCount) }} />
-              </span>
-            )}
-          </TodayFigure>
+          <TodayFigure label="Paid orders" value={today.ordersCount.toLocaleString()} action="All orders created today" onOpen={() => onNavigateTab('orders', 'active/today')}
+            detail={`Created today. Across all payment types: ${today.deliveredCount} delivered · ${today.processingCount} with supplier.`} />
           <TodayFigure label="Delivered today" value={todayReport ? todayReport.completedCount.toLocaleString() : '—'} action="Supporting orders" onOpen={() => todayReport ? setTodayMetric('completed_sales') : onNavigateTab('orders', 'delivered')}
             detail={todayReport ? `${ghs(todayReport.completedSalesMinor)} completed sales, by delivery time. Includes earlier orders.` : 'Delivery report unavailable right now.'} />
-          <TodayFigure label="Paystack receipts" value={ghs(today.revenueMinor)} action="Supporting orders" onOpen={() => todayReport ? setTodayMetric('external_receipts') : onNavigateTab('finance')}
-            detail="Verified payments today, by payment time. Before refunds; not profit." />
+          <TodayFigure label="Paystack receipts" value={todayReport ? ghs(todayReport.externalReceiptsMinor) : '—'} action={todayReport ? 'Supporting orders' : 'Open Finance'} onOpen={() => todayReport ? setTodayMetric('external_receipts') : onNavigateTab('finance')}
+            detail={todayReport ? 'Verified payments today, by payment time. Before refunds; not profit.' : 'Payment report unavailable right now.'} />
           <TodayFigure label="Needs attention" value={allTime.manualReviewPendingCount.toLocaleString()} tone={allTime.manualReviewPendingCount ? 'warning' : 'neutral'} action="Open queue" onOpen={() => onNavigateTab('orders', 'needs_attention')}
             detail={`Open cases from all dates. ${today.attentionCount} from today's orders.`} />
         </div>

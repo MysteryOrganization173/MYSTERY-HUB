@@ -46,7 +46,7 @@ export function AdminRecentOrders({ token, revision = 0, onOpenOrder, onOpenAll 
   }, [token, scope, revision, retry]);
 
   const scopeButton = (id: Scope, label: string) => (
-    <button type="button" role="radio" aria-checked={scope === id} onClick={() => { setOrders(null); setScope(id); }}
+    <button type="button" role="radio" aria-checked={scope === id} onClick={() => { if (scope === id) return; setOrders(null); setScope(id); }}
       className={`min-h-9 rounded-lg px-3 text-xs font-semibold transition-colors ${scope === id ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>
       {label}
     </button>
