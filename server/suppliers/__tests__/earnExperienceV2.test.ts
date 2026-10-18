@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { personalReferralLink, copyReferralLink, shareReferralLink, activeEarnRules, earnCount, rewardStatuses, type EarnSummary } from '../../../src/utils/earnExperience';
-import { EarnMetrics, EarnRewardActivity, EarnRules } from '../../../src/components/earn/EarnDetails';
+import { EarnMetrics, EarnNetwork, EarnRewardActivity, EarnRules } from '../../../src/components/earn/EarnDetails';
 import { describeReferralReward } from '../../../src/utils/referralRewardCopy';
 import { createEarnDashboardRefresh } from '../../../src/utils/earnDashboardRefresh';
 import { getPageFromPath } from '../../../src/utils/routing';
@@ -66,7 +66,8 @@ test('metric rendering distinguishes loading, true zero and unavailable network 
   const loading = renderToStaticMarkup(React.createElement(EarnMetrics, { summary: null, loading: true, stale: false }));
   assert.match(loading, /Loading/); assert.ok(!loading.includes('GH₵0.00'));
   const html = renderToStaticMarkup(React.createElement(EarnMetrics, { summary, loading: false, stale: true }));
-  assert.match(html, /Distinct browsers/); assert.match(html, /stored visitor keys/); assert.match(html, /Registered accounts/); assert.match(html, /Unavailable/); assert.match(html, /Last available/);
+  assert.match(html, /Distinct browsers/); assert.match(html, /stored visitor keys/); assert.match(html, /Registered accounts/); assert.match(html, /Last available/);
+  assert.match(renderToStaticMarkup(React.createElement(EarnNetwork, { summary, loading: false })), /Unavailable/);
   assert.match(html, /GH₵1.50/); assert.match(html, /GH₵7.00/); assert.match(html, /not your available balance/);
 });
 test('all four ledger states are distinct, use minor units and never imply a completed payout', () => {

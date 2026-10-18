@@ -1,6 +1,7 @@
 import type { PublicRewardRule, ReferralSummaryResponse, RewardLedgerItem } from '../services/apiClient';
 import { buildReferralUrl } from './referralUrl';
 import { ROUTE_PATH_MAP } from './routing';
+import { groupMilestones, milestoneRemaining, type EarnAchievement } from './earnMilestones';
 export type EarnSummary = ReferralSummaryResponse['summary'];
 
 /** Receives only the current session's authorized summary, never cached profile data. */
@@ -21,10 +22,10 @@ export async function copyReferralLink(url: string | null, clipboard?: Pick<Clip
   if (!url || !clipboard?.writeText) return false;
   try { await clipboard.writeText(url); return true; } catch { return false; }
 }
-export async function shareReferralLink(url: string | null, share?: (data: ShareData) => Promise<void>): Promise<'shared' | 'cancelled' | 'fallback'> {
+export async function shareReferralLink(url: string | null, share?: (data: ShareData) => Promise<void>, text = 'Data, websites and digital services in one place. Explore with my referral link.'): Promise<'shared' | 'cancelled' | 'fallback'> {
   if (!url || !share) return 'fallback';
   try {
-    await share({ title: 'Mystery Hub', text: 'Data, websites and digital services in one place. Explore with my referral link.', url });
+    await share({ title: 'Mystery Hub', text, url });
     return 'shared';
   } catch (error) { return (error as Error)?.name === 'AbortError' ? 'cancelled' : 'fallback'; }
 }
@@ -36,3 +37,34 @@ export const rewardStatuses: Record<RewardLedgerItem['status'], { label: string;
 };
 export const earnServiceLabel = (service: string) => ({ data: 'Data', airtime: 'Airtime', afa: 'AFA registration', instant_bundle: 'Instant Bundle', marketplace: 'Marketplace', website_builder: 'Website Builder', manual_adjustment: 'Reward adjustment', all: 'Eligible services' }[service] || 'Eligible purchase');
 export const earnCount = (value: number | undefined) => Number.isSafeInteger(value) && value! >= 0 ? value!.toLocaleString('en-GH') : 'Unavailable';
+
+/** Share topics only point at canonical first-party routes; the link itself still comes from personalReferralLink. */
+export const earnShareTopics = [
+  { id: 'general', path: '/', label: 'Mystery Hub', short: 'Mystery Hub', message: 'Check out Mystery Hub for data bundles and other digital services in Ghana.', note: 'A good first link for anyone.' },
+  { id: 'data', path: '/data', label: 'Data Bundles', short: 'Data', message: 'Need data? Mystery Hub has MTN, Telecel and AirtelTigo bundles you can pay for with Mobile Money and track until delivery.', note: 'Data purchases are the main qualifying activity today.' },
+  { id: 'afa', path: '/afa', label: 'MTN AFA Registration', short: 'AFA', message: 'Want to register for MTN AFA? You can do it on Mystery Hub and follow the registration status online.', note: 'AFA rewards apply only when an active AFA rule exists.' },
+  { id: 'website', path: '/website-builder', label: 'Free Website Builder', short: 'Websites', message: 'Want a simple website for your business? Mystery Hub has a free Website Builder you can try from your phone.', note: 'Free websites help friends, but are not paid qualifying purchases.' },
+  { id: 'marketplace', path: '/marketplace', label: 'Marketplace', short: 'Marketplace', message: 'Have a look at the Mystery Hub Marketplace for gadgets and products in Ghana.', note: 'Enquiries alone do not earn rewards.' },
+] as const;
+export type EarnShareTopic = (typeof earnShareTopics)[number];
+/** User-initiated message text; never promises savings or rewards to the recipient. */
+export function referralShareMessage(topic: Pick<EarnShareTopic, 'message'>, link: string) {
+  return `${topic.message} Here's my link: ${link}`;
+}
+export function referralWhatsAppUrl(text: string) {
+  return `https://wa.me/?text=${encodeURIComponent(text)}`;
+}
+
+/** One honest next step, derived only from confirmed server data. */
+export function earnNextStep(summary: EarnSummary | null, achievements: EarnAchievement[] | null, stale: boolean, restricted = false): string {
+  if (summary?.isEnabled === false) return 'Referral sharing is paused for your account. Your earnings and history are still here.';
+  if (restricted) return 'Your account is being reviewed. Sharing and history stay available; claims and cash-out may pause.';
+  if (achievements && !stale) {
+    const { featured, ready } = groupMilestones(achievements);
+    const readyCount = ready.length + (featured && !featured.claimed && featured.progress >= featured.threshold ? 1 : 0);
+    if (readyCount) return `You have ${readyCount} ${readyCount === 1 ? 'achievement' : 'achievements'} ready to collect.`;
+    if (featured) return `Next up: ${featured.name}. ${milestoneRemaining(featured)} to go.`;
+  }
+  if (summary && summary.referredCustomersCount === 0) return 'Start with one friend who buys data. Your link takes them straight there.';
+  return 'Share something useful and follow what it leads to.';
+}

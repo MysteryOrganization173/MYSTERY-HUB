@@ -45,8 +45,31 @@ export function milestoneRemaining(row: EarnAchievement) {
   }
 }
 export const milestoneMetricNotes: Record<AchievementMetric, string> = {
-  successful_referrals: 'Successful referrals from approved qualifying reward activity.',
+  successful_referrals: 'Distinct orders that earned you an approved referral reward. Repeat purchases by the same friend can each count; visits and sign-ups alone do not.',
   qualified_visitors: 'Distinct stored visitor keys, not verified individual people.',
   afa_referrals: 'Approved qualifying AFA referral activity.',
   lifetime_earnings: 'Approved referral earnings. Progress is stored in pesewas and displayed in Ghana cedis.',
 };
+export const milestoneMetricLabels: Record<AchievementMetric, string> = {
+  successful_referrals: 'Rewarded referrals', qualified_visitors: 'Link reach', afa_referrals: 'AFA referrals', lifetime_earnings: 'Approved rewards',
+};
+/** Level within the same metric family, ordered by threshold. Presentation only; never affects eligibility. */
+export function milestoneLevel(row: EarnAchievement, rows: EarnAchievement[]) {
+  const family = rows.filter(item => item.enabled && item.metric === row.metric && milestoneProgress(item))
+    .sort((a, b) => a.threshold - b.threshold || a.id.localeCompare(b.id, 'en'));
+  const index = family.findIndex(item => item.id === row.id);
+  return index < 0 ? null : { level: index + 1, of: family.length };
+}
+/** Splits enabled server rows into one featured milestone and three non-overlapping groups. */
+export function groupMilestones(rows: EarnAchievement[]) {
+  const enabled = rows.filter(row => row.enabled);
+  const featured = featuredMilestone(enabled);
+  const rest = enabled.filter(row => row.id !== featured?.id);
+  const byCloseness = (a: EarnAchievement, b: EarnAchievement) => (milestoneProgress(b)?.percentage ?? -1) - (milestoneProgress(a)?.percentage ?? -1) || a.id.localeCompare(b.id, 'en');
+  return {
+    enabled, featured,
+    ready: rest.filter(row => !row.claimed && milestoneProgress(row)?.complete).sort(byCloseness),
+    active: rest.filter(row => !row.claimed && !milestoneProgress(row)?.complete).sort(byCloseness),
+    collected: rest.filter(row => row.claimed),
+  };
+}

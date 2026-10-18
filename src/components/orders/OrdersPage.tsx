@@ -60,6 +60,7 @@ export const OrdersPage: React.FC = () => {
               },
               recipientPhone: o.recipient_phone,
               buyerRecipientVisible: true,
+              journey: 'account',
               network: o.network,
               paymentMethod: 'paystack',
               amountGhc: o.amount_ghc,

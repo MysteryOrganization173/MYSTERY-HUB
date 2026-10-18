@@ -2,269 +2,107 @@ import React from 'react';
 import { BrandLogo } from './BrandLogo';
 import { useApp } from '../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../config/business';
-import {
-  MessageSquare,
-  ShieldCheck,
-  Heart,
-  ArrowUpRight,
-  Phone,
-  Mail,
-  Radio,
-  ShoppingBag,
-  ExternalLink,
-} from 'lucide-react';
+import { ROUTE_PATH_MAP } from '../../utils/routing';
+import type { ActivePage } from '../../types';
+import { ArrowUpRight, Mail, MessageCircle, Phone, Radio, ShieldCheck } from 'lucide-react';
 
+type FooterLink = { label: string; page: ActivePage; note?: string; open?: () => void };
+
+/** Shared first-party footer. Admin and published customer sites render outside this shell and never receive it. */
 export const Footer: React.FC = () => {
-  const { setActivePage } = useApp();
+  const { setActivePage, openDataPage } = useApp();
+  const year = new Date().getFullYear();
+  const { contact } = BUSINESS_CONFIG;
+  const columns: { title: string; links: FooterLink[] }[] = [
+    { title: 'Services', links: [
+      { label: 'Data Bundles', page: 'data' },
+      { label: 'Airtime', page: 'data', open: () => openDataPage('airtime') },
+      { label: 'AFA Registration', page: 'afa' },
+      { label: 'Website Builder', page: 'website', note: 'Beta' },
+      { label: 'Marketplace', page: 'marketplace' },
+    ] },
+    { title: 'Your account', links: [
+      { label: 'Mystery Earn', page: 'earn', note: 'Rewards' },
+      { label: 'Mystery Wallet', page: 'wallet' },
+      { label: 'Track My Order', page: 'orders' },
+      { label: 'More Services', page: 'services' },
+    ] },
+    { title: 'Help', links: [
+      { label: 'Help & FAQs', page: 'help' },
+      { label: 'About Mystery Hub', page: 'about' },
+    ] },
+  ];
+  const go = (event: React.MouseEvent, link: FooterLink) => { event.preventDefault(); if (link.open) link.open(); else setActivePage(link.page); };
+  const linkClass = 'group inline-flex min-h-10 items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7cedb3] rounded';
 
   return (
-    <footer className="bg-[#070b0e] border-t border-slate-800/80 text-slate-400 text-sm mt-8 sm:mt-12 lg:mt-14 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:pb-10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-8 lg:pt-10">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 sm:gap-8 lg:gap-10 pb-5 sm:pb-8 border-b border-slate-800/60">
-          {/* Brand Col & Direct Contact */}
-          <div className="lg:col-span-2 space-y-3 text-left">
-            <BrandLogo size="md" />
-            <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-sm">
-              Everything digital. One trusted place. Buy data and airtime, build a business website and explore Marketplace items in Ghana. More services are coming soon.
-            </p>
-
-            {/* Direct Contact Links */}
-            <div className="pt-0.5 flex flex-wrap items-center gap-2">
-              <a
-                href={BUSINESS_CONFIG.contact.supportWhatsAppUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00c365]/10 hover:bg-[#00c365]/20 text-[#00c365] text-xs font-semibold transition-colors border border-[#00c365]/30 cursor-pointer min-h-[36px]"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>WhatsApp</span>
-                <ArrowUpRight className="w-3 h-3" />
-              </a>
-
-              <a
-                href={BUSINESS_CONFIG.contact.phoneLink}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium border border-slate-800 transition-colors min-h-[36px]"
-              >
-                <Phone className="w-3.5 h-3.5 text-amber-400" />
-                <span>0592066298</span>
-              </a>
-
-              <a
-                href={BUSINESS_CONFIG.contact.emailLink}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium border border-slate-800 transition-colors min-h-[36px]"
-              >
-                <Mail className="w-3.5 h-3.5 text-sky-400" />
-                <span>Email</span>
-              </a>
+    <footer className="relative mt-10 sm:mt-14 border-t border-slate-800/80 bg-[#070b0e] text-slate-400 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:pb-0 overflow-hidden">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_15%_0%,rgba(0,195,101,0.10),transparent_60%)]" />
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-12">
+        <div className="grid gap-8 lg:grid-cols-12 lg:gap-12">
+          {/* Identity and community */}
+          <div className="lg:col-span-5 space-y-6 text-left">
+            <div className="space-y-3">
+              <BrandLogo size="md" />
+              <p className="font-['Outfit'] text-xl sm:text-2xl font-semibold leading-snug text-white max-w-md">Everything digital. One trusted place.</p>
+              <p className="text-sm leading-relaxed text-slate-400 max-w-md">Data and airtime, AFA registration, business websites and Marketplace discovery for Ghana, with orders you can track and real people on WhatsApp.</p>
+              <p className="inline-flex items-center gap-2 text-xs font-semibold tracking-wide text-[#7cedb3]"><span aria-hidden="true" className="h-px w-6 bg-[#00c365]/60" />Building digital opportunities in Ghana since 2024</p>
             </div>
 
-            {/* Official WhatsApp Channel Follow Card */}
-            <div className="p-2.5 sm:p-3 rounded-xl bg-[#091512] border border-[#00c365]/25 max-w-sm space-y-1">
-              <div className="flex items-center gap-1.5">
-                <Radio className="w-3.5 h-3.5 text-[#00c365]" />
-                <span className="text-xs font-bold text-white">
-                  Follow Mystery Hub Channel
-                </span>
+            <section aria-labelledby="footer-channel" className="relative max-w-md rounded-2xl border border-[#00c365]/25 bg-[linear-gradient(135deg,#0d2219,#0a1512_70%)] p-4 sm:p-5">
+              <div className="flex items-start gap-3">
+                <span aria-hidden="true" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#00c365]/15 text-[#44df95]"><Radio className="h-5 w-5" /></span>
+                <div className="min-w-0 space-y-1">
+                  <h2 id="footer-channel" className="font-['Outfit'] text-base font-semibold text-white">Stay in the loop with Mystery Hub</h2>
+                  <p className="text-sm leading-relaxed text-slate-400">Product updates, new services, special offers and official Mystery Drops when one is running. Join only if you want to; you can leave anytime.</p>
+                </div>
               </div>
-              <p className="text-[11px] text-slate-400 leading-snug">
-                Service updates, tech product drops, and announcements on our WhatsApp Channel.
-              </p>
-              <a
-                href={BUSINESS_CONFIG.contact.whatsappChannelUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-[#00c365] hover:text-[#00e575] transition-colors pt-0.5"
-              >
-                <span>Join Official Channel</span>
-                <ExternalLink className="w-3 h-3" />
+              <a href={contact.whatsappChannelUrl} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#00c365] px-4 text-sm font-semibold text-[#02190d] hover:bg-[#19d679] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7cedb3]">
+                Join the WhatsApp Channel <ArrowUpRight className="h-4 w-4" aria-hidden="true" /><span className="sr-only">(opens WhatsApp)</span>
               </a>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs text-slate-500 pt-0.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Secure checkout · Orders you can track</span>
-            </div>
+            </section>
           </div>
 
-          {/* Grouped Link Columns: 2 cols on mobile, 3 cols on sm/desktop */}
-          <div className="lg:col-span-3 grid grid-cols-2 sm:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
-            {/* Quick Links: Services */}
-            <div className="space-y-2 text-left">
-              <h4 className="text-white font-semibold text-xs uppercase tracking-wider">Services</h4>
-              <ul className="space-y-1 sm:space-y-1.5 text-xs">
-                <li>
-                  <button
-                    onClick={() => setActivePage('data')}
-                    className="hover:text-white transition-colors text-left py-0.5 cursor-pointer block"
-                  >
-                    Data Bundles
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => setActivePage('afa')}
-                    className="hover:text-white transition-colors text-left py-0.5 flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>AFA Registration</span>
-                    <span className="text-[9px] text-[#00c365] font-semibold">Check Status</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => setActivePage('website')}
-                    className="hover:text-white transition-colors text-left py-0.5 flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>Website Builder</span>
-                    <span className="text-[9px] text-sky-400 font-semibold">Beta</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => setActivePage('marketplace')}
-                    className="hover:text-white transition-colors text-left py-0.5 flex items-center gap-1 cursor-pointer"
-                  >
-                    <ShoppingBag className="w-3 h-3 text-[#00c365]" />
-                    <span>Marketplace</span>
-                    <span className="text-[9px] text-[#00c365] font-semibold">New</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => setActivePage('earn')}
-                    className="hover:text-white transition-colors text-left py-0.5 flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>Mystery Earn</span>
-                    <span className="text-[9px] text-amber-400 font-semibold">Rewards</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => setActivePage('wallet')}
-                    className="hover:text-white transition-colors text-left py-0.5 cursor-pointer block"
-                  >
-                    Mystery Wallet
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => setActivePage('services')}
-                    className="text-slate-400 hover:text-white transition-colors text-left py-0.5 cursor-pointer block"
-                  >
-                    More Services →
-                  </button>
-                </li>
+          {/* Navigation */}
+          <nav aria-label="Footer" className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-3 content-start gap-x-6 gap-y-6 text-left">
+            {columns.map(column => (
+              <div key={column.title} className="space-y-2">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{column.title}</h2>
+                <ul className="space-y-0.5">
+                  {column.links.map(link => (
+                    <li key={link.label}>
+                      <a href={ROUTE_PATH_MAP[link.page]} onClick={event => go(event, link)} className={linkClass}>
+                        <span>{link.label}</span>{link.note && <span className="rounded-full border border-slate-700 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-slate-400 group-hover:border-[#00c365]/50 group-hover:text-[#7cedb3]">{link.note}</span>}
+                      </a>
+                    </li>
+                  ))}
+                  {column.title === 'Help' && <>
+                    <li><a href={contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer" className={linkClass}><MessageCircle className="h-4 w-4 text-[#44df95]" aria-hidden="true" />WhatsApp support</a></li>
+                    <li><a href={contact.phoneLink} className={linkClass}><Phone className="h-4 w-4 text-slate-500" aria-hidden="true" />{contact.supportPhone}</a></li>
+                    <li><a href={contact.emailLink} className={linkClass} title={contact.supportEmail}><Mail className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" /><span className="min-w-0">{contact.supportEmail.split('@')[0]}<wbr />@{contact.supportEmail.split('@')[1]}</span></a></li>
+                  </>}
+                </ul>
+              </div>
+            ))}
+            <div className="col-span-2 sm:col-span-3 rounded-2xl border border-dashed border-slate-800 px-4 py-3">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Coming soon</h2>
+              <ul className="mt-1 flex flex-wrap gap-x-5 text-sm text-slate-400">
+                {['ECG Prepaid Bills', 'WAEC Results PINs', 'DStv & GOtv Pay'].map(item => <li key={item}><a href={ROUTE_PATH_MAP.services} onClick={event => { event.preventDefault(); setActivePage('services'); }} className="inline-flex min-h-10 items-center hover:text-white transition-colors">{item}</a></li>)}
               </ul>
             </div>
-
-            {/* Platform & Support */}
-            <div className="space-y-2 text-left">
-              <h4 className="text-white font-semibold text-xs uppercase tracking-wider">About &amp; Support</h4>
-              <ul className="space-y-1 sm:space-y-1.5 text-xs">
-                <li>
-                  <button
-                    onClick={() => setActivePage('about')}
-                    className="hover:text-white transition-colors text-left py-0.5 cursor-pointer block"
-                  >
-                    About Mystery Hub
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => setActivePage('orders')}
-                    className="hover:text-white transition-colors text-left py-0.5 cursor-pointer block"
-                  >
-                    Track My Order
-                  </button>
-                </li>
-                <li><a href="/help" onClick={event => { event.preventDefault(); setActivePage('help'); }} className="inline-flex min-h-11 items-center hover:text-white transition-colors">Help &amp; FAQs</a></li>
-                <li>
-                  <a
-                    href={BUSINESS_CONFIG.contact.phoneLink}
-                    className="hover:text-white transition-colors text-left py-0.5 block truncate"
-                  >
-                    0592066298
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href={BUSINESS_CONFIG.contact.emailLink}
-                    className="hover:text-white transition-colors text-left py-0.5 block truncate"
-                    title="aryeeteyemmanuel852@gmail.com"
-                  >
-                    aryeeteyemmanuel852@gmail.com
-                  </a>
-                </li>
-                <li>
-                  <span className="text-slate-500 py-0.5 block">Accra, Ghana 🇬🇭</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Upcoming Utilities */}
-            <div className="col-span-2 sm:col-span-1 space-y-2 text-left">
-              <h4 className="text-white font-semibold text-xs uppercase tracking-wider">Coming Soon</h4>
-              <ul className="grid grid-cols-2 sm:grid-cols-1 gap-1 sm:gap-1.5 text-xs">
-                <li>
-                  <button
-                    onClick={() => setActivePage('services')}
-                    className="hover:text-white transition-colors text-left py-0.5 cursor-pointer block"
-                  >
-                    ECG Prepaid Bills
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => setActivePage('services')}
-                    className="hover:text-white transition-colors text-left py-0.5 cursor-pointer block"
-                  >
-                    WAEC Results PINs
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => setActivePage('services')}
-                    className="hover:text-white transition-colors text-left py-0.5 cursor-pointer block"
-                  >
-                    DStv & GOtv Pay
-                  </button>
-                </li>
-
-              </ul>
-            </div>
-          </div>
+          </nav>
         </div>
 
-        {/* Bottom row: Networks and copyright */}
-        <div className="pt-4 sm:pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 text-center sm:text-left">
-          <div className="flex items-center gap-2">
-            <span>© 2026 Mystery Hub Ghana. All rights reserved.</span>
-            <span className="text-slate-700">·</span>
-            <a
-              href="/admin"
-              onClick={(e) => {
-                e.preventDefault();
-                setActivePage('admin');
-              }}
-              className="text-slate-600 hover:text-slate-400 text-[11px] transition-colors cursor-pointer"
-            >
-              Staff Portal
-            </a>
-          </div>
+        {/* Payments and trust */}
+        <div className="mt-10 flex flex-col gap-3 border-t border-slate-800/70 pt-5 sm:flex-row sm:items-center sm:justify-between text-left">
+          <p className="flex items-center gap-2 text-xs text-slate-400"><ShieldCheck className="h-4 w-4 shrink-0 text-[#44df95]" aria-hidden="true" />Secure Mobile Money checkout · Orders you can track</p>
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"><span className="text-slate-500">Pay with</span><span className="font-semibold text-amber-300">MTN MoMo</span><span className="font-semibold text-red-300">Telecel Cash</span><span className="font-semibold text-sky-300">AT Money</span></p>
+        </div>
 
-          <div className="flex items-center gap-3 text-slate-400">
-            <span className="text-[11px] text-slate-500 hidden xs:inline">Accepted:</span>
-            <span className="text-amber-400 font-semibold text-xs">MTN MoMo</span>
-            <span className="text-slate-600">·</span>
-            <span className="text-red-400 font-semibold text-xs">Telecel Cash</span>
-            <span className="text-slate-600">·</span>
-            <span className="text-sky-400 font-semibold text-xs">AT Money</span>
-          </div>
-
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-            <span>Crafted with</span>
-            <Heart className="w-3 h-3 text-red-500 fill-red-500 inline mx-0.5" />
-            <span>for Ghana</span>
-          </div>
+        {/* Legal strip */}
+        <div className="flex flex-col gap-2 border-t border-slate-800/70 py-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between text-left">
+          <p>© {year} Mystery Hub. All rights reserved. <span className="text-slate-600">{contact.supportLocation}</span></p>
+          <a href="/admin" onClick={event => { event.preventDefault(); setActivePage('admin'); }} className="self-start sm:self-auto inline-flex min-h-10 items-center text-slate-600 hover:text-slate-400 transition-colors">Staff Portal</a>
         </div>
       </div>
     </footer>

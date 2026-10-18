@@ -10,6 +10,7 @@ import { clearPendingCheckout, isSettledForRecovery } from '../../utils/checkout
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
 import { OrderRecord } from '../../types';
+import { PostPurchaseInvite } from './PostPurchaseInvite';
 import { CheckCircle2, Clock, AlertTriangle, ArrowRight, MessageSquare, Copy, Check, RefreshCw, X, ShieldAlert, Phone as PhoneIcon } from 'lucide-react';
 
 export const OrderStatusModal: React.FC = () => {
@@ -458,6 +459,9 @@ export const OrderStatusModal: React.FC = () => {
               <span>{isAfa ? 'Back to Home' : tone === 'success' ? 'Buy again' : 'Done'}</span>
             </button>
           </div>
+
+          {/* Optional referral discovery: only after a confirmed first-party delivery, below tracking actions. */}
+          <PostPurchaseInvite order={activeOrder} onExplore={() => { closeOrderStatus(); setActivePage('earn'); }} />
 
           {/* WhatsApp Support Assistance */}
           <a
