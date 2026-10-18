@@ -1,20 +1,26 @@
 import { SiteFooterContact } from '../SiteContactDetails';
 import { useVisualEditMarkers, useTemplateCopy } from '../editor/VisualEditMarkers';
-import { websiteActionText, resolveResellerTheme } from '../../../utils/websiteBrand';
+import { websiteActionText, resolveStoreTheme } from '../../../utils/websiteBrand';
 import { SafeImage } from '../SafeImage.js';
 import React, { useMemo, useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
-import { ArrowRight, MessageCircle, Phone, MapPin, ShieldCheck } from 'lucide-react';
+import { ArrowRight, MessageCircle, Phone, MapPin, ShieldCheck, Search, Smartphone } from 'lucide-react';
 import { getCloudinarySrcSet } from '../../../utils/cloudinary';
-import { DATA_RESELLER_STARTER_HERO_IMAGE } from '../../../data/templates';
+import { resolveDataResellerHeroImage } from '../../../utils/dataResellerArtwork';
 import { DATA_BUNDLES } from '../../../data/bundles';
 import { formatGhs } from '../../../../shared/money';
 import {
-  BundleTile, HowBuyingWorks, NetworkTabs, RESELLER_STORE_CSS, STORE_NETWORKS, sortBundles,
-  storeNetworkColor, storeNetworkName, storeNetworksIn, type StoreBundle, type StoreNetwork,
+  BundleTile, HowBuyingWorks, NetworkPicker, NetworkTabs, RESELLER_STORE_CSS, STORE_NETWORKS, networkSummaries, sortBundles,
+  storeNetworkName, storeNetworksIn, type NetworkSummary, type StoreBundle, type StoreNetwork,
 } from '../storefront/ResellerCatalogue';
 
-export interface ResellerStoreSummary { networks: StoreNetwork[]; fromMinor: number | null; count: number }
+export interface ResellerStoreSummary {
+  networks: StoreNetwork[]; fromMinor: number | null; count: number;
+  /** Per-network counts and lowest server prices, for the hero's network picker. */
+  byNetwork?: NetworkSummary[];
+  /** Selects a network in the live catalogue. */
+  onPickNetwork?: (network: StoreNetwork) => void;
+}
 interface TemplateViewProps {
   template: WebsiteTemplate;
   onCtaClick?: () => void;
@@ -23,22 +29,7 @@ interface TemplateViewProps {
   managedSummary?: ResellerStoreSummary;
 }
 
-/**
- * Resolves the Data Reseller hero image.
- * Protects custom images while smoothly migrating old placeholders or missing URLs
- * to the official starter artwork.
- */
-export function resolveDataResellerHeroImage(heroImage?: string): string {
-  if (
-    !heroImage ||
-    heroImage.trim() === '' ||
-    heroImage.includes('photo-1556742049-0a67e5572293') ||
-    heroImage.includes('Neon_Data_Bundles_in_Accra')
-  ) {
-    return DATA_RESELLER_STARTER_HERO_IMAGE;
-  }
-  return heroImage;
-}
+export { resolveDataResellerHeroImage } from '../../../utils/dataResellerArtwork';
 
 /** Up to two letters from the business name, for a store that has not added a logo. */
 export function storeInitials(name: string): string {
@@ -60,20 +51,20 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
   const businessName = template.demoBusinessName || 'Your data store';
   const tagline = template.demoHeroTagline || '';
   const aboutText = template.demoSubtext || '';
-  const location = owner ? template.location || '' : template.location || '';
+  const location = template.location || '';
   const contact = owner ? template.siteContent?.phone || '' : '';
   const whatsapp = owner ? template.siteContent?.whatsapp || template.siteContent?.phone || '' : template.hoursOrContact || '';
   const cleanWhatsappNumber = whatsapp.replace(/\D/g, '').replace(/^0/, '233');
   const logoUrl = template.siteContent?.logoUrl;
 
-  const p = resolveResellerTheme(template.colorScheme || {
-    primary: '#0f172a', secondary: '#2563eb', background: '#0a0f1d', surface: '#111a2e',
-    text: '#f8fafc', mutedText: '#94a3b8', accent: '#2563eb', border: '#1e293b',
+  // Every surface, border and text colour follows the owner's own background and accent.
+  const p = resolveStoreTheme(template.colorScheme || {
+    primary: '#0f172a', secondary: '#2563eb', background: '#0a0f1d', accent: '#2563eb',
   });
   const onAccent = websiteActionText(p.accent);
 
-  const heroImageSrc = resolveDataResellerHeroImage(template.heroImage);
-  const heroSrcSet = getCloudinarySrcSet(heroImageSrc, [360, 430, 640, 768, 1024, 1280], { format: 'auto', quality: 'auto' });
+  const heroImageSrc = resolveDataResellerHeroImage(template.heroImage, owner);
+  const heroSrcSet = getCloudinarySrcSet(heroImageSrc, [480, 768, 1024, 1280, 1536], { format: 'auto', quality: 'auto' });
 
   // Gallery: example bundles. An owner's site without managed checkout (a design-switch preview) shows its empty state.
   const examples = useMemo(() => owner ? [] : exampleBundles(), [owner]);
@@ -81,6 +72,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
   const [notice, setNotice] = useState('');
   const networks: StoreNetwork[] = managedSummary?.networks.length ? managedSummary.networks : managedCheckout ? [] : storeNetworksIn(examples);
   const fromMinor = managedSummary ? managedSummary.fromMinor : null;
+  const picker: NetworkSummary[] = managedSummary?.byNetwork?.length ? managedSummary.byNetwork : !managedCheckout && !owner ? networkSummaries(examples) : [];
 
   const handleChatWhatsapp = () => {
     if (onCtaClick) { onCtaClick(); return; }
@@ -89,66 +81,74 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
     window.open(`https://wa.me/${cleanWhatsappNumber}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   };
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const pickNetwork = (n: StoreNetwork) => { (managedSummary?.onPickNetwork || setNetwork)(n); setNotice(''); scrollTo('bundle-catalog'); };
   const primaryLabel = managedCheckout && managedAvailability !== 'available'
     ? managedAvailability === 'loading' ? 'Check Availability' : 'View Availability'
     : template.siteContent?.ctaLabel || 'Buy Data';
 
-  const surface = { backgroundColor: p.surface, borderColor: p.border, color: p.surfaceText };
+  const line = p.hairline || p.border;
+  const surface = { backgroundColor: p.surface, borderColor: line, color: p.surfaceText };
+  const year = new Date().getFullYear();
 
   return (
     <div
       className="reseller-storefront min-h-full font-sans antialiased flex flex-col selection:bg-[var(--website-accent)] selection:text-[var(--website-on-accent)]"
-      style={{ backgroundColor: p.background, color: p.text, '--website-accent': p.accent, '--website-on-accent': onAccent, '--website-focus': p.focus, '--website-placeholder': p.mutedText } as React.CSSProperties}
+      style={{ backgroundColor: p.background, color: p.text, '--website-accent': p.accent, '--website-on-accent': onAccent, '--website-focus': p.focus, '--website-placeholder': p.mutedText, '--store-surface': p.surface, '--store-border': line } as React.CSSProperties}
     >
       <style>{RESELLER_STORE_CSS}</style>
 
       {/* 1. The store's own identity: its logo or monogram, its name and what it sells. */}
-      <header className="store-header" style={{ backgroundColor: `${p.surface}f2`, borderColor: p.border, color: p.surfaceText }}>
+      <header className="store-header" style={{ backgroundColor: `${p.background}eb`, borderColor: line, color: p.text }}>
         <div className="store-wrap store-header-inner">
           <div className="store-brand">
-            <span className="store-mark" style={logoUrl ? { backgroundColor: p.surface, border: `1px solid ${p.border}` } : { backgroundColor: p.accent, color: onAccent }}>
+            <span className="store-mark" style={logoUrl ? { backgroundColor: p.surface, border: `1px solid ${line}` } : { backgroundColor: p.accent, color: onAccent }}>
               {logoUrl ? <SafeImage {...edit('content:logoUrl')} src={logoUrl} alt={`${businessName} logo`} className="w-full h-full" style={{ objectFit: 'contain' }} /> : <span {...edit('content:logoUrl')} aria-hidden="true" className="site-display">{storeInitials(businessName)}</span>}
             </span>
             <div className="min-w-0">
-              <h1 {...edit('content:businessName')} className="store-brand-name site-display" style={{ color: p.surfaceText }}>{businessName}</h1>
-              <p className="store-brand-line" style={{ color: p.surfaceMutedText }}>
+              <h1 {...edit('content:businessName')} className="store-brand-name site-display" style={{ color: p.text }}>{businessName}</h1>
+              <p className="store-brand-line" style={{ color: p.mutedText }}>
                 <span {...copy.edit('brand')}>{copy.text('brand')}</span>{location ? <span> · {location}</span> : null}
               </p>
             </div>
           </div>
-          <nav aria-label="Store" className="hidden md:flex items-center gap-6 text-sm font-semibold" style={{ color: p.surfaceMutedText }}>
-            <a href="#bundle-catalog" className="inline-flex items-center hover:opacity-80">Bundles</a>
-            <a href="#store-track" className="inline-flex items-center hover:opacity-80">Track order</a>
-            <a href="#store-help" className="inline-flex items-center hover:opacity-80">Help</a>
+          <nav aria-label="Store" className="store-nav">
+            <a href="#bundle-catalog">Bundles</a>
+            {managedCheckout && <a href="#store-track">Track order</a>}
+            <a href="#store-help">Help</a>
           </nav>
           {whatsapp && (
             <button type="button" {...edit('content:whatsapp')} data-website-event="whatsapp_click" onClick={handleChatWhatsapp}
               className="store-chat bg-[#25D366] hover:bg-[#22c35e] text-black">
               <MessageCircle className="w-4 h-4" aria-hidden="true" />
-              <span>Chat</span>
+              <span>Chat<span className="sr-only"> on WhatsApp</span></span>
             </button>
           )}
         </div>
       </header>
 
-      {/* 2. Hero: what the store sells, the networks it really offers and the way in. */}
+      {/* 2. Hero: the owner's artwork leads, then the promise, the way in and the networks on sale. */}
       <section className="store-wrap store-hero" aria-labelledby="store-hero-title">
-        <div className="min-w-0">
+        <div {...edit('content:heroImage')} className="store-art" style={{ borderColor: line, backgroundColor: p.surface }}>
+          <SafeImage src={heroImageSrc} srcSet={heroSrcSet || undefined} sizes="(max-width: 899px) 100vw, 600px" alt="" loading="eager" fetchPriority="high" width={1536} height={1024} className="w-full h-full" />
+        </div>
+        <div className="store-hero-copy min-w-0">
           {networks.length > 0 && (
-            <p className="store-hero-badge" style={{ borderColor: p.border, color: p.text }}>
-              {networks.map(n => <span key={n} className="inline-flex items-center gap-1.5"><i style={{ backgroundColor: storeNetworkColor(n) }} />{storeNetworkName(n)}</span>)}
+            <p className="store-hero-badge" style={{ borderColor: line, color: p.mutedText }}>
+              <Smartphone className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>{networks.map(storeNetworkName).join(' · ')} data</span>
             </p>
           )}
           <h2 id="store-hero-title" {...edit('content:tagline')} className="store-hero-title site-display" style={{ color: p.text }}>{tagline}</h2>
           <p {...edit('content:aboutText')} className="store-hero-text" style={{ color: p.mutedText }}>{aboutText}</p>
           <div className="store-hero-actions">
             <button type="button" {...edit('content:ctaLabel')} data-website-primary-cta="true" onClick={() => scrollTo('bundle-catalog')}
-              className="store-primary" style={{ backgroundColor: p.accent, color: onAccent, borderColor: p.border }}>
+              className="store-primary" style={{ backgroundColor: p.accent, color: onAccent }}>
               <span>{primaryLabel}</span>
               <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </button>
             {managedCheckout && (
               <button type="button" onClick={() => scrollTo('store-track')} className="store-secondary" style={{ borderColor: p.border, color: p.text, backgroundColor: 'transparent' }}>
+                <Search className="w-4 h-4" aria-hidden="true" />
                 <span {...copy.edit('secondary')}>{copy.text('secondary')}</span>
               </button>
             )}
@@ -157,30 +157,30 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             <p className="store-hero-facts" style={{ color: p.mutedText }}>
               {fromMinor !== null && <span>Bundles from <strong style={{ color: p.text }}>{formatGhs(fromMinor)}</strong></span>}
               {managedSummary && managedSummary.count > 0 && <span><strong style={{ color: p.text }}>{managedSummary.count}</strong> bundle{managedSummary.count === 1 ? '' : 's'} available</span>}
-              {!managedCheckout && !owner && <span>Example store · bundles and prices are set by each store owner</span>}
+              {!managedCheckout && !owner && <span>Example store · each owner sets their own bundles and prices</span>}
             </p>
           )}
-          {/* How buying works, in the order it happens, right under the way in. */}
-          <section className="mt-7" aria-labelledby="store-steps-title">
-            <h2 id="store-steps-title" className="store-eyebrow" style={{ color: p.mutedText }}><span {...copy.edit('stepsHeading')}>{copy.text('stepsHeading')}</span></h2>
-            <HowBuyingWorks theme={p} managed={!!managedCheckout} />
-          </section>
-        </div>
-        <div {...edit('content:heroImage')} className="store-art" style={{ borderColor: p.border, backgroundColor: p.surface }}>
-          <SafeImage src={heroImageSrc} srcSet={heroSrcSet || undefined} sizes="(max-width: 899px) 100vw, 560px" alt="" loading="eager" fetchPriority="high" width={1200} height={825} className="w-full h-full" />
         </div>
       </section>
 
-      {/* 3. Catalogue: managed checkout on a live store; labelled examples in the gallery. */}
+      {/* 3. Shop by network: real counts and lowest prices, one tap from the catalogue. */}
+      {picker.length > 1 && (
+        <section className="store-wrap store-picker-wrap" aria-label="Shop by network">
+          <NetworkPicker networks={picker} theme={p} onPick={pickNetwork} example={!managedCheckout && !owner} />
+        </section>
+      )}
+
+      {/* 4. Catalogue: managed checkout on a live store; labelled examples in the gallery. */}
       <main id="bundle-catalog" className="store-wrap store-section flex-1 scroll-mt-20">
         <div className="store-section-head">
           <div>
             <p className="store-eyebrow" style={{ color: p.accentText }}><span {...copy.edit('catalogueEyebrow')}>{copy.text('catalogueEyebrow')}</span></p>
             <h2 className="site-display" style={{ color: p.text }}><span {...copy.edit('catalogueHeading')}>{copy.text('catalogueHeading')}</span></h2>
           </div>
+          {managedCheckout && <p className="store-note store-head-note" style={{ color: p.mutedText }}>Prices include everything you pay. Tap a bundle to review before paying.</p>}
         </div>
         {managedCheckout || (owner ? (
-          <div role="status" className="store-card" style={surface}>
+          <div role="status" className="store-card store-empty" style={surface}>
             <h3 className="font-bold text-base">Your bundles appear here</h3>
             <p className="store-note mt-1" style={{ color: p.surfaceMutedText }}>Customers see the bundles you switch on in Bundles &amp; Pricing, at the prices you set.</p>
           </div>
@@ -199,14 +199,23 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
         ))}
       </main>
 
-      {/* 4. Help: the store owner is the customer's first contact. */}
+      {/* 5. What happens after payment, in the order it happens. */}
+      <section className="store-wrap store-section" aria-labelledby="store-steps-title">
+        <div className="store-card store-steps-card" style={surface}>
+          <h2 id="store-steps-title" className="store-eyebrow" style={{ color: p.surfaceMutedText }}><span {...copy.edit('stepsHeading')}>{copy.text('stepsHeading')}</span></h2>
+          <HowBuyingWorks theme={p} managed={!!managedCheckout || !owner} />
+        </div>
+      </section>
+
+      {/* 6. Help: the store owner is the customer's first contact. */}
       <section id="store-help" className="store-wrap store-section scroll-mt-20" aria-labelledby="store-help-title">
         <div className="store-card store-help" style={surface}>
           <div>
             <h2 id="store-help-title" className="text-xl font-bold site-display" style={{ color: p.surfaceText }}><span {...copy.edit('helpHeading')}>{copy.text('helpHeading')}</span></h2>
             <p className="store-note mt-2" style={{ color: p.surfaceMutedText }}><span {...copy.edit('helpIntro')}>{copy.text('helpIntro')}</span></p>
+            {managedCheckout && whatsapp && <p className="store-note mt-2" style={{ color: p.surfaceMutedText }}>Bundles are bought and paid for on this page. WhatsApp and calls are for questions about an order.</p>}
           </div>
-          <div className="flex flex-wrap items-center gap-2 md:justify-end">
+          <div className="store-help-actions">
             {whatsapp && <button type="button" data-website-event="whatsapp_click" onClick={handleChatWhatsapp} className="store-secondary bg-[#25D366] text-black" style={{ borderColor: 'transparent' }}><MessageCircle className="w-4 h-4" aria-hidden="true" />WhatsApp</button>}
             {contact && <a {...edit('content:phone')} href={`tel:${contact.replace(/[^\d+]/g, '')}`} className="store-secondary" style={{ borderColor: p.border, color: p.surfaceText }}><Phone className="w-4 h-4" aria-hidden="true" />Call {contact}</a>}
             {!whatsapp && !contact && <p {...edit('content:whatsapp')} className="store-note" style={{ color: p.surfaceMutedText }}>{owner ? 'Contact details coming soon.' : 'The store’s WhatsApp and phone number appear here.'}</p>}
@@ -214,12 +223,21 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
         </div>
       </section>
 
-      {/* 5. Footer: the business's details, and who runs payments and delivery. */}
-      <footer className="store-footer" style={{ backgroundColor: p.surface, borderColor: p.border, color: p.surfaceText }}>
+      {/* 7. Footer: the business's details, its pages, and who runs payments and delivery. */}
+      <footer className="store-footer" style={{ backgroundColor: p.surface, borderColor: line, color: p.surfaceText }}>
         <div className="store-wrap store-footer-grid text-sm">
           <div>
             <p className="font-bold text-base site-display">{businessName}</p>
-            {location && <p {...edit('content:location')} className="mt-1 inline-flex items-center gap-1.5" style={{ color: p.surfaceMutedText }}><MapPin className="w-3.5 h-3.5" aria-hidden="true" />{location}</p>}
+            <p className="store-note mt-1" style={{ color: p.surfaceMutedText }}>{copy.text('brand')}</p>
+            {location && <p {...edit('content:location')} className="mt-2 inline-flex items-start gap-1.5" style={{ color: p.surfaceMutedText }}><MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />{location}</p>}
+          </div>
+          <div>
+            <h3 style={{ color: p.surfaceMutedText }}>Shop</h3>
+            <ul className="store-footer-links">
+              <li><a href="#bundle-catalog">Data bundles</a></li>
+              {managedCheckout && <li><a href="#store-track">Track an order</a></li>}
+              <li><a href="#store-help">Help</a></li>
+            </ul>
           </div>
           <div>
             <h3 style={{ color: p.surfaceMutedText }}>Contact</h3>
@@ -233,6 +251,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             </p>
           </div>
         </div>
+        <div className="store-wrap store-footer-base" style={{ color: p.surfaceMutedText, borderColor: line }}>© {year} {businessName}</div>
       </footer>
     </div>
   );

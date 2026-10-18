@@ -351,7 +351,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
                 className="w-full py-3.5 rounded-lg bg-[var(--website-accent,#f97316)] hover:bg-[#ea580c] text-black font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 <HardHat className="w-4 h-4 text-black" />
-                <span>{template.siteContent ? 'Contact About Your Project' : 'Submit Tender Intake for Certified BOQ'}</span>
+                <span>{template.siteContent ? 'Contact About Your Project' : 'Request a Project Estimate'}</span>
               </button>
             </form>
           )}
@@ -370,11 +370,11 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
             </p>
           </div>
           <div className="space-y-2">
-            <h5 className="font-bold text-white uppercase text-xs">Operating Headquarters</h5>
+            <h5 className="font-bold text-white uppercase text-xs">Office</h5>
             <p className="text-xs" {...edit("content:location")}>{template.location}</p>
           </div>
           <div className="space-y-2">
-            <h5 className="font-bold text-white uppercase text-xs">Direct Contract Lines</h5>
+            <h5 className="font-bold text-white uppercase text-xs">Contact</h5>
             <SiteFooterContact template={template} className="text-xs" />
           </div>
         </div>

@@ -66,9 +66,6 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
           <a href="#work" className="hover:text-white transition-colors">
             Selected Works
           </a>
-          <a href="#exhibitions" className="hover:text-white transition-colors">
-            Exhibitions & Press
-          </a>
           <a href="#gear" className="hover:text-white transition-colors">
             Gear & Rates
           </a>

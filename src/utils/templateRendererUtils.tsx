@@ -24,6 +24,7 @@ import { DataResellerTemplateView, type ResellerStoreSummary } from '../componen
 import { DynamicTemplateRenderer } from '../components/website/DynamicTemplateRenderer.js';
 import { PersonalityTemplateView, personalityPreset } from '../components/website/templates/PersonalityTemplateView';
 import { WEBSITE_TEMPLATES } from '../data/templates.js';
+import { resolveDataResellerHeroImage } from './dataResellerArtwork.js';
 
 /**
  * Merges user-edited content and settings with the base template definition
@@ -59,7 +60,8 @@ export function mergeSiteWithTemplate(
     demoSubtext: content?.aboutText ?? baseTemplate.demoSubtext,
     location: content?.location ?? baseTemplate.location,
     hoursOrContact: content ? content.whatsapp || content.phone || content.email || '' : baseTemplate.hoursOrContact,
-    heroImage: content?.heroImage || baseTemplate.heroImage,
+    // A Data Business owner's empty hero keeps the legacy banner it has always rendered, never the new starter.
+    heroImage: content && baseTemplate.layoutType === 'reseller' ? resolveDataResellerHeroImage(content.heroImage, true) : content?.heroImage || baseTemplate.heroImage,
     accentColor,
     colorScheme: {
       ...currentColors,

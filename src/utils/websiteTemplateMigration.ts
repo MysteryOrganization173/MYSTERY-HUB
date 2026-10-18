@@ -28,7 +28,10 @@ export function migrateWebsiteTemplate(content: SiteContent, fromId: string, tar
     businessName: content.businessName, logoUrl: content.logoUrl,
     location: content.location, phone: content.phone, whatsapp: content.whatsapp, email: content.email,
     social: structuredClone(content.social || {}),
-    tagline: '', aboutText: '', heroImage: '', ctaLabel: genericAction ? content.ctaLabel : defaultCta(targetId), ctaTarget: genericAction ? content.ctaTarget || '' : '',
+    tagline: '', aboutText: '',
+    // A design switch into the Data store starts with the neutral starter, written explicitly so it is never
+    // confused with an older site's inherited banner. Other designs keep falling back to their own photo.
+    heroImage: targetId === 'tmpl-data-reseller' ? target.heroImage || '' : '', ctaLabel: genericAction ? content.ctaLabel : defaultCta(targetId), ctaTarget: genericAction ? content.ctaTarget || '' : '',
     items: [], stats: [], features: [],
   };
   if (compatible && migrated.ctaLabel === defaultCta(fromId)) migrated.ctaLabel = defaultCta(targetId);
