@@ -3,6 +3,7 @@ import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {commercialRequest} from '../../../services/commercialApi';
 import {formatGhs,parseGhs,percentMinor} from '../../../../shared/money';
 import {AdminResellerControls} from './AdminResellerControls';
+import {AdminPageHeader} from '../ui/AdminUi';
 const field='min-h-11 w-full rounded-lg border border-slate-700 bg-slate-950 p-2';
 const button='min-h-11 rounded-lg bg-emerald-700 px-4 py-2 disabled:opacity-50';
 const cash=commercialCash;
@@ -39,7 +40,7 @@ export function AdminCommercialSection({token}:{token:string}) {
   catch(e:any){if(gate.current.current(owner))setError(e.message);}
   finally{gate.current.finish(owner);if(sessionGeneration.current===session){setBusy(false);savePending.current=false;}}
  };
- return <section className="space-y-5 min-w-0"><header className="space-y-1"><h1 className="text-2xl font-bold tracking-tight text-white sm:text-[1.7rem]">Commercial Pricing &amp; Welcome Offer</h1><p className="max-w-2xl text-sm leading-relaxed text-slate-400">Service prices, the Welcome offer and the contribution each sale leaves after discounts and referral rewards.</p></header>{error&&<p role="alert" className="text-rose-300">{error}</p>}{phase==='error'?<button type="button" className={button} onClick={()=>void refresh(true)}>Retry commercial settings</button>:phase==='loading'||phase==='retrying'?<p role="status" aria-live="polite">{phase==='retrying'?'Retrying commercial settings…':'Loading prices and offer settings…'}</p>:data?<>
+ return <section className="space-y-5 min-w-0"><AdminPageHeader title="Commercial Pricing & Welcome Offer" description="Service prices, the Welcome offer and the contribution each sale leaves after discounts and referral rewards."/>{error&&<p role="alert" className="text-rose-300">{error}</p>}{phase==='error'?<button type="button" className={button} onClick={()=>void refresh(true)}>Retry commercial settings</button>:phase==='loading'||phase==='retrying'?<p role="status" aria-live="polite">{phase==='retrying'?'Retrying commercial settings…':'Loading prices and offer settings…'}</p>:data?<>
  {data.dependencyStatus?.supplierCosts==='unavailable'&&<p role="status" className="rounded-xl border border-amber-800 bg-amber-950/30 p-3 text-sm text-amber-200">Supplier costs are temporarily unavailable for some packages. Settings are loaded; unknown contributions are not profit estimates.</p>}
  <p className="text-sm text-slate-400">Future direct prices only. Supplier cost is live provider authority. Reseller wholesale and owner retail remain separate. Unknown cost/contribution is not a profit estimate.</p>
  <form className="grid sm:grid-cols-3 gap-3" onSubmit={e=>{e.preventDefault();submit(()=>({kind:'pricing',expectedVersion:data.prices.version,configureReserve:true,reserveBps:Math.round(Number(bps)*100),reserveFixedMinor:/^0(?:\.0{1,2})?$/.test(fixed.trim())?0:parseGhs(fixed),products:[]}));}}>
