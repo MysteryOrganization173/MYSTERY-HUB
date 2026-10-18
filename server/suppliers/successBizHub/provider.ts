@@ -306,9 +306,10 @@ export class SuccessBizHubProvider implements SupplierProvider {
    */
   async resolvePackage(
     network: string,
-    bundleSize: string
+    bundleSize: string,
+    catalogSnapshot?: SbhOffer[]
   ): Promise<{ resolved: ResolvedSupplierPackage | null; error?: string }> {
-    const rawOffers = await this.getRawCatalog();
+    const rawOffers = catalogSnapshot ?? await this.getRawCatalog();
     return resolveSupplierPackage(rawOffers, network, bundleSize);
   }
 
