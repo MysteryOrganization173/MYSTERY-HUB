@@ -325,7 +325,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
           </div>}
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase tracking-wider text-[11px]">
-              Direct Reservations
+              Reservations
             </h5>
             <SiteFooterContact template={template} className="text-slate-400 text-xs" />
             <div className="pt-1">

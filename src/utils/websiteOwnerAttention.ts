@@ -30,3 +30,31 @@ export function ownerAttention(input: OwnerAttentionInput): OwnerAttentionItem[]
     title: 'No visits in this period', detail: 'Share your link on WhatsApp status or with your customers to get your first visitors.'});
   return items;
 }
+
+export interface OwnerSuggestionInput {
+  reseller: boolean;
+  /** True for designs that show an item list (menu, services, products...). */
+  hasItems: boolean;
+  itemWord: string;
+  content?: {logoUrl?: string; aboutText?: string; tagline?: string; location?: string; items?: unknown[]} | null;
+}
+
+/** Older Data starters told customers to order on WhatsApp; Data stores take orders and payment on the page. */
+export const WHATSAPP_ORDERING_WORDING = /(order|buy)[^.]{0,40}(through|on|via|by)\s+whatsapp|whatsapp\s+(to\s+)?order/i;
+
+/**
+ * Optional improvements, tailored to the business type and worked out from the saved draft only.
+ * They never change anything themselves; each opens the editor where the owner decides.
+ */
+export function ownerSuggestions(input: OwnerSuggestionInput): OwnerAttentionItem[] {
+  const c = input.content || {}, items: OwnerAttentionItem[] = [];
+  if (input.reseller && WHATSAPP_ORDERING_WORDING.test(`${c.tagline || ''} ${c.aboutText || ''}`)) items.push({id: 'wording', tone: 'info', action: 'edit', label: 'Review wording',
+    title: 'Your description says to order on WhatsApp', detail: 'Customers buy and pay for bundles on your website. Updating this line stops people messaging you to place orders.'});
+  if (!String(c.logoUrl || '').trim()) items.push({id: 'logo', tone: 'info', action: 'edit', label: 'Add logo',
+    title: 'Add your logo', detail: 'Your logo appears at the top of every page and helps customers recognise you.'});
+  if (input.hasItems && !(c.items || []).length) items.push({id: 'items', tone: 'info', action: 'edit', label: `Add ${input.itemWord}`,
+    title: `Show your ${input.itemWord}`, detail: `Customers decide faster when they can see your ${input.itemWord} and prices.`});
+  if (!String(c.location || '').trim()) items.push({id: 'location', tone: 'info', action: 'edit', label: 'Add location',
+    title: 'Say where you are', detail: 'A town or area helps local customers trust and find you.'});
+  return items.slice(0, 3);
+}

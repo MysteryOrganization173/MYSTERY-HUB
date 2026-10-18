@@ -1,11 +1,12 @@
 import { createWebsiteComposition, RESELLER_INTEGRATIONS } from '../config/websiteBuilder.js';
 import { WebsiteTemplate, TemplateCategory } from '../types';
 
-export const DATA_RESELLER_STARTER_HERO_IMAGE =
-  'https://res.cloudinary.com/da6oeat7m/image/upload/v1791053950/ChatGPT_Image_Oct_3_2026_06_58_33_PM_jr9ait.png';
+import { DATA_RESELLER_STARTER_HERO_IMAGE } from '../utils/dataResellerArtwork.js';
+// New Data Business sites start with the brand-neutral artwork. Existing sites keep theirs: see dataResellerArtwork.ts.
+export { DATA_RESELLER_STARTER_HERO_IMAGE, DATA_RESELLER_LEGACY_HERO_IMAGE } from '../utils/dataResellerArtwork.js';
 
 export const TEMPLATE_CATEGORIES: { id: TemplateCategory; label: string }[] = [
-  { id: 'all', label: 'All Templates' },
+  { id: 'all', label: 'All designs' },
   { id: 'restaurant', label: 'Restaurants & Cafes' },
   { id: 'construction', label: 'Construction & Civil' },
   { id: 'beauty', label: 'Salons & Barber Studios' },
@@ -30,7 +31,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     categoryLabel: 'Restaurants & Cafes',
     layoutType: 'restaurant',
     industry: 'Modern Ghanaian Dining, Cocktail Lounge & Private Catering',
-    description: 'Sophisticated culinary layout with interactive digital menu, table reservation picker, chef specials, and direct WhatsApp food ordering.',
+    description: 'Warm restaurant layout with a menu by category, a chef’s specials section and reservation enquiries sent to your WhatsApp.',
     features: ['Categorized Digital Menu with Prices', 'Reservation Enquiry Card', 'Chef’s Daily Special Showcase', 'WhatsApp Enquiries'],
     accentColor: '#D97706',
     demoBusinessName: 'Gold Coast Artisan Kitchen',
@@ -52,9 +53,9 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     },
     heroImage: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80',
     stats: [
-      { label: 'Fresh Daily Dishes', value: '45+' },
-      { label: 'Happy Diners in Accra', value: '12,000+' },
-      { label: 'TripAdvisor Rating', value: '4.9 ★' },
+      { label: 'Eat with us', value: 'Dine-in' },
+      { label: 'Ready to collect', value: 'Takeaway' },
+      { label: 'Ask for your area', value: 'Delivery' },
     ],
     items: [
       {
@@ -145,9 +146,9 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     },
     heroImage: DATA_RESELLER_STARTER_HERO_IMAGE,
     stats: [
-      { label: 'Bundles Delivered', value: '25,000+' },
-      { label: 'Active Lines', value: '4,500+' },
-      { label: 'Average Delivery', value: '< 3 Mins' },
+      { label: 'Networks: MTN, Telecel, AirtelTigo', value: '3' },
+      { label: 'Secure checkout', value: 'Paystack' },
+      { label: 'With your order reference', value: 'Tracking' },
     ],
     items: [
       // MTN Packages
@@ -185,7 +186,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     categoryLabel: 'Construction & Civil',
     layoutType: 'construction',
     industry: 'Civil Engineering, Residential High-Rises & Turnkey Contracting',
-    description: 'Heavy industrial architecture layout with structural grid, project completion portfolio, instant tender quote calculator, and safety credentials.',
+    description: 'Bold construction layout with a filterable project portfolio, your capabilities and project-estimate enquiries sent to your WhatsApp.',
     features: ['Interactive Project Portfolio Grid', 'Instant Cost Estimate Calculator', 'ISO 9001 Safety Certifications', 'Direct Tender Inquiries'],
     accentColor: '#F97316',
     demoBusinessName: 'Apex Build Civil Contractors',
@@ -207,10 +208,10 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     },
     heroImage: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1200&q=80',
     stats: [
-      { label: 'Completed Developments', value: '148+' },
-      { label: 'Years in Operation', value: '18 Yrs' },
-      { label: 'Safety Record', value: '0 Incidents' },
-      { label: 'Heavy Machinery Fleet', value: '62 Units' },
+      { label: 'Homes & extensions', value: 'Residential' },
+      { label: 'Shops & offices', value: 'Commercial' },
+      { label: 'By appointment', value: 'Site visits' },
+      { label: 'On request', value: 'Estimates' },
     ],
     items: [
       {
@@ -252,7 +253,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     categoryLabel: 'Salons & Barber Studios',
     layoutType: 'salon',
     industry: 'Hair Stylists, Luxury Braiding, Royal Barbering & Holistic Spa',
-    description: 'High-fashion aesthetic with appointment slot picker, hairstyle lookbook, stylist directory, and transparent Ghana Cedis rate card.',
+    description: 'Elegant salon layout with a service and price list, your stylists and appointment enquiries sent to your WhatsApp.',
     features: ['Appointment Slot Booking System', 'Hairstyle & Fade Lookbook', 'Stylist Selection & Availability', 'SMS / WhatsApp Confirmation'],
     accentColor: '#EC4899',
     demoBusinessName: 'Nectar Glow Hair & Barber Lounge',
@@ -274,9 +275,9 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     },
     heroImage: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1200&q=80',
     stats: [
-      { label: 'Happy Clients Styled', value: '6,400+' },
-      { label: 'Master Stylists', value: '14 Pros' },
-      { label: 'Client Satisfaction', value: '99.4%' },
+      { label: 'Cuts, braids & styling', value: 'Hair' },
+      { label: 'Nails & skincare', value: 'Beauty' },
+      { label: 'By appointment', value: 'Bookings' },
     ],
     items: [
       {
@@ -318,7 +319,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     categoryLabel: 'Real Estate & Properties',
     layoutType: 'realestate',
     industry: 'Luxury Residential Estates, Penthouse Rentals & Land Investment',
-    description: 'High-end property discovery platform with interactive search filter, bedroom/bath specs, price tags in USD & GH₵, and private tour booking.',
+    description: 'Polished property layout with filterable listings, prices, bedroom and bathroom details, and viewing requests sent to your WhatsApp.',
     features: ['Property Search & Filter Bar', 'Bed / Bath / SqFt Metric Cards', 'Interactive Tour Schedule Form', 'Mortgage / MoMo Deposit Guide'],
     accentColor: '#0EA5E9',
     demoBusinessName: 'GoldCoast Prestige Properties',
@@ -340,9 +341,9 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     },
     heroImage: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
     stats: [
-      { label: 'Properties Sold & Leased', value: '380+' },
-      { label: 'Active Prime Listings', value: '45 Units' },
-      { label: 'Client Asset Value', value: '$85M+' },
+      { label: 'Homes & apartments', value: 'Rent' },
+      { label: 'Houses & land', value: 'Buy' },
+      { label: 'By appointment', value: 'Viewings' },
     ],
     items: [
       {
@@ -387,7 +388,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     categoryLabel: 'Portfolios & Creators',
     layoutType: 'portfolio',
     industry: 'Documentary Photography, Commercial Campaigns & Cinematic Film',
-    description: 'Distraction-free dark mode gallery with masonry media grid, client credit roster, equipment breakdown, and direct commercial booking form.',
+    description: 'Dark, image-first portfolio with a filterable gallery of your work, your equipment and rates, and shoot enquiries sent to your WhatsApp.',
     features: ['Full-Screen Lightbox Portfolio', 'Masonry Photo Grid with Tags', 'Equipment & Rate Card', 'Direct Commission Booking'],
     accentColor: '#00C365',
     demoBusinessName: 'Lumina Visual Studio',
@@ -409,9 +410,9 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     },
     heroImage: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80',
     stats: [
-      { label: 'Exhibitions Worldwide', value: '12 Shows' },
-      { label: 'Commercial Campaigns', value: '85+' },
-      { label: 'Vogue & BBC Features', value: '14' },
+      { label: 'Portraits & events', value: 'Photo' },
+      { label: 'Brand & event video', value: 'Film' },
+      { label: 'By enquiry', value: 'Commissions' },
     ],
     items: [
       {
@@ -447,7 +448,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     categoryLabel: 'Tech & Digital Agency',
     layoutType: 'agency',
     industry: 'Cloud Architecture, Fintech API Rails & Mobile Product Engineering',
-    description: 'Futuristic high-contrast tech layout featuring live SLA metrics, technology stack badges, enterprise case studies, and instant discovery call booking.',
+    description: 'Sharp technology layout for your services, highlights and discovery-call enquiries sent to your WhatsApp.',
     features: ['Interactive Tech Stack Showcase', 'Live API Metrics & SLA Counters', 'Enterprise Case Studies with ROI', 'Discovery Call Booking Bar'],
     accentColor: '#8B5CF6',
     demoBusinessName: 'Vortex Digital Solutions',
@@ -469,9 +470,9 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     },
     heroImage: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80',
     stats: [
-      { label: 'Uptime SLA Guaranteed', value: '99.99%' },
-      { label: 'Daily API Transactions', value: '4.2M' },
-      { label: 'Enterprise Clients', value: '60+' },
+      { label: 'Sites & apps', value: 'Web' },
+      { label: 'Hosting & support', value: 'Cloud' },
+      { label: 'Discovery calls', value: 'Consulting' },
     ],
     items: [
       {
@@ -502,7 +503,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     categoryLabel: 'Hotels & Hospitality',
     layoutType: 'hotel',
     industry: 'Boutique Eco-Lodges, Luxury Chalets & Coastal Retreats',
-    description: 'Serene warm-neutral sanctuary design with date-picker booking bar, suite amenities breakdown, resort activities gallery, and guest reviews.',
+    description: 'Calm hospitality layout with your rooms and stays, guest experiences and availability enquiries sent to your WhatsApp.',
     features: ['Check-in / Check-out Date Selector', 'Room Suites with Amenities Pills', 'Resort Activity Booking', 'Ghana MoMo / Card Payment'],
     accentColor: '#10B981',
     demoBusinessName: 'Akwaaba Coastal Sanctuary',
@@ -524,9 +525,9 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     },
     heroImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80',
     stats: [
-      { label: 'Private Eco Chalets', value: '28' },
-      { label: 'Guest Satisfaction', value: '4.95 ★' },
-      { label: 'Solar Powered', value: '100%' },
+      { label: 'Suites & chalets', value: 'Rooms' },
+      { label: 'Breakfast & meals', value: 'Dining' },
+      { label: 'Book by enquiry', value: 'Stays' },
     ],
     items: [
       {
@@ -561,7 +562,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     categoryLabel: 'Education & Academies',
     layoutType: 'education',
     industry: 'Code Bootcamps, Data Science Institutes & High Schools',
-    description: 'Trust-inspiring academic layout with course catalog, certification badges, career placement metrics, and online admission application form.',
+    description: 'Clear school and training layout for your courses and classes, with admission enquiries by phone or WhatsApp.',
     features: ['Curriculum Syllabus Overview', 'Tuition & MoMo Installment Calculator', 'Student Placement Stats', 'Online Enrollment Form'],
     accentColor: '#F59E0B',
     demoBusinessName: 'Horizon STEM Institute Accra',
@@ -583,9 +584,9 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     },
     heroImage: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1200&q=80',
     stats: [
-      { label: 'Graduate Employment Rate', value: '94%' },
-      { label: 'Alumni Working Globally', value: '1,800+' },
-      { label: 'Corporate Hiring Partners', value: '45+' },
+      { label: 'Short & full-time', value: 'Courses' },
+      { label: 'Weekday & weekend', value: 'Classes' },
+      { label: 'Open by enquiry', value: 'Admissions' },
     ],
     items: [
       {
@@ -618,7 +619,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     categoryLabel: 'E-Commerce & Retail',
     layoutType: 'ecommerce',
     industry: 'Laptops, Smartphones, Audio Accessories & Consumer Retail',
-    description: 'High-conversion commerce layout with promo announcement banner, product card ratings, direct WhatsApp / MoMo checkout, and warranty badges.',
+    description: 'Shop layout with a product catalogue, delivery and returns notes, and orders arranged with you on WhatsApp.',
     features: ['Product Catalog with Price Tags', 'Instant WhatsApp Cart Checkout', '12-Month Official Warranty Badges', 'Same-Day Dispatch Tracking'],
     accentColor: '#2563EB',
     demoBusinessName: 'GadgetHub Ghana',
@@ -640,9 +641,9 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     },
     heroImage: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80',
     stats: [
-      { label: 'Original Products Sold', value: '18,500+' },
-      { label: 'Accra Same-Day Delivery', value: '< 3 Hours' },
-      { label: 'Customer Trust Rating', value: '4.8 ★' },
+      { label: 'Browse the catalogue', value: 'Shop' },
+      { label: 'Ask for your area', value: 'Delivery' },
+      { label: 'Collect in store', value: 'Pickup' },
     ],
     items: [
       {
@@ -660,7 +661,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
         name: 'Sony WH-1000XM5 Wireless Headphones',
         price: 'GH₵ 3,950',
         category: 'Audio',
-        desc: 'Industry-leading noise cancellation with dual processors, 8 mics, and 30-hour playback.',
+        desc: 'Wireless over-ear headphones with noise cancellation. Sample product: add your own items and specs.',
         tag: 'Sale -15%',
         specs: ['Active Noise Cancelling', 'Hi-Res Audio', 'Fast Charge'],
         image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80',
@@ -687,7 +688,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     categoryLabel: 'Churches & Ministries',
     layoutType: 'church',
     industry: 'Churches, Christian Fellowships, Non-Profits & Outreach',
-    description: 'Respectful, welcoming layout featuring live service stream broadcast, weekly schedule, sermon audio library, and online MoMo tithes & offerings.',
+    description: 'Welcoming layout for your services, weekly activities and how to plan a visit.',
     features: ['Weekly Service Schedules & Directions', 'Live Stream Broadcast Banner', 'Online Giving / MoMo Tithes & Donations', 'Confidential Prayer Request Form'],
     accentColor: '#1E3A8A',
     demoBusinessName: 'Grace City Chapel International',
@@ -709,9 +710,9 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     },
     heroImage: 'https://images.unsplash.com/photo-1438232992991-995b7058bbb3?auto=format&fit=crop&w=1200&q=80',
     stats: [
-      { label: 'Weekly Congregants', value: '2,200+' },
-      { label: 'Community Outreaches', value: '48 / Yr' },
-      { label: 'Global Online Family', value: '14 Nations' },
+      { label: 'Main service', value: 'Sundays' },
+      { label: 'Prayer & Bible study', value: 'Midweek' },
+      { label: 'Community programmes', value: 'Outreach' },
     ],
     items: [
       {
@@ -747,7 +748,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     categoryLabel: 'Fashion & Bespoke',
     layoutType: 'fashion',
     industry: 'Bespoke Tailoring, Kente Weavers & African Luxury Wear',
-    description: 'High-fashion lookbook showcasing bespoke cuts, fabric swatch selector, custom measurement intake, and worldwide delivery.',
+    description: 'Lookbook layout for your featured pieces, with fittings and orders by appointment.',
     features: ['Full Lookbook Runway Zoom', 'Custom Measurement Guide', 'Fabric Swatch Selector', 'Worldwide DHL & MoMo Checkout'],
     accentColor: '#9333EA',
     demoBusinessName: 'Akwete Bespoke Atelier',
@@ -769,9 +770,9 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     },
     heroImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',
     stats: [
-      { label: 'Bespoke Suits Crafted', value: '3,200+' },
-      { label: 'Countries Shipped To', value: '28' },
-      { label: 'Master Tailors & Weavers', value: '18' },
+      { label: 'Made to measure', value: 'Bespoke' },
+      { label: 'Seasonal pieces', value: 'Ready-to-wear' },
+      { label: 'By appointment', value: 'Fittings' },
     ],
     items: [
       {
@@ -804,7 +805,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     categoryLabel: 'Corporate & Legal',
     layoutType: 'services',
     industry: 'Tax Advisory, Commercial Law, Audit & ORC Business Registration',
-    description: 'Trust-centered corporate architecture with practitioner biographies, practice areas breakdown, compliance intake, and consultation booking.',
+    description: 'Calm professional layout for your services and how you help, with consultation enquiries by phone or WhatsApp.',
     features: ['Partner Credentials & Practice Areas', 'Confidential Client Intake Portal', 'GRA & ORC Regulatory Guides', 'Consultation Calendar'],
     accentColor: '#0F766E',
     demoBusinessName: 'Vanguard Advisors Ghana',
@@ -826,9 +827,9 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     },
     heroImage: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=1200&q=80',
     stats: [
-      { label: 'Corporate Clients Advised', value: '450+' },
-      { label: 'Tax Audits Successfully Closed', value: '98%' },
-      { label: 'Combined Partner Experience', value: '38 Yrs' },
+      { label: 'Filing & advice', value: 'Tax' },
+      { label: 'Contracts & compliance', value: 'Legal' },
+      { label: 'By appointment', value: 'Consults' },
     ],
     items: [
       {
@@ -843,7 +844,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
         name: 'Tax Advisory & GRA Audit Defense',
         category: 'Taxation',
         desc: 'Proactive corporate tax structuring, monthly VAT withholding compliance, and representation during GRA audits.',
-        specs: ['Full Regulatory Defense', 'Certified Tax Practitioners'],
+        specs: ['Audit preparation', 'Filing support'],
       },
     ],
   },

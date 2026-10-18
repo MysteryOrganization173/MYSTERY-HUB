@@ -259,11 +259,11 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
             </p>
           </div>
           <div className="space-y-2">
-            <h5 className="font-bold text-white uppercase text-xs">Showroom Address</h5>
+            <h5 className="font-bold text-white uppercase text-xs">Visit the shop</h5>
             <p className="text-xs" {...edit("content:location")}>{template.location}</p>
           </div>
           <div className="space-y-2">
-            <h5 className="font-bold text-white uppercase text-xs">Order Desk</h5>
+            <h5 className="font-bold text-white uppercase text-xs">Order or ask</h5>
             <SiteFooterContact template={template} className="text-xs" />
           </div>
         </div>

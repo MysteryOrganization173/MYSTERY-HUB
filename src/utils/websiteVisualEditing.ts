@@ -1,3 +1,4 @@
+import { DATA_RESELLER_STARTER_HERO_IMAGE } from './dataResellerArtwork.js';
 import type { SiteContent, SiteSettings, WebsiteTemplate } from '../types';
 import { SECTION_REGISTRY, type SectionData } from '../config/websiteBuilder';
 import { sanitizeUrl } from '../../server/types/website';
@@ -89,7 +90,11 @@ export function applyVisualValue(content: SiteContent, settings: SiteSettings, t
   const target = visualTargets(template).find(t => t.id === id);
   if (!target || target.source.kind === 'item' || visualValueError(target, value)) return null;
   if (target.source.kind === 'settings') return {content, settings: {...settings, [target.source.field]: value}};
-  if (target.source.kind === 'content') return {content: {...content, [target.source.field]: value}, settings};
+  if (target.source.kind === 'content') {
+    // Removing a Data store's photo selects the neutral starter rather than inheriting the legacy banner.
+    const next = target.source.field === 'heroImage' && template.layoutType === 'reseller' && !value.trim() ? DATA_RESELLER_STARTER_HERO_IMAGE : value;
+    return {content: {...content, [target.source.field]: next}, settings};
+  }
   if (target.source.kind === 'copy') {
     const copy = {...content.copy};
     if (value.trim()) copy[target.source.key] = value; else delete copy[target.source.key];
