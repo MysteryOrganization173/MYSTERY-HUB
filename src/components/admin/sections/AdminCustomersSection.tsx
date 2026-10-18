@@ -3,6 +3,7 @@ import {AdminGuestHistory} from './AdminGuestHistory';
 import { AdminCustomerSecurity } from './AdminCustomerSecurity';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { earnMoney } from './AdminEarnUi';
+import { AdminPageHeader, RefreshButton } from '../ui/AdminUi';
 import type { EarnCustomerSummary } from '../../../../server/types/adminEarn';
 import {
   AdminUsersResponse,
@@ -157,24 +158,11 @@ export const AdminCustomersSection: React.FC<AdminCustomersSectionProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-[1.7rem]">Customer Accounts</h1>
-          <p className="max-w-2xl text-sm leading-relaxed text-slate-400">
-            Registered accounts only. Linked orders use account ownership; guest purchases are never assigned by name or phone similarity. Enabled means allowed to sign in, not online. Spending counts verified, delivered purchases excluding refunds.
-          </p>
-        </div>
-
-        <button
-          onClick={() => fetchUsers()}
-          disabled={isSearching}
-          className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-medium text-slate-300 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin text-[#00c365]' : ''}`} />
-          <span>{isSearching ? 'Updating...' : 'Refresh'}</span>
-        </button>
-      </div>
+      <AdminPageHeader
+        title="Customers & security"
+        description="Registered accounts only. Linked orders use account ownership; guest purchases are never assigned by name or phone similarity. Enabled means allowed to sign in, not online. Spending counts verified, delivered purchases excluding refunds."
+        actions={<RefreshButton onClick={() => fetchUsers()} busy={isSearching} />}
+      />
 
       {/* Success Banner */}
       {successMessage && (

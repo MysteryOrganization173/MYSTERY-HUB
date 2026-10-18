@@ -27,12 +27,16 @@ interface AdminOrdersSectionProps {
   initialStatusFilter?: string;
   /** Opens one order directly (deep link from an alert or another section). */
   initialReference?: string;
+  /** Opens with the created-date filter set to today in Ghana time (from the Overview "Today" figures). */
+  initialCreatedToday?: boolean;
   onChanged?: () => void;
 }
 
 const lensFromFilter = (filter: string): OrderLensId => (ORDER_LENSES.some(l => l.id === filter) ? filter as OrderLensId : filter ? 'active' : 'active');
 
-export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionToken, initialStatusFilter = '', initialReference, onChanged }) => {
+const ghanaToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Accra' });
+
+export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionToken, initialStatusFilter = '', initialReference, initialCreatedToday = false, onChanged }) => {
   // Query & filter state. A lens maps to the existing server filters; nothing new is queried.
   const [searchTerm, setSearchTerm] = useState(initialReference || '');
   const [debouncedSearch, setDebouncedSearch] = useState(initialReference || '');
@@ -40,8 +44,8 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
   const [serviceTypeFilter, setServiceTypeFilter] = useState<string>('');
   const [networkFilter, setNetworkFilter] = useState<string>('');
   const [manualReviewFilter, setManualReviewFilter] = useState<string>('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState(initialCreatedToday ? ghanaToday : '');
+  const [dateTo, setDateTo] = useState(initialCreatedToday ? ghanaToday : '');
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   const pageSize = 20;
@@ -273,6 +277,14 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
             <label className={adminLabel}><span>Created from</span><input type="date" className={adminField} value={dateFrom} onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }} /></label>
             <label className={adminLabel}><span>Created to</span><input type="date" className={adminField} value={dateTo} onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }} /></label>
             {activeFilterCount > 0 && <button type="button" onClick={clearFilters} className="justify-self-start text-sm font-semibold text-[#00c365]">Clear filters</button>}
+          </div>
+        )}
+        {!showFilters && (dateFrom || dateTo) && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900 pl-3 pr-1">
+              {dateFrom && dateFrom === dateTo && dateFrom === ghanaToday() ? 'Created today' : `Created ${dateFrom || '…'} to ${dateTo || '…'}`}
+              <button type="button" aria-label="Clear created date filter" onClick={() => { setDateFrom(''); setDateTo(''); setCurrentPage(1); }} className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-white"><X className="h-3.5 w-3.5" /></button>
+            </span>
           </div>
         )}
         {lens === 'needs_attention' && <p className="text-xs text-slate-400">Needs Attention covers all dates: flagged orders, uncertain supplier submissions, refunds in progress and paid orders that failed without a recorded customer remedy. Resolved cases leave this list but stay searchable.</p>}

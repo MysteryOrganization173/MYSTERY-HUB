@@ -53,7 +53,7 @@ const ADMIN_AREAS: Record<AdminTab, { label: string; short: string; group: strin
   system: { label: 'System Health', short: 'System', group: 'Platform', icon: Server },
 };
 const GROUPS = ['Operate', 'Sell', 'Money', 'Platform'];
-const QUICK: AdminTab[] = ['overview', 'orders', 'marketplace', 'finance'];
+const QUICK: AdminTab[] = ['overview', 'orders', 'customers', 'finance'];
 
 /** Admin location lives in the URL hash (#orders/needs_attention) so Android back works and alerts can deep link. */
 function readHash(): { tab: AdminTab; param: string } {
@@ -152,7 +152,8 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
     finance: signals.pendingWithdrawals ? { count: signals.pendingWithdrawals, tone: 'warning', label: `${signals.pendingWithdrawals} withdrawal requests waiting` } : undefined,
     system: signals.supplierAlert ? { count: null, tone: 'danger', label: 'Supplier needs attention' } : undefined,
   };
-  const area = ADMIN_AREAS[activeTab];
+  // Areas reached through "More" on phones still surface their alerts on that button.
+  const moreBadges = (Object.keys(badges) as AdminTab[]).filter(tab => !QUICK.includes(tab) && badges[tab]).map(tab => badges[tab]!);
 
   const navItem = (tab: AdminTab, compact = false) => {
     const item = ADMIN_AREAS[tab];
@@ -245,7 +246,7 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
             />
           )}
           {activeTab === 'orders' && (
-            <AdminOrdersSection key={param} sessionToken={token} initialStatusFilter={param.startsWith('ref/')?'':param} initialReference={param.startsWith('ref/')?param.slice(4):undefined} onChanged={onSignalsChanged} />
+            <AdminOrdersSection key={param} sessionToken={token} initialStatusFilter={param.startsWith('ref/')?'':param.replace(/\/today$/,'')} initialReference={param.startsWith('ref/')?param.slice(4):undefined} initialCreatedToday={!param.startsWith('ref/')&&param.endsWith('/today')} onChanged={onSignalsChanged} />
           )}
           {activeTab === 'marketplace' && (
             <AdminMarketplaceSection sessionToken={token} initialView={param} onChanged={onSignalsChanged} />
@@ -281,8 +282,9 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
               </button>
             );
           })}
-          <button type="button" onClick={() => setMenuOpen(true)} className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${QUICK.includes(activeTab) ? 'text-slate-400' : 'text-[#00c365]'}`}>
+          <button type="button" onClick={() => setMenuOpen(true)} aria-label={moreBadges.length ? `More areas: ${moreBadges.map(b => b.label).join(', ')}` : 'More areas'} className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${QUICK.includes(activeTab) ? 'text-slate-400' : 'text-[#00c365]'}`}>
             <Menu className="h-5 w-5" />More
+            {moreBadges.length > 0 && <span aria-hidden className={`absolute right-[26%] top-2.5 h-2 w-2 rounded-full ${moreBadges.some(b => b.tone === 'danger') ? 'bg-rose-400' : moreBadges.some(b => b.tone === 'warning') ? 'bg-amber-300' : 'bg-sky-300'}`} />}
           </button>
         </div>
       </nav>
