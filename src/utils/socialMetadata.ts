@@ -35,11 +35,11 @@ export function publicImageUrl(value: unknown): string {
 /** Only canonical, versioned Cloudinary image originals get a known-size JPEG social rendition.
  * Padding keeps the whole product/banner visible. External/already-transformed URLs stay exact.
  */
-export function socialImage(value: string): Pick<SocialHead, 'image' | 'imageWidth' | 'imageHeight' | 'imageType'> {
+export function socialImage(value: string, padding: 'ffffff' | '0b0f12' = 'ffffff'): Pick<SocialHead, 'image' | 'imageWidth' | 'imageHeight' | 'imageType'> {
   const image = publicImageUrl(value);
   const original = image.match(/^(https:\/\/res\.cloudinary\.com\/[\w-]+\/image\/upload\/)(v\d+\/[^?#]+)$/);
   return original
-    ? { image: `${original[1]}f_jpg,q_auto,c_pad,w_1200,h_630,b_rgb:ffffff/${original[2]}`, imageWidth: 1200, imageHeight: 630, imageType: 'image/jpeg' }
+    ? { image: `${original[1]}f_jpg,q_auto,c_pad,w_1200,h_630,b_rgb:${padding}/${original[2]}`, imageWidth: 1200, imageHeight: 630, imageType: 'image/jpeg' }
     : { image };
 }
 
@@ -87,7 +87,8 @@ export function marketplaceProductHead(product: MarketplaceProduct): SocialHead 
     title: clipMetadata(product.name, 90),
     description: clipMetadata(`${price}. ${product.availabilityLabel}. ${action} ${details || ''}`, 240),
     url: `${PUBLIC_ORIGIN}/marketplace?product=${encodeURIComponent(product.slug || product.id)}`,
-    ...socialImage(publicImageUrl(product.imageUrl) || BUSINESS_CONFIG.marketplaceHeroImageUrl),
+    // Marketplace merchandise keeps its full photograph on a dark canvas; owner sites retain their existing rendition.
+    ...socialImage(publicImageUrl(product.imageUrl) || BUSINESS_CONFIG.marketplaceHeroImageUrl, '0b0f12'),
     imageAlt: clipMetadata(product.imageAlt || product.name, 160), icon: publicImageUrl(BRAND_IMAGE),
   };
 }
