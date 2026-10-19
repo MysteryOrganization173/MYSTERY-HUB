@@ -111,11 +111,11 @@ test('QuickByte original empty and retired hero resolution is preserved read-onl
     assert.equal(websiteSocialHead(record).image,socialImage(LEGACY).image);assert.deepEqual(record,before);
   }
 });
-test('owner-chosen replacement remains authoritative; other Data businesses never inherit QuickByte fallback',()=>{
-  const owned=site({template_id:'tmpl-data-reseller',content:{businessName:'Another business',heroImage:'',logoUrl:''} as any});
+test('neutral starter and owner-chosen replacement remain authoritative for new Data businesses',()=>{
+  const owned=site({template_id:'tmpl-data-reseller',content:{businessName:'Another business',heroImage:NEUTRAL,logoUrl:''} as any});
   assert.equal(websiteSocialHead(owned).image,socialImage(NEUTRAL).image);
   assert.equal(websiteSocialHead({...owned,content:{...owned.content,heroImage:'https://images.example.com/custom.jpg'}}).image,'https://images.example.com/custom.jpg');
-  assert.equal(websiteSocialHead({...owned,content:{...owned.content,logoUrl:'https://images.example.com/own-logo.png'}}).image,'https://images.example.com/own-logo.png');
+  assert.equal(websiteSocialHead({...owned,content:{...owned.content,logoUrl:'https://images.example.com/own-logo.png'}}).icon,'https://images.example.com/own-logo.png');
 });
 test('active section-layout hero image follows the published renderer; dormant/disabled sections do not override it',()=>{
   const content={businessName:'Section Business',heroImage:'https://images.example.com/base.jpg',composition:{version:1,sections:[{id:'hero',type:'hero',enabled:true,order:0,data:{image:'https://images.example.com/section.jpg'}}]}} as any;

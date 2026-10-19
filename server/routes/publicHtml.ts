@@ -36,6 +36,7 @@ export function createPublicHtmlRouter(distDirectory: string, readers: PublicMet
     }
     try {
       const { head, status, customerSite } = await resolvePublicSocialMetadata(req.originalUrl, readers);
+      if (head.noindex) res.set('X-Robots-Tag', 'noindex, nofollow');
       res.status(status).type('html').send(injectSocialHead(index, head, customerSite));
     } catch {
       // Never serve stale owner/product metadata or leak internal errors/PII in responses or logs.

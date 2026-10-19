@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
-import { applySocialHead, marketplaceProductHead, PUBLIC_ORIGIN, PUBLIC_PAGE_METADATA, publicPageHead } from '../../utils/socialMetadata';
+import { applySocialHead, marketplaceProductHead, pageIndexingHead, PUBLIC_ORIGIN, PUBLIC_PAGE_METADATA, publicPageHead } from '../../utils/socialMetadata';
 
 const OTHER_PAGES: Record<string, {title:string;description:string}> = {
   help: { title: 'Help & FAQs — Mystery Hub Ghana',description:'Find answers about Data, Airtime, payments, order tracking, Mystery Earn, Website Builder, Wallet and support.'},
@@ -15,6 +15,8 @@ export const SEOHead: React.FC = () => {
   useEffect(() => {
     const product = activePage === 'marketplace' && marketplaceOverlay.kind !== 'none' ? marketplaceOverlay.product : null;
     const head = product ? marketplaceProductHead(product) : publicPageHead(activePage);
+    const indexing = pageIndexingHead(window.location.pathname, window.location.search);
+    if (indexing.noindex) Object.assign(head, indexing);
     if (!product && !PUBLIC_PAGE_METADATA[activePage] && OTHER_PAGES[activePage]) {
       Object.assign(head, OTHER_PAGES[activePage], {url: `${PUBLIC_ORIGIN}${ROUTE_PATH_MAP[activePage] || '/'}`});
     }

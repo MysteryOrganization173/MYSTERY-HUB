@@ -1,9 +1,8 @@
 import { MarketplaceStore } from '../db/marketplaceStore.js';
 import { WebsiteStore } from '../db/websiteStore.js';
 import type { PublicWebsiteSite } from '../../src/types/index.js';
-import { marketplaceProductHead, PUBLIC_ORIGIN, publicPageHead, websiteSocialHead, type SocialHead } from '../../src/utils/socialMetadata.js';
+import { marketplaceProductHead, PUBLIC_ORIGIN, publicPageHead, pageIndexingHead, websiteSocialHead, type SocialHead } from '../../src/utils/socialMetadata.js';
 import { marketplaceProductKey } from '../../src/utils/marketplaceDeepLink.js';
-import { getPageFromPath } from '../../src/utils/routing.js';
 
 export const publicMetadataReaders = {
   product: (key: string) => MarketplaceStore.getPublicProductBySlug(key, true),
@@ -28,6 +27,10 @@ export async function resolvePublicSocialMetadata(requestTarget: string, readers
   if (requestTarget.length > 4096 || !requestTarget.startsWith('/') || requestTarget.startsWith('//') || /[\\\u0000-\u001f]/.test(requestTarget)) throw new Error('Invalid public path');
   const url = new URL(requestTarget, PUBLIC_ORIGIN);
   const path = url.pathname;
+  // Preview query URLs render isolated editor frames, never a public owner/product landing page.
+  if (['owner_preview', 'isolated_template_preview', 'preview_template_id', 'editor_channel', 'editor_site'].some(key => url.searchParams.has(key))) {
+    return { head: pageIndexingHead(path, url.search), status: 200, customerSite: false };
+  }
   if (/^\/sites(?:\/|$)/i.test(path)) {
     const match = path.match(/^\/sites\/([a-z0-9][a-z0-9-]{0,99})\/?$/i);
     const site = match ? await readers.site(match[1].toLowerCase()) : null;
@@ -40,5 +43,5 @@ export async function resolvePublicSocialMetadata(requestTarget: string, readers
       return { head: product ? marketplaceProductHead(product) : unavailableHead('product'), status: product ? 200 : 404, customerSite: false };
     }
   }
-  return { head: publicPageHead(getPageFromPath(path)), status: 200, customerSite: false };
+  return { head: pageIndexingHead(path, url.search), status: 200, customerSite: false };
 }

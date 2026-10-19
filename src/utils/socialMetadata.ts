@@ -1,6 +1,6 @@
 import { BUSINESS_CONFIG } from '../config/business.js';
 import { WEBSITE_TEMPLATES } from '../data/templates.js';
-import { DATA_RESELLER_LEGACY_HERO_IMAGE, DATA_RESELLER_STARTER_HERO_IMAGE, resolveDataResellerHeroImage, showsLegacyDataResellerArtwork } from './dataResellerArtwork.js';
+import { DATA_RESELLER_STARTER_HERO_IMAGE, resolveDataResellerHeroImage } from './dataResellerArtwork.js';
 import type { MarketplaceProduct, PublicWebsiteSite } from '../types/index.js';
 import { websiteLayoutMode } from './websiteLayout.js';
 
@@ -52,11 +52,31 @@ export const PUBLIC_PAGE_METADATA: Record<string, { title: string; description: 
   earn: { path: '/earn', title: 'Mystery Earn — Mystery Hub', description: 'Invite people to Mystery Hub and earn rewards from qualifying purchases.' },
   afa: { path: '/afa', title: 'MTN AFA Registration — Mystery Hub', description: 'Check AFA availability, register your MTN number and track your registration. The registration fee does not include future MTN voice or data packages.' },
   services: { path: '/services', title: 'More Services — Mystery Hub Ghana', description: 'Explore available services and what is coming next. ECG, water, TV renewals and results-checker services are not yet available.' },
+  about: { path: '/about', title: 'About Mystery Hub — Reliable Digital Solutions for Ghana', description: 'Learn about Mystery Hub’s mission to provide honest, reliable data bundles, website building tools, and everyday digital utilities across Ghana.' },
+  help: { path: '/help', title: 'Help & FAQs — Mystery Hub Ghana', description: 'Find answers about Data, Airtime, payments, order tracking, Mystery Earn, Website Builder, Wallet and support.' },
 };
 
 export function publicPageHead(page: string): SocialHead {
   const entry = PUBLIC_PAGE_METADATA[page] || PUBLIC_PAGE_METADATA.home;
   return { title: entry.title, description: entry.description, url: `${PUBLIC_ORIGIN}${entry.path}`, ...socialImage(entry.image || BRAND_IMAGE), imageAlt: entry.title, icon: publicImageUrl(BRAND_IMAGE) };
+}
+
+/** Explicit marketing-route allowlist: unknown/account/operational paths must not inherit an
+ * indexable homepage. This controls metadata only; the existing SPA still handles navigation/auth.
+ */
+export function pageIndexingHead(pathname: string, search = ''): SocialHead {
+  const path = pathname.toLowerCase().replace(/\/+$/, '') || '/';
+  const params = new URLSearchParams(search);
+  const preview = ['owner_preview', 'isolated_template_preview', 'preview_template_id', 'editor_channel', 'editor_site'].some(key => params.has(key));
+  const aliases: Record<string, string> = { '/index.html': 'home', '/website': 'website', '/rewards': 'earn', '/referral': 'earn', '/afa-registration': 'afa', '/faq': 'help' };
+  const clean = path.replace(/\/index\.html$/, '');
+  const page = Object.entries(PUBLIC_PAGE_METADATA).find(([, entry]) => entry.path === clean)?.[0] || aliases[clean] || aliases[path];
+  if (page && !preview) return publicPageHead(page);
+  const area = path.split('/')[1];
+  const titles: Record<string, string> = { admin: 'Staff & Operations Portal', wallet: 'Mystery Wallet', orders: 'Your Orders', account: 'My Account', dashboard: 'Your Dashboard', login: 'Sign In', signup: 'Create Account', register: 'Create Account', auth: 'Account Access' };
+  // Never include arbitrary path components, references, editor channels or account query values.
+  return { title: `${preview ? 'Website Preview' : titles[area] || 'Account & Workspace'} — Mystery Hub`, description: 'Sign in where required to access your account or workspace.',
+    url: `${PUBLIC_ORIGIN}${titles[area] ? `/${area}` : '/'}`, image: '', icon: publicImageUrl(BRAND_IMAGE), noindex: true };
 }
 
 export function marketplaceProductHead(product: MarketplaceProduct): SocialHead {
@@ -73,8 +93,9 @@ export function marketplaceProductHead(product: MarketplaceProduct): SocialHead 
 }
 
 /** One browser/server definition. Input MUST be the public published-snapshot projection, never a draft.
- * QuickByte's legacy empty hero intentionally resolves to its original banner, just as its renderer does.
- * Other businesses never inherit that branded fallback in metadata. No saved content is modified.
+ * Existing owners retain the renderer's legacy fallback, including QuickByte. New-site creation,
+ * migration and image removal explicitly select the neutral starter (covered by V4 regressions).
+ * Changing an existing owner's visible legacy artwork requires a separate owner/founder decision.
  */
 export function websiteSocialHead(site: PublicWebsiteSite): SocialHead {
   const c = site.content;
@@ -85,10 +106,7 @@ export function websiteSocialHead(site: PublicWebsiteSite): SocialHead {
   const sectionHero = websiteLayoutMode(site.template_id, c) === 'sections'
     ? [...(c.composition?.sections || [])].sort((a,b) => a.order-b.order).find(section => section.enabled && section.type === 'hero')?.data : undefined;
   const savedHero = publicImageUrl(sectionHero?.image || c.heroImage);
-  const hero = publicImageUrl(sectionHero?.image) || (dataSite
-    ? (site.slug === 'quickbyte-data' ? publicImageUrl(resolveDataResellerHeroImage(c.heroImage, true))
-      : showsLegacyDataResellerArtwork(c.heroImage) && savedHero !== DATA_RESELLER_LEGACY_HERO_IMAGE ? '' : savedHero)
-    : savedHero);
+  const hero = publicImageUrl(sectionHero?.image) || (dataSite ? publicImageUrl(resolveDataResellerHeroImage(c.heroImage, true)) : savedHero);
   const fallback = dataSite ? DATA_RESELLER_STARTER_HERO_IMAGE : template?.heroImage || WEBSITE_TEMPLATES.find(t => t.id === 'tmpl-legon-consult')!.heroImage!;
   return {
     title: name,
