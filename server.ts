@@ -10,6 +10,7 @@ import { initDatabase } from './server/db/connection.js';
 import { bootstrapAdminAccount } from './server/services/adminBootstrap.js';
 import { OrdersStore } from './server/db/ordersStore.js';
 import { FulfilmentService } from './server/services/fulfilmentService.js';
+import { createPublicHtmlRouter } from './server/routes/publicHtml.js';
 
 loadApplicationEnvironment();
 
@@ -90,10 +91,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.resolve(__dirname, 'dist')));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
-    });
+    app.use(createPublicHtmlRouter(path.resolve(__dirname, 'dist')));
   }
 
   app.listen(PORT, () => {
