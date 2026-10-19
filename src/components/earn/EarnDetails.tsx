@@ -40,6 +40,33 @@ export function EarnRewardActivity({ ledger, loading, stale }: { ledger: RewardL
 
 const ruleAmount = (rule: PublicRewardRule) => rule.reward_type === 'fixed_minor' ? formatGhs(rule.reward_minor || 0) : `${((rule.reward_percent_bps || 0) / 100).toLocaleString('en-GH', { maximumFractionDigits: 2 })}%`;
 const ruleStage = (rule: PublicRewardRule) => rule.purchase_stage === 'acquisition' ? 'Friend’s first purchase' : rule.purchase_stage === 'recurring' ? 'Their later purchases' : 'Each qualifying purchase';
+/**
+ * Data, Airtime and AFA rewards are worked out on the server from the eligible margin of each order, so a public
+ * rule's fixed amount is not the effective reward. Until the backend publishes the effective policy, show how the
+ * reward is worked out instead of an amount.
+ */
+export const MARGIN_POLICY_SERVICES = ['data', 'airtime', 'afa', 'instant_bundle'];
+export const ruleUsesServerPolicy = (rule: PublicRewardRule) => MARGIN_POLICY_SERVICES.includes(rule.service_type);
+function RuleCard({ rule }: { rule: PublicRewardRule }) {
+  const policy = ruleUsesServerPolicy(rule);
+  return <li data-policy={policy ? 'margin' : 'published'}>
+    <span className="earn-rule-service">{earnServiceLabel(rule.service_type)}{rule.network ? ` · ${rule.network === 'airteltigo' ? 'AirtelTigo' : rule.network.toUpperCase()}` : ''}</span>
+    <h3 className="earn-rule-stage">{ruleStage(rule)}</h3>
+    {policy ? <p>A share of Mystery Hub’s eligible margin on that purchase, not the price your friend pays.</p>
+      : <><strong className="earn-rule-amount">{ruleAmount(rule)}</strong><p>{describeReferralReward(rule)}</p></>}
+    {rule.product_key && <p className="earn-fine">Selected products only.</p>}{rule.ends_at && <p className="earn-fine">Until {new Date(rule.ends_at).toLocaleDateString('en-GH')}</p>}
+  </li>;
+}
 export function EarnRules({ rules, error, retry, compact = false }: { rules: PublicRewardRule[] | null; error: boolean; retry: () => void; compact?: boolean }) {
-  return <section className={`earn-section earn-rules${compact ? ' earn-rules-compact' : ''}`} aria-labelledby="earn-rules"><div className="earn-section-heading"><h2 id="earn-rules">What you can earn now</h2>{rules && rules.length > 0 && !error && <span className="earn-live-tag">Live rules</span>}</div>{error ? <p role="alert">Reward rules are unavailable. Eligibility cannot be confirmed. <button className="earn-text-button" onClick={retry}>Retry reward rules</button></p> : !rules ? <p role="status">Checking current reward rules…</p> : !rules.length ? <p>No reward rules are enabled right now. You can still share, but no reward is promised.</p> : <><p>Paid under the active reward rules when someone you referred makes a qualifying purchase.</p><ul className="earn-rules-list">{rules.map(rule => <li key={rule.id}><span className="earn-rule-service">{earnServiceLabel(rule.service_type)}{rule.network ? ` · ${rule.network === 'airteltigo' ? 'AirtelTigo' : rule.network.toUpperCase()}` : ''}</span><strong className="earn-rule-amount">{ruleAmount(rule)}</strong><span className="earn-rule-stage">{ruleStage(rule)}</span><h3 className="sr-only">{earnServiceLabel(rule.service_type)}</h3><p>{describeReferralReward(rule)}</p>{rule.product_key && <p className="earn-fine">Selected products only.</p>}{rule.ends_at && <p className="earn-fine">Until {new Date(rule.ends_at).toLocaleDateString('en-GH')}</p>}</li>)}</ul><p className="earn-fine">Data rewards can follow a separate margin-based policy, so the amount in your rewards history is final.</p></> }</section>;
+  return <section className={`earn-section earn-rules${compact ? ' earn-rules-compact' : ''}`} aria-labelledby="earn-rules" id="earn-rewards"><div className="earn-section-heading"><h2 id="earn-rules">What you can earn now</h2>{rules && rules.length > 0 && !error && <span className="earn-live-tag">Live rules</span>}</div>
+    {error ? <p role="alert">Reward rules are unavailable. Eligibility cannot be confirmed. <button className="earn-text-button" onClick={retry}>Retry reward rules</button></p>
+      : !rules ? <p role="status">Checking current reward rules…</p>
+      : !rules.length ? <p>No reward rules are enabled right now. You can still share, but no reward is promised.</p>
+      : <><p>Paid under the active reward rules when someone you referred makes a qualifying purchase. Clicks and sign-ups alone never earn.</p>
+        <ul className="earn-rules-list">{rules.map(rule => <RuleCard key={rule.id} rule={rule} />)}</ul>
+        <details className="earn-metric-explainer earn-rules-how"><summary>How rewards are worked out</summary>
+          <p>Data rewards follow a separate margin-based policy: your reward is a percentage of Mystery Hub’s eligible margin on the purchase, meaning what is left after the supplier’s cost and processing costs. It is not a percentage of the price your friend pays. Airtime and AFA rewards are worked out from the same eligible margin and never exceed it.</p>
+          <p>A friend’s first qualifying purchase and their later purchases can earn different shares. The amount recorded in your rewards history is final.</p>
+        </details></>}
+  </section>;
 }

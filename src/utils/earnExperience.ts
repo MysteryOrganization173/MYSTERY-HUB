@@ -42,13 +42,13 @@ export const earnCount = (value: number | undefined) => Number.isSafeInteger(val
 /** Share topics only point at canonical first-party routes; the link itself still comes from personalReferralLink. */
 export const earnShareTopics = [
   { id: 'general', path: '/', label: 'Mystery Hub', short: 'Mystery Hub', message: 'I buy my data and other digital services on Mystery Hub. Have a look.', note: 'A good first link for anyone.' },
-  { id: 'data', path: '/data', label: 'Data Bundles', short: 'Data', message: 'Need data? You can buy MTN, Telecel and AirtelTigo bundles on Mystery Hub with Mobile Money and track your order until it arrives.', note: 'Most referral rewards today come from Data purchases.' },
-  { id: 'afa', path: '/afa', label: 'MTN AFA Registration', short: 'AFA', message: 'Want to register for MTN AFA? You can do it on Mystery Hub and check your registration status online.', note: 'AFA earns a reward only while an AFA rule is active.' },
-  { id: 'website', path: '/website-builder', label: 'Free Website Builder', short: 'Websites', message: 'Need a simple website for your business? Mystery Hub has a free Website Builder you can use from your phone.', note: 'Free websites help friends but do not earn rewards.' },
-  { id: 'marketplace', path: '/marketplace', label: 'Marketplace', short: 'Marketplace', message: 'Have a look at the Mystery Hub Marketplace for gadgets and other products in Ghana.', note: 'Enquiries alone do not earn rewards.' },
+  { id: 'data', path: '/data', label: 'Data Bundles', short: 'Data', message: 'I buy my data on Mystery Hub. MTN, Telecel and AirtelTigo bundles, paid with Mobile Money, and you can track your order until it arrives. Have a look.', note: 'Most referral rewards today come from Data purchases.' },
+  { id: 'afa', path: '/afa', label: 'MTN AFA Registration', short: 'AFA', message: 'Thought you might need this: you can register for MTN AFA on Mystery Hub and check your status online.', note: 'AFA earns a reward only while an AFA rule is active.' },
+  { id: 'website', path: '/website-builder', label: 'Free Website Builder', short: 'Websites', message: 'Thought of your business: Mystery Hub has a free Website Builder you can set up from your phone. Have a look.', note: 'Free websites help friends but do not earn rewards.' },
+  { id: 'marketplace', path: '/marketplace', label: 'Marketplace', short: 'Marketplace', message: 'Saw this and thought of you: the Mystery Hub Marketplace has gadgets and other products in Ghana.', note: 'Enquiries alone do not earn rewards.' },
 ] as const;
 export type EarnShareTopic = (typeof earnShareTopics)[number];
-/** User-initiated message text; never promises savings or rewards to the recipient. */
+/** User-initiated, first-person message text; never promises savings or rewards to the recipient. The sharer can edit it in WhatsApp. */
 export function referralShareMessage(topic: Pick<EarnShareTopic, 'message'>, link: string) {
   return `${topic.message} Here's my link: ${link}`;
 }

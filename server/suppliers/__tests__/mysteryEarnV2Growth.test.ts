@@ -7,6 +7,7 @@ import { earnNextStep, earnShareTopics, personalReferralLink, referralShareMessa
 import { featuredMilestone, groupMilestones, milestoneLevel, milestoneMetricNotes, type EarnAchievement } from '../../../src/utils/earnMilestones';
 import { dismissPostPurchaseInvite, postPurchaseInviteCopy, postPurchaseInviteEligible, postPurchaseInviteHidden, POST_PURCHASE_INVITE_KEY } from '../../../src/utils/postPurchaseInvite';
 import { EarnMilestones } from '../../../src/components/earn/EarnMilestones';
+import { EarnRules } from '../../../src/components/earn/EarnDetails';
 import type { OrderRecord } from '../../../src/types';
 
 const source = (file: string) => readFileSync(file, 'utf8');
@@ -115,10 +116,13 @@ test('the dashboard next step reflects only confirmed data', () => {
   assert.match(earnNextStep({ ...summary, isEnabled: false }, roadmap, false), /paused/);
   assert.match(earnNextStep({ ...summary, referredCustomersCount: 0 }, null, false), /Start with one friend/);
 });
-test('guest preview is labelled and invents no balances, counts or testimonials', () => {
+test('guest demo is labelled and invents no balances, counts or testimonials', () => {
   const page = source('src/components/earn/MysteryEarnPage.tsx');
-  const preview = page.slice(page.indexOf('function EarnPreview()'), page.indexOf('function GuestEarn()'));
-  assert.match(preview, /Example preview/); assert.match(preview, /Not real account data/); assert.ok(!preview.includes('GH₵'));
+  const preview = page.slice(page.indexOf('function EarnShareDemo()'), page.indexOf('function GuestEarn()'));
+  assert.match(preview, />Demo</); assert.match(preview, /Example only/); assert.ok(!preview.includes('GH₵'));
+  // Demo controls never pretend to share: sharing asks the guest to join.
+  assert.ok(!preview.includes('wa.me') && !preview.includes('referralWhatsAppUrl') && !preview.includes('clipboard'));
+  assert.match(preview, /onClick=\{\(\) => openAuth\('signup'\)\}>.*Create account to share/);
   const guest = page.slice(page.indexOf('function GuestEarn()'), page.indexOf('export const MysteryEarnPage'));
   assert.doesNotMatch(guest, /testimonial|customers trust|members earned|\d+,\d{3}\+/i);
   assert.match(guest, /<EarnRules \{\.\.\.rules\} \/>/);
@@ -156,10 +160,10 @@ test('invitation copy is short, matches the order and shares the matching servic
 test('featured milestone favours a real Wallet credit over a closer badge, but claimable comes first', () => {
   const credit = badge('credit', 'successful_referrals', 10, 2, false, 100), close = badge('close', 'qualified_visitors', 10, 9);
   assert.equal(featuredMilestone([close, credit])?.id, 'credit');
-  assert.equal(featuredMilestone([credit, badge('done', 'qualified_visitors', 1, 1)])?.id, 'done');
+  assert.equal(featuredMilestone([credit, badge('done', 'qualified_visitors', 1, 1)])?.id, 'credit');
   const html = renderToStaticMarkup(React.createElement(EarnMilestones, { achievements: [close, credit], restricted: false, stale: false, busy: false, claimingId: null, onClaim: () => {}, retry: () => {} }));
   assert.match(html, /Your next reward/); assert.match(html, /GH₵1.00<\/strong> Wallet credit/);
-  assert.match(html, /Up to <strong>GH₵1.00<\/strong> in Wallet credit still to claim/);
+  assert.match(html, /GH₵1.00<\/strong> in Wallet credit still to earn/);
   const badgesOnly = renderToStaticMarkup(React.createElement(EarnMilestones, { achievements: [close], restricted: false, stale: false, busy: false, claimingId: null, onClaim: () => {}, retry: () => {} }));
   assert.match(badgesOnly, /Next badge/); assert.ok(!badgesOnly.includes('Your next reward')); assert.ok(!badgesOnly.includes('GH₵'));
 });
@@ -182,9 +186,49 @@ test('member hero shows the real available balance from the financial account wi
 });
 test('Footer V2.1 keeps coming-soon services as text, not dead links, and uses the approved logo component', () => {
   const footer = source('src/components/common/Footer.tsx');
-  assert.match(footer, /Coming soon:<\/span> ECG Prepaid Bills/); assert.ok(!footer.includes("['ECG Prepaid Bills'"));
+  const coming = footer.slice(footer.indexOf('>Coming soon<'), footer.indexOf('</nav>'));
+  assert.match(coming, /ECG Prepaid Bills/); assert.ok(!/<a |href=/.test(coming), 'coming-soon services are not links');
   assert.match(footer, /Join our WhatsApp Channel/); assert.match(footer, /<BrandLogo size="md" \/>/);
   assert.ok(!/privacy|terms of/i.test(footer), 'no links to legal pages that do not exist');
   assert.ok(!/giveaway|friday|members/i.test(footer));
   assert.match(footer, /safe-area-inset-bottom/);
+});
+
+// V2.2
+test('hero uses the approved Cloudinary artwork as decoration behind real HTML, with a phone crop and a fallback', async () => {
+  const page = source('src/components/earn/MysteryEarnPage.tsx');
+  assert.match(source('src/utils/earnHero.ts'), /https:\/\/res\.cloudinary\.com\/da6oeat7m\/image\/upload'[\s\S]*'v1792429490\/Neon_Fintech_Network_Over_City_Lights_yyxesi\.png'/);
+  assert.match(page, /import \{ earnHeroImage \} from '\.\.\/\.\.\/utils\/earnHero'/);
+  const { earnHeroImage } = await import('../../../src/utils/earnHero');
+  assert.match(earnHeroImage.mobile, /c_crop,g_east,w_0\.62\/f_auto,q_auto,c_scale,w_480\//); assert.match(earnHeroImage.desktop, /w_1672\/v1792429490/);
+  const art = page.slice(page.indexOf('function EarnHeroArt()'), page.indexOf('function EarnShareDemo()'));
+  assert.match(art, /aria-hidden="true"/); assert.match(art, /alt=""/); assert.match(art, /onError=\{\(\) => setFailed\(true\)\}/); assert.match(art, /fetchPriority="high"/);
+  const guest = page.slice(page.indexOf('function GuestEarn()'), page.indexOf('export const MysteryEarnPage'));
+  assert.match(guest, /<h1 id="earn-guest-title">Share Mystery Hub\.<br \/><span>Earn real rewards\.<\/span><\/h1>/); assert.match(guest, /href="#earn-how"/);
+});
+test('Data, Airtime and AFA rules never advertise the fixed public amount as the effective reward', () => {
+  const data = { id: 'standard_data_acquisition_v1', service_type: 'data', purchase_stage: 'acquisition', network: null, product_key: null, reward_type: 'fixed_minor', reward_minor: 50, reward_percent_bps: null, enabled: true } as const;
+  const html = renderToStaticMarkup(React.createElement(EarnRules, { rules: [data, { ...data, id: 'r', purchase_stage: 'recurring', reward_minor: 10 }], error: false, retry: () => {} }));
+  assert.ok(!html.includes('GH₵0.50') && !html.includes('GH₵0.10')); assert.match(html, /eligible margin/); assert.match(html, /not the price your friend pays/);
+  const market = renderToStaticMarkup(React.createElement(EarnRules, { rules: [{ ...data, service_type: 'marketplace' }], error: false, retry: () => {} }));
+  assert.match(market, /GH₵0.50/);
+  // The effective percentages belong to a backend API that does not exist yet; nothing hardcodes them.
+  for (const file of ['src/components/earn/EarnDetails.tsx', 'src/components/earn/MysteryEarnPage.tsx', 'src/utils/earnExperience.ts']) assert.ok(!/\b(45|20) ?%/.test(source(file)), file);
+});
+test('personal first-person share message style is preserved', () => {
+  assert.equal(earnShareTopics[0].message, 'I buy my data and other digital services on Mystery Hub. Have a look.');
+  assert.match(referralShareMessage(earnShareTopics[0], 'https://mysterybundlehub.com/?ref=MH-ABC123'), /Have a look\. Here's my link: https/);
+  assert.deepEqual(earnShareTopics.map(topic => topic.short), ['Mystery Hub', 'Data', 'AFA', 'Websites', 'Marketplace']);
+  for (const topic of earnShareTopics) assert.ok(!/^check out/i.test(topic.message), topic.id);
+});
+test('milestone headline follows real state, and ready badges stay secondary to Wallet credit', () => {
+  const render = (rows: EarnAchievement[]) => renderToStaticMarkup(React.createElement(EarnMilestones, { achievements: rows, restricted: false, stale: false, busy: false, claimingId: null, onClaim: () => {}, retry: () => {} }));
+  const ready = render([badge('credit', 'successful_referrals', 5, 5, false, 200)]);
+  assert.match(ready, /GH₵2.00<\/strong> Wallet credit ready to claim/); assert.ok(!ready.includes('still to'));
+  const upcoming = render([badge('credit', 'successful_referrals', 5, 2, false, 200)]);
+  assert.match(upcoming, /GH₵2.00<\/strong> in Wallet credit still to earn/); assert.ok(!upcoming.includes('ready to claim'));
+  const mixed = render([badge('credit', 'successful_referrals', 5, 2, false, 200), badge('visits', 'qualified_visitors', 10, 41)]);
+  assert.match(mixed, /data-milestone-id="credit" data-state="in-progress" data-reward="credit"/);
+  assert.match(mixed, /Badges ready to collect/); assert.match(mixed, /Claim Badge/);
+  assert.equal(featuredMilestone([badge('visits', 'qualified_visitors', 10, 41), badge('credit', 'successful_referrals', 5, 2, false, 200)])?.id, 'credit');
 });

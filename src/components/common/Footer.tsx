@@ -37,14 +37,15 @@ export const Footer: React.FC = () => {
 
   return (
     <footer className="relative mt-10 sm:mt-14 border-t border-slate-800/80 bg-[#070b0e] text-slate-400 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:pb-[env(safe-area-inset-bottom,0px)] overflow-hidden">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#00c365]/50 to-transparent" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_at_15%_0%,rgba(0,195,101,0.08),transparent_60%)]" />
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12">
-        <div className="grid gap-7 lg:grid-cols-12 lg:gap-12">
+        <div className="grid gap-6 lg:grid-cols-12 lg:gap-12">
           {/* Identity and community */}
           <div className="lg:col-span-5 space-y-5 text-left">
             <div className="space-y-2">
               <BrandLogo size="md" />
-              <p className="font-['Outfit'] text-lg sm:text-xl font-semibold leading-snug text-white">Everything digital. One trusted place.</p>
+              <p className="font-['Outfit'] text-xl sm:text-2xl font-semibold leading-tight tracking-tight text-white">Everything digital. One trusted place.</p>
               <p className="text-sm text-[#7cedb3]">Building digital opportunities in Ghana since 2024</p>
             </div>
 
@@ -79,13 +80,13 @@ export const Footer: React.FC = () => {
               </div>
             ))}
             {/* Not yet purchasable, so plain text rather than links. */}
-            <p className="col-span-2 sm:col-span-3 text-sm text-slate-500"><span className="font-semibold text-slate-400">Coming soon:</span> ECG Prepaid Bills · WAEC Results PINs · DStv &amp; GOtv Pay</p>
+            <div className="col-span-2 sm:col-span-3 flex flex-wrap items-center gap-2 text-xs text-slate-400"><span className="font-semibold uppercase tracking-[0.12em] text-slate-500">Coming soon</span>{['ECG Prepaid Bills', 'WAEC Results PINs', 'DStv & GOtv Pay'].map(item => <span key={item} className="rounded-full border border-dashed border-slate-700 px-2.5 py-0.5">{item}</span>)}</div>
           </nav>
         </div>
 
         {/* Payments, trust and legal */}
-        <div className="mt-8 grid gap-3 border-t border-slate-800/70 py-5 text-xs text-left sm:grid-cols-[1fr_auto] sm:items-center">
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1"><ShieldCheck className="h-4 w-4 shrink-0 text-[#44df95]" aria-hidden="true" /><span className="text-slate-400">Secure Mobile Money checkout</span><span className="font-semibold text-amber-300">MTN MoMo</span><span className="font-semibold text-red-300">Telecel Cash</span><span className="font-semibold text-sky-300">AT Money</span></p>
+        <div className="mt-6 sm:mt-8 grid gap-3 border-t border-slate-800/70 py-4 sm:py-5 text-xs text-left sm:grid-cols-[1fr_auto] sm:items-center">
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1"><ShieldCheck className="h-4 w-4 shrink-0 text-[#44df95]" aria-hidden="true" /><span className="text-slate-400">Secure Mobile Money checkout</span>{['MTN MoMo', 'Telecel Cash', 'AT Money'].map(method => <span key={method} className="rounded-md border border-slate-700/80 bg-slate-900/60 px-2 py-0.5 font-semibold text-slate-200">{method}</span>)}</p>
           <p className="text-slate-500">© {year} Mystery Hub. All rights reserved. <span className="text-slate-600">{contact.supportLocation}</span>
             <a href="/admin" onClick={event => { event.preventDefault(); setActivePage('admin'); }} className="ml-3 inline-flex min-h-10 items-center text-slate-600 hover:text-slate-400 transition-colors">Staff Portal</a></p>
         </div>

@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Link2, MessageCircle, RefreshCw, ShieldCheck, UserPlus, UserRoundCheck, Wallet } from 'lucide-react';
+import { ArrowRight, Gift, MessageCircle, RefreshCw, ShieldCheck, UserPlus, Wallet } from 'lucide-react';
+import { BrandMark } from '../common/BrandLogo';
 import { formatGhs } from '../../../shared/money';
 import { useApp } from '../../context/AppContext';
 import { FinancialPanel } from '../finance/FinancialPanel';
 import { getActiveRewardRules, getMyReferralSummary, getMyRewardLedger, type PublicRewardRule, type RewardLedgerItem } from '../../services/apiClient';
 import { createEarnDashboardRefresh } from '../../utils/earnDashboardRefresh';
-import { activeEarnRules, earnNextStep, type EarnSummary } from '../../utils/earnExperience';
+import { activeEarnRules, earnNextStep, earnShareTopics, type EarnSummary } from '../../utils/earnExperience';
+import { earnHeroImage } from '../../utils/earnHero';
 import { EarnSharing } from './EarnSharing';
 import { EarnMetrics, EarnNetwork, EarnRewardActivity, EarnRules } from './EarnDetails';
 import './earn.css';
@@ -93,14 +95,30 @@ function EarnHelp() {
   </div></section>;
 }
 
-/** Labelled sample of the member dashboard: no balances, counts or identities, only the shape of the experience. */
-function EarnPreview() {
-  return <figure className="earn-preview" aria-label="Example of the Mystery Earn dashboard">
-    <figcaption><span>Example preview</span> Not real account data</figcaption>
-    <div className="earn-preview-link"><Link2 size={15} aria-hidden="true" /><span>mysterybundlehub.com/data?ref=<b>YOUR-CODE</b></span></div>
-    <p className="earn-preview-message">Need data? You can buy MTN, Telecel and AirtelTigo bundles on Mystery Hub…</p>
-    <div className="earn-preview-actions"><span className="is-primary"><MessageCircle size={14} aria-hidden="true" />Share on WhatsApp</span><span>Copy link</span></div>
-    <div className="earn-preview-next"><span className="earn-medal earn-medal-sm" data-state="in-progress" data-tier="2" aria-hidden="true"><span className="earn-medal-face"><UserRoundCheck size={16} /></span></span><div><p>Next milestone · example</p><strong>Rewarded purchases</strong><span className="earn-preview-bar"><i /></span><small>Progress fills as friends’ purchases qualify</small></div></div>
+function EarnHeroArt() {
+  const [failed, setFailed] = useState(false);
+  // Decorative only: every word and action in the hero is real HTML. On failure the dark branded backdrop remains.
+  return <div className="earn-hero-art" aria-hidden="true" data-failed={failed || undefined}>
+    {!failed && <picture>
+      <source media="(max-width: 767px)" srcSet={earnHeroImage.mobile} sizes="100vw" />
+      <img src={earnHeroImage.fallback} srcSet={earnHeroImage.desktop} sizes="(min-width: 1180px) 1180px, 100vw" alt="" width={1672} height={941}
+        fetchPriority="high" loading="eager" decoding="async" onError={() => setFailed(true)} />
+    </picture>}
+  </div>;
+}
+
+/** Working demonstration of the sharing studio for guests: the service chips really switch the message; sharing asks them to join. */
+function EarnShareDemo() {
+  const { openAuth } = useApp();
+  const [topicId, setTopicId] = useState<string>('data');
+  const topic = earnShareTopics.find(item => item.id === topicId) || earnShareTopics[0];
+  return <figure className="earn-demo" aria-labelledby="earn-demo-title">
+    <figcaption className="earn-demo-head"><span id="earn-demo-title">Try it: pick what to share</span><span className="earn-demo-tag">Demo</span></figcaption>
+    <fieldset className="earn-topics"><legend className="sr-only">Choose a service for the example message</legend><div role="radiogroup" aria-label="Choose a service for the example message">{earnShareTopics.map(item => <label key={item.id} className={item.id === topic.id ? 'is-active' : undefined}><input type="radio" name="earn-demo-topic" value={item.id} checked={item.id === topic.id} onChange={() => setTopicId(item.id)} /><span>{item.short}</span></label>)}</div></fieldset>
+    <div className="earn-demo-bubble" aria-live="polite"><p>{topic.message} Here’s my link:</p>
+      <div className="earn-demo-link"><span className="earn-demo-link-mark"><BrandMark size="sm" ariaHidden /></span><div><strong>Mystery Hub</strong><span>mysterybundlehub.com{topic.path === '/' ? '' : topic.path}?ref=<b>YOUR-CODE</b></span></div></div></div>
+    <div className="earn-demo-actions"><button className="earn-primary" onClick={() => openAuth('signup')}><MessageCircle size={17} aria-hidden="true" />Create account to share</button><button className="earn-text-button" onClick={() => openAuth('login')}>I have an account</button></div>
+    <p className="earn-demo-note">Example only. Your real link and code are created with your free account.</p>
   </figure>;
 }
 
@@ -113,8 +131,16 @@ function GuestEarn() {
     { icon: Wallet, title: 'Earn when purchases qualify', detail: 'Withdraw approved rewards to Mobile Money or use them in Mystery Wallet.' },
   ];
   return <main className="earn-page earn-guest-page" aria-label="About Mystery Earn">
-    <section className="earn-guest-hero"><div className="earn-guest-copy"><p className="earn-eyebrow">Mystery Earn · Free to join</p><h1>Share Mystery Hub.<br /><span>Earn real rewards.</span></h1><p>Invite friends to buy data, register for MTN AFA and more. When someone you referred makes an eligible purchase, you earn a referral reward you can withdraw or spend.</p><div className="earn-actions"><button className="earn-primary" onClick={() => openAuth('signup')}>Create a Free Account <ArrowRight size={18} aria-hidden="true" /></button><button className="earn-secondary" onClick={() => openAuth('login')}>Log in</button></div><p className="earn-fine"><ShieldCheck size={16} aria-hidden="true" /> No fees. No reward for clicks alone. Rules apply.</p></div><EarnPreview /></section>
-    <section className="earn-section earn-steps-section" aria-labelledby="earn-steps-title"><h2 id="earn-steps-title">How it works</h2><ol className="earn-steps">{steps.map((step, index) => <li key={step.title}><span className="earn-step-icon"><step.icon size={18} aria-hidden="true" /></span><div><h3><span className="earn-step-number">{index + 1}</span>{step.title}</h3><p>{step.detail}</p></div></li>)}</ol></section>
+    <section className="earn-guest-hero" aria-labelledby="earn-guest-title"><EarnHeroArt />
+      <div className="earn-guest-copy"><p className="earn-hero-pill"><Gift size={14} aria-hidden="true" />Mystery Earn · Free to join</p>
+        <h1 id="earn-guest-title">Share Mystery Hub.<br /><span>Earn real rewards.</span></h1>
+        <p className="earn-hero-lede">Invite friends to useful digital services. Earn a referral reward when their purchases qualify, then withdraw it or spend it.</p>
+        <div className="earn-actions"><button className="earn-primary earn-hero-cta" onClick={() => openAuth('signup')}>Create a Free Account <ArrowRight size={18} aria-hidden="true" /></button><a className="earn-secondary earn-hero-secondary" href="#earn-how">How It Works</a></div>
+        <p className="earn-fine"><ShieldCheck size={16} aria-hidden="true" /> No fees. No reward for clicks alone. Rewards come from an eligible purchase.</p></div>
+    </section>
+    <section className="earn-how" id="earn-how" aria-labelledby="earn-steps-title"><div className="earn-how-copy"><p className="earn-eyebrow">How it works</p><h2 id="earn-steps-title">Three steps. Your friends get something useful.</h2>
+      <ol className="earn-steps">{steps.map((step, index) => <li key={step.title}><span className="earn-step-icon"><step.icon size={18} aria-hidden="true" /></span><div><h3><span className="earn-step-number">{index + 1}</span>{step.title}</h3><p>{step.detail}</p></div></li>)}</ol></div>
+      <EarnShareDemo /></section>
     <EarnRules {...rules} />
     <EarnHelp />
     <section className="earn-guest-cta"><div><h2>Get your link in a minute.</h2><p>Free to join. Your referral code is created with your account.</p></div><button className="earn-primary" onClick={() => openAuth('signup')}>Create a Free Account <ArrowRight size={18} aria-hidden="true" /></button></section>

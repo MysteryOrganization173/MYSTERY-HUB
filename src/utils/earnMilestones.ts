@@ -26,9 +26,10 @@ export function milestoneState(row: EarnAchievement, options: { restricted?: boo
 }
 export function featuredMilestone(rows: EarnAchievement[]) {
   return rows.filter(row => row.enabled && !row.claimed && milestoneProgress(row))
-    // Claimable first, then achievements that carry a real Wallet credit, then the closest badge.
-    .sort((a, b) => Number(milestoneProgress(b)!.complete) - Number(milestoneProgress(a)!.complete)
+    // Real Wallet credit leads: claimable credit, then credit in progress, then a claimable badge, then the closest badge.
+    .sort((a, b) => Number(b.rewardMinor > 0 && milestoneProgress(b)!.complete) - Number(a.rewardMinor > 0 && milestoneProgress(a)!.complete)
       || Number(b.rewardMinor > 0) - Number(a.rewardMinor > 0)
+      || Number(milestoneProgress(b)!.complete) - Number(milestoneProgress(a)!.complete)
       || milestoneProgress(b)!.percentage - milestoneProgress(a)!.percentage
       || a.id.localeCompare(b.id, 'en'))[0] ?? null;
 }

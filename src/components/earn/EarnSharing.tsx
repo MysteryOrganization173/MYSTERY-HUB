@@ -47,7 +47,7 @@ export function EarnSharing({ summary, unavailable, loading }: { summary: EarnSu
     <div className="earn-share-title"><h2 id="earn-personal-link">What would you like to share?</h2>{code && <p className="earn-referral-identity"><span>Your code</span><strong>{code}</strong></p>}</div>
     <fieldset className="earn-topics" disabled={!url}><legend className="sr-only">Share a Service</legend><div role="radiogroup" aria-label="What would you like to share?">{earnShareTopics.map(item => <label key={item.id} className={item.id === topic.id ? 'is-active' : undefined}><input type="radio" name="earn-share-topic" value={item.id} checked={item.id === topic.id} onChange={() => setTopicId(item.id)} /><span>{item.short}</span></label>)}</div></fieldset>
     <div className="earn-message" aria-live="polite">
-      {message ? <><p className="earn-message-label">Here’s the message your friend will see</p><p className="earn-message-text">{topic.message} Here’s my link: <span>{link}</span></p></>
+      {message ? <><p className="earn-message-label">Here’s the message your friend will see. You can edit it in WhatsApp before sending.</p><p className="earn-message-text">{topic.message} Here’s my link: <span>{link}</span></p></>
         : <p id="earn-link-status" role="status" className="earn-fine">{status}</p>}
     </div>
     <div className="earn-share-actions">
