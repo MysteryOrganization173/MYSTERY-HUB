@@ -243,14 +243,14 @@ export class MarketplaceStore {
   /**
    * 2. Public query by slug
    */
-  static async getPublicProductBySlug(slug: string): Promise<PublicMarketplaceProduct | null> {
+  static async getPublicProductBySlug(slug: string, allowLegacyId = false): Promise<PublicMarketplaceProduct | null> {
     const cleanSlug = slug.trim().toLowerCase();
     const pool = getPool();
 
     if (pool) {
       const query = `
         SELECT * FROM marketplace_products
-        WHERE slug = $1 AND published = true AND archived = false
+        WHERE (slug = $1 ${allowLegacyId ? 'OR id = $1' : ''}) AND published = true AND archived = false
         LIMIT 1;
       `;
       const res = await pool.query(query, [cleanSlug]);
@@ -259,7 +259,7 @@ export class MarketplaceStore {
     }
 
     const item = Array.from(devMarketplaceStore.values()).find(
-      (p) => p.slug === cleanSlug && p.published && !p.archived
+      (p) => (p.slug === cleanSlug || (allowLegacyId && p.id.toLowerCase() === cleanSlug)) && p.published && !p.archived
     );
     return item ? (await this.withCategoryLabels([toPublicMarketplaceProduct(item)]))[0] : null;
   }

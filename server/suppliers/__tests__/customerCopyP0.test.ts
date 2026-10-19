@@ -58,13 +58,14 @@ test('Marketplace enquiry wording matches enquiry action and avoids unverified d
   assert.match(source('src/components/home/HomeMarketplaceSection.tsx'), /Ask About This Item/);
 });
 test('metadata describes live services and keeps future utilities unavailable', () => {
-  for (const file of ['index.html', 'src/components/common/SEOHead.tsx']) {
+  for (const file of ['index.html', 'src/utils/socialMetadata.ts']) {
     const text = source(file);
     assert.match(text, /Digital Services Marketplace in Ghana/);
     assert.match(text, /data and airtime/); assert.match(text, /free business website/);
     assert.ok(!text.includes('website in minutes'));
   }
-  assert.match(source('src/components/common/SEOHead.tsx'), /results-checker services are not yet available/);
+  assert.match(source('src/utils/socialMetadata.ts'), /results-checker services are not yet available/);
+  assert.match(source('src/components/common/SEOHead.tsx'), /publicPageHead\(activePage\)/);
 });
 test('account recovery keeps ownership and password protections; AFA retains fee scope and privacy', () => {
   const auth = source('src/components/auth/AuthModal.tsx');
