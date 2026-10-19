@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { earnNextStep, earnShareTopics, personalReferralLink, referralShareMessage, referralWhatsAppUrl, shareReferralLink, type EarnSummary } from '../../../src/utils/earnExperience';
-import { groupMilestones, milestoneLevel, milestoneMetricNotes, type EarnAchievement } from '../../../src/utils/earnMilestones';
-import { dismissPostPurchaseInvite, postPurchaseInviteEligible, postPurchaseInviteHidden, POST_PURCHASE_INVITE_KEY } from '../../../src/utils/postPurchaseInvite';
+import { featuredMilestone, groupMilestones, milestoneLevel, milestoneMetricNotes, type EarnAchievement } from '../../../src/utils/earnMilestones';
+import { dismissPostPurchaseInvite, postPurchaseInviteCopy, postPurchaseInviteEligible, postPurchaseInviteHidden, POST_PURCHASE_INVITE_KEY } from '../../../src/utils/postPurchaseInvite';
 import { EarnMilestones } from '../../../src/components/earn/EarnMilestones';
 import type { OrderRecord } from '../../../src/types';
 
@@ -51,7 +51,7 @@ test('invitation is placed once, after tracking actions, and never fabricates a 
   assert.ok(!source('src/components/checkout/CheckoutModal.tsx').includes('PostPurchaseInvite'));
   const invite = source('src/components/checkout/PostPurchaseInvite.tsx');
   assert.match(invite, /getMyReferralSummary\(sessionToken\)/); assert.match(invite, /personalReferralLink\(result.summary\)/);
-  assert.match(invite, /member && state === 'ready' && message/); assert.match(invite, /Your own order does not earn a referral reward/);
+  assert.match(invite, /member && state === 'ready' && message/); assert.match(invite, /when their purchases qualify/); assert.doesNotMatch(invite, /your (own )?(order|purchase) (earns|will earn)/i);
   assert.match(invite, /if \(!active\) return/); assert.match(invite, /Dismiss Mystery Earn invitation/);
   for (const forbidden of ['publicReference}', 'recipientPhone', 'window.open', 'location.assign']) assert.ok(!invite.includes(forbidden), forbidden);
   // Lookups by reference and recovered payments carry no first-party journey.
@@ -103,13 +103,14 @@ test('thirteen badge-only achievements stay compact, unique and never claimable 
   assert.match(credit, /GH₵1.00 Wallet credit · Reward collected/);
 });
 test('metric notes are precise about what counts', () => {
-  assert.match(milestoneMetricNotes.successful_referrals, /Distinct orders/); assert.match(milestoneMetricNotes.successful_referrals, /visits and sign-ups alone do not/);
-  assert.match(milestoneMetricNotes.qualified_visitors, /not verified individual people/);
+  assert.match(milestoneMetricNotes.successful_referrals, /Each order counts, so one friend buying twice counts twice/); assert.match(milestoneMetricNotes.successful_referrals, /Visits and sign-ups do not count/);
+  assert.match(milestoneMetricNotes.qualified_visitors, /not a count of people/); assert.match(milestoneMetricNotes.qualified_visitors, /Never paid/);
 });
 test('the dashboard next step reflects only confirmed data', () => {
-  assert.match(earnNextStep(summary, roadmap, false), /1 achievement ready to collect/);
-  assert.match(earnNextStep(summary, [badge('a', 'successful_referrals', 3, 2)], false), /Next up: a\. 1 more successful referral to go/);
-  assert.doesNotMatch(earnNextStep(summary, roadmap, true), /ready to collect/);
+  assert.match(earnNextStep(summary, roadmap, false), /1 badge ready to collect/);
+  assert.match(earnNextStep(summary, [badge('a', 'successful_referrals', 3, 3, false, 150), badge('b', 'afa_referrals', 1, 1)], false), /GH₵1.50 in Wallet credit ready to claim/);
+  assert.match(earnNextStep(summary, [badge('a', 'successful_referrals', 3, 2)], false), /Next: a, 1 more rewarded purchase to go/);
+  assert.doesNotMatch(earnNextStep(summary, roadmap, true), /ready to/);
   assert.match(earnNextStep(summary, roadmap, false, true), /being reviewed/);
   assert.match(earnNextStep({ ...summary, isEnabled: false }, roadmap, false), /paused/);
   assert.match(earnNextStep({ ...summary, referredCustomersCount: 0 }, null, false), /Start with one friend/);
@@ -136,4 +137,54 @@ test('no server, payment, reward or finance logic is part of the Earn V2 present
   assert.match(panel, /if\(earnLayout\)return/); assert.ok(panel.includes('/achievements/${encodeURIComponent(row.id)}/claim'));
   for (const file of ['src/components/earn/MysteryEarnPage.tsx', 'src/components/earn/EarnSharing.tsx', 'src/components/earn/EarnMilestones.tsx', 'src/components/checkout/PostPurchaseInvite.tsx', 'src/components/common/Footer.tsx'])
     for (const forbidden of ['financeRequest', 'walletCheckout', 'paystack', '/claim', 'saveAchievements']) assert.ok(!source(file).toLowerCase().includes(forbidden.toLowerCase()) || (file.endsWith('Footer.tsx') && forbidden === 'paystack'), `${file} ${forbidden}`);
+});
+
+// V2.1 refinement
+test('invitation copy is short, matches the order and shares the matching service', () => {
+  assert.deepEqual(postPurchaseInviteCopy('data'), { heading: 'Know someone who needs data?', topicId: 'data' });
+  assert.equal(postPurchaseInviteCopy('instant_bundle').topicId, 'data');
+  assert.equal(postPurchaseInviteCopy('afa').topicId, 'afa');
+  assert.match(postPurchaseInviteCopy('airtime').heading, /airtime/);
+  for (const id of ['data', 'afa', 'general']) assert.ok(earnShareTopics.some(topic => topic.id === id));
+  const invite = source('src/components/checkout/PostPurchaseInvite.tsx');
+  assert.ok(!invite.includes('under the current rules'), 'policy text stays on the Earn page');
+  assert.match(invite, /View rewards/); assert.match(invite, /Share my link/);
+  // Still first-party only.
+  const now = Date.parse('2026-10-18T20:00:00Z');
+  assert.equal(postPurchaseInviteEligible(order(), now), true); assert.equal(postPurchaseInviteEligible(order({ journey: undefined }), now), false);
+});
+test('featured milestone favours a real Wallet credit over a closer badge, but claimable comes first', () => {
+  const credit = badge('credit', 'successful_referrals', 10, 2, false, 100), close = badge('close', 'qualified_visitors', 10, 9);
+  assert.equal(featuredMilestone([close, credit])?.id, 'credit');
+  assert.equal(featuredMilestone([credit, badge('done', 'qualified_visitors', 1, 1)])?.id, 'done');
+  const html = renderToStaticMarkup(React.createElement(EarnMilestones, { achievements: [close, credit], restricted: false, stale: false, busy: false, claimingId: null, onClaim: () => {}, retry: () => {} }));
+  assert.match(html, /Your next reward/); assert.match(html, /GH₵1.00<\/strong> Wallet credit/);
+  assert.match(html, /Up to <strong>GH₵1.00<\/strong> in Wallet credit still to claim/);
+  const badgesOnly = renderToStaticMarkup(React.createElement(EarnMilestones, { achievements: [close], restricted: false, stale: false, busy: false, claimingId: null, onClaim: () => {}, retry: () => {} }));
+  assert.match(badgesOnly, /Next badge/); assert.ok(!badgesOnly.includes('Your next reward')); assert.ok(!badgesOnly.includes('GH₵'));
+});
+test('sharing studio leads with WhatsApp and copy link, keeps copy message, and hides native share where unsupported', () => {
+  const studio = source('src/components/earn/EarnSharing.tsx');
+  assert.ok(studio.indexOf('Share on WhatsApp') < studio.indexOf("'Copy link'") && studio.indexOf("'Copy link'") < studio.indexOf("'Copy message'"));
+  assert.match(studio, /What would you like to share\?/); assert.match(studio, /Here’s the message your friend will see/);
+  assert.match(studio, /\{canNativeShare && <button/);
+  const website = earnShareTopics.find(topic => topic.id === 'website')!, market = earnShareTopics.find(topic => topic.id === 'marketplace')!;
+  assert.ok(!/plus|ai/i.test(website.message)); assert.ok(!/commission|reward|earn/i.test(market.message));
+  for (const topic of earnShareTopics) assert.ok(!/reward|earn|commission|free money/i.test(topic.message), topic.id);
+});
+test('member hero shows the real available balance from the financial account without changing finance logic', () => {
+  const page = source('src/components/earn/MysteryEarnPage.tsx');
+  assert.match(page, /availableMinor=\{finance.availableMinor\}/); assert.match(page, /href="#earn-available"/);
+  const panel = source('src/components/finance/FinancialPanel.tsx');
+  assert.match(panel, /availableMinor:Number.isSafeInteger\(data\?\.earn\?\.availableMinor\)\?data.earn.availableMinor:null/);
+  const guest = page.slice(page.indexOf('function GuestEarn()'), page.indexOf('export const MysteryEarnPage'));
+  assert.ok(!guest.includes('achievementTypes') && !guest.includes('earn-stage-list'), 'guest page keeps three steps, not five stages');
+});
+test('Footer V2.1 keeps coming-soon services as text, not dead links, and uses the approved logo component', () => {
+  const footer = source('src/components/common/Footer.tsx');
+  assert.match(footer, /Coming soon:<\/span> ECG Prepaid Bills/); assert.ok(!footer.includes("['ECG Prepaid Bills'"));
+  assert.match(footer, /Join our WhatsApp Channel/); assert.match(footer, /<BrandLogo size="md" \/>/);
+  assert.ok(!/privacy|terms of/i.test(footer), 'no links to legal pages that do not exist');
+  assert.ok(!/giveaway|friday|members/i.test(footer));
+  assert.match(footer, /safe-area-inset-bottom/);
 });

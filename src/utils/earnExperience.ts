@@ -1,6 +1,7 @@
 import type { PublicRewardRule, ReferralSummaryResponse, RewardLedgerItem } from '../services/apiClient';
 import { buildReferralUrl } from './referralUrl';
 import { ROUTE_PATH_MAP } from './routing';
+import { formatGhs } from '../../shared/money';
 import { groupMilestones, milestoneRemaining, type EarnAchievement } from './earnMilestones';
 export type EarnSummary = ReferralSummaryResponse['summary'];
 
@@ -40,11 +41,11 @@ export const earnCount = (value: number | undefined) => Number.isSafeInteger(val
 
 /** Share topics only point at canonical first-party routes; the link itself still comes from personalReferralLink. */
 export const earnShareTopics = [
-  { id: 'general', path: '/', label: 'Mystery Hub', short: 'Mystery Hub', message: 'Check out Mystery Hub for data bundles and other digital services in Ghana.', note: 'A good first link for anyone.' },
-  { id: 'data', path: '/data', label: 'Data Bundles', short: 'Data', message: 'Need data? Mystery Hub has MTN, Telecel and AirtelTigo bundles you can pay for with Mobile Money and track until delivery.', note: 'Data purchases are the main qualifying activity today.' },
-  { id: 'afa', path: '/afa', label: 'MTN AFA Registration', short: 'AFA', message: 'Want to register for MTN AFA? You can do it on Mystery Hub and follow the registration status online.', note: 'AFA rewards apply only when an active AFA rule exists.' },
-  { id: 'website', path: '/website-builder', label: 'Free Website Builder', short: 'Websites', message: 'Want a simple website for your business? Mystery Hub has a free Website Builder you can try from your phone.', note: 'Free websites help friends, but are not paid qualifying purchases.' },
-  { id: 'marketplace', path: '/marketplace', label: 'Marketplace', short: 'Marketplace', message: 'Have a look at the Mystery Hub Marketplace for gadgets and products in Ghana.', note: 'Enquiries alone do not earn rewards.' },
+  { id: 'general', path: '/', label: 'Mystery Hub', short: 'Mystery Hub', message: 'I buy my data and other digital services on Mystery Hub. Have a look.', note: 'A good first link for anyone.' },
+  { id: 'data', path: '/data', label: 'Data Bundles', short: 'Data', message: 'Need data? You can buy MTN, Telecel and AirtelTigo bundles on Mystery Hub with Mobile Money and track your order until it arrives.', note: 'Most referral rewards today come from Data purchases.' },
+  { id: 'afa', path: '/afa', label: 'MTN AFA Registration', short: 'AFA', message: 'Want to register for MTN AFA? You can do it on Mystery Hub and check your registration status online.', note: 'AFA earns a reward only while an AFA rule is active.' },
+  { id: 'website', path: '/website-builder', label: 'Free Website Builder', short: 'Websites', message: 'Need a simple website for your business? Mystery Hub has a free Website Builder you can use from your phone.', note: 'Free websites help friends but do not earn rewards.' },
+  { id: 'marketplace', path: '/marketplace', label: 'Marketplace', short: 'Marketplace', message: 'Have a look at the Mystery Hub Marketplace for gadgets and other products in Ghana.', note: 'Enquiries alone do not earn rewards.' },
 ] as const;
 export type EarnShareTopic = (typeof earnShareTopics)[number];
 /** User-initiated message text; never promises savings or rewards to the recipient. */
@@ -61,10 +62,12 @@ export function earnNextStep(summary: EarnSummary | null, achievements: EarnAchi
   if (restricted) return 'Your account is being reviewed. Sharing and history stay available; claims and cash-out may pause.';
   if (achievements && !stale) {
     const { featured, ready } = groupMilestones(achievements);
-    const readyCount = ready.length + (featured && !featured.claimed && featured.progress >= featured.threshold ? 1 : 0);
-    if (readyCount) return `You have ${readyCount} ${readyCount === 1 ? 'achievement' : 'achievements'} ready to collect.`;
-    if (featured) return `Next up: ${featured.name}. ${milestoneRemaining(featured)} to go.`;
+    const readyRows = [...ready, ...(featured && !featured.claimed && featured.progress >= featured.threshold ? [featured] : [])];
+    const readyCredit = readyRows.reduce((total, row) => total + (Number.isSafeInteger(row.rewardMinor) && row.rewardMinor > 0 ? row.rewardMinor : 0), 0);
+    if (readyCredit > 0) return `You have ${formatGhs(readyCredit)} in Wallet credit ready to claim.`;
+    if (readyRows.length) return `You have ${readyRows.length} ${readyRows.length === 1 ? 'badge' : 'badges'} ready to collect.`;
+    if (featured) return `Next: ${featured.name}, ${milestoneRemaining(featured)} to go.`;
   }
-  if (summary && summary.referredCustomersCount === 0) return 'Start with one friend who buys data. Your link takes them straight there.';
-  return 'Share something useful and follow what it leads to.';
+  if (summary && summary.referredCustomersCount === 0) return 'Start with one friend who needs data. Your link takes them straight there.';
+  return 'Pick a service below and share it with someone who needs it.';
 }

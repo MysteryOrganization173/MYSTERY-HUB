@@ -84,7 +84,7 @@ describe('Mobile Nav Restructure, Mystery Earn & Services Compression', () => {
   test('6. Earn members receive a session-owned dashboard rather than guest marketing', () => {
     const page = fs.readFileSync(path.join(process.cwd(), 'src/components/earn/MysteryEarnPage.tsx'), 'utf8');
     assert.match(page, /if \(user && sessionToken\) return <MemberEarn/);
-    assert.match(page, /<h1>Share what helps\. See what it leads to\.<\/h1>/);
+    assert.match(page, /<h1>Share with friends\. Earn rewards\.<\/h1>/);
     assert.match(page, /earn-member-page/);
     assert.match(page, /<FinancialPanel mode="earn"/);
   });

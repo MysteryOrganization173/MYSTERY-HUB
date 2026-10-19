@@ -10,7 +10,7 @@ import type { EarnAchievement } from '../../utils/earnMilestones';
 const inputClass='w-full min-w-0 rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm text-white';
 const buttonClass='rounded-xl bg-[#00c365] px-4 py-3 text-sm font-semibold text-black disabled:opacity-50';
 /** Earn pages can arrange the financial parts; all money state, requests and confirmations stay in this panel. */
-export interface EarnFinanceParts{balance:React.ReactNode;form:React.ReactNode;milestones:React.ReactNode;history:React.ReactNode;achievements:EarnAchievement[]|null;stale:boolean;restricted:boolean}
+export interface EarnFinanceParts{balance:React.ReactNode;form:React.ReactNode;milestones:React.ReactNode;history:React.ReactNode;achievements:EarnAchievement[]|null;stale:boolean;restricted:boolean;availableMinor:number|null;financeError:boolean}
 export const FinancialPanel:React.FC<{mode:'wallet'|'earn';earnLayout?:(parts:EarnFinanceParts)=>React.ReactNode}>=({mode,earnLayout})=>{
   const {sessionToken,user,openAuth,setActivePage}=useApp();
   const [data,setData]=useState<any>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
@@ -91,7 +91,7 @@ export const FinancialPanel:React.FC<{mode:'wallet'|'earn';earnLayout?:(parts:Ea
       {data.withdrawals.map((row:any)=><div key={row.id} className="earn-withdrawal-row"><p>{formatGhs(row.amount_minor)} · {customerActivityLabel(row.state)}</p><p>Fee {formatGhs(row.payload.feeMinor)} · You receive {formatGhs(row.payload.netMinor)}</p><p>{row.payload.maskedPhone} · {row.payload.network} · {new Date(row.created_at).toLocaleDateString()}</p>{row.payload.rejectionReason&&<p>{row.payload.rejectionReason}</p>}{row.payload.paidAt&&<p>Paid {new Date(row.payload.paidAt).toLocaleDateString()}</p>}</div>)}
       <div className="earn-history-pagination"><button className="earn-secondary" disabled={!offset} onClick={()=>setOffset(Math.max(0,offset-25))}>Previous</button><button className="earn-secondary" disabled={data.withdrawals.length<25} onClick={()=>setOffset(offset+25)}>More history</button></div>
     </div></details>;
-    if(earnLayout)return <>{earnLayout({balance,form,milestones,history,achievements,stale:achievementsStale,restricted:!!data?.restricted})}</>;
+    if(earnLayout)return <>{earnLayout({balance,form,milestones,history,achievements,stale:achievementsStale,restricted:!!data?.restricted,availableMinor:Number.isSafeInteger(data?.earn?.availableMinor)?data.earn.availableMinor:null,financeError:!!error})}</>;
     return <div className="earn-finance">{balance}{form}{milestones}{history}</div>;
   }
   return <section className="min-w-0 rounded-2xl border border-slate-800 bg-[#0b1116] p-4 sm:p-6 text-left text-slate-100 space-y-5">

@@ -42,3 +42,11 @@ export function dismissPostPurchaseInvite(reference: string, storage?: InviteSto
 export function safeLocalStorage(): InviteStorage | null {
   try { return typeof window !== 'undefined' ? window.localStorage : null; } catch { return null; }
 }
+
+/** Short, order-aware invitation copy and the share topic that matches what was just bought. */
+export function postPurchaseInviteCopy(serviceType: OrderRecord['serviceType']) {
+  const service = serviceType || 'data';
+  if (service === 'afa') return { heading: 'Know someone who needs MTN AFA?', topicId: 'afa' as const };
+  if (service === 'airtime') return { heading: 'Know someone who needs airtime?', topicId: 'general' as const };
+  return { heading: 'Know someone who needs data?', topicId: 'data' as const };
+}

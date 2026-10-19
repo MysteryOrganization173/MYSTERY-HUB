@@ -3,7 +3,7 @@ import { ArrowRight, Gift, MessageCircle, Share2, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { getMyReferralSummary } from '../../services/apiClient';
 import { personalReferralLink, referralShareMessage, referralWhatsAppUrl, shareReferralLink, earnShareTopics } from '../../utils/earnExperience';
-import { dismissPostPurchaseInvite, postPurchaseInviteEligible, postPurchaseInviteHidden, safeLocalStorage } from '../../utils/postPurchaseInvite';
+import { dismissPostPurchaseInvite, postPurchaseInviteCopy, postPurchaseInviteEligible, postPurchaseInviteHidden, safeLocalStorage } from '../../utils/postPurchaseInvite';
 import type { OrderRecord } from '../../types';
 
 /** Quiet, dismissible referral discovery after a confirmed first-party delivery. It never blocks tracking or support. */
@@ -30,7 +30,8 @@ export const PostPurchaseInvite: React.FC<{ order: OrderRecord; onExplore: () =>
   }, [eligible, user?.id, sessionToken]);
   if (!eligible || state === 'disabled') return null;
   const dismiss = () => { dismissPostPurchaseInvite(reference, safeLocalStorage()); setHidden(true); };
-  const topic = earnShareTopics[0];
+  const copy = postPurchaseInviteCopy(order.serviceType);
+  const topic = earnShareTopics.find(item => item.id === copy.topicId) || earnShareTopics[0];
   const message = link ? referralShareMessage(topic, link) : null;
   const nativeShare = async () => {
     if (!link) return;
@@ -45,10 +46,10 @@ export const PostPurchaseInvite: React.FC<{ order: OrderRecord; onExplore: () =>
       <div className="flex items-start gap-3">
         <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#00c365]/15 text-[#44df95]"><Gift className="h-4.5 w-4.5" /></span>
         <div className="min-w-0 space-y-1">
-          <h4 id="post-purchase-invite" className="text-sm font-semibold text-white">Enjoying Mystery Hub? Share it with a friend.</h4>
+          <h4 id="post-purchase-invite" className="text-sm font-semibold text-white">{copy.heading}</h4>
           <p className="text-xs leading-relaxed text-slate-400">{member
-            ? 'Your personal link helps friends discover Mystery Hub. Qualifying purchases by people you refer may earn rewards under the current rules. Your own order does not earn a referral reward.'
-            : 'With a free account you get a personal link to share. Qualifying purchases by people you refer may earn rewards under the current rules.'}</p>
+            ? 'Share Mystery Hub with a friend. You may earn a reward when their purchases qualify.'
+            : 'Create a free account to get your own link. You may earn a reward when friends’ purchases qualify.'}</p>
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2 pl-12">
@@ -57,7 +58,7 @@ export const PostPurchaseInvite: React.FC<{ order: OrderRecord; onExplore: () =>
           {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && <button onClick={() => void nativeShare()} aria-label="More sharing options" className="grid min-h-11 min-w-11 place-items-center rounded-xl border border-slate-700 text-slate-200 hover:border-slate-500"><Share2 className="h-4 w-4" aria-hidden="true" /></button>}
         </>}
         {member && state === 'loading' && <span role="status" className="inline-flex min-h-11 items-center text-xs text-slate-500">Loading your link…</span>}
-        <button onClick={onExplore} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2 text-sm font-semibold text-[#7cedb3] hover:text-white">Explore Mystery Earn <ArrowRight className="h-4 w-4" aria-hidden="true" /></button>
+        <button onClick={onExplore} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2 text-sm font-semibold text-[#7cedb3] hover:text-white">{member ? 'View rewards' : 'Explore Mystery Earn'} <ArrowRight className="h-4 w-4" aria-hidden="true" /></button>
       </div>
     </section>
   );
