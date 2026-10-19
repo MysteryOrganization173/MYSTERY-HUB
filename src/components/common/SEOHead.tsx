@@ -1,112 +1,26 @@
 import React, { useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
-import { ROUTE_PATH_MAP } from '../../context/AppContext';
-import { BUSINESS_CONFIG } from '../../config/business';
+import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
+import { applySocialHead, marketplaceProductHead, pageIndexingHead, PUBLIC_ORIGIN, PUBLIC_PAGE_METADATA, publicPageHead } from '../../utils/socialMetadata';
 
-interface PageMetadata {
-  title: string;
-  description: string;
-}
-
-const SEO_MAP: Record<string, PageMetadata> = {
-  help: { title: 'Help & FAQs — Mystery Hub Ghana', description: 'Find answers about Data, Airtime, payments, order tracking, Mystery Earn, Website Builder, Wallet and support.' },
+const OTHER_PAGES: Record<string, {title:string;description:string}> = {
+  help: { title: 'Help & FAQs — Mystery Hub Ghana',description:'Find answers about Data, Airtime, payments, order tracking, Mystery Earn, Website Builder, Wallet and support.'},
   wallet: {title:'Mystery Wallet — Mystery Hub',description:'Top up your Wallet and use your available balance for supported Mystery Hub purchases.'},
-  earn: {title:'Mystery Earn — Mystery Hub',description:'Invite people to Mystery Hub and earn rewards from qualifying purchases.'},
-  afa: { title:'MTN AFA Registration — Mystery Hub', description:'Check AFA availability, register your MTN number and track your registration. The registration fee does not include future MTN voice or data packages.' },
-  home: {
-    title: 'Mystery Hub — Digital Services Marketplace in Ghana',
-    description:
-      'Buy data and airtime in Ghana, create a free business website and track your orders. Explore Mystery Wallet, referral rewards and Marketplace enquiries.',
-  },
-  data: {
-    title: 'Buy Data Bundles (MTN, Telecel, AirtelTigo) — Mystery Hub Ghana',
-    description:
-      'Choose MTN, Telecel or AirtelTigo data and airtime. Review prices and recipient details, pay with Mobile Money and track your order.',
-  },
-  website: {
-    title: 'Website Builder for Ghanaian Businesses — Mystery Hub',
-    description:
-      'Create a free business website in Ghana. Choose a design, add your details and photos, and publish a mobile-friendly site with your own brand.',
-  },
-  marketplace: {
-    title: 'Digital Marketplace & Tech Hardware — Mystery Hub Ghana',
-    description:
-      'Browse technology, digital products and services in Ghana. Check each listing for checkout or enquiry options, pricing and availability.',
-  },
-  services: {
-    title: 'Digital Services & Upcoming Utilities in Ghana — Mystery Hub',
-    description:
-      'Explore available Mystery Hub services and see what is coming next. ECG, water, TV renewals and results-checker services are not yet available.',
-  },
-  about: {
-    title: 'About Mystery Hub — Reliable Digital Solutions for Ghana',
-    description:
-      'Learn about Mystery Hub’s mission to provide honest, reliable data bundles, website building tools, and everyday digital utilities across Ghana.',
-  },
-  orders: {
-    title: 'Track Your Order & Receipts — Mystery Hub Ghana',
-    description:
-      'Track your Mystery Hub orders using your reference or recipient number. Check payment and delivery status, and find support if you need help.',
-  },
-  admin: {
-    title: 'Staff & Operations Portal — Mystery Hub Ghana',
-    description:
-      'Authorized administrator and staff operations portal for Mystery Hub Ghana order processing, customers, and fulfillment.',
-  },
+  about: {title:'About Mystery Hub — Reliable Digital Solutions for Ghana',description:'Learn about Mystery Hub’s mission to provide honest, reliable data bundles, website building tools, and everyday digital utilities across Ghana.'},
+  orders: {title:'Track Your Order & Receipts — Mystery Hub Ghana',description:'Track your Mystery Hub orders using your reference or recipient number. Check payment and delivery status, and find support if you need help.'},
+  admin: {title:'Staff & Operations Portal — Mystery Hub Ghana',description:'Authorized administrator and staff operations portal for Mystery Hub Ghana order processing, customers, and fulfillment.'},
 };
 
 export const SEOHead: React.FC = () => {
-  const { activePage } = useApp();
-
+  const { activePage, marketplaceOverlay } = useApp();
   useEffect(() => {
-    const meta = SEO_MAP[activePage] || SEO_MAP.home;
-    const path = ROUTE_PATH_MAP[activePage] || '/';
-    const canonicalUrl = `https://${BUSINESS_CONFIG.domain}${path === '/' ? '' : path}`;
-
-    // Update Document Title
-    document.title = meta.title;
-
-    // Update or create Meta Description
-    let descTag = document.querySelector('meta[name="description"]');
-    if (!descTag) {
-      descTag = document.createElement('meta');
-      descTag.setAttribute('name', 'description');
-      document.head.appendChild(descTag);
+    const product = activePage === 'marketplace' && marketplaceOverlay.kind !== 'none' ? marketplaceOverlay.product : null;
+    const head = product ? marketplaceProductHead(product) : publicPageHead(activePage);
+    const indexing = pageIndexingHead(window.location.pathname, window.location.search);
+    if (indexing.noindex) Object.assign(head, indexing);
+    if (!product && !PUBLIC_PAGE_METADATA[activePage] && OTHER_PAGES[activePage]) {
+      Object.assign(head, OTHER_PAGES[activePage], {url: `${PUBLIC_ORIGIN}${ROUTE_PATH_MAP[activePage] || '/'}`});
     }
-    descTag.setAttribute('content', meta.description);
-
-    // Update or create Canonical Link
-    let canonicalTag = document.querySelector('link[rel="canonical"]');
-    if (!canonicalTag) {
-      canonicalTag = document.createElement('link');
-      canonicalTag.setAttribute('rel', 'canonical');
-      document.head.appendChild(canonicalTag);
-    }
-    canonicalTag.setAttribute('href', canonicalUrl);
-
-    // Update OpenGraph tags
-    const updateOrCreateMeta = (property: string, content: string) => {
-      let tag = document.querySelector(`meta[property="${property}"]`);
-      if (!tag) {
-        tag = document.createElement('meta');
-        tag.setAttribute('property', property);
-        document.head.appendChild(tag);
-      }
-      tag.setAttribute('content', content);
-    };
-
-    updateOrCreateMeta('og:title', meta.title);
-    updateOrCreateMeta('og:description', meta.description);
-    updateOrCreateMeta('og:url', canonicalUrl);
-    updateOrCreateMeta(
-      'og:image',
-      'https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1200/v1790859552/30338777-d9dc-4709-8603-b18a4dc8d0ca_tvptuc.png'
-    );
-    updateOrCreateMeta(
-      'twitter:image',
-      'https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_1200/v1790859552/30338777-d9dc-4709-8603-b18a4dc8d0ca_tvptuc.png'
-    );
-  }, [activePage]);
-
+    applySocialHead(head);
+  }, [activePage, marketplaceOverlay]);
   return null;
 };

@@ -13,6 +13,7 @@ import { ProductPhoto } from './MarketplaceMedia';
 import { MarketplaceProductCard } from './MarketplaceProductCard';
 import { MarketplaceRefineSheet, refineAvailability } from './MarketplaceRefineSheet';
 import { useMarketplaceDialog } from './useMarketplaceDialog';
+import { marketplaceProductKey } from '../../utils/marketplaceDeepLink';
 import {
   DEFAULT_BROWSE_STATE, KIND_LABELS, PRICE_BANDS, SORT_OPTIONS, MarketplaceBrowseState, MarketplaceSort,
   activeRefinementCount, applyRefinements, categoryIconKey, categoryLabel, parseBrowseState, serializeBrowseState, sortProducts, summariseCategories, summariseBrands, brandLabel,
@@ -42,11 +43,7 @@ import {
 type HistoryState = { page?: string; mhProduct?: string; mhScroll?: number } & Record<string, unknown>;
 const historyState = (): HistoryState => (typeof window !== 'undefined' && window.history.state && typeof window.history.state === 'object' ? window.history.state : {});
 const productParamFromUrl = (): string | null => {
-  const params = new URLSearchParams(window.location.search);
-  const fromQuery = params.get('product') || params.get('item') || params.get('id');
-  if (fromQuery) return fromQuery.toLowerCase().trim();
-  const parts = window.location.pathname.split('/').filter(Boolean);
-  return parts.length >= 2 && parts[0] === 'marketplace' ? parts[1].toLowerCase().trim() : null;
+  return marketplaceProductKey(window.location.pathname, window.location.search);
 };
 const findProduct = (list: MarketplaceProduct[], slug: string) => list.find(p => p.slug?.toLowerCase() === slug || p.id.toLowerCase() === slug);
 
@@ -167,7 +164,7 @@ export const MarketplacePage: React.FC = () => {
   useEffect(() => {
     const onPop = () => {
       setBrowse(parseBrowseState(window.location.search));
-      const slug = new URLSearchParams(window.location.search).get('product');
+      const slug = productParamFromUrl();
       const target = slug ? findProduct(productsRef.current, slug.toLowerCase()) : undefined;
       if (target) openMarketplaceOverlay('detail', target); else dismissMarketplaceOverlay();
     };
