@@ -62,7 +62,7 @@ export const Footer: React.FC = () => {
           <nav aria-label="Footer" className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-3 content-start gap-x-6 gap-y-5 text-left">
             {columns.map(column => (
               <div key={column.title} className={column.title === 'Help' ? 'col-span-2 sm:col-span-1' : undefined}>
-                <h2 className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{column.title}</h2>
+                <h2 className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{column.title}</h2>
                 <ul className={column.title === 'Help' ? 'grid grid-cols-2 gap-x-6 sm:grid-cols-1' : undefined}>
                   {column.links.map(link => (
                     <li key={link.label}>
@@ -73,22 +73,22 @@ export const Footer: React.FC = () => {
                   ))}
                   {column.title === 'Help' && <>
                     <li><a href={contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer" className={linkClass}><MessageCircle className="h-4 w-4 text-[#44df95]" aria-hidden="true" />WhatsApp support</a></li>
-                    <li><a href={contact.phoneLink} className={linkClass}><Phone className="h-4 w-4 text-slate-500" aria-hidden="true" />{contact.supportPhone}</a></li>
-                    <li className="col-span-2 sm:col-span-1"><a href={contact.emailLink} className={linkClass} title={contact.supportEmail}><Mail className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" /><span className="min-w-0">{contact.supportEmail.split('@')[0]}<wbr />@{contact.supportEmail.split('@')[1]}</span></a></li>
+                    <li><a href={contact.phoneLink} className={linkClass}><Phone className="h-4 w-4 text-slate-400" aria-hidden="true" />{contact.supportPhone}</a></li>
+                    <li className="col-span-2 sm:col-span-1"><a href={contact.emailLink} className={linkClass} title={contact.supportEmail}><Mail className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" /><span className="min-w-0">{contact.supportEmail.split('@')[0]}<wbr />@{contact.supportEmail.split('@')[1]}</span></a></li>
                   </>}
                 </ul>
               </div>
             ))}
             {/* Not yet purchasable, so plain text rather than links. */}
-            <div className="col-span-2 sm:col-span-3 flex flex-wrap items-center gap-2 text-xs text-slate-400"><span className="font-semibold uppercase tracking-[0.12em] text-slate-500">Coming soon</span>{['ECG Prepaid Bills', 'WAEC Results PINs', 'DStv & GOtv Pay'].map(item => <span key={item} className="rounded-full border border-dashed border-slate-700 px-2.5 py-0.5">{item}</span>)}</div>
+            <div className="col-span-2 sm:col-span-3 flex flex-wrap items-center gap-2 text-xs text-slate-400"><span className="font-semibold uppercase tracking-[0.12em] text-slate-400">Coming soon</span>{['ECG Prepaid Bills', 'WAEC Results PINs', 'DStv & GOtv Pay'].map(item => <span key={item} className="rounded-full border border-dashed border-slate-700 px-2.5 py-0.5">{item}</span>)}</div>
           </nav>
         </div>
 
         {/* Payments, trust and legal */}
         <div className="mt-6 sm:mt-8 grid gap-3 border-t border-slate-800/70 py-4 sm:py-5 text-xs text-left sm:grid-cols-[1fr_auto] sm:items-center">
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1"><ShieldCheck className="h-4 w-4 shrink-0 text-[#44df95]" aria-hidden="true" /><span className="text-slate-400">Secure Mobile Money checkout</span>{['MTN MoMo', 'Telecel Cash', 'AT Money'].map(method => <span key={method} className="rounded-md border border-slate-700/80 bg-slate-900/60 px-2 py-0.5 font-semibold text-slate-200">{method}</span>)}</p>
-          <p className="text-slate-500">© {year} Mystery Hub. All rights reserved. <span className="text-slate-600">{contact.supportLocation}</span>
-            <a href="/admin" onClick={event => { event.preventDefault(); setActivePage('admin'); }} className="ml-3 inline-flex min-h-10 items-center text-slate-600 hover:text-slate-400 transition-colors">Staff Portal</a></p>
+          <p className="text-slate-400">© {year} Mystery Hub. All rights reserved. <span className="text-slate-400">{contact.supportLocation}</span>
+            <a href="/admin" onClick={event => { event.preventDefault(); setActivePage('admin'); }} className="ml-3 inline-flex min-h-11 items-center text-slate-400 hover:text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7cedb3] rounded">Staff Portal</a></p>
         </div>
       </div>
     </footer>

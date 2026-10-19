@@ -66,7 +66,7 @@ export function EarnRules({ rules, error, retry, compact = false }: { rules: Pub
         <ul className="earn-rules-list">{rules.map(rule => <RuleCard key={rule.id} rule={rule} />)}</ul>
         <details className="earn-metric-explainer earn-rules-how"><summary>How rewards are worked out</summary>
           <p>Data rewards follow a separate margin-based policy: your reward is a percentage of Mystery Hub’s eligible margin on the purchase, meaning what is left after the supplier’s cost and processing costs. It is not a percentage of the price your friend pays. Airtime and AFA rewards are worked out from the same eligible margin and never exceed it.</p>
-          <p>A friend’s first qualifying purchase and their later purchases can earn different shares. The amount recorded in your rewards history is final.</p>
+          <p>A friend’s first qualifying purchase and their later purchases can earn different shares. Your rewards history shows each recorded amount and whether it is pending, approved or reversed.</p>
         </details></>}
   </section>;
 }

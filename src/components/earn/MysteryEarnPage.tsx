@@ -136,7 +136,7 @@ function GuestEarn() {
         <h1 id="earn-guest-title">Share Mystery Hub.<br /><span>Earn real rewards.</span></h1>
         <p className="earn-hero-lede">Invite friends to useful digital services. Earn a referral reward when their purchases qualify, then withdraw it or spend it.</p>
         <div className="earn-actions"><button className="earn-primary earn-hero-cta" onClick={() => openAuth('signup')}>Create a Free Account <ArrowRight size={18} aria-hidden="true" /></button><a className="earn-secondary earn-hero-secondary" href="#earn-how">How It Works</a></div>
-        <p className="earn-fine"><ShieldCheck size={16} aria-hidden="true" /> No fees. No reward for clicks alone. Rewards come from an eligible purchase.</p></div>
+        <p className="earn-fine"><ShieldCheck size={16} aria-hidden="true" /> Free to join. No reward for clicks alone. Rewards come from an eligible purchase.</p></div>
     </section>
     <section className="earn-how" id="earn-how" aria-labelledby="earn-steps-title"><div className="earn-how-copy"><p className="earn-eyebrow">How it works</p><h2 id="earn-steps-title">Three steps. Your friends get something useful.</h2>
       <ol className="earn-steps">{steps.map((step, index) => <li key={step.title}><span className="earn-step-icon"><step.icon size={18} aria-hidden="true" /></span><div><h3><span className="earn-step-number">{index + 1}</span>{step.title}</h3><p>{step.detail}</p></div></li>)}</ol></div>

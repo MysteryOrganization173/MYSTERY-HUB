@@ -10,7 +10,7 @@ import { EarnMilestones } from '../../../src/components/earn/EarnMilestones';
 import { EarnRules } from '../../../src/components/earn/EarnDetails';
 import type { OrderRecord } from '../../../src/types';
 
-const source = (file: string) => readFileSync(file, 'utf8');
+const source = (file: string) => readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
 const summary: EarnSummary = { code: 'MH-ABC123', shareUrl: 'https://mysterybundlehub.com/?ref=MH-ABC123', isEnabled: true, clicksCount: 47, rawClicksCount: 47, uniqueVisitorsCount: 41, referredCustomersCount: 4, pendingRewardsMinor: 10, pendingRewardsGhc: 0.1, approvedRewardsMinor: 69, approvedRewardsGhc: 0.69, totalRewardsMinor: 79, totalRewardsGhc: 0.79 };
 const NOW = Date.parse('2026-10-18T20:00:00Z');
 const order = (extra: Partial<OrderRecord> = {}): OrderRecord => ({ id: 'MH-1', publicReference: 'MH-20261018-000001', serviceType: 'data', journey: 'direct_checkout', status: 'delivered', serverStatus: 'delivered',
@@ -231,4 +231,28 @@ test('milestone headline follows real state, and ready badges stay secondary to 
   assert.match(mixed, /data-milestone-id="credit" data-state="in-progress" data-reward="credit"/);
   assert.match(mixed, /Badges ready to collect/); assert.match(mixed, /Claim Badge/);
   assert.equal(featuredMilestone([badge('visits', 'qualified_visitors', 10, 41), badge('credit', 'successful_referrals', 5, 2, false, 200)])?.id, 'credit');
+});
+
+test('restricted, stale and collected credits never advertise an available claim', () => {
+  const render = (rows: EarnAchievement[], restricted = false, stale = false) => renderToStaticMarkup(React.createElement(EarnMilestones, { achievements: rows, restricted, stale, busy: false, claimingId: null, onClaim: () => {}, retry: () => {} }));
+  const earned = badge('credit', 'successful_referrals', 5, 5, false, 200);
+  for (const html of [render([earned], true), render([earned], false, true), render([{ ...earned, claimed: true }])]) {
+    assert.ok(!html.includes('Wallet credit ready to claim'));
+    assert.ok(!html.includes('>Claim Reward<'));
+  }
+  const reached = [earned, { ...earned, id: 'second-credit' }, badge('visits', 'qualified_visitors', 10, 12)];
+  for (const html of [render(reached, true), render(reached, false, true)]) {
+    assert.match(html, /Reached milestones/);
+    assert.ok(!html.includes('Also ready to claim') && !html.includes('Badges ready to collect'));
+  }
+});
+
+test('reward explanation preserves pending/reversal meaning and free joining does not promise fee-free cash-out', () => {
+  const rule = { id: 'data', service_type: 'data', purchase_stage: 'acquisition', network: null, product_key: null, reward_type: 'fixed_minor', reward_minor: 50, reward_percent_bps: null, enabled: true } as const;
+  const html = renderToStaticMarkup(React.createElement(EarnRules, { rules: [rule], error: false, retry: () => {} }));
+  assert.match(html, /pending, approved or reversed/);
+  assert.ok(!html.includes('history is final'));
+  const hero = source('src/components/earn/MysteryEarnPage.tsx');
+  assert.match(hero, /Free to join\. No reward for clicks alone/);
+  assert.ok(!hero.includes('No fees.'));
 });
