@@ -98,6 +98,29 @@ test('external images stay exact without fabricated dimensions or MIME',()=>{
   const image='https://images.example.com/photo.jpg?fit=contain';assert.deepEqual(socialImage(image),{image});
   assert.deepEqual(socialImage('https://res.cloudinary.com/fixture/image/upload/w_100/v1/a.png'),{image:'https://res.cloudinary.com/fixture/image/upload/w_100/v1/a.png'});
 });
+
+for (const shape of ['portrait', 'square', 'landscape']) test(`Marketplace ${shape} original uses dark padding without cropping`,()=>{
+  const imageUrl=`https://res.cloudinary.com/fixture/image/upload/v1/${shape}.jpg`;
+  const head=marketplaceProductHead(product({imageUrl}));
+  assert.equal(head.image,`https://res.cloudinary.com/fixture/image/upload/f_jpg,q_auto,c_pad,w_1200,h_630,b_rgb:0b0f12/v1/${shape}.jpg`);
+  assert.equal(head.imageWidth,1200);assert.equal(head.imageHeight,630);assert.equal(head.imageType,'image/jpeg');
+  assert.doesNotMatch(head.image,/c_fill|c_crop|b_rgb:ffffff/);
+  const output=injectSocialHead('<head><title>Old</title></head>',head);
+  for(const tag of ['og:image','og:title','og:description','og:url']) assert.equal((output.match(new RegExp(`property="${tag}"`, 'g'))||[]).length,1);
+});
+
+test('Marketplace fallback also uses the dark canvas; marketing defaults stay unchanged',()=>{
+  assert.match(marketplaceProductHead(product({imageUrl:''})).image,/c_pad,w_1200,h_630,b_rgb:0b0f12\/v\d+\/Futuristic_Ghana_Tech_Marketplace_Banner/);
+  assert.match(publicPageHead('marketplace').image,/b_rgb:ffffff/);
+});
+
+for(const slug of ['quickbyte-data','independent-cafe']) test(`${slug} owner image keeps its existing white-padding rendition`,()=>{
+  const image='https://res.cloudinary.com/fixture/image/upload/v1/owner-banner.png';
+  const record=site({slug,content:{businessName:slug,heroImage:image,logoUrl:'https://images.example.com/owner-logo.png'} as any});
+  const before=structuredClone(record),head=websiteSocialHead(record);
+  assert.equal(head.image,`https://res.cloudinary.com/fixture/image/upload/f_jpg,q_auto,c_pad,w_1200,h_630,b_rgb:ffffff/v1/owner-banner.png`);
+  assert.equal(head.icon,record.content.logoUrl);assert.deepEqual(record,before);
+});
 test('published website initial HTML uses owner title, image, favicon and no platform ownership graph',async()=>{
   const {response,text}=await html('/sites/synthetic-cafe?ref=MH-EXAMPLE');assert.equal(response.status,200);assert.match(text,/<title>Owner Cafe/);assert.match(text,/cafe.jpg/);assert.match(text,/rel="icon" href="https:\/\/images.example.com\/logo.png"/);
   assert.doesNotMatch(text,/schema.org|rel="manifest"|30338777|MH-EXAMPLE/);assert.match(text,/https:\/\/mysterybundlehub.com\/sites\/synthetic-cafe/);
