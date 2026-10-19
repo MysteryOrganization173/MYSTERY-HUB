@@ -187,17 +187,16 @@
   .home-hero-content { grid-template-columns: 1.6fr 1fr; }
 }
 @media (max-width: 767px) {
-  /* Phones: the hero receives its own 4:3 cut of the artwork (Hero.tsx PHONE_REGION), so the
-     skyline fills the width at full strength instead of a sky slice hidden behind the copy.
-     Only the band's lower part dissolves into the page, where the eyebrow and headline rise
-     over it. The band is height-aware so short screens keep both actions on the first screen. */
-  /* 4:3 at the phone's width, capped on short screens (about 240px at 640px tall, 170px at 560px). */
-  .home-hero { --hero-art-h: clamp(160px, min(75vw, 87.5svh - 320px), 340px); }
+  /* Phones: a compact cinematic band cut for the phone (Hero.tsx PHONE_REGION), so the skyline
+     and Arch fill the width instead of a sky slice hidden behind the copy. The copy rises over
+     the band's lower ~40%, where a fade and a scrim local to the text side blend the two. The
+     band shrinks on short screens so both actions keep clear space above the bottom nav. */
+  .home-hero { --hero-art-h: clamp(110px, min(64vw, 137.5svh - 660px), 290px); }
   .home-hero-art { bottom: auto; height: var(--hero-art-h); background: radial-gradient(90% 70% at 70% 40%, #0e3524, transparent 75%), var(--home-bg, #070b0e); }
-  .home-hero-art img { object-position: 50% 35%;
-    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 64%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 64%, transparent 100%); }
-  .home-hero-art::after { background: linear-gradient(180deg, #070b0e33 0%, transparent 14%, transparent 52%, #070b0e99 78%, #070b0e 100%); }
-  .home-hero-content { grid-template-columns: 1fr; padding-block: calc(var(--hero-art-h) - 76px) 28px; }
+  .home-hero-art img { object-position: 50% 30%;
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 62%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 62%, transparent 100%); }
+  .home-hero-art::after { background: radial-gradient(ellipse 85% 55% at 18% 100%, #070b0ee6, #070b0e80 55%, transparent 80%), linear-gradient(180deg, #070b0e33 0%, transparent 14%, transparent 50%, #070b0e8c 80%, #070b0e 100%); }
+  .home-hero-content { grid-template-columns: 1fr; padding-block: calc(var(--hero-art-h) * .62) 28px; }
   /* No artwork: drop the band rather than leave an empty dark block above the headline. */
   .home-hero-no-art .home-hero-content { padding-top: 40px; }
   .home-hero h1 { font-size: clamp(2.25rem, 9.6vw, 3.25rem); }

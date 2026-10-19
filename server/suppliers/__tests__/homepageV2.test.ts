@@ -61,7 +61,8 @@ test('phones get an art-directed crop of the approved hero artwork, in one reque
   assert.ok(match, 'phone crop region');
   const [x, y, width, height] = match!.slice(1).map(Number);
   assert.ok(x >= 0 && y >= 0 && x + width <= 1672 && y + height <= 941, 'crop stays inside the 1672 × 941 original');
-  assert.ok(Math.abs(width / height - 4 / 3) < 0.01, 'phone crop is 4:3, matching the band');
+  // The band is 64vw tall at most, so the crop matches it (≈1.56:1) and CSS barely re-crops.
+  assert.ok(Math.abs(width / height - 1 / 0.64) < 0.01, 'phone crop matches the band');
   // Phone candidates never upscale past the crop's own pixels.
   const phoneWidths = hero.match(/getCloudinarySrcSet\(HERO_ARTWORK, \[([\d, ]+)\], \{ region/)![1].split(',').map(Number);
   assert.ok(Math.max(...phoneWidths) <= width);

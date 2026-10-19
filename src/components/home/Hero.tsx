@@ -7,9 +7,9 @@ import { Wifi, ArrowRight, Globe, Check } from 'lucide-react';
 const HERO_ARTWORK = 'https://res.cloudinary.com/da6oeat7m/image/upload/v1790778037/ChatGPT_Image_Sep_30_2026_02_14_20_PM_baowst.png';
 
 // Phones get an art-directed cut of the same artwork: its right-hand 60% (the skyline,
-// arch and network glow the desktop layout shows beside the copy) at 4:3, instead of a
-// slice of the full-width image. Pixel values are against the 1672 × 941 original.
-const PHONE_REGION = { x: 669, y: 94, width: 1003, height: 753 };
+// Independence Arch, globe and Wi-Fi arcs) in a wide band, instead of a slice of the
+// full-width image. Pixel values are against the 1672 × 941 original.
+const PHONE_REGION = { x: 669, y: 130, width: 1003, height: 643 };
 
 // Only services that are live today.
 const LIVE_NOW = ['Data & airtime', 'Free business website', 'Order tracking'];
