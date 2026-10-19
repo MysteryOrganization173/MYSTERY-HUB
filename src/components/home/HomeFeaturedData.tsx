@@ -70,6 +70,7 @@ export const HomeFeaturedData: React.FC = () => {
                   type="button"
                   aria-pressed={selectedNetwork === id}
                   onClick={() => setSelectedNetwork(id)}
+                  style={{ '--network-color': GHANA_NETWORKS[id].brandColor } as React.CSSProperties}
                 >
                   <span className="home-network-dot" style={{ backgroundColor: GHANA_NETWORKS[id].brandColor }} aria-hidden="true" />
                   {label}

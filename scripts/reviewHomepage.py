@@ -169,7 +169,7 @@ with sync_playwright() as playwright:
     expect(page).to_have_url(re.compile('/data$'))
     expect(page.get_by_label('Recipient number')).to_be_visible()
     home()
-    page.locator('.home-template-showcase').get_by_role('button', name='Preview', exact=True).click()
+    page.locator('.home-template-showcase').get_by_role('button', name=re.compile(r'^Preview the .+ design$')).click()
     expect(page.get_by_role('dialog', name='Website template preview')).to_be_visible()
     page.keyboard.press('Escape')
     expect(page.get_by_role('dialog', name='Website template preview')).to_have_count(0)
