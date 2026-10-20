@@ -35,7 +35,11 @@ export function getPool(): pg.Pool | null {
       pool = new Pool({
         connectionString: process.env.DATABASE_URL,
         ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
-        max: 20,
+        // Production uses Supavisor session mode with 15 slots. Leave room for
+        // another process during a rolling deploy (2 x 5) and operational access.
+        // Excess work must wait in pg's bounded-time acquisition queue instead
+        // of opening more sessions than the provider permits.
+        max: 5,
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 10000,
       });
