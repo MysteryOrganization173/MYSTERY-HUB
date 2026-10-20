@@ -30,7 +30,14 @@ import {
 import { WEBSITE_TEMPLATES, LEGACY_DEMO_BUSINESS_NAMES } from '../../src/data/templates.js';
 import {websiteStarter,WEBSITE_STARTER_VERSION} from '../../src/config/websiteStarters.js';
 import {websiteLayoutMode,websiteExampleReview} from '../../src/utils/websiteLayout.js';
-import {safeWebsiteText} from '../services/websiteValidation.js';
+import {safeWebsiteText, websiteV5Fields} from '../services/websiteValidation.js';
+/** V5 fields replace whole values when sent; null hours clears them. Unsent fields keep the saved value. */
+function v5Merge(existing: SiteContent, patch: Record<string, unknown>): Partial<SiteContent> {
+  const fields = websiteV5Fields(patch), out: Partial<SiteContent> = {};
+  for (const [key, value] of Object.entries(fields)) (out as any)[key] = value === null ? undefined : value;
+  if (fields.imageMeta) out.imageMeta = { ...existing.imageMeta, ...fields.imageMeta };
+  return out;
+}
 import {WebsiteCheckpointStore} from './websiteCheckpointStore.js';
 export class WebsiteReviewRequiredError extends WebsiteOperationError {
   readonly code='EXAMPLE_REVIEW_REQUIRED';
@@ -402,6 +409,7 @@ export class WebsiteStore {
             features: Array.isArray(input.content.features)
               ? input.content.features
               : existing.content_json.features,
+            ...v5Merge(existing.content_json, input.content as unknown as Record<string, unknown>),
             ...(input.content.copy && typeof input.content.copy === 'object'
               ? {copy: Object.fromEntries(Object.entries(input.content.copy).map(([key, text]) => [key, sanitizeString(text, 200)]).filter(([, text]) => text))}
               : existing.content_json.copy !== undefined ? {copy: existing.content_json.copy} : {}),

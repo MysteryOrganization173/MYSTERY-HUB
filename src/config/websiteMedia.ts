@@ -1,4 +1,6 @@
-export const WEBSITE_MEDIA_DEFAULTS = { maxAssets: 20, maxBytes: 8 * 1024 * 1024, intentMinutes: 10 } as const;
+// V5: 60 images per Free website (founder-approved, Cloudinary Free plan). Phones resize before upload,
+// so typical photos arrive at a few hundred KB; the byte cap only bounds the fallback original.
+export const WEBSITE_MEDIA_DEFAULTS = { maxAssets: 60, maxBytes: 8 * 1024 * 1024, intentMinutes: 10 } as const;
 export const WEBSITE_UPLOAD_REPLAY_GRACE_MS = 15 * 60_000;
 export const WEBSITE_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 export interface WebsiteAsset {

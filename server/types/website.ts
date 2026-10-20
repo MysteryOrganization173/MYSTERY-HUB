@@ -34,6 +34,14 @@ export interface SiteContent {
   features?: string[];
   /** Owner wording for a designed template's headings and labels, keyed `${layout}.${slot}`. */
   copy?: Record<string, string>;
+  /** V5 additive fields. All optional; absent on older websites. */
+  hours?: import('../../src/config/websiteContentV5.js').WebsiteHours;
+  policies?: import('../../src/config/websiteContentV5.js').WebsitePolicies;
+  sections?: import('../../src/config/websiteContentV5.js').WebsiteSectionLayout;
+  imageMeta?: import('../../src/config/websiteContentV5.js').WebsiteImageMeta;
+  gallery?: string[];
+  /** Data stores: up to six bundle ids the owner features first. */
+  pinnedBundles?: string[];
 }
 
 export interface SiteSettings {
@@ -141,6 +149,14 @@ export function sanitizeTemplateItems(rawItems: unknown): TemplateItem[] {
     if (desc) item.desc = desc;
     if (tag) item.tag = tag;
     if (image) item.image = image;
+    // V5 additive fields, already validated by validateWebsiteContentPatch.
+    if (Array.isArray(r.images)) { const images = r.images.slice(0, 2).map(sanitizeUrl).filter(Boolean); if (images.length) item.images = images; }
+    const label = sanitizeString(r.label, 30); if (label) item.label = label;
+    if (r.pinned === true) item.pinned = true;
+    const alt = sanitizeString(r.alt, 150); if (alt) item.alt = alt;
+    const focal = r.focal as { x?: unknown; y?: unknown } | undefined;
+    if (focal && Number.isInteger(focal.x) && Number.isInteger(focal.y) && (focal.x as number) >= 0 && (focal.x as number) <= 100 && (focal.y as number) >= 0 && (focal.y as number) <= 100) item.focal = { x: focal.x as number, y: focal.y as number };
+    if (Array.isArray(r.options)) { const options = r.options.slice(0, 6).map(option => sanitizeString(option, 24)).filter(Boolean); if (options.length) item.options = options; }
     return item;
   });
 }
