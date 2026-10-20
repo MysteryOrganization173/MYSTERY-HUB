@@ -10,7 +10,7 @@ import { resolveDataResellerHeroImage } from '../../../utils/dataResellerArtwork
 import { DATA_BUNDLES } from '../../../data/bundles';
 import { formatGhs } from '../../../../shared/money';
 import {
-  BundleTile, HowBuyingWorks, NetworkPicker, NetworkTabs, RESELLER_STORE_CSS, STORE_NETWORKS, networkSummaries, sortBundles,
+  BundleRow, HowBuyingWorks, NetworkPicker, NetworkTabs, RESELLER_STORE_CSS, STORE_NETWORKS, networkSummaries, sortBundles,
   storeNetworkName, storeNetworksIn, type NetworkSummary, type StoreBundle, type StoreNetwork,
 } from '../storefront/ResellerCatalogue';
 
@@ -187,9 +187,10 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
         ) : (
           <>
             <NetworkTabs networks={networks} value={network} onChange={n => { setNetwork(n); setNotice(''); }} bundles={examples} theme={p} />
-            <div className="store-grid">
+            {/* The same compact rows a live Signal store shows; the gallery never takes payment. */}
+            <div className="store-rows" style={{ marginTop: 14 }}>
               {sortBundles(examples.filter(b => b.network === network)).map(b => (
-                <BundleTile key={b.id} bundle={b} theme={p} example onChoose={() => { if (onCtaClick) onCtaClick(); else setNotice('This is an example store. Bundles and prices appear here once a store owner sets them.'); }} />
+                <BundleRow key={b.id} bundle={b} theme={p} onChoose={() => { if (onCtaClick) onCtaClick(); else setNotice('This is an example store. Bundles and prices appear here once a store owner sets them.'); }} />
               ))}
             </div>
             <p className="store-note mt-3" role={notice ? 'status' : undefined} style={{ color: p.mutedText }}>
