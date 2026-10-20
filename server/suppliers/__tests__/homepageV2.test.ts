@@ -51,3 +51,34 @@ test('help sits beside the FAQ and keeps real support destinations', () => {
   assert.match(help, /setActivePage\('orders'\)/);
   assert.match(help, /MoMo PIN/);
 });
+
+test('phones get an art-directed crop of the approved hero artwork, in one request', async () => {
+  const hero = home('Hero.tsx');
+  assert.match(hero, /const HERO_ARTWORK = 'https:\/\/res\.cloudinary\.com\/da6oeat7m\/image\/upload\/v1790778037\/ChatGPT_Image_Sep_30_2026_02_14_20_PM_baowst\.png';/);
+  // A <picture> source swaps the phone crop in; the browser fetches one candidate, never both.
+  assert.match(hero, /<picture>[\s\S]*<source media="\(max-width: 767px\)"[\s\S]*region: PHONE_REGION[\s\S]*<img[\s\S]*<\/picture>/);
+  const match = hero.match(/PHONE_REGION = \{ x: (\d+), y: (\d+), width: (\d+), height: (\d+) \}/);
+  assert.ok(match, 'phone crop region');
+  const [x, y, width, height] = match!.slice(1).map(Number);
+  assert.ok(x >= 0 && y >= 0 && x + width <= 1672 && y + height <= 941, 'crop stays inside the 1672 × 941 original');
+  // The band is 64vw tall at most, so the crop matches it (≈1.56:1) and CSS barely re-crops.
+  assert.ok(Math.abs(width / height - 1 / 0.64) < 0.01, 'phone crop matches the band');
+  // Phone candidates never upscale past the crop's own pixels.
+  const phoneWidths = hero.match(/getCloudinarySrcSet\(HERO_ARTWORK, \[([\d, ]+)\], \{ region/)![1].split(',').map(Number);
+  assert.ok(Math.max(...phoneWidths) <= width);
+  const { getCloudinaryUrl } = await import('../../../src/utils/cloudinary.ts');
+  assert.equal(
+    getCloudinaryUrl('https://res.cloudinary.com/demo/image/upload/v1/a.png', { width: 720, region: { x, y, width, height } }),
+    `https://res.cloudinary.com/demo/image/upload/c_crop,h_${height},w_${width},x_${x},y_${y}/f_auto,q_auto,w_720/v1/a.png`,
+  );
+  // Image failure removes the empty band instead of leaving a dark block above the headline.
+  assert.match(hero, /home-hero-no-art/);
+  const css = home('homepage.css');
+  assert.match(css, /\.home-hero-no-art \.home-hero-content \{ padding-top: 40px; \}/);
+  assert.match(css, /--hero-art-h: clamp\(/);
+});
+
+test('network selector keeps distinct network colours on its selected state', () => {
+  assert.match(home('HomeFeaturedData.tsx'), /'--network-color': GHANA_NETWORKS\[id\]\.brandColor/);
+  assert.match(home('homepage.css'), /button\[aria-pressed="true"\] \{[^}]*var\(--network-color/);
+});

@@ -6,6 +6,11 @@ import { Wifi, ArrowRight, Globe, Check } from 'lucide-react';
 // Existing approved Accra artwork; keep text independent of image availability.
 const HERO_ARTWORK = 'https://res.cloudinary.com/da6oeat7m/image/upload/v1790778037/ChatGPT_Image_Sep_30_2026_02_14_20_PM_baowst.png';
 
+// Phones get an art-directed cut of the same artwork: its right-hand 60% (the skyline,
+// Independence Arch, globe and Wi-Fi arcs) in a wide band, instead of a slice of the
+// full-width image. Pixel values are against the 1672 × 941 original.
+const PHONE_REGION = { x: 669, y: 130, width: 1003, height: 643 };
+
 // Only services that are live today.
 const LIVE_NOW = ['Data & airtime', 'Free business website', 'Order tracking'];
 
@@ -14,14 +19,19 @@ export const Hero: React.FC = () => {
   const [imageFailed, setImageFailed] = useState(false);
 
   return (
-    <section className="home-hero" aria-labelledby="home-headline">
+    <section className={`home-hero${imageFailed ? ' home-hero-no-art' : ''}`} aria-labelledby="home-headline">
       <div className="home-hero-art" aria-hidden="true">
-        {!imageFailed && <img
-          src={getCloudinaryUrl(HERO_ARTWORK, { width: 1280 })}
-          srcSet={getCloudinarySrcSet(HERO_ARTWORK, [640, 960, 1280, 1600])}
-          sizes="100vw" alt="" fetchPriority="high" loading="eager" decoding="async"
-          onError={() => setImageFailed(true)}
-        />}
+        {!imageFailed && <picture>
+          {/* One request either way: the browser picks a single source before fetching. */}
+          <source media="(max-width: 767px)" sizes="100vw"
+            srcSet={getCloudinarySrcSet(HERO_ARTWORK, [480, 720, 1000], { region: PHONE_REGION })} />
+          <img
+            src={getCloudinaryUrl(HERO_ARTWORK, { width: 1280 })}
+            srcSet={getCloudinarySrcSet(HERO_ARTWORK, [640, 960, 1280, 1600])}
+            sizes="100vw" alt="" fetchPriority="high" loading="eager" decoding="async"
+            onError={() => setImageFailed(true)}
+          />
+        </picture>}
       </div>
       <div className="home-container home-hero-content">
         <div className="home-hero-copy">

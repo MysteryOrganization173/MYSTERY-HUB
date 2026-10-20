@@ -108,6 +108,30 @@ with sync_playwright() as playwright:
         brand = page.locator('header a[aria-label="Mystery Hub Homepage"]')
         assert brand.bounding_box()['height'] <= 32, 'Brand wordmark must not wrap'
 
+    # Hero placement: short phones must keep complete 52px actions above the real sticky nav.
+    # Use the same artwork and compiled application; geometry alone is not visual acceptance.
+    for width, height in [(360, 560), (360, 640), (390, 700), (390, 844),
+                          (412, 915), (430, 932), (768, 1024), (1280, 800)]:
+        page.set_viewport_size({'width': width, 'height': height})
+        home()
+        assert_fits()
+        hero = page.locator('.home-hero').bounding_box()
+        heading = page.locator('#home-headline').bounding_box()
+        primary = page.locator('.home-hero-actions .mh-button').bounding_box()
+        secondary = page.locator('.home-hero-actions .mh-button-secondary').bounding_box()
+        assert primary['height'] >= 52 and secondary['height'] >= 52
+        if width < 768:
+            nav = page.get_by_role('navigation', name='Mobile Navigation').bounding_box()
+            assert secondary['y'] + secondary['height'] <= nav['y'] - 24, (width, height, secondary, nav)
+            assert page.locator('.home-hero-art').bounding_box()['height'] >= 190
+        if (width, height) == (390, 844):
+            assert hero['height'] <= 520, 'Do not restore a standalone tall banner above the copy'
+            assert heading['y'] <= 220, 'Headline should share the lower artwork region'
+        if width >= 768:
+            assert abs(primary['y'] - secondary['y']) < 1, 'Preserve single-row tablet/desktop CTAs'
+        results.append({'heroViewport': [width, height], 'heroHeight': hero['height'],
+                        'headlineY': heading['y'], 'primary': primary, 'secondary': secondary})
+
     for width in [360, 390, 430, 768, 1024, 1280]:
         page.set_viewport_size({'width': width, 'height': 844 if width < 768 else 900})
         home()
@@ -169,7 +193,7 @@ with sync_playwright() as playwright:
     expect(page).to_have_url(re.compile('/data$'))
     expect(page.get_by_label('Recipient number')).to_be_visible()
     home()
-    page.locator('.home-template-showcase').get_by_role('button', name='Preview', exact=True).click()
+    page.locator('.home-template-showcase').get_by_role('button', name=re.compile(r'^Preview the .+ design$')).click()
     expect(page.get_by_role('dialog', name='Website template preview')).to_be_visible()
     page.keyboard.press('Escape')
     expect(page.get_by_role('dialog', name='Website template preview')).to_have_count(0)
