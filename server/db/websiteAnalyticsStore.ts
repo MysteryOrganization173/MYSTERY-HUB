@@ -37,8 +37,8 @@ export class WebsiteAnalyticsStore {
       await client.query('COMMIT');
     }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
   }
-  static async ownerAnalytics(siteId:string,userId:string,range='30') {
-    await WebsiteAssetStore.ownedSite(siteId,userId);
+  static async ownerAnalytics(siteId:string,userId:string,range='30',staffVerified=false) {
+    if(!staffVerified)await WebsiteAssetStore.ownedSite(siteId,userId);
     if(!['7','30','90','all'].includes(range))throw new WebsiteOperationError('Invalid analytics period.');
     const since=range==='all'?null:new Date(Date.now()-Number(range)*86400000).toISOString(),db=getPool();
     const rows:EventRecord[]=db?(await db.query('SELECT * FROM analytics_events WHERE entity_id=$1 AND ($2::timestamptz IS NULL OR created_at >= $2)',[siteId,since])).rows.map(e=>({...e,created_at:new Date(e.created_at).toISOString()})):memory.filter(e=>e.entity_id===siteId&&(!since||e.created_at>=since));
@@ -76,7 +76,7 @@ export class WebsiteAnalyticsStore {
   }
   static async siteDetails(site: WebsiteSiteRecord, assets?: Awaited<ReturnType<typeof WebsiteAssetStore.all>>): Promise<AdminWebsiteRow> {
     const owner=await AuthStore.findUserById(site.user_id);
-    const siteAssets=assets || await WebsiteAssetStore.list(site.id,site.user_id);
+    const siteAssets=assets || (site.status==='archived' ? await WebsiteAssetStore.forSite(site.id) : await WebsiteAssetStore.list(site.id,site.user_id));
     return { id:site.id,name:site.name,businessName:site.content_json.businessName,slug:site.slug,user_id:site.user_id,ownerName:owner?.name || 'Customer',template_id:site.template_id,status:site.status,created_at:site.created_at,updated_at:site.updated_at,published_at:site.published_at || null,assetCount:siteAssets.filter(a=>a.website_id===site.id && a.status==='ready').length,publicUrl:site.status==='published' ? `/sites/${encodeURIComponent(site.slug)}` : null };
   }
   static async summary(query: Record<string, unknown>): Promise<WebsiteAdminSummary> {

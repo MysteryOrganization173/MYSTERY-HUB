@@ -27,7 +27,7 @@ import {
   sanitizeTemplateItems,
   isValidTemplateId,
 } from '../types/website.js';
-import { WEBSITE_TEMPLATES } from '../../src/data/templates.js';
+import { WEBSITE_TEMPLATES, LEGACY_DEMO_BUSINESS_NAMES } from '../../src/data/templates.js';
 import {websiteStarter,WEBSITE_STARTER_VERSION} from '../../src/config/websiteStarters.js';
 import {websiteLayoutMode,websiteExampleReview} from '../../src/utils/websiteLayout.js';
 import {safeWebsiteText} from '../services/websiteValidation.js';
@@ -204,7 +204,7 @@ export class WebsiteStore {
     const demoPhone = '';
     // Older gallery clients pass a demonstration identity automatically. Keep them usable without
     // representing that demonstration as the owner's business; B1 clients supply businessName.
-    const name = sanitizeString(!b1 && input.name===templateDef.demoBusinessName ? 'My Business' : input.name || 'My Business', 128);
+    const name = sanitizeString(!b1 && (input.name===templateDef.demoBusinessName || input.name===LEGACY_DEMO_BUSINESS_NAMES[templateDef.id]) ? 'My Business' : input.name || 'My Business', 128);
 
     const slug = await this.generateUniqueSlug(input.slug || name);
 
@@ -573,37 +573,44 @@ export class WebsiteStore {
     return updatedRecord;
   }
 
-  /**
-   * Delete a site permanently with ownership check.
-   * Releases user's one-site free limit.
-   */
-  static async deleteSite(id: string, userId: string) {
-    return withWebsiteLock(userId, () => this.deleteSiteLocked(id, userId));
-  }
-  private static async deleteSiteLocked(id: string, userId: string): Promise<boolean> {
-    const existing = await this.findSiteById(id);
-    if (!existing) {
-      return false;
-    }
-
-    if (existing.user_id !== userId) {
-      throw new Error('Forbidden: You do not own this website.');
-    }
-
-    await WebsiteAssetStore.detachSite(id);
+  /** Reads a website in any state, including archived (deleted). Only deletion idempotency and staff
+   * history use this; every owner editing and public path keeps excluding archived websites. */
+  static async findSiteRecordById(id: string): Promise<WebsiteSiteRecord | null> {
     const pool = websiteDatabase();
-    if (!pool) {
-      for(const checkpoint of await WebsiteCheckpointStore.forSite(id,userId))await WebsiteCheckpointStore.discard(id,userId,checkpoint.id);
-      devWebsiteStore.delete(id);
-      return true;
-    }
+    if (!pool) { const site = devWebsiteStore.get(id); return site ? structuredClone(site) : null; }
+    const res = await pool.query('SELECT * FROM website_sites WHERE id = $1;', [id]);
+    return res.rows[0] ? this.normalizeRecord(res.rows[0]) : null;
+  }
+  /** A deleted website's address stays reserved forever; this only tells the public page it closed. */
+  static async findArchivedSiteBySlug(slug: string): Promise<WebsiteSiteRecord | null> {
+    const cleanSlug = slug.toLowerCase().trim();
+    const pool = websiteDatabase();
+    if (!pool) { for (const s of devWebsiteStore.values()) if (s.slug === cleanSlug && s.status === 'archived') return structuredClone(s); return null; }
+    const res = await pool.query("SELECT * FROM website_sites WHERE slug = $1 AND status = 'archived';", [cleanSlug]);
+    return res.rows[0] ? this.normalizeRecord(res.rows[0]) : null;
+  }
 
-    await pool.query(
-      `DELETE FROM website_sites WHERE id = $1 AND user_id = $2;`,
-      [id, userId]
+  /**
+   * Website deletion is an archive: the row, its live snapshot, checkpoints, media and every order or
+   * financial record stay for staff history. Archived websites leave the owner's list (releasing the
+   * Free slot), stop resolving publicly and keep their slug reserved. Repeating it is a no-op.
+   */
+  static async archiveSite(id: string, userId: string) {
+    return withWebsiteLock(userId, () => this.archiveSiteLocked(id, userId));
+  }
+  private static async archiveSiteLocked(id: string, userId: string): Promise<{ site: WebsiteSiteRecord; alreadyArchived: boolean } | null> {
+    const existing = await this.findSiteRecordById(id);
+    if (!existing || existing.user_id !== userId) return null;
+    if (existing.status === 'archived') return { site: existing, alreadyArchived: true };
+    const now = new Date(Math.max(Date.now(), Date.parse(existing.updated_at) + 1)).toISOString();
+    const archived: WebsiteSiteRecord = { ...existing, status: 'archived', updated_at: now };
+    const pool = websiteDatabase();
+    if (!pool) { devWebsiteStore.set(id, structuredClone(archived)); return { site: archived, alreadyArchived: false }; }
+    const result = await pool.query(
+      `UPDATE website_sites SET status = 'archived', updated_at = $1 WHERE id = $2 AND user_id = $3 AND status != 'archived';`,
+      [now, id, userId]
     );
-
-    return true;
+    return { site: archived, alreadyArchived: result.rowCount === 0 };
   }
 
   static async changeTemplate(id: string, userId: string, targetTemplateId: string, expectedUpdatedAt?: string) {

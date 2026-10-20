@@ -36,6 +36,7 @@ adminWebsiteBusinessRouter.post('/reseller-wholesale/preview',sensitive,handler(
 adminWebsiteBusinessRouter.post('/reseller-wholesale/apply',sensitive,handler(req=>Business.resellerBulkApply(req.user.id,req.body)));
 adminWebsiteBusinessRouter.post('/store-orders/:id/reconcile',sensitive,handler(req=>Business.reconcileReversal(req.user.id,req.params.id,req.body)));
 adminWebsiteBusinessRouter.get('/:id/business',handler(async req=>{
-  const site=await WebsiteStore.findSiteById(req.params.id);if(!site)throw new FinanceError('Website not found.',404);
-  return {...await Business.ownerSummary(site.id,site.user_id,offset(req)),analytics:await WebsiteAnalyticsStore.ownerAnalytics(site.id,site.user_id,String(req.query.range||'30'))};
+  // Staff keep read access to a deleted (archived) website's orders and earnings history.
+  const site=await WebsiteStore.findSiteRecordById(req.params.id);if(!site)throw new FinanceError('Website not found.',404);
+  return {...await Business.ownerSummary(site.id,site.user_id,offset(req),site),analytics:await WebsiteAnalyticsStore.ownerAnalytics(site.id,site.user_id,String(req.query.range||'30'),true)};
 }));

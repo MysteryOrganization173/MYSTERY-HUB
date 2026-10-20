@@ -26,7 +26,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-buka-bistro',
     priority: 30,
-    title: 'Gold Coast Artisan Kitchen & Grill',
+    title: 'Classic Kitchen',
     category: 'restaurant',
     categoryLabel: 'Restaurants & Cafes',
     layoutType: 'restaurant',
@@ -113,7 +113,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     id: 'tmpl-data-reseller',
     integrations: RESELLER_INTEGRATIONS,
     priority: 10,
-    title: 'QuickByte Data',
+    title: 'Signal',
     category: 'retail',
     categoryLabel: 'Data & Telecom',
     layoutType: 'reseller',
@@ -126,7 +126,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
       'Managed checkout and order tracking',
     ],
     accentColor: '#2563eb',
-    demoBusinessName: 'QuickByte Data',
+    demoBusinessName: 'Your Data Store',
     demoHeroTagline: 'Data bundles, bought in a few taps',
     demoSubtext:
       'Choose a bundle, enter the number that should receive it and pay securely. Keep your order reference to track your order here.',
@@ -168,20 +168,14 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
       { id: 'ds-at-3', name: '5GB AT Big Time Bundle', price: 'GH₵ 42.00', category: 'AT', tag: 'Best Value' },
       { id: 'ds-at-4', name: '10GB AT Big Time Bundle', price: 'GH₵ 80.00', category: 'AT', tag: 'Hot' },
     ],
-    testimonials: [
-      {
-        quote: 'Started selling data with this branded storefront. My customers love ordering directly on WhatsApp!',
-        author: 'Kwame Mensah',
-        role: 'Tech Retailer, Kumasi',
-      },
-    ],
+    testimonials: [],
   },
 
   // 3. CONSTRUCTION & CIVIL WORKS
   {
     id: 'tmpl-accra-build',
     priority: 100,
-    title: 'Apex Build & Civil Contractors',
+    title: 'Site & Build',
     category: 'construction',
     categoryLabel: 'Construction & Civil',
     layoutType: 'construction',
@@ -248,7 +242,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-glow-salon',
     priority: 40,
-    title: 'Nectar Glow Salon & Barber Studio',
+    title: 'Salon Studio',
     category: 'beauty',
     categoryLabel: 'Salons & Barber Studios',
     layoutType: 'salon',
@@ -314,7 +308,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-goldcoast-realty',
     priority: 60,
-    title: 'GoldCoast Realty & Luxury Living',
+    title: 'Property Showcase',
     category: 'realestate',
     categoryLabel: 'Real Estate & Properties',
     layoutType: 'realestate',
@@ -383,7 +377,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-lens-creative',
     priority: 80,
-    title: 'Kofi Lens — Visual Storyteller & Filmmaker',
+    title: 'Portfolio',
     category: 'portfolio',
     categoryLabel: 'Portfolios & Creators',
     layoutType: 'portfolio',
@@ -443,7 +437,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-vortex-tech',
     priority: 110,
-    title: 'Vortex Cloud & Digital Systems',
+    title: 'Tech Studio',
     category: 'agency',
     categoryLabel: 'Tech & Digital Agency',
     layoutType: 'agency',
@@ -498,7 +492,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-akwaaba-hotel',
     priority: 50,
-    title: 'Akwaaba Eco-Resort & Spa',
+    title: 'Stays',
     category: 'hotel',
     categoryLabel: 'Hotels & Hospitality',
     layoutType: 'hotel',
@@ -557,7 +551,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-horizon-edu',
     priority: 120,
-    title: 'Horizon STEM & Tech Academy',
+    title: 'Campus',
     category: 'education',
     categoryLabel: 'Education & Academies',
     layoutType: 'education',
@@ -614,7 +608,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-makola-mart',
     priority: 20,
-    title: 'GadgetHub Ghana — Electronics & Gear',
+    title: 'Classic Shop',
     category: 'retail',
     categoryLabel: 'E-Commerce & Retail',
     layoutType: 'ecommerce',
@@ -683,7 +677,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-grace-ministry',
     priority: 90,
-    title: 'Grace City Chapel International',
+    title: 'Sanctuary',
     category: 'church',
     categoryLabel: 'Churches & Ministries',
     layoutType: 'church',
@@ -743,7 +737,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-afrochic-threads',
     priority: 70,
-    title: 'Akwete Bespoke Atelier & Kente House',
+    title: 'Atelier',
     category: 'fashion',
     categoryLabel: 'Fashion & Bespoke',
     layoutType: 'fashion',
@@ -800,7 +794,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-legon-consult',
     priority: 101,
-    title: 'Vanguard Legal & Accounting Partners',
+    title: 'Counsel',
     category: 'services',
     categoryLabel: 'Corporate & Legal',
     layoutType: 'services',
@@ -852,3 +846,39 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
 
 WEBSITE_TEMPLATES.push({ id: 'tmpl-start-blank', priority: 999, title: 'Start Blank', category: 'services', categoryLabel: 'Custom Layout', industry: 'Your business', description: 'Start with the essentials and build your own layout.', features: ['Header', 'Hero', 'Sections', 'Footer'], accentColor: '#00c365', demoBusinessName: 'My Business', demoHeroTagline: 'Introduce your business', demoSubtext: 'Tell visitors what you offer.', isFreeTier: true, layoutType: 'blank', badgeText: 'Essentials', composition: createWebsiteComposition() });
 export function orderedWebsiteTemplates() { return [...WEBSITE_TEMPLATES].sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999) || a.id.localeCompare(b.id)); }
+
+/**
+ * V5 renamed each design from a sample business ("QuickByte Data", a real customer's name) to a neutral
+ * design name. These frozen values keep old shared links and owner sites that never stored a business name
+ * rendering exactly as before. Never show them in gallery or dashboard chrome.
+ */
+export const LEGACY_TEMPLATE_TITLE_SLUGS: Readonly<Record<string, string>> = Object.freeze({
+  'gold-coast-artisan-kitchen-grill': 'tmpl-buka-bistro',
+  'quickbyte-data': 'tmpl-data-reseller',
+  'apex-build-civil-contractors': 'tmpl-accra-build',
+  'nectar-glow-salon-barber-studio': 'tmpl-glow-salon',
+  'goldcoast-realty-luxury-living': 'tmpl-goldcoast-realty',
+  'kofi-lens-visual-storyteller-filmmaker': 'tmpl-lens-creative',
+  'vortex-cloud-digital-systems': 'tmpl-vortex-tech',
+  'akwaaba-eco-resort-spa': 'tmpl-akwaaba-hotel',
+  'horizon-stem-tech-academy': 'tmpl-horizon-edu',
+  'gadgethub-ghana-electronics-gear': 'tmpl-makola-mart',
+  'grace-city-chapel-international': 'tmpl-grace-ministry',
+  'akwete-bespoke-atelier-kente-house': 'tmpl-afrochic-threads',
+  'vanguard-legal-accounting-partners': 'tmpl-legon-consult',
+});
+export const LEGACY_DEMO_BUSINESS_NAMES: Readonly<Record<string, string>> = Object.freeze({ 'tmpl-data-reseller': 'QuickByte Data' });
+
+/** Resolves a gallery deep link: template id, id without the prefix, current design-name slug or a legacy title slug. */
+export function findTemplateByLink(value: string): WebsiteTemplate | undefined {
+  const clean = value.toLowerCase().trim();
+  const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return WEBSITE_TEMPLATES.find(t => t.id.toLowerCase() === clean || t.id.replace(/^tmpl-/, '').toLowerCase() === clean || slug(t.title) === clean)
+    || WEBSITE_TEMPLATES.find(t => t.id === LEGACY_TEMPLATE_TITLE_SLUGS[clean.replace(/^-|-$/g, '')]);
+}
+
+/** Dashboard chip: the design name and its category, never a sample business. */
+export function templateDesignLabel(template?: Pick<WebsiteTemplate, 'title' | 'categoryLabel'> | null): string {
+  if (!template) return '';
+  return template.categoryLabel ? `${template.title} design · ${template.categoryLabel}` : `${template.title} design`;
+}

@@ -23,7 +23,7 @@ import { EcommerceTemplateView } from '../components/website/templates/Ecommerce
 import { DataResellerTemplateView, type ResellerStoreSummary } from '../components/website/templates/DataResellerTemplateView.js';
 import { DynamicTemplateRenderer } from '../components/website/DynamicTemplateRenderer.js';
 import { PersonalityTemplateView, personalityPreset } from '../components/website/templates/PersonalityTemplateView';
-import { WEBSITE_TEMPLATES } from '../data/templates.js';
+import { WEBSITE_TEMPLATES, LEGACY_DEMO_BUSINESS_NAMES } from '../data/templates.js';
 import { resolveDataResellerHeroImage } from './dataResellerArtwork.js';
 
 /**
@@ -55,7 +55,8 @@ export function mergeSiteWithTemplate(
     ...baseTemplate,
     composition: websiteLayoutMode(baseTemplate.id,content)==='sections' ? content?.composition ?? baseTemplate.composition : undefined,
     siteContent: content,
-    demoBusinessName: content?.businessName ?? baseTemplate.demoBusinessName,
+    // Owner content without a stored name keeps the sample name it has always rendered (frozen in V5).
+    demoBusinessName: content?.businessName ?? (content ? LEGACY_DEMO_BUSINESS_NAMES[baseTemplate.id] : undefined) ?? baseTemplate.demoBusinessName,
     demoHeroTagline: content?.tagline ?? baseTemplate.demoHeroTagline,
     demoSubtext: content?.aboutText ?? baseTemplate.demoSubtext,
     location: content?.location ?? baseTemplate.location,

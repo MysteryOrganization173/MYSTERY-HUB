@@ -1,9 +1,10 @@
 import { WebsiteBusinessDashboard } from './WebsiteBusinessDashboard';
 import { WebsiteSettingsControls } from './WebsiteSettingsControls';
+import { isDeletedWebsite, withoutDeletedWebsites } from '../../utils/websiteDeletion';
 import { trackWebsiteEvent } from '../../utils/websiteAnalytics';
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { TEMPLATE_CATEGORIES, WEBSITE_TEMPLATES, orderedWebsiteTemplates } from '../../data/templates';
+import { TEMPLATE_CATEGORIES, WEBSITE_TEMPLATES, orderedWebsiteTemplates, findTemplateByLink, templateDesignLabel } from '../../data/templates';
 import { TemplateCategory, WebsiteSiteRecord, WebsiteTemplate } from '../../types';
 import { TemplateCardPreview } from './TemplateCardPreview';
 import { WebsiteStartSheet } from './WebsiteStartSheet';
@@ -83,6 +84,15 @@ export const WebsiteBuilderPage: React.FC = () => {
       (target?.querySelector('h1,h2') as HTMLElement | null)?.focus({ preventScroll: true });
     });
   }, [activeEditorSite]);
+  // After deletion the owner lands on the gallery to start again: new design, new name, new address.
+  const handleWebsiteDeleted = (siteId: string) => {
+    setMySites(prev => prev.filter(site => site.id !== siteId));
+    setShowSettingsDrawer(false); setChangeTarget(''); setDashboardTab('Overview'); setPricingDirty(false);
+    if (activeEditorSite?.id === siteId) closeWebsiteEditor();
+    showToast('Website deleted. Choose a design to start a new website.', 'success');
+    requestAnimationFrame(() => { const gallery = document.getElementById('templates-showcase'); if (gallery) gallery.scrollIntoView({ block: 'start' }); else window.scrollTo({ top: 0 }); });
+    if (sessionToken) getMyWebsitesOnServer(sessionToken).then(res => { if (res.success) setMySites(withoutDeletedWebsites(res.sites || [])); }).catch(() => {});
+  };
   const updateSite = (updated: WebsiteSiteRecord) => {
     setMySites(prev => prev.map(site => site.id === updated.id ? updated : site));
     if (activeEditorSite?.id === updated.id && activeEditorSite.template_id !== updated.template_id) openWebsiteEditor(updated);
@@ -90,7 +100,8 @@ export const WebsiteBuilderPage: React.FC = () => {
 
   // A switch started in the global template preview must also update the owner dashboard.
   // A website created from the template preview joins the dashboard too.
-  useEffect(()=>{if(activeEditorSite)setMySites(prev=>prev.some(site=>site.id===activeEditorSite.id)?prev.map(site=>site.id===activeEditorSite.id?activeEditorSite:site):[activeEditorSite,...prev]);},[activeEditorSite]);
+  // A deleted website never comes back from editor state or a stale response.
+  useEffect(()=>{if(activeEditorSite&&!isDeletedWebsite(activeEditorSite.id))setMySites(prev=>prev.some(site=>site.id===activeEditorSite.id)?prev.map(site=>site.id===activeEditorSite.id?activeEditorSite:site):[activeEditorSite,...prev]);},[activeEditorSite]);
 
   useEffect(() => { trackWebsiteEvent('website_builder_viewed', {source:'builder'}, sessionToken || undefined); }, [sessionToken]);
 
@@ -102,7 +113,7 @@ export const WebsiteBuilderPage: React.FC = () => {
       getMyWebsitesOnServer(sessionToken)
         .then((res) => {
           if (res.success) {
-            setMySites(res.sites || []);
+            setMySites(withoutDeletedWebsites(res.sites || []));
           }
         })
         .catch((err: any) => {
@@ -118,7 +129,7 @@ export const WebsiteBuilderPage: React.FC = () => {
     }
   }, [sessionToken]);
 
-  // Deep-link template preview support (e.g. /website-builder?template=tmpl-quickbyte-data)
+  // Deep-link template preview support (e.g. /website-builder?template=tmpl-data-reseller)
   useEffect(() => {
     try {
       const url = new URL(window.location.href);
@@ -137,13 +148,7 @@ export const WebsiteBuilderPage: React.FC = () => {
       }
 
       if (targetId) {
-        const cleanId = targetId.toLowerCase().trim();
-        const found = WEBSITE_TEMPLATES.find(
-          (t) =>
-            t.id.toLowerCase() === cleanId ||
-            t.id.replace(/^tmpl-/, '').toLowerCase() === cleanId ||
-            t.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') === cleanId
-        );
+        const found = findTemplateByLink(targetId);
         if (found) {
           openTemplatePreview(found);
         }
@@ -306,7 +311,7 @@ export const WebsiteBuilderPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
 
         {startTemplate&&<WebsiteStartSheet templateId={startTemplate} onClose={()=>setStartTemplate('')} onCreated={(site,alreadyExists)=>{const requested=startTemplate;setStartTemplate('');setMySites([site]);if(alreadyExists&&site.template_id!==requested){setChangeTarget(requested);return;}setEditorPublish(false);openWebsiteEditor(site);showToast(alreadyExists?'Opening your existing website.':'Your website is ready. Tap anything to change it.',alreadyExists?'info':'success');}}/>}
-        {activeSite&&sessionToken&&changeTarget&&<WebsiteSettingsControls site={activeSite} token={sessionToken} requestedTemplateId={changeTarget} selectionOnly onClosed={()=>setChangeTarget('')} onDeleted={()=>setMySites([])} onUpdated={updated=>{setMySites([updated]);setChangeTarget('');openWebsiteEditor(updated);}}/>}
+        {activeSite&&sessionToken&&changeTarget&&<WebsiteSettingsControls site={activeSite} token={sessionToken} requestedTemplateId={changeTarget} selectionOnly onClosed={()=>setChangeTarget('')} onDeleted={handleWebsiteDeleted} onUpdated={updated=>{setMySites([updated]);setChangeTarget('');openWebsiteEditor(updated);}}/>}
         {/* =========================================================
             LOADING / ERROR STATE FOR AUTHENTICATED USERS
             ========================================================= */}
@@ -337,7 +342,7 @@ export const WebsiteBuilderPage: React.FC = () => {
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ${isPublished?'bg-emerald-500/15 text-emerald-300':'bg-amber-500/15 text-amber-200'}`}><span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${isPublished?'bg-emerald-400':'bg-amber-300'}`}/>{isPublished?'Live':'Draft · not public yet'}</span>
                 {isPublished&&draftAhead&&<span className="inline-flex items-center rounded-full px-2.5 py-1 font-semibold bg-sky-500/15 text-sky-200">Draft has unpublished changes</span>}
-                <span className="text-slate-400">{activeBaseTemplate?.title} · Free plan</span>
+                <span className="text-slate-400">{templateDesignLabel(activeBaseTemplate)} · Free plan</span>
               </div>
               <h1 id="website-owner-name" tabIndex={-1} className="mt-3 text-2xl sm:text-3xl font-bold break-words outline-none">{displaySiteName}</h1>
               <div className="website-owner-address mt-3">
@@ -359,7 +364,7 @@ export const WebsiteBuilderPage: React.FC = () => {
               </div>
             </section>
             <WebsiteBusinessDashboard site={activeSite} token={sessionToken!} requestedTab={dashboardTab} onTabChange={setDashboardTab} onEdit={()=>editSite(activeSite)} onPricingDirty={setPricingDirty} onPreview={handlePreviewCurrentSite} onPublish={()=>editSite(activeSite,true)} onShare={isPublished?()=>void handleShare(activeSite.slug):undefined} onSettings={()=>{setShowSettingsDrawer(true);requestAnimationFrame(()=>document.getElementById('website-settings')?.scrollIntoView({block:'start'}));}}/>
-            {showSettingsDrawer&&<section id="website-settings" className="scroll-mt-24 rounded-2xl border border-slate-800 bg-[#0b131a] p-4 text-left space-y-3"><div className="flex items-center justify-between"><h2 className="font-bold">Website settings</h2><button className="min-h-11 px-3 text-sm" onClick={()=>setShowSettingsDrawer(false)}>Close settings</button></div><p className="text-sm text-slate-400">Current design: {activeBaseTemplate?.title}. Your site address stays the same when you change design.</p><WebsiteSettingsControls site={activeSite} token={sessionToken!} onUpdated={updated=>{updateSite(updated);setShowSettingsDrawer(false);openWebsiteEditor(updated);}} onDeleted={()=>{setMySites([]);setShowSettingsDrawer(false);showToast('Website deleted. You can create a new Free website.','success');}}/></section>}
+            {showSettingsDrawer&&<section id="website-settings" className="scroll-mt-24 rounded-2xl border border-slate-800 bg-[#0b131a] p-4 text-left space-y-3"><div className="flex items-center justify-between"><h2 className="font-bold">Website settings</h2><button className="min-h-11 px-3 text-sm" onClick={()=>setShowSettingsDrawer(false)}>Close settings</button></div><p className="text-sm text-slate-400">Current design: {activeBaseTemplate?.title}. Your site address stays the same when you change design.</p><WebsiteSettingsControls site={activeSite} token={sessionToken!} onUpdated={updated=>{updateSite(updated);setShowSettingsDrawer(false);openWebsiteEditor(updated);}} onDeleted={handleWebsiteDeleted}/></section>}
           </div>
         ) : (
           /* =========================================================

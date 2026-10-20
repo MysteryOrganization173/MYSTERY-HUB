@@ -725,7 +725,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
                   {isDataReseller && showsLegacyDataResellerArtwork(content.heroImage) && (
                     <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-300 space-y-2">
-                      <p>Your store shows the original QuickByte-style banner. It stays unless you change it. A plain starter image without another brand's name is also available.</p>
+                      <p>Your store shows the original Data store banner. It stays unless you change it. A plain starter image without any brand name is also available.</p>
                       <button type="button" className="min-h-11 px-3 rounded-xl border border-emerald-500/40 text-emerald-300" onClick={() => { setContent({ ...content, heroImage: DATA_RESELLER_STARTER_HERO_IMAGE }); markDirty(); }}>Use the neutral starter image</button>
                     </div>
                   )}

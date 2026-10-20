@@ -57,7 +57,8 @@ adminWebsiteRouter.use(requireAdmin);
 adminWebsiteRouter.use(adminWebsiteBusinessRouter);
 adminWebsiteRouter.get('/',websiteFreeHandler(async(req,res)=>{res.json({success:true,...await WebsiteAnalyticsStore.summary(req.query)});}));
 adminWebsiteRouter.get('/:id',websiteFreeHandler(async(req,res)=>{
-  const site=await WebsiteStore.findSiteById(req.params.id);
+  // Includes deleted (archived) websites so staff can still trace their history.
+  const site=await WebsiteStore.findSiteRecordById(req.params.id);
   if(!site) throw new WebsiteOperationError('Website not found.',404);
   // Safe operational projection; no account/security/provider credentials or arbitrary content.
   res.json({success:true,site:await WebsiteAnalyticsStore.siteDetails(site)});

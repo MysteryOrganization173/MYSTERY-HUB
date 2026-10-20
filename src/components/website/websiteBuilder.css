@@ -184,3 +184,17 @@
 .website-made-for button:hover .website-made-for-photo{transform:scale(1.05)}
 .website-made-for button::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(5,8,12,.85))}
 .website-made-for button>span:last-child{position:absolute;z-index:1;left:10px;right:10px;bottom:9px;color:#fff;font-size:13px;font-weight:700;line-height:1.25}
+
+/* Danger Zone deletion sheet. */
+.website-delete-identity{display:grid;gap:4px;border-radius:14px;background:#111a21;border:1px solid #1f2a32;padding:12px 14px;font-size:13px;color:#9fb0a8}
+.website-delete-identity strong{font-size:17px;color:#eef3f1}
+.website-delete-effects{margin:0;padding:0;list-style:none;display:grid;gap:10px;font-size:14px;line-height:1.5;color:#cbd5d1}
+.website-delete-effects li{padding-left:14px;border-left:2px solid #263440}
+.website-delete-effects strong{color:#eef3f1}
+.website-delete-blockers{border-radius:14px;border:1px solid rgba(251,191,36,.45);background:rgba(251,191,36,.08);padding:12px 14px;font-size:14px;line-height:1.5;color:#fde68a}
+.website-delete-blockers ul{margin:6px 0;padding-left:18px;list-style:disc}
+.website-delete-blockers p{margin:0;color:#fcd34d}
+.website-danger-zone{border:1px solid rgba(244,63,94,.35);border-radius:14px;padding:14px;display:grid;gap:8px}
+.website-danger-zone strong{color:#fda4af}
+.website-danger-zone p{margin:0;font-size:13px;color:#9fb0a8}
+.website-danger-zone button{justify-self:start;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid rgba(244,63,94,.5);color:#fecdd3;font-weight:600}
