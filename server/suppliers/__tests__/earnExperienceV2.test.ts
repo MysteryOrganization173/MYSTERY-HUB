@@ -57,8 +57,9 @@ test('rule presentation has honest absent/error states and discloses product lim
   assert.match(empty, /No reward rules.*enabled/); assert.ok(!empty.includes('GH₵0.50'));
   const error = renderToStaticMarkup(React.createElement(EarnRules, { rules: [rule], error: true, retry: () => {} }));
   assert.match(error, /Eligibility cannot be confirmed/); assert.ok(!error.includes('GH₵0.50'));
-  const current = renderToStaticMarkup(React.createElement(EarnRules, { rules: [{ ...rule, product_key: 'internal-product-id' }], error: false, retry: () => {} }));
-  assert.match(current, /Selected products only/); assert.match(current, /separate margin-based policy/);
+  const current = renderToStaticMarkup(React.createElement(EarnRules, { rules: [{ ...rule, product_key: 'internal-product-id' }],
+    dataPolicy: { service: 'data', journey: 'direct', status: 'active', basis: 'eligible_margin', acquisitionBps: 4500, recurringBps: 2000, eligibleStages: ['acquisition'] }, error: false, retry: () => {} }));
+  assert.match(current, /Only eligible products and networks/); assert.match(current, /eligible margin/);
   assert.ok(!current.includes(rule.id)); assert.ok(!current.includes('internal-product-id'));
 });
 test('metric rendering distinguishes loading, true zero and unavailable network counts', () => {

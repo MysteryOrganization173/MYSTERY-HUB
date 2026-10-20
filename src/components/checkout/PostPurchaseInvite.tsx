@@ -11,7 +11,9 @@ export const PostPurchaseInvite: React.FC<{ order: OrderRecord; onExplore: () =>
   const { user, sessionToken, showToast } = useApp();
   const reference = order.publicReference || order.id;
   const [hidden, setHidden] = useState(() => postPurchaseInviteHidden(reference, safeLocalStorage()));
-  const [link, setLink] = useState<string | null>(null);
+  const [ownedLink, setLink] = useState<{ url: string; userId: string; token: string } | null>(null);
+  // Hide the old account's link synchronously, before effect cleanup runs.
+  const link = ownedLink?.userId === user?.id && ownedLink?.token === sessionToken ? ownedLink.url : null;
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'disabled' | 'unavailable'>('idle');
   const eligible = postPurchaseInviteEligible(order) && !hidden;
   useEffect(() => { setHidden(postPurchaseInviteHidden(reference, safeLocalStorage())); }, [reference]);
@@ -24,7 +26,7 @@ export const PostPurchaseInvite: React.FC<{ order: OrderRecord; onExplore: () =>
       if (!active) return;
       if (!result.success || result.summary?.isEnabled !== true) { setState(result.success ? 'disabled' : 'unavailable'); return; }
       const url = personalReferralLink(result.summary);
-      setLink(url); setState(url ? 'ready' : 'unavailable');
+      setLink(url ? { url, userId: user.id, token: sessionToken } : null); setState(url ? 'ready' : 'unavailable');
     }).catch(() => { if (active) setState('unavailable'); });
     return () => { active = false; };
   }, [eligible, user?.id, sessionToken]);

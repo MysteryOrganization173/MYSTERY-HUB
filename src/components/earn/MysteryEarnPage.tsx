@@ -11,20 +11,23 @@ import { earnHeroImage } from '../../utils/earnHero';
 import { EarnSharing } from './EarnSharing';
 import { EarnMetrics, EarnNetwork, EarnRewardActivity, EarnRules } from './EarnDetails';
 import './earn.css';
+import type { PublicDataReferralPolicy } from '../../../shared/publicReferralPolicy';
 
 export interface MysteryEarnPageProps { highestActiveReferralRewardMinor?: number | null }
 
 function useEarnRules() {
   const [rules, setRules] = useState<PublicRewardRule[] | null>(null);
+  const [dataPolicy, setDataPolicy] = useState<PublicDataReferralPolicy | null>(null);
   const [error, setError] = useState(false);
   const [revision, setRevision] = useState(0);
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     let active = true;
     setError(false);
+    setRules(null); setDataPolicy(null);
     getActiveRewardRules().then(result => {
       if (!result.success || !Array.isArray(result.rules)) throw new Error('Unavailable');
-      if (active) { setRules(result.rules); setNow(Date.now()); }
+      if (active) { setRules(result.rules); setDataPolicy(result.dataPolicy ?? null); setNow(Date.now()); }
     }).catch(() => { if (active) setError(true); });
     return () => { active = false; };
   }, [revision]);
@@ -35,7 +38,7 @@ function useEarnRules() {
     const timer = window.setTimeout(() => setNow(Date.now()), Math.min(2_147_483_647, Math.min(...boundaries) - now));
     return () => window.clearTimeout(timer);
   }, [rules, now]);
-  return { rules: rules ? activeEarnRules(rules, now) : null, error, retry: () => setRevision(value => value + 1) };
+  return { rules: rules ? activeEarnRules(rules, now) : null, dataPolicy, error, retry: () => setRevision(value => value + 1) };
 }
 
 function MemberEarn({ token, name }: { token: string; name: string }) {

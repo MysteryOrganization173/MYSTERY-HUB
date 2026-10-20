@@ -256,6 +256,7 @@
 /* Rules, records, FAQ */
 .earn-rules-list { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
 .earn-rules-list li { display: grid; gap: 4px; padding: 14px; border-radius: 16px; border: 1px solid #24382e; background: #0e1815; align-content: start; }
+.earn-rules-list li[data-policy="effective-data"] { grid-column: 1 / -1; }
 .earn-rule-service { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: #8fc3a5; font-weight: 650; }
 .earn-rule-amount { font: 600 1.6rem/1.15 Outfit, sans-serif; color: #eafff2; font-variant-numeric: tabular-nums; }
 .earn-page .earn-rule-stage { font: 600 1.05rem/1.3 Outfit, sans-serif; color: #f1fff6; }

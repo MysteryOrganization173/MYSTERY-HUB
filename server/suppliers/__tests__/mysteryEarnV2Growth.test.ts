@@ -54,6 +54,7 @@ test('invitation is placed once, after tracking actions, and never fabricates a 
   assert.match(invite, /getMyReferralSummary\(sessionToken\)/); assert.match(invite, /personalReferralLink\(result.summary\)/);
   assert.match(invite, /member && state === 'ready' && message/); assert.match(invite, /when their purchases qualify/); assert.doesNotMatch(invite, /your (own )?(order|purchase) (earns|will earn)/i);
   assert.match(invite, /if \(!active\) return/); assert.match(invite, /Dismiss Mystery Earn invitation/);
+  assert.match(invite, /ownedLink\?\.userId === user\?\.id && ownedLink\?\.token === sessionToken/);
   for (const forbidden of ['publicReference}', 'recipientPhone', 'window.open', 'location.assign']) assert.ok(!invite.includes(forbidden), forbidden);
   // Lookups by reference and recovered payments carry no first-party journey.
   assert.ok(!source('src/utils/checkoutRecovery.ts').includes('journey'));
@@ -209,10 +210,10 @@ test('hero uses the approved Cloudinary artwork as decoration behind real HTML, 
 test('Data, Airtime and AFA rules never advertise the fixed public amount as the effective reward', () => {
   const data = { id: 'standard_data_acquisition_v1', service_type: 'data', purchase_stage: 'acquisition', network: null, product_key: null, reward_type: 'fixed_minor', reward_minor: 50, reward_percent_bps: null, enabled: true } as const;
   const html = renderToStaticMarkup(React.createElement(EarnRules, { rules: [data, { ...data, id: 'r', purchase_stage: 'recurring', reward_minor: 10 }], error: false, retry: () => {} }));
-  assert.ok(!html.includes('GH₵0.50') && !html.includes('GH₵0.10')); assert.match(html, /eligible margin/); assert.match(html, /not the price your friend pays/);
+  assert.ok(!html.includes('GH₵0.50') && !html.includes('GH₵0.10')); assert.match(html, /eligible margin/); assert.match(html, /not a percentage of the price your friend pays/);
   const market = renderToStaticMarkup(React.createElement(EarnRules, { rules: [{ ...data, service_type: 'marketplace' }], error: false, retry: () => {} }));
   assert.match(market, /GH₵0.50/);
-  // The effective percentages belong to a backend API that does not exist yet; nothing hardcodes them.
+  // Effective percentages come from the backend API; components never hardcode them.
   for (const file of ['src/components/earn/EarnDetails.tsx', 'src/components/earn/MysteryEarnPage.tsx', 'src/utils/earnExperience.ts']) assert.ok(!/\b(45|20) ?%/.test(source(file)), file);
 });
 test('personal first-person share message style is preserved', () => {
