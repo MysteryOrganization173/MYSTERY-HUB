@@ -10,6 +10,8 @@ export interface CloudinaryOptions {
   format?: 'auto' | 'webp' | 'png' | 'jpg';
   crop?: 'fill' | 'scale' | 'fit' | 'limit' | 'thumb' | 'pad';
   gravity?: 'auto' | 'center' | 'east' | 'west' | 'north' | 'south' | 'face';
+  /** Pixel region of the original to cut out before resizing (art-directed crops). */
+  region?: { x: number; y: number; width: number; height: number };
 }
 
 /**
@@ -29,6 +31,7 @@ export function getCloudinaryUrl(
     format = 'auto',
     crop,
     gravity,
+    region,
   } = options;
 
   const transforms: string[] = [`f_${format}`, `q_${quality}`];
@@ -37,7 +40,8 @@ export function getCloudinaryUrl(
   if (crop) transforms.push(`c_${crop}`);
   if (gravity) transforms.push(`g_${gravity}`);
 
-  const transformStr = transforms.join(',');
+  // The region crop runs first, as its own component, so the resize applies to the cut-out.
+  const transformStr = (region ? `c_crop,h_${region.height},w_${region.width},x_${region.x},y_${region.y}/` : '') + transforms.join(',');
 
   // If already transformed, return as is
   if (url.includes('/upload/f_auto') || url.includes('/upload/w_')) {
