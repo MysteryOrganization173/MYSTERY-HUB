@@ -51,7 +51,7 @@ test('invitation is placed once, after tracking actions, and never fabricates a 
   assert.ok(status.indexOf('<PostPurchaseInvite') > status.indexOf('All orders'));
   assert.ok(!source('src/components/checkout/CheckoutModal.tsx').includes('PostPurchaseInvite'));
   const invite = source('src/components/checkout/PostPurchaseInvite.tsx');
-  assert.match(invite, /getMyReferralSummary\(sessionToken\)/); assert.match(invite, /personalReferralLink\(result.summary\)/);
+  assert.match(invite, /getMyReferralSummary\(sessionToken\)/); assert.match(invite, /personalReferralLink\(result.summary, topic.path\)/);
   assert.match(invite, /member && state === 'ready' && message/); assert.match(invite, /when their purchases qualify/); assert.doesNotMatch(invite, /your (own )?(order|purchase) (earns|will earn)/i);
   assert.match(invite, /if \(!active\) return/); assert.match(invite, /Dismiss Mystery Earn invitation/);
   assert.match(invite, /ownedLink\?\.userId === user\?\.id && ownedLink\?\.token === sessionToken/);
@@ -158,6 +158,22 @@ test('invitation copy is short, matches the order and shares the matching servic
   const now = Date.parse('2026-10-18T20:00:00Z');
   assert.equal(postPurchaseInviteEligible(order(), now), true); assert.equal(postPurchaseInviteEligible(order({ journey: undefined }), now), false);
 });
+
+for (const [service, path] of [['data', '/data'], ['instant_bundle', '/data'], ['afa', '/afa'], ['airtime', '/']] as const) {
+  test(`post-purchase ${service} sharing preserves attribution at ${path}`, () => {
+    const copy = postPurchaseInviteCopy(service);
+    const topic = earnShareTopics.find(item => item.id === copy.topicId)!;
+    const url = personalReferralLink(summary, topic.path, 'https://mysterybundlehub.com')!;
+    assert.equal(new URL(url).pathname, path);
+    assert.equal(new URL(url).origin, 'https://mysterybundlehub.com');
+    assert.equal(new URL(url).searchParams.get('ref'), summary.code);
+    const message = referralShareMessage(topic, url);
+    assert.equal(new URL(referralWhatsAppUrl(message)).searchParams.get('text'), message);
+    assert.equal(personalReferralLink({ ...summary, isEnabled: false }, topic.path), null);
+    assert.equal(personalReferralLink(summary, 'https://untrusted.example/data'), null);
+    assert.equal(personalReferralLink(summary, '/unsupported-service'), null);
+  });
+}
 test('featured milestone favours a real Wallet credit over a closer badge, but claimable comes first', () => {
   const credit = badge('credit', 'successful_referrals', 10, 2, false, 100), close = badge('close', 'qualified_visitors', 10, 9);
   assert.equal(featuredMilestone([close, credit])?.id, 'credit');

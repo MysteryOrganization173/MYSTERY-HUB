@@ -10,10 +10,12 @@ import type { OrderRecord } from '../../types';
 export const PostPurchaseInvite: React.FC<{ order: OrderRecord; onExplore: () => void }> = ({ order, onExplore }) => {
   const { user, sessionToken, showToast } = useApp();
   const reference = order.publicReference || order.id;
+  const copy = postPurchaseInviteCopy(order.serviceType);
+  const topic = earnShareTopics.find(item => item.id === copy.topicId) || earnShareTopics[0];
   const [hidden, setHidden] = useState(() => postPurchaseInviteHidden(reference, safeLocalStorage()));
-  const [ownedLink, setLink] = useState<{ url: string; userId: string; token: string } | null>(null);
+  const [ownedLink, setLink] = useState<{ url: string; path: string; userId: string; token: string } | null>(null);
   // Hide the old account's link synchronously, before effect cleanup runs.
-  const link = ownedLink?.userId === user?.id && ownedLink?.token === sessionToken ? ownedLink.url : null;
+  const link = ownedLink?.userId === user?.id && ownedLink?.token === sessionToken && ownedLink?.path === topic.path ? ownedLink.url : null;
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'disabled' | 'unavailable'>('idle');
   const eligible = postPurchaseInviteEligible(order) && !hidden;
   useEffect(() => { setHidden(postPurchaseInviteHidden(reference, safeLocalStorage())); }, [reference]);
@@ -25,15 +27,13 @@ export const PostPurchaseInvite: React.FC<{ order: OrderRecord; onExplore: () =>
     getMyReferralSummary(sessionToken).then(result => {
       if (!active) return;
       if (!result.success || result.summary?.isEnabled !== true) { setState(result.success ? 'disabled' : 'unavailable'); return; }
-      const url = personalReferralLink(result.summary);
-      setLink(url ? { url, userId: user.id, token: sessionToken } : null); setState(url ? 'ready' : 'unavailable');
+      const url = personalReferralLink(result.summary, topic.path);
+      setLink(url ? { url, path: topic.path, userId: user.id, token: sessionToken } : null); setState(url ? 'ready' : 'unavailable');
     }).catch(() => { if (active) setState('unavailable'); });
     return () => { active = false; };
-  }, [eligible, user?.id, sessionToken]);
+  }, [eligible, user?.id, sessionToken, topic.path]);
   if (!eligible || state === 'disabled') return null;
   const dismiss = () => { dismissPostPurchaseInvite(reference, safeLocalStorage()); setHidden(true); };
-  const copy = postPurchaseInviteCopy(order.serviceType);
-  const topic = earnShareTopics.find(item => item.id === copy.topicId) || earnShareTopics[0];
   const message = link ? referralShareMessage(topic, link) : null;
   const nativeShare = async () => {
     if (!link) return;
