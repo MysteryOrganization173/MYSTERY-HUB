@@ -23,7 +23,6 @@ import { EcommerceTemplateView } from '../components/website/templates/Ecommerce
 import { DataResellerTemplateView, type ResellerStoreSummary } from '../components/website/templates/DataResellerTemplateView.js';
 import { NightKitchenTemplateView } from '../components/website/templates/NightKitchenTemplateView.js';
 import { BoutiqueTemplateView } from '../components/website/templates/BoutiqueTemplateView.js';
-import { DynamicTemplateRenderer } from '../components/website/DynamicTemplateRenderer.js';
 import { PersonalityTemplateView, personalityPreset } from '../components/website/templates/PersonalityTemplateView';
 import { WEBSITE_TEMPLATES, LEGACY_DEMO_BUSINESS_NAMES } from '../data/templates.js';
 import { resolveDataResellerHeroImage } from './dataResellerArtwork.js';
@@ -140,15 +139,8 @@ function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: 
     case 'retail':
       return <EcommerceTemplateView template={template} onCtaClick={onCtaClick} />;
     default: {
-      const preset = personalityPreset(layout);
-      if (preset) return <PersonalityTemplateView template={template} onCtaClick={onCtaClick} preset={preset} />;
-      return (
-        <DynamicTemplateRenderer
-          template={template}
-          onCtaClick={onCtaClick}
-          isMobileView={isMobileView}
-        />
-      );
+      // Unknown layouts get the neutral services presentation rather than the old demo renderer.
+      return <PersonalityTemplateView template={template} onCtaClick={onCtaClick} preset={personalityPreset(layout) || personalityPreset('services')!} />;
     }
   }
 }
