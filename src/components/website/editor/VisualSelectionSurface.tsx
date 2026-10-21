@@ -12,7 +12,7 @@ export type VisualSelectHint = 'settings' | 'pricing';
  */
 export function VisualSelectionSurface({targets, selected, onSelect, onOrder, focusRequest, reserveBottom = 0, children}: {targets: VisualTarget[]; selected: string | null; onSelect: (id: string | null, hint?: VisualSelectHint) => void; onOrder?: (ids: string[]) => void; focusRequest: number; reserveBottom?: number; children: React.ReactNode}) {
   const root = useRef<HTMLDivElement>(null), previous = useRef<string | null>(null), lastOrder = useRef('');
-  const [tag, setTag] = useState<{label: string; top: number; left: number} | null>(null);
+  const [tag, setTag] = useState<{label: string; top: number; left: number; below: boolean} | null>(null);
   const elementsFor = (id: string) => Array.from(root.current?.querySelectorAll<HTMLElement>('[data-visual-target]') || []).filter(e => e.dataset.visualTarget === id);
 
   useEffect(() => {
@@ -33,7 +33,10 @@ export function VisualSelectionSurface({targets, selected, onSelect, onOrder, fo
     if (!element || !label) {setTag(null); return;}
     const place = () => {
       const rect = element.getBoundingClientRect();
-      setTag({label, top: rect.top + window.scrollY, left: Math.max(4, Math.min(rect.left + window.scrollX, window.innerWidth - 160))});
+      // Near the top of the page (a header logo, the business name) the label goes under the target
+      // instead of over it, so it never hides what the owner just tapped.
+      const below = rect.top + window.scrollY < 40;
+      setTag({label, below, top: below ? rect.bottom + window.scrollY : rect.top + window.scrollY, left: Math.max(4, Math.min(rect.left + window.scrollX, window.innerWidth - 160))});
     };
     const rect = element.getBoundingClientRect(), view = window.innerHeight, visibleBottom = view * (1 - reserveBottom);
     if (rect.top < 40 || rect.bottom > visibleBottom - 12) {
@@ -78,9 +81,10 @@ export function VisualSelectionSurface({targets, selected, onSelect, onOrder, fo
 .visual-selection-surface [data-visual-target]:empty::before{content:attr(data-visual-empty);opacity:.6;font-style:italic;font-weight:500}
 .visual-selection-surface [data-visual-locked]{outline:2px dashed #94a3b8!important;outline-offset:3px}
 .visual-selected-tag{position:absolute;z-index:2147483000;transform:translateY(calc(-100% - 8px));background:#0a0e11;color:#fff;font:600 12px/1 'Plus Jakarta Sans',system-ui,sans-serif;padding:6px 9px;border-radius:8px;pointer-events:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.visual-selected-tag.is-below{transform:translateY(8px)}
 .visual-selected-tag::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#00c365;margin-right:6px;vertical-align:1px}
 @media (prefers-reduced-motion:reduce){.visual-selection-surface [data-visual-target]{transition:none}}`}</style>
     {children}
-    {tag && <div className="visual-selected-tag" aria-hidden="true" style={{top: Math.max(tag.top, 34), left: tag.left}}>{tag.label}</div>}
+    {tag && <div className={`visual-selected-tag${tag.below ? ' is-below' : ''}`} aria-hidden="true" data-tag-placement={tag.below ? 'below' : 'above'} style={{top: tag.top, left: tag.left}}>{tag.label}</div>}
   </div></VisualEditContext.Provider>;
 }

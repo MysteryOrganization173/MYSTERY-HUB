@@ -962,3 +962,6 @@ export function templateDesignLabel(template?: Pick<WebsiteTemplate, 'title' | '
   if (!template) return '';
   return template.categoryLabel ? `${template.title} design · ${template.categoryLabel}` : `${template.title} design`;
 }
+/** The blank start is a way to begin, not a design. Every "N designs" count uses this one rule. */
+export const isReadyDesign = (t: { id: string }) => t.id !== 'tmpl-start-blank';
+export function readyDesignCount(templates: { id: string }[] = WEBSITE_TEMPLATES) { return templates.filter(isReadyDesign).length; }

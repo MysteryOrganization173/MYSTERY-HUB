@@ -23,16 +23,15 @@ function LiveTemplateThumb({ template, onLive }: { template: WebsiteTemplate; on
   useEffect(() => {
     const el = box.current; if (!el || typeof IntersectionObserver === 'undefined' || typeof ResizeObserver === 'undefined') return;
     const io = new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) { setVisible(true); io.disconnect(); } }, { rootMargin: '200px' });
-    // On a phone the design shows inside a phone-shaped screen, so more of it fits in the card than a full-width crop.
-    const ro = new ResizeObserver(() => { const width = Math.max(360, window.innerWidth), phone = width < 768; setFrame({ width, phone, scale: el.clientWidth * (phone ? 0.56 : 1) / width }); });
+    // V5.1: on a phone the design's phone layout fills the whole card width (it was shrunk into a 56% phone
+    // frame with blurred borders), so its header, photo and headline are big enough to recognise.
+    const ro = new ResizeObserver(() => { const width = Math.max(360, window.innerWidth), phone = width < 768; setFrame({ width: phone ? 390 : width, phone, scale: el.clientWidth / (phone ? 390 : width) }); });
     io.observe(el); ro.observe(el);
     return () => { io.disconnect(); ro.disconnect(); };
   }, []);
   useEffect(() => { if (visible && frame.scale) onLive(frame.phone); }, [visible, frame.scale, frame.phone]);
   const page = visible && frame.scale > 0 && <div className="template-card-live-frame" style={{ width: frame.width, transform: `scale(${frame.scale})` }}>{renderTemplateLayout(template)}</div>;
-  return <div ref={box} className={`template-card-live${frame.phone ? ' is-phone' : ''}`} aria-hidden="true" inert>
-    {frame.phone ? page && <div className="template-card-live-screen">{page}</div> : page}
-  </div>;
+  return <div ref={box} className={`template-card-live${frame.phone ? ' is-phone' : ''}`} aria-hidden="true" inert>{page}</div>;
 }
 
 /**
@@ -57,7 +56,7 @@ export const TemplateCardPreview: React.FC<TemplateCardPreviewProps> = ({
       className={`template-card group ${isStartBlank ? 'template-card-blank' : ''}`}
       style={{ '--template-accent': accent } as React.CSSProperties}
     >
-      <div className="template-card-media">
+      <div className={`template-card-media${phoneLive ? ' is-phone-live' : ''}`}>
         {isStartBlank ? (
           <div className="template-card-blueprint" aria-hidden="true">
             <span className="template-card-blueprint-bar">{t.demoBusinessName}</span>
@@ -68,9 +67,9 @@ export const TemplateCardPreview: React.FC<TemplateCardPreviewProps> = ({
           </div>
         ) : (
           <>
-            {(!live || phoneLive) && (t.heroImage ? <SafeImage className="template-card-photo" src={t.heroImage} alt="" loading="lazy" /> : <span className="template-card-photo" />)}
+            {!live && (t.heroImage ? <SafeImage className="template-card-photo" src={t.heroImage} alt="" loading="lazy" /> : <span className="template-card-photo" />)}
             <LiveTemplateThumb template={t} onLive={phone => { setLive(true); setPhoneLive(phone); }} />
-            {(!live || phoneLive) && <span className={`template-card-shade${phoneLive ? ' is-backdrop' : ''}`} aria-hidden="true" />}
+            {!live && <span className="template-card-shade" aria-hidden="true" />}
             <span className={`template-card-sample${live ? ' is-live' : ''}`}>
               <span className="template-card-sample-label">{live ? 'Live design · sample content' : 'Sample'}</span>
               {!live && <span className="template-card-sample-name">{t.demoBusinessName}</span>}

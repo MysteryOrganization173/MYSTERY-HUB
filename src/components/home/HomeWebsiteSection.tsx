@@ -1,13 +1,13 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { orderedWebsiteTemplates } from '../../data/templates';
+import { orderedWebsiteTemplates, isReadyDesign } from '../../data/templates';
 import { TemplateCardPreview } from '../website/TemplateCardPreview';
 import { Globe, ArrowRight, Check, Eye } from 'lucide-react';
 
 export const HomeWebsiteSection: React.FC = () => {
   const { setActivePage, openTemplatePreview } = useApp();
   // Actual existing templates and Cloudinary artwork, never a fabricated screenshot.
-  const designs = orderedWebsiteTemplates().filter(t => t.id !== 'tmpl-start-blank');
+  const designs = orderedWebsiteTemplates().filter(isReadyDesign);
   const template = designs.find(t => t.id === 'tmpl-data-reseller') || designs[0];
   const more = designs.filter(t => t.id !== template?.id).slice(0, 4);
   return (

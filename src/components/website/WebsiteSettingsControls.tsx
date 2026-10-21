@@ -12,7 +12,7 @@ import { getWebsiteTemplatePlan, restoreWebsiteDraft } from '../../services/webs
 import { historyDate } from './editor/WebsiteLayoutAndHistory';
 import './websiteBuilder.css';
 
-export function WebsiteSettingsControls({site,token,onUpdated,onDeleted,requestedTemplateId,selectionOnly,onClosed,onResolve}:{site:WebsiteSiteRecord;token:string;onUpdated:(site:WebsiteSiteRecord)=>void;onDeleted:(siteId:string)=>void;requestedTemplateId?:string;selectionOnly?:boolean;onClosed?:()=>void;onResolve?:(tab:'Orders'|'Store Earnings')=>void}) {
+export function WebsiteSettingsControls({site,token,onUpdated,onDeleted,requestedTemplateId,selectionOnly,onClosed,onResolve,withdrawalMinimumMinor,onUnpublish}:{site:WebsiteSiteRecord;token:string;onUpdated:(site:WebsiteSiteRecord)=>void;onDeleted:(siteId:string)=>void;requestedTemplateId?:string;selectionOnly?:boolean;onClosed?:()=>void;onResolve?:(tab:'Orders'|'Store Earnings')=>void;withdrawalMinimumMinor?:number;onUnpublish?:()=>Promise<boolean>}) {
   const [mode,setMode]=useState<'template'|'delete'|null>(null),[target,setTarget]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const dialog=useRef<HTMLDialogElement>(null);
   // The server's plan is authoritative: the exact resulting draft, the live design and history room.
@@ -31,12 +31,17 @@ export function WebsiteSettingsControls({site,token,onUpdated,onDeleted,requeste
   const earlier=plan?.recoverable?.[0];
   const historyFull=plan?.checkpointSlotsRemaining===0;
   const liveTitle=plan?.publishedTemplateId ? getTemplateById(plan.publishedTemplateId).title : '';
-  return <div className="sm:col-span-2 space-y-4 pt-3 border-t border-slate-800">
+  const current=getTemplateById(site.template_id);
+  return <div className={selectionOnly?'':'website-settings-list'} data-website-settings>
     {!selectionOnly&&<>
-    <button type="button" onClick={()=>setMode('template')} className="px-4 py-2 rounded-xl bg-slate-800 text-white font-semibold">Change your design</button>
-    <section className="website-danger-zone" aria-labelledby="website-danger-title"><strong id="website-danger-title">Danger Zone</strong><p>Delete this website to free your Free website slot and start again with a new name and address. Your account, Wallet, Mystery Earn and order records stay.</p><button type="button" onClick={()=>setMode('delete')}>Delete website…</button></section>
+    {/* V5.1: the Settings tab shows these directly; there is no second "open settings" step. */}
+    <section className="website-settings-row" aria-labelledby="website-settings-design">
+      <div className="min-w-0"><h3 id="website-settings-design">Design</h3><p>{current.title}{current.categoryLabel?` · ${current.categoryLabel}`:''}. Your name, contact details, photos and website address stay when you change design. You see a preview before anything changes.</p></div>
+      <button type="button" onClick={()=>setMode('template')}>Change design</button>
+    </section>
+    <section className="website-danger-zone" aria-labelledby="website-danger-title"><strong id="website-danger-title">Delete website</strong><p>Frees your Free website slot so you can start again with a new name and address. Your account, Wallet, Mystery Earn, earnings and order records stay.</p><button type="button" onClick={()=>setMode('delete')}>Delete website…</button></section>
     </>}
-    {mode==='delete' && <WebsiteDeleteSheet onResolve={onResolve?tab=>{setMode(null);onResolve(tab);}:undefined} site={site} token={token} onClose={()=>setMode(null)} onDeleted={id=>{setMode(null);onDeleted(id);}}/>}
+    {mode==='delete' && <WebsiteDeleteSheet onResolve={onResolve?tab=>{setMode(null);onResolve(tab);}:undefined} site={site} token={token} withdrawalMinimumMinor={withdrawalMinimumMinor} onUnpublish={onUnpublish} onClose={()=>setMode(null)} onDeleted={id=>{setMode(null);onDeleted(id);}}/>}
     {mode==='template' && <dialog ref={dialog} onCancel={event=>{event.preventDefault();close();}} aria-labelledby="website-settings-action" className="website-sheet">
       <div className="website-sheet-head">
         <div className="min-w-0 flex-1"><h2 id="website-settings-action">{summary ? `Switch to ${summary.target.title}?` : 'Choose a new design'}</h2>
