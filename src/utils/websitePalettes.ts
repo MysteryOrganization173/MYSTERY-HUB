@@ -13,4 +13,3 @@ export const WEBSITE_PALETTES: readonly WebsitePalette[] = Object.freeze([
   { name: 'Charcoal lime', backgroundColor: '#111315', primaryColor: '#1b1f22', accentColor: '#a3e635' },
 ]);
 export const paletteIsReadable = (p: WebsitePalette) => websiteContrast(websiteActionText(p.accentColor), p.accentColor) >= 4.5 && websiteContrast(p.accentColor, p.backgroundColor) >= 3;
-
