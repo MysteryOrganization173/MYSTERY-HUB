@@ -249,6 +249,7 @@ export const TemplatePreviewModal: React.FC = () => {
     const layout = (t.layoutType || t.category || '').toLowerCase();
     switch (layout) {
       case 'restaurant':
+      case 'nightkitchen':
         return <Utensils className="w-3.5 h-3.5" />;
       case 'construction':
         return <HardHat className="w-3.5 h-3.5" />;
@@ -265,6 +266,7 @@ export const TemplatePreviewModal: React.FC = () => {
         return <Palmtree className="w-3.5 h-3.5" />;
       case 'ecommerce':
       case 'retail':
+      case 'boutique':
         return <ShoppingBag className="w-3.5 h-3.5" />;
       case 'education':
         return <GraduationCap className="w-3.5 h-3.5" />;

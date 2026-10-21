@@ -97,6 +97,8 @@ export type TemplateLayoutType =
   | 'fashion'
   | 'services'
   | 'reseller'
+  | 'nightkitchen'
+  | 'boutique'
   | 'blank';
 
 export interface SiteSocialLinks {

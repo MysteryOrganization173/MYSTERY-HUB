@@ -105,6 +105,8 @@ export interface UpdateWebsiteInput {
 export const VALID_TEMPLATE_IDS = new Set<string>([
   'tmpl-start-blank',
   'tmpl-buka-bistro',
+  'tmpl-night-kitchen',
+  'tmpl-boutique',
   'tmpl-data-reseller',
   'tmpl-accra-build',
   'tmpl-glow-salon',

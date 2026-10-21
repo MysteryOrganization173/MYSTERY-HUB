@@ -13,7 +13,8 @@ import type {SiteContent} from '../../../src/types';
 const composition=createWebsiteComposition(['header','hero','products','gallery','testimonials','footer']);
 for(const section of composition.sections)section.data={heading:'Old restaurant only',image:'https://example.test/restaurant.jpg',items:[{title:'Jollof',image:'https://example.test/food.jpg'}]};
 const content:SiteContent={businessName:'Ama Business',logoUrl:'https://example.test/logo.png',phone:'0241234567',whatsapp:'0551234567',email:'ama@example.test',location:'Tema',social:{instagram:'ama'},tagline:'Restaurant food only',aboutText:'Restaurant story only',heroImage:'https://example.test/old-food.jpg',ctaLabel:'Book a table',ctaTarget:'https://example.test/restaurant-booking',items:[{id:'dish',name:'Jollof',image:'https://example.test/food.jpg'}],features:['Old restaurant only'],stats:[{label:'Meals',value:'100'}],composition};
-for(const target of WEBSITE_TEMPLATES.filter(t=>t.id!=='tmpl-buka-bistro'))test(`cross-industry migration to ${target.id} preserves identity and resets semantic content`,()=>{
+// Night Kitchen shares the restaurant content family; websiteV5Flagships covers that switch.
+for(const target of WEBSITE_TEMPLATES.filter(t=>t.id!=='tmpl-buka-bistro'&&t.contentFamily!=='restaurant'))test(`cross-industry migration to ${target.id} preserves identity and resets semantic content`,()=>{
  const before=structuredClone(content),next=migrateWebsiteTemplate(content,'tmpl-buka-bistro',target.id);
  for(const key of ['businessName','logoUrl','phone','whatsapp','email','location','social'] as const)assert.deepEqual(next[key],content[key]);
  assert.equal(next.heroImage,target.id==='tmpl-data-reseller'?DATA_RESELLER_STARTER_HERO_IMAGE:'');assert.equal(next.tagline,'');assert.equal(next.aboutText,'');assert.equal(next.ctaTarget,'');

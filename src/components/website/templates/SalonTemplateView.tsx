@@ -311,7 +311,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
           </div>
         </div>
         <div className="border-t border-pink-900/40 mt-8 pt-4 text-center text-pink-300/60 text-[10px]">
-          © 2026 {template.demoBusinessName}. Powered by Mystery Hub Sites Ghana.
+          © {new Date().getFullYear()} {template.demoBusinessName}.
         </div>
       </footer>
     </div>

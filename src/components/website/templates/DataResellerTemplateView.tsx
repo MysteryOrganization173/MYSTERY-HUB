@@ -5,6 +5,7 @@ import { SafeImage } from '../SafeImage.js';
 import React, { useMemo, useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
 import { ArrowRight, MessageCircle, Phone, MapPin, ShieldCheck, Search, Smartphone } from 'lucide-react';
+import { resolveWebsiteSections } from '../../../config/websiteContentV5';
 import { getCloudinarySrcSet } from '../../../utils/cloudinary';
 import { resolveDataResellerHeroImage } from '../../../utils/dataResellerArtwork';
 import { DATA_BUNDLES } from '../../../data/bundles';
@@ -89,14 +90,11 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
   const line = p.hairline || p.border;
   const surface = { backgroundColor: p.surface, borderColor: line, color: p.surfaceText };
   const year = new Date().getFullYear();
+  // Owners can hide or reorder the optional parts; the header, banner, bundles and footer always stay.
+  const sections = resolveWebsiteSections('reseller', template.siteContent?.sections);
+  const helpVisible = sections.find(section => section.id === 'help')?.visible !== false;
 
-  return (
-    <div
-      className="reseller-storefront min-h-full font-sans antialiased flex flex-col selection:bg-[var(--website-accent)] selection:text-[var(--website-on-accent)]"
-      style={{ backgroundColor: p.background, color: p.text, '--website-accent': p.accent, '--website-on-accent': onAccent, '--website-focus': p.focus, '--website-placeholder': p.mutedText, '--store-surface': p.surface, '--store-border': line } as React.CSSProperties}
-    >
-      <style>{RESELLER_STORE_CSS}</style>
-
+  const headerNode = <React.Fragment key="header">
       {/* 1. The store's own identity: its logo or monogram, its name and what it sells. */}
       <header className="store-header" style={{ backgroundColor: `${p.background}eb`, borderColor: line, color: p.text }}>
         <div className="store-wrap store-header-inner">
@@ -114,7 +112,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           <nav aria-label="Store" className="store-nav">
             <a href="#bundle-catalog">Bundles</a>
             {managedCheckout && <a href="#store-track">Track order</a>}
-            <a href="#store-help">Help</a>
+            {helpVisible && <a href="#store-help">Help</a>}
           </nav>
           {whatsapp && (
             <button type="button" {...edit('content:whatsapp')} data-website-event="whatsapp_click" onClick={handleChatWhatsapp}
@@ -125,7 +123,8 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           )}
         </div>
       </header>
-
+  </React.Fragment>;
+  const heroNode = <React.Fragment key="hero">
       {/* 2. Hero: the owner's artwork leads, then the promise, the way in and the networks on sale. */}
       <section className="store-wrap store-hero" aria-labelledby="store-hero-title">
         <div {...edit('content:heroImage')} className="store-art" style={{ borderColor: line, backgroundColor: p.surface }}>
@@ -162,14 +161,16 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           )}
         </div>
       </section>
-
+  </React.Fragment>;
+  const pickerNode = <React.Fragment key="picker">
       {/* 3. Shop by network: real counts and lowest prices, one tap from the catalogue. */}
       {picker.length > 1 && (
         <section className="store-wrap store-picker-wrap" aria-label="Shop by network">
           <NetworkPicker networks={picker} theme={p} onPick={pickNetwork} example={!managedCheckout && !owner} />
         </section>
       )}
-
+  </React.Fragment>;
+  const catalogueNode = <React.Fragment key="catalogue">
       {/* 4. Catalogue: managed checkout on a live store; labelled examples in the gallery. */}
       <main id="bundle-catalog" className="store-wrap store-section flex-1 scroll-mt-20">
         <div className="store-section-head">
@@ -199,7 +200,8 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           </>
         ))}
       </main>
-
+  </React.Fragment>;
+  const stepsNode = <React.Fragment key="steps">
       {/* 5. What happens after payment, in the order it happens. */}
       <section className="store-wrap store-section" aria-labelledby="store-steps-title">
         <div className="store-card store-steps-card" style={surface}>
@@ -207,7 +209,8 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           <HowBuyingWorks theme={p} managed={!!managedCheckout || !owner} />
         </div>
       </section>
-
+  </React.Fragment>;
+  const helpNode = <React.Fragment key="help">
       {/* 6. Help: the store owner is the customer's first contact. */}
       <section id="store-help" className="store-wrap store-section scroll-mt-20" aria-labelledby="store-help-title">
         <div className="store-card store-help" style={surface}>
@@ -223,7 +226,8 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           </div>
         </div>
       </section>
-
+  </React.Fragment>;
+  const footerNode = <React.Fragment key="footer">
       {/* 7. Footer: the business's details, its pages, and who runs payments and delivery. */}
       <footer className="store-footer" style={{ backgroundColor: p.surface, borderColor: line, color: p.surfaceText }}>
         <div className="store-wrap store-footer-grid text-sm">
@@ -237,7 +241,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             <ul className="store-footer-links">
               <li><a href="#bundle-catalog">Data bundles</a></li>
               {managedCheckout && <li><a href="#store-track">Track an order</a></li>}
-              <li><a href="#store-help">Help</a></li>
+              {helpVisible && <li><a href="#store-help">Help</a></li>}
             </ul>
           </div>
           <div>
@@ -254,6 +258,17 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
         </div>
         <div className="store-wrap store-footer-base" style={{ color: p.surfaceMutedText, borderColor: line }}>© {year} {businessName}</div>
       </footer>
+  </React.Fragment>;
+  const nodes: Record<string, React.ReactNode> = { header: headerNode, hero: heroNode, picker: pickerNode, catalogue: catalogueNode, steps: stepsNode, help: helpNode, footer: footerNode };
+
+  return (
+    <div
+      className="reseller-storefront min-h-full font-sans antialiased flex flex-col selection:bg-[var(--website-accent)] selection:text-[var(--website-on-accent)]"
+      style={{ backgroundColor: p.background, color: p.text, '--website-accent': p.accent, '--website-on-accent': onAccent, '--website-focus': p.focus, '--website-placeholder': p.mutedText, '--store-surface': p.surface, '--store-border': line } as React.CSSProperties}
+    >
+      <style>{RESELLER_STORE_CSS}</style>
+
+      {sections.map(section => section.visible ? nodes[section.id] : null)}
     </div>
   );
 };

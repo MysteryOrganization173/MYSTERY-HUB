@@ -379,7 +379,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
           </div>
         </div>
         <div className="border-t border-slate-800 mt-8 pt-4 text-center text-slate-500 text-[10px]">
-          © 2026 {template.demoBusinessName}. Powered by Mystery Hub Sites Ghana.
+          © {new Date().getFullYear()} {template.demoBusinessName}.
         </div>
       </footer>
     </div>

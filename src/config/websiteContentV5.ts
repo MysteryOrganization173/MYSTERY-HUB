@@ -80,8 +80,12 @@ export function defaultWebsiteHours(): WebsiteHours {
  * Hidden sections keep their content; navigation only links to visible sections.
  * ------------------------------------------------------------------------------------------- */
 export interface WebsiteSectionDef { id: string; label: string; essential?: boolean; nav?: string }
-export const WEBSITE_SECTION_REGISTRY: Record<string, readonly WebsiteSectionDef[]> = {};
-export function registerWebsiteSections(layout: string, sections: readonly WebsiteSectionDef[]) { WEBSITE_SECTION_REGISTRY[layout] = sections; }
+const S = (id: string, label: string, extra: Partial<WebsiteSectionDef> = {}): WebsiteSectionDef => ({ id, label, ...extra });
+export const WEBSITE_SECTION_REGISTRY: Readonly<Record<string, readonly WebsiteSectionDef[]>> = Object.freeze({
+  reseller: [S('header', 'Header', { essential: true }), S('hero', 'Banner and promise', { essential: true }), S('picker', 'Shop by network'), S('catalogue', 'Bundles and checkout', { essential: true }), S('steps', 'How buying works'), S('help', 'Help', { nav: 'Help' }), S('footer', 'Footer', { essential: true })],
+  nightkitchen: [S('header', 'Header', { essential: true }), S('hero', 'Opening photo', { essential: true }), S('picks', 'Owner’s picks'), S('menu', 'Menu and ordering', { essential: true, nav: 'Menu' }), S('gallery', 'Photo gallery'), S('hours', 'Opening hours', { nav: 'Hours' }), S('findus', 'Find us', { nav: 'Find us' }), S('enquiry', 'Table enquiry'), S('footer', 'Footer', { essential: true })],
+  boutique: [S('header', 'Header', { essential: true }), S('hero', 'Opening photos', { essential: true }), S('collection', 'Products and ordering', { essential: true, nav: 'Shop' }), S('gallery', 'Photo gallery'), S('policies', 'Delivery, payment & returns', { nav: 'Delivery' }), S('visit', 'Visit or contact', { nav: 'Visit' }), S('footer', 'Footer', { essential: true })],
+});
 
 /** The ordered, visible sections a renderer should draw. Unknown ids are ignored. */
 export function resolveWebsiteSections(layout: string, layoutState?: WebsiteSectionLayout): Array<WebsiteSectionDef & { visible: boolean }> {
@@ -92,6 +96,10 @@ export function resolveWebsiteSections(layout: string, layoutState?: WebsiteSect
   const hidden = new Set((layoutState?.hidden || []).filter(id => movable.includes(id)));
   let next = 0;
   // Essential sections keep their declared position; the movable ones fill the slots between them.
-  return defs.map(def => def.essential ? { ...def, visible: true } : { ...defs.find(d => d.id === ordered[next++])!, visible: !hidden.has(ordered[next - 1]) });
+  return defs.map(def => {
+    if (def.essential) return { ...def, visible: true };
+    const id = ordered[next++];
+    return { ...defs.find(d => d.id === id)!, visible: !hidden.has(id) };
+  });
 }
 export const websiteSectionVisible = (layout: string, id: string, layoutState?: WebsiteSectionLayout) => resolveWebsiteSections(layout, layoutState).find(s => s.id === id)?.visible ?? true;

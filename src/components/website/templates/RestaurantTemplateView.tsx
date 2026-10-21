@@ -337,7 +337,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
           </div>
         </div>
         <div className="border-t border-white/10 mt-8 pt-4 text-center text-slate-500 text-[10px]">
-          © 2026 {template.demoBusinessName}. Built on Mystery Hub Sites Ghana.
+          © {new Date().getFullYear()} {template.demoBusinessName}.
         </div>
       </footer>
     </div>

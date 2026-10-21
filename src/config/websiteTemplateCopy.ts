@@ -113,6 +113,26 @@ export const TEMPLATE_COPY: Record<string, Slots> = {
     itemsHeading: s('Products heading', 'Trending Hardware & Gadgets', 'Our products'),
     itemsIntro: intro('Products introduction', 'Contact the business to confirm current stock and delivery options.'),
   },
+  nightkitchen: {
+    eyebrow: s('Line above the heading', 'Lunch and dinner', 'Cooked fresh', 50),
+    primary: s('Main page button', 'Order on WhatsApp', undefined, 40),
+    picksEyebrow: s('Picks label', 'Owner’s picks', undefined, 50),
+    picksHeading: s('Picks heading', 'Start here'),
+    menuHeading: s('Menu heading', 'Menu'),
+    menuIntro: intro('Menu introduction', 'Add dishes to your order, then send it on WhatsApp. We confirm prices, pickup or delivery with you.'),
+    hoursHeading: s('Hours heading', 'Hours'),
+    findHeading: s('Find us heading', 'Find us'),
+    enquiryHeading: s('Table enquiry heading', 'Coming with a group?'),
+  },
+  boutique: {
+    eyebrow: s('Line above the heading', 'New this week', 'The collection', 50),
+    primary: s('Main page button', 'Shop the collection', undefined, 40),
+    secondary: s('Second page button', 'Visit or ask', undefined, 40),
+    collectionHeading: s('Products heading', 'The collection'),
+    collectionIntro: intro('Products introduction', 'Tap a product for photos and options. Order on WhatsApp and we confirm stock and delivery.'),
+    policiesHeading: s('Policies heading', 'Delivery, payment & returns'),
+    visitHeading: s('Visit heading', 'Visit or ask'),
+  },
   // Data stores: the storefront's own wording. Bundles, prices, payment and delivery notices stay platform-managed.
   reseller: {
     brand: s('Line under your name', 'Data bundle store', undefined, 50),

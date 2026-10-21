@@ -21,6 +21,8 @@ import { TechAgencyTemplateView } from '../components/website/templates/TechAgen
 import { HotelTemplateView } from '../components/website/templates/HotelTemplateView.js';
 import { EcommerceTemplateView } from '../components/website/templates/EcommerceTemplateView.js';
 import { DataResellerTemplateView, type ResellerStoreSummary } from '../components/website/templates/DataResellerTemplateView.js';
+import { NightKitchenTemplateView } from '../components/website/templates/NightKitchenTemplateView.js';
+import { BoutiqueTemplateView } from '../components/website/templates/BoutiqueTemplateView.js';
 import { DynamicTemplateRenderer } from '../components/website/DynamicTemplateRenderer.js';
 import { PersonalityTemplateView, personalityPreset } from '../components/website/templates/PersonalityTemplateView';
 import { WEBSITE_TEMPLATES, LEGACY_DEMO_BUSINESS_NAMES } from '../data/templates.js';
@@ -115,6 +117,10 @@ function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: 
   switch (layout) {
     case 'reseller':
       return <DataResellerTemplateView template={template} onCtaClick={onCtaClick} managedCheckout={options?.managedCheckout} managedAvailability={options?.managedAvailability} managedSummary={options?.managedSummary} />;
+    case 'nightkitchen':
+      return <NightKitchenTemplateView template={template} onCtaClick={onCtaClick} />;
+    case 'boutique':
+      return <BoutiqueTemplateView template={template} onCtaClick={onCtaClick} />;
     case 'restaurant':
       return <RestaurantTemplateView template={template} onCtaClick={onCtaClick} />;
     case 'construction':
