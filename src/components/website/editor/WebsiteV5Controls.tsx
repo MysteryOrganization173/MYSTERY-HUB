@@ -1,5 +1,7 @@
-import React, { useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Eye, EyeOff, Lock, Plus, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { websiteBusinessRequest } from '../../../services/websiteBusinessApi';
+import { formatGhs } from '../../../../shared/money';
+import { ArrowDown, ArrowUp, Eye, EyeOff, Lock, Plus, Star, X } from 'lucide-react';
 import type { SiteSettings, TemplateItem } from '../../../types';
 import { SafeImage } from '../SafeImage';
 import { WebsiteImageField } from './WebsiteImageField';
@@ -104,6 +106,28 @@ export function WebsiteGalleryControl({ gallery, siteId, token, onChange }: { ga
     {photos.length < WEBSITE_V5_LIMITS.gallery && (adding
       ? <WebsiteImageField label="Add a gallery photo" value="" siteId={siteId} token={token} onChange={url => { if (url) onChange([...photos, url]); setAdding(false); }} />
       : <button type="button" className="visual-secondary-button" onClick={() => setAdding(true)}><Plus size={16} />Add a photo</button>)}
+  </section>;
+}
+
+/* ------------------------------------------------------------------ Featured bundles (Signal) */
+
+/**
+ * Owner's picks for a Data store: shown first under "Featured" on the store. Only bundles the server says are
+ * on sale can be picked, and the store drops any pick that stops being on sale, so a pick never shows a stale price.
+ */
+export function WebsiteFeaturedBundlesControl({ siteId, token, value, onChange }: { siteId: string; token: string; value?: string[]; onChange: (next: string[]) => void }) {
+  const [products, setProducts] = useState<any[] | null>(null), [error, setError] = useState('');
+  useEffect(() => { let live = true; websiteBusinessRequest(`websites/${siteId}/bundles`, token).then((r: any) => { if (live) setProducts((r?.products || []).filter((p: any) => p.eligible)); }).catch((e: Error) => { if (live) setError(e.message); }); return () => { live = false; }; }, [siteId, token]);
+  const picks = (value || []).filter(id => !products || products.some(p => p.id === id));
+  const toggle = (id: string) => onChange(picks.includes(id) ? picks.filter(x => x !== id) : [...picks, id].slice(0, WEBSITE_V5_LIMITS.pinnedBundles));
+  return <section className="space-y-3" aria-labelledby="featured-bundles-title" data-featured-bundles>
+    <div><h3 id="featured-bundles-title" className="font-bold text-sm text-white">Featured bundles</h3><p className="text-xs text-slate-400 mt-1">Pick up to {WEBSITE_V5_LIMITS.pinnedBundles} bundles to show first under "Featured". Only bundles on sale can be featured. {picks.length} of {WEBSITE_V5_LIMITS.pinnedBundles} picked.</p></div>
+    {error ? <p role="alert" className="text-sm text-rose-300">{error}</p> : !products ? <p role="status" className="text-sm text-slate-400">Loading your bundles…</p> : !products.length ? <p className="text-sm text-slate-400">No bundles are on sale yet. Set prices in Bundles &amp; pricing first.</p> :
+      <ul className="grid gap-2">{products.map(p => { const on = picks.includes(p.id), full = !on && picks.length >= WEBSITE_V5_LIMITS.pinnedBundles; return <li key={p.id}>
+        <button type="button" aria-pressed={on} disabled={full} onClick={() => toggle(p.id)} className={`w-full min-h-11 flex items-center gap-3 px-3 py-2 rounded-xl border text-left text-sm disabled:opacity-40 ${on ? 'border-emerald-500 bg-emerald-500/10 text-white' : 'border-slate-700 text-slate-200'}`}>
+          <Star size={16} aria-hidden="true" className={on ? 'text-emerald-300 fill-emerald-300' : 'text-slate-500'} />
+          <span className="flex-1 min-w-0">{p.networkName} {p.dataAmount}</span><span className="text-slate-400">{formatGhs(p.retailMinor)}</span>
+        </button></li>; })}</ul>}
   </section>;
 }
 

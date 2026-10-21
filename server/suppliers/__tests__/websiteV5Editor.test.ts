@@ -90,3 +90,11 @@ test('phone photos are resized before upload; small images and unsupported brows
   await assert.rejects(prepareWebsiteImage(new File([new Uint8Array(2000)],'b.jpg',{type:'image/jpeg'}),1000));
   assert.match(readFileSync('src/components/website/editor/WebsiteImageField.tsx','utf8'),/prepareWebsiteImage\(original,limits\.maxBytes\)/);
 });
+
+test('Data owners pick featured bundles from what is on sale, within the limit, saved as site content',()=>{
+  const controls=readFileSync('src/components/website/editor/WebsiteV5Controls.tsx','utf8'),editor=readFileSync('src/components/website/editor/WebsiteEditor.tsx','utf8');
+  assert.match(controls,/filter\(\(p: any\) => p\.eligible\)/,'only bundles on sale');
+  assert.match(controls,/\.slice\(0, WEBSITE_V5_LIMITS\.pinnedBundles\)/);
+  assert.match(editor,/<WebsiteFeaturedBundlesControl siteId=\{currentSite\.id\} token=\{sessionToken\} value=\{content\.pinnedBundles\}/);
+  assert.match(readFileSync('src/components/website/ManagedDataStorefront.tsx','utf8'),/pinnedBundles\|\|\[\]\)\.filter\(id=>bundles\.some\(b=>b\.id===id/,'the store drops picks that are no longer on sale');
+});

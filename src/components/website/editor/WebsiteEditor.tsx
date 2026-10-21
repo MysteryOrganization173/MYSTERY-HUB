@@ -13,7 +13,7 @@ import { useApp } from '../../../context/AppContext';
 import { WebsiteSectionsControl } from './WebsiteSectionsControl';
 import { SafeImage } from '../SafeImage';
 import { WebsiteItemPanel } from './WebsiteItemPanel';
-import { WebsiteGalleryControl, WebsiteHoursControl, WebsiteImageDetails, WebsitePageSectionsControl, WebsitePaletteControl, WebsitePoliciesControl } from './WebsiteV5Controls';
+import { WebsiteFeaturedBundlesControl, WebsiteGalleryControl, WebsiteHoursControl, WebsiteImageDetails, WebsitePageSectionsControl, WebsitePaletteControl, WebsitePoliciesControl } from './WebsiteV5Controls';
 import { applyUndo, pushUndo, undoDiff, undoLabel, type UndoDraft, type UndoEntry } from '../../../utils/websiteUndo';
 import { WEBSITE_SECTION_REGISTRY } from '../../../config/websiteContentV5';
 import { websitePublishChanges } from '../../../utils/websitePublishChanges';
@@ -888,6 +888,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               <h3 className="font-bold text-white">Your bundles & pricing</h3>
               <p className="text-sm text-slate-400">Choose which bundles appear on your store and set your selling prices. Your work here will be saved before opening pricing.</p>
               <button type="button" className="min-h-11 px-4 py-3 rounded-xl bg-emerald-500 text-black font-bold" disabled={isSaving||isPublishing} onClick={async()=>{if(isDirty && !(await handleSaveDraft()))return;(onOpenPricing||onClose)();}}>Open Bundles &amp; Pricing</button>
+              <WebsiteFeaturedBundlesControl siteId={currentSite.id} token={sessionToken} value={content.pinnedBundles} onChange={next=>changeContent({pinnedBundles:next.length?next:undefined})} />
             </div>}
 
             {/* 6. CALL TO ACTION SECTION */}
