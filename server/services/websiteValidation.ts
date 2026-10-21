@@ -1,6 +1,7 @@
 import { SECTION_REGISTRY, sectionEligible, resolveWebsitePlan, type WebsiteComposition, type WebsiteSectionType, type SectionData, type UltraEnquiryInput } from '../../src/config/websiteBuilder.js';
 import { sanitizeUrl } from '../types/website.js';
 import { TEMPLATE_COPY } from '../../src/config/websiteTemplateCopy.js';
+import { WEBSITE_V5_LIMITS as V5, WEBSITE_POLICY_KEYS, isWebsiteTime, isFocal, type WebsiteHours, type WebsitePolicies, type WebsiteSectionLayout, type WebsiteImageMeta } from '../../src/config/websiteContentV5.js';
 export class WebsiteInputError extends Error {}
 function fail(message: string): never { throw new WebsiteInputError(message); }
 function object(value: unknown): Record<string, unknown> {
@@ -64,7 +65,8 @@ export function validateWebsiteComposition(value: unknown, userId: string): Webs
 export function validateWebsiteContentPatch(value: unknown): void {
   if (value === undefined) return;
   const content = object(value);
-  keys(content, ['starterVersion','layoutMode','composition','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','social','items','stats','features','copy']);
+  keys(content, ['starterVersion','layoutMode','composition','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','social','items','stats','features','copy',...WEBSITE_V5_CONTENT_KEYS]);
+  websiteV5Fields(content);
   if(content.starterVersion!==undefined && content.starterVersion!==1)fail('Unsupported starter version.');
   if(content.layoutMode !== undefined && !['template','sections'].includes(content.layoutMode as string))fail('Invalid website layout mode.');
   const limits = { businessName:100, tagline:150, aboutText:2000, location:150, phone:30, whatsapp:30, email:100, ctaLabel:50 };
@@ -113,7 +115,8 @@ export function validateWebsiteContentPatch(value: unknown): void {
     if (!Array.isArray(content.items) || content.items.length > 50) fail('Too many business items.');
     const ids=new Set<string>();
     for (const raw of content.items) {
-      const item = object(raw); keys(item,['id','name','price','category','network','desc','tag','image','isExample']);
+      const item = object(raw); keys(item,['id','name','price','category','network','desc','tag','image','isExample','images','label','pinned','alt','focal','options']);
+      websiteV5ItemFields(item);
       if(item.isExample!==undefined && typeof item.isExample!=='boolean')fail('Invalid example status.');
       if(item.isExample===true && (typeof item.id!=='string'||!item.id.trim()))fail('Example items require a stable id.');
       if(typeof item.id==='string'){if(ids.has(item.id))fail('Duplicate business item id.');ids.add(item.id);}
@@ -131,4 +134,76 @@ export function validateUltraEnquiry(value: unknown): UltraEnquiryInput {
   const email = safeWebsiteText(input.email ?? '', 150);
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail('Invalid email.');
   return { businessName: safeWebsiteText(input.businessName, 150, true), businessType: safeWebsiteText(input.businessType, 100, true), contactName: safeWebsiteText(input.contactName, 100, true), phone, email, existingDomain: input.existingDomain as 'yes' | 'no', estimatedPages: input.estimatedPages as number, featuresRequirements: safeWebsiteText(input.featuresRequirements, 2000, true), preferredStyle: safeWebsiteText(input.preferredStyle, 300, true), referenceWebsite: safeWebsiteUrl(input.referenceWebsite ?? ''), projectNotes: safeWebsiteText(input.projectNotes, 2000) };
+}
+
+/* ------------------------------ V5 additive content (all optional) ------------------------------ */
+export const WEBSITE_V5_CONTENT_KEYS = ['hours','policies','sections','imageMeta','gallery','pinnedBundles'] as const;
+const imageUrl = (value: unknown) => { const url = safeWebsiteText(value, 500); if (!url || !sanitizeUrl(url) || !/^https?:\/\//.test(url)) fail('Invalid image.'); return url; };
+const idList = (value: unknown, max: number, pattern: RegExp, message: string) => {
+  if (!Array.isArray(value) || value.length > max) fail(message);
+  const ids = value.map(id => { if (typeof id !== 'string' || !pattern.test(id)) fail(message); return id; });
+  if (new Set(ids).size !== ids.length) fail(message);
+  return ids;
+};
+/** Validates and normalizes only the V5 fields that are present. Returns exactly what may be stored. */
+export function websiteV5Fields(content: Record<string, unknown>) {
+  const out: { hours?: WebsiteHours | null; policies?: WebsitePolicies | null; sections?: WebsiteSectionLayout | null; imageMeta?: WebsiteImageMeta | null; gallery?: string[] | null; pinnedBundles?: string[] | null } = {};
+  // null clears a field: editors send it when the owner removed something the saved draft still has.
+  const rest: Record<string, unknown> = { ...content };
+  for (const key of WEBSITE_V5_CONTENT_KEYS) if (content[key] === null) { (out as any)[key] = null; delete rest[key]; }
+  content = rest;
+  if (content.hours !== undefined) {
+    {
+      const hours = object(content.hours); keys(hours, ['days', 'note']);
+      if (!Array.isArray(hours.days) || hours.days.length !== 7) fail('Enter hours for all seven days.');
+      const days = hours.days.map(raw => {
+        const day = object(raw); keys(day, ['closed', 'open', 'close']);
+        if (typeof day.closed !== 'boolean') fail('Mark each day open or closed.');
+        if (day.closed) return { closed: true };
+        if (!isWebsiteTime(day.open) || !isWebsiteTime(day.close)) fail('Use opening times like 09:00 and 18:00.');
+        return { closed: false, open: day.open, close: day.close };
+      });
+      out.hours = { days, ...(hours.note !== undefined && safeWebsiteText(hours.note, V5.hoursNote) ? { note: safeWebsiteText(hours.note, V5.hoursNote) } : {}) };
+    }
+  }
+  if (content.policies !== undefined) {
+    const policies = object(content.policies); keys(policies, [...WEBSITE_POLICY_KEYS]);
+    out.policies = Object.fromEntries(Object.entries(policies).map(([key, text]) => [key, safeWebsiteText(text, V5.policy)]).filter(([, text]) => text));
+  }
+  if (content.sections !== undefined) {
+    const sections = object(content.sections); keys(sections, ['order', 'hidden']);
+    out.sections = {
+      ...(sections.order !== undefined ? { order: idList(sections.order, V5.sections, /^[a-z][a-z0-9-]{0,31}$/, 'Invalid section order.') } : {}),
+      ...(sections.hidden !== undefined ? { hidden: idList(sections.hidden, V5.sections, /^[a-z][a-z0-9-]{0,31}$/, 'Invalid hidden sections.') } : {}),
+    };
+  }
+  if (content.imageMeta !== undefined) {
+    const meta = object(content.imageMeta); keys(meta, ['heroImage', 'logoUrl']);
+    out.imageMeta = {};
+    if (meta.heroImage !== undefined) {
+      const hero = object(meta.heroImage); keys(hero, ['x', 'y', 'alt']);
+      if ((hero.x !== undefined || hero.y !== undefined) && !isFocal({ x: hero.x, y: hero.y })) fail('Invalid image focus point.');
+      out.imageMeta.heroImage = { ...(hero.x !== undefined ? { x: hero.x as number, y: hero.y as number } : {}), ...(hero.alt !== undefined ? { alt: safeWebsiteText(hero.alt, V5.alt) } : {}) };
+    }
+    if (meta.logoUrl !== undefined) { const logo = object(meta.logoUrl); keys(logo, ['alt']); out.imageMeta.logoUrl = logo.alt !== undefined ? { alt: safeWebsiteText(logo.alt, V5.alt) } : {}; }
+  }
+  if (content.gallery !== undefined) {
+    if (!Array.isArray(content.gallery) || content.gallery.length > V5.gallery) fail(`Add up to ${V5.gallery} gallery photos.`);
+    out.gallery = content.gallery.map(imageUrl);
+  }
+  if (content.pinnedBundles !== undefined) out.pinnedBundles = idList(content.pinnedBundles, V5.pinnedBundles, /^[a-z0-9][a-z0-9-]{0,47}$/, `Feature up to ${V5.pinnedBundles} bundles.`);
+  return out;
+}
+export function websiteV5ItemFields(item: Record<string, unknown>) {
+  const out: { images?: string[]; label?: string; pinned?: boolean; alt?: string; focal?: { x: number; y: number }; options?: string[] } = {};
+  if (item.images !== undefined) { if (!Array.isArray(item.images) || item.images.length > V5.itemImages) fail(`Add up to ${V5.itemImages} extra photos.`); out.images = item.images.map(imageUrl); }
+  if (item.label !== undefined) out.label = safeWebsiteText(item.label, V5.label);
+  if (item.pinned !== undefined) { if (typeof item.pinned !== 'boolean') fail('Invalid featured status.'); out.pinned = item.pinned; }
+  if (item.alt !== undefined) out.alt = safeWebsiteText(item.alt, V5.alt);
+  if (item.focal !== undefined) { if (!isFocal(item.focal)) fail('Invalid image focus point.'); out.focal = { x: (item.focal as any).x, y: (item.focal as any).y }; }
+  if (item.options !== undefined) {
+    if (!Array.isArray(item.options) || item.options.length > V5.options) fail(`Add up to ${V5.options} options.`);
+    out.options = item.options.map(option => safeWebsiteText(option, V5.option, true));
+  }
+  return out;
 }

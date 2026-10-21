@@ -4,8 +4,13 @@ const pick=(value:unknown,keys:readonly string[])=>{const input=object(value);re
 const items=(value:unknown,keys:readonly string[])=>Array.isArray(value)?value.map(item=>pick(item,keys)):[];
 /** Public field projection also removes historical unknown/editor-only nested keys. */
 export function publicWebsiteContent(value:unknown):SiteContent {
- const input=object(value),result=pick(input,['starterVersion','layoutMode','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','features','copy']);
- if(Object.hasOwn(input,'items'))result.items=items(Array.isArray(input.items)?input.items.filter(item=>object(item).isExample!==true):[],['id','name','price','category','tag','desc','image']);
+ const input=object(value),result=pick(input,['starterVersion','layoutMode','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','features','copy','gallery','pinnedBundles']);
+ // V5 additive fields: exact nested whitelists, so a draft-only or unknown key can never go live.
+ if(Object.hasOwn(input,'hours')&&input.hours){const h=object(input.hours);result.hours={days:items(h.days,['closed','open','close']),...(typeof h.note==='string'?{note:h.note}:{})};}
+ if(Object.hasOwn(input,'policies'))result.policies=pick(input.policies,['delivery','payment','returns']);
+ if(Object.hasOwn(input,'sections'))result.sections=pick(input.sections,['order','hidden']);
+ if(Object.hasOwn(input,'imageMeta')){const m=object(input.imageMeta);result.imageMeta={...(m.heroImage?{heroImage:pick(m.heroImage,['x','y','alt'])}:{}),...(m.logoUrl?{logoUrl:pick(m.logoUrl,['alt'])}:{})};}
+ if(Object.hasOwn(input,'items'))result.items=items(Array.isArray(input.items)?input.items.filter(item=>object(item).isExample!==true):[],['id','name','price','category','tag','desc','image','images','label','pinned','alt','focal','options']);
  if(Object.hasOwn(input,'stats'))result.stats=items(input.stats,['label','value']);
  if(Object.hasOwn(input,'social'))result.social=pick(input.social,['instagram','facebook','tiktok']);
  if(input.composition && input.layoutMode!=='template'){const c=object(input.composition);result.composition={version:c.version,sections:items(c.sections,['id','type','enabled','variant','order','data']).map(section=>{const data=pick(section.data,['heading','body','image','alt','ctaLabel','ctaUrl']);if(Object.hasOwn(object(section.data),'items'))data.items=items(section.data.items,['title','text','image','price']);return {...section,data};})};}

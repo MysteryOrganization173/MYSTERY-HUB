@@ -17,7 +17,7 @@ export const WEBSITE_TYPEFACES: Record<WebsiteTypePreset, {family: string; stack
 };
 
 const BY_LAYOUT: Record<string, WebsiteTypePreset> = {
-  restaurant: 'editorial', church: 'editorial',
+  restaurant: 'editorial', church: 'editorial', nightkitchen: 'editorial', boutique: 'couture',
   salon: 'couture', beauty: 'couture', hotel: 'couture', fashion: 'couture',
   reseller: 'grotesk', ecommerce: 'grotesk', retail: 'grotesk',
   education: 'humanist', services: 'humanist', realestate: 'humanist',

@@ -1,7 +1,9 @@
 import { WebsiteSiteRenderer } from './WebsiteSiteRenderer';
 import { trackPublicWebsite, publicWebsiteClickKind } from '../../services/websiteBusinessApi';
 import React, { useState, useEffect } from 'react';
-import { getPublicSiteBySlug } from '../../services/apiClient';
+import { getPublicSiteBySlug, PublicSiteClosed } from '../../services/apiClient';
+import { websiteBusinessRequest } from '../../services/websiteBusinessApi';
+import { dataOrderPresentation } from '../../utils/dataPurchasePresentation';
 import { PublicWebsiteSite } from '../../types';
 import { getTemplateById, mergeSiteWithTemplate, renderTemplateLayout } from '../../utils/templateRendererUtils';
 import { Globe, AlertCircle, ArrowRight } from 'lucide-react';
@@ -16,11 +18,13 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
+  const [closed, setClosed] = useState<{ trackingSiteId: string | null } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
     setError(null);
+    setClosed(null);
 
     getPublicSiteBySlug(slug)
       .then((res) => {
@@ -35,6 +39,7 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
       })
       .catch((err) => {
         if (!isMounted) return;
+        if (err instanceof PublicSiteClosed) setClosed({ trackingSiteId: err.trackingSiteId });
         setError(err.message || 'Website unavailable.');
       })
       .finally(() => {
@@ -58,6 +63,8 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
       </div>
     );
   }
+
+  if (closed) return <ClosedWebsite trackingSiteId={closed.trackingSiteId} />;
 
   if (error || !site) {
     return (
@@ -112,3 +119,32 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
     </div>
   );
 };
+
+/** A deleted website: no business name, branding or redirect to anyone else. Buyers can still track. */
+export function ClosedWebsite({ trackingSiteId }: { trackingSiteId: string | null }) {
+  const [reference, setReference] = useState(''), [order, setOrder] = useState<any>(null), [message, setMessage] = useState(''), [busy, setBusy] = useState(false);
+  useEffect(() => { const robots = document.createElement('meta'); robots.name = 'robots'; robots.content = 'noindex'; document.head.appendChild(robots); document.title = 'Website no longer available'; return () => robots.remove(); }, []);
+  const track = async (event: React.FormEvent) => {
+    event.preventDefault(); if (!trackingSiteId || busy) return;
+    const ref = reference.trim(); if (!/^MH-[a-zA-Z0-9-]{1,60}$/.test(ref)) { setMessage('Enter the order reference from your receipt. It starts with MH-.'); return; }
+    setBusy(true); setMessage('');
+    try { setOrder(await websiteBusinessRequest(`websites/${encodeURIComponent(trackingSiteId)}/store-orders/${encodeURIComponent(ref)}`)); }
+    catch (e: any) { setOrder(null); setMessage(e.message || 'Order not found.'); } finally { setBusy(false); }
+  };
+  const view = order ? dataOrderPresentation(order.status, order.manual_review) : null;
+  return <main className="min-h-screen bg-[#070b0e] text-slate-100 flex flex-col items-center justify-center px-4 py-10 text-center">
+    <div className="w-full max-w-md space-y-5">
+      <h1 className="text-2xl font-bold">This website is no longer available</h1>
+      <p className="text-sm text-slate-400 leading-relaxed">The owner has closed it. Nothing can be bought here any more.</p>
+      {trackingSiteId && <form onSubmit={track} className="text-left rounded-2xl border border-slate-800 bg-[#0b1116] p-4 space-y-3" aria-labelledby="closed-track-title">
+        <h2 id="closed-track-title" className="font-semibold">Bought data here before?</h2>
+        <p className="text-sm text-slate-400">Track your order with the reference from your receipt.</p>
+        <label className="block text-sm">Order reference<input value={reference} onChange={e => setReference(e.target.value)} autoComplete="off" spellCheck={false} placeholder="MH-…" className="mt-1 block w-full min-h-12 rounded-xl border border-slate-700 bg-slate-900 px-3 text-base" /></label>
+        <button type="submit" disabled={busy} className="w-full min-h-12 rounded-xl bg-white text-black font-semibold disabled:opacity-60">{busy ? 'Checking…' : 'Track order'}</button>
+        {message && <p role="alert" className="text-sm text-amber-200">{message}</p>}
+        {view && <div role="status" className="rounded-xl bg-slate-900 p-3 text-sm"><strong className="block">{view.title}</strong><span className="block text-slate-300 mt-1">{view.label}</span><span className="block text-slate-400 mt-1">{view.next}</span></div>}
+      </form>}
+      <a href="/" className="inline-flex min-h-11 items-center text-sm text-slate-400 underline">Go to Mystery Hub</a>
+    </div>
+  </main>;
+}

@@ -6,12 +6,18 @@ import { WebsiteImageLibrary, WebsiteImageField } from './WebsiteImageField';
 import { trackWebsiteEvent } from '../../../utils/websiteAnalytics';
 import React, { useState, useEffect, useRef } from 'react';
 import { WebsiteSiteRecord, SiteContent, SiteSettings, WebsiteTemplate } from '../../../types';
-import { updateWebsiteOnServer, unpublishWebsiteOnServer } from '../../../services/apiClient';
+import { updateWebsiteOnServer, unpublishWebsiteOnServer, getWebsiteByIdOnServer, WebsiteSaveConflict } from '../../../services/apiClient';
+import { WebsiteConflictSheet, WebsiteRecoveryBanner, readDraftRecovery, writeDraftRecovery, clearDraftRecovery, type DraftRecovery } from './WebsiteDraftSafety';
 import { getTemplateById, mergeSiteWithTemplate, renderTemplateLayout } from '../../../utils/templateRendererUtils';
 import { useApp } from '../../../context/AppContext';
 import { WebsiteSectionsControl } from './WebsiteSectionsControl';
 import { SafeImage } from '../SafeImage';
 import { WebsiteItemPanel } from './WebsiteItemPanel';
+import { WebsiteFeaturedBundlesControl, WebsiteGalleryControl, WebsiteHoursControl, WebsiteImageDetails, WebsitePageSectionsControl, WebsitePaletteControl, WebsitePoliciesControl } from './WebsiteV5Controls';
+import { applyUndo, pushUndo, undoDiff, undoLabel, type UndoDraft, type UndoEntry } from '../../../utils/websiteUndo';
+import { WEBSITE_SECTION_REGISTRY } from '../../../config/websiteContentV5';
+import { websitePublishChanges } from '../../../utils/websitePublishChanges';
+import { withV5Clears } from '../../../utils/websiteDraftRecovery';
 import { WebsiteItemsList } from './WebsiteItemsList';
 import { WebsitePublishSheet } from './WebsitePublishSheet';
 import { WebsiteLayoutControl, WebsiteHistoryControl } from './WebsiteLayoutAndHistory';
@@ -45,6 +51,7 @@ import {
   ImageIcon,
   UtensilsCrossed,
   History,
+  Clock,
 } from 'lucide-react';
 
 interface WebsiteEditorProps {
@@ -106,7 +113,9 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   // Status & Dirty Tracking
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveStatusText, setSaveStatusText] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const [saveStatusText, setSaveStatusText] = useState<'saved' | 'saving' | 'unsaved' | 'failed' | 'offline'>('saved');
+  const [conflict, setConflict] = useState<WebsiteSiteRecord | null>(null);
+  const [recovery, setRecovery] = useState<DraftRecovery | null>(() => readDraftRecovery(initialSite));
   const [isPublishing, setIsPublishing] = useState(false);
 
   // View Mode: 'edit' or 'preview' (on mobile)
@@ -160,7 +169,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
   // Active editor section
   const [activeSection, setActiveSection] = useState<
-    'business' | 'contact' | 'items' | 'branding' | 'media' | 'sections' | 'bundles' | 'cta' | 'social' | 'history'
+    'business' | 'contact' | 'items' | 'hours' | 'branding' | 'media' | 'sections' | 'bundles' | 'cta' | 'social' | 'history'
   >('business');
   const [publishOpen, setPublishOpen] = useState(openPublish);
   // B1 server actions (review, layout, restore) run against the saved draft; the editor waits for them.
@@ -178,6 +187,20 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     setIsDirty(false); setSaveStatusText('saved'); setActiveSection('business');
     setVisualSelection(null);setSettingsNotice(false);setTargetOrder([]);setAllSettings(false);setActiveTab('edit');setFocusRequest(0);
   }, [initialSite.id, initialSite.template_id]);
+
+  // Undo: every edit is diffed against the last draft the owner saw; server adoption is never an edit.
+  const undoStack = useRef<UndoEntry[]>([]), [undoTop, setUndoTop] = useState<UndoEntry | null>(null);
+  const historyBase = useRef<UndoDraft>({content: initialSite.content_json as any, settings: initialSite.settings_json as any});
+  const historySeen = useRef(0), undoing = useRef(false);
+  useEffect(() => {
+    const now = {content: content as any, settings: settings as any};
+    if (editVersion.current !== historySeen.current && !undoing.current) {
+      undoStack.current = pushUndo(undoStack.current, undoDiff(historyBase.current, now), Date.now());
+      setUndoTop(undoStack.current[undoStack.current.length - 1] || null);
+    }
+    undoing.current = false; historySeen.current = editVersion.current; historyBase.current = now;
+  }, [content, settings]);
+  useEffect(() => { undoStack.current = []; setUndoTop(null); historyBase.current = {content: initialSite.content_json as any, settings: initialSite.settings_json as any}; historySeen.current = 0; }, [initialSite.id, initialSite.template_id]);
 
   // Mark dirty on any edit
   const markDirty = () => {
@@ -220,18 +243,42 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     setIsSaving(true);setSaveStatusText('saving');
     const job=(async()=>{
       try {
-        const res=await updateWebsiteOnServer(sessionToken,currentSite.id,{...snapshot,expectedUpdatedAt:serverSiteRef.current.updated_at});
+        const res=await updateWebsiteOnServer(sessionToken,currentSite.id,{...snapshot,content:withV5Clears(serverSiteRef.current.content_json,snapshot.content),expectedUpdatedAt:serverSiteRef.current.updated_at});
         failedSaveVersion.current=null;
         serverSiteRef.current=res.site;setCurrentSite(res.site);onSiteUpdated(res.site);savedVersion.current=version;
         const unchanged=editVersion.current===version;
         setIsDirty(!unchanged);setSaveStatusText(unchanged?'saved':'unsaved');
         if(unchanged){setSiteName(res.site.name);setContent(res.site.content_json);setSettings(res.site.settings_json);}
         return res.site;
-      } catch(err:any) {failedSaveVersion.current=version;showToast(err.message || 'Failed to save changes.','warning');setSaveStatusText('unsaved');return null;}
+      } catch(err:any) {
+        failedSaveVersion.current=version;
+        if(err instanceof WebsiteSaveConflict){
+          // Someone saved this website elsewhere. Nothing is overwritten until the owner chooses.
+          try{const latest=(await getWebsiteByIdOnServer(sessionToken,currentSite.id)).site;setConflict(latest);}catch{showToast(err.message,'warning');}
+          setSaveStatusText('failed');return null;
+        }
+        const offline=typeof navigator!=='undefined' && navigator.onLine===false || err instanceof TypeError;
+        setSaveStatusText(offline?'offline':'failed');
+        if(!offline)showToast(err.message || 'Failed to save changes.','warning');
+        return null;
+      }
       finally {setIsSaving(false);savingJob.current=null;}
     })();
     savingJob.current=job;return job;
   };
+
+  // Unsaved edits are also kept on this device, so a lost connection or a closed tab never loses them.
+  useEffect(() => {
+    if (isDirty) writeDraftRecovery(currentSite.id, {templateId:currentSite.template_id,base: serverSiteRef.current.updated_at, name: siteName, content, settings});
+    else if (saveStatusText === 'saved' && !recovery) clearDraftRecovery(currentSite.id,currentSite.template_id);
+  }, [isDirty, siteName, content, settings, saveStatusText, recovery]);
+  const retryRef = useRef(() => {});
+  retryRef.current = () => { if (failedSaveVersion.current !== null && !conflict) { failedSaveVersion.current = null; void handleSaveDraft(); } };
+  useEffect(() => {
+    const online = () => retryRef.current();
+    window.addEventListener('online', online);
+    return () => window.removeEventListener('online', online);
+  }, []);
 
   // Debounced Autosave (2.5 seconds of inactivity)
   useEffect(() => {
@@ -347,6 +394,32 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     finally{publicationJob.current=false;setIsPublishing(false);}
   };
 
+  const changeContent = (patch: Partial<SiteContent>) => {
+    const next={...draftRef.current.content,...patch} as SiteContent;
+    for(const key of Object.keys(patch) as (keyof SiteContent)[]) if(patch[key]===undefined) delete next[key];
+    draftRef.current={...draftRef.current,content:next};setContent(next);markDirty();
+  };
+  const handleUndo = () => {
+    if (isPublishing || serverBusy) return;
+    const result = applyUndo(undoStack.current, {content: draftRef.current.content as any, settings: draftRef.current.settings as any});
+    undoStack.current = result.stack; setUndoTop(result.stack[result.stack.length - 1] || null);
+    if (!result.entry) return;
+    undoing.current = true;
+    const next = {...draftRef.current, content: result.draft.content as SiteContent, settings: result.draft.settings as SiteSettings};
+    draftRef.current = next; setContent(next.content); setSettings(next.settings); markDirty();
+    showToast(`Undone: ${undoLabel(result.entry)}.`, 'info');
+  };
+  const undoRef = useRef(handleUndo); undoRef.current = handleUndo;
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.key.toLowerCase() !== 'z' || target?.closest('input,textarea,select,[contenteditable="true"]')) return;
+      event.preventDefault(); undoRef.current();
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, []);
+
   const handleCopyLink = () => {
     const fullUrl = `${window.location.origin}/sites/${currentSite.slug}`;
     navigator.clipboard.writeText(fullUrl).then(() => {
@@ -395,7 +468,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     draftRef.current={...draft,...next};setContent(next.content);setSettings(next.settings);markDirty();
   };
   type Area = [typeof activeSection, string, typeof Building];
-  const settingsAreas: Area[] = [['business','Business',Building],['contact','Contact',Phone],...(isDataReseller||currentSite.template_id==='tmpl-start-blank'?[]:[['items',word.plural,UtensilsCrossed] as Area]),['branding','Colors',Palette],['media','Images',ImageIcon],...(isDataReseller?[['bundles','Bundles & pricing',Layers] as Area]:[]),['sections','Layout',Layers],['cta','Main button',MousePointerClick],['social','Social links',Share2],['history','History',History]];
+  const settingsAreas: Area[] = [['business','Business',Building],['contact','Contact',Phone],...(isDataReseller||currentSite.template_id==='tmpl-start-blank'?[]:[['items',word.plural,UtensilsCrossed] as Area,['hours','Hours & policies',Clock] as Area]),['branding','Colors',Palette],['media','Images',ImageIcon],...(isDataReseller?[['bundles','Bundles & pricing',Layers] as Area]:[]),['sections','Layout',Layers],['cta','Main button',MousePointerClick],['social','Social links',Share2],['history','History',History]];
   const openSettings=(section?: typeof activeSection)=>{setAllSettings(true);setVisualSelection(null);setSettingsNotice(false);if(section)setActiveSection(section);};
   const locked = isPublishing || serverBusy;
   // Previous/Next walk the page in reading order; fall back to the schema order before the frame reports.
@@ -407,13 +480,19 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
   return (
     <div ref={workspaceRef} role="dialog" aria-modal="true" aria-label="Website editor" className="visual-workspace fixed inset-0 z-[80] text-slate-100 flex flex-col font-sans overflow-hidden">
+      {conflict && <WebsiteConflictSheet mine={{name: siteName, content, settings}} theirs={conflict} templateId={currentSite.template_id} word={word.singular.toLowerCase()}
+        onKeepMine={()=>{serverSiteRef.current=conflict;setCurrentSite(conflict);setConflict(null);failedSaveVersion.current=null;void handleSaveDraft();}}
+        onUseTheirs={()=>{const site=conflict;setConflict(null);failedSaveVersion.current=null;serverSiteRef.current=site;setCurrentSite(site);onSiteUpdated(site);draftRef.current={name:site.name,content:site.content_json,settings:site.settings_json};setSiteName(site.name);setContent(site.content_json);setSettings(site.settings_json);editVersion.current++;savedVersion.current=editVersion.current;historySeen.current=editVersion.current;setIsDirty(false);setSaveStatusText('saved');clearDraftRecovery(site.id,site.template_id);}}/>}
+      {recovery && <WebsiteRecoveryBanner recovery={recovery} changedSince={recovery.base!==currentSite.updated_at}
+        onRestore={()=>{const r=recovery;setRecovery(null);draftRef.current={name:r.name,content:r.content,settings:r.settings};setSiteName(r.name);setContent(r.content);setSettings(r.settings);markDirty();showToast('Your unsaved changes are back. Saving now.','success');}}
+        onDiscard={()=>{setRecovery(null);clearDraftRecovery(currentSite.id,currentSite.template_id);}}/>}
       {publishOpen && <WebsitePublishSheet content={content} published={currentSite.status==='published'} publishedAt={currentSite.published_at} publicUrl={`${window.location.origin}/sites/${currentSite.slug}`} word={word} managed={isDataReseller}
         onReview={reviewItems} onEditItem={openItem} onPublish={handlePublish} onClose={()=>setPublishOpen(false)}
-        suggestions={publishSuggestions}
+        suggestions={publishSuggestions} changes={websitePublishChanges(currentSite.published_snapshot_json, {templateId: currentSite.template_id, content, settings}, word.singular.toLowerCase())}
         onEditField={target=>{setPublishOpen(false);setActiveTab('edit');if(target==='name')selectTarget('content:businessName');else if(target==='contact')openSettings('contact');else selectTarget(target);}}/>}
       {mediaOpen && <WebsiteImageLibrary siteId={currentSite.id} token={sessionToken} onClose={()=>setMediaOpen(false)} onChoose={url=>{setContent({...content,heroImage:url});markDirty();setMediaOpen(false);}} />}
       <WebsiteEditorToolbar name={content.businessName || siteName} mode={activeTab} device={previewDevice} status={saveStatusText} published={currentSite.status==='published'} saving={isSaving} publishing={isPublishing}
-        onExit={()=>{if(!isDirty || window.confirm('You have unsaved changes. Exit anyway?'))onClose();}} onMode={changeMode} onDevice={device=>{setPreviewDevice(device);if(isPhone && device!=='mobile')changeMode('preview');}} onSave={()=>void handleSaveDraft()} onPublish={()=>{setVisualSelection(null);setPublishOpen(true);}} onUnpublish={()=>void handleUnpublish()} onSettings={()=>openSettings()} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`}/>
+        onExit={()=>{if(!isDirty || window.confirm('You have unsaved changes. Exit anyway?'))onClose();}} onMode={changeMode} onDevice={device=>{setPreviewDevice(device);if(isPhone && device!=='mobile')changeMode('preview');}} onSave={()=>void handleSaveDraft()} onPublish={()=>{setVisualSelection(null);setPublishOpen(true);}} onUnpublish={()=>void handleUnpublish()} onSettings={()=>openSettings()} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`} undoLabel={undoTop ? undoLabel(undoTop) : ''} onUndo={handleUndo} liveBehind={currentSite.status==='published' && websitePublishChanges(currentSite.published_snapshot_json, {templateId: currentSite.template_id, content: currentSite.content_json, settings: currentSite.settings_json}).length>0}/>
       {/* =========================================================
           WORKSPACE: LEFT EDITOR / RIGHT LIVE PREVIEW
           ========================================================= */}
@@ -600,10 +679,21 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               </div>
             )}
 
+            {activeSection === 'hours' && <div className="space-y-8">
+              <p className="text-xs text-slate-400">These describe your business, not the design, so they stay when you switch designs. {['nightkitchen'].includes(baseTemplate.layoutType || '') ? 'Your design shows your hours and an “Open now” badge.' : ['boutique'].includes(baseTemplate.layoutType || '') ? 'Your design shows your delivery, payment and returns notes.' : 'The Night Kitchen and Boutique designs show them; this design keeps them safely for later.'}</p>
+              <WebsiteHoursControl hours={content.hours} onChange={hours=>changeContent({hours:hours||undefined})}/>
+              <WebsitePoliciesControl policies={content.policies} onChange={policies=>changeContent({policies})}/>
+            </div>}
+
             {activeSection === 'media' && <section className="space-y-5">
               <div><h3 className="text-lg font-semibold">Images &amp; Media</h3><p className="text-sm text-slate-400 mt-2">Upload once, reuse across your website. Choose your cover image and logo here.</p></div>
               <WebsiteImageField label="Cover image" value={content.heroImage} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,heroImage:isDataReseller&&!url?DATA_RESELLER_STARTER_HERO_IMAGE:url});markDirty();}} />
+              {!isDataReseller && content.heroImage && <details className="rounded-xl border border-slate-800 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-200 min-h-8">Cover photo focus and description</summary>
+                <div className="mt-3"><WebsiteImageDetails src={content.heroImage} focal={content.imageMeta?.heroImage} alt={content.imageMeta?.heroImage?.alt} onChange={patch=>changeContent({imageMeta:{...(content.imageMeta||{}),heroImage:{...(content.imageMeta?.heroImage||{}),...(patch.x!==undefined?{x:patch.x,y:patch.y}:{}),...(patch.alt!==undefined?{alt:patch.alt||undefined}:{})}}})}/></div>
+              </details>}
               <WebsiteImageField label="Business logo" value={content.logoUrl||''} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,logoUrl:url});markDirty();}} />
+              {content.logoUrl && <div className="visual-field"><div className="visual-field-label"><label htmlFor="logo-alt">Logo description (optional)</label></div><input id="logo-alt" className="visual-input" maxLength={150} value={content.imageMeta?.logoUrl?.alt || ''} placeholder={`${content.businessName || 'Business'} logo`} onChange={e=>changeContent({imageMeta:{...(content.imageMeta||{}),logoUrl:{alt:e.target.value.replace(/[<>]/g,'')||undefined}}})}/></div>}
+              {!isDataReseller && currentSite.template_id!=='tmpl-start-blank' && <WebsiteGalleryControl gallery={content.gallery} siteId={currentSite.id} token={sessionToken} onChange={gallery=>changeContent({gallery})}/>}
               <button type="button" className="mh-button-secondary" onClick={()=>setMediaOpen(true)}>Open media library for cover image</button>
               <p className="text-sm text-slate-400">Images used on a published website are public. Keep identity documents and private photos out of your library.</p>
             </section>}
@@ -617,6 +707,8 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     Choose colours and images that feel like your business.
                   </p>
                 </div>
+
+                <WebsitePaletteControl settings={settings} onApply={palette=>{const next={...draftRef.current.settings,backgroundColor:palette.backgroundColor,primaryColor:palette.primaryColor,accentColor:palette.accentColor};draftRef.current={...draftRef.current,settings:next};setSettings(next);markDirty();}}/>
 
                 {/* Brand Colors Grid */}
                 <div className="p-3.5 rounded-2xl bg-[#090f15] border border-slate-800/80 space-y-3">
@@ -725,7 +817,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
                   {isDataReseller && showsLegacyDataResellerArtwork(content.heroImage) && (
                     <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-300 space-y-2">
-                      <p>Your store shows the original QuickByte-style banner. It stays unless you change it. A plain starter image without another brand's name is also available.</p>
+                      <p>Your store shows the original Data store banner. It stays unless you change it. A plain starter image without any brand name is also available.</p>
                       <button type="button" className="min-h-11 px-3 rounded-xl border border-emerald-500/40 text-emerald-300" onClick={() => { setContent({ ...content, heroImage: DATA_RESELLER_STARTER_HERO_IMAGE }); markDirty(); }}>Use the neutral starter image</button>
                     </div>
                   )}
@@ -769,6 +861,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             )}
 
             {/* 4. SECTIONS TAB */}
+            {activeSection === 'sections' && layoutMode==='template' && WEBSITE_SECTION_REGISTRY[baseTemplate.layoutType || ''] && <div className="mb-6"><WebsitePageSectionsControl layout={baseTemplate.layoutType!} value={content.sections} onChange={sections=>changeContent({sections})}/></div>}
             {activeSection === 'sections' && (
               <WebsiteLayoutControl mode={layoutMode} templateTitle={baseTemplate.title} startBlank={currentSite.template_id==='tmpl-start-blank'} plural={word.plural} onSwitch={changeLayout} onOpenHistory={()=>setActiveSection('history')}>
                 <WebsiteSectionsControl
@@ -795,6 +888,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               <h3 className="font-bold text-white">Your bundles & pricing</h3>
               <p className="text-sm text-slate-400">Choose which bundles appear on your store and set your selling prices. Your work here will be saved before opening pricing.</p>
               <button type="button" className="min-h-11 px-4 py-3 rounded-xl bg-emerald-500 text-black font-bold" disabled={isSaving||isPublishing} onClick={async()=>{if(isDirty && !(await handleSaveDraft()))return;(onOpenPricing||onClose)();}}>Open Bundles &amp; Pricing</button>
+              <WebsiteFeaturedBundlesControl siteId={currentSite.id} token={sessionToken} value={content.pinnedBundles} onChange={next=>changeContent({pinnedBundles:next.length?next:undefined})} />
             </div>}
 
             {/* 6. CALL TO ACTION SECTION */}
@@ -924,7 +1018,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             </div>
           </div>
         </div>
-        {activeTab==='edit' && selectedItemIndex>=0 && <WebsiteItemPanel item={items[selectedItemIndex]} index={selectedItemIndex} total={items.length} word={word} fields={itemFields} siteId={currentSite.id} token={sessionToken} busy={locked} cardButton={cardButton && {value:cardButton.value,max:cardButton.maxLength,onChange:value=>editVisualValue(cardButton.id,value)}}
+        {activeTab==='edit' && selectedItemIndex>=0 && <WebsiteItemPanel item={items[selectedItemIndex]} index={selectedItemIndex} total={items.length} word={word} fields={itemFields} layout={baseTemplate.layoutType || ''} pinnedCount={items.filter(i=>i.pinned).length} siteId={currentSite.id} token={sessionToken} busy={locked} cardButton={cardButton && {value:cardButton.value,max:cardButton.maxLength,onChange:value=>editVisualValue(cardButton.id,value)}}
           onChange={patch=>updateItem(items[selectedItemIndex].id!,patch)} onKeep={()=>void reviewItems([items[selectedItemIndex].id!],'confirm')} onRemove={()=>removeItem(items[selectedItemIndex].id!)} onAdd={addItem} onPrevious={()=>stepItem(-1)} onNext={()=>stepItem(1)} onDone={clearSelection}/>}
         {activeTab==='edit' && contextualTargets.length>0 && !selectedItemId && <div className="contents" inert={locked}><VisualContextPanel title={visualSelection==='branding'?'Website colors':selected!.label} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()} position={stepIndex>=0?{index:stepIndex,total:stepIds.length}:undefined} onPrevious={()=>step(-1)} onNext={()=>step(1)} suggested={!!selected && suggestedFields.includes(selected.id)}/></div>}
         {activeTab==='edit' && settingsNotice==="settings" && !contextualTargets.length && <VisualContextPanel notice title="Change this in All Settings" targets={[]} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()}/>}

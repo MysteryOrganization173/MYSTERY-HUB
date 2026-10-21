@@ -203,8 +203,10 @@ export class WebsiteBusinessService {
     order=await FulfilmentService.refreshOrderStatusIfDue(order);
     return toSafePublicOrder(order);
   }
-  static async siteOrders(siteId:string,offset=0):Promise<OrderRecord[]> {
-    const db=getPool();return db?(await db.query<OrderRecord>("SELECT * FROM orders WHERE store_context->>'siteId'=$1 ORDER BY created_at DESC LIMIT 25 OFFSET $2",[siteId,offset])).rows:OrdersStore.adminDevOrders().filter(o=>o.store_context?.siteId===siteId).sort((a,b)=>b.created_at.localeCompare(a.created_at)).slice(offset,offset+25);
+  static async siteOrders(siteId:string,offset=0,lastFour=''):Promise<OrderRecord[]> {
+    if(lastFour && !/^\d{4}$/.test(lastFour))throw new FinanceError('Enter exactly the last four recipient digits.');
+    offset=Math.max(0,Math.min(100000,Math.floor(Number(offset)||0)));
+    const db=getPool();return db?(await db.query<OrderRecord>("SELECT * FROM orders WHERE store_context->>'siteId'=$1 AND ($3::text = '' OR right(regexp_replace(recipient_phone, '[^0-9]', '', 'g'),4)=$3) ORDER BY created_at DESC,id DESC LIMIT 25 OFFSET $2",[siteId,offset,lastFour])).rows:OrdersStore.adminDevOrders().filter(o=>o.store_context?.siteId===siteId&&(!lastFour||o.recipient_phone.replace(/\D/g,'').slice(-4)===lastFour)).sort((a,b)=>b.created_at.localeCompare(a.created_at)||b.id.localeCompare(a.id)).slice(offset,offset+25);
   }
   static async recoverEffects() {
     const db=getPool();
@@ -214,9 +216,10 @@ export class WebsiteBusinessService {
     for(const order of orders){try{if(order.manual_review&&order.supplier_order_id)await FulfilmentService.refreshOrderStatusIfDue(order,true);await this.syncOrder(order);if(order.status==='paid')await FulfilmentService.processPaidOrder(order.payment_reference,order.paid_at!,'Managed store recovery');}catch{ /* Durable order remains eligible on the next pass. */ }}
   }
   static safeStoreOrder(o:OrderRecord) {return {id:o.id,reference:o.public_reference,createdAt:o.created_at,network:o.network,bundle:o.bundle_size_snapshot,recipient:maskOrderRecipient(o.recipient_phone),retailMinor:o.amount,earningMinor:o.store_context!.earningMinor,status:o.status,manualReview:!!o.manual_review,paid:o.payment_status==='success',snapshot:o.store_context};}
-  static async ownerSummary(siteId:string,userId:string,offset=0) {
-    const site=await this.owned(siteId,userId);const orders=await this.siteOrders(siteId,offset);for(const order of orders)await this.syncOrder(order);
-    const hasOrders=orders.length>0 || (offset>0 && (await this.siteOrders(siteId,0)).length>0);
+  /** `resolved` is only passed by staff history views, which may read an archived (deleted) website. */
+  static async ownerSummary(siteId:string,userId:string,offset=0,resolved?:Awaited<ReturnType<typeof WebsiteStore.findSiteRecordById>>,lastFour='') {
+    const site=resolved||await this.owned(siteId,userId);const orders=await this.siteOrders(siteId,offset,lastFour);for(const order of orders)await this.syncOrder(order);
+    const hasOrders=orders.length>0 || ((offset>0||!!lastFour) && (await this.siteOrders(siteId,0)).length>0);
     return FinanceStore.transaction(userId,async tx=>{const operations=await tx.operations(),ledger=await tx.ledger();return {capabilities:websiteBusinessCapabilities(site,hasOrders,operations,ledger.some(e=>e.bucket==='store')),orders:orders.map(o=>({...this.safeStoreOrder(o),earningState:operations.find(row=>row.idempotency_key===`store-sale:${o.id}`)?.state||(o.payment_status==='success'?'awaiting_reconciliation':'awaiting_payment')})),earnings:await tx.storeEarnings(),policy:await currentPolicy(tx),withdrawals:operations.filter(o=>o.kind==='withdrawal'&&o.payload.source==='store').slice(offset,offset+25).map(maskWithdrawal),ledger:ledger.filter(e=>e.bucket==='store').slice(offset,offset+25),activity:operations.filter(o=>o.payload.siteId===siteId||o.kind==='withdrawal'&&o.payload.source==='store').slice(0,15).map(o=>({id:o.id,kind:o.kind,state:o.state,createdAt:o.created_at,amountMinor:o.amount_minor}))};});
   }
   static async withdraw(siteId:string,userId:string,input:Record<string,unknown>){await this.owned(siteId,userId);exact(input,['confirmed','amountMinor','requestId','phone','network','recipientName']);return FinanceService.requestWithdrawal(userId,{...input,source:'store'});}

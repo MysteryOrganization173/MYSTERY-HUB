@@ -13,6 +13,8 @@ function normalize(row: any): WebsiteAsset {
 export function websiteImageReferences(content: SiteContent): { url: string; location: string }[] {
   const references = [{ url: content.heroImage, location: 'Hero image' }, { url: content.logoUrl || '', location: 'Brand logo' }];
   for (const [n, item] of (content.items || []).entries()) references.push({ url: item.image || '', location: `Business item ${n + 1}` });
+  for (const [n, item] of (content.items || []).entries()) for (const [p, url] of (item.images || []).entries()) references.push({ url, location: `Business item ${n + 1} photo ${p + 2}` });
+  for (const [n, url] of (content.gallery || []).entries()) references.push({ url, location: `Gallery photo ${n + 1}` });
   for (const section of content.composition?.sections || []) {
     references.push({ url: section.data.image || '', location: `${section.type} section` });
     for (const [n, item] of (section.data.items || []).entries()) references.push({ url: item.image || '', location: `${section.type} item ${n + 1}` });

@@ -186,3 +186,6 @@
 @keyframes visual-rise{from{transform:translateY(16px);opacity:.5}}
 .visual-example-note.is-suggested{border-color:rgba(0,195,101,.32);background:rgba(0,195,101,.07)}
 .visual-example-note.is-suggested strong{color:#8ef0b9}
+.visual-undo-button:disabled{opacity:.35;cursor:default}
+[data-state="failed"] .visual-status-dot{background:#f87171;box-shadow:0 0 0 3px rgba(248,113,113,.2)}
+[data-state="offline"] .visual-status-dot{background:#94a3b8;box-shadow:0 0 0 3px rgba(148,163,184,.2)}

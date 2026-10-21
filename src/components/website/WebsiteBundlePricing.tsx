@@ -2,13 +2,14 @@ import React,{useEffect,useRef,useState} from 'react';
 import {websiteBusinessRequest} from '../../services/websiteBusinessApi';
 import {formatGhs,parseGhs} from '../../../shared/money';
 import {storeReserve} from '../../../shared/storeEconomics';
+import {pricingReviewLines} from '../../utils/websiteOwnerOrders';
 import {bulkSellerPrices,canPrice,sellerDrafts,sellerPriceError,type SellerBundle,type SellerDraft} from '../../utils/websitePricing';
 const button='min-h-11 px-3 rounded-lg border border-slate-700 text-sm disabled:opacity-50';
 const field='min-h-11 rounded-lg px-3 bg-slate-950 border border-slate-700 min-w-0';
 export function WebsiteBundlePricing({siteId,token,onDirty}:{siteId:string;token:string;onDirty?:(dirty:boolean)=>void}) {
  const [catalog,setCatalog]=useState<any>(null),[drafts,setDrafts]=useState<Record<string,SellerDraft>>({}),[network,setNetwork]=useState('mtn');
  const [scope,setScope]=useState('all'),[kind,setKind]=useState<'percent'|'flat'>('percent'),[markup,setMarkup]=useState('10');
- const [preview,setPreview]=useState<ReturnType<typeof bulkSellerPrices>|null>(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
+ const [preview,setPreview]=useState<ReturnType<typeof bulkSellerPrices>|null>(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[reviewing,setReviewing]=useState(false);
  const alive=useRef(true),saving=useRef(false),identity=useRef('');
  identity.current=`${siteId}:${token}`;
  const load=async()=>{const expected=identity.current;const result=await websiteBusinessRequest(`websites/${siteId}/bundles`,token);if(alive.current&&identity.current===expected){setCatalog(result);setDrafts(sellerDrafts(result.products));}};
@@ -18,9 +19,9 @@ export function WebsiteBundlePricing({siteId,token,onDirty}:{siteId:string;token
  const changed=products.filter(p=>drafts[p.id]&&(drafts[p.id].price!==original[p.id].price||drafts[p.id].enabled!==original[p.id].enabled));
  useEffect(()=>{onDirty?.(changed.length>0);},[changed.length,onDirty]);
  useEffect(()=>{if(!changed.length)return;const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[changed.length]);
- const update=(id:string,patch:Partial<SellerDraft>)=>{setDrafts(prev=>({...prev,[id]:{...prev[id],...patch}}));setNotice('');setPreview(null);};
+ const update=(id:string,patch:Partial<SellerDraft>)=>{setDrafts(prev=>({...prev,[id]:{...prev[id],...patch}}));setNotice('');setPreview(null);setReviewing(false);};
  const save=async()=>{if(saving.current||!catalog)return;const invalid=changed.find(p=>sellerPriceError(p,drafts[p.id]));if(invalid){setError(`${invalid.networkName} ${invalid.dataAmount}: ${sellerPriceError(invalid,drafts[invalid.id])}`);return;}
-   saving.current=true;setBusy(true);setError('');setNotice('');try{const result=await websiteBusinessRequest(`websites/${siteId}/bundles`,token,{expectedVersion:catalog.version,products:changed.map(p=>({productId:p.id,enabled:drafts[p.id].enabled,retailMinor:drafts[p.id].price?parseGhs(drafts[p.id].price):0}))},'PUT');
+   setReviewing(false);saving.current=true;setBusy(true);setError('');setNotice('');try{const result=await websiteBusinessRequest(`websites/${siteId}/bundles`,token,{expectedVersion:catalog.version,products:changed.map(p=>({productId:p.id,enabled:drafts[p.id].enabled,retailMinor:drafts[p.id].price?parseGhs(drafts[p.id].price):0}))},'PUT');
    if(alive.current){const savedProducts=products.map(p=>result.products[p.id]?{...p,...result.products[p.id]}:p);setCatalog({...catalog,version:result.version,products:savedProducts});setDrafts(sellerDrafts(savedProducts));setPreview(null);setNotice('Saved ✓');}
    }catch(e:any){if(alive.current)setError(e.message);}finally{saving.current=false;if(alive.current)setBusy(false);}};
  if(!catalog)return <div role="status">{error?<><p role="alert">{error}</p><button className={button} onClick={()=>{setError('');void load().catch(e=>setError(e.message));}}>Try again</button></>:'Loading bundles & prices…'}</div>;
@@ -47,7 +48,8 @@ export function WebsiteBundlePricing({siteId,token,onDirty}:{siteId:string;token
  {message&&<p id={`price-error-${p.id}`} className="col-span-full text-xs text-rose-300">{message}</p>}
  </article>;})}{!products.some(p=>p.network===network)&&<p className="text-sm text-slate-400">No bundles on this network yet.</p>}</fieldset>
  {error&&<div className="space-y-2"><p role="alert" className="text-sm text-rose-300">{error}</p><button className={button} disabled={busy} onClick={()=>{if(changed.length&&!window.confirm('Reload current prices and discard your unsaved pricing edits?'))return;setPreview(null);void load().then(()=>setError('')).catch(e=>setError(e.message));}}>Reload prices</button></div>}
- <div className="sticky bottom-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-700 bg-[#0b131a] p-3 shadow-xl"><span role="status" className="text-xs text-slate-300">{changed.length?`${changed.length} unsaved changes`:notice||'Prices are up to date'}</span><button className={`${button} bg-emerald-500 text-black font-bold`} disabled={busy||!changed.length||changed.some(p=>!!sellerPriceError(p,drafts[p.id]))} onClick={()=>void save()}>{busy?'Saving…':'Save Changes'}</button></div>
+ {reviewing&&changed.length>0&&<div className="website-pricing-review rounded-xl border border-emerald-700/50 bg-[#0b131a] p-3" aria-label="Review price changes" data-pricing-review><h3 className="font-semibold">Check {changed.length===1?'this change':`these ${changed.length} changes`} before saving</h3><ul>{pricingReviewLines(changed.map(p=>({id:p.id,networkName:p.networkName,dataAmount:p.dataAmount,before:original[p.id],after:drafts[p.id]}))).map((line,i)=><li key={changed[i].id}>{line}</li>)}</ul><p className="text-xs text-slate-400 mb-3">New prices show on your store as soon as you save. Orders already paid keep the price the customer paid.</p><div className="flex flex-wrap gap-2"><button type="button" className={button} onClick={()=>setReviewing(false)}>Back to prices</button><button type="button" className={`${button} bg-emerald-500 text-black font-bold`} disabled={busy} onClick={()=>void save()}>Confirm and save</button></div></div>}
+ <div className="sticky bottom-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-700 bg-[#0b131a] p-3 shadow-xl"><span role="status" className="text-xs text-slate-300">{changed.length?`${changed.length} unsaved changes`:notice||'Prices are up to date'}</span><button className={`${button} bg-emerald-500 text-black font-bold`} disabled={busy||!changed.length||changed.some(p=>!!sellerPriceError(p,drafts[p.id]))} onClick={()=>{const invalid=changed.find(p=>sellerPriceError(p,drafts[p.id]));if(invalid){setError(`${invalid.networkName} ${invalid.dataAmount}: ${sellerPriceError(invalid,drafts[invalid.id])}`);return;}setError('');setReviewing(true);}}>{busy?'Saving…':`Review ${changed.length===1?'1 change':`${changed.length||''} changes`.trim()}`}</button></div>
  {notice&&changed.length>0&&<p role="status" className="text-xs text-emerald-300">{notice}</p>}
  </section>;
 }

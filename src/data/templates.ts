@@ -26,7 +26,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-buka-bistro',
     priority: 30,
-    title: 'Gold Coast Artisan Kitchen & Grill',
+    title: 'Classic Kitchen',
     category: 'restaurant',
     categoryLabel: 'Restaurants & Cafes',
     layoutType: 'restaurant',
@@ -108,12 +108,92 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     ],
   },
 
+  // V5 FLAGSHIP: NIGHT KITCHEN (restaurant). Shares content with Classic Kitchen.
+  {
+    id: 'tmpl-night-kitchen',
+    priority: 25,
+    title: 'Night Kitchen',
+    category: 'restaurant',
+    categoryLabel: 'Restaurants & Cafes',
+    layoutType: 'nightkitchen',
+    contentFamily: 'restaurant',
+    industry: 'Restaurants, chop bars, takeaways and home kitchens',
+    description: 'Warm, dark restaurant design: your opening hours up front, a menu with photos, and orders sent to your WhatsApp in one message.',
+    features: ['Open-now badge from your own hours', 'Menu with photos and labels', 'WhatsApp order list', 'Directions and hours'],
+    accentColor: '#E8833A',
+    demoBusinessName: 'Your Kitchen',
+    demoHeroTagline: 'Home-style food, cooked fresh every day.',
+    demoSubtext: 'Browse the menu, add what you fancy and send your order on WhatsApp. Or come and eat with us.',
+    location: 'Your area, your city',
+    hoursOrContact: 'Your WhatsApp number',
+    isFreeTier: true,
+    badgeText: 'New design',
+    colorScheme: {
+      primary: '#1c1310',
+      secondary: '#e8833a',
+      background: '#140d0b',
+      surface: '#1f1714',
+      text: '#fbf4ee',
+      mutedText: '#c5b3a6',
+      accent: '#e8833a',
+      border: '#3a2c26',
+    },
+    heroImage: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1600&q=80',
+    stats: [],
+    items: [
+      { id: 'nk1', name: 'Jollof with grilled chicken', price: 'GH₵ 65', category: 'Mains', desc: 'Smoky tomato jollof with a quarter grilled chicken and fresh salad.', label: 'Popular', pinned: true, image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=600&q=80', options: ['Regular', 'Large'] },
+      { id: 'nk2', name: 'Grilled tilapia with banku', price: 'GH₵ 90', category: 'Mains', desc: 'Whole grilled tilapia with banku, pepper sauce and sliced onions.', label: 'Spicy', pinned: true, image: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=600&q=80' },
+      { id: 'nk3', name: 'Light soup with fufu', price: 'GH₵ 70', category: 'Soups', desc: 'Goat or fish light soup served with soft fufu.', image: 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=600&q=80', options: ['Goat', 'Fish'] },
+      { id: 'nk4', name: 'Sobolo', price: 'GH₵ 20', category: 'Drinks', desc: 'Chilled hibiscus drink with ginger and cloves.', image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80' },
+    ],
+  },
+
+  // V5 FLAGSHIP: BOUTIQUE (shop). Shares content with Classic Shop.
+  {
+    id: 'tmpl-boutique',
+    priority: 15,
+    title: 'Boutique',
+    category: 'retail',
+    categoryLabel: 'E-Commerce & Retail',
+    layoutType: 'boutique',
+    contentFamily: 'ecommerce',
+    industry: 'Fashion, bags, shoes, beauty, gifts and small shops',
+    description: 'Editorial shop design: a photo collage, a two-column product grid on phones, product details and orders sent to your WhatsApp.',
+    features: ['Two products side by side on phones', 'Product photos, options and details', 'WhatsApp order list', 'Delivery, payment and returns notes'],
+    accentColor: '#8A5A3B',
+    demoBusinessName: 'Your Boutique',
+    demoHeroTagline: 'Made to be worn and carried every day.',
+    demoSubtext: 'Browse the collection, pick your size or colour and order on WhatsApp. We confirm stock and delivery with you.',
+    location: 'Your area, your city',
+    hoursOrContact: 'Your WhatsApp number',
+    isFreeTier: true,
+    badgeText: 'New design',
+    colorScheme: {
+      primary: '#1f1a17',
+      secondary: '#8a5a3b',
+      background: '#f4efe7',
+      surface: '#fbf8f3',
+      text: '#1f1a17',
+      mutedText: '#6b5e55',
+      accent: '#8a5a3b',
+      border: '#ddd3c6',
+    },
+    heroImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',
+    stats: [],
+    items: [
+      { id: 'bq1', name: 'Kente occasion set', price: 'GH₵ 650', category: 'Occasion', desc: 'Made-to-measure kente for weddings and special days.', label: 'New', image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=600&q=80', options: ['S', 'M', 'L'] },
+      { id: 'bq2', name: 'Linen kaftan', price: 'GH₵ 380', category: 'Everyday', desc: 'A relaxed linen kaftan, tailored to your measurements.', image: 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?auto=format&fit=crop&w=600&q=80', options: ['Sand', 'Olive'] },
+      { id: 'bq3', name: 'Statement look', price: 'GH₵ 420', category: 'Occasion', desc: 'A bold outfit for evenings out. Ask about colours and fit.', image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80' },
+      { id: 'bq4', name: 'Ready-to-wear pieces', price: 'Ask', category: 'Everyday', desc: 'New pieces arrive every week. Ask what is in your size.', label: 'Gift idea', image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=600&q=80' },
+    ],
+  },
+
   // 2. DATA RESELLER STOREFRONT
   {
     id: 'tmpl-data-reseller',
     integrations: RESELLER_INTEGRATIONS,
     priority: 10,
-    title: 'QuickByte Data',
+    title: 'Signal',
     category: 'retail',
     categoryLabel: 'Data & Telecom',
     layoutType: 'reseller',
@@ -126,7 +206,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
       'Managed checkout and order tracking',
     ],
     accentColor: '#2563eb',
-    demoBusinessName: 'QuickByte Data',
+    demoBusinessName: 'Your Data Store',
     demoHeroTagline: 'Data bundles, bought in a few taps',
     demoSubtext:
       'Choose a bundle, enter the number that should receive it and pay securely. Keep your order reference to track your order here.',
@@ -168,20 +248,14 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
       { id: 'ds-at-3', name: '5GB AT Big Time Bundle', price: 'GH₵ 42.00', category: 'AT', tag: 'Best Value' },
       { id: 'ds-at-4', name: '10GB AT Big Time Bundle', price: 'GH₵ 80.00', category: 'AT', tag: 'Hot' },
     ],
-    testimonials: [
-      {
-        quote: 'Started selling data with this branded storefront. My customers love ordering directly on WhatsApp!',
-        author: 'Kwame Mensah',
-        role: 'Tech Retailer, Kumasi',
-      },
-    ],
+    testimonials: [],
   },
 
   // 3. CONSTRUCTION & CIVIL WORKS
   {
     id: 'tmpl-accra-build',
     priority: 100,
-    title: 'Apex Build & Civil Contractors',
+    title: 'Site & Build',
     category: 'construction',
     categoryLabel: 'Construction & Civil',
     layoutType: 'construction',
@@ -248,7 +322,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-glow-salon',
     priority: 40,
-    title: 'Nectar Glow Salon & Barber Studio',
+    title: 'Salon Studio',
     category: 'beauty',
     categoryLabel: 'Salons & Barber Studios',
     layoutType: 'salon',
@@ -314,7 +388,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-goldcoast-realty',
     priority: 60,
-    title: 'GoldCoast Realty & Luxury Living',
+    title: 'Property Showcase',
     category: 'realestate',
     categoryLabel: 'Real Estate & Properties',
     layoutType: 'realestate',
@@ -383,7 +457,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-lens-creative',
     priority: 80,
-    title: 'Kofi Lens — Visual Storyteller & Filmmaker',
+    title: 'Portfolio',
     category: 'portfolio',
     categoryLabel: 'Portfolios & Creators',
     layoutType: 'portfolio',
@@ -443,7 +517,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-vortex-tech',
     priority: 110,
-    title: 'Vortex Cloud & Digital Systems',
+    title: 'Tech Studio',
     category: 'agency',
     categoryLabel: 'Tech & Digital Agency',
     layoutType: 'agency',
@@ -498,7 +572,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-akwaaba-hotel',
     priority: 50,
-    title: 'Akwaaba Eco-Resort & Spa',
+    title: 'Stays',
     category: 'hotel',
     categoryLabel: 'Hotels & Hospitality',
     layoutType: 'hotel',
@@ -557,7 +631,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-horizon-edu',
     priority: 120,
-    title: 'Horizon STEM & Tech Academy',
+    title: 'Campus',
     category: 'education',
     categoryLabel: 'Education & Academies',
     layoutType: 'education',
@@ -614,7 +688,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-makola-mart',
     priority: 20,
-    title: 'GadgetHub Ghana — Electronics & Gear',
+    title: 'Classic Shop',
     category: 'retail',
     categoryLabel: 'E-Commerce & Retail',
     layoutType: 'ecommerce',
@@ -683,7 +757,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-grace-ministry',
     priority: 90,
-    title: 'Grace City Chapel International',
+    title: 'Sanctuary',
     category: 'church',
     categoryLabel: 'Churches & Ministries',
     layoutType: 'church',
@@ -743,7 +817,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-afrochic-threads',
     priority: 70,
-    title: 'Akwete Bespoke Atelier & Kente House',
+    title: 'Atelier',
     category: 'fashion',
     categoryLabel: 'Fashion & Bespoke',
     layoutType: 'fashion',
@@ -800,7 +874,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
   {
     id: 'tmpl-legon-consult',
     priority: 101,
-    title: 'Vanguard Legal & Accounting Partners',
+    title: 'Counsel',
     category: 'services',
     categoryLabel: 'Corporate & Legal',
     layoutType: 'services',
@@ -852,3 +926,39 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
 
 WEBSITE_TEMPLATES.push({ id: 'tmpl-start-blank', priority: 999, title: 'Start Blank', category: 'services', categoryLabel: 'Custom Layout', industry: 'Your business', description: 'Start with the essentials and build your own layout.', features: ['Header', 'Hero', 'Sections', 'Footer'], accentColor: '#00c365', demoBusinessName: 'My Business', demoHeroTagline: 'Introduce your business', demoSubtext: 'Tell visitors what you offer.', isFreeTier: true, layoutType: 'blank', badgeText: 'Essentials', composition: createWebsiteComposition() });
 export function orderedWebsiteTemplates() { return [...WEBSITE_TEMPLATES].sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999) || a.id.localeCompare(b.id)); }
+
+/**
+ * V5 renamed each design from a sample business ("QuickByte Data", a real customer's name) to a neutral
+ * design name. These frozen values keep old shared links and owner sites that never stored a business name
+ * rendering exactly as before. Never show them in gallery or dashboard chrome.
+ */
+export const LEGACY_TEMPLATE_TITLE_SLUGS: Readonly<Record<string, string>> = Object.freeze({
+  'gold-coast-artisan-kitchen-grill': 'tmpl-buka-bistro',
+  'quickbyte-data': 'tmpl-data-reseller',
+  'apex-build-civil-contractors': 'tmpl-accra-build',
+  'nectar-glow-salon-barber-studio': 'tmpl-glow-salon',
+  'goldcoast-realty-luxury-living': 'tmpl-goldcoast-realty',
+  'kofi-lens-visual-storyteller-filmmaker': 'tmpl-lens-creative',
+  'vortex-cloud-digital-systems': 'tmpl-vortex-tech',
+  'akwaaba-eco-resort-spa': 'tmpl-akwaaba-hotel',
+  'horizon-stem-tech-academy': 'tmpl-horizon-edu',
+  'gadgethub-ghana-electronics-gear': 'tmpl-makola-mart',
+  'grace-city-chapel-international': 'tmpl-grace-ministry',
+  'akwete-bespoke-atelier-kente-house': 'tmpl-afrochic-threads',
+  'vanguard-legal-accounting-partners': 'tmpl-legon-consult',
+});
+export const LEGACY_DEMO_BUSINESS_NAMES: Readonly<Record<string, string>> = Object.freeze({ 'tmpl-data-reseller': 'QuickByte Data' });
+
+/** Resolves a gallery deep link: template id, id without the prefix, current design-name slug or a legacy title slug. */
+export function findTemplateByLink(value: string): WebsiteTemplate | undefined {
+  const clean = value.toLowerCase().trim();
+  const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return WEBSITE_TEMPLATES.find(t => t.id.toLowerCase() === clean || t.id.replace(/^tmpl-/, '').toLowerCase() === clean || slug(t.title) === clean)
+    || WEBSITE_TEMPLATES.find(t => t.id === LEGACY_TEMPLATE_TITLE_SLUGS[clean.replace(/^-|-$/g, '')]);
+}
+
+/** Dashboard chip: the design name and its category, never a sample business. */
+export function templateDesignLabel(template?: Pick<WebsiteTemplate, 'title' | 'categoryLabel'> | null): string {
+  if (!template) return '';
+  return template.categoryLabel ? `${template.title} design · ${template.categoryLabel}` : `${template.title} design`;
+}

@@ -28,15 +28,8 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
   const edit = useVisualEditMarkers();
   const editing = useIsVisualEditing();
   const copy = useTemplateCopy(template);
-  const [booked, setBooked] = useState<boolean>(false);
   const suites = template.items || [];
 
-  const handleBooking = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (template.siteContent) { onCtaClick?.(); return; }
-    setBooked(true);
-    setTimeout(() => setBooked(false), 5000);
-  };
 
   return (
     <div className="bg-[var(--website-background,#f8f6f0)] text-[#192b23] font-sans min-h-full">
@@ -65,9 +58,6 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
         <div className="hidden md:flex items-center gap-6 text-xs font-semibold text-[#687e74] uppercase tracking-wider">
           <a href="#suites" className="hover:text-[var(--website-primary,#132e23)] transition-colors">
             Rooms & Stays
-          </a>
-          <a href="#experiences" className="hover:text-[var(--website-primary,#132e23)] transition-colors">
-            Experiences
           </a>
           <a href="#reserve" className="hover:text-[var(--website-primary,#132e23)] transition-colors">
             Book Stay
@@ -136,54 +126,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       {/* Quick Check-in Reservation Bar */}
       <div id="reserve" className="bg-white p-4 sm:p-6 border-b border-[#e8e5dc] shadow-md">
         <div className="max-w-5xl mx-auto">
-          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Which room?" dateLabel="Check-in date"/> : booked ? (
-            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-center text-xs text-emerald-800 font-bold">
-              Example only. No availability has been confirmed and no dates have been reserved.
-            </div>
-          ) : (
-            <form onSubmit={handleBooking} className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-              <div>
-                <label className="block text-[10px] font-bold text-[#687e74] uppercase mb-1">
-                  Check-In
-                </label>
-                <input
-                  type="date"
-                  defaultValue="2026-10-10"
-                  className="w-full bg-[var(--website-background,#f8f6f0)] border border-[#e8e5dc] rounded-xl p-2.5 text-[#192b23] focus:outline-none"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-[#687e74] uppercase mb-1">
-                  Check-Out
-                </label>
-                <input
-                  type="date"
-                  defaultValue="2026-10-12"
-                  className="w-full bg-[var(--website-background,#f8f6f0)] border border-[#e8e5dc] rounded-xl p-2.5 text-[#192b23] focus:outline-none"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-[#687e74] uppercase mb-1">
-                  Guests
-                </label>
-                <select className="w-full bg-[var(--website-background,#f8f6f0)] border border-[#e8e5dc] rounded-xl p-2.5 text-[#192b23] focus:outline-none">
-                  <option>2 Adults (Couples Getaway)</option>
-                  <option>4 Adults (Family Chalet)</option>
-                  <option>Private Group Booking</option>
-                </select>
-              </div>
-              <div className="flex items-end">
-                <button
-                  type="submit"
-                  className="w-full py-3 rounded-xl bg-[var(--website-primary,#132e23)] hover:bg-[var(--website-accent,#10b981)] hover:text-black text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
-                >
-                  {template.siteContent ? 'Enquire About Stay Dates' : 'Preview stay enquiry'}
-                </button>
-              </div>
-            </form>
-          )}
+          <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Which room?" dateLabel="Check-in date"/>
         </div>
       </div>
 
@@ -265,7 +208,7 @@ export const HotelTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
           </div>
         </div>
         <div className="border-t border-emerald-900/60 mt-8 pt-4 text-center text-emerald-400/60 text-[10px]">
-          © 2026 {template.demoBusinessName}. Powered by Mystery Hub Sites Ghana.
+          © {new Date().getFullYear()} {template.demoBusinessName}.
         </div>
       </footer>
     </div>

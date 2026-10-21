@@ -5,6 +5,8 @@ import {websiteTemplateItemFields} from './websiteBuilder.js';
 export const WEBSITE_STARTER_VERSION=1;
 const vocabulary:Record<string,[string,string,string]>={
   restaurant:['Menu item','Describe the dish, ingredients and portion you actually offer.','Menu'],
+  nightkitchen:['Menu item','Describe the dish, ingredients and portion you actually offer.','Menu'],
+  boutique:['Product','Describe an actual product and confirm availability before publishing.','Products'],
   salon:['Service','Describe this service and what a customer can expect.','Services'],
   construction:['Project outline','Replace this example with an accurate description of your own work or offering.','Projects'],
   realestate:['Property outline','Replace this example with a property you are authorized to advertise.','Properties'],
@@ -30,6 +32,16 @@ const examples:Record<string,StarterExample[]>={
     {name:'Jollof rice with grilled chicken',desc:'Smoky tomato jollof served with grilled chicken and fresh salad.',category:'Mains',image:2},
     {name:'Light soup with fufu',desc:'Goat or fish light soup served with soft fufu.',category:'Soups',image:1},
     {name:'Grilled tilapia with banku',desc:'Whole grilled tilapia with banku, pepper sauce and sliced onions.',category:'Mains',image:0},
+  ],
+  'tmpl-night-kitchen':[
+    {name:'Jollof rice with grilled chicken',desc:'Smoky tomato jollof served with grilled chicken and fresh salad.',category:'Mains',image:0},
+    {name:'Grilled tilapia with banku',desc:'Whole grilled tilapia with banku, pepper sauce and sliced onions.',category:'Mains',image:1},
+    {name:'Light soup with fufu',desc:'Goat or fish light soup served with soft fufu.',category:'Soups',image:2},
+  ],
+  'tmpl-boutique':[
+    {name:'Occasion outfit',desc:'Describe the fabric, sizes and colours you offer.',category:'Occasion',image:0},
+    {name:'Everyday piece',desc:'Describe the fabric, sizes and colours you offer.',category:'Everyday',image:1},
+    {name:'Gift idea',desc:'Describe a product customers often buy as a gift.',category:'Gifts',image:2},
   ],
   'tmpl-accra-build':[
     {name:'Offices and shops',desc:'Design and construction of offices, shops and mixed-use buildings.',category:'Commercial',image:0},
@@ -95,6 +107,8 @@ const examples:Record<string,StarterExample[]>={
 const wording:Record<string,{tagline:string;aboutText:string}>={
   'tmpl-data-reseller':{tagline:'Data bundles, bought in a few taps',aboutText:'Choose a bundle, enter the number that should receive it and pay securely. Keep your order reference to track your order here.'},
   'tmpl-buka-bistro':{tagline:'Ghanaian flavours, cooked with care',aboutText:'Take a look at our menu, then message us to ask about a table or to place an order.'},
+  'tmpl-night-kitchen':{tagline:'Home-style food, cooked fresh every day.',aboutText:'Browse the menu, add what you fancy and send your order on WhatsApp. Or come and eat with us.'},
+  'tmpl-boutique':{tagline:'Pieces made to be worn every day.',aboutText:'Browse the collection, pick your size or colour and order on WhatsApp. We confirm stock and delivery with you.'},
   'tmpl-accra-build':{tagline:'Built right, from foundation to handover',aboutText:'See the kind of work we take on, then tell us about your project and ask for an estimate.'},
   'tmpl-glow-salon':{tagline:'Look good. Feel confident.',aboutText:'Browse our services and message us to book a time that suits you.'},
   'tmpl-goldcoast-realty':{tagline:'Find a place that feels like home',aboutText:'Browse our listings and message us to ask about a property or arrange a viewing.'},
@@ -110,7 +124,7 @@ const wording:Record<string,{tagline:string;aboutText:string}>={
 /** The suggested headline and description a design starts with, if it has them. */
 export const websiteStarterWording=(templateId:string)=>wording[templateId];
 const itemWords:Record<string,[string,string,string]>={
-  restaurant:['Dish','Menu','dishes'],salon:['Service','Services','services'],construction:['Project','Projects','projects'],realestate:['Property','Properties','properties'],
+  restaurant:['Dish','Menu','dishes'],nightkitchen:['Dish','Menu','dishes'],boutique:['Product','Products','products'],salon:['Service','Services','services'],construction:['Project','Projects','projects'],realestate:['Property','Properties','properties'],
   portfolio:['Work','Portfolio','works'],agency:['Service','Services','services'],hotel:['Room','Rooms','rooms'],education:['Course','Courses','courses'],
   church:['Activity','Activities','activities'],fashion:['Item','Collection','items'],services:['Service','Services','services'],ecommerce:['Product','Products','products'],retail:['Product','Products','products'],
 };

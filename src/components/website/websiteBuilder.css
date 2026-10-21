@@ -184,3 +184,43 @@
 .website-made-for button:hover .website-made-for-photo{transform:scale(1.05)}
 .website-made-for button::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(5,8,12,.85))}
 .website-made-for button>span:last-child{position:absolute;z-index:1;left:10px;right:10px;bottom:9px;color:#fff;font-size:13px;font-weight:700;line-height:1.25}
+
+/* Danger Zone deletion sheet. */
+.website-delete-identity{display:grid;gap:4px;border-radius:14px;background:#111a21;border:1px solid #1f2a32;padding:12px 14px;font-size:13px;color:#9fb0a8}
+.website-delete-identity strong{font-size:17px;color:#eef3f1}
+.website-delete-effects{margin:0;padding:0;list-style:none;display:grid;gap:10px;font-size:14px;line-height:1.5;color:#cbd5d1}
+.website-delete-effects li{padding-left:14px;border-left:2px solid #263440}
+.website-delete-effects strong{color:#eef3f1}
+.website-delete-blockers{border-radius:14px;border:1px solid rgba(251,191,36,.45);background:rgba(251,191,36,.08);padding:12px 14px;font-size:14px;line-height:1.5;color:#fde68a}
+.website-delete-blockers ul{margin:6px 0;padding-left:18px;list-style:disc}
+.website-delete-blockers p{margin:0;color:#fcd34d}
+.website-danger-zone{border:1px solid rgba(244,63,94,.35);border-radius:14px;padding:14px;display:grid;gap:8px}
+.website-danger-zone strong{color:#fda4af}
+.website-danger-zone p{margin:0;font-size:13px;color:#9fb0a8}
+.website-danger-zone button{justify-self:start;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid rgba(244,63,94,.5);color:#fecdd3;font-weight:600}
+.website-publish-changes{border:1px solid rgba(148,163,184,.25);border-radius:14px;padding:12px 14px;margin-bottom:12px;background:rgba(15,23,42,.45)}
+.website-publish-changes strong{display:block;font-size:14px;color:#f1f5f9}
+.website-publish-changes ul{margin:8px 0 0;padding-left:18px;display:grid;gap:3px;font-size:13.5px;color:#cbd5e1}
+.website-publish-changes p{margin:6px 0 0;font-size:13px;color:#94a3b8}
+.website-recovery{position:fixed;z-index:95;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));max-width:560px;margin:0 auto;display:flex;gap:12px;padding:14px;border-radius:16px;background:#0f1a16;border:1px solid rgba(0,195,101,.45);color:#e2e8f0;box-shadow:0 18px 40px rgba(0,0,0,.5)}
+.website-recovery strong{display:block;font-size:14px}
+.website-recovery p{margin:4px 0 0;font-size:13px;color:#a7b6b0}
+.website-recovery-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+@media(min-width:1024px){.website-recovery{bottom:20px}}
+/* V5 owner dashboard: live strip, order facts, earnings definitions. */
+.website-live-strip{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 14px;border-radius:999px;border:1px solid #1e2a33;background:#0d171f;font-size:14px;font-weight:700}
+.website-live-strip>span{width:8px;height:8px;border-radius:50%;background:#94a3b8}
+.website-live-strip[data-live="yes"]>span{background:#00c365;box-shadow:0 0 0 4px rgba(0,195,101,.18)}
+.website-order-facts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.website-order-facts>span{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:700;background:#16212a;color:#cbd5e1}
+.website-order-facts>span[data-paid="yes"]{background:rgba(0,195,101,.14);color:#6ee7b7}
+.website-order-facts>span[data-group="delivered"]{background:rgba(0,195,101,.14);color:#6ee7b7}
+.website-order-facts>span[data-group="check"],.website-order-facts>span[data-group="failed"]{background:rgba(251,191,36,.14);color:#fcd34d}
+.website-earnings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (min-width:1024px){.website-earnings{grid-template-columns:repeat(5,minmax(0,1fr))}}
+.website-earnings>div{border:1px solid #1e2a33;border-radius:14px;padding:12px;background:#0d171f;min-width:0}
+.website-earnings dt{font-size:12px;color:#94a3b8}
+.website-earnings dd strong{display:block;font-size:20px;margin-top:2px;overflow-wrap:anywhere}
+.website-earnings dd span{display:block;font-size:12px;color:#94a3b8;line-height:1.4;margin-top:4px}
+.website-pricing-review ul{display:grid;gap:6px;margin:8px 0 12px;max-height:14rem;overflow-y:auto}
+.website-pricing-review li{font-size:14px;padding:8px 10px;border-radius:10px;background:#0a1218;border:1px solid #1a252d}

@@ -4,6 +4,7 @@
  * Supports independent deployment (Netlify frontend + Render/Cloud backend via VITE_API_BASE_URL).
  */
 
+import type { WebsiteDeletionBlockerView, WebsiteDeletionCheckView } from '../utils/websiteDeletion';
 import { SafePublicOrderDetails, AuthenticatedCustomerOrderDetails, AdminOrderDetails } from '../../server/types/orders';
 import { SafeUserProfile, WaitlistChannel, AuthSessionResponse, WaitlistRecord, UserStatus } from '../../server/types/auth';
 import { MarketplaceProduct } from '../types';
@@ -1133,10 +1134,13 @@ export async function updateWebsiteOnServer(
     body: JSON.stringify(input),
   });
 
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
+  // Another tab or phone saved a newer draft: the editor asks which version to keep instead of failing.
+  if (res.status === 409 && /changed/i.test(data.error || '')) throw new WebsiteSaveConflict(data.error);
   if (!res.ok) throw new Error(data.error || 'Failed to save website changes.');
   return data;
 }
+export class WebsiteSaveConflict extends Error {}
 
 export async function publishWebsiteOnServer(
   token: string,
@@ -1185,15 +1189,31 @@ export async function getPublicSiteBySlug(
   const res = await fetch(url, { method: 'GET' });
 
   const data = await res.json();
+  if (res.status === 410 && data.closed) throw new PublicSiteClosed(data.error, data.orderTracking?.siteId || null);
   if (!res.ok) throw new Error(data.error || 'Website not found.');
   return data;
 }
+/** A deleted website. Only its order tracking stays available, under the same address. */
+export class PublicSiteClosed extends Error {
+  constructor(message: string, public trackingSiteId: string | null) { super(message || 'This website is no longer available.'); }
+}
 
+export class WebsiteDeletionBlocked extends Error {
+  constructor(message: string, public blockers: WebsiteDeletionBlockerView[]) { super(message); }
+}
+/** Read-only: what deleting would remove and anything that must settle first. */
+export async function getWebsiteDeletionCheck(token: string, id: string): Promise<WebsiteDeletionCheckView> {
+  const res = await fetch(`${API_BASE_URL}/api/websites/${encodeURIComponent(id)}/deletion-check`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Could not check this website. Try again.');
+  return data;
+}
+/** Safe to retry: a website that is already deleted returns success. */
 export async function deleteWebsiteOnServer(
   token: string,
   id: string,
   confirmation: string
-): Promise<{ success: boolean; message?: string }> {
+): Promise<{ success: boolean; alreadyDeleted?: boolean; message?: string }> {
   const url = `${API_BASE_URL}/api/websites/${encodeURIComponent(id)}`;
   const res = await fetch(url, {
     method: 'DELETE',
@@ -1204,7 +1224,8 @@ export async function deleteWebsiteOnServer(
     body: JSON.stringify({ confirmation }),
   });
 
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 409 && Array.isArray(data.blockers)) throw new WebsiteDeletionBlocked(data.error, data.blockers);
   if (!res.ok) throw new Error(data.error || 'Failed to delete website.');
   return data;
 }

@@ -6,15 +6,17 @@ export function websiteMigrationSummary(fromId: string, targetId: string) {
   const from = WEBSITE_TEMPLATES.find(t => t.id === fromId);
   const target = WEBSITE_TEMPLATES.find(t => t.id === targetId);
   if (!target) throw new Error('Unknown template.');
-  // Matching field names are not evidence that two industries share content.
-  const compatible = !!from?.layoutType && from.layoutType === target.layoutType;
+  // Matching field names are not evidence that two industries share content. Designs for the same kind
+  // of business (Classic Kitchen and Night Kitchen, Classic Shop and Boutique) share one content family.
+  const compatible = !!from && websiteContentFamily(from) === websiteContentFamily(target);
   return { target, compatible,
-    kept: ['Business name & logo', 'Phone, WhatsApp & email', 'Location & social links', 'Site address & brand colours', 'Uploaded media library', ...(compatible ? ['Business content & image assignments'] : [])],
-    reset: compatible ? ['Page layout'] : [`${from?.categoryLabel || 'Previous design'} content & item lists`, 'Cover & gallery image assignments', 'Statistics, testimonials & custom sections'],
+    kept: ['Business name & logo', 'Phone, WhatsApp & email', 'Location & social links', 'Opening hours & policies', 'Site address & brand colours', 'Uploaded media library', ...(compatible ? ['Business content & image assignments'] : [])],
+    reset: compatible ? ['Page layout', ...(from?.layoutType !== target.layoutType ? ['Section order & hidden sections'] : [])] : [`${from?.categoryLabel || 'Previous design'} content & item lists`, 'Cover & gallery image assignments', 'Statistics, testimonials & custom sections'],
   };
 }
 
 /** The preview and server action use the same identity-only migration across industries. */
+export const websiteContentFamily = (template: { layoutType?: string; contentFamily?: string }) => template.contentFamily || template.layoutType || '';
 export function migrateWebsiteTemplate(content: SiteContent, fromId: string, targetId: string): SiteContent {
   const {target, compatible} = websiteMigrationSummary(fromId, targetId);
   if (fromId === targetId) return structuredClone(content);
@@ -33,7 +35,13 @@ export function migrateWebsiteTemplate(content: SiteContent, fromId: string, tar
     // confused with an older site's inherited banner. Other designs keep falling back to their own photo.
     heroImage: targetId === 'tmpl-data-reseller' ? target.heroImage || '' : '', ctaLabel: genericAction ? content.ctaLabel : defaultCta(targetId), ctaTarget: genericAction ? content.ctaTarget || '' : '',
     items: [], stats: [], features: [],
+    // V5: opening hours, policies and the logo description describe the business, not the design.
+    ...(content.hours ? { hours: structuredClone(content.hours) } : {}),
+    ...(content.policies ? { policies: structuredClone(content.policies) } : {}),
+    ...(content.imageMeta?.logoUrl ? { imageMeta: { logoUrl: structuredClone(content.imageMeta.logoUrl) } } : {}),
   };
+  // Section choices belong to one design's own sections.
+  if (WEBSITE_TEMPLATES.find(t => t.id === fromId)?.layoutType !== target.layoutType) delete migrated.sections;
   if (compatible && migrated.ctaLabel === defaultCta(fromId)) migrated.ctaLabel = defaultCta(targetId);
   if (!composition) { delete migrated.composition; return migrated; }
   migrated.composition = composition;
