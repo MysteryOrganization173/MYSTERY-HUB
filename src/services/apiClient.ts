@@ -1134,10 +1134,13 @@ export async function updateWebsiteOnServer(
     body: JSON.stringify(input),
   });
 
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
+  // Another tab or phone saved a newer draft: the editor asks which version to keep instead of failing.
+  if (res.status === 409 && /changed/i.test(data.error || '')) throw new WebsiteSaveConflict(data.error);
   if (!res.ok) throw new Error(data.error || 'Failed to save website changes.');
   return data;
 }
+export class WebsiteSaveConflict extends Error {}
 
 export async function publishWebsiteOnServer(
   token: string,

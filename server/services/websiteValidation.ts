@@ -147,11 +147,13 @@ const idList = (value: unknown, max: number, pattern: RegExp, message: string) =
 };
 /** Validates and normalizes only the V5 fields that are present. Returns exactly what may be stored. */
 export function websiteV5Fields(content: Record<string, unknown>) {
-  const out: { hours?: WebsiteHours | null; policies?: WebsitePolicies; sections?: WebsiteSectionLayout; imageMeta?: WebsiteImageMeta; gallery?: string[]; pinnedBundles?: string[] } = {};
+  const out: { hours?: WebsiteHours | null; policies?: WebsitePolicies | null; sections?: WebsiteSectionLayout | null; imageMeta?: WebsiteImageMeta | null; gallery?: string[] | null; pinnedBundles?: string[] | null } = {};
+  // null clears a field: editors send it when the owner removed something the saved draft still has.
+  const rest: Record<string, unknown> = { ...content };
+  for (const key of WEBSITE_V5_CONTENT_KEYS) if (content[key] === null) { (out as any)[key] = null; delete rest[key]; }
+  content = rest;
   if (content.hours !== undefined) {
-    // null clears the hours (the "Open now" badge then stays hidden).
-    if (content.hours === null) out.hours = null;
-    else {
+    {
       const hours = object(content.hours); keys(hours, ['days', 'note']);
       if (!Array.isArray(hours.days) || hours.days.length !== 7) fail('Enter hours for all seven days.');
       const days = hours.days.map(raw => {

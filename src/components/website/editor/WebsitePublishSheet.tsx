@@ -13,10 +13,12 @@ const formatDate = (value?: string | null) => {
  * One place to decide "is this ready to be public?": the owner's name, a way to be reached and the
  * example items the server will not publish until each is kept or removed. Never confirms for them.
  */
-export function WebsitePublishSheet({content, published, publishedAt, publicUrl, word, managed, suggestions = [], onReview, onEditItem, onEditField, onPublish, onClose}: {
+export function WebsitePublishSheet({content, published, publishedAt, publicUrl, word, managed, suggestions = [], changes, onReview, onEditItem, onEditField, onPublish, onClose}: {
   content: SiteContent; published: boolean; publishedAt?: string | null; publicUrl: string; word: {singular: string; plural: string; many: string}; managed: boolean;
   /** Design wording and sample photos still in use. Shown for a final look; never blocks publishing. */
   suggestions?: {label: string; target: string}[];
+  /** For a live website: what this update changes, compared with what visitors see now. */
+  changes?: string[];
   onReview: (ids: string[], action: 'confirm' | 'remove') => Promise<boolean>; onEditItem: (id: string) => void; onEditField: (target: string) => void;
   onPublish: () => Promise<boolean>; onClose: () => void;
 }) {
@@ -50,7 +52,10 @@ export function WebsitePublishSheet({content, published, publishedAt, publicUrl,
           <a className="website-sheet-confirm" href={`https://wa.me/?text=${encodeURIComponent(`${content.businessName || 'My website'}: ${publicUrl}`)}`} target="_blank" rel="noopener noreferrer"><MessageCircle size={18}/>Share on WhatsApp</a>
           <a className="website-sheet-cancel" href={publicUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={18}/>View website</a>
         </div>
-      </div> : <ol className="website-checklist">
+      </div> : <>{published && changes && <div className="website-publish-changes" data-publish-changes>
+        <strong>{changes.length ? 'What changes on your live website' : 'No changes since your last publish'}</strong>
+        {changes.length > 0 ? <ul>{changes.map(change => <li key={change}>{change}</li>)}</ul> : <p>Visitors already see this version.</p>}
+      </div>}<ol className="website-checklist">
         <li data-state="ok">
           <span className="website-check-icon" aria-hidden="true"><Check size={15}/></span>
           <div><strong>Business name</strong><p>{content.businessName}</p></div>
@@ -82,7 +87,7 @@ export function WebsitePublishSheet({content, published, publishedAt, publicUrl,
             </li>)}</ul>}
           </div>
         </li>}
-      </ol>}
+      </ol></>}
     </div>
     <div className="website-sheet-foot">
       {done ? <button type="button" onClick={onClose} className="website-sheet-confirm">Back to editing</button> : <>
