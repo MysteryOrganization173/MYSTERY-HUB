@@ -33,7 +33,8 @@ export function WebsiteBundlePricing({siteId,token,onDirty,published=true,onSave
  const choose=(patch:Partial<BundleSetupChoice>)=>{setChoice(prev=>({...prev,...patch}));setPlan(null);setError('');};
  const toggleNetwork=(id:string)=>choose({networks:choice.networks.includes(id)?choice.networks.filter(n=>n!==id):[...choice.networks,id]});
  // Quick setup: a preview only. Nothing changes in the list or on the store until the owner applies or saves it.
- const previewSetup=()=>{try{const next=planBundleSetup(products,drafts,choice);setPlan(next);setReviewing(false);setError('');setNotice('');}catch(e:any){setPlan(null);setError(e.message);}};
+ // Networks with nothing Mystery Hub can sell yet are shown but never chosen.
+ const previewSetup=()=>{try{const ready=new Set(products.filter(canPrice).map(p=>p.network));const next=planBundleSetup(products,drafts,{...choice,networks:choice.networks.filter(n=>ready.has(n))});setPlan(next);setReviewing(false);setError('');setNotice('');}catch(e:any){setPlan(null);setError(e.message);}};
  const applyPlan=(current:BundleSetupPlan)=>{const next={...drafts};for(const row of current.rows)next[row.id]=row.after;return next;};
  const save=async(next=drafts)=>{if(saving.current||!catalog)return;const rows=bundleSaveRows(products,original,next);
    const invalid=products.find(p=>rows.some(r=>r.productId===p.id)&&sellerPriceError(p,next[p.id]));if(invalid){setError(`${invalid.networkName} ${invalid.dataAmount}: ${sellerPriceError(invalid,next[invalid.id])}`);return;}
@@ -63,7 +64,7 @@ export function WebsiteBundlePricing({siteId,token,onDirty,published=true,onSave
  <fieldset disabled={busy||!configurable.length} className="website-bundles-setup min-w-0 rounded-xl border border-emerald-800/60 bg-emerald-950/10 p-3 space-y-4">
   <legend className="px-1 font-semibold">Quick setup</legend>
   <div><p className="text-xs font-semibold text-slate-300 mb-2" id={`bundle-networks-${variant}`}>1. Networks</p>
-   <div role="group" aria-labelledby={`bundle-networks-${variant}`} className="flex flex-wrap gap-2">{byNetwork.map(n=><button key={n.id} type="button" aria-pressed={choice.networks.includes(n.id)} disabled={!n.total} onClick={()=>toggleNetwork(n.id)} className={`${button} ${choice.networks.includes(n.id)?'border-emerald-500 text-emerald-200 bg-emerald-500/10':''}`}>{n.label}{!n.ready&&n.total?<span className="text-[11px] text-slate-400"> · not available</span>:null}</button>)}</div></div>
+   <div role="group" aria-labelledby={`bundle-networks-${variant}`} className="flex flex-wrap gap-2">{byNetwork.map(n=><button key={n.id} type="button" aria-pressed={!!n.ready&&choice.networks.includes(n.id)} disabled={!n.ready} onClick={()=>toggleNetwork(n.id)} className={`${button} disabled:opacity-60 ${n.ready&&choice.networks.includes(n.id)?'border-emerald-500 text-emerald-200 bg-emerald-500/10':''}`}>{n.label}{!n.ready&&n.total?<span className="text-[11px] text-slate-400"> · not available</span>:null}</button>)}</div></div>
   <div><p className="text-xs font-semibold text-slate-300 mb-2" id={`bundle-price-${variant}`}>2. Selling price</p>
    <div role="radiogroup" aria-labelledby={`bundle-price-${variant}`} className="grid gap-2">
     <label className="website-bundles-option"><input type="radio" name={`price-${variant}`} checked={choice.priceMode==='markup'} onChange={()=>choose({priceMode:'markup'})}/><span><strong>Add my profit to the minimum price</strong><small>Each bundle starts from its minimum selling price.</small></span></label>
