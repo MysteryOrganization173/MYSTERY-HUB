@@ -1,7 +1,7 @@
 import { getPool } from '../db/connection.js';
-import { websiteDatabase } from '../db/websiteTransaction.js';
+import { websiteDatabase, websiteTransactionClient } from '../db/websiteTransaction.js';
 import { WebsiteStore } from '../db/websiteStore.js';
-import { FinanceStore } from '../db/financeStore.js';
+import { FinanceStore, FinanceTx } from '../db/financeStore.js';
 import { WebsiteOperationError } from './websiteCloudinary.js';
 import type { WebsiteSiteRecord } from '../types/website.js';
 import type { OrderRecord } from '../types/orders.js';
@@ -23,21 +23,20 @@ export interface WebsiteDeletionCheck {
 }
 
 const IN_PROGRESS = ['paid', 'queued', 'submitted', 'processing', 'refund_pending'];
-/** An unpaid checkout can still be completed in Paystack for a while; give it a day to settle or expire. */
+/** Retained for old callers; elapsed time alone is never proof that a provider payment expired. */
 export const DELETION_PENDING_PAYMENT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 type OrderRow = Pick<OrderRecord, 'status' | 'payment_status' | 'manual_review' | 'created_at'>;
 async function unresolvedOrders(siteId: string, now: number): Promise<OrderRow[]> {
-  const since = new Date(now - DELETION_PENDING_PAYMENT_WINDOW_MS).toISOString();
   // Inside the owner's website transaction this reads through the same connection (no second checkout).
   const db = websiteDatabase();
   if (db) return (await db.query<OrderRow>(
     `SELECT status, payment_status, manual_review, created_at FROM orders WHERE store_context->>'siteId' = $1
-     AND (status = ANY($2::text[]) OR manual_review = TRUE OR (status = 'pending_payment' AND created_at > $3))`,
-    [siteId, IN_PROGRESS, since])).rows;
+     AND (status = ANY($2::text[]) OR manual_review = TRUE OR status = 'pending_payment')`,
+    [siteId, IN_PROGRESS])).rows;
   const { OrdersStore } = await import('../db/ordersStore.js');
   return OrdersStore.adminDevOrders().filter(o => o.store_context?.siteId === siteId
-    && (IN_PROGRESS.includes(o.status) || o.manual_review || (o.status === 'pending_payment' && o.created_at > since)));
+    && (IN_PROGRESS.includes(o.status) || o.manual_review || o.status === 'pending_payment'));
 }
 
 function orderBlockers(rows: OrderRow[]): WebsiteDeletionBlocker[] {
@@ -46,13 +45,17 @@ function orderBlockers(rows: OrderRow[]): WebsiteDeletionBlocker[] {
   const pending = rows.filter(o => o.status === 'pending_payment').length;
   const review = rows.filter(o => o.manual_review && !IN_PROGRESS.includes(o.status)).length;
   if (active) blockers.push({ code: 'orders_in_progress', count: active, message: `${active} paid ${active === 1 ? 'order is' : 'orders are'} still being delivered or refunded. Wait until ${active === 1 ? 'it finishes' : 'they finish'}.` });
-  if (pending) blockers.push({ code: 'payment_pending', count: pending, message: `${pending} ${pending === 1 ? 'customer has' : 'customers have'} an unfinished payment from the last 24 hours. It can still complete, so wait for it to finish or expire.` });
+  if (pending) blockers.push({ code: 'payment_pending', count: pending, message: `${pending} ${pending === 1 ? 'customer has' : 'customers have'} an unfinished payment. Wait for confirmed completion or expiry; contact support if it remains pending.` });
   if (review) blockers.push({ code: 'order_review', count: review, message: `${review} ${review === 1 ? 'order is' : 'orders are'} being checked by Mystery Hub support. Contact support before deleting.` });
   return blockers;
 }
 
 async function financeBlockers(userId: string): Promise<WebsiteDeletionBlocker[]> {
-  const earnings = await FinanceStore.read(userId, tx => tx.storeEarnings());
+  const client=websiteTransactionClient();
+  // Share the archive transaction and serialize against checkout, settlement and withdrawals.
+  // Passive reads create no accounts and never change ledger entries.
+  if(client)await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`finance:${userId}`]);
+  const earnings = client ? await new FinanceTx(userId,client,undefined,true).storeEarnings() : await FinanceStore.read(userId, tx => tx.storeEarnings());
   const blockers: WebsiteDeletionBlocker[] = [];
   if (earnings.availableMinor > 0) blockers.push({ code: 'earnings_available', amountMinor: earnings.availableMinor, message: 'You have store earnings ready to withdraw. Withdraw them first, because a deleted website cannot request a withdrawal.' });
   if (earnings.pendingMinor > 0) blockers.push({ code: 'earnings_pending', amountMinor: earnings.pendingMinor, message: 'Some store earnings are still pending. Wait until they become available and withdraw them first.' });
@@ -73,10 +76,8 @@ export class WebsiteDeletionService {
   }
 
   /**
-   * Archive under the owner's website lock. The finance read happens first, on its own short read-only
-   * connection; inside the lock, orders are re-read on the lock's connection, so a checkout that
-   * started meanwhile still blocks. Checkout itself re-reads the site after locking its row and refuses
-   * an archived website, so no new purchase can begin afterwards.
+   * Archive under the owner's website and finance locks, using one database transaction. All blockers
+   * are re-read before archiving; checkout serializes on the same finance lock and rechecks the site.
    */
   static async archive(siteId: string, userId: string, confirmation: unknown, now = Date.now()) {
     const { withWebsiteLock } = await import('../db/websiteTransaction.js');
@@ -85,9 +86,9 @@ export class WebsiteDeletionService {
     if (first.user_id !== userId) throw new WebsiteOperationError('You do not own this website.', 403);
     if (first.status === 'archived') return { site: first, alreadyDeleted: true };
     if (!deletionConfirmed(first, confirmation)) throw new WebsiteOperationError('Type the website name exactly as shown to confirm.');
-    const money = await financeBlockers(userId);
-    if (money.length) throw new WebsiteDeletionBlockedError(money);
     return withWebsiteLock(userId, async () => {
+      const money = await financeBlockers(userId);
+      if (money.length) throw new WebsiteDeletionBlockedError(money);
       const current = await WebsiteStore.findSiteRecordById(siteId);
       if (!current || current.user_id !== userId) throw new WebsiteOperationError('Website not found.', 404);
       if (current.status === 'archived') return { site: current, alreadyDeleted: true };

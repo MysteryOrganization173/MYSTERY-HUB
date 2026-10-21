@@ -12,7 +12,7 @@ import { getWebsiteTemplatePlan, restoreWebsiteDraft } from '../../services/webs
 import { historyDate } from './editor/WebsiteLayoutAndHistory';
 import './websiteBuilder.css';
 
-export function WebsiteSettingsControls({site,token,onUpdated,onDeleted,requestedTemplateId,selectionOnly,onClosed}:{site:WebsiteSiteRecord;token:string;onUpdated:(site:WebsiteSiteRecord)=>void;onDeleted:(siteId:string)=>void;requestedTemplateId?:string;selectionOnly?:boolean;onClosed?:()=>void}) {
+export function WebsiteSettingsControls({site,token,onUpdated,onDeleted,requestedTemplateId,selectionOnly,onClosed,onResolve}:{site:WebsiteSiteRecord;token:string;onUpdated:(site:WebsiteSiteRecord)=>void;onDeleted:(siteId:string)=>void;requestedTemplateId?:string;selectionOnly?:boolean;onClosed?:()=>void;onResolve?:(tab:'Orders'|'Store Earnings')=>void}) {
   const [mode,setMode]=useState<'template'|'delete'|null>(null),[target,setTarget]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const dialog=useRef<HTMLDialogElement>(null);
   // The server's plan is authoritative: the exact resulting draft, the live design and history room.
@@ -36,7 +36,7 @@ export function WebsiteSettingsControls({site,token,onUpdated,onDeleted,requeste
     <button type="button" onClick={()=>setMode('template')} className="px-4 py-2 rounded-xl bg-slate-800 text-white font-semibold">Change your design</button>
     <section className="website-danger-zone" aria-labelledby="website-danger-title"><strong id="website-danger-title">Danger Zone</strong><p>Delete this website to free your Free website slot and start again with a new name and address. Your account, Wallet, Mystery Earn and order records stay.</p><button type="button" onClick={()=>setMode('delete')}>Delete website…</button></section>
     </>}
-    {mode==='delete' && <WebsiteDeleteSheet site={site} token={token} onClose={()=>setMode(null)} onDeleted={id=>{setMode(null);onDeleted(id);}}/>}
+    {mode==='delete' && <WebsiteDeleteSheet onResolve={onResolve?tab=>{setMode(null);onResolve(tab);}:undefined} site={site} token={token} onClose={()=>setMode(null)} onDeleted={id=>{setMode(null);onDeleted(id);}}/>}
     {mode==='template' && <dialog ref={dialog} onCancel={event=>{event.preventDefault();close();}} aria-labelledby="website-settings-action" className="website-sheet">
       <div className="website-sheet-head">
         <div className="min-w-0 flex-1"><h2 id="website-settings-action">{summary ? `Switch to ${summary.target.title}?` : 'Choose a new design'}</h2>

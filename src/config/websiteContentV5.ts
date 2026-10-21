@@ -24,6 +24,17 @@ export const isFocal = (value: unknown): value is WebsiteFocal => !!value && typ
 /** CSS object-position for an owner focal point; the centre when none was chosen. */
 export const focalPosition = (focal?: Partial<WebsiteFocal> | null) => focal && isFocal({ x: focal.x, y: focal.y }) ? `${focal.x}% ${focal.y}%` : undefined;
 
+/** Percentage bounds of the actual photo inside an object-fit:contain focus selector. */
+export function containedPhotoBounds(width:number,height:number,imageWidth:number,imageHeight:number) {
+  if(Math.min(width,height,imageWidth,imageHeight)<=0)return {left:0,top:0,width:100,height:100};
+  const scale=Math.min(width/imageWidth,height/imageHeight),w=imageWidth*scale/width*100,h=imageHeight*scale/height*100;
+  return {left:(100-w)/2,top:(100-h)/2,width:w,height:h};
+}
+export function containedPhotoFocal(x:number,y:number,bounds:ReturnType<typeof containedPhotoBounds>):WebsiteFocal {
+  const clamp=(value:number)=>Math.round(Math.min(100,Math.max(0,value)));
+  return {x:clamp((x-bounds.left)/bounds.width*100),y:clamp((y-bounds.top)/bounds.height*100)};
+}
+
 const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
 /** Ghana keeps UTC all year (no daylight saving), so Accra time is UTC. */
 function accraParts(now: Date) { const day = (now.getUTCDay() + 6) % 7; return { day, minute: now.getUTCHours() * 60 + now.getUTCMinutes() }; }

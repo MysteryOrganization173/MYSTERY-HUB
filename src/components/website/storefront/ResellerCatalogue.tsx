@@ -118,7 +118,7 @@ export function filterBundles(bundles: StoreBundle[], filter: BundleFilter, pinn
   if (filter === 'under20') return bundles.filter(b => b.priceMinor < 2000);
   if (filter === 'mid') return bundles.filter(b => { const gb = bundleSizeGb(b.dataAmount); return gb !== null && gb >= 1 && gb < 10; });
   if (filter === 'big') return bundles.filter(b => (bundleSizeGb(b.dataAmount) ?? 0) >= 10);
-  return bundles;
+  return [...filterBundles(bundles,'featured',pinned),...bundles.filter(b=>!pinned.includes(b.id))];
 }
 
 /** A compact bundle row: size, validity and per-GB on the left, the total price on the right. */

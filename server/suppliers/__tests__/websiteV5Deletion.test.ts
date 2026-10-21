@@ -49,6 +49,29 @@ async function founderSite(publish=true){
 async function configure(siteId:string){await Business.savePolicy('admin',{confirmed:true,expectedVersion:'unconfigured',enabled:true,reserveBps:300,reserveFixedMinor:10,withdrawalMinimumMinor:500,withdrawalFeeBps:300});await Business.saveWholesale('admin',{confirmed:true,expectedVersion:'empty',productId:'mtn-1gb',wholesaleMinor:300,enabled:true});await Business.savePrices(siteId,'owner',{expectedVersion:'empty',products:[{productId:'mtn-1gb',retailMinor:500,enabled:true}]});}
 const checkoutBody=()=>({productId:'mtn-1gb',recipientPhone:'0241111111',customerEmail:'receipt@fixture.test',requestId:randomUUID()});
 const del=(siteId:string,confirmation:string,token='owner-token')=>request(`/api/websites/${siteId}`,'DELETE',{confirmation},token);
+
+test('owner last-four search covers all pages, stays site-bound, masks numbers and rejects invalid queries',async()=>{
+  const site=await founderSite();await configure(site.id);await Business.initialize(site.id,checkoutBody());
+  const source=OrdersStore.adminDevOrders()[0];
+  for(let i=0;i<29;i++)await OrdersStore.createOrder({...source,id:`ord-search-${i}`,public_reference:`MH-search-${i}`,payment_reference:`search-${i}`,recipient_phone:i===28?'0242229876':'0243331111',created_at:new Date(Date.now()-i*1000).toISOString(),store_context:{...source.store_context!,siteId:i===27?'another-site':site.id}});
+  const response=await request(`/api/websites/${site.id}/business?lastFour=9876`,'GET',undefined,'owner-token');assert.equal(response.status,200);
+  const {data}=await response.json();assert.equal(data.orders.length,1);assert.equal(data.orders[0].id,'ord-search-28');assert.ok(data.capabilities.hasStoreHistory);assert.ok(!JSON.stringify(data).includes('0242229876'));
+  assert.ok(data.orders[0].recipient.endsWith('9876'));
+  for(const query of ['123','12345','abcd',"1234%27",'1234&lastFour=5678'])assert.equal((await request(`/api/websites/${site.id}/business?lastFour=${query}`,'GET',undefined,'owner-token')).status,400);
+  for(const [token,status] of [['',401],['other-token',403]] as const)assert.equal((await request(`/api/websites/${site.id}/business?lastFour=9876`,'GET',undefined,token)).status,status);
+  const page=await (await request(`/api/websites/${site.id}/business?lastFour=1111&offset=25`,'GET',undefined,'owner-token')).json();assert.ok(page.data.orders.length>0&&page.data.orders.length<25);assert.ok(!page.data.orders.some((o:any)=>o.id==='ord-search-27'));
+});
+
+test('store earnings use gross withdrawal totals, include approved reservations, and retain historical lifetime',async()=>{
+  await FinanceStore.transaction('owner',async tx=>{
+    const sale=await tx.create('store_sale','definition-sale',1000,{availableAt:'2026-10-21'},'available');await tx.append(sale,'store',1000,'fixture');
+    for(const [key,state,amount] of [['review','pending_review',100],['approved','approved',200],['paid','paid',300]] as const){const w=await tx.create('withdrawal',key,amount,{source:'store',feeMinor:10,netMinor:amount-10},state);await tx.append(w,'store',-amount,'fixture');}
+    await tx.create('store_sale','pending-sale',50,{},'pending');
+    await tx.update(sale,'reversed');
+  });
+  const e=await FinanceStore.read('owner',tx=>tx.storeEarnings());
+  assert.deepEqual({available:e.availableMinor,pending:e.pendingMinor,reserved:e.reservedMinor,withdrawn:e.withdrawnMinor,lifetime:e.lifetimeMinor},{available:400,pending:50,reserved:300,withdrawn:300,lifetime:1000});
+});
 const financialState=()=>JSON.stringify({orders:OrdersStore.adminDevOrders().map(o=>({id:o.id,status:o.status,payment_status:o.payment_status,amount:o.amount,store_context:o.store_context})).sort((a,b)=>a.id.localeCompare(b.id))});
 
 test('founder journey: the check names the exact website, deletion archives it and frees the Free slot',async()=>{
@@ -107,11 +130,11 @@ test('an order still being delivered blocks deletion and explains why; nothing i
   assert.equal((await WebsiteStore.findSiteById(site.id))?.status,'published');assert.equal(financialState(),before);
 });
 
-test('an unfinished payment blocks deletion for 24 hours, then it no longer does',async()=>{
+test('an unfinished payment still blocks after 24 hours without provider-confirmed expiry',async()=>{
   const site=await founderSite();await configure(site.id);await Business.initialize(site.id,checkoutBody());
   assert.ok((await WebsiteDeletionService.check(site)).blockers.some(b=>b.code==='payment_pending'));
   await assert.rejects(()=>WebsiteDeletionService.archive(site.id,'owner','MYSTERY TEST hub'),/unfinished payment/);
-  const later=Date.now()+DELETION_PENDING_PAYMENT_WINDOW_MS+60_000;assert.deepEqual((await WebsiteDeletionService.check(site,later)).blockers,[]);
+  const later=Date.now()+DELETION_PENDING_PAYMENT_WINDOW_MS+60_000;assert.ok((await WebsiteDeletionService.check(site,later)).blockers.some(b=>b.code==='payment_pending'));
 });
 
 test('store earnings that are pending or available block deletion, because withdrawal needs the website',async()=>{

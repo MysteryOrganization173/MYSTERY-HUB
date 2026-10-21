@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import type { WebsiteSiteRecord } from '../../types';
 import { deleteWebsiteOnServer, getWebsiteDeletionCheck, WebsiteDeletionBlocked } from '../../services/apiClient';
 import { deletionNameMatches, forgetDeletedWebsite, websiteDeletionName, type WebsiteDeletionBlockerView, type WebsiteDeletionCheckView } from '../../utils/websiteDeletion';
+import { BUSINESS_CONFIG } from '../../config/business';
 import { formatGhs } from '../../../shared/money';
 import './websiteBuilder.css';
 
@@ -10,7 +11,7 @@ import './websiteBuilder.css';
  * Danger Zone deletion. The server decides: it shows what will happen, refuses while orders or store
  * earnings could still move, and archives (never erases) the website. Retrying after a lost response is safe.
  */
-export function WebsiteDeleteSheet({ site, token, onDeleted, onClose }: { site: WebsiteSiteRecord; token: string; onDeleted: (siteId: string) => void; onClose: () => void }) {
+export function WebsiteDeleteSheet({ site, token, onDeleted, onClose, onResolve }: { site: WebsiteSiteRecord; token: string; onDeleted: (siteId: string) => void; onClose: () => void; onResolve?: (tab: 'Orders' | 'Store Earnings') => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [check, setCheck] = useState<WebsiteDeletionCheckView | null>(null), [loadError, setLoadError] = useState(''), [attempt, setAttempt] = useState(0);
   const [typed, setTyped] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [blockers, setBlockers] = useState<WebsiteDeletionBlockerView[] | null>(null);
@@ -52,7 +53,13 @@ export function WebsiteDeleteSheet({ site, token, onDeleted, onClose }: { site: 
       {blocked && <div role="alert" className="website-delete-blockers" data-website-delete-blocked>
         <strong>You can’t delete this website yet</strong>
         <ul>{blockers!.map(b => <li key={b.code}>{b.message}{b.amountMinor ? ` (${formatGhs(b.amountMinor)})` : ''}</li>)}</ul>
-        <p>Nothing has been changed. Come back once these are settled.</p>
+        <p>Your website and financial records remain accessible. You can unpublish it to stop new checkouts while existing orders and withdrawals settle. Deletion never forfeits earnings.</p>
+        <div className="flex flex-wrap gap-3 mt-3">
+          {onResolve&&<><button type="button" className="website-sheet-cancel" onClick={()=>onResolve('Orders')}>Open Orders</button><button type="button" className="website-sheet-cancel" onClick={()=>onResolve('Store Earnings')}>Open Store Earnings</button></>}
+          <a href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="min-h-11 inline-flex items-center underline">Contact support about settlement</a>
+          <button type="button" className="min-h-11 underline" onClick={()=>setAttempt(n=>n+1)}>Check again</button>
+        </div>
+        <p>If your balance is below the withdrawal minimum or needs reconciliation, contact support before closing. No automatic payout or transfer takes place here.</p>
       </div>}
       <ul className="website-delete-effects">
         <li><strong>Gone right away.</strong> Visitors to the address see “This website is no longer available”. Nobody is sent to another business.</li>

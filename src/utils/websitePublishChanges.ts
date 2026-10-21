@@ -11,6 +11,7 @@ const FIELDS: [keyof SiteContent, string][] = [
   ['heroImage', 'Main photo'], ['logoUrl', 'Logo'], ['ctaLabel', 'Main button'], ['ctaTarget', 'Main button link'],
   ['hours', 'Opening hours'], ['policies', 'Delivery, payment & returns'], ['sections', 'Page sections'], ['gallery', 'Gallery photos'],
   ['imageMeta', 'Photo focus and descriptions'], ['copy', 'Headings and labels'], ['social', 'Social links'], ['composition', 'Custom sections'],
+  ['pinnedBundles', 'Featured bundles'], ['features', 'Feature details'], ['stats', 'Business facts'],
 ];
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -32,5 +33,7 @@ export function websitePublishChanges(snapshot: WebsitePublishedSnapshot | null 
   if (changed) out.push(`${plural(changed, itemWord)} changed`);
   if (order) out.push(`${itemWord[0].toUpperCase()}${itemWord.slice(1)} order`);
   if ((['primaryColor', 'accentColor', 'backgroundColor'] as const).some(k => !same(snapshot.settings?.[k], draft.settings[k]))) out.push('Colours');
+  if (!same(snapshot.settings?.fontFamily, draft.settings.fontFamily)) out.push('Font');
+  if (!same(snapshot.settings?.borderRadius, draft.settings.borderRadius)) out.push('Corner style');
   return out;
 }

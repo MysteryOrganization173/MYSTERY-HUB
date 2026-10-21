@@ -90,7 +90,8 @@ function StorefrontCheckout({siteId,template,preview}:{siteId:string;template:We
   const suggested=validNumber?detectGhanaNetwork(phone) as StoreNetwork|null:null;
   const shown=networks.includes(network as StoreNetwork)?network as StoreNetwork:suggested&&networks.includes(suggested)?suggested:networks[0]||'mtn';
   const pinned=(template.siteContent?.pinnedBundles||[]).filter(id=>bundles.some(b=>b.id===id&&b.network===shown));
-  const onNetwork=sortBundles(bundles.filter(b=>b.network===shown));
+  // Owner choices lead the default list, so the collapsed catalogue cannot hide them.
+  const onNetwork=filterBundles(sortBundles(bundles.filter(b=>b.network===shown)),'all',pinned);
   const filters=bundleFilters(onNetwork,pinned);
   const activeFilter=filters.some(f=>f.id===filter)?filter:'all';
   const matching=filterBundles(onNetwork,activeFilter,pinned);
