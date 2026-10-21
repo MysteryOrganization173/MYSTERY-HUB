@@ -64,9 +64,9 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
           <a href="#solutions" className="hover:text-[#06b6d4] transition-colors">
             Architecture
           </a>
-          <a href="#metrics" className="hover:text-[#06b6d4] transition-colors">
+          {!!template.stats?.length && <a href="#metrics" className="hover:text-[#06b6d4] transition-colors">
             Highlights
-          </a>
+          </a>}
           <a href="#discovery" className="hover:text-[#06b6d4] transition-colors">
             Discovery Call
           </a>

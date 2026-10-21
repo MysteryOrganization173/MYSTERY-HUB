@@ -4,6 +4,7 @@ import {useVisualEditMarkers, useIsVisualEditing, useTemplateCopy} from '../edit
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
+import { HoursList } from '../storefront/BusinessInfo.js';
 import React, { useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
 import {
@@ -29,10 +30,6 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
   const editing = useIsVisualEditing();
   const copy = useTemplateCopy(template);
   const [activeCategory, setActiveCategory] = useState<string>('All');
-  const [selectedPartySize, setSelectedPartySize] = useState<number>(2);
-  const [reservationDate, setReservationDate] = useState<string>('2026-10-02');
-  const [reservationTime, setReservationTime] = useState<string>('19:30');
-  const [isBooked, setIsBooked] = useState<boolean>(false);
 
   const categories = template.siteContent ? ['All', ...new Set((template.items || []).map(item=>item.category).filter((category):category is string=>Boolean(category) && category!=='All'))] : ['All', 'Main Grills', 'Soups & Swallows', 'Beverages'];
   const menuItems = template.items || [];
@@ -42,12 +39,6 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
     return item.category === activeCategory;
   });
 
-  const handleBookTable = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (template.siteContent) { onCtaClick?.(); return; }
-    setIsBooked(true);
-    setTimeout(() => setIsBooked(false), 5000);
-  };
 
   return (
     <div className="bg-[var(--website-background,#fcf9f5)] text-[#1c1917] font-serif min-h-full">
@@ -79,11 +70,8 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
           <a href="#menu" className="hover:text-[var(--website-primary,#7a1c28)] transition-colors">
             Our Menu
           </a>
-          <a href="#story" className="hover:text-[var(--website-primary,#7a1c28)] transition-colors">
-            Chef’s Craft
-          </a>
           <a href="#reserve" className="hover:text-[var(--website-primary,#7a1c28)] transition-colors">
-            Reservations
+            {template.siteContent ? 'Enquire' : 'Reservations'}
           </a>
           <a href="#location" className="hover:text-[var(--website-primary,#7a1c28)] transition-colors">
             Find Us
@@ -95,7 +83,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
           className="px-4 py-2 rounded-full bg-[var(--website-primary,#7a1c28)] hover:bg-[#5d151e] text-[var(--website-background,#fcf9f5)] text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer font-sans"
         >
           <Calendar className="w-3.5 h-3.5 text-[var(--website-accent,#c99a45)]" />
-          <span>{template.siteContent?.ctaLabel || 'Reserve Table'}</span>
+          <span>{template.siteContent?.ctaLabel || (template.siteContent ? 'Contact us' : 'Reserve Table')}</span>
         </button>
       </nav>
 
@@ -218,89 +206,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
             <p className="text-xs text-[#78716c]" {...copy.edit('enquiryIntro')}>{copy.text('enquiryIntro')}</p>
           </div>
 
-          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Ask about" dateLabel="Date of your visit"/> : isBooked ? (
-            <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-center space-y-2">
-              <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto">
-                <Check className="w-5 h-5" />
-              </div>
-              <h4 className="font-bold text-emerald-800 text-base">Example reservation</h4>
-              <p className="text-xs text-emerald-700">
-                Example only: {selectedPartySize} guests on {reservationDate} at {reservationTime}. No reservation has been made.
-              </p>
-            </div>
-          ) : (
-            <form onSubmit={handleBookTable} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#78716c] uppercase mb-1">
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    value={reservationDate}
-                    onChange={(e) => setReservationDate(e.target.value)}
-                    className="w-full bg-[var(--website-background,#fcf9f5)] border border-[#e7ded1] rounded-xl px-3 py-2 text-xs text-[#1c1917] focus:outline-none focus:border-[var(--website-primary,#7a1c28)]"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#78716c] uppercase mb-1">
-                    Time
-                  </label>
-                  <select
-                    value={reservationTime}
-                    onChange={(e) => setReservationTime(e.target.value)}
-                    className="w-full bg-[var(--website-background,#fcf9f5)] border border-[#e7ded1] rounded-xl px-3 py-2 text-xs text-[#1c1917] focus:outline-none focus:border-[var(--website-primary,#7a1c28)]"
-                  >
-                    <option value="12:30">12:30 PM (Lunch)</option>
-                    <option value="14:00">2:00 PM (Afternoon)</option>
-                    <option value="18:30">6:30 PM (Sunset)</option>
-                    <option value="19:30">7:30 PM (Dinner)</option>
-                    <option value="20:30">8:30 PM (Late Night)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#78716c] uppercase mb-1">
-                    Guests
-                  </label>
-                  <select
-                    value={selectedPartySize}
-                    onChange={(e) => setSelectedPartySize(Number(e.target.value))}
-                    className="w-full bg-[var(--website-background,#fcf9f5)] border border-[#e7ded1] rounded-xl px-3 py-2 text-xs text-[#1c1917] focus:outline-none focus:border-[var(--website-primary,#7a1c28)]"
-                  >
-                    <option value={1}>1 Guest (Solo)</option>
-                    <option value={2}>2 Guests (Couple)</option>
-                    <option value={4}>4 Guests (Table)</option>
-                    <option value={6}>6 Guests (Family)</option>
-                    <option value={10}>10+ Guests (Private Area)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  placeholder="Your Full Name"
-                  className="w-full bg-[var(--website-background,#fcf9f5)] border border-[#e7ded1] rounded-xl px-3.5 py-2.5 text-xs text-[#1c1917] focus:outline-none focus:border-[var(--website-primary,#7a1c28)]"
-                  required
-                />
-                <input
-                  type="tel"
-                  placeholder="WhatsApp Mobile (+233 24 000 0000)"
-                  className="w-full bg-[var(--website-background,#fcf9f5)] border border-[#e7ded1] rounded-xl px-3.5 py-2.5 text-xs text-[#1c1917] focus:outline-none focus:border-[var(--website-primary,#7a1c28)]"
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3.5 rounded-xl bg-[var(--website-primary,#7a1c28)] hover:bg-[#5d151e] text-[var(--website-background,#fcf9f5)] font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Calendar className="w-4 h-4 text-[var(--website-accent,#c99a45)]" />
-                <span>{template.siteContent ? 'Contact to Arrange Reservation' : 'Preview reservation enquiry'}</span>
-              </button>
-            </form>
-          )}
+          <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Ask about" dateLabel="Date of your visit"/>
         </div>
       </div>
 
@@ -315,17 +221,18 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
               {template.demoSubtext}
             </p>
           </div>
-          {(template.location || editing) && <div className="space-y-2">
+          {(template.location || editing || template.siteContent?.hours) && <div className="space-y-2">
             <h5 className="font-bold text-white uppercase tracking-wider text-[11px]">
-              Location & Hours
+              {template.siteContent?.hours ? 'Location & Hours' : 'Location'}
             </h5>
             <p className="text-slate-400 text-xs" {...edit("content:location")}>
               {template.location}
             </p>
+            {template.siteContent?.hours && <HoursList hours={template.siteContent.hours} className="text-slate-400 text-xs" />}
           </div>}
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase tracking-wider text-[11px]">
-              Reservations
+              {template.siteContent ? 'Contact' : 'Reservations'}
             </h5>
             <SiteFooterContact template={template} className="text-slate-400 text-xs" />
             <div className="pt-1">
