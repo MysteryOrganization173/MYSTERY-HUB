@@ -30,8 +30,8 @@ export async function prepareWebsiteImage(file: File, maxBytes: number): Promise
     const canvas = document.createElement('canvas');
     canvas.width = plan.width; canvas.height = plan.height;
     canvas.getContext('2d')!.drawImage(bitmap, 0, 0, plan.width, plan.height); bitmap.close();
-    // PNG logos keep transparency as WebP; photos become JPEG, which every phone and crawler reads.
-    const type = file.type === 'image/png' ? 'image/webp' : 'image/jpeg', ext = type === 'image/webp' ? '.webp' : '.jpg';
+    // PNG/WebP logos retain transparency; JPEG photos remain JPEG.
+    const type = file.type === 'image/png' || file.type === 'image/webp' ? 'image/webp' : 'image/jpeg', ext = type === 'image/webp' ? '.webp' : '.jpg';
     for (const quality of [0.82, 0.72, 0.62]) {
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, type, quality));
       if (!blob || blob.type !== type) break;

@@ -13,6 +13,7 @@ test('payment and delivery are two separate facts, both from server status',()=>
   assert.equal(ownerOrderView(order('expired')).payment,'Payment not completed');
   assert.deepEqual(ownerOrderView(order('processing')),{payment:'Payment received',delivery:'Processing',group:'sending',paid:true});
   assert.equal(ownerOrderView(order('delivered')).group,'delivered');assert.equal(ownerOrderView(order('delivered')).delivery,'Delivered');
+  assert.equal(ownerOrderView(order('delivered',{paid:false})).payment,'Awaiting payment','delivery status never substitutes for the authoritative payment flag');
   assert.equal(ownerOrderView(order('failed')).group,'failed');assert.equal(ownerOrderView(order('refund_pending')).group,'failed');
   assert.equal(ownerOrderView(order('processing',{manualReview:true})).group,'check','manual review wins over status');
   assert.deepEqual(ownerOrderCounts([order('delivered'),order('delivered'),order('failed'),order('queued')]),{check:0,sending:1,delivered:2,failed:1,unpaid:0});

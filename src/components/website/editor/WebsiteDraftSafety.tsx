@@ -5,7 +5,7 @@ import { websitePublishChanges } from '../../../utils/websitePublishChanges';
 import '../websiteBuilder.css';
 
 /**
- * Draft safety: unsaved edits are mirrored on this device under one key per website (cleared once the
+ * Draft safety: unsaved edits are mirrored on this device under a separate key for each website/design (cleared once the
  * server confirms the save, and when the website is deleted), and a save that meets a newer version
  * from another tab or phone asks which version to keep instead of overwriting either.
  */

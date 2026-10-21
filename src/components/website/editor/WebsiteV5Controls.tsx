@@ -7,7 +7,7 @@ import { SafeImage } from '../SafeImage';
 import { WebsiteImageField } from './WebsiteImageField';
 import {
   WEBSITE_DAYS, WEBSITE_POLICY_KEYS, WEBSITE_POLICY_LABELS, WEBSITE_SECTION_REGISTRY, WEBSITE_V5_LIMITS, defaultWebsiteHours, focalPosition, isWebsiteTime,
-  resolveWebsiteSections, websiteHoursRows, type WebsiteFocal, type WebsiteHours, type WebsitePolicies, type WebsiteSectionLayout,
+  resolveWebsiteSections, websiteHoursRows, containedPhotoBounds, containedPhotoFocal, type WebsiteFocal, type WebsiteHours, type WebsitePolicies, type WebsiteSectionLayout,
 } from '../../../config/websiteContentV5';
 
 /* ------------------------------------------------------------------ Page sections */
@@ -140,14 +140,16 @@ export function WebsiteFeaturedBundlesControl({ siteId, token, value, onChange }
  */
 export function WebsiteImageDetails({ src, focal, alt, onChange, altLabel = 'Describe the photo' }: { src?: string; focal?: Partial<WebsiteFocal>; alt?: string; onChange: (patch: { x?: number; y?: number; alt?: string }) => void; altLabel?: string }) {
   const box = useRef<HTMLButtonElement>(null);
+  const [natural,setNatural]=useState({src:'',width:0,height:0}),[size,setSize]=useState({width:0,height:0});
+  useEffect(()=>{const el=box.current;if(!el)return;const observer=new ResizeObserver(()=>setSize({width:el.clientWidth,height:el.clientHeight}));observer.observe(el);return()=>observer.disconnect();},[src]);
   if (!src) return null;
   const position = focalPosition(focal) || '50% 50%';
   const [fx, fy] = position.split(' ').map(v => parseFloat(v));
+  const image=natural.src===src?natural:{width:0,height:0};
+  const bounds=containedPhotoBounds(size.width,size.height,image.width,image.height);
   const pick = (event: React.PointerEvent<HTMLButtonElement>) => {
     const rect = box.current!.getBoundingClientRect();
-    const x = Math.round(Math.min(100, Math.max(0, (event.clientX - rect.left) / rect.width * 100)));
-    const y = Math.round(Math.min(100, Math.max(0, (event.clientY - rect.top) / rect.height * 100)));
-    onChange({ x, y });
+    onChange(containedPhotoFocal((event.clientX-rect.left)/rect.width*100,(event.clientY-rect.top)/rect.height*100,containedPhotoBounds(rect.width,rect.height,image.width,image.height)));
   };
   const nudge = (event: React.KeyboardEvent) => {
     const step = { ArrowLeft: [-5, 0], ArrowRight: [5, 0], ArrowUp: [0, -5], ArrowDown: [0, 5] }[event.key];
@@ -158,8 +160,8 @@ export function WebsiteImageDetails({ src, focal, alt, onChange, altLabel = 'Des
     <div className="visual-field">
       <div className="visual-field-label"><label>Focus point</label><span>{focal ? `${fx}% · ${fy}%` : 'Centre'}</span></div>
       <button ref={box} type="button" onPointerDown={pick} onKeyDown={nudge} aria-label="Choose the focus point. Tap the photo, or use the arrow keys." className="relative block w-full rounded-xl overflow-hidden border border-slate-700 cursor-crosshair" style={{ aspectRatio: '3 / 2', touchAction: 'none' }}>
-        <SafeImage src={src} alt="" className="absolute inset-0 w-full h-full" style={{ objectFit: 'contain', background: '#05090c' }} />
-        <span aria-hidden="true" className="absolute w-8 h-8 -ml-4 -mt-4 rounded-full border-[3px] border-white shadow-[0_0_0_2px_rgba(0,0,0,.6)]" style={{ left: `${fx}%`, top: `${fy}%` }} />
+        <SafeImage src={src} alt="" className="absolute inset-0 w-full h-full" style={{ objectFit: 'contain', background: '#05090c' }} onLoad={event=>setNatural({src:src||'',width:event.currentTarget.naturalWidth,height:event.currentTarget.naturalHeight})} />
+        <span aria-hidden="true" className="absolute w-8 h-8 -ml-4 -mt-4 rounded-full border-[3px] border-white shadow-[0_0_0_2px_rgba(0,0,0,.6)]" style={{ left: `${bounds.left+fx*bounds.width/100}%`, top: `${bounds.top+fy*bounds.height/100}%` }} />
       </button>
       <div className="grid grid-cols-[2fr_3fr] gap-2" aria-label="How the photo is cropped">
         <figure className="m-0"><SafeImage src={src} alt="" className="rounded-lg w-full" style={{ aspectRatio: '4 / 5', objectPosition: position }} /><figcaption className="text-[11px] text-slate-400 mt-1">Phone</figcaption></figure>

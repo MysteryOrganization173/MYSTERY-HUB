@@ -269,8 +269,8 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
   // Unsaved edits are also kept on this device, so a lost connection or a closed tab never loses them.
   useEffect(() => {
-    if (isDirty) writeDraftRecovery(currentSite.id, {base: serverSiteRef.current.updated_at, name: siteName, content, settings});
-    else if (saveStatusText === 'saved' && !recovery) clearDraftRecovery(currentSite.id);
+    if (isDirty) writeDraftRecovery(currentSite.id, {templateId:currentSite.template_id,base: serverSiteRef.current.updated_at, name: siteName, content, settings});
+    else if (saveStatusText === 'saved' && !recovery) clearDraftRecovery(currentSite.id,currentSite.template_id);
   }, [isDirty, siteName, content, settings, saveStatusText, recovery]);
   const retryRef = useRef(() => {});
   retryRef.current = () => { if (failedSaveVersion.current !== null && !conflict) { failedSaveVersion.current = null; void handleSaveDraft(); } };
@@ -482,10 +482,10 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     <div ref={workspaceRef} role="dialog" aria-modal="true" aria-label="Website editor" className="visual-workspace fixed inset-0 z-[80] text-slate-100 flex flex-col font-sans overflow-hidden">
       {conflict && <WebsiteConflictSheet mine={{name: siteName, content, settings}} theirs={conflict} templateId={currentSite.template_id} word={word.singular.toLowerCase()}
         onKeepMine={()=>{serverSiteRef.current=conflict;setCurrentSite(conflict);setConflict(null);failedSaveVersion.current=null;void handleSaveDraft();}}
-        onUseTheirs={()=>{const site=conflict;setConflict(null);failedSaveVersion.current=null;serverSiteRef.current=site;setCurrentSite(site);onSiteUpdated(site);draftRef.current={name:site.name,content:site.content_json,settings:site.settings_json};setSiteName(site.name);setContent(site.content_json);setSettings(site.settings_json);editVersion.current++;savedVersion.current=editVersion.current;historySeen.current=editVersion.current;setIsDirty(false);setSaveStatusText('saved');clearDraftRecovery(site.id);}}/>}
+        onUseTheirs={()=>{const site=conflict;setConflict(null);failedSaveVersion.current=null;serverSiteRef.current=site;setCurrentSite(site);onSiteUpdated(site);draftRef.current={name:site.name,content:site.content_json,settings:site.settings_json};setSiteName(site.name);setContent(site.content_json);setSettings(site.settings_json);editVersion.current++;savedVersion.current=editVersion.current;historySeen.current=editVersion.current;setIsDirty(false);setSaveStatusText('saved');clearDraftRecovery(site.id,site.template_id);}}/>}
       {recovery && <WebsiteRecoveryBanner recovery={recovery} changedSince={recovery.base!==currentSite.updated_at}
         onRestore={()=>{const r=recovery;setRecovery(null);draftRef.current={name:r.name,content:r.content,settings:r.settings};setSiteName(r.name);setContent(r.content);setSettings(r.settings);markDirty();showToast('Your unsaved changes are back. Saving now.','success');}}
-        onDiscard={()=>{setRecovery(null);clearDraftRecovery(currentSite.id);}}/>}
+        onDiscard={()=>{setRecovery(null);clearDraftRecovery(currentSite.id,currentSite.template_id);}}/>}
       {publishOpen && <WebsitePublishSheet content={content} published={currentSite.status==='published'} publishedAt={currentSite.published_at} publicUrl={`${window.location.origin}/sites/${currentSite.slug}`} word={word} managed={isDataReseller}
         onReview={reviewItems} onEditItem={openItem} onPublish={handlePublish} onClose={()=>setPublishOpen(false)}
         suggestions={publishSuggestions} changes={websitePublishChanges(currentSite.published_snapshot_json, {templateId: currentSite.template_id, content, settings}, word.singular.toLowerCase())}

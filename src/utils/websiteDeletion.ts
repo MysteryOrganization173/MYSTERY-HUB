@@ -24,7 +24,12 @@ export const withoutDeletedWebsites = <T extends { id: string }>(sites: T[]) => 
 /** Per-site browser state that must not follow the owner into a new website. */
 // A buyer's checkout recovery key is deliberately kept: it protects against paying twice.
 export const websiteBrowserKeys = (id: string) => [`mh_builder_guide_dismissed_${id}`, `mh_website_draft_recovery:${id}`];
-export function forgetDeletedWebsite(id: string, storages: Array<Pick<Storage, 'removeItem'> | undefined> = typeof window === 'undefined' ? [] : [window.localStorage, window.sessionStorage]) {
+export function forgetDeletedWebsite(id: string, storages?: Array<(Pick<Storage, 'removeItem'> & Partial<Pick<Storage,'key'|'length'>>) | undefined>) {
   deleted.add(id);
-  for (const storage of storages) for (const key of websiteBrowserKeys(id)) { try { storage?.removeItem(key); } catch { /* Storage can be unavailable. */ } }
+  if(!storages){storages=[];if(typeof window!=='undefined')for(const name of ['localStorage','sessionStorage'] as const){try{storages.push(window[name]);}catch{/* Storage can be blocked. */}}}
+  for (const storage of storages) { try {
+    const keys=websiteBrowserKeys(id);
+    for(let i=(storage?.length||0)-1;i>=0;i--){const key=storage?.key?.(i);if(key?.startsWith(`mh_website_draft_recovery:${id}:`))keys.push(key);}
+    for(const key of keys)storage?.removeItem(key);
+  } catch { /* The server deletion still succeeded when browser storage is unavailable. */ } }
 }

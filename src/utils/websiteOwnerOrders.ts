@@ -11,7 +11,7 @@ export const OWNER_ORDER_FILTERS: [OwnerOrderGroup | 'all', string][] = [['all',
 
 export function ownerOrderView(order: OwnerOrder) {
   const p = dataOrderPresentation(order.status, order.manualReview);
-  const unpaid = !order.paid && !p.paymentConfirmed;
+  const unpaid = !order.paid;
   const payment = unpaid ? (['cancelled', 'expired'].includes(order.status) ? 'Payment not completed' : 'Awaiting payment') : 'Payment received';
   const group: OwnerOrderGroup = order.manualReview ? 'check'
     : unpaid ? 'unpaid'
@@ -27,12 +27,12 @@ export function ownerOrderCounts(orders: OwnerOrder[]) {
   return counts;
 }
 
-/** Plain definitions shown next to each earnings figure. Wording to be confirmed against ledger rules (Codex handoff). */
+/** Store ledger definitions; withdrawal totals are gross deductions, including the payout fee. */
 export const STORE_EARNING_DEFINITIONS: [key: 'availableMinor' | 'pendingMinor' | 'reservedMinor' | 'withdrawnMinor', label: string, meaning: string][] = [
   ['availableMinor', 'Available', 'Confirmed earnings you can request to withdraw.'],
   ['pendingMinor', 'Pending', 'From paid orders, not released to Available yet.'],
-  ['reservedMinor', 'Reserved', 'Held for withdrawal requests that are being reviewed.'],
-  ['withdrawnMinor', 'Withdrawn', 'Already paid out to you.'],
+  ['reservedMinor', 'Reserved', 'Held for withdrawals under review or approved but not yet paid.'],
+  ['withdrawnMinor', 'Withdrawn', 'Total earnings deducted for completed withdrawals, including payout fees.'],
 ];
 
 export interface PricingChangeInput { id: string; networkName: string; dataAmount: string; before: { price: string; enabled: boolean }; after: { price: string; enabled: boolean } }
