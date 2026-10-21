@@ -2,7 +2,7 @@
  * What an owner should look at next, worked out only from records the dashboard already loaded.
  * Nothing here is a guess: every item points at a real gap and at the place that fixes it.
  */
-export type OwnerAttentionAction = 'edit' | 'pricing' | 'earnings' | 'share' | 'publish';
+export type OwnerAttentionAction = 'edit' | 'pricing' | 'earnings' | 'share' | 'publish' | 'orders';
 export interface OwnerAttentionItem {id: string; title: string; detail: string; action: OwnerAttentionAction; label: string; tone: 'warn' | 'info'}
 
 export interface OwnerAttentionInput {
@@ -13,11 +13,15 @@ export interface OwnerAttentionInput {
   sellableBundles?: number | null;
   reconciliationRequired?: boolean;
   views?: number | null;
+  /** Loaded Data orders on review or failed/refund paths (server statuses only). */
+  ordersNeedingCheck?: number;
 }
 
 export function ownerAttention(input: OwnerAttentionInput): OwnerAttentionItem[] {
   const items: OwnerAttentionItem[] = [];
   const c = input.content || {};
+  if (input.reseller && input.ordersNeedingCheck) items.push({id: 'orders', tone: 'warn', action: 'orders', label: 'See orders',
+    title: input.ordersNeedingCheck === 1 ? '1 order needs a check' : `${input.ordersNeedingCheck} orders need a check`, detail: 'Mystery Hub is reviewing delivery or a refund. Tell the customer not to pay again for the same order.'});
   if (input.reseller && input.sellableBundles === 0) items.push({id: 'bundles', tone: 'warn', action: 'pricing', label: 'Set up bundles',
     title: 'No bundles on sale yet', detail: 'Customers see an empty store until you switch on bundles and set your prices.'});
   if (input.reconciliationRequired) items.push({id: 'earnings', tone: 'warn', action: 'earnings', label: 'View Store Earnings',

@@ -39,7 +39,7 @@ export class WebsiteAnalyticsStore {
   }
   static async ownerAnalytics(siteId:string,userId:string,range='30',staffVerified=false) {
     if(!staffVerified)await WebsiteAssetStore.ownedSite(siteId,userId);
-    if(!['7','30','90','all'].includes(range))throw new WebsiteOperationError('Invalid analytics period.');
+    if(!['1','7','30','90','all'].includes(range))throw new WebsiteOperationError('Invalid analytics period.');
     const since=range==='all'?null:new Date(Date.now()-Number(range)*86400000).toISOString(),db=getPool();
     const rows:EventRecord[]=db?(await db.query('SELECT * FROM analytics_events WHERE entity_id=$1 AND ($2::timestamptz IS NULL OR created_at >= $2)',[siteId,since])).rows.map(e=>({...e,created_at:new Date(e.created_at).toISOString()})):memory.filter(e=>e.entity_id===siteId&&(!since||e.created_at>=since));
     const count=(name:string)=>rows.filter(e=>e.event_name===`website_public_${name}`).length;
