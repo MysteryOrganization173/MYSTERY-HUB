@@ -98,6 +98,8 @@ export type TemplateLayoutType =
   | 'fashion'
   | 'services'
   | 'reseller'
+  | 'nightkitchen'
+  | 'boutique'
   | 'blank';
 
 export interface SiteSocialLinks {
@@ -128,6 +130,14 @@ export interface SiteContent {
   features?: string[];
   /** Owner wording for a designed template's headings and labels, keyed `${layout}.${slot}`. */
   copy?: Record<string, string>;
+  /** V5 additive fields. All optional; absent on older websites. */
+  hours?: import('../config/websiteContentV5.js').WebsiteHours;
+  policies?: import('../config/websiteContentV5.js').WebsitePolicies;
+  sections?: import('../config/websiteContentV5.js').WebsiteSectionLayout;
+  imageMeta?: import('../config/websiteContentV5.js').WebsiteImageMeta;
+  gallery?: string[];
+  /** Data stores: up to six bundle ids the owner features first. */
+  pinnedBundles?: string[];
 }
 
 export interface SiteSettings {
@@ -191,9 +201,18 @@ export interface TemplateItem {
   tag?: string;
   specs?: string[];
   rating?: number;
+  /** V5 additive item fields. */
+  images?: string[];
+  label?: string;
+  pinned?: boolean;
+  alt?: string;
+  focal?: { x: number; y: number };
+  options?: string[];
 }
 
 export interface WebsiteTemplate {
+  /** Designs for the same kind of business share content when switching (defaults to layoutType). */
+  contentFamily?: string;
   /** Owner-only preview context; never persisted in website content. */
   previewSiteId?: string;
   priority?: number;

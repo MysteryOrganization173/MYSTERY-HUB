@@ -9,6 +9,7 @@ import { WebsiteOperationError } from '../services/websiteCloudinary.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
 import { resolveWebsitePlan, showWebsiteAttribution } from '../../src/config/websiteBuilder.js';
 import { ultraRouter } from './websiteUltraApi.js';
+import { WebsiteDeletionService, WebsiteDeletionBlockedError } from '../services/websiteDeletion.js';
 /**
  * Website Builder API Routes
  * Endpoints for site creation, editing, live previewing, saving, publishing, and public display.
@@ -210,24 +211,32 @@ websiteRouter.post('/:id/unpublish', requireAuth, async (req: Request, res: Resp
 });
 
 /**
- * 7. DELETE /api/websites/:id
- * Permanently deletes a website project with ownership check.
- * Releases the 1-site free limit immediately.
+ * 7. GET /api/websites/:id/deletion-check
+ * Read-only: what deleting would remove and anything that must settle first.
  */
-websiteRouter.delete('/:id', requireAuth, createRateLimiter({windowMs:60_000,max:5,key:req=>req.user!.id}), websiteFreeHandler(async (req, res) => {
-  const userId = req.user!.id;
-  const { site, assetIds } = await withWebsiteLock(userId, async () => {
-    const site = await WebsiteAssetStore.ownedSite(req.params.id, userId);
-    if (typeof req.body?.confirmation !== 'string' || ![site.name, site.slug].includes(req.body.confirmation)) throw new WebsiteOperationError('Type the website name or slug to confirm deletion.');
-    const assetIds = (await WebsiteAssetStore.forSite(site.id)).map(asset => asset.id);
-    await WebsiteStore.deleteSite(site.id, userId);
-    return { site, assetIds };
-  });
-  // Database commit precedes remote destruction. Failed provider cleanup keeps durable tombstones.
-  const cleanup = await Promise.all(assetIds.map(id => WebsiteAssetStore.cleanup(id)));
-  await WebsiteAnalyticsStore.action('website_deleted', userId, site.id, site.template_id);
-  res.json({success:true,message:'Website deleted successfully.',cleanupPending:cleanup.some(success=>!success)});
+websiteRouter.get('/:id/deletion-check', requireAuth, websiteFreeHandler(async (req, res) => {
+  const site = await WebsiteAssetStore.ownedSite(req.params.id, req.user!.id);
+  res.set('Cache-Control', 'no-store').json({ success: true, ...await WebsiteDeletionService.check(site) });
 }));
+
+/**
+ * 8. DELETE /api/websites/:id
+ * Deletes (archives) a website after typed confirmation. Releases the Free slot immediately, keeps the
+ * address reserved and every order, earning and image record intact. Repeating it succeeds.
+ */
+websiteRouter.delete('/:id', requireAuth, createRateLimiter({windowMs:60_000,max:5,key:req=>req.user!.id}), async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  try {
+    const { site, alreadyDeleted } = await WebsiteDeletionService.archive(req.params.id, userId, req.body?.confirmation);
+    if (!alreadyDeleted) await WebsiteAnalyticsStore.action('website_deleted', userId, site.id, site.template_id);
+    res.set('Cache-Control', 'no-store').json({ success: true, deleted: true, alreadyDeleted, siteId: site.id, message: 'Website deleted.' });
+  } catch (err) {
+    if (err instanceof WebsiteDeletionBlockedError) { res.status(409).json({ error: err.message, code: err.code, blockers: err.blockers }); return; }
+    if (err instanceof WebsiteOperationError) { res.status(err.status).json({ error: err.message }); return; }
+    console.error('[Website API] Error deleting site:', err instanceof Error ? err.message : 'unknown');
+    res.status(500).json({ error: 'The website was not deleted. Try again.' });
+  }
+});
 
 /**
  * 7. GET /api/public/sites/:slug
@@ -245,7 +254,9 @@ export async function handlePublicSiteBySlug(req: Request, res: Response): Promi
     const site = await WebsiteStore.findPublishedSiteBySlug(slug);
 
     if (!site) {
-      res.status(404).json({ error: 'Website not found or not published.' });
+      // A deleted website shows a neutral closed page; existing buyers can still track their orders.
+      const closed = await WebsiteDeletionService.closedSite(slug);
+      res.status(closed ? 410 : 404).set('Cache-Control', 'no-store').json(closed ? { error: 'This website is no longer available.', ...closed } : { error: 'Website not found or not published.' });
       return;
     }
 

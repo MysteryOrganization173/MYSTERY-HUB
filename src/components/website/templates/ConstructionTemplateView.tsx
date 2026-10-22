@@ -29,7 +29,6 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
   const edit = useVisualEditMarkers();
   const copy = useTemplateCopy(template);
   const [activeTab, setActiveTab] = useState<string>('All');
-  const [quoteSubmitted, setQuoteSubmitted] = useState<boolean>(false);
 
   const projects = template.items || [];
   const filteredProjects = projects.filter((p) => {
@@ -37,12 +36,6 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
     return p.category === activeTab;
   });
 
-  const handleQuoteSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (template.siteContent) { onCtaClick?.(); return; }
-    setQuoteSubmitted(true);
-    setTimeout(() => setQuoteSubmitted(false), 5000);
-  };
 
   return (
     <div className="bg-[var(--website-background,#0b1118)] text-slate-100 font-sans min-h-full">
@@ -83,9 +76,9 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
           <a href="#projects" className="hover:text-[var(--website-accent,#f97316)] transition-colors">
             Projects Portfolio
           </a>
-          <a href="#capabilities" className="hover:text-[var(--website-accent,#f97316)] transition-colors">
+          {(!template.siteContent || !!template.features?.length) && <a href="#capabilities" className="hover:text-[var(--website-accent,#f97316)] transition-colors">
             Capabilities
-          </a>
+          </a>}
           <a href="#quote" className="hover:text-[var(--website-accent,#f97316)] transition-colors">
             Tender Estimate
           </a>
@@ -286,81 +279,13 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
             <p className="text-xs text-slate-400" {...copy.edit('enquiryIntro')}>{copy.text('enquiryIntro')}</p>
           </div>
 
-          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Type of project" dateLabel="Planned start date"/> : quoteSubmitted ? (
-            <div className="p-6 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-2">
-              <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
-              <h4 className="font-bold text-emerald-300 text-base">Tender Request Received</h4>
-              <p className="text-xs text-slate-300">
-                Example only. No project request has been sent.
-              </p>
-            </div>
-          ) : (
-            <form onSubmit={handleQuoteSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
-                    Project Type
-                  </label>
-                  <select className="w-full bg-[var(--website-background,#0b1118)] border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[var(--website-accent,#f97316)]">
-                    <option>Commercial Multi-Storey Building</option>
-                    <option>Residential Estate / Luxury Villa</option>
-                    <option>Industrial Warehouse / Logistics Yard</option>
-                    <option>Road Paving & Civil Infrastructure</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
-                    Site Location in Ghana
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Airport Residential, Accra"
-                    className="w-full bg-[var(--website-background,#0b1118)] border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[var(--website-accent,#f97316)]"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
-                    Contact Person / Company Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Full Name / Company Name"
-                    className="w-full bg-[var(--website-background,#0b1118)] border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[var(--website-accent,#f97316)]"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
-                    Ghana Phone / WhatsApp Number
-                  </label>
-                  <input
-                    type="tel"
-                    placeholder="e.g. +233 24 000 0000"
-                    className="w-full bg-[var(--website-background,#0b1118)] border border-slate-700 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[var(--website-accent,#f97316)]"
-                    required
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3.5 rounded-lg bg-[var(--website-accent,#f97316)] hover:bg-[#ea580c] text-black font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <HardHat className="w-4 h-4 text-black" />
-                <span>{template.siteContent ? 'Contact About Your Project' : 'Request a Project Estimate'}</span>
-              </button>
-            </form>
-          )}
+          <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Type of project" dateLabel="Planned start date"/>
         </div>
       </div>
 
       {/* Industrial Footer */}
-      <footer id="safety" className="bg-[#070b10] border-t border-slate-800 py-10 px-6 sm:px-12 text-xs">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6 text-slate-400">
+      <footer id="safety" className="bg-[#070b10] border-t border-slate-800 py-7 sm:py-10 px-6 sm:px-12 text-xs">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 text-slate-400">
           <div className="space-y-2">
             <h4 className="font-black text-white text-base uppercase" {...edit("content:businessName")}>
               {template.demoBusinessName}
@@ -378,8 +303,8 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
             <SiteFooterContact template={template} className="text-xs" />
           </div>
         </div>
-        <div className="border-t border-slate-800 mt-8 pt-4 text-center text-slate-500 text-[10px]">
-          © 2026 {template.demoBusinessName}. Powered by Mystery Hub Sites Ghana.
+        <div className="border-t border-slate-800 mt-5 sm:mt-8 pt-4 text-center text-slate-500 text-[10px]">
+          © {new Date().getFullYear()} {template.demoBusinessName}.
         </div>
       </footer>
     </div>

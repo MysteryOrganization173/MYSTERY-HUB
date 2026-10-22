@@ -76,9 +76,9 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
         </div>
 
         <div className="hidden lg:flex items-center gap-6 text-xs font-bold text-slate-600 uppercase tracking-wider">
-          <a href="#search" className="hover:text-[var(--website-accent,#0ea5e9)] transition-colors">
+          {!template.siteContent && <a href="#search" className="hover:text-[var(--website-accent,#0ea5e9)] transition-colors">
             Property Search
-          </a>
+          </a>}
           <a href="#featured" className="hover:text-[var(--website-accent,#0ea5e9)] transition-colors">
             Featured Homes
           </a>
@@ -327,8 +327,8 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
       </div>
 
       {/* Footer */}
-      <footer id="contact" className="bg-[var(--website-primary,#0f172a)] text-slate-400 py-10 px-6 sm:px-12 text-xs">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <footer id="contact" className="bg-[var(--website-primary,#0f172a)] text-slate-400 py-7 sm:py-10 px-6 sm:px-12 text-xs">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
           <div className="space-y-2">
             <h4 className="font-bold text-white text-base" {...edit("content:businessName")}>
               {template.demoBusinessName}
@@ -346,8 +346,8 @@ export const RealEstateTemplateView: React.FC<TemplateViewProps> = ({ template, 
             <SiteFooterContact template={template} className="text-xs" />
           </div>
         </div>
-        <div className="border-t border-slate-800 mt-8 pt-4 text-center text-slate-500 text-[10px]">
-          © 2026 {template.demoBusinessName}. Powered by Mystery Hub Sites Ghana.
+        <div className="border-t border-slate-800 mt-5 sm:mt-8 pt-4 text-center text-slate-500 text-[10px]">
+          © {new Date().getFullYear()} {template.demoBusinessName}.
         </div>
       </footer>
     </div>

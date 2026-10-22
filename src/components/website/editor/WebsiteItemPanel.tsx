@@ -2,6 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {Check, ChevronLeft, ChevronRight, Plus, Trash2} from 'lucide-react';
 import type {TemplateItem} from '../../../types';
 import {WebsiteImageField} from './WebsiteImageField';
+import {WebsiteItemExtras} from './WebsiteV5Controls';
 import './visualEditor.css';
 
 type ItemField = 'name' | 'price' | 'category' | 'desc' | 'tag';
@@ -44,8 +45,8 @@ function CardButtonInput({value, max, onChange, lower}: {value: string; max: num
  * Edits one menu dish, service, room or product in place on the canvas. Example items carry the
  * explicit keep/remove decision the publish gate asks for, right where the owner is looking.
  */
-export function WebsiteItemPanel({item, index, total, word, fields, siteId, token, busy, cardButton, onChange, onKeep, onRemove, onAdd, onPrevious, onNext, onDone}: {
-  item: TemplateItem; index: number; total: number; word: {singular: string; plural: string; many: string}; fields: string[]; siteId: string; token: string; busy: boolean;
+export function WebsiteItemPanel({item, index, total, word, fields, layout = '', pinnedCount = 0, siteId, token, busy, cardButton, onChange, onKeep, onRemove, onAdd, onPrevious, onNext, onDone}: {
+  item: TemplateItem; index: number; total: number; word: {singular: string; plural: string; many: string}; fields: string[]; layout?: string; pinnedCount?: number; siteId: string; token: string; busy: boolean;
   cardButton?: {value: string; max: number; onChange: (value: string) => void};
   onChange: (patch: Partial<TemplateItem>) => void; onKeep: () => void; onRemove: () => void; onAdd: () => void; onPrevious: () => void; onNext: () => void; onDone: () => void;
 }) {
@@ -88,6 +89,7 @@ export function WebsiteItemPanel({item, index, total, word, fields, siteId, toke
       {fields.includes('price') && <ItemInput item={item} field="price" label="Price (optional)" placeholder="e.g. GH₵ 45" hint="Leave empty to hide the price." onChange={onChange}/>}
       {fields.includes('desc') && <ItemInput item={item} field="desc" label="Description" multiline onChange={onChange}/>}
       {fields.includes('image') && <div className="visual-field"><WebsiteImageField label="Photo" value={item.image || ''} siteId={siteId} token={token} onChange={image => onChange({image})}/></div>}
+      {['nightkitchen','boutique'].includes(layout) && <WebsiteItemExtras item={item} layout={layout} siteId={siteId} token={token} pinnedCount={pinnedCount} onChange={onChange}/>}
       {fields.includes('category') && <ItemInput item={item} field="category" label="Group (optional)" hint={`Visitors can filter your ${word.many} by group.`} onChange={onChange}/>}
       {fields.includes('tag') && <ItemInput item={item} field="tag" label="Label (optional)" placeholder="e.g. New or Popular" hint="A short badge on the card. Only add one that is true." onChange={onChange}/>}
       {cardButton && <CardButtonInput {...cardButton} lower={word.many}/>}

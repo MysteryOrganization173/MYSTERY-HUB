@@ -21,9 +21,10 @@ import { TechAgencyTemplateView } from '../components/website/templates/TechAgen
 import { HotelTemplateView } from '../components/website/templates/HotelTemplateView.js';
 import { EcommerceTemplateView } from '../components/website/templates/EcommerceTemplateView.js';
 import { DataResellerTemplateView, type ResellerStoreSummary } from '../components/website/templates/DataResellerTemplateView.js';
-import { DynamicTemplateRenderer } from '../components/website/DynamicTemplateRenderer.js';
+import { NightKitchenTemplateView } from '../components/website/templates/NightKitchenTemplateView.js';
+import { BoutiqueTemplateView } from '../components/website/templates/BoutiqueTemplateView.js';
 import { PersonalityTemplateView, personalityPreset } from '../components/website/templates/PersonalityTemplateView';
-import { WEBSITE_TEMPLATES } from '../data/templates.js';
+import { WEBSITE_TEMPLATES, LEGACY_DEMO_BUSINESS_NAMES } from '../data/templates.js';
 import { resolveDataResellerHeroImage } from './dataResellerArtwork.js';
 
 /**
@@ -55,7 +56,8 @@ export function mergeSiteWithTemplate(
     ...baseTemplate,
     composition: websiteLayoutMode(baseTemplate.id,content)==='sections' ? content?.composition ?? baseTemplate.composition : undefined,
     siteContent: content,
-    demoBusinessName: content?.businessName ?? baseTemplate.demoBusinessName,
+    // Owner content without a stored name keeps the sample name it has always rendered (frozen in V5).
+    demoBusinessName: content?.businessName ?? (content ? LEGACY_DEMO_BUSINESS_NAMES[baseTemplate.id] : undefined) ?? baseTemplate.demoBusinessName,
     demoHeroTagline: content?.tagline ?? baseTemplate.demoHeroTagline,
     demoSubtext: content?.aboutText ?? baseTemplate.demoSubtext,
     location: content?.location ?? baseTemplate.location,
@@ -114,6 +116,10 @@ function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: 
   switch (layout) {
     case 'reseller':
       return <DataResellerTemplateView template={template} onCtaClick={onCtaClick} managedCheckout={options?.managedCheckout} managedAvailability={options?.managedAvailability} managedSummary={options?.managedSummary} />;
+    case 'nightkitchen':
+      return <NightKitchenTemplateView template={template} onCtaClick={onCtaClick} />;
+    case 'boutique':
+      return <BoutiqueTemplateView template={template} onCtaClick={onCtaClick} />;
     case 'restaurant':
       return <RestaurantTemplateView template={template} onCtaClick={onCtaClick} />;
     case 'construction':
@@ -133,15 +139,8 @@ function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: 
     case 'retail':
       return <EcommerceTemplateView template={template} onCtaClick={onCtaClick} />;
     default: {
-      const preset = personalityPreset(layout);
-      if (preset) return <PersonalityTemplateView template={template} onCtaClick={onCtaClick} preset={preset} />;
-      return (
-        <DynamicTemplateRenderer
-          template={template}
-          onCtaClick={onCtaClick}
-          isMobileView={isMobileView}
-        />
-      );
+      // Unknown layouts get the neutral services presentation rather than the old demo renderer.
+      return <PersonalityTemplateView template={template} onCtaClick={onCtaClick} preset={personalityPreset(layout) || personalityPreset('services')!} />;
     }
   }
 }

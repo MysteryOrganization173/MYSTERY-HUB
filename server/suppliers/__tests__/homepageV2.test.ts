@@ -37,7 +37,8 @@ test('service directory lists only live services with honest status labels', () 
 
 test('builder showcase uses real templates and the real design count', () => {
   const builder = home('HomeWebsiteSection.tsx');
-  assert.match(builder, /orderedWebsiteTemplates\(\)\.filter\(t => t\.id !== 'tmpl-start-blank'\)/);
+  assert.match(builder, /orderedWebsiteTemplates\(\)\.filter\(isReadyDesign\)/);
+  assert.match(readFileSync('src/data/templates.ts', 'utf8'), /isReadyDesign = \(t: \{ id: string \}\) => t\.id !== 'tmpl-start-blank'/);
   assert.match(builder, /\{designs\.length\} ready-made designs/);
   assert.match(builder, /openTemplatePreview\(t\)/);
   assert.match(builder, /Sample design and content/);

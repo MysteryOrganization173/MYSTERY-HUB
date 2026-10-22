@@ -26,7 +26,6 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
   const edit = useVisualEditMarkers();
   const copy = useTemplateCopy(template);
   const [filter, setFilter] = useState<string>('All');
-  const [commissionBooked, setCommissionBooked] = useState<boolean>(false);
 
   const works = template.items || [];
   const filteredWorks = works.filter((w) => {
@@ -34,12 +33,6 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
     return w.category === filter;
   });
 
-  const handleBooking = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (template.siteContent) { onCtaClick?.(); return; }
-    setCommissionBooked(true);
-    setTimeout(() => setCommissionBooked(false), 5000);
-  };
 
   return (
     <div className="bg-[var(--website-primary,#09090b)] text-[#fafafa] font-sans min-h-full selection:bg-[var(--website-accent,#00c365)] selection:text-black">
@@ -214,54 +207,14 @@ export const PortfolioTemplateView: React.FC<TemplateViewProps> = ({ template, o
             <p className="text-xs text-zinc-400 font-sans" {...copy.edit('enquiryIntro')}>{copy.text('enquiryIntro')}</p>
           </div>
 
-          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Type of work" dateLabel="Shoot date"/> : commissionBooked ? (
-            <div className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-2">
-              <CheckCircle className="w-10 h-10 text-emerald-400 mx-auto" />
-              <h4 className="font-bold text-emerald-300 text-base">Example enquiry</h4>
-              <p className="text-xs text-zinc-300 font-sans">
-                Preview only. No enquiry has been sent.
-              </p>
-            </div>
-          ) : (
-            <form onSubmit={handleBooking} className="space-y-4 font-sans text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  placeholder="Your Name / Organization"
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[var(--website-accent,#00c365)]"
-                  required
-                />
-                <input
-                  type="email"
-                  placeholder="Official Email Address"
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[var(--website-accent,#00c365)]"
-                  required
-                />
-              </div>
-
-              <select className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[var(--website-accent,#00c365)]">
-                <option>Commercial Advertising Campaign</option>
-                <option>Documentary Film Project</option>
-                <option>Fashion Editorial / Lookbook</option>
-                <option>Private Collection / Exhibition Commission</option>
-              </select>
-
-              <button
-                type="submit"
-                className="w-full py-3.5 rounded-xl bg-[var(--website-accent,#00c365)] hover:bg-[#00e575] text-black font-mono font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Mail className="w-4 h-4" />
-                <span>Submit Production Brief</span>
-              </button>
-            </form>
-          )}
+          <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Type of work" dateLabel="Shoot date"/>
         </div>
       </div>
 
       {/* Minimal Footer */}
       <footer className="bg-black border-t border-zinc-900 py-8 px-6 text-center text-zinc-500 font-mono text-[10px]">
         <SiteFooterContact template={template} className="mb-5 items-center text-xs text-zinc-300" />
-        © 2026 {template.demoBusinessName}. All rights reserved. Powered by Mystery Hub Sites Ghana.
+        © {new Date().getFullYear()} {template.demoBusinessName}. All rights reserved.
       </footer>
     </div>
   );

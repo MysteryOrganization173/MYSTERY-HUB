@@ -17,9 +17,9 @@ function component(preview=false,siteId='site-a') {
     useRef:(initial:any)=>{const i=cursor++;return cells[i]??(cells[i]={current:initial});},
     useEffect:(fn:any,deps:any[])=>{const i=cursor++,old=cells[i];if(!old||deps.some((d,j)=>!Object.is(d,old.deps[j]))){effects.push(()=>{old?.cleanup?.();cells[i]={deps,cleanup:fn()};});}}
   };
-  const tile=()=>null,tabs=()=>null,colors={accent:'#7c3aed',background:'#07101e',surface:'#0b1220',text:'#fff',mutedText:'#bbb',border:'#566',focus:'#fff'};
-  const modules:any={react,'../../data/templates':{WEBSITE_TEMPLATES:[]},'../../data/bundles':{detectGhanaNetwork:()=>'mtn'},
-    './storefront/ResellerCatalogue':{BundleTile:tile,NetworkTabs:tabs,lowestPrice:(b:any[])=>b.length?Math.min(...b.map(x=>x.priceMinor)):null,sortBundles:(b:any[])=>b,storeNetworkColor:()=>'#ffcc00',storeNetworkName:(n:string)=>n.toUpperCase(),storeNetworksIn:(b:any[])=>[...new Set(b.map(x=>x.network))],networkSummaries:()=>[]},
+  const tile=()=>null,tabs=()=>null,row=()=>null,colors={accent:'#7c3aed',background:'#07101e',surface:'#0b1220',text:'#fff',mutedText:'#bbb',border:'#566',focus:'#fff'};
+  const modules:any={react,'../../utils/websitePreviewCatalog':{websitePreviewCatalog:(rows:any)=>rows||[]},'../../data/templates':{WEBSITE_TEMPLATES:[]},'../../data/bundles':{detectGhanaNetwork:()=>'mtn'},
+    './storefront/ResellerCatalogue':{BundleTile:tile,NetworkTabs:tabs,BundleRow:row,SignalSteps:()=>null,bundleFilters:()=>[{id:'all',label:'All',count:1}],filterBundles:(b:any[])=>b,lowestPrice:(b:any[])=>b.length?Math.min(...b.map(x=>x.priceMinor)):null,sortBundles:(b:any[])=>b,storeNetworkColor:()=>'#ffcc00',storeNetworkName:(n:string)=>n.toUpperCase(),storeNetworksIn:(b:any[])=>[...new Set(b.map(x=>x.network))],networkSummaries:()=>[]},
     '../../utils/websiteBrand':{websiteActionText:()=> '#fff',resolveResellerTheme:()=>colors,resolveStoreTheme:()=>colors},
     '../../utils/templateRendererUtils':{renderTemplateLayout:(_template:any,slots:any)=>({type:'layout',props:slots})},
     '../../hooks/usePaystack':{usePaystack:()=>({loadingPhase:'opening',initializeServerPayment:async(options:any)=>{calls.payments.push(options);}})},
@@ -29,11 +29,12 @@ function component(preview=false,siteId='site-a') {
   };
   const module={exports:{} as any};
   runInNewContext(compiled,{module,exports:module.exports,require:(name:string)=>{assert.ok(modules[name],name);return modules[name];},crypto:{randomUUID:()=> '12345678-1234-1234-1234-123456789abc'},sessionStorage:{getItem:(key:string)=>{calls.storageReads++;return values.get(key)||null;},setItem:(key:string,value:string)=>values.set(key,value),removeItem:(key:string)=>values.delete(key)},setInterval:()=>0,clearInterval:()=>{},requestAnimationFrame:()=>{}});
-  const wrapper=module.exports.ManagedDataStorefront({siteId,preview,template:{colorScheme:colors,demoBusinessName:'Synthetic owner'}});
+  const wrapper=module.exports.ManagedDataStorefront({siteId,preview,previewProducts:[{id:'mtn-1gb',network:'mtn',dataAmount:'1GB',retailMinor:521}],template:{colorScheme:colors,demoBusinessName:'Synthetic owner'}});
   const render=()=>{cursor=0;const tree=wrapper.type(wrapper.props);while(effects.length)effects.shift()!();return tree;};
   const nodes=(tree:any):any[]=>!tree||typeof tree!=='object'?[]:Array.isArray(tree)?tree.flatMap(nodes):[tree,...nodes(tree.props?.children),...nodes(tree.props?.managedCheckout)];
   const find=(predicate:(node:any)=>boolean)=>nodes(render()).find(predicate);
-  const buy=()=>{find(n=>n.type===tile).props.onChoose({id:'mtn-1gb',network:'mtn',dataAmount:'1GB',priceMinor:521});const phone=nodes(render()).find(n=>n.type==='input'&&n.props.type==='tel');phone?.props.onChange({target:{value:'0240000000'}});};
+  // Signal is number-first: pick a bundle row, enter the number, confirm the network, then Review.
+  const buy=()=>{find(n=>n.type===row).props.onChoose({id:'mtn-1gb',network:'mtn',dataAmount:'1GB',priceMinor:521});const phone=nodes(render()).find(n=>n.type==='input'&&n.props.type==='tel');phone?.props.onChange({target:{value:'0240000000'}});find(n=>n.type==='button'&&n.props['data-network']==='mtn').props.onClick();find(n=>n.type==='button'&&n.props['data-store-review']).props.onClick();};
   const details=()=>{const inputs=nodes(render()).filter(n=>n.type==='input'&&n.props.type==='email');assert.equal(inputs.length,1);inputs[0].props.onChange({target:{value:'buyer@example.test'}});};
   const pay=()=>find(n=>n.type==='button'&&n.props.className?.includes('w-full font-bold')).props.onClick();
   const cleanup=()=>cells.forEach(cell=>cell?.cleanup?.());

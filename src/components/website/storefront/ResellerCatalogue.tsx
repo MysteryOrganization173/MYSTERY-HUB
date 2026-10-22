@@ -100,11 +100,57 @@ export function BundleTile({bundle, theme, onChoose, example = false}: {bundle: 
   </button>;
 }
 
+/* ------------------------------------ Signal (V5) ------------------------------------ */
+export type BundleFilter = 'featured' | 'all' | 'under20' | 'mid' | 'big';
+/**
+ * Size and price filters computed only from the bundles on sale. "Featured" exists only when the owner
+ * pinned bundles: Signal never invents popularity or best-sellers.
+ */
+export function bundleFilters(bundles: StoreBundle[], pinned: readonly string[] = []): Array<{ id: BundleFilter; label: string; count: number }> {
+  const count = (filter: BundleFilter) => filterBundles(bundles, filter, pinned).length;
+  const options: Array<{ id: BundleFilter; label: string }> = [
+    { id: 'featured', label: 'Featured' }, { id: 'all', label: 'All' }, { id: 'under20', label: 'Under GH₵20' }, { id: 'mid', label: '1–9GB' }, { id: 'big', label: '10GB+' },
+  ];
+  return options.map(o => ({ ...o, count: count(o.id) })).filter(o => o.id === 'all' || (o.count > 0 && o.count < bundles.length));
+}
+export function filterBundles(bundles: StoreBundle[], filter: BundleFilter, pinned: readonly string[] = []): StoreBundle[] {
+  if (filter === 'featured') return pinned.map(id => bundles.find(b => b.id === id)).filter((b): b is StoreBundle => !!b);
+  if (filter === 'under20') return bundles.filter(b => b.priceMinor < 2000);
+  if (filter === 'mid') return bundles.filter(b => { const gb = bundleSizeGb(b.dataAmount); return gb !== null && gb >= 1 && gb < 10; });
+  if (filter === 'big') return bundles.filter(b => (bundleSizeGb(b.dataAmount) ?? 0) >= 10);
+  return [...filterBundles(bundles,'featured',pinned),...bundles.filter(b=>!pinned.includes(b.id))];
+}
+
+/** A compact bundle row: size, validity and per-GB on the left, the total price on the right. */
+export function BundleRow({ bundle, theme, onChoose, selected = false, featured = false }: { bundle: StoreBundle; theme: StoreTheme; onChoose: (bundle: StoreBundle) => void; selected?: boolean; featured?: boolean }) {
+  const perGb = pricePerGb(bundle), price = formatGhs(bundle.priceMinor);
+  return <button type="button" className="store-row" aria-pressed={selected} onClick={() => onChoose(bundle)}
+    aria-label={`${storeNetworkName(bundle.network)} ${bundle.dataAmount}${bundle.validity ? `, ${bundle.validity}` : ''}, ${price}${featured ? ', featured by the store' : ''}`}
+    style={{ backgroundColor: theme.surface, borderColor: selected ? theme.accent : theme.hairline || theme.border, color: theme.surfaceText, '--store-network': storeNetworkColor(bundle.network) } as React.CSSProperties}>
+    <span className="store-row-size site-display">{bundle.dataAmount}</span>
+    <span className="store-row-meta" style={{ color: theme.surfaceMutedText }}>
+      <span>{bundle.validity || storeNetworkName(bundle.network)}{featured ? <b className="store-row-flag" style={{ borderColor: theme.hairline || theme.border, color: theme.surfaceText }}>Featured</b> : null}</span>
+      {perGb && <small>{perGb}</small>}
+    </span>
+    <strong className="store-row-price">{price}</strong>
+  </button>;
+}
+
+/** Number-first progress: shown as plain text steps, never as a fake loading state. */
+export function SignalSteps({ step, theme }: { step: 1 | 2 | 3 | 4; theme: StoreTheme }) {
+  const steps = ['Number', 'Bundle', 'Review & pay', 'Track'];
+  return <ol className="store-progress" aria-label="Buying steps">
+    {steps.map((label, i) => <li key={label} aria-current={step === i + 1 ? 'step' : undefined} style={{ color: step >= i + 1 ? theme.text : theme.mutedText }}>
+      <span aria-hidden="true" style={step >= i + 1 ? { backgroundColor: theme.accent, color: websiteActionText(theme.accent) } : { borderColor: theme.hairline || theme.border }}>{i + 1}</span>{label}
+    </li>)}
+  </ol>;
+}
+
 /** How buying works, in the order it happens. No delivery times or guarantees are promised here. */
 export function HowBuyingWorks({theme, managed}: {theme: StoreTheme; managed: boolean}) {
   const steps = [
-    ['Choose a bundle', 'Pick the network and the bundle size you need.'],
-    ['Pay securely', managed ? 'Enter the number to receive the data, then pay in the secure Paystack window.' : 'Enter the number to receive the data, then pay securely.'],
+    ['Enter the number', 'Type the number that should receive the data and confirm its network.'],
+    ['Choose and pay', managed ? 'Pick a bundle, review it, then pay in the secure Paystack window.' : 'Pick a bundle, review it, then pay securely.'],
     ['Track your order', managed ? 'Keep your order reference. You can check its status on this page at any time.' : 'Keep your order reference so the store can check your order.'],
   ];
   return <ol className="store-steps" aria-label="How buying works">
@@ -221,10 +267,41 @@ export const RESELLER_STORE_CSS = `
 .store-footer{margin-top:48px;border-top:1px solid;padding:32px 0 0}
 .store-footer-grid{display:grid;gap:22px}
 @media (min-width:720px){.store-footer-grid{grid-template-columns:1.3fr .7fr 1fr 1.2fr}}
+@media (max-width:719px){.store-footer{margin-top:32px;padding-top:24px}.store-footer-grid{grid-template-columns:1fr 1fr;gap:16px 20px}.store-footer-grid>:first-child,.store-footer-grid>:last-child{grid-column:1/-1}.store-footer-base{margin-top:18px}}
 .store-footer h3{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px}
 .store-footer-links{list-style:none;margin:0;padding:0;display:grid;gap:0}
 .store-footer-links a{display:inline-flex;align-items:center;font-weight:600}
 .store-footer-links a:hover{text-decoration:underline;text-underline-offset:3px}
 .store-footer-base{border-top:1px solid;margin-top:24px;padding-top:14px;padding-bottom:16px;font-size:12px}
+.store-progress{list-style:none;margin:0;padding:0;display:flex;gap:6px 14px;flex-wrap:wrap;font-size:12.5px;font-weight:600}
+.store-progress li{display:inline-flex;align-items:center;gap:6px}
+.store-progress span{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;border:1px solid transparent}
+.store-buy{display:grid;gap:14px}
+.store-buy h3{font-size:17px;font-weight:700;margin:0;letter-spacing:-.01em}
+.store-step-label{font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:0 0 4px}
+.store-number{font-size:20px!important;font-weight:700;letter-spacing:.04em}
+.store-confirm{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.store-confirm button{position:relative;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 4px;border-radius:12px;border:1.5px solid;font-weight:700;font-size:14px;line-height:1.1}
+.store-confirm button small{font-size:10.5px;font-weight:700;letter-spacing:.02em}
+.store-confirm i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.store-chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.store-chips::-webkit-scrollbar{display:none}
+.store-chips button{flex:0 0 auto;padding:0 12px;min-height:38px!important;border-radius:999px;border:1px solid;font-size:13px;font-weight:600;white-space:nowrap}
+.store-rows{display:grid;gap:8px}
+@media (min-width:720px){.store-rows{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.store-row{position:relative;display:grid;grid-template-columns:72px minmax(0,1fr) auto;align-items:center;gap:10px;text-align:left;padding:10px 14px 10px 16px;border:1.5px solid;border-radius:14px;overflow:hidden;transition:border-color .15s ease,transform .15s ease}
+.store-row::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--store-network)}
+.store-row[aria-pressed="true"]{box-shadow:0 0 0 3px color-mix(in srgb,var(--website-accent) 22%,transparent)}
+.store-row:active{transform:scale(.99)}
+.store-row-size{font-size:22px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.store-row-meta{display:grid;gap:2px;font-size:13px;min-width:0}
+.store-row-meta small{font-size:11.5px}
+.store-row-flag{display:inline-block;margin-left:6px;font-size:10px;font-weight:700;border:1px solid;border-radius:999px;padding:1px 6px;vertical-align:1px}
+.store-row-price{font-size:16px;font-weight:800;text-align:right;white-space:nowrap}
+.store-bar{position:sticky;bottom:10px;z-index:20;display:flex;align-items:center;gap:12px;border-radius:18px;padding:10px 10px 10px 16px;border:1px solid;box-shadow:0 18px 40px -18px rgba(0,0,0,.7)}
+.store-bar>div{min-width:0;flex:1;font-size:12.5px;line-height:1.35}
+.store-bar strong{display:block;font-size:15px}
+.store-bar .store-primary{min-height:46px!important;padding:0 18px;flex-shrink:0}
+.store-recipient{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid;border-radius:14px;padding:10px 12px;margin-top:12px;font-size:14px}
 @media (prefers-reduced-motion:reduce){.reseller-storefront *{transition:none!important;animation:none!important}}
 `;

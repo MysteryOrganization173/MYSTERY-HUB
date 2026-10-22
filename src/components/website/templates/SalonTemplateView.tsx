@@ -27,18 +27,9 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
   const edit = useVisualEditMarkers();
   const editing = useIsVisualEditing();
   const copy = useTemplateCopy(template);
-  const [selectedStylist, setSelectedStylist] = useState<string>('Abena - Braiding Artisan');
-  const [selectedService, setSelectedService] = useState<string>('Goddess Knotless Box Braids (Mid-Back)');
-  const [bookingConfirmed, setBookingConfirmed] = useState<boolean>(false);
 
   const services = template.items || [];
 
-  const handleBooking = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (template.siteContent) { onCtaClick?.(); return; }
-    setBookingConfirmed(true);
-    setTimeout(() => setBookingConfirmed(false), 5000);
-  };
 
   return (
     <div className="bg-[var(--website-background,#fff9fa)] text-[#2e1020] font-sans min-h-full">
@@ -67,9 +58,6 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
         <div className="hidden md:flex items-center gap-6 text-xs font-semibold tracking-wider text-[#836574]">
           <a href="#services" className="hover:text-[var(--website-accent,#ec4899)] transition-colors">
             Services & Rates
-          </a>
-          <a href="#stylists" className="hover:text-[var(--website-accent,#ec4899)] transition-colors">
-            Our Stylists
           </a>
           <a href="#book" className="hover:text-[var(--website-accent,#ec4899)] transition-colors">
             Book Appointment
@@ -185,7 +173,6 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
                 </div>
                 <a
                   href="#book"
-                  onClick={() => setSelectedService(item.name)}
                   className="w-full py-2 rounded-xl bg-[#fdf2f6] hover:bg-[var(--website-accent,#ec4899)] hover:text-white text-[var(--website-accent,#ec4899)] text-xs font-bold text-center block transition-colors cursor-pointer"
                 >
                   {copy.text('itemButton')}
@@ -205,94 +192,13 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
             <p className="text-xs text-[#836574]" {...copy.edit('enquiryIntro')}>{copy.text('enquiryIntro')}</p>
           </div>
 
-          {template.siteContent ? <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Which service?" dateLabel="Preferred date"/> : bookingConfirmed ? (
-            <div className="p-6 rounded-2xl bg-pink-50 border border-pink-200 text-center space-y-2">
-              <div className="w-10 h-10 rounded-full bg-[var(--website-accent,#ec4899)] text-white flex items-center justify-center mx-auto">
-                <Check className="w-5 h-5" />
-              </div>
-              <h4 className="font-bold text-[var(--website-primary,#3b1828)] text-base">Example appointment</h4>
-              <p className="text-xs text-[#836574]">
-                Example only: {selectedService} with {selectedStylist}. No appointment or confirmation message has been sent.
-              </p>
-            </div>
-          ) : (
-            <form onSubmit={handleBooking} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#836574] uppercase mb-1">
-                  Selected Treatment
-                </label>
-                <select
-                  value={selectedService}
-                  onChange={(e) => setSelectedService(e.target.value)}
-                  className="w-full bg-[var(--website-background,#fff9fa)] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[var(--website-primary,#3b1828)] focus:outline-none focus:border-[var(--website-accent,#ec4899)]"
-                >
-                  {services.map((s) => (
-                    <option key={s.id} value={s.name}>
-                      {s.name} ({s.price})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#836574] uppercase mb-1">
-                    Select Stylist
-                  </label>
-                  <select
-                    value={selectedStylist}
-                    onChange={(e) => setSelectedStylist(e.target.value)}
-                    className="w-full bg-[var(--website-background,#fff9fa)] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[var(--website-primary,#3b1828)] focus:outline-none focus:border-[var(--website-accent,#ec4899)]"
-                  >
-                    <option value="Abena - Braiding Artisan">Abena (Senior Braiding Specialist)</option>
-                    <option value="Kweku - Master Barber">Kweku (Master Barber & Fades)</option>
-                    <option value="Efia - Esthetician">Efia (Skin & Hydra-Facial Specialist)</option>
-                    <option value="First Available">First Available Master Stylist</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#836574] uppercase mb-1">
-                    Preferred Date & Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    defaultValue="2026-10-03T11:00"
-                    className="w-full bg-[var(--website-background,#fff9fa)] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[var(--website-primary,#3b1828)] focus:outline-none focus:border-[var(--website-accent,#ec4899)]"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  placeholder="Your Full Name"
-                  className="w-full bg-[var(--website-background,#fff9fa)] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[var(--website-primary,#3b1828)] focus:outline-none focus:border-[var(--website-accent,#ec4899)]"
-                  required
-                />
-                <input
-                  type="tel"
-                  placeholder="Ghana WhatsApp Number"
-                  className="w-full bg-[var(--website-background,#fff9fa)] border border-[#f5d0e0] rounded-xl px-3.5 py-2.5 text-xs text-[var(--website-primary,#3b1828)] focus:outline-none focus:border-[var(--website-accent,#ec4899)]"
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3.5 rounded-xl bg-[var(--website-accent,#ec4899)] hover:bg-[#db2777] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Calendar className="w-4 h-4" />
-                <span>{template.siteContent ? 'Contact to Arrange Appointment' : 'Preview appointment enquiry'}</span>
-              </button>
-            </form>
-          )}
+          <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Which service?" dateLabel="Preferred date"/>
         </div>
       </div>
 
       {/* Footer */}
-      <footer id="salon-info" className="bg-[#240c17] text-pink-100 py-10 px-6 sm:px-12 text-xs">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <footer id="salon-info" className="bg-[#240c17] text-pink-100 py-7 sm:py-10 px-6 sm:px-12 text-xs">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
           <div className="space-y-2">
             <h4 className="font-serif font-bold text-base text-white" {...edit("content:businessName")}>
               {template.demoBusinessName}
@@ -310,8 +216,8 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
             <SiteFooterContact template={template} className="text-pink-200/80 text-xs" />
           </div>
         </div>
-        <div className="border-t border-pink-900/40 mt-8 pt-4 text-center text-pink-300/60 text-[10px]">
-          © 2026 {template.demoBusinessName}. Powered by Mystery Hub Sites Ghana.
+        <div className="border-t border-pink-900/40 mt-5 sm:mt-8 pt-4 text-center text-pink-300/60 text-[10px]">
+          © {new Date().getFullYear()} {template.demoBusinessName}.
         </div>
       </footer>
     </div>

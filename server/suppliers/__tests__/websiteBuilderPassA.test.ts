@@ -37,7 +37,7 @@ test('editor, settings, design switch and exit share the Canvas First patterns',
   assert.ok(editor.includes('role="tablist" aria-label="Editing area"'));assert.ok(!editor.includes('<select aria-label="Editing area"'));
   assert.match(editor,/isPhone && activeTab === 'edit' \? 'mobile'/);
   assert.ok(settings.includes('website-sheet-foot'));assert.ok(settings.includes('Switch design'));
-  assert.match(builder,/exitTarget\.current = 'website-business-dashboard'/);assert.match(builder,/window\.scrollTo\(\{ top: 0 \}\)/);
+  assert.ok(!builder.includes('openPricing'));assert.ok(editor.includes('<WebsiteBundleSetupSheet'));assert.match(builder,/window\.scrollTo\(\{ top: 0 \}\)/);
   assert.ok(!dashboard.includes('aria-label="Manage website"'));
   // Owner chrome styles never reach the customer site renderer.
   assert.ok(!text('src/components/website/WebsiteSiteRenderer.tsx').includes('websiteBuilder.css'));

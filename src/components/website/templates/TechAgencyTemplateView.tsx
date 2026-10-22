@@ -64,9 +64,9 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
           <a href="#solutions" className="hover:text-[#06b6d4] transition-colors">
             Architecture
           </a>
-          <a href="#metrics" className="hover:text-[#06b6d4] transition-colors">
+          {!!template.stats?.length && <a href="#metrics" className="hover:text-[#06b6d4] transition-colors">
             Highlights
-          </a>
+          </a>}
           <a href="#discovery" className="hover:text-[#06b6d4] transition-colors">
             Discovery Call
           </a>
@@ -218,8 +218,8 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
       </div>
 
       {/* Footer */}
-      <footer className="bg-[#05080c] border-t border-slate-800 py-10 px-6 sm:px-12 text-xs font-mono text-slate-400">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <footer className="bg-[#05080c] border-t border-slate-800 py-7 sm:py-10 px-6 sm:px-12 text-xs font-mono text-slate-400">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
           <div className="space-y-2">
             <h4 className="font-bold text-white text-base font-mono" {...edit("content:businessName")}>
               {template.demoBusinessName}
@@ -237,8 +237,8 @@ export const TechAgencyTemplateView: React.FC<TemplateViewProps> = ({ template, 
             <SiteFooterContact template={template} className="text-xs" />
           </div>
         </div>
-        <div className="border-t border-slate-900 mt-8 pt-4 text-center text-slate-600 text-[10px]">
-          © 2026 {template.demoBusinessName}. Powered by Mystery Hub Sites Ghana.
+        <div className="border-t border-slate-900 mt-5 sm:mt-8 pt-4 text-center text-slate-600 text-[10px]">
+          © {new Date().getFullYear()} {template.demoBusinessName}.
         </div>
       </footer>
     </div>

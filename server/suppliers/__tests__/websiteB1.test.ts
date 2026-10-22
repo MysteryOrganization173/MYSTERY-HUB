@@ -26,10 +26,10 @@ let server:Server,base:string;
 before(async()=>{assert.equal(process.env.DATABASE_URL,undefined);const app=express();app.use(express.json());app.use('/api/websites',websiteRouter);server=await new Promise<Server>(r=>{const s=app.listen(0,'127.0.0.1',()=>r(s));});base=`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/websites`;});
 after(async()=>{await new Promise<void>(r=>server.close(()=>r()));});
 beforeEach(async()=>{WebsiteStore.clearDevStore();WebsiteAssetStore.clearDevStore();AuthStore._clearDevStore();for(const id of ['owner','other']){await AuthStore.createUser({id,name:id,email:null,phone:null,passwordHash:'fixture',role:'customer',status:'active'});await AuthStore.createSession(id,id+'-token',false);}});
-const create=(templateId='tmpl-buka-bistro',owner='owner')=>WebsiteStore.createSite(owner,{template_id:templateId,name:'Actual owner business',businessName:'Actual owner business',starterVersion:1});
+const create=(templateId='tmpl-buka-bistro',owner='owner',withContact=true)=>WebsiteStore.createSite(owner,{template_id:templateId,name:'Actual owner business',businessName:'Actual owner business',starterVersion:1,...(withContact?{content:{whatsapp:'0241234567'}}:{})});
 async function api(path:string,method='GET',body?:unknown,token:string|null='owner-token') {const r=await fetch(base+path,{method,headers:{...(token?{Authorization:`Bearer ${token}`}:{ }),...(body?{'Content-Type':'application/json'}:{ })},...(body?{body:JSON.stringify(body)}:{})});return {status:r.status,data:await r.json()};}
 for(const template of WEBSITE_TEMPLATES.filter(t=>t.id!=='tmpl-data-reseller'&&t.id!=='tmpl-start-blank'))test(`B1 ${template.id}: starter/create/reload/example review/publication agree`,async()=>{
-  const {site}=await create(template.id),starter=websiteStarter(template.id,'Actual owner business');
+  const {site}=await create(template.id,'owner',false),starter=websiteStarter(template.id,'Actual owner business');
   assert.equal(site.content_json.starterVersion,1);assert.deepEqual(site.settings_json,starter.settings);
   assert.equal(site.name,site.content_json.businessName);assert.deepEqual(site.content_json.items,starter.content.items);assert.equal(site.content_json.items?.length,3);
   for(const i of site.content_json.items!){assert.equal(i.isExample,true);assert.equal(i.price,undefined);assert.equal(i.rating,undefined);assert.equal(i.specs,undefined);}
@@ -39,7 +39,8 @@ for(const template of WEBSITE_TEMPLATES.filter(t=>t.id!=='tmpl-data-reseller'&&t
   await assert.rejects(()=>WebsiteStore.publishSite(site.id,'owner',site.updated_at),WebsiteReviewRequiredError);
   assert.equal((await WebsiteStore.findSiteById(site.id))?.status,'draft');
   const review=await api(`/${site.id}/review-examples`,'POST',{expectedUpdatedAt:site.updated_at,confirmed:true,itemIds:site.content_json.items!.map(i=>i.id),action:'confirm'});assert.equal(review.status,200);
-  const published=await WebsiteStore.publishSite(site.id,'owner',review.data.site.updated_at);const live=(await WebsiteStore.findPublishedSiteBySlug(site.slug))!;
+  const ready=(await WebsiteStore.updateSite(site.id,'owner',{expectedUpdatedAt:review.data.site.updated_at,content:{whatsapp:'0241234567'}}))!;
+  const published=await WebsiteStore.publishSite(site.id,'owner',ready.updated_at);const live=(await WebsiteStore.findPublishedSiteBySlug(site.slug))!;
   assert.equal(live.content_json.items?.length,3);assert.ok(!JSON.stringify(live.content_json).includes('isExample'));assert.ok(published?.published_snapshot_json);
 });
 test('Start Blank remains sections; managed Data has no fictional products',async()=>{
@@ -62,7 +63,7 @@ test('HTTP publication fails visibly with structured review details, not silent 
   const saved=await WebsiteStore.updateSite(site.id,'owner',{expectedUpdatedAt:live!.updated_at,content:{tagline:'Owner edit'}});assert.deepEqual(saved?.content_json.items,[]);
 });
 test('legacy sites never reseed; intentionally supplied empty arrays stay empty',async()=>{
-  const {site}=await WebsiteStore.createSite('owner',{template_id:'tmpl-buka-bistro',name:'Legacy',content:{items:[]}});assert.equal(site.content_json.layoutMode,undefined);assert.deepEqual(site.content_json.items,[]);
+  const {site}=await WebsiteStore.createSite('owner',{template_id:'tmpl-buka-bistro',name:'Legacy',content:{whatsapp:'0241234567',items:[]}});assert.equal(site.content_json.layoutMode,undefined);assert.deepEqual(site.content_json.items,[]);
   const published=(await WebsiteStore.publishSite(site.id,'owner',site.updated_at))!;const snapshot=structuredClone(published.published_snapshot_json);
   const changed=(await WebsiteStore.updateSite(site.id,'owner',{expectedUpdatedAt:published.updated_at,content:{tagline:'Private'}}))!;assert.deepEqual(changed.published_snapshot_json,snapshot);assert.deepEqual((await WebsiteStore.findPublishedSiteBySlug(site.slug))!.content_json.tagline,'Welcome to our business');
   const another=await WebsiteStore.createSite('other',{template_id:'tmpl-buka-bistro',name:'Owner',businessName:'Owner',starterVersion:1,content:{items:[]}});assert.deepEqual(another.site.content_json.items,[]);
@@ -90,7 +91,7 @@ test('private recovery HTTP contracts reject foreign/stale/forged data, expose m
   assert.equal((await api(`/${site.id}/review-examples`,'POST',{itemIds:[site.content_json.items![0].id],action:'confirm',confirmed:true,expectedUpdatedAt:site.updated_at})).status,409);
 });
 test('layout round-trip retains inactive sections, original items, identity and live snapshot',async()=>{
-  const {site}=await WebsiteStore.createSite('owner',{template_id:'tmpl-buka-bistro',name:'Legacy',content:{items:[{id:'food',name:'Actual food'}]}});
+  const {site}=await WebsiteStore.createSite('owner',{template_id:'tmpl-buka-bistro',name:'Legacy',content:{whatsapp:'0241234567',items:[{id:'food',name:'Actual food'}]}});
   const published=(await WebsiteStore.publishSite(site.id,'owner',site.updated_at))!,snapshot=structuredClone(published.published_snapshot_json);
   const sections=await WebsiteStore.transitionLayout(site.id,'owner','sections',published.updated_at);
   const edited=(await WebsiteStore.updateSite(site.id,'owner',{expectedUpdatedAt:sections.updated_at,content:{composition:{...sections.content_json.composition!,sections:sections.content_json.composition!.sections.map(s=>s.type==='hero'?{...s,data:{heading:'Sections only'}}:s)}}}))!;
@@ -101,13 +102,13 @@ test('layout round-trip retains inactive sections, original items, identity and 
 });
 test('explicit sections publication excludes disabled content while retaining valid public order and private draft',async()=>{
   const composition=createWebsiteComposition(['header','hero','about','footer']);composition.sections[2].enabled=false;composition.sections[2].data.body='Private disabled content';
-  const b1=(await WebsiteStore.createSite('other',{template_id:'tmpl-start-blank',name:'Owner',businessName:'Owner',starterVersion:1,content:{composition}})).site;
+  const b1=(await WebsiteStore.createSite('other',{template_id:'tmpl-start-blank',name:'Owner',businessName:'Owner',starterVersion:1,content:{whatsapp:'0241234567',composition}})).site;
   const published=(await WebsiteStore.publishSite(b1.id,'other',b1.updated_at))!;
   const content=published.published_snapshot_json!.content;assert.equal(content.composition!.sections.length,3);assert.deepEqual(content.composition!.sections.map(s=>s.order),[0,1,2]);assert.ok(!JSON.stringify(content).includes('Private disabled content'));
   assert.equal(published.content_json.composition!.sections.length,4);
 });
 test('switch and restore recover exact draft without touching URL/status/published snapshot',async()=>{
-  const {site}=await WebsiteStore.createSite('owner',{template_id:'tmpl-buka-bistro',name:'Owner',content:{tagline:'Original',items:[{id:'dish',name:'Owner dish'}]},settings:{accentColor:'#abcdef'}});
+  const {site}=await WebsiteStore.createSite('owner',{template_id:'tmpl-buka-bistro',name:'Owner',content:{whatsapp:'0241234567',tagline:'Original',items:[{id:'dish',name:'Owner dish'}]},settings:{accentColor:'#abcdef'}});
   const published=(await WebsiteStore.publishSite(site.id,'owner',site.updated_at))!;const draft=(await WebsiteStore.updateSite(site.id,'owner',{expectedUpdatedAt:published.updated_at,content:{tagline:'Unpublished work'}}))!;
   const switched=await WebsiteStore.changeTemplate(site.id,'owner','tmpl-glow-salon',draft.updated_at),checkpoint=(await WebsiteCheckpointStore.forSite(site.id,'owner'))[0];
   assert.deepEqual(switched.content_json.items,[]);assert.deepEqual(checkpoint.document.content,draft.content_json);assert.equal((await WebsiteStore.findPublishedSiteBySlug(site.slug))!.template_id,site.template_id);
@@ -116,13 +117,13 @@ test('switch and restore recover exact draft without touching URL/status/publish
   await assert.rejects(()=>WebsiteStore.restoreDraft(site.id,'owner',checkpoint.id,switched.updated_at),/changed/);
 });
 test('same revision cannot win concurrent layout mutations; denied actions have no checkpoint',async()=>{
-  const {site}=await WebsiteStore.createSite('owner',{template_id:'tmpl-buka-bistro',name:'Owner'});
+  const {site}=await WebsiteStore.createSite('owner',{template_id:'tmpl-buka-bistro',name:'Owner',content:{whatsapp:'0241234567'}});
   const results=await Promise.allSettled([1,2].map(()=>WebsiteStore.transitionLayout(site.id,'owner','sections',site.updated_at)));
   assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal((await WebsiteCheckpointStore.forSite(site.id,'owner')).length,1);
   const before=await WebsiteStore.findSiteById(site.id);await assert.rejects(()=>WebsiteStore.changeTemplate(site.id,'other','tmpl-glow-salon',before!.updated_at),/do not own/);assert.deepEqual(await WebsiteStore.findSiteById(site.id),before);
 });
 test('history is bounded; explicit removal frees a slot, never automatic eviction',async()=>{
-  let site=(await WebsiteStore.createSite('owner',{template_id:'tmpl-buka-bistro',name:'Owner'})).site;
+  let site=(await WebsiteStore.createSite('owner',{template_id:'tmpl-buka-bistro',name:'Owner',content:{whatsapp:'0241234567'}})).site;
   for(let n=0;n<WEBSITE_CHECKPOINT_LIMIT;n++)site=await WebsiteStore.transitionLayout(site.id,'owner',n%2?'template':'sections',site.updated_at);
   const checkpoints=await WebsiteCheckpointStore.forSite(site.id,'owner');assert.equal(checkpoints.length,WEBSITE_CHECKPOINT_LIMIT);
   await assert.rejects(()=>WebsiteStore.transitionLayout(site.id,'owner','sections',site.updated_at),(error:any)=>/history is full/.test(error.message)&&error.code==='HISTORY_FULL'&&error.status===409);assert.deepEqual(await WebsiteStore.findSiteById(site.id),site);
