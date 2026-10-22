@@ -35,14 +35,18 @@ export function AdminRecentOrders({ token, revision = 0, onOpenOrder, onOpenAll 
   const [orders, setOrders] = useState<AdminOrderDetails[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
+  const [busy, setBusy] = useState(true);
   const ticket = useRef(0);
 
   useEffect(() => {
     const current = ++ticket.current;
     setError(null);
+    setBusy(true);
     getAdminOrdersOnServer(token, { ...(scope === 'paid' ? { paymentStatus: 'success', status: 'all' } : {}), page: 1, limit: LIMIT })
-      .then(res => { if (current === ticket.current) setOrders(res.orders); })
-      .catch(err => { if (current === ticket.current) { setOrders(null); setError(err instanceof Error ? err.message : 'Latest orders could not load.'); } });
+      .then(res => { if (!res.success) throw new Error('Latest orders were not returned.'); if (current === ticket.current) setOrders(res.orders); })
+      .catch(err => { if (current === ticket.current) setError(err instanceof Error ? err.message : 'Latest orders could not load.'); })
+      .finally(() => { if (current === ticket.current) setBusy(false); });
+    return () => { ticket.current++; };
   }, [token, scope, revision, retry]);
 
   const scopeButton = (id: Scope, label: string) => (
@@ -59,12 +63,13 @@ export function AdminRecentOrders({ token, revision = 0, onOpenOrder, onOpenAll 
       actions={<div role="radiogroup" aria-label="Which orders to show" className="flex rounded-xl border border-slate-800 bg-slate-950/60 p-0.5">{scopeButton('paid', 'Paid')}{scopeButton('all', 'All attempts')}</div>}
       className="flex flex-col"
     >
-      {error ? <AdminError title="Latest orders could not load" message={error} onRetry={() => setRetry(n => n + 1)} />
-        : !orders ? (
+      {error && <AdminError title={orders ? 'Refresh failed · last loaded orders' : 'Latest orders could not load'} message={error} onRetry={() => setRetry(n => n + 1)} />}
+      {busy && orders && <p role="status" className="mb-2 text-xs text-slate-400">Refreshing latest orders…</p>}
+      {!orders ? busy ? (
           <ul aria-busy="true" aria-label="Loading latest orders" className="space-y-1">
             {Array.from({ length: 5 }, (_, i) => <li key={i} className="h-14 animate-pulse rounded-xl bg-slate-800/40 motion-reduce:animate-none" />)}
           </ul>
-        ) : orders.length === 0 ? (
+        ) : null : orders.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-800 px-4 py-8 text-center text-sm text-slate-400">{scope === 'paid' ? 'No paid orders yet.' : 'No orders yet.'}</p>
         ) : (
           <ul className="-mx-2 divide-y divide-slate-800/70">
