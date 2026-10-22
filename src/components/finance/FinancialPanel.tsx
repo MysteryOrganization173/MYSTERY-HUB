@@ -9,7 +9,9 @@ import type { EarnAchievement } from '../../utils/earnMilestones';
 
 const inputClass='w-full min-w-0 rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm text-white';
 const buttonClass='rounded-xl bg-[#00c365] px-4 py-3 text-sm font-semibold text-black disabled:opacity-50';
-export const FinancialPanel:React.FC<{mode:'wallet'|'earn'}>=({mode})=>{
+/** Earn pages can arrange the financial parts; all money state, requests and confirmations stay in this panel. */
+export interface EarnFinanceParts{balance:React.ReactNode;form:React.ReactNode;milestones:React.ReactNode;history:React.ReactNode;achievements:EarnAchievement[]|null;stale:boolean;restricted:boolean;availableMinor:number|null;financeError:boolean}
+export const FinancialPanel:React.FC<{mode:'wallet'|'earn';earnLayout?:(parts:EarnFinanceParts)=>React.ReactNode}>=({mode,earnLayout})=>{
   const {sessionToken,user,openAuth,setActivePage}=useApp();
   const [data,setData]=useState<any>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
   const [action,setAction]=useState(''),[amount,setAmount]=useState(''),[phone,setPhone]=useState(''),[network,setNetwork]=useState('mtn'),[recipientName,setName]=useState('');
@@ -78,17 +80,20 @@ export const FinancialPanel:React.FC<{mode:'wallet'|'earn'}>=({mode})=>{
         {action!=='topup'&&<label className="flex gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>I confirm the amount and {action==='transfer'?'irreversible transfer':'payout destination and fee'}.</label>}
         <div className="flex flex-wrap gap-3"><button className={buttonClass} disabled={busy||minor===0||action!=='topup'&&!confirmed||mode==='earn'&&(data.restricted||!!error)}>{busy?'Processing…':'Confirm'}</button><button type="button" className="text-slate-400" onClick={()=>setAction('')} disabled={busy}>Cancel</button></div>
       </form>;
-  if(mode==='earn')return <div className="earn-finance">
-    <EarnBalanceSummary data={data} error={error} notice={notice} busy={busy} refresh={()=>void refresh()}
-      withdraw={()=>{setAction('withdrawal');setConfirmed(false);}} transfer={()=>{setAction('transfer');setConfirmed(false);}}/>
-    {transactionForm&&<div className="earn-transaction-form">{transactionForm}</div>}
-    <EarnMilestones achievements={Array.isArray(data?.achievements)?data.achievements:null} restricted={!!data?.restricted} stale={!!error||!!data&&!Array.isArray(data.achievements)} busy={busy} claimingId={claimingId} onClaim={row=>void claimAchievement(row)} retry={()=>void refresh()}/>
-    {data&&<details className="earn-withdrawal-history"><summary>Withdrawal History <span>Latest requests</span></summary><div>
+  if(mode==='earn'){
+    const achievements=Array.isArray(data?.achievements)?data.achievements as EarnAchievement[]:null,achievementsStale=!!error||!!data&&!Array.isArray(data.achievements);
+    const balance=<EarnBalanceSummary data={data} error={error} notice={notice} busy={busy} refresh={()=>void refresh()}
+      withdraw={()=>{setAction('withdrawal');setConfirmed(false);}} transfer={()=>{setAction('transfer');setConfirmed(false);}}/>;
+    const form=transactionForm&&<div className="earn-transaction-form">{transactionForm}</div>;
+    const milestones=<EarnMilestones achievements={achievements} restricted={!!data?.restricted} stale={achievementsStale} busy={busy} claimingId={claimingId} onClaim={row=>void claimAchievement(row)} retry={()=>void refresh()}/>;
+    const history=data&&<details className="earn-withdrawal-history"><summary>Withdrawal History <span>Latest requests</span></summary><div>
       {!data.withdrawals.length&&<p>Your cash-out requests will appear here once you request a payout.</p>}
       {data.withdrawals.map((row:any)=><div key={row.id} className="earn-withdrawal-row"><p>{formatGhs(row.amount_minor)} · {customerActivityLabel(row.state)}</p><p>Fee {formatGhs(row.payload.feeMinor)} · You receive {formatGhs(row.payload.netMinor)}</p><p>{row.payload.maskedPhone} · {row.payload.network} · {new Date(row.created_at).toLocaleDateString()}</p>{row.payload.rejectionReason&&<p>{row.payload.rejectionReason}</p>}{row.payload.paidAt&&<p>Paid {new Date(row.payload.paidAt).toLocaleDateString()}</p>}</div>)}
       <div className="earn-history-pagination"><button className="earn-secondary" disabled={!offset} onClick={()=>setOffset(Math.max(0,offset-25))}>Previous</button><button className="earn-secondary" disabled={data.withdrawals.length<25} onClick={()=>setOffset(offset+25)}>More history</button></div>
-    </div></details>}
-  </div>;
+    </div></details>;
+    if(earnLayout)return <>{earnLayout({balance,form,milestones,history,achievements,stale:achievementsStale,restricted:!!data?.restricted,availableMinor:Number.isSafeInteger(data?.earn?.availableMinor)?data.earn.availableMinor:null,financeError:!!error})}</>;
+    return <div className="earn-finance">{balance}{form}{milestones}{history}</div>;
+  }
   return <section className="min-w-0 rounded-2xl border border-slate-800 bg-[#0b1116] p-4 sm:p-6 text-left text-slate-100 space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">{mode==='wallet'?'Mystery Wallet':'Your earnings'}</h2><p className="text-sm text-slate-400">{mode==='wallet'?'Add money to pay for eligible Mystery Hub purchases. Wallet funds cannot be withdrawn.':'Available funds from your financial account. Referral totals are shown separately.'}</p></div><button onClick={()=>void refresh()} className="text-sm text-[#00c365]" disabled={busy}>Refresh</button></div>
     {error&&<p role="alert" className="break-words text-sm text-amber-300">{error}</p>}{notice&&<p role="status" className="break-words text-sm text-emerald-300">{notice}</p>}

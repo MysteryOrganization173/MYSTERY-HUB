@@ -51,6 +51,7 @@ export interface OrderRecord {
   bundle: DataBundle;
   recipientPhone: string;
   buyerRecipientVisible?: boolean; // Presentation only: direct checkout or authenticated account Orders.
+  journey?: 'direct_checkout' | 'account'; // Presentation only: first-party origin; reference lookups leave it unset.
   network: NetworkId;
   paymentMethod: PaymentMethod;
   commercialPricing?: {regularMinor:number;discountMinor:number;paidMinor:number};
