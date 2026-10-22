@@ -15,8 +15,9 @@ export function WebsiteEditorToolbar(p: {
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null), opener = useRef<HTMLElement | null>(null);
-  const status = p.status==='saving' ? 'Saving…' : p.status==='saved' ? (p.published ? (p.liveBehind ? 'Draft saved · not on your live site yet' : 'Saved · live site is up to date') : 'Draft saved · not published') : p.status==='offline' ? 'Offline · changes kept on this device' : p.status==='failed' ? 'Not saved · tap Save to retry' : 'Unsaved changes';
-  const shortStatus = p.status==='saving' ? 'Saving…' : p.status==='saved' ? (p.published && p.liveBehind ? 'Saved · not live yet' : 'Saved') : p.status==='offline' ? 'Offline · kept here' : p.status==='failed' ? 'Not saved' : 'Unsaved';
+  // V5.1: say which thing is not live. "Not live yet" read as "my website is offline" to owners.
+  const status = p.status==='saving' ? 'Saving…' : p.status==='saved' ? (p.published ? (p.liveBehind ? 'Changes saved · press Update Live to show them' : 'Saved · your live website is up to date') : 'Draft saved · website not published yet') : p.status==='offline' ? 'Offline · changes kept on this device' : p.status==='failed' ? 'Not saved · tap Save to retry' : 'Unsaved changes';
+  const shortStatus = p.status==='saving' ? 'Saving…' : p.status==='saved' ? (p.published ? (p.liveBehind ? 'Saved · update to go live' : 'Saved · live') : 'Saved · not published') : p.status==='offline' ? 'Offline · kept here' : p.status==='failed' ? 'Not saved' : 'Unsaved';
   const active = p.settingsOpen ? 'settings' : p.colorsOpen ? 'colors' : p.mode;
   const openMore = (event: React.MouseEvent<HTMLElement>) => {opener.current = event.currentTarget; setMoreOpen(open => !open);};
   const closeMore = () => {setMoreOpen(false); opener.current?.focus();};

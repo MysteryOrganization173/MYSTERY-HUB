@@ -224,3 +224,52 @@
 .website-earnings dd span{display:block;font-size:12px;color:#94a3b8;line-height:1.4;margin-top:4px}
 .website-pricing-review ul{display:grid;gap:6px;margin:8px 0 12px;max-height:14rem;overflow-y:auto}
 .website-pricing-review li{font-size:14px;padding:8px 10px;border-radius:10px;background:#0a1218;border:1px solid #1a252d}
+/* V5.1 bundle setup: one task, one review, one save. */
+.website-bundles-status{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px;padding:12px 14px;border-radius:14px;background:#0d171f;border:1px solid #1e2a33}
+.website-bundles-status strong{font-size:16px}
+.website-bundles-status span{font-size:12px;color:#94a3b8}
+.website-bundles-status[data-sellable="0"]{border-color:rgba(251,191,36,.45)}
+.website-bundles-saved{margin:0;padding:12px 14px;border-radius:14px;border:1px solid rgba(0,195,101,.45);background:rgba(0,195,101,.1);color:#bbf7d0;font-size:14px;font-weight:600}
+.website-bundles-option{display:flex;gap:10px;align-items:flex-start;min-height:44px;padding:10px 12px;border-radius:12px;border:1px solid #1e2a33;background:#0b131a;cursor:pointer}
+.website-bundles-option:has(input:checked){border-color:#00c365;background:rgba(0,195,101,.08)}
+.website-bundles-option input{margin-top:3px;accent-color:#00c365;width:18px;height:18px;flex:none}
+.website-bundles-option strong{display:block;font-size:14px;line-height:1.3}
+.website-bundles-option small{display:block;font-size:12px;color:#94a3b8;margin-top:2px}
+.website-bundles-segment{display:flex;border:1px solid #334155;border-radius:10px;overflow:hidden}
+.website-bundles-segment button{min-height:44px;min-width:52px;padding:0 10px;font-size:14px;font-weight:700;color:#cbd5e1}
+.website-bundles-segment button[aria-pressed="true"]{background:#00c365;color:#05140c}
+.website-bundles-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.website-bundles-facts li{font-size:13px;padding:8px 10px;border-radius:10px;background:#0a1218;border:1px solid #1a252d;color:#cbd5e1}
+.website-bundles-facts li strong{color:#fff;font-size:15px;margin-right:2px}
+.website-bundles-facts li[data-tone="warn"]{border-color:rgba(251,191,36,.45);color:#fde68a}
+.website-bundles-bar{position:sticky;bottom:calc(var(--website-bottom-offset,16px));z-index:5;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;border-radius:12px;border:1px solid #334155;background:#0b131a;padding:12px;box-shadow:0 12px 32px rgba(0,0,0,.5)}
+/* Phones: the app's bottom navigation must never cover the save bar on the dashboard. */
+@media (max-width:767px){[data-bundle-setup="dashboard"]{--website-bottom-offset:calc(72px + env(safe-area-inset-bottom))}}
+[data-bundle-setup="sheet"] .website-bundles-bar{bottom:0}
+.website-bundles-sheet{width:min(860px,calc(100vw - 32px));height:min(92dvh,900px)}
+@media (max-width:639px){.website-bundles-sheet{width:100%;height:94dvh;max-height:94dvh}}
+/* V5.1 deletion blocker: why, what to do, money safety, stopping new orders. */
+.website-delete-blockers>strong{display:block;font-size:16px;color:#fef3c7}
+.website-delete-blockers ul.website-delete-reasons{list-style:none;padding:0;margin:10px 0;display:grid;gap:8px}
+.website-delete-reasons li{display:grid;gap:2px;padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.25)}
+.website-delete-reasons b{color:#fff7d6}
+.website-delete-reasons span{color:#fde68a;font-size:13px}
+.website-delete-blockers p.website-delete-safe{margin:10px 0;color:#d9f99d}
+.website-delete-next{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px}
+.website-delete-next>a,.website-delete-next>button.website-sheet-cancel{min-height:44px;display:inline-flex;align-items:center;justify-content:center;padding:0 14px;border-radius:12px;font-size:14px;font-weight:700}
+.website-delete-next>a{flex:1 1 100%;text-align:center}
+.website-delete-blockers p.website-delete-whatsapp-note{margin-top:6px;font-size:12px;color:#cbd5c0}
+.website-delete-stop{margin-top:12px;padding-top:12px;border-top:1px solid rgba(251,191,36,.25);display:grid;gap:8px;color:#fde68a}
+.website-delete-stop p{color:#fde68a!important}
+.website-delete-stop button{justify-self:start;min-height:44px;padding:0 14px;border-radius:12px;font-weight:600}
+.website-delete-later{font-size:13px;color:#9fb0a8}
+.website-delete-later summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
+.website-settings-list{display:grid;gap:12px}
+.website-settings-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;border:1px solid #1e2a33;border-radius:14px;padding:14px;background:#0d171f}
+.website-settings-row h3{margin:0;font-size:15px;font-weight:700}
+.website-settings-row p{margin:4px 0 0;font-size:13px;color:#9fb0a8;line-height:1.5}
+.website-settings-row>div{flex:1 1 240px}
+.website-settings-row>button{min-height:44px;padding:0 16px;border-radius:12px;background:#1b2731;border:1px solid #334155;color:#fff;font-weight:700}
+
+/* V5.1: a logo preview shows the whole logo on a checkerboard, so a transparent PNG reads as transparent. */
+.website-logo-preview[data-image-state="loaded"]{background:repeating-conic-gradient(#1e293b 0 25%,#0f172a 0 50%) 0 0/16px 16px!important}

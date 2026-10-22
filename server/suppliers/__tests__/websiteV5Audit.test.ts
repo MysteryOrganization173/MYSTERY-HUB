@@ -64,7 +64,7 @@ test('both flagships use the published owner hero and identity in server HTML, n
   assert.equal(process.env.DATABASE_URL,undefined);WebsiteStore.clearDevStore();
   for(const template of ['tmpl-night-kitchen','tmpl-boutique']){
     const hero='https://res.cloudinary.com/da6oeat7m/image/upload/v1790859552/owner-photo.png';
-    const site=(await WebsiteStore.createSite(template,{template_id:template,name:'Real owner business',content:{businessName:'Real owner business',heroImage:hero,tagline:'Owner headline'}})).site;
+    const site=(await WebsiteStore.createSite(template,{template_id:template,name:'Real owner business',content:{whatsapp:'0241234567',businessName:'Real owner business',heroImage:hero,tagline:'Owner headline'}})).site;
     const published=(await WebsiteStore.publishSite(site.id,template,site.updated_at))!;
     await WebsiteStore.updateSite(site.id,template,{content:{businessName:'Private later name',heroImage:'https://images.unsplash.com/private'},expectedUpdatedAt:published.updated_at});
     const resolved=await resolvePublicSocialMetadata(`/sites/${site.slug}?utm_source=share`);

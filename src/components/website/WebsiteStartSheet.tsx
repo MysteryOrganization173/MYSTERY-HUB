@@ -6,6 +6,7 @@ import {createWebsiteStarter} from '../../services/websiteB1Api';
 import {WEBSITE_STARTER_VERSION} from '../../config/websiteStarters';
 import {getTemplateById} from '../../utils/templateRendererUtils';
 import {trackWebsiteEvent} from '../../utils/websiteAnalytics';
+import {hasWorkingWhatsApp, websiteContactNeed} from '../../utils/websiteReadiness';
 import './websiteBuilder.css';
 
 export interface WebsiteStartDetails {businessName: string; whatsapp: string; location: string}
@@ -25,7 +26,10 @@ export function WebsiteStartSheet({templateId, initialName = '', onCreated, onCl
   const template = getTemplateById(templateId);
   useEffect(() => {dialog.current?.showModal();}, []);
   const name = details.businessName.trim();
-  const problem = !name ? '' : name.length < 2 ? 'Use at least 2 characters.' : /[<>]/.test(details.businessName + details.whatsapp + details.location) ? 'Use plain text without < or >.' : '';
+  // V5.1: whether WhatsApp is needed depends on how this design's customers act.
+  const need = websiteContactNeed(templateId);
+  const whatsappProblem = details.whatsapp.trim() && !hasWorkingWhatsApp(details.whatsapp) ? 'Enter the full number, for example 024 123 4567 or +233 24 123 4567.' : '';
+  const problem = !name ? '' : name.length < 2 ? 'Use at least 2 characters.' : /[<>]/.test(details.businessName + details.whatsapp + details.location) ? 'Use plain text without < or >.' : whatsappProblem;
 
   const create = async (token: string, input: WebsiteStartDetails) => {
     trackWebsiteEvent('website_build_started', {templateId, source: 'builder'}, token);
@@ -64,9 +68,9 @@ export function WebsiteStartSheet({templateId, initialName = '', onCreated, onCl
           <input autoFocus required maxLength={100} value={details.businessName} onChange={e => setDetails({...details, businessName: e.target.value})} placeholder="e.g. Auntie Ama’s Kitchen" autoComplete="organization" enterKeyHint="next" aria-invalid={!!problem}/>
         </label>
         <label className="website-start-field">
-          <span>WhatsApp number <em>optional</em></span>
-          <input type="tel" inputMode="tel" maxLength={30} value={details.whatsapp} onChange={e => setDetails({...details, whatsapp: e.target.value})} placeholder="e.g. 024 123 4567" autoComplete="tel" enterKeyHint="next"/>
-          <small>Your website’s buttons open a WhatsApp chat with you.</small>
+          <span>WhatsApp number <em>{need === 'whatsapp' ? 'needed to publish' : need === 'contact' ? 'recommended' : 'optional'}</em></span>
+          <input type="tel" inputMode="tel" maxLength={30} value={details.whatsapp} onChange={e => setDetails({...details, whatsapp: e.target.value})} placeholder="e.g. 024 123 4567" autoComplete="tel" enterKeyHint="next" aria-invalid={!!whatsappProblem} aria-describedby="website-start-whatsapp-hint"/>
+          <small id="website-start-whatsapp-hint" data-need={need}>{whatsappProblem || (need === 'whatsapp' ? 'Customers send their orders to this WhatsApp. You can start your draft without it, but you need it before publishing.' : need === 'contact' ? 'Your website’s buttons open a WhatsApp chat with you. You can add a phone or email later instead.' : 'Adds a Chat button for customer questions. Customers buy and pay on your store, not on WhatsApp.')}</small>
         </label>
         <label className="website-start-field">
           <span>Area or address <em>optional</em></span>

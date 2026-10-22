@@ -18,7 +18,7 @@ function component(preview=false,siteId='site-a') {
     useEffect:(fn:any,deps:any[])=>{const i=cursor++,old=cells[i];if(!old||deps.some((d,j)=>!Object.is(d,old.deps[j]))){effects.push(()=>{old?.cleanup?.();cells[i]={deps,cleanup:fn()};});}}
   };
   const tile=()=>null,tabs=()=>null,row=()=>null,colors={accent:'#7c3aed',background:'#07101e',surface:'#0b1220',text:'#fff',mutedText:'#bbb',border:'#566',focus:'#fff'};
-  const modules:any={react,'../../data/templates':{WEBSITE_TEMPLATES:[]},'../../data/bundles':{detectGhanaNetwork:()=>'mtn'},
+  const modules:any={react,'../../utils/websitePreviewCatalog':{websitePreviewCatalog:(rows:any)=>rows||[]},'../../data/templates':{WEBSITE_TEMPLATES:[]},'../../data/bundles':{detectGhanaNetwork:()=>'mtn'},
     './storefront/ResellerCatalogue':{BundleTile:tile,NetworkTabs:tabs,BundleRow:row,SignalSteps:()=>null,bundleFilters:()=>[{id:'all',label:'All',count:1}],filterBundles:(b:any[])=>b,lowestPrice:(b:any[])=>b.length?Math.min(...b.map(x=>x.priceMinor)):null,sortBundles:(b:any[])=>b,storeNetworkColor:()=>'#ffcc00',storeNetworkName:(n:string)=>n.toUpperCase(),storeNetworksIn:(b:any[])=>[...new Set(b.map(x=>x.network))],networkSummaries:()=>[]},
     '../../utils/websiteBrand':{websiteActionText:()=> '#fff',resolveResellerTheme:()=>colors,resolveStoreTheme:()=>colors},
     '../../utils/templateRendererUtils':{renderTemplateLayout:(_template:any,slots:any)=>({type:'layout',props:slots})},
@@ -29,7 +29,7 @@ function component(preview=false,siteId='site-a') {
   };
   const module={exports:{} as any};
   runInNewContext(compiled,{module,exports:module.exports,require:(name:string)=>{assert.ok(modules[name],name);return modules[name];},crypto:{randomUUID:()=> '12345678-1234-1234-1234-123456789abc'},sessionStorage:{getItem:(key:string)=>{calls.storageReads++;return values.get(key)||null;},setItem:(key:string,value:string)=>values.set(key,value),removeItem:(key:string)=>values.delete(key)},setInterval:()=>0,clearInterval:()=>{},requestAnimationFrame:()=>{}});
-  const wrapper=module.exports.ManagedDataStorefront({siteId,preview,template:{colorScheme:colors,demoBusinessName:'Synthetic owner'}});
+  const wrapper=module.exports.ManagedDataStorefront({siteId,preview,previewProducts:[{id:'mtn-1gb',network:'mtn',dataAmount:'1GB',retailMinor:521}],template:{colorScheme:colors,demoBusinessName:'Synthetic owner'}});
   const render=()=>{cursor=0;const tree=wrapper.type(wrapper.props);while(effects.length)effects.shift()!();return tree;};
   const nodes=(tree:any):any[]=>!tree||typeof tree!=='object'?[]:Array.isArray(tree)?tree.flatMap(nodes):[tree,...nodes(tree.props?.children),...nodes(tree.props?.managedCheckout)];
   const find=(predicate:(node:any)=>boolean)=>nodes(render()).find(predicate);

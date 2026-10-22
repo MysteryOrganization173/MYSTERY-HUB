@@ -4,7 +4,7 @@ import { isDeletedWebsite, withoutDeletedWebsites } from '../../utils/websiteDel
 import { trackWebsiteEvent } from '../../utils/websiteAnalytics';
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { TEMPLATE_CATEGORIES, WEBSITE_TEMPLATES, orderedWebsiteTemplates, findTemplateByLink, templateDesignLabel } from '../../data/templates';
+import { TEMPLATE_CATEGORIES, WEBSITE_TEMPLATES, orderedWebsiteTemplates, findTemplateByLink, templateDesignLabel, readyDesignCount, isReadyDesign } from '../../data/templates';
 import { TemplateCategory, WebsiteSiteRecord, WebsiteTemplate } from '../../types';
 import { TemplateCardPreview } from './TemplateCardPreview';
 import { WebsiteStartSheet } from './WebsiteStartSheet';
@@ -14,6 +14,7 @@ import { WebsiteEditor } from './editor/WebsiteEditor';
 import { WebsitePlansAndUltra } from './WebsitePlansAndUltra';
 import './websiteBuilder.css';
 import { mergeSiteWithTemplate } from '../../utils/templateRendererUtils';
+import { WEBSITE_LIVE_LABELS, websiteLiveState } from '../../utils/websiteReadiness';
 import {
   getMyWebsitesOnServer,
   createWebsiteOnServer,
@@ -58,7 +59,6 @@ export const WebsiteBuilderPage: React.FC = () => {
   const [isLoadingSites, setIsLoadingSites] = useState(false);
   const [siteFetchError, setSiteFetchError] = useState<string | null>(null);
   const [actionLoadingSiteId, setActionLoadingSiteId] = useState<string | null>(null);
-  const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
   const [changeTarget,setChangeTarget]=useState('');
   const [startTemplate,setStartTemplate]=useState('');
   // The dashboard's Publish opens the editor's publish checklist, never a blind publish.
@@ -71,7 +71,6 @@ export const WebsiteBuilderPage: React.FC = () => {
   // asked for), never to wherever the collapsed page happened to leave the window scrolled.
   const exitTarget = useRef<string>('website-owner-card');
   const wasEditing = useRef(false);
-  const openPricing = () => { setDashboardTab('Bundles & Pricing'); exitTarget.current = 'website-business-dashboard'; closeWebsiteEditor(); };
   useEffect(() => {
     if (activeEditorSite) { wasEditing.current = true; return; }
     if (!wasEditing.current) return;
@@ -87,7 +86,7 @@ export const WebsiteBuilderPage: React.FC = () => {
   // After deletion the owner lands on the gallery to start again: new design, new name, new address.
   const handleWebsiteDeleted = (siteId: string) => {
     setMySites(prev => prev.filter(site => site.id !== siteId));
-    setShowSettingsDrawer(false); setChangeTarget(''); setDashboardTab('Overview'); setPricingDirty(false);
+    setChangeTarget(''); setDashboardTab('Overview'); setPricingDirty(false);
     if (activeEditorSite?.id === siteId) closeWebsiteEditor();
     showToast('Website deleted. Choose a design to start a new website.', 'success');
     requestAnimationFrame(() => { const gallery = document.getElementById('templates-showcase'); if (gallery) gallery.scrollIntoView({ block: 'start' }); else window.scrollTo({ top: 0 }); });
@@ -187,7 +186,7 @@ export const WebsiteBuilderPage: React.FC = () => {
   });
 
   // Real gallery designs, one per industry, for the visitor showcase strip.
-  const showcaseTemplates = orderedWebsiteTemplates().filter(t => t.id !== 'tmpl-start-blank' && t.heroImage).slice(0, 6);
+  const showcaseTemplates = orderedWebsiteTemplates().filter(t => isReadyDesign(t) && t.heroImage).slice(0, 6);
 
   const isFiltering = selectedCategory !== 'all' || searchQuery.trim().length > 0;
   const displayedTemplates = isFiltering || showAllTemplates ? filteredTemplates : filteredTemplates.slice(0, 6);
@@ -230,8 +229,8 @@ export const WebsiteBuilderPage: React.FC = () => {
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleTogglePublish = async (site: WebsiteSiteRecord) => {
-    if (!sessionToken) return;
+  const handleTogglePublish = async (site: WebsiteSiteRecord): Promise<boolean> => {
+    if (!sessionToken) return false;
     setActionLoadingSiteId(site.id);
     try {
       if (site.status === 'published') {
@@ -239,16 +238,20 @@ export const WebsiteBuilderPage: React.FC = () => {
         if (res.success && res.site) {
           setMySites((prev) => prev.map((s) => (s.id === res.site.id ? res.site : s)));
           showToast('Your website is now a draft and is no longer public.', 'info');
+          return true;
         }
       } else {
         const res = await publishWebsiteOnServer(sessionToken, site.id, site.updated_at);
         if (res.success && res.site) {
           setMySites((prev) => prev.map((s) => (s.id === res.site.id ? res.site : s)));
           showToast(`Website published! Live at /sites/${res.site.slug}`, 'success');
+          return true;
         }
       }
+      return false;
     } catch (err: any) {
       showToast(err.message || 'Action failed.', 'warning');
+      return false;
     } finally {
       setActionLoadingSiteId(null);
     }
@@ -285,7 +288,6 @@ export const WebsiteBuilderPage: React.FC = () => {
       <WebsiteEditor
         key={`${activeEditorSite.id}:${activeEditorSite.template_id}`}
         site={activeEditorSite}
-        onOpenPricing={openPricing}
         sessionToken={sessionToken}
         openPublish={editorPublish}
         onClose={()=>{setEditorPublish(false);closeWebsiteEditor();}}
@@ -296,8 +298,8 @@ export const WebsiteBuilderPage: React.FC = () => {
   }
 
   const isPublished = activeSite?.status === 'published';
-  // Publishing stamps published_at; any later draft save moves updated_at past it.
-  const draftAhead = !!activeSite?.published_at && Date.parse(activeSite.updated_at) - Date.parse(activeSite.published_at) > 1000;
+  // Compared with what visitors see (the published snapshot), the same rule the editor uses.
+  const draftAhead = !!activeSite && websiteLiveState(activeSite) === 'live-changes';
   const exampleCount = (activeSite?.content_json?.items || []).filter(item => item.isExample).length;
   const itemWord = websiteItemVocabulary(activeSite?.template_id || '');
   const displaySiteName =
@@ -340,8 +342,8 @@ export const WebsiteBuilderPage: React.FC = () => {
           <div className="space-y-5">
             <section id="website-owner-card" data-website-owner-card aria-labelledby="website-owner-name" className="website-owner-card scroll-mt-24 text-left">
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ${isPublished?'bg-emerald-500/15 text-emerald-300':'bg-amber-500/15 text-amber-200'}`}><span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${isPublished?'bg-emerald-400':'bg-amber-300'}`}/>{isPublished?'Live':'Draft · not public yet'}</span>
-                {isPublished&&draftAhead&&<span className="inline-flex items-center rounded-full px-2.5 py-1 font-semibold bg-sky-500/15 text-sky-200">Draft has unpublished changes</span>}
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ${isPublished?'bg-emerald-500/15 text-emerald-300':'bg-amber-500/15 text-amber-200'}`}><span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${isPublished?'bg-emerald-400':'bg-amber-300'}`}/>{isPublished?WEBSITE_LIVE_LABELS.live.short:WEBSITE_LIVE_LABELS['not-published'].short}</span>
+                {isPublished&&draftAhead&&<span className="inline-flex items-center rounded-full px-2.5 py-1 font-semibold bg-sky-500/15 text-sky-200">Changes waiting to go live</span>}
                 <span className="text-slate-400">{templateDesignLabel(activeBaseTemplate)} · Free plan</span>
               </div>
               <h1 id="website-owner-name" tabIndex={-1} className="mt-3 text-2xl sm:text-3xl font-bold break-words outline-none">{displaySiteName}</h1>
@@ -363,8 +365,8 @@ export const WebsiteBuilderPage: React.FC = () => {
                 {isPublished&&<button disabled={actionLoadingSiteId===activeSite.id} className="min-h-11 text-slate-400 hover:text-slate-200 disabled:opacity-50 sm:ml-auto" onClick={()=>void handleTogglePublish(activeSite)}>{actionLoadingSiteId===activeSite.id?'Updating…':'Unpublish'}</button>}
               </div>
             </section>
-            <WebsiteBusinessDashboard site={activeSite} token={sessionToken!} requestedTab={dashboardTab} onTabChange={setDashboardTab} onEdit={()=>editSite(activeSite)} onPricingDirty={setPricingDirty} onPreview={handlePreviewCurrentSite} onPublish={()=>editSite(activeSite,true)} onShare={isPublished?()=>void handleShare(activeSite.slug):undefined} onSettings={()=>{setShowSettingsDrawer(true);requestAnimationFrame(()=>document.getElementById('website-settings')?.scrollIntoView({block:'start'}));}}/>
-            {showSettingsDrawer&&<section id="website-settings" className="scroll-mt-24 rounded-2xl border border-slate-800 bg-[#0b131a] p-4 text-left space-y-3"><div className="flex items-center justify-between"><h2 className="font-bold">Website settings</h2><button className="min-h-11 px-3 text-sm" onClick={()=>setShowSettingsDrawer(false)}>Close settings</button></div><p className="text-sm text-slate-400">Current design: {activeBaseTemplate?.title}. Your site address stays the same when you change design.</p><WebsiteSettingsControls site={activeSite} token={sessionToken!} onUpdated={updated=>{updateSite(updated);setShowSettingsDrawer(false);openWebsiteEditor(updated);}} onDeleted={handleWebsiteDeleted} onResolve={tab=>{setShowSettingsDrawer(false);setDashboardTab(tab);requestAnimationFrame(()=>document.getElementById('website-business-dashboard')?.scrollIntoView({block:'start'}));}}/></section>}
+            <WebsiteBusinessDashboard site={activeSite} token={sessionToken!} requestedTab={dashboardTab} onTabChange={setDashboardTab} onEdit={()=>editSite(activeSite)} onPricingDirty={setPricingDirty} onPublish={()=>editSite(activeSite,true)} onShare={isPublished?()=>void handleShare(activeSite.slug):undefined}
+              settings={policy=><WebsiteSettingsControls site={activeSite} token={sessionToken!} withdrawalMinimumMinor={policy.withdrawalMinimumMinor} onUnpublish={isPublished?()=>handleTogglePublish(activeSite):undefined} onUpdated={updated=>{updateSite(updated);openWebsiteEditor(updated);}} onDeleted={handleWebsiteDeleted} onResolve={tab=>{setDashboardTab(tab);requestAnimationFrame(()=>document.getElementById('website-business-dashboard')?.scrollIntoView({block:'start'}));}}/>}/>
           </div>
         ) : (
           /* =========================================================
@@ -480,7 +482,7 @@ export const WebsiteBuilderPage: React.FC = () => {
               <p className="text-sm text-slate-400 mt-1 max-w-xl">
                 {activeSite
                   ? 'Switching keeps your business details. You will see exactly what stays and what resets before anything changes.'
-                  : `${WEBSITE_TEMPLATES.filter(t => t.id !== 'tmpl-start-blank').length} designs, all included in Free. Preview any of them on phone and desktop before you start.`}
+                  : `${readyDesignCount()} designs, all included in Free. Preview any of them on phone and desktop before you start.`}
               </p>
             </div>
 
@@ -528,8 +530,8 @@ export const WebsiteBuilderPage: React.FC = () => {
           {/* Result Count Indicator & Expand Toggle */}
           <div className="text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
             <span>
-              Showing <strong>{displayedTemplates.length}</strong> of{' '}
-              <strong>{filteredTemplates.length}</strong> design{filteredTemplates.length === 1 ? '' : 's'}
+              Showing <strong>{readyDesignCount(displayedTemplates)}</strong> of{' '}
+              <strong>{readyDesignCount(filteredTemplates)}</strong> design{readyDesignCount(filteredTemplates) === 1 ? '' : 's'}
               {searchQuery && ` matching "${searchQuery}"`}
             </span>
 
@@ -550,7 +552,7 @@ export const WebsiteBuilderPage: React.FC = () => {
                   onClick={() => setShowAllTemplates((prev) => !prev)}
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-[#00c365] hover:text-[#00e575] transition-colors cursor-pointer"
                 >
-                  <span>{showAllTemplates ? 'Show fewer' : `View all ${filteredTemplates.length}`}</span>
+                  <span>{showAllTemplates ? 'Show fewer' : `View all ${readyDesignCount(filteredTemplates)}`}</span>
                   {showAllTemplates ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </button>
               )}
@@ -598,7 +600,7 @@ export const WebsiteBuilderPage: React.FC = () => {
                 }}
                 className="px-6 py-3 rounded-2xl bg-[#0f171e] hover:bg-[#15202a] text-slate-200 border border-slate-700/80 font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-md hover:border-[#00c365]/40"
               >
-                <span>{showAllTemplates ? 'Show fewer designs' : `View all ${filteredTemplates.length} designs`}</span>
+                <span>{showAllTemplates ? 'Show fewer designs' : `View all ${readyDesignCount(filteredTemplates)} designs`}</span>
                 {showAllTemplates ? <ChevronUp className="w-4 h-4 text-[#00c365]" /> : <ChevronDown className="w-4 h-4 text-[#00c365]" />}
               </button>
             </div>

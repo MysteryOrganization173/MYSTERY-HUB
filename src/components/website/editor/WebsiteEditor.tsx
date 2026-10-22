@@ -20,6 +20,10 @@ import { websitePublishChanges } from '../../../utils/websitePublishChanges';
 import { withV5Clears } from '../../../utils/websiteDraftRecovery';
 import { WebsiteItemsList } from './WebsiteItemsList';
 import { WebsitePublishSheet } from './WebsitePublishSheet';
+import { WebsiteBundleSetupSheet } from './WebsiteBundleSetupSheet';
+import { websiteBusinessRequest } from '../../../services/websiteBusinessApi';
+import { websiteReadiness } from '../../../utils/websiteReadiness';
+import {websitePreviewCatalog,type WebsitePreviewProduct} from '../../../utils/websitePreviewCatalog';
 import { WebsiteLayoutControl, WebsiteHistoryControl } from './WebsiteLayoutAndHistory';
 import { publishWebsiteB1, reviewWebsiteExamples, setWebsiteLayout, restoreWebsiteDraft, discardWebsiteCheckpoint, WebsiteB1Error } from '../../../services/websiteB1Api';
 import { websiteItemVocabulary, websiteStarterWording } from '../../../config/websiteStarters';
@@ -58,7 +62,6 @@ interface WebsiteEditorProps {
   site: WebsiteSiteRecord;
   sessionToken: string;
   onClose: () => void;
-  onOpenPricing?: () => void;
   onSiteUpdated: (updatedSite: WebsiteSiteRecord) => void;
   /** Open the publish checklist straight away (the dashboard's Publish button). */
   openPublish?: boolean;
@@ -69,7 +72,6 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   site: initialSite,
   sessionToken,
   onClose,
-  onOpenPricing,
   onSiteUpdated,
   openPublish = false,
   showToast,
@@ -124,13 +126,14 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const [visualSelection, setVisualSelection] = useState<string|null>(null);
   const [focusRequest, setFocusRequest] = useState(0);
   // A tap on content that has no tap-to-edit field explains where to change it.
-  const [settingsNotice, setSettingsNotice] = useState<false|'settings'|'pricing'>(false);
+  const [settingsNotice, setSettingsNotice] = useState<false|'settings'>(false);
   // Rendered targets in reading order, reported by the draft frame, for Previous/Next.
   const [targetOrder, setTargetOrder] = useState<string[]>([]);
   const [canvasHintSeen, setCanvasHintSeen] = useState(false);
   const [previewHintSeen, setPreviewHintSeen] = useState(false);
   const clearSelection = () => {setVisualSelection(null);setSettingsNotice(false);setFocusRequest(n=>n+1);};
-  const selectTarget = (id:string|null, hint?:'settings'|'pricing') => {setAllSettings(false);setVisualSelection(id);setSettingsNotice(!id && hint ? (hint==='pricing' && isDataReseller ? 'pricing' : 'settings') : false);if(id || hint)setCanvasHintSeen(true);};
+  // V5.1: tapping the bundles opens the bundle workspace itself, not an explanation that points elsewhere.
+  const selectTarget = (id:string|null, hint?:'settings'|'pricing') => {setAllSettings(false);setVisualSelection(id);if(!id && hint==='pricing' && isDataReseller){setSettingsNotice(false);setBundleSheet(true);}else setSettingsNotice(!id && hint ? 'settings' : false);if(id || hint)setCanvasHintSeen(true);};
   const changeMode = (mode:'edit'|'preview') => {setActiveTab(mode);setVisualSelection(null);setSettingsNotice(false);setAllSettings(false);};
 
   // Device View in Preview: responsive default based on viewport width
@@ -172,6 +175,19 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     'business' | 'contact' | 'items' | 'hours' | 'branding' | 'media' | 'sections' | 'bundles' | 'cta' | 'social' | 'history'
   >('business');
   const [publishOpen, setPublishOpen] = useState(openPublish);
+  // Data stores: the bundle workspace sheet and the server's count of bundles customers can buy.
+  const [bundleSheet, setBundleSheet] = useState(false);
+  const [previewProducts,setPreviewProducts]=useState<WebsitePreviewProduct[]>([]);
+  const [catalogRevision,setCatalogRevision]=useState(0);
+  const [sellableBundles, setSellableBundles] = useState<number | null>(null);
+  const [frameGeneration, setFrameGeneration] = useState(0);
+  useEffect(() => {
+    setPreviewProducts([]);
+    if (!isDataReseller) {setSellableBundles(null); return;}
+    let live = true;
+    websiteBusinessRequest(`websites/${currentSite.id}/bundles`, sessionToken).then((r: any) => {if (live) {setSellableBundles((r?.products || []).filter((p: any) => p.eligible).length);setPreviewProducts(websitePreviewCatalog(r?.products,true));}}).catch(() => {if (live) setSellableBundles(null);});
+    return () => {live = false;};
+  }, [currentSite.id, isDataReseller, sessionToken,catalogRevision]);
   // B1 server actions (review, layout, restore) run against the saved draft; the editor waits for them.
   const [serverBusy, setServerBusy] = useState(false);
   const word = websiteItemVocabulary(currentSite.template_id);
@@ -488,7 +504,9 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         onDiscard={()=>{setRecovery(null);clearDraftRecovery(currentSite.id,currentSite.template_id);}}/>}
       {publishOpen && <WebsitePublishSheet content={content} published={currentSite.status==='published'} publishedAt={currentSite.published_at} publicUrl={`${window.location.origin}/sites/${currentSite.slug}`} word={word} managed={isDataReseller}
         onReview={reviewItems} onEditItem={openItem} onPublish={handlePublish} onClose={()=>setPublishOpen(false)}
-        suggestions={publishSuggestions} changes={websitePublishChanges(currentSite.published_snapshot_json, {templateId: currentSite.template_id, content, settings}, word.singular.toLowerCase())}
+        suggestions={publishSuggestions} readiness={websiteReadiness({templateId:currentSite.template_id,content,layoutMode,sellableBundles,publishedSnapshot:currentSite.status==='published'?currentSite.published_snapshot_json:null})} sellableBundles={sellableBundles}
+        onFix={item=>{if(item.fix){changeContent(item.fix.patch);showToast(`${item.fix.label.replace(/^Use /,'Using ')}. You can edit it any time.`,'success');}}} onBundles={()=>{setPublishOpen(false);setBundleSheet(true);}}
+        changes={websitePublishChanges(currentSite.published_snapshot_json, {templateId: currentSite.template_id, content, settings}, word.singular.toLowerCase())}
         onEditField={target=>{setPublishOpen(false);setActiveTab('edit');if(target==='name')selectTarget('content:businessName');else if(target==='contact')openSettings('contact');else selectTarget(target);}}/>}
       {mediaOpen && <WebsiteImageLibrary siteId={currentSite.id} token={sessionToken} onClose={()=>setMediaOpen(false)} onChoose={url=>{setContent({...content,heroImage:url});markDirty();setMediaOpen(false);}} />}
       <WebsiteEditorToolbar name={content.businessName || siteName} mode={activeTab} device={previewDevice} status={saveStatusText} published={currentSite.status==='published'} saving={isSaving} publishing={isPublishing}
@@ -691,7 +709,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
               {!isDataReseller && content.heroImage && <details className="rounded-xl border border-slate-800 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-200 min-h-8">Cover photo focus and description</summary>
                 <div className="mt-3"><WebsiteImageDetails src={content.heroImage} focal={content.imageMeta?.heroImage} alt={content.imageMeta?.heroImage?.alt} onChange={patch=>changeContent({imageMeta:{...(content.imageMeta||{}),heroImage:{...(content.imageMeta?.heroImage||{}),...(patch.x!==undefined?{x:patch.x,y:patch.y}:{}),...(patch.alt!==undefined?{alt:patch.alt||undefined}:{})}}})}/></div>
               </details>}
-              <WebsiteImageField label="Business logo" value={content.logoUrl||''} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,logoUrl:url});markDirty();}} />
+              <WebsiteImageField logo label="Business logo" value={content.logoUrl||''} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,logoUrl:url});markDirty();}} />
               {content.logoUrl && <div className="visual-field"><div className="visual-field-label"><label htmlFor="logo-alt">Logo description (optional)</label></div><input id="logo-alt" className="visual-input" maxLength={150} value={content.imageMeta?.logoUrl?.alt || ''} placeholder={`${content.businessName || 'Business'} logo`} onChange={e=>changeContent({imageMeta:{...(content.imageMeta||{}),logoUrl:{alt:e.target.value.replace(/[<>]/g,'')||undefined}}})}/></div>}
               {!isDataReseller && currentSite.template_id!=='tmpl-start-blank' && <WebsiteGalleryControl gallery={content.gallery} siteId={currentSite.id} token={sessionToken} onChange={gallery=>changeContent({gallery})}/>}
               <button type="button" className="mh-button-secondary" onClick={()=>setMediaOpen(true)}>Open media library for cover image</button>
@@ -855,7 +873,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     </div>
                   )}
 
-                  <WebsiteImageField label="Brand Logo" value={content.logoUrl || ''} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,logoUrl:url});markDirty();}} />
+                  <WebsiteImageField logo label="Brand Logo" value={content.logoUrl || ''} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,logoUrl:url});markDirty();}} />
                 </div>
               </div>
             )}
@@ -885,9 +903,9 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
             {/* Managed bundle prices are authoritative business settings, not template content. */}
             {isDataReseller && activeSection === 'bundles' && <div className="space-y-4">
-              <h3 className="font-bold text-white">Your bundles & pricing</h3>
-              <p className="text-sm text-slate-400">Choose which bundles appear on your store and set your selling prices. Your work here will be saved before opening pricing.</p>
-              <button type="button" className="min-h-11 px-4 py-3 rounded-xl bg-emerald-500 text-black font-bold" disabled={isSaving||isPublishing} onClick={async()=>{if(isDirty && !(await handleSaveDraft()))return;(onOpenPricing||onClose)();}}>Open Bundles &amp; Pricing</button>
+              <h3 className="font-bold text-white">Your bundles & prices</h3>
+              <p className="text-sm text-slate-300" data-sellable-summary>{sellableBundles===null?'Choose which bundles customers can buy and set your selling prices.':sellableBundles?`${sellableBundles===1?'1 bundle is':`${sellableBundles} bundles are`} on sale.`:'No bundles are on sale yet. Customers can’t buy until you switch some on.'}</p>
+              <button type="button" className="min-h-11 px-4 py-3 rounded-xl bg-emerald-500 text-black font-bold" onClick={()=>setBundleSheet(true)}>Set up bundles &amp; prices</button>
               <WebsiteFeaturedBundlesControl siteId={currentSite.id} token={sessionToken} value={content.pinnedBundles} onChange={next=>changeContent({pinnedBundles:next.length?next:undefined})} />
             </div>}
 
@@ -1014,7 +1032,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
           {activeTab==='preview' && !previewHintSeen && <div className="visual-canvas-hint is-preview" role="note"><Eye size={15}/><span>{canvasDevice==='mobile'?'Preview of your draft':`${canvasDevice==='tablet'?'Tablet':'Desktop'} preview, scaled to fit`} · payments are off</span><button type="button" aria-label="Dismiss preview note" onClick={()=>setPreviewHintSeen(true)}><X size={15}/></button></div>}
           <div ref={canvasRef} className="visual-canvas-viewport">
             <div style={{width:effectiveCanvasWidth, flexShrink:0, height:scale<1 ? 'calc(100% / '+scale+')' : '100%', transform:scale<1 ? 'scale('+scale+')' : undefined, transformOrigin:'top center'}} className="visual-canvas-page">
-              <WebsitePreviewFrame template={previewTemplate} siteId={currentSite.id} viewportWidth={targetWidth} editMode={activeTab==='edit' && !isPublishing} selectedTarget={visualSelection} onSelect={selectTarget} onOrder={setTargetOrder} focusRequest={focusRequest} reserveBottom={contextualTargets.length>0 || settingsNotice ? sheetReserve : 0}/>
+              <WebsitePreviewFrame key={frameGeneration} template={previewTemplate} previewProducts={previewProducts} siteId={currentSite.id} viewportWidth={targetWidth} editMode={activeTab==='edit' && !isPublishing} selectedTarget={visualSelection} onSelect={selectTarget} onOrder={setTargetOrder} focusRequest={focusRequest} reserveBottom={contextualTargets.length>0 || settingsNotice ? sheetReserve : 0}/>
             </div>
           </div>
         </div>
@@ -1022,7 +1040,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
           onChange={patch=>updateItem(items[selectedItemIndex].id!,patch)} onKeep={()=>void reviewItems([items[selectedItemIndex].id!],'confirm')} onRemove={()=>removeItem(items[selectedItemIndex].id!)} onAdd={addItem} onPrevious={()=>stepItem(-1)} onNext={()=>stepItem(1)} onDone={clearSelection}/>}
         {activeTab==='edit' && contextualTargets.length>0 && !selectedItemId && <div className="contents" inert={locked}><VisualContextPanel title={visualSelection==='branding'?'Website colors':selected!.label} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()} position={stepIndex>=0?{index:stepIndex,total:stepIds.length}:undefined} onPrevious={()=>step(-1)} onNext={()=>step(1)} suggested={!!selected && suggestedFields.includes(selected.id)}/></div>}
         {activeTab==='edit' && settingsNotice==="settings" && !contextualTargets.length && <VisualContextPanel notice title="Change this in All Settings" targets={[]} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()}/>}
-        {activeTab==='edit' && settingsNotice==="pricing" && !contextualTargets.length && <VisualContextPanel notice title="Bundles come from Bundles & Pricing" noticeText="The bundles and prices on your store are the ones you enable in Bundles & Pricing, so customers only see bundles you can sell. Headings above the bundles can be tapped and edited here." noticeAction="Open Bundles & Pricing" targets={[]} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings('bundles')}/>}
+        {bundleSheet && isDataReseller && <WebsiteBundleSetupSheet siteId={currentSite.id} token={sessionToken} published={currentSite.status==='published'} onClose={()=>setBundleSheet(false)} onSaved={count=>{setSellableBundles(count);setCatalogRevision(n=>n+1);setFrameGeneration(n=>n+1);}}/>}
       </div>
 
       {/* =========================================================
@@ -1127,7 +1145,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                   : 'max-w-[1280px] sm:rounded-2xl sm:my-4 sm:border sm:border-slate-700'
               }`}
             >
-              <div className="h-[75dvh] min-h-[480px]"><WebsitePreviewFrame template={previewTemplate} siteId={currentSite.id} viewportWidth={targetWidth} /></div>
+              <div className="h-[75dvh] min-h-[480px]"><WebsitePreviewFrame key={frameGeneration} template={previewTemplate} previewProducts={previewProducts} siteId={currentSite.id} viewportWidth={targetWidth} /></div>
               {/* Free Tier Attribution */}
               <div className="py-4 px-4 bg-[#090d11] border-t border-slate-800 text-center text-xs text-slate-400 select-none">
                 <span className="inline-flex items-center gap-1.5">

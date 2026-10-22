@@ -248,8 +248,8 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
       </div>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-10 px-6 sm:px-12 text-xs">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <footer className="bg-slate-900 text-slate-400 py-7 sm:py-10 px-6 sm:px-12 text-xs">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
           <div className="space-y-2">
             <h4 className="font-bold text-white text-base" {...edit("content:businessName")}>
               {template.demoBusinessName}
@@ -267,7 +267,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
             <SiteFooterContact template={template} className="text-xs" />
           </div>
         </div>
-        <div className="border-t border-slate-800 mt-8 pt-4 text-center text-slate-500 text-[10px]">
+        <div className="border-t border-slate-800 mt-5 sm:mt-8 pt-4 text-center text-slate-500 text-[10px]">
           © {new Date().getFullYear()} {template.demoBusinessName}.
         </div>
       </footer>

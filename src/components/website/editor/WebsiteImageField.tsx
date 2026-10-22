@@ -4,11 +4,15 @@ import { listWebsiteAssets, requestWebsiteUpload, uploadWebsiteImage, finalizeWe
 import { WEBSITE_IMAGE_MIMES, WEBSITE_MEDIA_DEFAULTS, type WebsiteAsset } from '../../../config/websiteMedia';
 import { formatImageBytes, prepareWebsiteImage } from '../../../utils/websiteImageCompression';
 
-export function WebsiteImageField({label,value,onChange,siteId,token}: {label:string;value:string;onChange:(url:string)=>void;siteId:string;token:string}) {
+export function WebsiteImageField({label,value,onChange,siteId,token,logo=false}: {label:string;value:string;onChange:(url:string)=>void;siteId:string;token:string;
+  /** Logos are shown whole (never cropped) on a checkerboard, so transparent edges are visible. */
+  logo?:boolean}) {
   const [open,setOpen]=useState(false);
   return <div className="space-y-2 min-w-0">
     <span className="block text-sm font-semibold text-slate-300">{label}</span>
-    {value&&<SafeImage src={value} alt={`${label} current image`} className="w-24 h-24 object-cover rounded-lg border border-slate-700"/>}
+    {value&&(logo
+      ? <SafeImage src={value} alt={`${label} current image`} className="website-logo-preview h-24 w-40 max-w-full rounded-lg border border-slate-700 p-2" style={{objectFit:'contain'}} data-logo-preview/>
+      : <SafeImage src={value} alt={`${label} current image`} className="w-24 h-24 object-cover rounded-lg border border-slate-700"/>)}
     <div className="flex flex-wrap gap-2"><button type="button" onClick={()=>setOpen(true)} className="min-h-11 px-3 py-2 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs">{value?'Replace image':'Upload Image'}</button><button type="button" onClick={()=>setOpen(true)} className="min-h-11 px-3 text-xs border border-slate-700 rounded-xl text-slate-300">Choose from Media</button>{value && <button type="button" onClick={()=>onChange('')} className="min-h-11 px-3 text-xs text-slate-400">Remove image</button>}</div>
     <details className="text-xs text-slate-400"><summary className="cursor-pointer">Advanced: image URL</summary><input aria-label={`${label} URL`} type="url" maxLength={500} value={value} onChange={e=>onChange(e.target.value)} className="w-full mt-2 p-2 rounded-lg bg-slate-900 border border-slate-700 text-white" placeholder="https://..." /></details>
     {open && <WebsiteImageLibrary siteId={siteId} token={token} onClose={()=>setOpen(false)} onChoose={url=>{onChange(url);setOpen(false);}} />}

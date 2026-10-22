@@ -1,6 +1,7 @@
 import { SECTION_REGISTRY } from '../config/websiteBuilder.js';
 import { WEBSITE_TEMPLATES } from '../data/templates.js';
 import type { SiteContent } from '../types/index.js';
+import { websiteStarterWording } from '../config/websiteStarters.js';
 
 export function websiteMigrationSummary(fromId: string, targetId: string) {
   const from = WEBSITE_TEMPLATES.find(t => t.id === fromId);
@@ -24,16 +25,22 @@ export function migrateWebsiteTemplate(content: SiteContent, fromId: string, tar
   const composition = target.composition ? structuredClone(target.composition) : compatible && content.composition ? structuredClone(content.composition) : undefined;
   const defaultCta = (id:string) => id==='tmpl-data-reseller'?'Buy Data':id==='tmpl-start-blank'?'Contact us':'Order via WhatsApp';
   const genericAction = /^(contact|message|talk|call)\b/i.test(content.ctaLabel || '');
+  // A contact-style label still works on other designs, but the Data store's main button always opens its
+  // bundles, so there it would mislead buyers: switching into the Data store gives it Buy Data.
+  const keepAction = genericAction && targetId !== 'tmpl-data-reseller';
+  // Text written for another kind of business starts fresh, with the new design's suggested wording
+  // (claim-free and marked "Suggested" in the editor) instead of an empty headline.
+  const starter = websiteStarterWording(targetId);
   const migrated: SiteContent = compatible ? structuredClone(content) : {
     ...(content.starterVersion!==undefined?{starterVersion:content.starterVersion}:{}),
     layoutMode: target.composition ? 'sections' : 'template',
     businessName: content.businessName, logoUrl: content.logoUrl,
     location: content.location, phone: content.phone, whatsapp: content.whatsapp, email: content.email,
     social: structuredClone(content.social || {}),
-    tagline: '', aboutText: '',
+    tagline: starter?.tagline || '', aboutText: starter?.aboutText || '',
     // A design switch into the Data store starts with the neutral starter, written explicitly so it is never
     // confused with an older site's inherited banner. Other designs keep falling back to their own photo.
-    heroImage: targetId === 'tmpl-data-reseller' ? target.heroImage || '' : '', ctaLabel: genericAction ? content.ctaLabel : defaultCta(targetId), ctaTarget: genericAction ? content.ctaTarget || '' : '',
+    heroImage: targetId === 'tmpl-data-reseller' ? target.heroImage || '' : '', ctaLabel: keepAction ? content.ctaLabel : defaultCta(targetId), ctaTarget: keepAction ? content.ctaTarget || '' : '',
     items: [], stats: [], features: [],
     // V5: opening hours, policies and the logo description describe the business, not the design.
     ...(content.hours ? { hours: structuredClone(content.hours) } : {}),

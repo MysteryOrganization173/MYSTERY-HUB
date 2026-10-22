@@ -10,6 +10,9 @@ let sessions = 0, peak = 0, failConnect = false, failQuery = false;
 let queryDelay = 5;
 const statements: string[] = [];
 class FixtureClient extends EventEmitter {
+  // A connected native client owns a referenced socket. This socket-free fixture must model
+  // that lifetime too: pg-pool deliberately unrefs queue-wait timers while all clients are held.
+  private socketLifetime?: ReturnType<typeof setInterval>;
   _queryable = true;
   _ending = false;
   connected = false;
@@ -17,6 +20,7 @@ class FixtureClient extends EventEmitter {
     setImmediate(() => {
       if (failConnect || sessions >= 15) return callback(new Error('EMAXCONNSESSION: synthetic provider limit 15'));
       this.connected = true;
+      this.socketLifetime=setInterval(()=>{},1000);
       sessions++; peak = Math.max(peak, sessions);
       callback();
     });
@@ -35,12 +39,13 @@ class FixtureClient extends EventEmitter {
   }
   end(callback?: () => void) {
     this._ending = true;
+    clearInterval(this.socketLifetime);
     if (this.connected) { sessions--; this.connected = false; }
     setImmediate(() => { this.emit('end'); callback?.(); });
     return Promise.resolve();
   }
-  ref() {}
-  unref() {}
+  ref() {this.socketLifetime?.ref();}
+  unref() {this.socketLifetime?.unref();}
 }
 
 pg.Pool = class extends NativePool {
@@ -125,7 +130,7 @@ test('account transaction and failed startup schema initialization release their
   await pool.query('SELECT 1');
 });
 
-test('an exhausted local pool times out its waiter without opening an excess connection and recovers', async () => {
+test('an exhausted local pool times out its waiter without opening an excess connection and recovers', {timeout:1000},async () => {
   const acquisitions = await Promise.allSettled(Array.from({ length: pool.options.max! }, () => pool.connect()));
   const clients = acquisitions.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
   const timeout = pool.options.connectionTimeoutMillis;

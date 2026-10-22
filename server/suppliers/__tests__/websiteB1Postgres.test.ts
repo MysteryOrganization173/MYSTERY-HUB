@@ -40,7 +40,7 @@ test('B1 native PostgreSQL: permissions, repeatability, atomic recovery, retenti
       assert.equal((await setup.query("SELECT relrowsecurity FROM pg_class WHERE oid='mysteryhub_builder_private.website_draft_checkpoints'::regclass")).rows[0].relrowsecurity,true);
       assert.equal((await setup.query("SELECT count(*) FROM pg_policies WHERE schemaname='mysteryhub_builder_private'")).rows[0].count,'0');
     });
-    const initial=(await WebsiteStore.createSite('owner',{template_id:'tmpl-buka-bistro',name:'Real owner',content:{tagline:'Live original',items:[{id:'food',name:'Owner item'}]}})).site;
+    const initial=(await WebsiteStore.createSite('owner',{template_id:'tmpl-buka-bistro',name:'Real owner',content:{whatsapp:'0241234567',tagline:'Live original',items:[{id:'food',name:'Owner item'}]}})).site;
     let site=(await WebsiteStore.publishSite(initial.id,'owner',initial.updated_at))!;
     const snapshot=structuredClone(site.published_snapshot_json),slug=site.slug;
 

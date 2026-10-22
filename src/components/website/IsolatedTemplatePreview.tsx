@@ -1,4 +1,5 @@
 import { WebsiteSiteRenderer } from './WebsiteSiteRenderer';
+import {websitePreviewCatalog,type WebsitePreviewProduct} from '../../utils/websitePreviewCatalog';
 import React, { useEffect, useState } from 'react';
 import type { WebsiteTemplate } from '../../types';
 import { WEBSITE_TEMPLATES } from '../../data/templates';
@@ -17,6 +18,7 @@ export const IsolatedTemplatePreview: React.FC<IsolatedTemplatePreviewProps> = (
 
   const ownerPreview = new URLSearchParams(window.location.search).get('owner_preview') === '1';
   const [ownerTemplate, setOwnerTemplate] = useState<WebsiteTemplate | null>(null);
+  const [previewProducts,setPreviewProducts]=useState<WebsitePreviewProduct[]>([]);
   const [siteId,setSiteId] = useState<string | undefined>();
   const [editing,setEditing] = useState(false), [selected,setSelected] = useState<string|null>(null), [focusRequest,setFocusRequest] = useState(0), [reserveBottom,setReserveBottom] = useState(0);
   const params = new URLSearchParams(window.location.search);
@@ -28,6 +30,7 @@ export const IsolatedTemplatePreview: React.FC<IsolatedTemplatePreviewProps> = (
       const validIdentity = !channel || matchesVisualMessage(event,window.location.origin,window.parent,{channel,siteId:expectedSite,templateId:template.id},'MYSTERYHUB_PREVIEW_CONTENT');
       if (ownerPreview && validIdentity && event.data?.type === 'MYSTERYHUB_PREVIEW_CONTENT' && event.data.template?.id === template.id && event.data.template?.siteContent) {
         setOwnerTemplate(event.data.template);
+        setPreviewProducts(websitePreviewCatalog(event.data.previewProducts));
         setSiteId(typeof event.data.siteId==='string'?event.data.siteId:undefined);
         const edit = !!channel && window.parent !== window && event.data.editMode === true;
         const targets = visualTargets(event.data.template);
@@ -74,7 +77,7 @@ export const IsolatedTemplatePreview: React.FC<IsolatedTemplatePreviewProps> = (
       className="min-h-screen w-full text-slate-900 antialiased selection:bg-[#00c365] selection:text-black overflow-x-hidden"
       style={{ backgroundColor: bg }}
     >
-      {ownerPreview ? editing ? <VisualSelectionSurface targets={visualTargets(shownTemplate)} selected={selected} focusRequest={focusRequest} reserveBottom={reserveBottom} onSelect={(targetId,hint)=>window.parent.postMessage({type:'MYSTERYHUB_VISUAL_SELECT',channel,siteId,templateId:template.id,targetId,...(hint?{hint}:{})},window.location.origin)} onOrder={targetIds=>window.parent.postMessage({type:'MYSTERYHUB_VISUAL_ORDER',channel,siteId,templateId:template.id,targetIds},window.location.origin)}><WebsiteSiteRenderer template={shownTemplate} siteId={siteId} preview/></VisualSelectionSurface> : <WebsiteSiteRenderer template={shownTemplate} siteId={siteId} preview/> : renderTemplateLayout(shownTemplate, { onCtaClick: handleCtaClick })}
+      {ownerPreview ? editing ? <VisualSelectionSurface targets={visualTargets(shownTemplate)} selected={selected} focusRequest={focusRequest} reserveBottom={reserveBottom} onSelect={(targetId,hint)=>window.parent.postMessage({type:'MYSTERYHUB_VISUAL_SELECT',channel,siteId,templateId:template.id,targetId,...(hint?{hint}:{})},window.location.origin)} onOrder={targetIds=>window.parent.postMessage({type:'MYSTERYHUB_VISUAL_ORDER',channel,siteId,templateId:template.id,targetIds},window.location.origin)}><WebsiteSiteRenderer template={shownTemplate} siteId={siteId} preview previewProducts={previewProducts}/></VisualSelectionSurface> : <WebsiteSiteRenderer template={shownTemplate} siteId={siteId} preview previewProducts={previewProducts}/> : renderTemplateLayout(shownTemplate, { onCtaClick: handleCtaClick })}
     </div>
   );
 };

@@ -1,13 +1,14 @@
 import React,{useEffect,useMemo,useRef} from 'react';
 import type { WebsiteTemplate } from '../../types';
+import type {WebsitePreviewProduct} from '../../utils/websitePreviewCatalog';
 import {matchesVisualMessage, visualTargets} from '../../utils/websiteVisualEditing';
 /** A real iframe viewport applies the same media queries as a public browser. */
-export function WebsitePreviewFrame({template,siteId,viewportWidth,editMode=false,selectedTarget=null,onSelect,onOrder,focusRequest=0,reserveBottom=0}:{template:WebsiteTemplate;siteId:string;viewportWidth?:number;editMode?:boolean;selectedTarget?:string|null;onSelect?:(id:string|null,hint?:'settings'|'pricing')=>void;onOrder?:(ids:string[])=>void;focusRequest?:number;reserveBottom?:number}) {
+export function WebsitePreviewFrame({template,siteId,viewportWidth,editMode=false,selectedTarget=null,onSelect,onOrder,focusRequest=0,reserveBottom=0,previewProducts}:{template:WebsiteTemplate;siteId:string;viewportWidth?:number;editMode?:boolean;selectedTarget?:string|null;onSelect?:(id:string|null,hint?:'settings'|'pricing')=>void;onOrder?:(ids:string[])=>void;focusRequest?:number;reserveBottom?:number;previewProducts?:WebsitePreviewProduct[]}) {
   const frame=useRef<HTMLIFrameElement>(null);
   const identity=useMemo(()=>({siteId,templateId:template.id,channel:crypto.randomUUID()}),[siteId,template.id]);
-  const latest=useRef({template,editMode,selectedTarget,onSelect,onOrder,focusRequest,reserveBottom,identity});latest.current={template,editMode,selectedTarget,onSelect,onOrder,focusRequest,reserveBottom,identity};
-  const send=()=>{const v=latest.current;frame.current?.contentWindow?.postMessage({type:'MYSTERYHUB_PREVIEW_CONTENT',...v.identity,template:v.template,editMode:v.editMode,selectedTarget:v.selectedTarget,focusRequest:v.focusRequest,reserveBottom:v.reserveBottom},window.location.origin);};
-  useEffect(()=>{send();},[template,identity,editMode,selectedTarget,focusRequest,reserveBottom]);
+  const latest=useRef({template,editMode,selectedTarget,onSelect,onOrder,focusRequest,reserveBottom,previewProducts,identity});latest.current={template,editMode,selectedTarget,onSelect,onOrder,focusRequest,reserveBottom,previewProducts,identity};
+  const send=()=>{const v=latest.current;frame.current?.contentWindow?.postMessage({type:'MYSTERYHUB_PREVIEW_CONTENT',...v.identity,template:v.template,editMode:v.editMode,selectedTarget:v.selectedTarget,focusRequest:v.focusRequest,reserveBottom:v.reserveBottom,previewProducts:v.previewProducts},window.location.origin);};
+  useEffect(()=>{send();},[template,identity,editMode,selectedTarget,focusRequest,reserveBottom,previewProducts]);
   useEffect(()=>{
     const receive=(event:MessageEvent)=>{
       const v=latest.current;

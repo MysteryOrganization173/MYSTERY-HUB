@@ -267,6 +267,7 @@ export const RESELLER_STORE_CSS = `
 .store-footer{margin-top:48px;border-top:1px solid;padding:32px 0 0}
 .store-footer-grid{display:grid;gap:22px}
 @media (min-width:720px){.store-footer-grid{grid-template-columns:1.3fr .7fr 1fr 1.2fr}}
+@media (max-width:719px){.store-footer{margin-top:32px;padding-top:24px}.store-footer-grid{grid-template-columns:1fr 1fr;gap:16px 20px}.store-footer-grid>:first-child,.store-footer-grid>:last-child{grid-column:1/-1}.store-footer-base{margin-top:18px}}
 .store-footer h3{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px}
 .store-footer-links{list-style:none;margin:0;padding:0;display:grid;gap:0}
 .store-footer-links a{display:inline-flex;align-items:center;font-weight:600}

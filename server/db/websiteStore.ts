@@ -9,6 +9,7 @@ import { resolveWebsitePlan, WEBSITE_PLANS, createWebsiteComposition } from '../
  */
 
 import { websiteDatabase, withWebsiteLock, websiteTransactionClient } from './websiteTransaction.js';
+import { websiteContactIssue } from '../../src/utils/websiteReadiness.js';
 import { WebsiteAssetStore } from './websiteAssetStore.js';
 import { WebsiteOperationError } from '../services/websiteCloudinary.js';
 import { migrateWebsiteTemplate } from '../../src/utils/websiteTemplateMigration.js';
@@ -512,6 +513,10 @@ export class WebsiteStore {
     if(review.required)throw new WebsiteReviewRequiredError(review);
     const publicContent=publicWebsiteContent(existing.content_json);
     validateWebsiteContentPatch(publicContent);
+    // Validate the saved authoritative draft inside the owner lock, before changing any live snapshot.
+    const previous=existing.status==='published' ? existing.published_snapshot_json || (existing.updated_at===existing.published_at?createPublishedSnapshot(existing):null) : null;
+    const contactIssue=websiteContactIssue(existing.template_id,publicContent,previous);
+    if(contactIssue)throw new WebsiteOperationError(contactIssue==='whatsapp'?'Add a working WhatsApp number before publishing this design.':'Add a working WhatsApp number, phone or email before publishing this design.',400);
     if(publicContent.composition)validateWebsiteComposition(publicContent.composition,userId);
     await WebsiteAssetStore.validateReferences(id,userId,publicContent);
 

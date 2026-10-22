@@ -2,7 +2,7 @@ import { API_BASE_URL } from './apiClient';
 export async function websiteBusinessRequest<T=any>(path:string,token?:string,body?:unknown,method=body?'POST':'GET'):Promise<T> {
   const response=await fetch(`${API_BASE_URL}/api/${path}`,{method,headers:{...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`}:{})},...(body?{body:JSON.stringify(body)}:{})});
   if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Website services returned an unexpected response. Please retry.');
-  const result=await response.json();if(!response.ok)throw Object.assign(new Error(result.error||'Website action failed.'),{existingOrderReference:result.existingOrderReference});return result.data;
+  const result=await response.json();if(!response.ok)throw Object.assign(new Error(result.error||'Website action failed.'),{status:response.status,existingOrderReference:result.existingOrderReference});return result.data;
 }
 export function initializeStorePayment(siteId:string,requestId:string,productId:string,recipientPhone:string,customerEmail:string,token?:string){return websiteBusinessRequest(`websites/${encodeURIComponent(siteId)}/store-checkout`,token,{requestId,productId,recipientPhone,customerEmail});}
 export function trackPublicWebsite(siteId:string,event:string){
