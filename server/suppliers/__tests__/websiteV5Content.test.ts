@@ -14,7 +14,7 @@ beforeEach(()=>{assert.equal(process.env.NODE_ENV,'test');assert.equal(process.e
 const week=(open='11:00',close='21:00'):WebsiteHours=>({days:[0,1,2,3,4,5,6].map(i=>i===6?{closed:true}:{closed:false,open,close}),note:'Kitchen closes 30 minutes earlier'});
 const v5={hours:week(),policies:{delivery:'Delivery in Osu and Labone, or pick up from the shop.',payment:'Mobile Money or cash on pickup.',returns:'Exchanges within 3 days with receipt.'},sections:{order:['menu','gallery'],hidden:['gallery']},imageMeta:{heroImage:{x:30,y:60,alt:'Jollof and grilled chicken on a plate'},logoUrl:{alt:'Esi Kitchen logo'}},gallery:['https://images.unsplash.com/photo-1'],pinnedBundles:['mtn-1gb','mtn-5gb']};
 const item={id:'dish-1',name:'Jollof with chicken',price:'GH₵ 65',image:'https://images.unsplash.com/photo-2',images:['https://images.unsplash.com/photo-3'],label:'Spicy',pinned:true,alt:'Jollof',focal:{x:50,y:40},options:['Small','Large']};
-async function site(template='tmpl-buka-bistro'){return (await WebsiteStore.createSite('owner',{template_id:template,name:'Esi Kitchen'})).site;}
+async function site(template='tmpl-buka-bistro'){return (await WebsiteStore.createSite('owner',{template_id:template,name:'Esi Kitchen',content:{whatsapp:'0241234567'}})).site;}
 
 test('a complete V5 payload validates, is stored normalized and stays private until published',async()=>{
   let record=await site();

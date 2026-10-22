@@ -73,7 +73,7 @@ test('curated colour sets keep button text and accents readable',()=>{
 
 test('the editor reports failed and offline saves and asks before overwriting a newer version',()=>{
   const toolbar=readFileSync('src/components/website/editor/WebsiteEditorToolbar.tsx','utf8'),editor=readFileSync('src/components/website/editor/WebsiteEditor.tsx','utf8');
-  for(const text of ['Offline · changes kept on this device','Not saved · tap Save to retry','Draft saved · not on your live site yet','Saved · live site is up to date'])assert.ok(toolbar.includes(text),text);
+  for(const text of ['Offline · changes kept on this device','Not saved · tap Save to retry','Changes saved · press Update Live to show them','Draft saved · website not published yet','Saved · your live website is up to date'])assert.ok(toolbar.includes(text),text);
   assert.match(editor,/err instanceof WebsiteSaveConflict/);assert.match(editor,/<WebsiteConflictSheet/);assert.match(editor,/addEventListener\('online'/);
   assert.match(readFileSync('src/services/apiClient.ts','utf8'),/res\.status === 409 && \/changed\/i/);
 });

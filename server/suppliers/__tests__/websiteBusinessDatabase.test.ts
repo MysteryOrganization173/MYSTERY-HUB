@@ -20,6 +20,7 @@ beforeEach(()=>{
     if(sql.includes('pg_advisory_xact_lock')||sql.startsWith('INSERT INTO finance_accounts')||sql.startsWith('INSERT INTO admin_audit_log'))return {rows:[]};
     if(sql.startsWith('SELECT * FROM finance_accounts'))return {rows:[{wallet_minor:0,restricted:false}]};
     if(sql.startsWith('SELECT * FROM website_sites'))return {rows:[structuredClone(state.site)]};
+    if(sql.startsWith('SELECT id,template_id FROM website_sites'))return {rows:values[1]===state.site.user_id?[{id:state.site.id,template_id:state.site.template_id}]:[]};
     if(sql.startsWith('SELECT id FROM website_sites'))return {rows:[{id:state.site.id}]};
     if(sql.startsWith('SELECT value FROM finance_config'))return {rows:state.config[values[0]]?[{value:structuredClone(state.config[values[0]])}]:[]};
     if(sql.startsWith('INSERT INTO finance_config')){state.config[values[0]]=JSON.parse(values[1]);return {rows:[]};}

@@ -284,8 +284,8 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
       </div>
 
       {/* Industrial Footer */}
-      <footer id="safety" className="bg-[#070b10] border-t border-slate-800 py-10 px-6 sm:px-12 text-xs">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6 text-slate-400">
+      <footer id="safety" className="bg-[#070b10] border-t border-slate-800 py-7 sm:py-10 px-6 sm:px-12 text-xs">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 text-slate-400">
           <div className="space-y-2">
             <h4 className="font-black text-white text-base uppercase" {...edit("content:businessName")}>
               {template.demoBusinessName}
@@ -303,7 +303,7 @@ export const ConstructionTemplateView: React.FC<TemplateViewProps> = ({ template
             <SiteFooterContact template={template} className="text-xs" />
           </div>
         </div>
-        <div className="border-t border-slate-800 mt-8 pt-4 text-center text-slate-500 text-[10px]">
+        <div className="border-t border-slate-800 mt-5 sm:mt-8 pt-4 text-center text-slate-500 text-[10px]">
           © {new Date().getFullYear()} {template.demoBusinessName}.
         </div>
       </footer>

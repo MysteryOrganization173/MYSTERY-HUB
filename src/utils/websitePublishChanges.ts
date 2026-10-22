@@ -5,7 +5,9 @@ import { WEBSITE_TEMPLATES } from '../data/templates.js';
  * Plain-language list of what "Update live site" will change, compared with the published snapshot.
  * Purely informational: the server publishes the saved draft whatever this says.
  */
-const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+// PostgreSQL JSONB reorders object keys. Object ordering is not a draft change; array order is.
+const stable=(value:unknown)=>JSON.stringify(value??null,(_key,item)=>item&&typeof item==='object'&&!Array.isArray(item)?Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])):item);
+const same = (a: unknown, b: unknown) => stable(a) === stable(b);
 const FIELDS: [keyof SiteContent, string][] = [
   ['businessName', 'Business name'], ['tagline', 'Headline'], ['aboutText', 'Description'], ['location', 'Location'],
   ['heroImage', 'Main photo'], ['logoUrl', 'Logo'], ['ctaLabel', 'Main button'], ['ctaTarget', 'Main button link'],

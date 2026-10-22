@@ -87,32 +87,32 @@ export const TemplatePreviewModal: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Update browser URL state for stable sharing and reload persistence
+  // V5.1: the open preview is its own history entry, so a phone's Back button closes the preview and
+  // returns to the gallery instead of leaving the Website Builder. The URL stays shareable.
   useEffect(() => {
-    if (!selectedTemplatePreview || selectedTemplatePreview.siteContent) return;
+    if (!selectedTemplatePreview) return;
     try {
-      const currentUrl = new URL(window.location.href);
-      const targetQuery = selectedTemplatePreview.id;
-      if (currentUrl.searchParams.get('template') !== targetQuery) {
-        const newUrl = `/website-builder?template=${encodeURIComponent(targetQuery)}&preview=1`;
-        window.history.replaceState({ templatePreview: targetQuery }, '', newUrl);
-      }
+      const url = selectedTemplatePreview.siteContent ? window.location.href : `/website-builder?template=${encodeURIComponent(selectedTemplatePreview.id)}&preview=1`;
+      if (window.history.state?.mhPreview) window.history.replaceState({ ...window.history.state, templatePreview: selectedTemplatePreview.id }, '', url);
+      else window.history.pushState({ mhPreview: true, templatePreview: selectedTemplatePreview.id }, '', url);
     } catch {
       // Non-invasive URL update
     }
-  }, [selectedTemplatePreview]);
+  }, [selectedTemplatePreview?.id, selectedTemplatePreview?.siteContent]);
+  const cleanUrl = () => {
+    try {
+      const currentUrl = new URL(window.location.href);
+      if (currentUrl.searchParams.has('template') || currentUrl.pathname.includes('/template')) window.history.replaceState(null, '', '/website-builder');
+    } catch {
+      // ignore
+    }
+  };
 
-  // Handle browser Back button (popstate)
+  // Browser Back: leaving the preview's history entry closes it.
   useEffect(() => {
-    const handlePopState = () => {
-      try {
-        const currentUrl = new URL(window.location.href);
-        if (!currentUrl.searchParams.has('template') && !currentUrl.pathname.includes('/template')) {
-          closeTemplatePreview();
-        }
-      } catch {
-        // fallback
-      }
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state?.mhPreview) return;
+      closeTemplatePreview(); cleanUrl();
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -121,15 +121,18 @@ export const TemplatePreviewModal: React.FC = () => {
   // Close preview and reset URL to /website-builder
   const handleClose = useCallback(() => {
     closeTemplatePreview();
-    try {
-      const currentUrl = new URL(window.location.href);
-      if (currentUrl.searchParams.has('template') || currentUrl.pathname.includes('/template')) {
-        window.history.replaceState(null, '', '/website-builder');
-      }
-    } catch {
-      // ignore
-    }
+    // Step back over the preview's own history entry, so Back later does not reopen it.
+    if (window.history.state?.mhPreview) window.history.back();
+    else cleanUrl();
   }, [closeTemplatePreview]);
+
+  // While the preview is open the gallery underneath stops painting its live thumbnails: they are
+  // full websites with sticky bars and blurred headers, and nothing of them may show around the preview.
+  useEffect(() => {
+    if (!selectedTemplatePreview) return;
+    document.documentElement.classList.add('mh-preview-open');
+    return () => document.documentElement.classList.remove('mh-preview-open');
+  }, [!!selectedTemplatePreview]);
 
   const dialogRef=useDialogFocus(!!selectedTemplatePreview,handleClose);
 
@@ -297,7 +300,7 @@ export const TemplatePreviewModal: React.FC = () => {
   const frameRenderedWidth = targetWidth * scale;
 
   return (
-    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Website template preview" className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-3 md:p-5 bg-black/95 backdrop-blur-md animate-in fade-in duration-200 overflow-hidden">
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Website template preview" className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-3 md:p-5 bg-[#05080c] animate-in fade-in duration-200 overflow-hidden overscroll-contain" data-template-preview>
       {/* Dynamic Ambient Background Glow customized to template colors */}
       <div
         className="absolute inset-0 pointer-events-none opacity-20 blur-[140px] transition-colors duration-500"
@@ -307,7 +310,8 @@ export const TemplatePreviewModal: React.FC = () => {
       />
 
       {/* Main Modal Container: Full Screen on Mobile, Windowed on Desktop */}
-      <div className="relative w-full h-[100dvh] sm:h-[95vh] sm:max-w-7xl bg-[#0a0f14] border-0 sm:border border-slate-800 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 z-10">
+      {/* Fills the fixed overlay exactly (not 100dvh, which can differ from it while Android's address bar moves). */}
+      <div className="relative w-full h-full sm:h-[95vh] sm:max-w-7xl bg-[#0a0f14] border-0 sm:border border-slate-800 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 z-10">
         
         {startSheet}
         <p className="px-4 py-2 text-xs text-slate-300 bg-slate-900">{t.siteContent ? 'Your website preview · Saved content. Preview actions do not place orders or bookings.' : starterTemplate ? `This is exactly how your website starts.${starterTemplate.items?.length ? ' Items marked Example are there for you to edit, keep or remove.' : ''}` : 'Design preview · Sample content and interactions. Reservations and purchases are not submitted.'}</p>

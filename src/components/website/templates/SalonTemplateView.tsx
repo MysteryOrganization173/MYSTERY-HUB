@@ -197,8 +197,8 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
       </div>
 
       {/* Footer */}
-      <footer id="salon-info" className="bg-[#240c17] text-pink-100 py-10 px-6 sm:px-12 text-xs">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <footer id="salon-info" className="bg-[#240c17] text-pink-100 py-7 sm:py-10 px-6 sm:px-12 text-xs">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
           <div className="space-y-2">
             <h4 className="font-serif font-bold text-base text-white" {...edit("content:businessName")}>
               {template.demoBusinessName}
@@ -216,7 +216,7 @@ export const SalonTemplateView: React.FC<TemplateViewProps> = ({ template, onCta
             <SiteFooterContact template={template} className="text-pink-200/80 text-xs" />
           </div>
         </div>
-        <div className="border-t border-pink-900/40 mt-8 pt-4 text-center text-pink-300/60 text-[10px]">
+        <div className="border-t border-pink-900/40 mt-5 sm:mt-8 pt-4 text-center text-pink-300/60 text-[10px]">
           © {new Date().getFullYear()} {template.demoBusinessName}.
         </div>
       </footer>
