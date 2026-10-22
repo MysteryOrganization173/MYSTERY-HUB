@@ -104,12 +104,13 @@ const BrandTiles: React.FC<{ row: BrandRow; selected: string; onSelect: (id: str
         <h2 className="text-[13px] sm:text-base font-bold text-white tracking-tight">{heading}</h2>
         {row.brands.length > 3 && <span className="text-[11px] text-slate-400 lg:hidden" aria-hidden="true">Swipe for more →</span>}
       </div>
-      <ul role="list" className={`${rowClass} lg:grid lg:grid-cols-8 lg:overflow-visible lg:pb-0 lg:mb-0`}>
+      {/* Desktop: one row of fixed-size tiles (scrolls sideways past ~9 brands) instead of a second row. */}
+      <ul role="list" className={`${rowClass} lg:grid lg:grid-flow-col lg:auto-cols-[minmax(104px,124px)] lg:gap-3`}>
         {[{ id: '', label: 'All', count: row.total } as BrandSummary, ...row.brands].map(brand => {
           const active = selected === brand.id;
           const isOther = brand.id === OTHER_BRAND;
           return (
-            <li key={brand.id || 'all'} className="w-[76px] sm:w-[128px] shrink-0 snap-start lg:w-auto">
+            <li key={brand.id || 'all'} className="w-[76px] sm:w-[124px] shrink-0 snap-start lg:w-auto">
               <a
                 href={marketplaceHref({ category: row.category, brand: brand.id || undefined })}
                 onClick={e => { e.preventDefault(); onSelect(active && brand.id ? '' : brand.id, row.category); }}
@@ -119,11 +120,17 @@ const BrandTiles: React.FC<{ row: BrandRow; selected: string; onSelect: (id: str
                 className={`group flex flex-col items-center gap-1 sm:gap-0 sm:items-stretch sm:rounded-2xl sm:border sm:overflow-hidden ${active ? 'sm:border-[#00c365] sm:bg-[#0d1d16]' : 'sm:bg-[#0e141a] sm:border-slate-800 sm:hover:border-slate-600'} rounded-2xl p-0.5 sm:p-0 transition-colors ${focusRing}`}
               >
                 <span className={`relative block w-16 h-16 sm:w-full sm:h-auto sm:aspect-square rounded-2xl sm:rounded-none overflow-hidden ring-2 transition-[box-shadow,transform] group-active:scale-95 ${active ? 'ring-[#00c365]' : 'ring-transparent sm:ring-0'}`}>
-                  {brand.id ? (
+                  {isOther ? (
+                    // A catch-all group gets a neutral tile: one item's photo would suggest a brand it is not.
+                    <span className="w-full h-full flex flex-col items-center justify-center gap-1 bg-[#0e141a] text-slate-300">
+                      <LayoutGrid className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
+                      <span className="text-[11px] sm:text-sm font-extrabold text-white" aria-hidden="true">Other</span>
+                    </span>
+                  ) : brand.id ? (
                     <>
                       <ProductPhoto src={brand.imageUrl} alt="" iconKey="laptop" coverTolerance={TILE_TOLERANCE} framing={brand.imageFraming} widths={[128, 200, 320]} sizes="(min-width: 1024px) 150px, (min-width: 640px) 128px, 64px" iconSize="md" />
                       {/* The brand name sits on the photo so a row of similar laptops still reads at a glance. */}
-                      <span className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent pt-4 pb-1 px-1 text-center font-extrabold text-white tracking-tight truncate ${isOther ? 'text-[10px] sm:text-xs' : 'text-[11px] sm:text-sm'}`} aria-hidden="true">{isOther ? 'Other' : brand.label}</span>
+                      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent pt-4 pb-1 px-1 text-center text-[11px] sm:text-sm font-extrabold text-white tracking-tight truncate" aria-hidden="true">{brand.label}</span>
                     </>
                   ) : (
                     <span className="w-full h-full flex items-center justify-center bg-[#0d1d16] text-[#00e575]">

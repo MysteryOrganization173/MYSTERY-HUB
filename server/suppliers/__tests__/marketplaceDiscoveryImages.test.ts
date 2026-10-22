@@ -139,7 +139,8 @@ test('page wiring: departments/brands push history, reveal the brand gallery fir
   const page = source('src/components/marketplace/MarketplacePage.tsx');
   assert.ok(page.includes("window.history.pushState({ page: 'marketplace' }"), 'department and brand choices create Back entries');
   assert.ok(page.includes('navigateBrowse(selectDepartment(browse, slug, products))'));
-  assert.ok(page.includes('reveal(brandRowRef.current, 0.55)'), 'a branded department scrolls to its brands, not past them');
+  assert.ok(page.includes("reveal(brandRowRef.current, 'gallery')"), 'a branded department scrolls to its brands, not past them');
+  assert.ok(page.includes('Math.min(rect.bottom - bottom, rect.top - header)'), 'never scrolls the gallery under the sticky header');
   assert.ok(page.includes("setBrowse(parseBrowseState(window.location.search))"), 'Back/forward restore department and brand');
   assert.ok(page.includes("updateBrowse({ brand: '' })"), 'stale brand links fall back to the department');
   assert.ok(page.includes("onChange={(e) => updateBrowse({ q: e.target.value.slice(0, 80) })}"), 'typing never floods history');
@@ -167,9 +168,15 @@ test('photo layout matrix: fill when close, enlarge-and-blur otherwise, never st
   // Small square tiles accept a 3:4 phone shot as a fill.
   assert.equal(photoLayout({ width: 960, height: 1280 }, { width: 64, height: 64 }, { coverTolerance: 0.26 }).treatment, 'cover');
   // Admin framing pans and zooms toward the subject, but never on the whole-photo product page.
-  const framed = photoLayout({ width: 960, height: 1280 }, card, { framing: { x: 30, y: 70, zoom: 1.3 } });
-  assert.deepEqual(framed, { treatment: 'cover', scale: 1.3, position: '30% 70%' });
-  assert.equal(photoLayout({ width: 960, height: 1280 }, card, { fit: 'contain', framing: { x: 30, y: 70, zoom: 1.3 } }).scale, 1);
+  const framed = photoLayout({ width: 960, height: 1280 }, card, { framing: { x: 26, y: 80, zoom: 1.6 } });
+  assert.equal(framed.treatment, 'cover');
+  const b = framed.box!;
+  assert.ok(Math.abs(b.width / b.height - (960 / 1280) / 0.8) < 0.01, 'framed box keeps the photo proportions (no stretching)');
+  assert.ok(b.left <= 0 && b.top <= 0 && b.left + b.width >= 100 - 1e-6 && b.top + b.height >= 100 - 1e-6, 'a filled frame never shows empty edges');
+  const subjectX = b.left + 0.26 * b.width, subjectY = b.top + 0.8 * b.height;
+  const unframedX = 26, unframedY = 80; // where the subject sits in the frame without framing (roughly)
+  assert.ok(Math.abs(subjectX - 50) < Math.abs(unframedX - 50) && Math.abs(subjectY - 50) <= Math.abs(unframedY - 50), 'the subject moves toward the centre');
+  assert.equal(photoLayout({ width: 960, height: 1280 }, card, { fit: 'contain', framing: { x: 30, y: 70, zoom: 1.3 } }).box, undefined, 'product page ignores framing');
   const media = source('src/components/marketplace/MarketplaceMedia.tsx');
   assert.ok(!/object-fill|object-\[fill\]/.test(media), 'no stretching fit is ever used');
 });

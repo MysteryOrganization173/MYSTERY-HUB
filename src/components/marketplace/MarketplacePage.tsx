@@ -256,22 +256,28 @@ export const MarketplacePage: React.FC = () => {
     if (!loading && browse.brand && products.length && !applyRefinements(products, { ...DEFAULT_BROWSE_STATE, category: browse.category, brand: browse.brand }).length) updateBrowse({ brand: '' });
   }, [loading, products, browse.brand, browse.category, updateBrowse]);
 
-  // Scroll only when the next thing to choose is off screen, and never past it: a department with
-  // brands brings its brand gallery into view; otherwise the results come into view.
-  const reveal = (target: HTMLElement | null, below = 0.65) => requestAnimationFrame(() => requestAnimationFrame(() => {
+  // Scroll only as far as needed and never past the next choice: a department with brands brings
+  // its brand gallery fully into view while keeping the departments above it where possible; other
+  // choices bring the results into view only when they start below the fold. Allows for the sticky
+  // header (top) and the phone bottom navigation.
+  const reveal = (target: HTMLElement | null, mode: 'gallery' | 'results') => requestAnimationFrame(() => requestAnimationFrame(() => {
     const rect = target?.getBoundingClientRect();
-    if (rect && (rect.top > window.innerHeight * below || rect.top < 56)) target!.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!rect) return;
+    const header = 72, bottom = window.innerHeight - (window.innerWidth < 1024 ? 76 : 16);
+    if (mode === 'results') { if (rect.top > window.innerHeight * 0.65) target!.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    const down = rect.bottom > bottom ? Math.min(rect.bottom - bottom, rect.top - header) : rect.top < header ? rect.top - header : 0;
+    if (Math.abs(down) > 4) window.scrollBy({ top: down, behavior: 'smooth' });
   }));
 
   const selectBrand = (id: string, category: string) => {
     navigateBrowse({ ...browse, category: category === 'all' ? browse.category : category, brand: id });
-    reveal(resultsRef.current);
+    reveal(resultsRef.current, 'results');
   };
 
   const selectCategory = (slug: string) => {
     navigateBrowse(selectDepartment(browse, slug, products));
-    if (slug !== 'all' && brandLayer(products, slug)) reveal(brandRowRef.current, 0.55);
-    else if (slug !== 'all') reveal(resultsRef.current);
+    if (slug !== 'all' && brandLayer(products, slug)) reveal(brandRowRef.current, 'gallery');
+    else if (slug !== 'all') reveal(resultsRef.current, 'results');
   };
 
   const formatGhcReward = (val: number | null | undefined): string => {

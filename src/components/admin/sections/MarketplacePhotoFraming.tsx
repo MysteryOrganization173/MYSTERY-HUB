@@ -124,11 +124,15 @@ const SocialPreview: React.FC<{ imageUrl: string; framing: ImageFraming | null; 
   const ratio = size ? size.width / size.height : 1;
   // The crop keeps the photo's proportions, so the fitted foreground box has the photo's own ratio.
   const box = ratio < SOCIAL_RATIO ? { height: '100%', width: `${(ratio / SOCIAL_RATIO) * 100}%` } : { width: '100%', height: `${(SOCIAL_RATIO / ratio) * 100}%` };
+  // The backdrop is the same cropped region, filling the frame (Cloudinary's c_fill before e_blur).
+  const cover = ratio < SOCIAL_RATIO ? { width: '100%', height: `${(SOCIAL_RATIO / ratio) * 100}%` } : { height: '100%', width: `${(ratio / SOCIAL_RATIO) * 100}%` };
   const crop: React.CSSProperties = { position: 'absolute', width: `${100 / region.w}%`, height: `${100 / region.h}%`, left: `${(-region.x / region.w) * 100}%`, top: `${(-region.y / region.h) * 100}%`, maxWidth: 'none' };
   return (
     <div className="relative w-full overflow-hidden rounded-xl border border-slate-800 bg-[#0b0f12]" style={{ aspectRatio: '1200 / 630' }} data-mh-preview="social">
       <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-        <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover scale-110 blur-xl brightness-[.62]" />
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden blur-xl brightness-[.62]" style={cover}>
+          <img src={src} alt="" style={crop} />
+        </div>
       </div>
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden" style={box}>
         <img src={src} alt="" style={crop} onLoad={e => onSize({ src: imageUrl, width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })} />

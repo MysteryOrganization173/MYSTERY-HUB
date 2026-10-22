@@ -69,7 +69,15 @@ export interface PhotoLayout {
   scale: number;
   /** CSS position of the subject; used for object-position (cover) and transform-origin. */
   position: string;
+  /**
+   * Admin framing only: the photo's box in % of the frame, placed so the chosen subject point sits
+   * as close to the centre as the photo allows (no empty edges when it fills). Same proportions
+   * as the photo, so nothing is stretched.
+   */
+  box?: { left: number; top: number; width: number; height: number };
 }
+
+const round = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * Full layout for one photo in one frame. `contain` photos are enlarged until at most
@@ -79,17 +87,23 @@ export interface PhotoLayout {
 export function photoLayout(natural: { width: number; height: number }, frame: { width: number; height: number }, options: { fit?: PhotoProps['fit']; coverTolerance?: number; framing?: ImageFraming } = {}): PhotoLayout {
   const { fit = 'adaptive', coverTolerance = COVER_TOLERANCE } = options;
   const framing = fit === 'contain' ? undefined : options.framing;
-  const zoom = framing && framing.zoom > 1 ? framing.zoom : 1;
-  const position = framing ? `${framing.x}% ${framing.y}%` : '50% 50%';
-  if (fit === 'contain') return { treatment: 'contain', scale: 1, position };
-  if (fit === 'cover') return { treatment: 'cover', scale: zoom, position: framing ? position : '50% 42%' };
-  const treatment = photoTreatment(natural, frame, coverTolerance);
-  if (treatment === 'cover') return { treatment, scale: zoom, position: framing ? position : '50% 42%' };
-  const photo = natural.width / natural.height || 1;
-  const box = frame.width / frame.height || 1;
-  const fill = Math.max(photo / box, box / photo); // enlargement that would fill the frame
-  const partial = Math.min(fill, 1 / (1 - PARTIAL_CROP));
-  return { treatment, scale: Math.round(partial * zoom * 1000) / 1000, position };
+  if (fit === 'contain') return { treatment: 'contain', scale: 1, position: '50% 50%' };
+  const known = natural.width > 0 && natural.height > 0 && frame.width > 0 && frame.height > 0;
+  const treatment = fit === 'cover' ? 'cover' : photoTreatment(natural, frame, coverTolerance);
+  const photo = known ? natural.width / natural.height : 1;
+  const box = known ? frame.width / frame.height : 1;
+  const fill = Math.max(photo / box, box / photo); // enlargement over "contain" that fills the frame
+  const base = treatment === 'cover' ? 1 : Math.min(fill, 1 / (1 - PARTIAL_CROP)); // relative to object-fit
+  if (!framing || !known) return { treatment, scale: Math.round(base * 1000) / 1000, position: treatment === 'cover' ? '50% 42%' : '50% 50%' };
+  // Photo size as a share of the frame: start from contain (or cover), apply the enlargement and zoom.
+  const containW = photo >= box ? 1 : photo / box, containH = photo >= box ? box / photo : 1;
+  const grow = (treatment === 'cover' ? fill : base) * framing.zoom;
+  const w = containW * grow, h = containH * grow;
+  const place = (size: number, focus: number) => size >= 1 ? Math.min(0, Math.max(1 - size, 0.5 - focus * size)) : (1 - size) / 2;
+  return {
+    treatment, scale: 1, position: `${framing.x}% ${framing.y}%`,
+    box: { left: round(place(w, framing.x / 100) * 100), top: round(place(h, framing.y / 100) * 100), width: round(w * 100), height: round(h * 100) },
+  };
 }
 
 /**
@@ -115,9 +129,9 @@ export const ProductPhoto: React.FC<PhotoProps> = ({ src, alt, iconKey, widths, 
     setMeasured({ src, natural: { width: img.naturalWidth, height: img.naturalHeight }, frame: { width: rect?.width || 0, height: rect?.height || 0 } });
   };
   // Framing changes (admin preview) re-lay out instantly from the stored measurements.
-  const layout = fit === 'cover' && !current.natural
-    ? photoLayout({ width: 0, height: 0 }, { width: 0, height: 0 }, { fit, framing })
-    : current.natural ? photoLayout(current.natural, current.frame || { width: 0, height: 0 }, { fit, coverTolerance, framing }) : null;
+  // Cover photos show at once; framed and adaptive ones wait for their measurements.
+  const layout = current.natural ? photoLayout(current.natural, current.frame || { width: 0, height: 0 }, { fit, coverTolerance, framing })
+    : fit === 'cover' && !framing ? photoLayout({ width: 0, height: 0 }, { width: 0, height: 0 }, { fit }) : null;
   const contained = layout?.treatment === 'contain';
   const transform = layout && layout.scale !== 1 ? `scale(${layout.scale})` : undefined;
 
@@ -139,8 +153,10 @@ export const ProductPhoto: React.FC<PhotoProps> = ({ src, alt, iconKey, widths, 
         decoding="async"
         onLoad={onLoad}
         onError={setFailed}
-        style={layout ? { objectPosition: layout.treatment === 'cover' ? layout.position : undefined, transform, transformOrigin: transform ? layout.position : undefined } : undefined}
-        className={`absolute inset-0 w-full h-full transition-opacity duration-300 motion-reduce:transition-none ${layout ? 'opacity-100' : 'opacity-0'} ${contained ? 'object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.45)]' : 'object-cover'}`}
+        style={layout?.box
+          ? { left: `${layout.box.left}%`, top: `${layout.box.top}%`, width: `${layout.box.width}%`, height: `${layout.box.height}%`, maxWidth: 'none' }
+          : layout ? { objectPosition: layout.treatment === 'cover' ? layout.position : undefined, transform, transformOrigin: transform ? layout.position : undefined } : undefined}
+        className={`absolute transition-opacity duration-300 motion-reduce:transition-none ${layout?.box ? '' : 'inset-0 w-full h-full'} ${layout ? 'opacity-100' : 'opacity-0'} ${contained ? 'object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.45)]' : 'object-cover'}`}
       />
     </div>
   );
