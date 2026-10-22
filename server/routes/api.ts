@@ -14,7 +14,7 @@ import { MarketplaceControlStore, MarketplaceInputError } from '../db/marketplac
  */
 
 import { Router, Request, Response } from 'express';
-import { isActiveReferralRule, publicReferralRule } from '../services/referralRulePolicy.js';
+import { getPublicReferralRules } from '../services/publicReferralPolicy.js';
 import { validateAndNormalizeGhanaPhone } from '../utils/phone.js';
 import { getAuthoritativeProduct } from '../data/productCatalog.js';
 import { calculateAirtimeOrder, validateAirtimeAmount, AIRTIME_SERVICE_FEE_PERCENT } from '../data/airtimePricing.js';
@@ -1604,14 +1604,9 @@ apiRouter.get('/referrals/ledger', requireAuth, async (req: Request, res: Respon
  * Returns active reward rules for public disclosure & transparency.
  */
 apiRouter.get('/referrals/rules', async (_req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
   try {
-    const rules = await ReferralStore.getAllRules();
-    const activeRules = rules.filter(r => isActiveReferralRule(r)).map(publicReferralRule);
-
-    res.json({
-      success: true,
-      rules: activeRules,
-    });
+    res.json(await getPublicReferralRules());
   } catch (err) {
     console.error('Referral Rules API Exception:', err);
     res.status(500).json({ error: 'Failed to retrieve referral rules.' });

@@ -295,6 +295,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       bundle,
       recipientPhone: phone,
       buyerRecipientVisible: true,
+      journey: 'direct_checkout',
       network: bundle.network,
       paymentMethod: method,
       amountGhc: bundle.priceGhc,

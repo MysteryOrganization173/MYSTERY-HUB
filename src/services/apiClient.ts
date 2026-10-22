@@ -1360,6 +1360,8 @@ export interface PublicRewardRule {
 export interface RewardRulesResponse {
   success: boolean;
   rules: PublicRewardRule[];
+  /** Optional for compatibility with servers deployed before effective-policy disclosure. */
+  dataPolicy?: import('../../shared/publicReferralPolicy').PublicDataReferralPolicy;
   error?: string;
 }
 
