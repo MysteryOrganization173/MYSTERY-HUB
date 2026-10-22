@@ -36,7 +36,7 @@ test('QuickByte gets Signal automatically with its own name, logo, banner, colou
 
 test('Signal keeps the managed checkout contract: server prices, review dialog, unchanged payment call',()=>{
   const source=readFileSync('src/components/website/ManagedDataStorefront.tsx','utf8');
-  assert.match(source,/choose\(toBundle\(picked\), ?phone\)/,'review hands the same bundle and number to the existing flow');
+  assert.match(source,/const pick=\(b:StoreBundle\)=>choose\(toBundle\(b\)\)/,'V5.2: tapping a bundle hands the same server bundle to the existing flow');
   assert.doesNotMatch(source,/popular|best ?seller|most bought/i,'no invented popularity');
-  assert.match(source,/data-network=\{n\}/,'the buyer confirms the network');
+  assert.match(source,/data-network=\{selectedNetwork\}/,'the buyer confirms the network');
 });

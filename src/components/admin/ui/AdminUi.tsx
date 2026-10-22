@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { AlertTriangle, ArrowUpRight, CheckCircle2, ChevronRight, Info, Loader2, RefreshCw, X } from 'lucide-react';
+import { acquireOverlay } from '../../../utils/overlayStack';
 
 /**
  * Admin Workspace V2 design system.
@@ -222,9 +223,9 @@ export function AdminSheet({ title, subtitle, onClose, busy = false, children, f
   useEffect(() => {
     const dialog = ref.current;
     if (dialog && !dialog.open) dialog.showModal();
-    const saved = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = saved; if (dialog?.open) dialog.close(); };
+    // Native showModal() already makes the rest inert; the shared stack only holds the page still.
+    const release = acquireOverlay(dialog, { modal: false });
+    return () => { release(); if (dialog?.open) dialog.close(); };
   }, []);
   return (
     <dialog ref={ref} aria-labelledby={titleId}
