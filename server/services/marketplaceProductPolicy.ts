@@ -1,4 +1,5 @@
 import { MARKETPLACE_LIMITS } from '../../shared/marketplaceLimits.js';
+import { FRAMING_ZOOM_MAX, formatImageFraming, parseImageFraming } from '../../shared/marketplaceImageFraming.js';
 import { FULFILMENT_MODES, encouragesCredentials, productReadiness } from '../../shared/marketplacePolicy.js';
 import { MarketplaceControlStore, MarketplaceInputError, plainText } from '../db/marketplaceControlStore.js';
 import { toAdminMarketplaceProduct, MarketplaceProductRecord } from '../types/marketplace.js';
@@ -26,6 +27,18 @@ export async function validateProductInput(body: Record<string, unknown>, existi
     if (!Array.isArray(urls) || urls.length > 12) throw new MarketplaceInputError('Invalid image list.');
     const clean = urls.map(u => { if (u === null || u === '') return ''; if (typeof u !== 'string' || u.length > 2000) throw new MarketplaceInputError('Invalid image URL.'); try { if (!['http:','https:'].includes(new URL(u).protocol)) throw new Error(); } catch { throw new MarketplaceInputError('Image URLs must use HTTP or HTTPS.'); } return u.trim(); });
     input[key] = key === 'imageUrl' ? clean[0] || null : clean.filter(Boolean);
+  }
+  if (body.imageFraming !== undefined) {
+    // Presentation only: null restores automatic framing; the photo itself is never changed.
+    const raw = body.imageFraming as Record<string, unknown> | string | null;
+    const inRange = (n: unknown, min: number, max: number) => typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max;
+    const parsed = raw === null || raw === '' ? null
+      : typeof raw === 'string' ? parseImageFraming(raw)
+      : raw && typeof raw === 'object' && !Array.isArray(raw) && inRange(raw.x,0,100) && inRange(raw.y,0,100) && inRange(raw.zoom,1,FRAMING_ZOOM_MAX) ? { x: raw.x as number, y: raw.y as number, zoom: raw.zoom as number }
+      : undefined;
+    if (parsed === undefined || (raw !== null && raw !== '' && !parsed)) throw new MarketplaceInputError('Invalid photo framing.');
+    // Normalised to whole percentages and 0.05 zoom steps; the centred default is stored as automatic.
+    input.imageFraming = parseImageFraming(formatImageFraming(parsed) || '');
   }
   if (body.highlights !== undefined) { if (!Array.isArray(body.highlights) || body.highlights.length > 20) throw new MarketplaceInputError('Invalid highlights.'); input.highlights = body.highlights.map(h=>plainText(h,'Highlight',256,true)); }
   if (body.specs !== undefined) { if (!Array.isArray(body.specs) || body.specs.length > 30) throw new MarketplaceInputError('Invalid specifications.'); input.specs = body.specs.map(s=>({label:plainText(s?.label,'Specification label',100,true),value:plainText(s?.value,'Specification value',500,true)})); }

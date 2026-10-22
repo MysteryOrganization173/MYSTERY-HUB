@@ -8,7 +8,7 @@ import type { MarketplaceProduct } from '../../../src/types/index.js';
 import {
   DEFAULT_BROWSE_STATE, applyRefinements, cardSpecLine, categoryIconKey, categoryLabel, fulfilmentHint, isDirectPurchaseSupported,
   marketplaceHref, matchesSearch, openMarketplaceAt, parseBrowseState, productPath, productPriceMinor, productPriceText,
-  referralRewardGhc, serializeBrowseState, sortProducts, summariseCategories, summariseBrands, productBrand,
+  referralRewardGhc, serializeBrowseState, sortProducts, summariseCategories, summariseBrands, productBrand, brandLayer, landingBrandCategory,
 } from '../../../src/utils/marketplaceBrowse.js';
 import { categoryMismatches } from '../../../src/utils/marketplaceCategoryCheck.js';
 import { photoTreatment, COVER_TOLERANCE } from '../../../src/components/marketplace/MarketplaceMedia.js';
@@ -289,12 +289,17 @@ test('single-category catalogue: brands from product names become the discovery 
   assert.equal(serializeBrowseState(state), '?brand=hp');
   const tiles = summariseCategories(cats, laptops);
   assert.equal(tiles.length, 1);
-  const out = html(React.createElement(MarketplaceCategoryTiles, { tiles, total: laptops.length, selected: 'all', onSelect: () => {}, brands, selectedBrand: 'hp', onSelectBrand: () => {} }));
+  const row = { category: 'laptops_computers', label: 'Laptops & Computers', brands: brandLayer(laptops, 'all')!, total: laptops.length };
+  assert.equal(landingBrandCategory(laptops, tiles), 'laptops_computers', 'one department leads with its brands');
+  const out = html(React.createElement(MarketplaceCategoryTiles, { tiles, total: laptops.length, selected: 'all', onSelect: () => {}, brandRow: row, selectedBrand: 'hp', onSelectBrand: () => {} }));
   assert.ok(out.includes('Shop Laptops &amp; Computers by brand'));
-  assert.ok(out.includes('href="/marketplace?brand=hp"') && out.includes('HP, 2 items') && out.includes('All brands, 5 items'));
+  assert.ok(out.includes('href="/marketplace?category=laptops_computers&amp;brand=hp"') && out.includes('HP, 2 items') && out.includes('All Laptops &amp; Computers, 5 items'));
+  assert.ok(out.includes('Other brands, 1 item'), 'unbranded laptops keep the counts adding up');
   assert.ok(out.includes('aria-current="true"'));
   assert.ok(!out.includes('Phones'), 'empty categories are never shown');
-  assert.equal(html(React.createElement(MarketplaceCategoryTiles, { tiles, total: 5, selected: 'all', onSelect: () => {}, brands: brands.slice(0, 1), onSelectBrand: () => {} })), '', 'one brand is not worth a row');
+  assert.ok(!out.includes('Shop by department'), 'a single department is not repeated as a tile');
+  assert.equal(brandLayer(laptops.slice(0, 2), 'all'), null, 'one brand is not worth a row');
+  assert.equal(html(React.createElement(MarketplaceCategoryTiles, { tiles, total: 2, selected: 'all', onSelect: () => {}, brandRow: null, onSelectBrand: () => {} })), '');
 });
 
 test('admin category check flags clear name mismatches and never edits on its own', () => {

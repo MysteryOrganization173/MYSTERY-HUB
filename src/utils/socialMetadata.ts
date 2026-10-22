@@ -3,6 +3,7 @@ import { WEBSITE_TEMPLATES } from '../data/templates.js';
 import { DATA_RESELLER_STARTER_HERO_IMAGE, resolveDataResellerHeroImage } from './dataResellerArtwork.js';
 import type { MarketplaceProduct, PublicWebsiteSite } from '../types/index.js';
 import { websiteLayoutMode } from './websiteLayout.js';
+import { framingRegion, isDefaultFraming, type ImageFraming } from '../../shared/marketplaceImageFraming.js';
 
 // Canonical identity never comes from a request Host, Forwarded header or visitor query string.
 export const PUBLIC_ORIGIN = `https://${BUSINESS_CONFIG.domain}`;
@@ -41,6 +42,33 @@ export function socialImage(value: string, padding: 'ffffff' | '0b0f12' = 'fffff
   return original
     ? { image: `${original[1]}f_jpg,q_auto,c_pad,w_1200,h_630,b_rgb:${padding}/${original[2]}`, imageWidth: 1200, imageHeight: 630, imageType: 'image/jpeg' }
     : { image };
+}
+
+// Plain versioned Cloudinary originals whose public ID is safe to reuse as an overlay (l_a:b:c).
+const COMPOSABLE_ORIGINAL = /^(https:\/\/res\.cloudinary\.com\/[\w-]+\/image\/upload\/)(v\d+\/([A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*)\.(?:jpe?g|png|webp|avif|heic))$/i;
+
+/**
+ * Marketplace sharing image (1200x630 JPEG). The whole product photo sits as large as the
+ * canvas allows (c_fit, never stretched or cropped), over an enlarged, blurred and darkened copy
+ * of the same photo, so portrait shots no longer float in wide black bars. One deterministic URL
+ * per photo + framing, so Cloudinary renders it once and caches it. Optional admin framing crops
+ * the photo toward the subject first. Anything that is not a plain versioned Cloudinary original
+ * keeps the existing behaviour (padded rendition, or the exact external URL).
+ */
+export function marketplaceSocialImage(value: string, framing?: ImageFraming | null): Pick<SocialHead, 'image' | 'imageWidth' | 'imageHeight' | 'imageType'> {
+  const image = publicImageUrl(value);
+  const original = image.match(COMPOSABLE_ORIGINAL);
+  if (!original) return socialImage(image, '0b0f12');
+  const [, base, path, publicId] = original;
+  const region = !framing || isDefaultFraming(framing) ? null : framingRegion(framing);
+  const crop = region ? `c_crop,g_north_west,h_${region.h},w_${region.w},x_${region.x},y_${region.y}/` : '';
+  const transform = [
+    `${crop}c_fill,h_630,w_1200`, 'e_blur:1500', 'e_brightness:-35',
+    `l_${publicId.replace(/\//g, ':')}`, `${crop}c_fit,h_630,w_1200`, 'fl_layer_apply,g_center',
+    // Flattens any transparency onto the brand's dark surface instead of JPEG white.
+    'b_rgb:0b0f12,c_pad,h_630,w_1200', 'f_jpg', 'q_auto',
+  ].join('/');
+  return { image: `${base}${transform}/${path}`, imageWidth: 1200, imageHeight: 630, imageType: 'image/jpeg' };
 }
 
 const BRAND_IMAGE = BUSINESS_CONFIG.brandMarkUrl;
@@ -87,8 +115,8 @@ export function marketplaceProductHead(product: MarketplaceProduct): SocialHead 
     title: clipMetadata(product.name, 90),
     description: clipMetadata(`${price}. ${product.availabilityLabel}. ${action} ${details || ''}`, 240),
     url: `${PUBLIC_ORIGIN}/marketplace?product=${encodeURIComponent(product.slug || product.id)}`,
-    // Marketplace merchandise keeps its full photograph on a dark canvas; owner sites retain their existing rendition.
-    ...socialImage(publicImageUrl(product.imageUrl) || BUSINESS_CONFIG.marketplaceHeroImageUrl, '0b0f12'),
+    // Merchandise keeps its whole photograph, filled out with a blurred copy of itself; owner sites retain their existing rendition.
+    ...(publicImageUrl(product.imageUrl) ? marketplaceSocialImage(product.imageUrl!, product.imageFraming) : socialImage(BUSINESS_CONFIG.marketplaceHeroImageUrl, '0b0f12')),
     imageAlt: clipMetadata(product.imageAlt || product.name, 160), icon: publicImageUrl(BRAND_IMAGE),
   };
 }

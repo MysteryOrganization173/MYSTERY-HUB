@@ -1,6 +1,7 @@
 import { MARKETPLACE_LIMITS, duplicateMarketplaceName } from '../../shared/marketplaceLimits.js';
 import { parseJsonPickupLocations, parseJsonVariants } from '../types/marketplace.js';
 import { randomUUID } from 'node:crypto';
+import { formatImageFraming, type ImageFraming } from '../../shared/marketplaceImageFraming.js';
 import { MarketplaceControlStore, plainText } from './marketplaceControlStore.js';
 /**
  * Marketplace Data Store
@@ -55,6 +56,7 @@ export interface CreateMarketplaceProductInput {
   imageUrl?: string | null;
   imageAlt?: string | null;
   galleryUrls?: string[] | null;
+  imageFraming?: ImageFraming | null;
   highlights?: string[] | null;
   specs?: MarketplaceSpecItem[] | null;
   featured?: boolean;
@@ -92,6 +94,7 @@ export interface UpdateMarketplaceProductInput {
   imageUrl?: string | null;
   imageAlt?: string | null;
   galleryUrls?: string[] | null;
+  imageFraming?: ImageFraming | null;
   highlights?: string[] | null;
   specs?: MarketplaceSpecItem[] | null;
   featured?: boolean;
@@ -450,6 +453,7 @@ export class MarketplaceStore {
       image_url: input.imageUrl?.trim() || null,
       image_alt: input.imageAlt?.trim() || null,
       gallery_urls: input.galleryUrls && input.galleryUrls.length > 0 ? JSON.stringify(input.galleryUrls) : null,
+      image_framing: formatImageFraming(input.imageFraming),
       highlights: input.highlights && input.highlights.length > 0 ? JSON.stringify(input.highlights) : null,
       specs: input.specs && input.specs.length > 0 ? JSON.stringify(input.specs) : null,
       featured: Boolean(input.featured),
@@ -468,9 +472,9 @@ export class MarketplaceStore {
           id, slug, name, category, tagline, description, price_type, price_minor, referral_reward_minor,
           purchase_enabled, fulfilment_mode, pickup_locations, delivery_available, delivery_note, purchase_note, payment_required_before_delivery, variants,
           availability, availability_label, badge, image_url, image_alt, gallery_urls,
-          highlights, specs, featured, published, archived, sort_order, created_at, updated_at, product_kind, fulfilment_note, fulfilment_identifier_label, fulfilment_identifier_placeholder, fulfilment_identifier_required, admin_note
+          highlights, specs, featured, published, archived, sort_order, created_at, updated_at, product_kind, fulfilment_note, fulfilment_identifier_label, fulfilment_identifier_placeholder, fulfilment_identifier_required, admin_note, image_framing
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38
         ) RETURNING *;
       `;
       const res = await pool.query(insertSql, [
@@ -511,6 +515,7 @@ export class MarketplaceStore {
         record.fulfilment_identifier_placeholder,
         record.fulfilment_identifier_required,
         record.admin_note,
+        record.image_framing,
       ]);
       const saved = res.rows[0] as MarketplaceProductRecord;
 
@@ -618,6 +623,9 @@ export class MarketplaceStore {
       image_url: input.imageUrl !== undefined ? (input.imageUrl ? input.imageUrl.trim() : null) : existing.image_url,
       image_alt: input.imageAlt !== undefined ? (input.imageAlt ? input.imageAlt.trim() : null) : existing.image_alt,
       gallery_urls: input.galleryUrls !== undefined ? (input.galleryUrls && input.galleryUrls.length > 0 ? JSON.stringify(input.galleryUrls) : null) : existing.gallery_urls,
+      // A new main photo starts with automatic framing unless the same save sets one.
+      image_framing: input.imageFraming !== undefined ? formatImageFraming(input.imageFraming)
+        : input.imageUrl !== undefined && (input.imageUrl?.trim() || null) !== existing.image_url ? null : existing.image_framing ?? null,
       highlights: input.highlights !== undefined ? (input.highlights && input.highlights.length > 0 ? JSON.stringify(input.highlights) : null) : existing.highlights,
       specs: input.specs !== undefined ? (input.specs && input.specs.length > 0 ? JSON.stringify(input.specs) : null) : existing.specs,
       featured: input.featured !== undefined ? Boolean(input.featured) : existing.featured,
@@ -666,7 +674,8 @@ export class MarketplaceStore {
           fulfilment_identifier_label = $33,
           fulfilment_identifier_placeholder = $34,
           fulfilment_identifier_required = $35,
-          admin_note = $36
+          admin_note = $36,
+          image_framing = $37
         WHERE id = $1
         RETURNING *;
       `;
@@ -707,6 +716,7 @@ export class MarketplaceStore {
         updatedRecord.fulfilment_identifier_placeholder,
         updatedRecord.fulfilment_identifier_required,
         updatedRecord.admin_note,
+        updatedRecord.image_framing,
       ]);
 
       const saved = res.rows[0] as MarketplaceProductRecord;

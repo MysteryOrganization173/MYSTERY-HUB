@@ -18,7 +18,7 @@ export interface MarketplaceBrowseState {
   buyOnline: boolean;
   kind: MarketplaceKindFilter | '';
   price: MarketplacePriceBand | '';
-  brand: string; // '' or a BRANDS id, read from product names
+  brand: string; // '' | a brand id (see productBrandInfo) | 'other'
 }
 
 export const DEFAULT_BROWSE_STATE: MarketplaceBrowseState = { category: 'all', q: '', sort: 'recommended', buyOnline: false, kind: '', price: '', brand: '' };
@@ -46,7 +46,7 @@ const KIND_IDS = new Set(Object.keys(KIND_LABELS));
 const BAND_IDS = new Set(PRICE_BANDS.map(b => b.id));
 const SLUG = /^[a-z][a-z0-9_]{1,63}$/;
 
-/* ---------------- Brands (derived from product names) ---------------- */
+/* ---------------- Brands (structured spec first, then product names) ---------------- */
 
 /**
  * Brands a Ghanaian electronics shopper looks for, matched as whole words in the
@@ -69,30 +69,119 @@ export const BRANDS: { id: string; label: string; pattern: RegExp }[] = [
   { id: 'tecno', label: 'Tecno', pattern: /\btecno\b/i },
   { id: 'xiaomi', label: 'Xiaomi', pattern: /\b(xiaomi|redmi)\b/i },
 ];
-const BRAND_IDS = new Set(BRANDS.map(b => b.id));
+/** Groups products whose brand is unknown, so a category's brand tiles always add up to its total. */
+export const OTHER_BRAND = 'other';
+const BRAND_SLUG = /^[a-z0-9][a-z0-9-]{0,31}$/;
+const BRAND_SPEC = /^(brand|make|manufacturer)$/i;
 
-/** The brand a product's name names first, or null. */
-export function productBrand(product: Pick<MarketplaceProduct, 'name'>): string | null {
-  let best: { id: string; at: number } | null = null;
-  for (const brand of BRANDS) {
-    const at = product.name.search(brand.pattern);
-    if (at >= 0 && (!best || at < best.at)) best = { id: brand.id, at };
-  }
-  return best?.id ?? null;
+type BrandSource = Pick<MarketplaceProduct, 'name'> & Partial<Pick<MarketplaceProduct, 'specs' | 'productKind' | 'category' | 'categoryLabel'>>;
+
+/**
+ * Name-based guesses only run on physical goods outside software/digital departments:
+ * there "Microsoft 365" or "Apple Music" name a publisher, not a brand to shop hardware by.
+ */
+export function brandInferenceAllowed(product: BrandSource): boolean {
+  if ((product.productKind || 'physical') !== 'physical') return false;
+  if (!product.category) return true;
+  const key = categoryIconKey(product.category, product.categoryLabel || '');
+  return key !== 'software' && key !== 'digital';
 }
 
-export interface BrandSummary { id: string; label: string; count: number; imageUrl?: string }
+const brandCache = new WeakMap<object, { id: string; label: string } | null>();
+
+/**
+ * The product's brand: an admin "Brand"/"Make"/"Manufacturer" specification wins (known brands
+ * keep their canonical name, others become their own tile); otherwise the brand its name names
+ * first. Published records are never rewritten to make this work.
+ */
+export function productBrandInfo(product: BrandSource): { id: string; label: string } | null {
+  const cached = brandCache.get(product);
+  if (cached !== undefined) return cached;
+  let found: { id: string; label: string } | null = null;
+  const declared = (product.specs || []).find(s => BRAND_SPEC.test((s?.label || '').trim()))?.value?.trim();
+  if (declared && declared.length <= 40) {
+    const known = BRANDS.find(b => b.label.toLowerCase() === declared.toLowerCase()) || BRANDS.find(b => b.pattern.test(declared));
+    const id = declared.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
+    if (known) found = { id: known.id, label: known.label };
+    else if (BRAND_SLUG.test(id) && id !== OTHER_BRAND) found = { id, label: declared };
+  }
+  if (!found && brandInferenceAllowed(product)) {
+    let best: { id: string; label: string; at: number } | null = null;
+    for (const brand of BRANDS) {
+      const at = product.name.search(brand.pattern);
+      if (at >= 0 && (!best || at < best.at)) best = { id: brand.id, label: brand.label, at };
+    }
+    if (best) found = { id: best.id, label: best.label };
+  }
+  brandCache.set(product, found);
+  return found;
+}
+
+/** The brand id a product belongs to, or null. */
+export function productBrand(product: BrandSource): string | null {
+  return productBrandInfo(product)?.id ?? null;
+}
+
+const matchesBrand = (product: MarketplaceProduct, brand: string) =>
+  brand === OTHER_BRAND ? !productBrandInfo(product) : productBrand(product) === brand;
+
+export interface BrandSummary { id: string; label: string; count: number; imageUrl?: string; imageFraming?: MarketplaceProduct['imageFraming'] }
+
+const brandCover = (items: MarketplaceProduct[]) => items.find(p => p.featured && p.imageUrl && p.availability !== 'coming_soon') || items.find(p => p.imageUrl && p.availability !== 'coming_soon') || items.find(p => p.imageUrl);
 
 /** Brand tiles with exact counts and a real photo from that brand, most stocked first. */
 export function summariseBrands(products: MarketplaceProduct[]): BrandSummary[] {
-  return BRANDS.map(brand => {
-    const items = products.filter(p => productBrand(p) === brand.id);
-    const cover = items.find(p => p.featured && p.imageUrl) || items.find(p => p.imageUrl);
-    return { id: brand.id, label: brand.label, count: items.length, imageUrl: cover?.imageUrl };
-  }).filter(b => b.count > 0).sort((a, b) => b.count - a.count);
+  const groups = new Map<string, { label: string; items: MarketplaceProduct[] }>();
+  for (const p of products) {
+    const brand = productBrandInfo(p);
+    if (!brand) continue;
+    const group = groups.get(brand.id) || { label: brand.label, items: [] };
+    group.items.push(p);
+    groups.set(brand.id, group);
+  }
+  return [...groups.entries()].map(([id, { label, items }]) => {
+    const cover = brandCover(items);
+    return { id, label, count: items.length, imageUrl: cover?.imageUrl, imageFraming: cover?.imageFraming };
+  }).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
-export const brandLabel = (id: string) => BRANDS.find(b => b.id === id)?.label || id;
+/**
+ * The brand row for one department (or the whole catalogue), or null when brands would not
+ * help: fewer than two real brands means there is nothing to choose between. Unbranded items
+ * get an "Other" tile so the counts always add up to the department total.
+ */
+export function brandLayer(products: MarketplaceProduct[], category: string): BrandSummary[] | null {
+  const scope = category === 'all' ? products : products.filter(p => p.category === category);
+  const brands = summariseBrands(scope);
+  if (brands.length < 2) return null;
+  const unbranded = scope.filter(p => !productBrandInfo(p));
+  if (!unbranded.length) return brands;
+  const cover = brandCover(unbranded);
+  return [...brands, { id: OTHER_BRAND, label: 'Other brands', count: unbranded.length, imageUrl: cover?.imageUrl, imageFraming: cover?.imageFraming }];
+}
+
+/**
+ * Which department's brands the landing view shows: the only department when there is one,
+ * otherwise the single department that has a brand row. With several such departments the
+ * customer picks a department first, so the landing view never stacks several galleries.
+ */
+export function landingBrandCategory(products: MarketplaceProduct[], categories: CategorySummary[]): string | null {
+  if (categories.length < 2) return brandLayer(products, 'all') ? (categories[0]?.slug ?? 'all') : null;
+  const withBrands = categories.filter(c => brandLayer(products, c.slug));
+  return withBrands.length === 1 ? withBrands[0].slug : null;
+}
+
+export const brandLabel = (id: string, products: MarketplaceProduct[] = []) =>
+  id === OTHER_BRAND ? 'Other brands' : BRANDS.find(b => b.id === id)?.label || products.map(p => productBrandInfo(p)).find(b => b?.id === id)?.label || id;
+
+/**
+ * Department change: a brand survives only when the new department still has products from it
+ * (Dell laptops → Dell monitors), so a stale brand can never empty or skew the results.
+ */
+export function selectDepartment(state: MarketplaceBrowseState, category: string, products: MarketplaceProduct[]): MarketplaceBrowseState {
+  const keep = state.brand && state.brand !== OTHER_BRAND && products.some(p => (category === 'all' || p.category === category) && matchesBrand(p, state.brand));
+  return { ...state, category, brand: keep ? state.brand : '' };
+}
 
 /** Reads browse state from a query string, ignoring anything malformed. */
 export function parseBrowseState(search: string): MarketplaceBrowseState {
@@ -108,7 +197,7 @@ export function parseBrowseState(search: string): MarketplaceBrowseState {
     buyOnline: params.get('buy') === '1',
     kind: KIND_IDS.has(kind) ? kind : '',
     price: BAND_IDS.has(price) ? price : '',
-    brand: BRAND_IDS.has(params.get('brand') || '') ? params.get('brand')! : '',
+    brand: BRAND_SLUG.test((params.get('brand') || '').toLowerCase()) ? params.get('brand')!.toLowerCase() : '',
   };
 }
 
@@ -127,9 +216,10 @@ export function serializeBrowseState(state: MarketplaceBrowseState, currentSearc
   return out ? `?${out}` : '';
 }
 
-export function marketplaceHref(params: { category?: string; q?: string; product?: string } = {}): string {
+export function marketplaceHref(params: { category?: string; brand?: string; q?: string; product?: string } = {}): string {
   const query = new URLSearchParams();
   if (params.category && params.category !== 'all') query.set('category', params.category);
+  if (params.brand) query.set('brand', params.brand);
   if (params.q?.trim()) query.set('q', params.q.trim());
   if (params.product) query.set('product', params.product);
   const qs = query.toString();
@@ -226,7 +316,7 @@ function inBand(product: MarketplaceProduct, bandId: MarketplacePriceBand): bool
 export function applyRefinements(products: MarketplaceProduct[], state: MarketplaceBrowseState, skip: Array<'category' | 'q' | 'buy' | 'kind' | 'price' | 'brand'> = []): MarketplaceProduct[] {
   return products.filter(p =>
     (skip.includes('category') || state.category === 'all' || p.category === state.category)
-    && (skip.includes('brand') || !state.brand || productBrand(p) === state.brand)
+    && (skip.includes('brand') || !state.brand || matchesBrand(p, state.brand))
     && (skip.includes('q') || matchesSearch(p, state.q))
     && (skip.includes('buy') || !state.buyOnline || productPath(p) === 'buy')
     && (skip.includes('kind') || !state.kind || productKind(p) === state.kind)
@@ -266,7 +356,7 @@ export function activeRefinementCount(state: MarketplaceBrowseState): number {
 /* ---------------- Categories ---------------- */
 
 export interface CategoryInput { slug: string; label: string; active?: boolean; sort_order?: number }
-export interface CategorySummary { slug: string; label: string; count: number; imageUrl?: string; imageAlt?: string; iconKey: CategoryIconKey }
+export interface CategorySummary { slug: string; label: string; count: number; imageUrl?: string; imageAlt?: string; imageFraming?: MarketplaceProduct['imageFraming']; iconKey: CategoryIconKey }
 export type CategoryIconKey = 'laptop' | 'phone' | 'audio' | 'camera' | 'software' | 'printer' | 'digital' | 'home' | 'game' | 'box';
 
 const ICON_RULES: [CategoryIconKey, RegExp][] = [
@@ -304,7 +394,7 @@ export function summariseCategories(categories: CategoryInput[], products: Marke
     const items = products.filter(p => p.category === c.slug);
     const withImage = items.filter(p => typeof p.imageUrl === 'string' && /^https?:\/\//.test(p.imageUrl));
     const cover = withImage.find(p => p.featured && p.availability !== 'coming_soon') || withImage.find(p => p.availability !== 'coming_soon') || withImage[0];
-    return { slug: c.slug, label: c.label, count: items.length, imageUrl: cover?.imageUrl, imageAlt: cover ? (cover.imageAlt || cover.name) : undefined, iconKey: categoryIconKey(c.slug, c.label) };
+    return { slug: c.slug, label: c.label, count: items.length, imageUrl: cover?.imageUrl, imageAlt: cover ? (cover.imageAlt || cover.name) : undefined, imageFraming: cover?.imageFraming, iconKey: categoryIconKey(c.slug, c.label) };
   }).filter(c => c.count > 0);
 }
 
