@@ -60,7 +60,7 @@ test('raw HTML contains actual product identity, price, stored image and saved s
   assert.equal(response.status,200); assert.match(response.headers.get('content-type')!,/text\/html/);
   assert.equal(response.headers.get('cache-control'),'no-store');
   assert.match(text,/<title>Synthetic Latitude Laptop<\/title>/); assert.match(text,/GH₵4,450/); assert.match(text,/16GB RAM, 256GB SSD/);
-  assert.match(text,/own-laptop.jpg/); assert.match(text,/w_1200,h_630/); assert.doesNotMatch(text,/MH-EXAMPLE|q=laptop/);
+  assert.match(text,/own-laptop.jpg/); assert.match(text,/c_fit,h_630,w_1200/); assert.doesNotMatch(text,/MH-EXAMPLE|q=laptop/);
   assert.equal((text.match(/property="og:title"/g)||[]).length,1); assert.equal((text.match(/name="twitter:image"/g)||[]).length,1);
   assert.match(text,/<div id="root"><\/div>/); assert.match(text,/src="\/src\/main.tsx"/,'SPA entry remains intact');
 });
@@ -99,12 +99,15 @@ test('external images stay exact without fabricated dimensions or MIME',()=>{
   assert.deepEqual(socialImage('https://res.cloudinary.com/fixture/image/upload/w_100/v1/a.png'),{image:'https://res.cloudinary.com/fixture/image/upload/w_100/v1/a.png'});
 });
 
-for (const shape of ['portrait', 'square', 'landscape']) test(`Marketplace ${shape} original uses dark padding without cropping`,()=>{
+for (const shape of ['portrait', 'square', 'landscape']) test(`Marketplace ${shape} original is shown whole over a blurred fill of itself`,()=>{
   const imageUrl=`https://res.cloudinary.com/fixture/image/upload/v1/${shape}.jpg`;
   const head=marketplaceProductHead(product({imageUrl}));
-  assert.equal(head.image,`https://res.cloudinary.com/fixture/image/upload/f_jpg,q_auto,c_pad,w_1200,h_630,b_rgb:0b0f12/v1/${shape}.jpg`);
+  // Base layer: the same photo filled and blurred. Foreground: the whole photo fitted (never stretched or cropped).
+  assert.equal(head.image,`https://res.cloudinary.com/fixture/image/upload/c_fill,h_630,w_1200/e_blur:1500/e_brightness:-35/l_${shape}/c_fit,h_630,w_1200/fl_layer_apply,g_center/b_rgb:0b0f12,c_pad,h_630,w_1200/f_jpg/q_auto/v1/${shape}.jpg`);
   assert.equal(head.imageWidth,1200);assert.equal(head.imageHeight,630);assert.equal(head.imageType,'image/jpeg');
-  assert.doesNotMatch(head.image,/c_fill|c_crop|b_rgb:ffffff/);
+  const foreground=head.image.split(`l_${shape}/`)[1].split('/fl_layer_apply')[0];
+  assert.equal(foreground,'c_fit,h_630,w_1200','the product layer only scales to fit');
+  assert.doesNotMatch(head.image,/c_crop|c_scale|b_rgb:ffffff/);
   const output=injectSocialHead('<head><title>Old</title></head>',head);
   for(const tag of ['og:image','og:title','og:description','og:url']) assert.equal((output.match(new RegExp(`property="${tag}"`, 'g'))||[]).length,1);
 });

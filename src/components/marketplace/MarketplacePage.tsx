@@ -8,7 +8,7 @@ import { buildReferralUrl } from '../../utils/referralUrl';
 import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
 import { MarketplaceCheckoutModal } from './MarketplaceCheckoutModal';
 import { MarketplaceProductDetailModal } from './MarketplaceProductDetailModal';
-import { MarketplaceCategoryTiles } from './MarketplaceCategoryTiles';
+import { MarketplaceCategoryTiles, type BrandRow } from './MarketplaceCategoryTiles';
 import { ProductPhoto } from './MarketplaceMedia';
 import { MarketplaceProductCard } from './MarketplaceProductCard';
 import { MarketplaceRefineSheet, refineAvailability } from './MarketplaceRefineSheet';
@@ -16,7 +16,8 @@ import { useMarketplaceDialog } from './useMarketplaceDialog';
 import { marketplaceProductKey } from '../../utils/marketplaceDeepLink';
 import {
   DEFAULT_BROWSE_STATE, KIND_LABELS, PRICE_BANDS, SORT_OPTIONS, MarketplaceBrowseState, MarketplaceSort,
-  activeRefinementCount, applyRefinements, categoryIconKey, categoryLabel, parseBrowseState, serializeBrowseState, sortProducts, summariseCategories, summariseBrands, brandLabel,
+  activeRefinementCount, applyRefinements, categoryIconKey, categoryLabel, parseBrowseState, serializeBrowseState, sortProducts, summariseCategories, brandLabel,
+  brandLayer, landingBrandCategory, selectDepartment,
 } from '../../utils/marketplaceBrowse';
 import {
   Search,
@@ -57,6 +58,14 @@ export const MarketplacePage: React.FC = () => {
   // Browsing state lives in the URL so refresh, sharing and Back all keep the customer's place.
   const [browse, setBrowse] = useState<MarketplaceBrowseState>(() => typeof window === 'undefined' ? DEFAULT_BROWSE_STATE : parseBrowseState(window.location.search));
   const updateBrowse = useCallback((patch: Partial<MarketplaceBrowseState>) => setBrowse(prev => ({ ...prev, ...patch })), []);
+  // Department and brand choices are navigation: each gets a history entry so Back steps out of
+  // Dell to the Laptops gallery, then to All. Typing, sorting and refining only replace the URL.
+  const navigateBrowse = useCallback((next: MarketplaceBrowseState) => {
+    setBrowse(next);
+    const qs = serializeBrowseState(next, window.location.search);
+    if (qs !== window.location.search) window.history.pushState({ page: 'marketplace' }, '', window.location.pathname + qs + window.location.hash);
+  }, []);
+  const brandRowRef = useRef<HTMLElement>(null);
   const [refineOpen, setRefineOpen] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -225,29 +234,44 @@ export const MarketplacePage: React.FC = () => {
   }, [loading, products]);
 
   const categoryTiles = useMemo(() => summariseCategories(categories, products), [categories, products]);
-  const brandTiles = useMemo(() => summariseBrands(products), [products]);
+  // Departments → brands → products. The selected department shows its own brands; the landing
+  // view shows brands only when exactly one department has them (or there is one department).
+  const brandRow = useMemo<BrandRow | null>(() => {
+    const slug = browse.category !== 'all' ? browse.category : landingBrandCategory(products, categoryTiles);
+    const brands = slug ? brandLayer(products, slug) : null;
+    if (!slug || !brands) return null;
+    const total = slug === 'all' ? products.length : products.filter(p => p.category === slug).length;
+    return { category: slug, label: slug === 'all' ? '' : categoryLabel(slug, categories, products), brands, total };
+  }, [browse.category, products, categoryTiles, categories]);
   const activeCategoryLabel = categoryLabel(browse.category, categories, products);
+  const activeBrandLabel = browse.brand ? brandLabel(browse.brand, products) : '';
   const filteredProducts = useMemo(() => sortProducts(applyRefinements(products, browse), browse.sort), [products, browse]);
   const refinementCount = activeRefinementCount(browse);
   const canRefine = refinementCount > 0 || (() => { const o = refineAvailability(applyRefinements(products, browse, ['buy', 'kind', 'price'])); return o.buy || o.kinds.length > 0 || o.bands.length > 0; })();
   const isFiltered = browse.category !== 'all' || !!browse.brand || !!browse.q.trim() || refinementCount > 0;
-  const resetAll = () => setBrowse(prev => ({ ...DEFAULT_BROWSE_STATE, sort: prev.sort }));
+  const resetAll = () => navigateBrowse({ ...DEFAULT_BROWSE_STATE, sort: browse.sort });
 
-  const selectBrand = (id: string) => {
-    updateBrowse({ brand: id });
-    requestAnimationFrame(() => {
-      const top = resultsRef.current?.getBoundingClientRect().top;
-      if (top !== undefined && top > window.innerHeight * 0.65) resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+  // A shared or old link naming a brand nobody sells any more falls back to the department.
+  useEffect(() => {
+    if (!loading && browse.brand && products.length && !applyRefinements(products, { ...DEFAULT_BROWSE_STATE, category: browse.category, brand: browse.brand }).length) updateBrowse({ brand: '' });
+  }, [loading, products, browse.brand, browse.category, updateBrowse]);
+
+  // Scroll only when the next thing to choose is off screen, and never past it: a department with
+  // brands brings its brand gallery into view; otherwise the results come into view.
+  const reveal = (target: HTMLElement | null, below = 0.65) => requestAnimationFrame(() => requestAnimationFrame(() => {
+    const rect = target?.getBoundingClientRect();
+    if (rect && (rect.top > window.innerHeight * below || rect.top < 56)) target!.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
+
+  const selectBrand = (id: string, category: string) => {
+    navigateBrowse({ ...browse, category: category === 'all' ? browse.category : category, brand: id });
+    reveal(resultsRef.current);
   };
 
   const selectCategory = (slug: string) => {
-    updateBrowse({ category: slug });
-    // Bring results into view when the grid starts below the fold on a phone.
-    requestAnimationFrame(() => {
-      const top = resultsRef.current?.getBoundingClientRect().top;
-      if (top !== undefined && top > window.innerHeight * 0.65) resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+    navigateBrowse(selectDepartment(browse, slug, products));
+    if (slug !== 'all' && brandLayer(products, slug)) reveal(brandRowRef.current, 0.55);
+    else if (slug !== 'all') reveal(resultsRef.current);
   };
 
   const formatGhcReward = (val: number | null | undefined): string => {
@@ -322,8 +346,8 @@ export const MarketplacePage: React.FC = () => {
     : 'Hello Mystery Hub team, I have a specific hardware or software sourcing request.';
 
   const activeChips: { key: string; label: string; clear: () => void }[] = [
-    ...(browse.category !== 'all' ? [{ key: 'category', label: activeCategoryLabel, clear: () => updateBrowse({ category: 'all' }) }] : []),
-    ...(browse.brand ? [{ key: 'brand', label: brandLabel(browse.brand), clear: () => updateBrowse({ brand: '' }) }] : []),
+    ...(browse.category !== 'all' ? [{ key: 'category', label: activeCategoryLabel, clear: () => navigateBrowse(selectDepartment(browse, 'all', products)) }] : []),
+    ...(browse.brand ? [{ key: 'brand', label: activeBrandLabel, clear: () => navigateBrowse({ ...browse, brand: '' }) }] : []),
     ...(browse.q.trim() ? [{ key: 'q', label: `“${browse.q.trim()}”`, clear: () => updateBrowse({ q: '' }) }] : []),
     ...(browse.buyOnline ? [{ key: 'buy', label: 'Buy online', clear: () => updateBrowse({ buyOnline: false }) }] : []),
     ...(browse.kind ? [{ key: 'kind', label: KIND_LABELS[browse.kind], clear: () => updateBrowse({ kind: '' }) }] : []),
@@ -426,7 +450,7 @@ export const MarketplacePage: React.FC = () => {
             2. VISUAL CATEGORY DISCOVERY (admin categories, live counts, real product photos)
             ========================================================= */}
         {!loading && !error && products.length > 0 && (
-          <MarketplaceCategoryTiles tiles={categoryTiles} total={products.length} selected={browse.category} onSelect={selectCategory} brands={brandTiles} selectedBrand={browse.brand} onSelectBrand={selectBrand} />
+          <MarketplaceCategoryTiles tiles={categoryTiles} total={products.length} selected={browse.category} onSelect={selectCategory} brandRow={brandRow} selectedBrand={browse.brand} onSelectBrand={selectBrand} brandRowRef={brandRowRef} />
         )}
 
         {/* =========================================================
@@ -437,7 +461,7 @@ export const MarketplacePage: React.FC = () => {
           <div className="space-y-2.5">
             <div className="flex items-end justify-between gap-2 sm:gap-3">
               <div className="min-w-0">
-                <h2 className="text-base sm:text-xl font-bold text-white tracking-tight truncate">{browse.brand ? `${brandLabel(browse.brand)}${browse.category !== 'all' ? ` · ${activeCategoryLabel}` : ''}` : activeCategoryLabel}</h2>
+                <h2 className="text-base sm:text-xl font-bold text-white tracking-tight truncate">{browse.brand ? `${activeBrandLabel}${browse.category !== 'all' ? ` · ${activeCategoryLabel}` : ''}` : activeCategoryLabel}</h2>
                 <p className="text-xs text-slate-400" aria-live="polite">
                   <span className="font-semibold text-slate-200 tabular-nums">{filteredProducts.length}</span> {filteredProducts.length === 1 ? 'product' : 'products'}
                   {browse.q.trim() && <> for <span className="text-slate-200">“{browse.q.trim()}”</span></>}
@@ -479,9 +503,7 @@ export const MarketplacePage: React.FC = () => {
                     <X className="w-3 h-3 text-slate-400 shrink-0" aria-hidden="true" />
                   </button>
                 ))}
-                {activeChips.length > 1 && (
-                  <button type="button" onClick={resetAll} className="text-xs font-semibold text-[#00c365] hover:underline px-1.5 py-1">Clear all</button>
-                )}
+                <button type="button" onClick={resetAll} data-mh-show-all className="text-xs font-semibold text-[#00c365] hover:underline px-1.5 min-h-[32px]">{activeChips.length > 1 ? 'Clear all' : 'All products'}</button>
               </div>
             )}
           </div>
@@ -584,7 +606,7 @@ export const MarketplacePage: React.FC = () => {
             </p>
             <div className="pt-1 flex flex-col sm:flex-row items-center justify-center gap-2">
               {browse.q.trim() && browse.category !== 'all' && applyRefinements(products, browse, ['category']).length > 0 ? (
-                <button type="button" onClick={() => updateBrowse({ category: 'all' })} className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#00c365] text-black font-bold text-xs inline-flex items-center justify-center gap-1.5">
+                <button type="button" onClick={() => navigateBrowse(selectDepartment(browse, 'all', products))} className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#00c365] text-black font-bold text-xs inline-flex items-center justify-center gap-1.5">
                   <Search className="w-3.5 h-3.5" />
                   <span>Search all categories</span>
                 </button>
@@ -776,6 +798,7 @@ export const MarketplacePage: React.FC = () => {
                     src={shareModalProduct.imageUrl}
                     alt={shareModalProduct.imageAlt || shareModalProduct.name}
                     iconKey={categoryIconKey(shareModalProduct.category, shareModalProduct.categoryLabel)}
+                    framing={shareModalProduct.imageFraming}
                     fit="cover"
                     widths={[112, 168]}
                     sizes="56px"

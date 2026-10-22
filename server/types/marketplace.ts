@@ -1,4 +1,5 @@
 import { marketplaceOptionPrice, purchasableOptions } from '../../shared/marketplaceVariants.js';
+import { parseImageFraming, type ImageFraming } from '../../shared/marketplaceImageFraming.js';
 /**
  * Marketplace V1 Types & Presentation Utilities
  * Strict typing for PostgreSQL storage and safe customer-facing APIs.
@@ -79,6 +80,7 @@ export interface MarketplaceProductRecord {
   image_url: string | null;
   image_alt: string | null;
   gallery_urls: string | null; // JSON array of string URLs
+  image_framing?: string | null; // optional "x,y,zoom" main-photo framing (shared/marketplaceImageFraming)
   highlights: string | null; // JSON array of strings
   specs: string | null; // JSON array of MarketplaceSpecItem
   featured: boolean;
@@ -113,6 +115,7 @@ export interface PublicMarketplaceProduct {
   imageUrl?: string;
   imageAlt?: string;
   galleryUrls?: string[];
+  imageFraming?: ImageFraming;
   highlights: string[];
   specs?: MarketplaceSpecItem[];
   featured: boolean;
@@ -323,6 +326,7 @@ export function toPublicMarketplaceProduct(record: MarketplaceProductRecord): Pu
     imageUrl: record.image_url || undefined,
     imageAlt: record.image_alt || record.name,
     galleryUrls: parseJsonStringArray(record.gallery_urls),
+    imageFraming: parseImageFraming(record.image_framing) || undefined,
     highlights: parseJsonStringArray(record.highlights),
     specs: parseJsonSpecs(record.specs),
     featured: Boolean(record.featured),

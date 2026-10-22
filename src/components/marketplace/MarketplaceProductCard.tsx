@@ -56,6 +56,7 @@ export const MarketplaceProductCard: React.FC<Props> = ({ product: p, highlighte
           src={p.imageUrl}
           alt={p.imageAlt || p.name}
           iconKey={categoryIconKey(p.category, p.categoryLabel)}
+          framing={p.imageFraming}
           widths={[240, 360, 480, 640]}
           sizes="(min-width: 1280px) 290px, (min-width: 768px) 30vw, 48vw"
           priority={priority}

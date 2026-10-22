@@ -320,6 +320,8 @@ export interface MarketplaceProduct {
   imageUrl?: string;
   imageAlt?: string;
   galleryUrls?: string[];
+  /** Optional admin framing of the main photo; absent means automatic framing. */
+  imageFraming?: import('../../shared/marketplaceImageFraming').ImageFraming;
   highlights: string[];
   specs?: Array<{ label: string; value: string }>;
   iconName?: string;

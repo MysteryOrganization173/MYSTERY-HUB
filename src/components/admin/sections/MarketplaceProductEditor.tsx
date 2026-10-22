@@ -6,6 +6,8 @@ import { FULFILMENT_MODES, FULFILMENT_LABELS, type ProductKind, type FulfilmentM
 import type { ManagedCategory } from '../../../services/marketplaceControls';
 import { createAdminMarketplaceProduct, updateAdminMarketplaceProduct, importMarketplaceProductWithAi } from '../../../services/apiClient';
 import { getMarketplaceMedia, preparePhoto, uploadMarketplacePhoto, marketplaceThumb, MARKETPLACE_PHOTO_TYPES, type MarketplaceMediaLibrary } from '../../../services/marketplaceMedia';
+import { MarketplacePhotoFraming } from './MarketplacePhotoFraming';
+import type { ImageFraming } from '../../../../shared/marketplaceImageFraming';
 import { AdminButton, AdminNotice, AdminSheet, ConfirmAction, StatusPill, adminField as field, adminLabel } from '../ui/AdminUi';
 
 const MAX_GALLERY = 8;
@@ -66,6 +68,8 @@ export function MarketplaceProductEditor({ token, product, categories, products,
   const [adminNote, setAdminNote] = useState(p?.adminNote || '');
   const [imageAlt, setImageAlt] = useState(p?.imageAlt || '');
   const [photos, setPhotos] = useState<Photo[]>(() => [p?.imageUrl, ...(p?.galleryUrls || [])].filter((u): u is string => Boolean(u)).map(url => ({ key: newId('ph'), url, preview: null, progress: 100, error: null, uploading: false })));
+  // Framing belongs to one photo: choosing a different main photo starts again from automatic.
+  const [framingState, setFramingState] = useState<{ url: string; framing: ImageFraming | null }>(() => ({ url: p?.imageUrl || '', framing: p?.imageFraming || null }));
   const [linkDraft, setLinkDraft] = useState('');
   const [library, setLibrary] = useState<MarketplaceMediaLibrary | null>(null);
   const [libraryError, setLibraryError] = useState('');
@@ -96,6 +100,7 @@ export function MarketplaceProductEditor({ token, product, categories, products,
   const imageUrl = photos.find(ph => ph.url)?.url || '';
   const galleryUrls = photos.filter(ph => ph.url).slice(1).map(ph => ph.url!) ;
   const uploading = photos.some(ph => ph.uploading);
+  const imageFraming = imageUrl && framingState.url === imageUrl ? framingState.framing : null;
   const priceMinor = priceType === 'quote' ? null : Math.round(Number(priceGhc) * 100);
   const readiness = productReadiness({ name, category, productKind: kind, priceType, priceMinor, purchaseEnabled, fulfilmentMode: mode, pickupLocations: pickups, deliveryAvailable, imageUrl, imageAlt, description, highlights: highlights.filter(Boolean), referralRewardMinor: Number(rewardGhc) * 100, fulfilmentIdentifierLabel: identifierLabel, fulfilmentIdentifierPlaceholder: identifierPlaceholder, fulfilmentIdentifierRequired: identifierRequired, fulfilmentNote, purchaseNote }, categories);
 
@@ -177,7 +182,7 @@ export function MarketplaceProductEditor({ token, product, categories, products,
     priceType, priceGhc: priceType !== 'quote' ? parseFloat(priceGhc) : undefined,
     referralRewardGhc: rewardGhc && parseFloat(rewardGhc) > 0 ? parseFloat(rewardGhc) : null,
     availability, availabilityLabel: availabilityLabel.trim() || undefined, badge: badge.trim() || undefined,
-    imageUrl: imageUrl || (p?.imageUrl ? '' : undefined), galleryUrls, imageAlt: imageAlt.trim() || undefined,
+    imageUrl: imageUrl || (p?.imageUrl ? '' : undefined), galleryUrls, imageAlt: imageAlt.trim() || undefined, imageFraming,
     highlights: highlights.map(h => h.trim()).filter(Boolean), specs: specs.filter(s => s.label.trim()).map(s => ({ label: s.label.trim(), value: s.value.trim() })),
     featured, published: publish, sortOrder,
     purchaseEnabled: purchaseEnabled && mode !== 'inquiry_only' && priceType !== 'quote', fulfilmentMode: mode,
@@ -267,6 +272,7 @@ export function MarketplaceProductEditor({ token, product, categories, products,
           <input ref={cameraInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
           <input ref={galleryInput} type="file" accept={MARKETPLACE_PHOTO_TYPES.join(',')} multiple className="hidden" onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
           <p className="mt-2 text-xs text-slate-500">Large phone photos are resized before upload. Removing a photo only removes it from this product.</p>
+          {imageUrl && <MarketplacePhotoFraming key={imageUrl} imageUrl={imageUrl} name={name} framing={imageFraming} onChange={framing => setFramingState({ url: imageUrl, framing })} />}
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className={adminLabel}><span>Describe the main photo</span><input className={field} value={imageAlt} maxLength={256} placeholder="e.g. HP EliteBook 840 G8, front view, open" onChange={e => setImageAlt(e.target.value)} /><span className="block text-xs text-slate-500">Read aloud by screen readers and shown if the photo fails to load.</span></label>
             <div className="space-y-2">

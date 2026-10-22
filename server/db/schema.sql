@@ -443,6 +443,8 @@ ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS fulfilment_identifier_
 ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS fulfilment_identifier_placeholder VARCHAR(150);
 ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS fulfilment_identifier_required BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS admin_note VARCHAR(1000);
+-- Optional main-photo framing ("x,y,zoom"). NULL = automatic framing for every existing product.
+ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS image_framing VARCHAR(32);
 ALTER TABLE marketplace_inquiries ADD COLUMN IF NOT EXISTS admin_note VARCHAR(1000);
 ALTER TABLE marketplace_inquiries ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 ALTER TABLE marketplace_inquiries ADD COLUMN IF NOT EXISTS contacted_at TIMESTAMPTZ;

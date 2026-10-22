@@ -60,7 +60,7 @@ export const HomeMarketplaceSection: React.FC = () => {
           <>
           <div className="home-product-grid">{featuredProducts.map(p => (
             <article key={p.id} className="home-product">
-              <a href={marketplaceHref({ product: p.slug || p.id })} onClick={e => go(e, { product: p.slug || p.id })} className="home-product-image" aria-label={`View ${p.name}`}><ProductPhoto src={p.imageUrl} alt={p.imageAlt || p.name} iconKey={categoryIconKey(p.category, p.categoryLabel)} widths={[320, 480, 640]} sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" /></a>
+              <a href={marketplaceHref({ product: p.slug || p.id })} onClick={e => go(e, { product: p.slug || p.id })} className="home-product-image" aria-label={`View ${p.name}`}><ProductPhoto src={p.imageUrl} alt={p.imageAlt || p.name} iconKey={categoryIconKey(p.category, p.categoryLabel)} framing={p.imageFraming} widths={[320, 480, 640]} sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" /></a>
               <div className="home-product-details"><p><a href={marketplaceHref({ category: p.category })} onClick={e => go(e, { category: p.category })} className="home-product-category">{p.categoryLabel}</a></p><h3><a href={marketplaceHref({ product: p.slug || p.id })} onClick={e => go(e, { product: p.slug || p.id })}>{p.name}</a></h3><strong>{productPriceText(p)}</strong><span className={`home-product-path home-product-path-${productPath(p)}`}>{PATH_LABELS[productPath(p)]}</span>{p.tagline && <p>{p.tagline}</p>}</div>
               {/* The shortcut matches what the product really supports: buyable items open their product sheet. */}
               {productPath(p) === 'buy' ? (
