@@ -26,7 +26,10 @@ export function milestoneState(row: EarnAchievement, options: { restricted?: boo
 }
 export function featuredMilestone(rows: EarnAchievement[]) {
   return rows.filter(row => row.enabled && !row.claimed && milestoneProgress(row))
-    .sort((a, b) => Number(milestoneProgress(b)!.complete) - Number(milestoneProgress(a)!.complete)
+    // Real Wallet credit leads: claimable credit, then credit in progress, then a claimable badge, then the closest badge.
+    .sort((a, b) => Number(b.rewardMinor > 0 && milestoneProgress(b)!.complete) - Number(a.rewardMinor > 0 && milestoneProgress(a)!.complete)
+      || Number(b.rewardMinor > 0) - Number(a.rewardMinor > 0)
+      || Number(milestoneProgress(b)!.complete) - Number(milestoneProgress(a)!.complete)
       || milestoneProgress(b)!.percentage - milestoneProgress(a)!.percentage
       || a.id.localeCompare(b.id, 'en'))[0] ?? null;
 }
@@ -38,15 +41,38 @@ export function milestoneRemaining(row: EarnAchievement) {
   if (progress.complete) return 'Milestone reached';
   const amount = milestoneValue(progress.remaining, row.metric);
   switch (row.metric) {
-    case 'qualified_visitors': return `${amount} more qualifying visitor ${progress.remaining === 1 ? 'key' : 'keys'}`;
-    case 'successful_referrals': return `${amount} more successful ${progress.remaining === 1 ? 'referral' : 'referrals'}`;
-    case 'afa_referrals': return `${amount} more qualifying AFA ${progress.remaining === 1 ? 'referral' : 'referrals'}`;
-    case 'lifetime_earnings': return `${amount} more approved referral earnings`;
+    case 'qualified_visitors': return `${amount} more distinct ${progress.remaining === 1 ? 'browser' : 'browsers'}`;
+    case 'successful_referrals': return `${amount} more rewarded ${progress.remaining === 1 ? 'purchase' : 'purchases'}`;
+    case 'afa_referrals': return `${amount} more AFA ${progress.remaining === 1 ? 'referral' : 'referrals'}`;
+    case 'lifetime_earnings': return `${amount} more approved rewards`;
   }
 }
 export const milestoneMetricNotes: Record<AchievementMetric, string> = {
-  successful_referrals: 'Successful referrals from approved qualifying reward activity.',
-  qualified_visitors: 'Distinct stored visitor keys, not verified individual people.',
-  afa_referrals: 'Approved qualifying AFA referral activity.',
-  lifetime_earnings: 'Approved referral earnings. Progress is stored in pesewas and displayed in Ghana cedis.',
+  successful_referrals: 'Purchases by people you referred that earned you an approved reward. Each order counts, so one friend buying twice counts twice. Visits and sign-ups do not count.',
+  qualified_visitors: 'Different browsers that opened your link. One person on two phones counts twice, so this is not a count of people. Never paid.',
+  afa_referrals: 'MTN AFA registrations by people you referred that earned an approved reward.',
+  lifetime_earnings: 'The total of your approved referral rewards so far.',
 };
+export const milestoneMetricLabels: Record<AchievementMetric, string> = {
+  successful_referrals: 'Rewarded purchases', qualified_visitors: 'Link reach', afa_referrals: 'AFA referrals', lifetime_earnings: 'Approved rewards',
+};
+/** Level within the same metric family, ordered by threshold. Presentation only; never affects eligibility. */
+export function milestoneLevel(row: EarnAchievement, rows: EarnAchievement[]) {
+  const family = rows.filter(item => item.enabled && item.metric === row.metric && milestoneProgress(item))
+    .sort((a, b) => a.threshold - b.threshold || a.id.localeCompare(b.id, 'en'));
+  const index = family.findIndex(item => item.id === row.id);
+  return index < 0 ? null : { level: index + 1, of: family.length };
+}
+/** Splits enabled server rows into one featured milestone and three non-overlapping groups. */
+export function groupMilestones(rows: EarnAchievement[]) {
+  const enabled = rows.filter(row => row.enabled);
+  const featured = featuredMilestone(enabled);
+  const rest = enabled.filter(row => row.id !== featured?.id);
+  const byCloseness = (a: EarnAchievement, b: EarnAchievement) => (milestoneProgress(b)?.percentage ?? -1) - (milestoneProgress(a)?.percentage ?? -1) || a.id.localeCompare(b.id, 'en');
+  return {
+    enabled, featured,
+    ready: rest.filter(row => !row.claimed && milestoneProgress(row)?.complete).sort(byCloseness),
+    active: rest.filter(row => !row.claimed && !milestoneProgress(row)?.complete).sort(byCloseness),
+    collected: rest.filter(row => row.claimed),
+  };
+}

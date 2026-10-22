@@ -398,7 +398,7 @@ export const CheckoutModal: React.FC = () => {
       if (res.success && res.order && view.paymentConfirmed) {
         clearPendingCheckout(attemptRef);
         closeCheckout();
-        openOrderStatus({ ...orderRecordFromLookup(res.order), recipientPhone: phone.trim(), buyerRecipientVisible: true });
+        openOrderStatus({ ...orderRecordFromLookup(res.order), recipientPhone: phone.trim(), buyerRecipientVisible: true, journey: 'direct_checkout' });
         return;
       }
       setRecovery({ checking: false, message: 'No payment has been confirmed for this order yet. If you approved the prompt, it can take a minute to arrive. Check again before paying a second time.' });

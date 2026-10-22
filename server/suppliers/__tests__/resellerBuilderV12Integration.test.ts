@@ -33,12 +33,12 @@ function component(preview=false,siteId='site-a') {
   const render=()=>{cursor=0;const tree=wrapper.type(wrapper.props);while(effects.length)effects.shift()!();return tree;};
   const nodes=(tree:any):any[]=>!tree||typeof tree!=='object'?[]:Array.isArray(tree)?tree.flatMap(nodes):[tree,...nodes(tree.props?.children),...nodes(tree.props?.managedCheckout)];
   const find=(predicate:(node:any)=>boolean)=>nodes(render()).find(predicate);
-  // Signal is number-first: pick a bundle row, enter the number, confirm the network, then Review.
-  const buy=()=>{find(n=>n.type===row).props.onChoose({id:'mtn-1gb',network:'mtn',dataAmount:'1GB',priceMinor:521});const phone=nodes(render()).find(n=>n.type==='input'&&n.props.type==='tel');phone?.props.onChange({target:{value:'0240000000'}});find(n=>n.type==='button'&&n.props['data-network']==='mtn').props.onClick();find(n=>n.type==='button'&&n.props['data-store-review']).props.onClick();};
+  // V5.2 Signal is bundle-first: tap a bundle row, then enter the number and confirm its network inside the sheet.
+  const buy=()=>{find(n=>n.type===row).props.onChoose({id:'mtn-1gb',network:'mtn',dataAmount:'1GB',priceMinor:521});const phone=nodes(render()).find(n=>n.type==='input'&&n.props.type==='tel');phone?.props.onChange({target:{value:'0240000000'}});nodes(render()).find(n=>n.type==='input'&&n.props.type==='checkbox'&&n.props['data-network']==='mtn')?.props.onChange({target:{checked:true}});};
   const details=()=>{const inputs=nodes(render()).filter(n=>n.type==='input'&&n.props.type==='email');assert.equal(inputs.length,1);inputs[0].props.onChange({target:{value:'buyer@example.test'}});};
   const pay=()=>find(n=>n.type==='button'&&n.props.className?.includes('w-full font-bold')).props.onClick();
   const cleanup=()=>cells.forEach(cell=>cell?.cleanup?.());
-  return {calls,values,wrapper,render,find,buy,details,pay,cleanup};
+  return {calls,values,wrapper,render,find,buy,details,pay,cleanup,row};
 }
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 
@@ -55,6 +55,23 @@ test('published mode locks one request and cancellation resumes the same identit
   first.onOrderCreated('MH-synthetic');first.onCancel('MH-synthetic');first.onCancel('MH-synthetic');h.render();await h.pay();
   assert.equal(h.calls.payments.length,2);assert.equal(h.calls.payments[1].store.requestId,first.store.requestId);
   const saved=JSON.parse([...h.values.values()][0]);assert.deepEqual(Object.keys(saved).sort(),['reference','requestId']);h.cleanup();
+});
+test('bundle-first sheet refuses payment until the number, network confirmation and email are all valid',async()=>{
+  const h=component();h.render();await tick();
+  h.find(n=>n.type===h.row).props.onChoose({id:'mtn-1gb',network:'mtn',dataAmount:'1GB',priceMinor:521});h.render();
+  assert.ok(h.find(n=>n.type==='dialog'),'tapping a bundle opens the purchase sheet directly');
+  await h.pay();assert.equal(h.calls.payments.length,0,'no number');
+  h.find(n=>n.type==='input'&&n.props.type==='tel').props.onChange({target:{value:'0240000000'}});h.render();await h.pay();assert.equal(h.calls.payments.length,0,'network not confirmed');
+  h.find(n=>n.type==='input'&&n.props.type==='checkbox').props.onChange({target:{checked:true}});h.details();h.render();
+  h.find(n=>n.type==='input'&&n.props.type==='tel').props.onChange({target:{value:'0240000001'}});h.render();await h.pay();assert.equal(h.calls.payments.length,0,'changing the number clears the confirmation');
+  h.find(n=>n.type==='input'&&n.props.type==='tel').props.onChange({target:{value:'0240000000'}});h.find(n=>n.type==='input'&&n.props.type==='checkbox').props.onChange({target:{checked:true}});h.render();await h.pay();
+  assert.equal(h.calls.payments.length,1);assert.equal(h.calls.payments[0].recipientPhone,'0240000000');assert.equal(h.calls.payments[0].store.expectedMinor,521);h.cleanup();
+});
+test('a created order shows its server reference with copy and tracking actions, and blocks another payment',async()=>{
+  const h=component();h.render();await tick();h.buy();h.details();h.render();await h.pay();h.calls.payments[0].onOrderCreated('MH-synthetic');h.calls.payments[0].onPaymentReceived('MH-synthetic');h.render();await tick();
+  const text=(tree:any):string=>!tree||typeof tree!=='object'?String(tree??''):Array.isArray(tree)?tree.map(text).join(''):text(tree.props?.children)+text(tree.props?.managedCheckout);
+  const page=text(h.render());assert.ok(page.includes('MH-synthetic'));assert.ok(page.includes('Copy reference'));assert.ok(page.includes('Track this order'));assert.ok(!page.includes('delivered'),'pending server status is never shown as delivered');
+  h.find(n=>n.type===h.row).props.onChoose({id:'mtn-1gb',network:'mtn',dataAmount:'1GB',priceMinor:521});h.render();assert.equal(h.find(n=>n.type==='dialog'),undefined,'an uncertain order blocks a second checkout');h.cleanup();
 });
 test('preview/site changes remount checkout and old callbacks cannot activate the replacement',async()=>{
   const h=component();h.render();await tick();h.buy();h.details();h.render();await h.pay();const attempt=h.calls.payments[0];assert.equal(attempt.isActive(),true);h.cleanup();

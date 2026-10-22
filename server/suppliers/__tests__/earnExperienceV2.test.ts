@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { personalReferralLink, copyReferralLink, shareReferralLink, activeEarnRules, earnCount, rewardStatuses, type EarnSummary } from '../../../src/utils/earnExperience';
-import { EarnMetrics, EarnRewardActivity, EarnRules } from '../../../src/components/earn/EarnDetails';
+import { EarnMetrics, EarnNetwork, EarnRewardActivity, EarnRules } from '../../../src/components/earn/EarnDetails';
 import { describeReferralReward } from '../../../src/utils/referralRewardCopy';
 import { createEarnDashboardRefresh } from '../../../src/utils/earnDashboardRefresh';
 import { getPageFromPath } from '../../../src/utils/routing';
@@ -57,8 +57,9 @@ test('rule presentation has honest absent/error states and discloses product lim
   assert.match(empty, /No reward rules.*enabled/); assert.ok(!empty.includes('GH₵0.50'));
   const error = renderToStaticMarkup(React.createElement(EarnRules, { rules: [rule], error: true, retry: () => {} }));
   assert.match(error, /Eligibility cannot be confirmed/); assert.ok(!error.includes('GH₵0.50'));
-  const current = renderToStaticMarkup(React.createElement(EarnRules, { rules: [{ ...rule, product_key: 'internal-product-id' }], error: false, retry: () => {} }));
-  assert.match(current, /Selected products only/); assert.match(current, /separate margin-based policy/);
+  const current = renderToStaticMarkup(React.createElement(EarnRules, { rules: [{ ...rule, product_key: 'internal-product-id' }],
+    dataPolicy: { service: 'data', journey: 'direct', status: 'active', basis: 'eligible_margin', acquisitionBps: 4500, recurringBps: 2000, eligibleStages: ['acquisition'] }, error: false, retry: () => {} }));
+  assert.match(current, /Only eligible products and networks/); assert.match(current, /eligible margin/);
   assert.ok(!current.includes(rule.id)); assert.ok(!current.includes('internal-product-id'));
 });
 test('metric rendering distinguishes loading, true zero and unavailable network counts', () => {
@@ -66,7 +67,8 @@ test('metric rendering distinguishes loading, true zero and unavailable network 
   const loading = renderToStaticMarkup(React.createElement(EarnMetrics, { summary: null, loading: true, stale: false }));
   assert.match(loading, /Loading/); assert.ok(!loading.includes('GH₵0.00'));
   const html = renderToStaticMarkup(React.createElement(EarnMetrics, { summary, loading: false, stale: true }));
-  assert.match(html, /Distinct browsers/); assert.match(html, /stored visitor keys/); assert.match(html, /Registered accounts/); assert.match(html, /Unavailable/); assert.match(html, /Last available/);
+  assert.match(html, /Distinct browsers/); assert.match(html, /stored visitor keys/); assert.match(html, /Registered accounts/); assert.match(html, /Last available/);
+  assert.match(renderToStaticMarkup(React.createElement(EarnNetwork, { summary, loading: false })), /Unavailable/);
   assert.match(html, /GH₵1.50/); assert.match(html, /GH₵7.00/); assert.match(html, /not your available balance/);
 });
 test('all four ledger states are distinct, use minor units and never imply a completed payout', () => {

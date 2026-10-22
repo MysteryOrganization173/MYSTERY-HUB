@@ -1,9 +1,10 @@
-import React, { useLayoutEffect, useRef } from 'react';
-import { Award, Check, CircleCheck, Gift, Link2, LockKeyhole, Sparkles, TrendingUp, Users, UserRoundCheck } from 'lucide-react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Award, CircleCheck, Gift, Link2, LockKeyhole, Sparkles, TrendingUp, Users, UserRoundCheck } from 'lucide-react';
 import { formatGhs } from '../../../shared/money';
-import { featuredMilestone, milestoneMetricNotes, milestoneProgress, milestoneRemaining, milestoneState, milestoneValue, type EarnAchievement } from '../../utils/earnMilestones';
+import { groupMilestones, milestoneLevel, milestoneMetricLabels, milestoneMetricNotes, milestoneProgress, milestoneRemaining, milestoneState, milestoneValue, type AchievementMetric, type EarnAchievement, type MilestoneState } from '../../utils/earnMilestones';
 
 const metricIcons = { successful_referrals: UserRoundCheck, qualified_visitors: Users, afa_referrals: Link2, lifetime_earnings: TrendingUp };
+const stateLabels: Record<MilestoneState, string> = { unavailable: 'Unavailable', claimed: 'Claimed', restricted: 'Restricted', claiming: 'Claiming…', ready: 'Ready to claim', 'not-started': 'Not started', 'in-progress': 'In progress' };
 export function EarnProgressBar({ percentage, label, valueText }: { percentage: number | null; label: string; valueText: string }) {
   const previous = useRef(percentage);
   const fill = useRef<HTMLSpanElement>(null);
@@ -22,48 +23,99 @@ export function EarnProgressBar({ percentage, label, valueText }: { percentage: 
     <span ref={fill} className="earn-progress-fill" style={{ transform: `scaleX(${(percentage ?? 0) / 100})` }} />
   </div>;
 }
-export function EarnMilestoneCard({ row, featured = false, restricted, stale, busy, claimingId, onClaim }: {
-  row: EarnAchievement; featured?: boolean; restricted: boolean; stale: boolean; busy: boolean;
+/** Collectible badge face. Tier colour follows the level within a metric family; it carries no monetary meaning. */
+export function EarnMedal({ metric, state, level, size = 'md', fresh = false }: { metric: AchievementMetric; state: MilestoneState; level: { level: number; of: number } | null; size?: 'sm' | 'md' | 'lg'; fresh?: boolean }) {
+  const Icon = metricIcons[metric] || Award;
+  return <span className={`earn-medal earn-medal-${size}${fresh ? ' earn-medal-fresh' : ''}`} data-state={state} data-tier={Math.min(level?.level ?? 1, 4)} aria-hidden="true">
+    <span className="earn-medal-face"><Icon size={size === 'lg' ? 26 : size === 'sm' ? 16 : 21} /></span>
+    {level && level.of > 1 && <span className="earn-medal-level">{level.level}</span>}
+  </span>;
+}
+export function EarnMilestoneCard({ row, rows, featured = false, restricted, stale, busy, claimingId, onClaim }: {
+  row: EarnAchievement; rows?: EarnAchievement[]; featured?: boolean; restricted: boolean; stale: boolean; busy: boolean;
   claimingId: string | null; onClaim: (row: EarnAchievement) => void;
 }) {
   const progress = milestoneProgress(row);
   const state = milestoneState(row, { restricted, stale, claimingId });
-  const Icon = metricIcons[row.metric] || Award;
-  const labels = { unavailable: 'Unavailable', claimed: 'Claimed', restricted: 'Restricted', claiming: 'Claiming…', ready: 'Ready to claim', 'not-started': 'Not started', 'in-progress': 'In progress' };
   const titleId = React.useId();
   const configuredReward = Number.isSafeInteger(row.rewardMinor) && row.rewardMinor > 0;
   const rewardKnown = Number.isSafeInteger(row.rewardMinor) && row.rewardMinor >= 0;
   const percentage = progress ? Math.floor(progress.percentage) : null;
   const showClaim = state === 'ready' || state === 'claiming';
-  return <article className={`earn-milestone earn-milestone-${state} ${featured ? 'earn-milestone-featured' : ''}`} aria-labelledby={titleId} data-milestone-id={row.id} data-state={state}>
-    <div className="earn-milestone-top"><span className="earn-metric-icon"><Icon size={23} aria-hidden="true" /></span><div>
-      {featured && <p className="earn-milestone-kicker">Your next milestone</p>}
-      <h3 id={titleId}>{row.name}</h3></div><span className="earn-milestone-state">{state === 'claimed' && <Check size={13} aria-hidden="true" />}{labels[state]}</span></div>
-    <div className="earn-milestone-progress"><div className="earn-milestone-count">{progress ? <><strong>{milestoneValue(row.progress, row.metric)}</strong><span> / {milestoneValue(row.threshold, row.metric)}</span></> : <strong>Unconfirmed</strong>}</div><span className="earn-percentage">{percentage === null ? 'Unavailable' : `${percentage}%`}<small>{percentage !== null && 'complete'}</small></span></div>
+  const level = milestoneLevel(row, rows || [row]);
+  const remaining = stale ? 'Last confirmed progress. Refresh to check.' : progress ? milestoneRemaining(row) : 'Refresh to confirm progress.';
+  return <article className={`earn-milestone earn-milestone-${state} ${featured ? 'earn-milestone-featured' : ''}`} aria-labelledby={titleId} data-milestone-id={row.id} data-state={state} data-reward={configuredReward ? 'credit' : 'badge'}>
+    <div className="earn-milestone-top"><EarnMedal metric={row.metric} state={state} level={level} size={featured ? 'lg' : 'md'} /><div>
+      <p className="earn-milestone-kicker">{featured ? (showClaim ? 'Ready to claim' : configuredReward ? 'Your next reward' : 'Next badge') : milestoneMetricLabels[row.metric]}{level && level.of > 1 ? ` · Level ${level.level} of ${level.of}` : ''}</p>
+      <h3 id={titleId}>{row.name}</h3></div>
+      <span className="earn-reward-type">{configuredReward ? <Gift size={15} aria-hidden="true" /> : <Award size={15} aria-hidden="true" />}<span>{configuredReward ? <><strong>{formatGhs(row.rewardMinor)}</strong> Wallet credit</> : rewardKnown ? 'Badge only · no cash value' : 'Reward unavailable'}</span></span></div>
+    <div className="earn-milestone-progress"><div className="earn-milestone-count">{progress ? <><strong>{milestoneValue(row.progress, row.metric)}</strong><span> / {milestoneValue(row.threshold, row.metric)}</span></> : <strong>Unconfirmed</strong>}</div><span className="earn-milestone-remaining">{state === 'claimed' ? 'Complete' : remaining}</span></div>
     <EarnProgressBar percentage={stale ? null : progress?.percentage ?? null} label={`${row.name} progress`} valueText={progress ? `${milestoneValue(row.progress, row.metric)} of ${milestoneValue(row.threshold, row.metric)}; ${percentage}% complete` : 'Progress unavailable'} />
-    <p className="earn-milestone-remaining">{stale ? 'Last confirmed progress. Refresh to check eligibility.' : progress ? milestoneRemaining(row) : 'Refresh to confirm this milestone’s progress.'}</p>
-    <div className="earn-milestone-bottom"><span className="earn-reward-type">{configuredReward ? <Gift size={16} aria-hidden="true" /> : <Award size={16} aria-hidden="true" />}<span>{configuredReward ? <><strong>{formatGhs(row.rewardMinor)}</strong> Wallet credit</> : rewardKnown ? 'Badge only · no cash value' : 'Reward unavailable'}</span></span>
+    {(showClaim || state === 'claimed' || state === 'restricted' || state === 'unavailable') && <div className="earn-milestone-bottom">
       {showClaim ? <button className="earn-primary earn-claim" disabled={busy || state === 'claiming'} aria-busy={state === 'claiming'} onClick={() => onClaim(row)}>{state === 'claiming' ? 'Claiming…' : configuredReward ? 'Claim Reward' : 'Claim Badge'}{state === 'ready' && <CircleCheck size={17} aria-hidden="true" />}</button>
       : state === 'claimed' ? <span className="earn-claimed"><CircleCheck size={17} aria-hidden="true" />{configuredReward ? 'Reward collected' : 'Badge collected'}</span>
-      : (state === 'restricted' || state === 'unavailable') && <span className="earn-unavailable"><LockKeyhole size={14} aria-hidden="true" />Claim unavailable</span>}</div>
-    <details className="earn-metric-explainer"><summary>What counts?</summary><p>{milestoneMetricNotes[row.metric] || 'Progress cannot be confirmed for this metric.'}{configuredReward && ' Claimed credit goes to Wallet, not withdrawable Earn cash.'}{restricted && ' Your account needs review before claiming.'}</p></details>
+      : <span className="earn-unavailable"><LockKeyhole size={14} aria-hidden="true" />{stateLabels[state]} · claim unavailable</span>}
+      {showClaim && configuredReward && <span className="earn-claim-note">Goes to your Mystery Wallet for purchases. Not withdrawable.</span>}</div>}
+    {featured && <details className="earn-metric-explainer"><summary>What counts?</summary><p>{milestoneMetricNotes[row.metric] || 'Progress cannot be confirmed for this metric.'}{configuredReward && ' Claimed credit goes to Wallet, not withdrawable Earn cash.'}{restricted && ' Your account needs review before claiming.'}</p></details>}
   </article>;
+}
+/** Compact in-progress row: enough to see the gap, without a full card per achievement. */
+function EarnMilestoneRow({ row, rows, restricted, stale, claim }: { row: EarnAchievement; rows: EarnAchievement[]; restricted: boolean; stale: boolean;
+  claim?: { busy: boolean; claimingId: string | null; onClaim: (row: EarnAchievement) => void } }) {
+  const progress = milestoneProgress(row);
+  const state = milestoneState(row, { restricted, stale, claimingId: claim?.claimingId });
+  const configuredReward = Number.isSafeInteger(row.rewardMinor) && row.rewardMinor > 0;
+  const level = milestoneLevel(row, rows);
+  const percentage = progress ? Math.floor(progress.percentage) : null;
+  return <li className="earn-milestone-row" data-milestone-id={row.id} data-state={state}>
+    <EarnMedal metric={row.metric} state={state} level={level} size="sm" />
+    <div className="earn-milestone-row-body">
+      <div className="earn-milestone-row-head"><h4>{row.name}</h4><span className="earn-milestone-row-count">{progress ? <>{milestoneValue(row.progress, row.metric)}<span> / {milestoneValue(row.threshold, row.metric)}</span></> : 'Unconfirmed'}</span></div>
+      <EarnProgressBar percentage={stale ? null : progress?.percentage ?? null} label={`${row.name} progress`} valueText={progress ? `${milestoneValue(row.progress, row.metric)} of ${milestoneValue(row.threshold, row.metric)}; ${percentage}% complete` : 'Progress unavailable'} />
+      <p>{stale ? 'Last confirmed progress' : progress ? milestoneRemaining(row) : 'Progress unavailable'} · {configuredReward ? <strong className="earn-row-credit">{formatGhs(row.rewardMinor)} Wallet credit</strong> : 'Badge only'}</p>
+    </div>
+    {claim && (state === 'ready' || state === 'claiming') && <button className="earn-secondary earn-row-claim" disabled={claim.busy || state === 'claiming'} aria-busy={state === 'claiming'} onClick={() => claim.onClaim(row)} aria-label={`Claim ${row.name} badge`}>{state === 'claiming' ? 'Claiming…' : 'Claim Badge'}</button>}
+  </li>;
 }
 export function EarnMilestones({ achievements, restricted, stale, busy, claimingId, onClaim, retry }: {
   achievements: EarnAchievement[] | null; restricted: boolean; stale: boolean; busy: boolean;
   claimingId: string | null; onClaim: (row: EarnAchievement) => void; retry: () => void;
 }) {
-  const enabled = achievements?.filter(row => row.enabled) ?? [];
-  const featured = featuredMilestone(enabled);
-  const remaining = enabled.filter(row => row.id !== featured?.id);
+  const { enabled, featured, ready, active, collected } = groupMilestones(achievements ?? []);
   const claimed = enabled.filter(row => row.claimed).length;
+  // Celebrate only a claim confirmed during this visit; a reload shows the collection without replaying it.
+  const seen = useRef<Set<string> | null>(null);
+  const [fresh, setFresh] = useState<string[]>([]);
+  useEffect(() => {
+    if (!achievements) return;
+    const ids = new Set(achievements.filter(row => row.claimed).map(row => row.id));
+    if (seen.current) { const added = [...ids].filter(id => !seen.current!.has(id)); if (added.length) setFresh(added); }
+    seen.current = ids;
+  }, [achievements]);
+  const shownActive = active.slice(0, 3), moreActive = active.slice(3);
+  const metrics = [...new Set(enabled.map(row => row.metric))];
+  // Headline credit comes from each row's real state: claimable now versus still to earn. Configured admin values only.
+  const credit = (row: EarnAchievement) => Number.isSafeInteger(row.rewardMinor) && row.rewardMinor > 0 ? row.rewardMinor : 0;
+  const claimableCredit = enabled.filter(row => !row.claimed && milestoneProgress(row)?.complete).reduce((total, row) => total + credit(row), 0);
+  const upcomingCredit = enabled.filter(row => !row.claimed && milestoneProgress(row) && !milestoneProgress(row)!.complete).reduce((total, row) => total + credit(row), 0);
+  const readyCredit = ready.filter(row => credit(row) > 0), readyBadges = ready.filter(row => credit(row) === 0);
+  const reachedHeading = stale ? 'Reached milestones · refresh to confirm' : restricted ? 'Reached milestones · account review required' : null;
   return <section className="earn-milestones" id="earn-milestones" aria-labelledby="earn-milestones-title">
-    <div className="earn-section-heading"><div><p className="earn-eyebrow">Every step counts</p><h2 id="earn-milestones-title">Milestones worth reaching</h2></div><span className="earn-milestone-tally"><Award size={17} aria-hidden="true" />{achievements ? `${claimed} / ${enabled.length} collected` : 'Awaiting progress'}</span></div>
+    <div className="earn-section-heading"><div><h2 id="earn-milestones-title">Milestones</h2>{!stale && !restricted && claimableCredit > 0 && <p className="earn-credit-to-unlock"><Gift size={14} aria-hidden="true" /><strong>{formatGhs(claimableCredit)}</strong> Wallet credit ready to claim</p>}
+      {!stale && claimableCredit === 0 && upcomingCredit > 0 && <p className="earn-credit-to-unlock"><Gift size={14} aria-hidden="true" /><strong>{formatGhs(upcomingCredit)}</strong> in Wallet credit still to earn from milestones</p>}</div><span className="earn-milestone-tally"><Award size={17} aria-hidden="true" />{achievements ? `${claimed} / ${enabled.length} collected` : 'Awaiting progress'}</span></div>
     {!achievements ? <div className="earn-milestone-empty"><Sparkles size={28} aria-hidden="true" /><h3>{stale ? 'Your progress is unavailable' : 'Loading your milestones…'}</h3><p>{stale ? 'We could not confirm your milestones. No reward eligibility is assumed.' : 'Checking your real achievement progress.'}</p>{stale && <button className="earn-secondary" onClick={retry}>Retry milestones</button>}</div>
       : !enabled.length ? <div className="earn-milestone-empty"><Award size={28} aria-hidden="true" /><h3>No milestones are enabled right now</h3><p>Your referral link and financial account remain available. New milestones appear here when configured.</p></div>
       : <>{!featured && <div className="earn-milestone-completion"><CircleCheck size={26} aria-hidden="true" /><div><h3>{claimed === enabled.length ? 'Every available milestone collected' : 'Progress needs confirmation'}</h3><p>{claimed === enabled.length ? 'Your confirmed achievements are below. No additional reward is promised.' : 'Refresh to check your next milestone.'}</p></div></div>}
-        {featured && <EarnMilestoneCard key={featured.id} row={featured} featured restricted={restricted} stale={stale} busy={busy} claimingId={claimingId} onClaim={onClaim} />}
-        {remaining.length > 0 && <div className="earn-milestone-grid">{remaining.map(row => <EarnMilestoneCard key={row.id} row={row} restricted={restricted} stale={stale} busy={busy} claimingId={claimingId} onClaim={onClaim} />)}</div>}
+        {featured && <EarnMilestoneCard key={featured.id} row={featured} rows={enabled} featured restricted={restricted} stale={stale} busy={busy} claimingId={claimingId} onClaim={onClaim} />}
+        {readyCredit.length > 0 && <div className="earn-milestone-group"><h3 className="earn-group-title">{reachedHeading || 'Also ready to claim'}</h3><div className="earn-milestone-grid">{readyCredit.map(row => <EarnMilestoneCard key={row.id} row={row} rows={enabled} restricted={restricted} stale={stale} busy={busy} claimingId={claimingId} onClaim={onClaim} />)}</div></div>}
+        {readyBadges.length > 0 && <div className="earn-milestone-group"><h3 className="earn-group-title">{reachedHeading || 'Badges ready to collect'}</h3><ul className="earn-milestone-rows earn-badge-rows">{readyBadges.map(row => <EarnMilestoneRow key={row.id} row={row} rows={enabled} restricted={restricted} stale={stale} claim={{ busy, claimingId, onClaim }} />)}</ul></div>}
+        {active.length > 0 && <div className="earn-milestone-group"><h3 className="earn-group-title">In progress</h3><ul className="earn-milestone-rows">{shownActive.map(row => <EarnMilestoneRow key={row.id} row={row} rows={enabled} restricted={restricted} stale={stale} />)}</ul>
+          {moreActive.length > 0 && <details className="earn-more"><summary>Show {moreActive.length} more {moreActive.length === 1 ? 'achievement' : 'achievements'}</summary><ul className="earn-milestone-rows">{moreActive.map(row => <EarnMilestoneRow key={row.id} row={row} rows={enabled} restricted={restricted} stale={stale} />)}</ul></details>}</div>}
+        {collected.length > 0 && <div className="earn-milestone-group"><h3 className="earn-group-title">Collected</h3><ul className="earn-collection" aria-label="Collected achievements">{collected.map(row => {
+          const configuredReward = Number.isSafeInteger(row.rewardMinor) && row.rewardMinor > 0;
+          return <li key={row.id} data-milestone-id={row.id} data-state="claimed"><EarnMedal metric={row.metric} state="claimed" level={milestoneLevel(row, enabled)} size="md" fresh={fresh.includes(row.id)} /><span className="earn-collection-name">{row.name}</span><span className="earn-collection-meta">{configuredReward ? `${formatGhs(row.rewardMinor)} Wallet credit · Reward collected` : 'Badge collected'}</span></li>;
+        })}</ul></div>}
+        <details className="earn-metric-explainer earn-metrics-legend"><summary>How achievement progress is counted</summary><dl>{metrics.map(metric => <div key={metric}><dt>{milestoneMetricLabels[metric]}</dt><dd>{milestoneMetricNotes[metric]}</dd></div>)}</dl><p>Badges have no cash value. A milestone pays only when it shows a Wallet credit, and Wallet credit is for Mystery Hub purchases, not withdrawal.</p></details>
       </>}
   </section>;
 }

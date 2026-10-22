@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from 'react';
+import { acquireOverlay } from '../../utils/overlayStack';
 const controls = 'button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex="0"]';
 // Only the authoritative foreground Marketplace dialog mounts this lifecycle.
 export function useMarketplaceDialog(active: boolean, close: () => void) {
@@ -9,8 +10,7 @@ export function useMarketplaceDialog(active: boolean, close: () => void) {
     if (!active || !ref.current) return;
     const dialog = ref.current;
     const previous = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const release = acquireOverlay(dialog);
     const visibleControls = () => [...dialog.querySelectorAll<HTMLElement>(controls)].filter(e => e.getClientRects().length);
     const focusTarget = dialog.querySelector<HTMLElement>('[data-marketplace-primary]:not([disabled])') || visibleControls()[0] || dialog;
     focusTarget.focus();
@@ -27,7 +27,7 @@ export function useMarketplaceDialog(active: boolean, close: () => void) {
     dialog.addEventListener('keydown', keydown);
     return () => {
       dialog.removeEventListener('keydown', keydown);
-      document.body.style.overflow = overflow;
+      release();
       if (previous?.isConnected) previous.focus();
     };
   }, [active]);
