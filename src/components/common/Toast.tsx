@@ -11,8 +11,8 @@ export const ToastContainer: React.FC = () => {
 
   return (
     <>
-    {toasts.filter(toast=>toast.key==='auth').map(toast=><div key={toast.id} role="status" aria-live="polite" aria-atomic="true" className={hideAuthFeedback?'sr-only':'fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:bottom-4 left-1/2 -translate-x-1/2 z-[110] pointer-events-none flex items-center gap-2 rounded-full border border-slate-700 bg-[#121920] pl-4 pr-1 text-xs text-slate-100 shadow-lg'}><CheckCircle2 className="size-4 text-emerald-300" aria-hidden="true"/>{toast.message}{!hideAuthFeedback&&<button className="pointer-events-auto min-h-11 min-w-11 flex items-center justify-center rounded-full" onClick={()=>removeToast(toast.id)} aria-label="Dismiss account feedback"><X className="size-3.5"/></button>}</div>)}
-    <div className="fixed top-20 inset-x-3 sm:left-auto sm:right-4 z-[110] flex flex-col gap-2 sm:max-w-sm pointer-events-none">
+    {toasts.filter(toast=>toast.key==='auth').map(toast=><div key={toast.id} data-overlay-exempt role="status" aria-live="polite" aria-atomic="true" className={hideAuthFeedback?'sr-only':'fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:bottom-4 left-1/2 -translate-x-1/2 z-[110] pointer-events-none flex items-center gap-2 rounded-full border border-slate-700 bg-[#121920] pl-4 pr-1 text-xs text-slate-100 shadow-lg'}><CheckCircle2 className="size-4 text-emerald-300" aria-hidden="true"/>{toast.message}{!hideAuthFeedback&&<button className="pointer-events-auto min-h-11 min-w-11 flex items-center justify-center rounded-full" onClick={()=>removeToast(toast.id)} aria-label="Dismiss account feedback"><X className="size-3.5"/></button>}</div>)}
+    <div data-overlay-exempt className="fixed top-20 inset-x-3 sm:left-auto sm:right-4 z-[110] flex flex-col gap-2 sm:max-w-sm pointer-events-none">
       {toasts.filter(toast=>toast.key!=='auth').map((toast) => {
         return (
           <div

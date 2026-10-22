@@ -23,6 +23,12 @@ export const IsolatedTemplatePreview: React.FC<IsolatedTemplatePreviewProps> = (
   const [editing,setEditing] = useState(false), [selected,setSelected] = useState<string|null>(null), [focusRequest,setFocusRequest] = useState(0), [reserveBottom,setReserveBottom] = useState(0);
   const params = new URLSearchParams(window.location.search);
   const channel = params.get('editor_channel') || '', expectedSite = params.get('editor_site') || '';
+  // Inside a preview frame, reaching the top or bottom of the design must not scroll the page that hosts it.
+  useEffect(() => {
+    if (window.parent === window) return;
+    document.documentElement.classList.add('mh-isolated-preview');
+    return () => document.documentElement.classList.remove('mh-isolated-preview');
+  }, []);
   useEffect(() => {
     setOwnerTemplate(null);
     const receiveContent = (event: MessageEvent) => {

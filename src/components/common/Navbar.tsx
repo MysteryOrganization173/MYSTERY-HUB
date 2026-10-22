@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useOverlayLock } from '../../utils/overlayStack';
 import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { BrandLogo } from './BrandLogo';
 import { ActivePage } from '../../types';
@@ -30,6 +31,21 @@ export const Navbar: React.FC = () => {
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const accountTrigger = useRef<HTMLButtonElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
+
+  // V5.2: the phone menu is a blocking overlay. The page behind it stays still (the menu scrolls by itself), the rest
+  // of the app is inert, and the lock is released on close, navigation, Back, or when the window grows to desktop.
+  useOverlayLock(mobileMenuOpen, headerRef);
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const desktop = window.matchMedia('(min-width: 1280px)');
+    const close = () => setMobileMenuOpen(false);
+    const onWidth = () => { if (desktop.matches) close(); };
+    desktop.addEventListener('change', onWidth);
+    window.addEventListener('popstate', close);
+    return () => { desktop.removeEventListener('change', onWidth); window.removeEventListener('popstate', close); };
+  }, [mobileMenuOpen]);
 
   const navLinks: { id: ActivePage; label: string }[] = [
     { id: 'home', label: 'Home' },
@@ -52,7 +68,7 @@ export const Navbar: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setAccountDropdownOpen(open=>{if(open)accountTrigger.current?.focus();return false;});
-        setMobileMenuOpen(false);
+        setMobileMenuOpen(open => { if (open) menuTrigger.current?.focus(); return false; });
         setSearchOpen(false);
       }
     };
@@ -100,7 +116,7 @@ export const Navbar: React.FC = () => {
   const userSubtext = user?.email || user?.phone || '';
 
   return (
-    <header className="sticky top-0 z-40 bg-[#0a0e11]/90 backdrop-blur-md border-b border-slate-800/80">
+    <header ref={headerRef} className="sticky top-0 z-40 bg-[#0a0e11]/90 backdrop-blur-md border-b border-slate-800/80">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-1 sm:gap-4">
         {/* Zone 1: Brand Wordmark */}
         <a
@@ -305,6 +321,7 @@ export const Navbar: React.FC = () => {
 
           {/* Mobile Menu Hamburger */}
           <button
+            ref={menuTrigger}
             onClick={() => {setAccountDropdownOpen(false);setMobileMenuOpen(!mobileMenuOpen);}}
             aria-expanded={mobileMenuOpen} aria-controls="mobile-menu"
             className="xl:hidden min-w-11 min-h-11 flex items-center justify-center p-2 text-slate-400 hover:text-white rounded-lg focus:outline-none cursor-pointer"
@@ -317,7 +334,8 @@ export const Navbar: React.FC = () => {
 
       {/* Mobile Dropdown Menu Drawer */}
       {mobileMenuOpen && (
-        <div id="mobile-menu" className="xl:hidden max-h-[calc(100dvh-5rem)] overflow-auto bg-[#0c1116] border-b border-slate-800 px-4 pt-3 pb-5 space-y-3">
+        <div className="mh-mobile-menu xl:hidden">
+        <div id="mobile-menu" className="mh-mobile-menu-panel bg-[#0c1116] border-b border-slate-800 px-4 pt-3 pb-5 space-y-3">
           {user && (
             <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
@@ -403,6 +421,8 @@ export const Navbar: React.FC = () => {
               </button>
             </div>
           )}
+        </div>
+        <div className="mh-mobile-menu-scrim" aria-hidden="true" onClick={() => setMobileMenuOpen(false)} />
         </div>
       )}
     </header>

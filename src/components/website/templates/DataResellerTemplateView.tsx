@@ -178,7 +178,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             <p className="store-eyebrow" style={{ color: p.accentText }}><span {...copy.edit('catalogueEyebrow')}>{copy.text('catalogueEyebrow')}</span></p>
             <h2 className="site-display" style={{ color: p.text }}><span {...copy.edit('catalogueHeading')}>{copy.text('catalogueHeading')}</span></h2>
           </div>
-          {managedCheckout && <p className="store-note store-head-note" style={{ color: p.mutedText }}>Prices include everything you pay. Tap a bundle to review before paying.</p>}
+          {managedCheckout && <p className="store-note store-head-note" style={{ color: p.mutedText }}>Tap a bundle to buy it. The price shown is the total you pay.</p>}
         </div>
         {managedCheckout || (owner ? (
           <div role="status" className="store-card store-empty" style={surface}>
