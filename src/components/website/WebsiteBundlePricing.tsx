@@ -19,10 +19,10 @@ export function WebsiteBundlePricing({siteId,token,onDirty,published=true,onSave
  const [catalog,setCatalog]=useState<any>(null),[drafts,setDrafts]=useState<Record<string,SellerDraft>>({}),[network,setNetwork]=useState('mtn');
  const [choice,setChoice]=useState<BundleSetupChoice>({networks:['mtn','telecel','airteltigo'],priceMode:'markup',kind:'percent',value:'10',activation:'enable'});
  const [plan,setPlan]=useState<BundleSetupPlan|null>(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[reviewing,setReviewing]=useState(false),[conflict,setConflict]=useState(false);
- const alive=useRef(true),saving=useRef(false),identity=useRef(''),reviewRef=useRef<HTMLDivElement>(null),listRef=useRef<HTMLDivElement>(null);
+ const alive=useRef(true),saving=useRef(false),identity=useRef(''),catalogIdentity=useRef(''),reviewRef=useRef<HTMLDivElement>(null),listRef=useRef<HTMLDivElement>(null);
  identity.current=`${siteId}:${token}`;
- const load=async()=>{const expected=identity.current;const result=await websiteBusinessRequest(`websites/${siteId}/bundles`,token);if(alive.current&&identity.current===expected){setCatalog(result);setDrafts(sellerDrafts(result.products));setConflict(false);}return result;};
- useEffect(()=>{alive.current=true;void load().catch(e=>{if(alive.current)setError(e.message);});return()=>{alive.current=false;};},[siteId,token]);
+ const load=async()=>{const expected=identity.current;const result=await websiteBusinessRequest(`websites/${siteId}/bundles`,token);if(alive.current&&identity.current===expected){catalogIdentity.current=expected;setCatalog(result);setDrafts(sellerDrafts(result.products));setConflict(false);}return alive.current&&identity.current===expected?result:null;};
+ useEffect(()=>{alive.current=true;setBusy(false);setCatalog(null);setDrafts({});setError('');setNotice('');setPlan(null);setReviewing(false);const expected=identity.current;void load().catch(e=>{if(alive.current&&identity.current===expected)setError(e.message);});return()=>{alive.current=false;};},[siteId,token]);
  const products:SellerBundle[]=catalog?.products||[];
  const original=sellerDrafts(products);
  const changed=products.filter(p=>drafts[p.id]&&(drafts[p.id].price!==original[p.id].price||drafts[p.id].enabled!==original[p.id].enabled));
@@ -36,16 +36,18 @@ export function WebsiteBundlePricing({siteId,token,onDirty,published=true,onSave
  // Networks with nothing Mystery Hub can sell yet are shown but never chosen.
  const previewSetup=()=>{try{const ready=new Set(products.filter(canPrice).map(p=>p.network));const next=planBundleSetup(products,drafts,{...choice,networks:choice.networks.filter(n=>ready.has(n))});setPlan(next);setReviewing(false);setError('');setNotice('');}catch(e:any){setPlan(null);setError(e.message);}};
  const applyPlan=(current:BundleSetupPlan)=>{const next={...drafts};for(const row of current.rows)next[row.id]=row.after;return next;};
- const save=async(next=drafts)=>{if(saving.current||!catalog)return;const rows=bundleSaveRows(products,original,next);
+ const save=async(next=drafts)=>{if(saving.current||!catalog||catalogIdentity.current!==identity.current)return;const rows=bundleSaveRows(products,original,next);
    const invalid=products.find(p=>rows.some(r=>r.productId===p.id)&&sellerPriceError(p,next[p.id]));if(invalid){setError(`${invalid.networkName} ${invalid.dataAmount}: ${sellerPriceError(invalid,next[invalid.id])}`);return;}
    if(!rows.length){setNotice('Nothing to save. Your bundles already match this setup.');setPlan(null);setReviewing(false);return;}
+   const expected=identity.current;let committed=false;
    saving.current=true;setBusy(true);setError('');setNotice('');setDrafts(next);
-   try{await websiteBusinessRequest(`websites/${siteId}/bundles`,token,{expectedVersion:catalog.version,products:rows},'PUT');
+   try{await websiteBusinessRequest(`websites/${siteId}/bundles`,token,{expectedVersion:catalog.version,products:rows},'PUT');committed=true;
+     if(!alive.current||identity.current!==expected)return;
      // The refreshed catalogue, not this screen, says how many bundles customers can buy now.
      const fresh=await load();const live=(fresh?.products||[]).filter((p:any)=>p.eligible).length;
-     if(alive.current){setPlan(null);setReviewing(false);setNotice(`Your bundle setup is saved. ${live===1?'1 bundle is':`${live} bundles are`} ready for customers${published?'':' once your website is published'}.`);onSaved?.(live);}
-   }catch(e:any){if(alive.current){const stale=/changed|refresh/i.test(e.message||'');setConflict(stale);setError(stale?'Your prices were changed somewhere else (another tab or device) since you opened this page. Nothing was saved. Reload the latest prices, then review again.':`${e.message} Nothing was saved, so you can try again.`);}}
-   finally{saving.current=false;if(alive.current)setBusy(false);}};
+     if(fresh&&alive.current&&identity.current===expected){setPlan(null);setReviewing(false);setNotice(`Your bundle setup is saved. ${live===1?'1 bundle meets':`${live} bundles meet`} the current catalogue rules.${published?' Live checkout still depends on current service availability.':' Publish your Data website before customers can buy.'}`);onSaved?.(live);}
+   }catch(e:any){if(alive.current&&identity.current===expected){const stale=e.status===409;setConflict(true);setError(committed?'Your settings were saved, but the latest catalogue could not be loaded. Reload prices to confirm the saved state.':stale?'Your prices changed in another tab or device. This update was not applied. Reload the latest prices, then review again.':e.status>=400&&e.status<500?`${e.message} This update was not applied.`:'The save result could not be confirmed. Reload prices before trying again.');}}
+   finally{saving.current=false;if(alive.current&&identity.current===expected)setBusy(false);}};
  if(!catalog)return <div role="status" className="text-sm">{error?<><p role="alert">{error}</p><button className={button} onClick={()=>{setError('');void load().catch(e=>setError(e.message));}}>Try again</button></>:'Loading your bundles…'}</div>;
  const configurable=products.filter(canPrice);
  const sellableNow=sellableCount(products,original);
@@ -53,10 +55,10 @@ export function WebsiteBundlePricing({siteId,token,onDirty,published=true,onSave
  const s=plan?.summary;
  return <section aria-label="Bundles & Pricing" className="website-bundles space-y-4" data-bundle-setup={variant}>
  <div className="website-bundles-status" data-sellable={sellableNow}>
-  <strong>{sellableNow?`${count(sellableNow,'bundle')} on sale`:'No bundles are ready for customers yet'}</strong>
+  <strong>{sellableNow?`${count(sellableNow,'bundle')} configured`:'No eligible bundles are configured yet'}</strong>
   <span>{byNetwork.filter(n=>n.total).map(n=>`${n.label} ${n.onSale}/${n.ready||n.total}`).join(' · ')}</span>
  </div>
- <p className="text-sm text-slate-400">Choose the bundles customers can buy and set your selling prices. Estimated earnings per sale allow for bundle costs and payment processing.</p>
+ <p className="text-sm text-slate-400">Configure bundles and selling prices. Eligible means enabled under the current pricing policy; customers also need a published Data store, available checkout and supplier availability. Estimated earnings per sale allow for bundle costs and payment processing.</p>
  {!catalog.policy?.enabled?<p role="status" className="text-sm text-amber-200">Online checkout is not enabled for reseller stores yet. Contact Mystery Hub before offering online purchases.</p>:!sellableNow&&!changed.length&&<p role="status" className="text-sm text-amber-200">Customers can’t buy from your store until you price and switch on some bundles. Quick setup below does it in one go.</p>}
  {configurable.length<products.length&&<p role="status" className="rounded-xl border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200">{count(products.length-configurable.length,'bundle')} {products.length-configurable.length===1?'is':'are'} not available from Mystery Hub right now, so {products.length-configurable.length===1?'it':'they'} can’t go on sale. The rest can.</p>}
 

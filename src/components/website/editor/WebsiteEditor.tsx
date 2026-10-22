@@ -23,6 +23,7 @@ import { WebsitePublishSheet } from './WebsitePublishSheet';
 import { WebsiteBundleSetupSheet } from './WebsiteBundleSetupSheet';
 import { websiteBusinessRequest } from '../../../services/websiteBusinessApi';
 import { websiteReadiness } from '../../../utils/websiteReadiness';
+import {websitePreviewCatalog,type WebsitePreviewProduct} from '../../../utils/websitePreviewCatalog';
 import { WebsiteLayoutControl, WebsiteHistoryControl } from './WebsiteLayoutAndHistory';
 import { publishWebsiteB1, reviewWebsiteExamples, setWebsiteLayout, restoreWebsiteDraft, discardWebsiteCheckpoint, WebsiteB1Error } from '../../../services/websiteB1Api';
 import { websiteItemVocabulary, websiteStarterWording } from '../../../config/websiteStarters';
@@ -176,14 +177,17 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const [publishOpen, setPublishOpen] = useState(openPublish);
   // Data stores: the bundle workspace sheet and the server's count of bundles customers can buy.
   const [bundleSheet, setBundleSheet] = useState(false);
+  const [previewProducts,setPreviewProducts]=useState<WebsitePreviewProduct[]>([]);
+  const [catalogRevision,setCatalogRevision]=useState(0);
   const [sellableBundles, setSellableBundles] = useState<number | null>(null);
   const [frameGeneration, setFrameGeneration] = useState(0);
   useEffect(() => {
+    setPreviewProducts([]);
     if (!isDataReseller) {setSellableBundles(null); return;}
     let live = true;
-    websiteBusinessRequest(`websites/${currentSite.id}/bundles`, sessionToken).then((r: any) => {if (live) setSellableBundles((r?.products || []).filter((p: any) => p.eligible).length);}).catch(() => {if (live) setSellableBundles(null);});
+    websiteBusinessRequest(`websites/${currentSite.id}/bundles`, sessionToken).then((r: any) => {if (live) {setSellableBundles((r?.products || []).filter((p: any) => p.eligible).length);setPreviewProducts(websitePreviewCatalog(r?.products,true));}}).catch(() => {if (live) setSellableBundles(null);});
     return () => {live = false;};
-  }, [currentSite.id, isDataReseller, sessionToken]);
+  }, [currentSite.id, isDataReseller, sessionToken,catalogRevision]);
   // B1 server actions (review, layout, restore) run against the saved draft; the editor waits for them.
   const [serverBusy, setServerBusy] = useState(false);
   const word = websiteItemVocabulary(currentSite.template_id);
@@ -500,7 +504,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         onDiscard={()=>{setRecovery(null);clearDraftRecovery(currentSite.id,currentSite.template_id);}}/>}
       {publishOpen && <WebsitePublishSheet content={content} published={currentSite.status==='published'} publishedAt={currentSite.published_at} publicUrl={`${window.location.origin}/sites/${currentSite.slug}`} word={word} managed={isDataReseller}
         onReview={reviewItems} onEditItem={openItem} onPublish={handlePublish} onClose={()=>setPublishOpen(false)}
-        suggestions={publishSuggestions} readiness={websiteReadiness({templateId:currentSite.template_id,content,layoutMode,sellableBundles})} sellableBundles={sellableBundles}
+        suggestions={publishSuggestions} readiness={websiteReadiness({templateId:currentSite.template_id,content,layoutMode,sellableBundles,publishedSnapshot:currentSite.status==='published'?currentSite.published_snapshot_json:null})} sellableBundles={sellableBundles}
         onFix={item=>{if(item.fix){changeContent(item.fix.patch);showToast(`${item.fix.label.replace(/^Use /,'Using ')}. You can edit it any time.`,'success');}}} onBundles={()=>{setPublishOpen(false);setBundleSheet(true);}}
         changes={websitePublishChanges(currentSite.published_snapshot_json, {templateId: currentSite.template_id, content, settings}, word.singular.toLowerCase())}
         onEditField={target=>{setPublishOpen(false);setActiveTab('edit');if(target==='name')selectTarget('content:businessName');else if(target==='contact')openSettings('contact');else selectTarget(target);}}/>}
@@ -1028,7 +1032,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
           {activeTab==='preview' && !previewHintSeen && <div className="visual-canvas-hint is-preview" role="note"><Eye size={15}/><span>{canvasDevice==='mobile'?'Preview of your draft':`${canvasDevice==='tablet'?'Tablet':'Desktop'} preview, scaled to fit`} · payments are off</span><button type="button" aria-label="Dismiss preview note" onClick={()=>setPreviewHintSeen(true)}><X size={15}/></button></div>}
           <div ref={canvasRef} className="visual-canvas-viewport">
             <div style={{width:effectiveCanvasWidth, flexShrink:0, height:scale<1 ? 'calc(100% / '+scale+')' : '100%', transform:scale<1 ? 'scale('+scale+')' : undefined, transformOrigin:'top center'}} className="visual-canvas-page">
-              <WebsitePreviewFrame key={frameGeneration} template={previewTemplate} siteId={currentSite.id} viewportWidth={targetWidth} editMode={activeTab==='edit' && !isPublishing} selectedTarget={visualSelection} onSelect={selectTarget} onOrder={setTargetOrder} focusRequest={focusRequest} reserveBottom={contextualTargets.length>0 || settingsNotice ? sheetReserve : 0}/>
+              <WebsitePreviewFrame key={frameGeneration} template={previewTemplate} previewProducts={previewProducts} siteId={currentSite.id} viewportWidth={targetWidth} editMode={activeTab==='edit' && !isPublishing} selectedTarget={visualSelection} onSelect={selectTarget} onOrder={setTargetOrder} focusRequest={focusRequest} reserveBottom={contextualTargets.length>0 || settingsNotice ? sheetReserve : 0}/>
             </div>
           </div>
         </div>
@@ -1036,7 +1040,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
           onChange={patch=>updateItem(items[selectedItemIndex].id!,patch)} onKeep={()=>void reviewItems([items[selectedItemIndex].id!],'confirm')} onRemove={()=>removeItem(items[selectedItemIndex].id!)} onAdd={addItem} onPrevious={()=>stepItem(-1)} onNext={()=>stepItem(1)} onDone={clearSelection}/>}
         {activeTab==='edit' && contextualTargets.length>0 && !selectedItemId && <div className="contents" inert={locked}><VisualContextPanel title={visualSelection==='branding'?'Website colors':selected!.label} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()} position={stepIndex>=0?{index:stepIndex,total:stepIds.length}:undefined} onPrevious={()=>step(-1)} onNext={()=>step(1)} suggested={!!selected && suggestedFields.includes(selected.id)}/></div>}
         {activeTab==='edit' && settingsNotice==="settings" && !contextualTargets.length && <VisualContextPanel notice title="Change this in All Settings" targets={[]} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()}/>}
-        {bundleSheet && isDataReseller && <WebsiteBundleSetupSheet siteId={currentSite.id} token={sessionToken} published={currentSite.status==='published'} onClose={()=>setBundleSheet(false)} onSaved={count=>{setSellableBundles(count);setFrameGeneration(n=>n+1);}}/>}
+        {bundleSheet && isDataReseller && <WebsiteBundleSetupSheet siteId={currentSite.id} token={sessionToken} published={currentSite.status==='published'} onClose={()=>setBundleSheet(false)} onSaved={count=>{setSellableBundles(count);setCatalogRevision(n=>n+1);setFrameGeneration(n=>n+1);}}/>}
       </div>
 
       {/* =========================================================
@@ -1141,7 +1145,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                   : 'max-w-[1280px] sm:rounded-2xl sm:my-4 sm:border sm:border-slate-700'
               }`}
             >
-              <div className="h-[75dvh] min-h-[480px]"><WebsitePreviewFrame key={frameGeneration} template={previewTemplate} siteId={currentSite.id} viewportWidth={targetWidth} /></div>
+              <div className="h-[75dvh] min-h-[480px]"><WebsitePreviewFrame key={frameGeneration} template={previewTemplate} previewProducts={previewProducts} siteId={currentSite.id} viewportWidth={targetWidth} /></div>
               {/* Free Tier Attribution */}
               <div className="py-4 px-4 bg-[#090d11] border-t border-slate-800 text-center text-xs text-slate-400 select-none">
                 <span className="inline-flex items-center gap-1.5">

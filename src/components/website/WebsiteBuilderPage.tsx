@@ -530,7 +530,7 @@ export const WebsiteBuilderPage: React.FC = () => {
           {/* Result Count Indicator & Expand Toggle */}
           <div className="text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
             <span>
-              Showing <strong>{displayedTemplates.length}</strong> of{' '}
+              Showing <strong>{readyDesignCount(displayedTemplates)}</strong> of{' '}
               <strong>{readyDesignCount(filteredTemplates)}</strong> design{readyDesignCount(filteredTemplates) === 1 ? '' : 's'}
               {searchQuery && ` matching "${searchQuery}"`}
             </span>

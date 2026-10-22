@@ -40,6 +40,6 @@ test('main reseller activation guidance survives P0 copy integration', () => {
   const pricing = source('src/components/website/WebsiteBundlePricing.tsx');
   assert.match(pricing, /!catalog\.policy\?\.enabled/);
   assert.match(pricing, /Online checkout is not enabled for reseller stores yet/);
-  assert.match(pricing, /No bundles are ready for customers yet/);
+  assert.match(pricing, /No eligible bundles are configured yet/);
   assert.match(pricing, /Estimated earnings per sale allow for bundle costs and payment processing/);
 });

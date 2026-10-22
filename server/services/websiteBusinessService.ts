@@ -101,14 +101,17 @@ export class WebsiteBusinessService {
     exact(input,['expectedVersion','products']);
     if(!Array.isArray(input.products)||input.products.length>Object.keys(AUTHORITATIVE_PRODUCTS).length)throw new FinanceError('Invalid bundle prices.');
     return FinanceStore.transaction(userId,async tx=>{
-      await configLock(tx);await this.owned(siteId,userId);
-      if(tx.client)await tx.client.query('SELECT id FROM website_sites WHERE id=$1 AND user_id=$2 FOR UPDATE',[siteId,userId]);
-      const site=await WebsiteStore.findSiteById(siteId);if(site?.template_id!=='tmpl-data-reseller')throw new FinanceError('Select the Data Reseller template first.');
+      await configLock(tx);
+      // Reuse this transaction's connection: five simultaneous saves must not each hold one
+      // of the five pool slots while waiting for a second slot to check website ownership.
+      const site=tx.client?(await tx.client.query("SELECT id,template_id FROM website_sites WHERE id=$1 AND user_id=$2 AND status<>'archived' FOR UPDATE",[siteId,userId])).rows[0]:await this.owned(siteId,userId);
+      if(!site)throw new FinanceError('Website not found.',404);
+      if(site.template_id!=='tmpl-data-reseller')throw new FinanceError('Select the Data Reseller template first.');
       const existing=await priceConfig(siteId,tx);if(input.expectedVersion!==existing.version)throw new FinanceError('Prices changed. Refresh before saving.',409);
       const policy=await currentPolicy(tx),costs=await wholesale(tx),products={...existing.products};const seen=new Set<string>();
       for(const item of input.products as any[]) {
         exact(item,['productId','retailMinor','enabled']);const product=getAuthoritativeProduct(item.productId);
-        if(!product||seen.has(product.id)||typeof item.enabled!=='boolean')throw new FinanceError('Invalid or duplicate bundle.');seen.add(product.id);
+        if(!product||!product.isActive||seen.has(product.id)||typeof item.enabled!=='boolean')throw new FinanceError('Invalid or duplicate bundle.');seen.add(product.id);
         const retail=moneyMinor(item.retailMinor,true),cost=costs[product.id];
         if(cost?.enabled&&policy.enabled&&retail>0&&retail<minimumStorePrice(cost.wholesaleMinor,policy))throw new FinanceError('Set a price at or above the configured minimum online price.');
         if(item.enabled&&(!policy.enabled||!cost?.enabled||retail<minimumStorePrice(cost.wholesaleMinor,policy)))throw new FinanceError('Set a price at or above the configured minimum online price.');

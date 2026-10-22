@@ -24,7 +24,7 @@ test('V5 native PostgreSQL: archive concurrency, finance retention, search and r
     process.env.DATABASE_URL=url;process.env.DATABASE_SSL='false';process.env.MYSTERY_TEST_DATABASE_OPT_IN='true';
     pool=getPool();await initDatabase();await initDatabase();
     for(const id of ['owner','buyer','clear','rollback','other'])await AuthStore.createUser({id,name:id,email:`${id}@fixture.test`,phone:null,passwordHash:'fixture',role:'customer'});
-    const make=async(owner:string)=>{const s=(await WebsiteStore.createSite(owner,{template_id:'tmpl-boutique',name:owner})).site;return (await WebsiteStore.publishSite(s.id,owner,s.updated_at))!;};
+    const make=async(owner:string)=>{const s=(await WebsiteStore.createSite(owner,{template_id:'tmpl-boutique',name:owner,content:{whatsapp:'0241234567'}})).site;return (await WebsiteStore.publishSite(s.id,owner,s.updated_at))!;};
     const site=await make('owner');
     await t.test('real SQL reservations serialize the final Free image slot at 60 and survive archival',async()=>{
       const names=['CLOUDINARY_CLOUD_NAME','CLOUDINARY_API_KEY','CLOUDINARY_API_SECRET','WEBSITE_FREE_MAX_ASSETS'];const before=names.map(n=>process.env[n]);

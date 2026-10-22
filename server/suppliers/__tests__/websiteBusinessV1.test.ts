@@ -34,7 +34,7 @@ beforeEach(async()=>{
   FulfilmentService.preflightCheck=async()=>({allowed:true,supplierCostMinor:cost});
   PaystackServerService.initializeTransaction=async params=>{transaction=params;initCount++;return {success:!initFail,reference:params.reference,accessCode:'fixture-access',authorizationUrl:'https://checkout.paystack.com/fixture'};};
   PaystackServerService.verifyTransaction=async reference=>({isVerified:true,status:'success',reference,amountPesewas:transaction.amountPesewas,currency:'GHS',metadata:transaction.metadata});
-  site=(await WebsiteStore.createSite('owner',{template_id:'tmpl-data-reseller',name:'Fixture Store'})).site;site=await WebsiteStore.publishSite(site.id,'owner');
+  site=(await WebsiteStore.createSite('owner',{template_id:'tmpl-data-reseller',name:'Fixture Store',content:{whatsapp:'0241234567'}})).site;site=await WebsiteStore.publishSite(site.id,'owner');
 });
 const request=(path:string,method='GET',body?:unknown,token='')=>originals.fetch(base+path,{method,headers:{...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`}:{})},...(body?{body:JSON.stringify(body)}:{})});
 const body=()=>({productId:'mtn-1gb',recipientPhone:'0241111111',customerEmail:'receipt@fixture.test',requestId:randomUUID()});

@@ -11,13 +11,14 @@ import { formatGhs } from '../../../shared/money';
 import type { WebsiteTemplate,DataBundle } from '../../types';
 import { createStoreCheckoutAttempt, readStoreCheckoutRecovery } from '../../utils/storeCheckoutAttempt';
 import { isValidGhanaPhoneNumber } from '../../../server/utils/phone';
+import {websitePreviewCatalog,type WebsitePreviewProduct} from '../../utils/websitePreviewCatalog';
 const sentence=(text:string)=>/[.!?]$/.test(text.trim())?text.trim():`${text.trim()}.`;
-export function ManagedDataStorefront({siteId,template,preview=false}:{siteId:string;template:WebsiteTemplate;preview?:boolean}) {
+export function ManagedDataStorefront({siteId,template,preview=false,previewProducts}:{siteId:string;template:WebsiteTemplate;preview?:boolean;previewProducts?:WebsitePreviewProduct[]}) {
   // A different store gets a separate lifecycle, form and tracking state.
   // Switching into preview also disposes any pending published-store callbacks.
-  return <StorefrontCheckout key={`${siteId}:${preview?'preview':'published'}`} siteId={siteId} template={template} preview={preview}/>;
+  return <StorefrontCheckout key={`${siteId}:${preview?'preview':'published'}`} siteId={siteId} template={template} preview={preview} previewProducts={previewProducts}/>;
 }
-function StorefrontCheckout({siteId,template,preview}:{siteId:string;template:WebsiteTemplate;preview:boolean}) {
+function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:string;template:WebsiteTemplate;preview:boolean;previewProducts?:WebsitePreviewProduct[]}) {
   const [products,setProducts]=useState<any[]>([]),[network,setNetwork]=useState('mtn'),[selected,setSelected]=useState<DataBundle|null>(null),[phone,setPhone]=useState(''),[email,setEmail]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(true),[order,setOrder]=useState<any>(null),[reference,setReference]=useState(''),[busy,setBusy]=useState(false);
   const requestId=useRef<string|null>(null),guard=useRef(false),dialog=useRef<HTMLDialogElement>(null),payButton=useRef<HTMLButtonElement>(null),restoreFocus=useRef(false);
   const lifecycle=useRef(createStoreCheckoutAttempt()),mounted=useRef(false),trackingGeneration=useRef(0),paymentReference=useRef(''),started=useRef(false),trackingInput=useRef<HTMLInputElement>(null);
@@ -38,7 +39,11 @@ function StorefrontCheckout({siteId,template,preview}:{siteId:string;template:We
   const neutral={backgroundColor:colors.background,borderColor:colors.border,color:colors.text};
   const primary={backgroundColor:colors.accent,borderColor:colors.border,color:websiteActionText(colors.accent)};
   const muted={color:colors.mutedText};
-  useEffect(()=>{let active=true;setLoading(true);websiteBusinessRequest(`websites/${encodeURIComponent(siteId)}/storefront`).then(data=>{if(active)setProducts(data.products);}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[siteId]);
+  useEffect(()=>{
+    // Drafts are not public stores. Only the authenticated parent supplies a safe read-only projection.
+    if(preview){setProducts(websitePreviewCatalog(previewProducts));setError('');setLoading(false);return;}
+    let active=true;setLoading(true);websiteBusinessRequest(`websites/${encodeURIComponent(siteId)}/storefront`).then(data=>{if(active)setProducts(data.products);}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};
+  },[siteId,preview,previewProducts]);
   useEffect(()=>{
     if(preview||!selected||busy||!dialog.current||dialog.current.open)return;
     dialog.current.showModal();
@@ -112,11 +117,11 @@ function StorefrontCheckout({siteId,template,preview}:{siteId:string;template:We
   const step:1|2|3|4=reference?4:selected?3:validNumber&&confirmed?2:1;
   const masked=validNumber?maskDataRecipient(phone):'';
   const storefront=<div className="space-y-4" style={{color:colors.text, '--website-focus':colors.focus, '--website-placeholder':colors.mutedText} as React.CSSProperties}>
-    {preview&&<p role="status" className="store-card store-note" style={{...neutral,backgroundColor:colors.surface,color:colors.surfaceText}}><strong>Draft preview.</strong> Checkout and order tracking are turned off. Customers can buy once your store is live.</p>}
+    {preview&&<p role="status" className="store-card store-note" style={{...neutral,backgroundColor:colors.surface,color:colors.surfaceText}}><strong>Draft preview.</strong> Checkout and order tracking are turned off. Bundles shown use your saved settings; live checkout also depends on publication and current availability.</p>}
     <p className="sr-only">Data bundles from {template.demoBusinessName}</p>
     <SignalSteps step={step} theme={colors}/>
     {loading&&<p role="status" className="store-note" style={muted}>Loading available bundles…</p>}{error&&!selected&&<p role="alert" className="store-card store-note break-words" style={{...neutral,backgroundColor:colors.surface,color:colors.surfaceText}}>{error}</p>}
-    {!loading&&!error&&!onNetwork.length&&<section role="status" className="store-card space-y-2" style={{...neutral,backgroundColor:colors.surface,color:colors.surfaceText}}><h3 className="font-bold">{products.length?'No bundles available on this network right now.':'Bundles are not available right now.'}</h3><p className="store-note" style={{color:colors.surfaceMutedText}}>{products.length?'Choose another network or check back later.':'Please check back later or contact the business.'}</p>{businessContact&&<a href={businessContact} className="store-primary" style={{...primary,display:'inline-flex',alignItems:'center'}}>Contact Business</a>}</section>}
+    {!loading&&!error&&!onNetwork.length&&<section role="status" className="store-card space-y-2" style={{...neutral,backgroundColor:colors.surface,color:colors.surfaceText}}><h3 className="font-bold">{products.length?'No bundles available on this network right now.':preview?'No saved eligible bundles in this preview yet.':'Bundles are not available right now.'}</h3><p className="store-note" style={{color:colors.surfaceMutedText}}>{products.length?'Choose another network or check back later.':preview?'Open Bundles & pricing to configure and save your bundles. Preview never collects payments.':'Please check back later or contact the business.'}</p>{businessContact&&<a href={businessContact} className="store-primary" style={{...primary,display:'inline-flex',alignItems:'center'}}>Contact Business</a>}</section>}
     {bundles.length>0&&<section className="store-card store-buy" aria-labelledby="store-buy-title" style={{...neutral,backgroundColor:colors.surface,color:colors.surfaceText}}>
       <div><p className="store-step-label" style={{color:colors.surfaceAccentText}}>Step 1 · Who is it for?</p><h3 id="store-buy-title" className="site-display">Number to receive the data</h3></div>
       <label className="block text-sm font-semibold"><span className="sr-only">Number to receive the data</span><input ref={numberInput} type="tel" inputMode="tel" autoComplete="tel" maxLength={16} disabled={busy||locked} value={phone} placeholder="024 123 4567" onChange={event=>{if(started.current||guard.current)return;setPhone(event.target.value);requestId.current=crypto.randomUUID();setHint('');if(!confirmed){const guess=detectGhanaNetwork(event.target.value);if(guess&&isValidGhanaPhoneNumber(event.target.value)&&networks.includes(guess as StoreNetwork))setNetwork(guess);}}} style={neutral} className="store-field store-number font-normal placeholder:text-[var(--website-placeholder)]"/></label>
