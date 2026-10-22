@@ -13,6 +13,9 @@ export function useDialogFocus(active: boolean, onClose: () => void) {
     (surface.querySelector<HTMLElement>('[data-autofocus]') || controls()[0] || surface).focus();
     const release = acquireOverlay(surface);
     const keydown = (event: KeyboardEvent) => {
+      // A sheet opened on top of this overlay (a nested dialog) handles its own Escape and Tab.
+      const owner = (event.target as Element | null)?.closest?.('dialog[open], [role="dialog"]');
+      if (owner && owner !== surface && surface.contains(owner)) return;
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close.current(); }
       if (event.key !== 'Tab') return;
       const items = controls(); const first = items[0]; const last = items.at(-1);

@@ -7,7 +7,8 @@ import { useLayoutEffect, type RefObject } from 'react';
  * viewport. Every overlay locked only <body>, while the viewport (the real page scroller) kept scrolling under
  * touch and wheel input, including scroll chained out of the template preview iframe. The lock therefore sits on
  * the root element (`html.mh-scroll-locked`, see index.css). An overflow lock keeps the page exactly where it was,
- * so nothing has to be restored on release and route changes are never fought.
+ * so nothing has to be restored on release and route changes are never fought. <body> is deliberately left alone:
+ * `overflow: hidden` on it would make it a scroll container and unstick the sticky site header.
  *
  * The topmost modal entry makes the rest of the app `inert`. Only nodes inside #root are touched, so a third-party
  * payment window (Paystack appends its iframe to <body>) is never blocked. Native <dialog>.showModal() keeps its
@@ -16,7 +17,6 @@ import { useLayoutEffect, type RefObject } from 'react';
 type Entry = { surface: HTMLElement | null; modal: boolean };
 const stack: Entry[] = [];
 let marked: HTMLElement[] = [];
-let savedBodyOverflow = '';
 
 /** The overlay's own layer: its outermost fixed-position ancestor, so a backdrop beside the surface stays usable. */
 function overlayLayer(surface: HTMLElement, root: HTMLElement) {
@@ -46,16 +46,13 @@ function applyInert() {
 
 function lockPage() {
   const html = document.documentElement;
-  savedBodyOverflow = document.body.style.overflow;
   // Desktop: keep the scrollbar's space so the page does not shift sideways while locked.
   html.classList.toggle('mh-scroll-gutter', html.scrollHeight > html.clientHeight);
   html.classList.add('mh-scroll-locked');
-  document.body.style.overflow = 'hidden'; // kept as the "a sheet is open" signal older code reads
 }
 
 function unlockPage() {
   document.documentElement.classList.remove('mh-scroll-locked', 'mh-scroll-gutter');
-  document.body.style.overflow = savedBodyOverflow;
 }
 
 /** Registers an open overlay. The returned release is idempotent, so a double cleanup can never unlock early. */

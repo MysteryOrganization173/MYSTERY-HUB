@@ -185,8 +185,11 @@ export const WebsiteBuilderPage: React.FC = () => {
     );
   });
 
-  // Real gallery designs, one per industry, for the visitor showcase strip.
-  const showcaseTemplates = orderedWebsiteTemplates().filter(t => isReadyDesign(t) && t.heroImage).slice(0, 6);
+  // Real gallery designs, one per industry, for the visitor showcase strip. V5.2: an industry with several designs
+  // (Night Kitchen and Classic Kitchen are both restaurants) appears once, as its lead design; every design stays in
+  // the full gallery below. A tile always opens the preview of the design it shows.
+  const showcaseTemplates = orderedWebsiteTemplates().filter(t => isReadyDesign(t) && t.heroImage)
+    .filter((t, i, all) => all.findIndex(other => other.categoryLabel === t.categoryLabel) === i).slice(0, 6);
 
   const isFiltering = selectedCategory !== 'all' || searchQuery.trim().length > 0;
   const displayedTemplates = isFiltering || showAllTemplates ? filteredTemplates : filteredTemplates.slice(0, 6);
@@ -455,7 +458,7 @@ export const WebsiteBuilderPage: React.FC = () => {
             <ul className="website-made-for">
               {showcaseTemplates.map(t => (
                 <li key={t.id}>
-                  <button type="button" aria-label={`Preview the ${t.categoryLabel} design`} onClick={() => openTemplatePreview(t)}>
+                  <button type="button" aria-label={`Preview ${t.title}, a ${t.categoryLabel} design`} onClick={() => openTemplatePreview(t)}>
                     {t.heroImage && <SafeImage src={t.heroImage} alt="" loading="lazy" className="website-made-for-photo" />}
                     <span>{t.categoryLabel}</span>
                   </button>
@@ -575,7 +578,7 @@ export const WebsiteBuilderPage: React.FC = () => {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
               {displayedTemplates.map((t) => (
                 <TemplateCardPreview
                   key={t.id}

@@ -71,7 +71,7 @@ export const TemplateCardPreview: React.FC<TemplateCardPreviewProps> = ({
             <LiveTemplateThumb template={t} onLive={phone => { setLive(true); setPhoneLive(phone); }} />
             {!live && <span className="template-card-shade" aria-hidden="true" />}
             <span className={`template-card-sample${live ? ' is-live' : ''}`}>
-              <span className="template-card-sample-label">{live ? 'Live design · sample content' : 'Sample'}</span>
+              <span className="template-card-sample-label">{live ? <><span className="template-card-label-long">Live design · sample content</span><span className="template-card-label-short">Sample</span></> : 'Sample'}</span>
               {!live && <span className="template-card-sample-name">{t.demoBusinessName}</span>}
               {!live && <span className="template-card-sample-line">{t.demoHeroTagline}</span>}
             </span>
