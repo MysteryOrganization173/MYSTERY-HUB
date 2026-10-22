@@ -58,7 +58,8 @@ const catalogue = [...laptops, ...digitals];
 test('root cause regression: a second department no longer hides the laptop brand gallery', () => {
   const tiles = summariseCategories(cats, catalogue);
   assert.deepEqual(tiles.map(t => [t.slug, t.count]), [['laptops_computers', 9], ['digital_products', 3]]);
-  assert.equal(landingBrandCategory(catalogue, tiles), 'laptops_computers', 'the only branded department leads on the landing view');
+  assert.equal(landingBrandCategory(catalogue, tiles), null, 'V2.1: with several departments, "All products" is the whole catalogue with no laptop gallery');
+  assert.equal(landingBrandCategory(laptops, summariseCategories(cats, laptops)), 'laptops_computers', 'a single-department catalogue still leads with its brands');
   const brands = brandLayer(catalogue, 'laptops_computers')!;
   assert.deepEqual(brands.map(b => [b.id, b.count]), [['dell', 3], ['hp', 2], ['apple', 1], ['lenovo', 1], ['microsoft', 1], ['toshiba', 1]]);
   assert.equal(brands.reduce((n, b) => n + b.count, 0), 9, 'brand counts add up to the department');
@@ -70,6 +71,36 @@ test('root cause regression: a second department no longer hides the laptop bran
   for (const label of ['Dell', 'HP', 'Lenovo', 'Microsoft', 'Apple', 'Toshiba']) assert.ok(out.includes(`>${label}<`), `${label} tile`);
   assert.ok(out.includes('href="/marketplace?category=laptops_computers&amp;brand=dell"'), 'brand links keep their department');
   assert.ok(out.indexOf('Shop by department') < out.indexOf('by brand'), 'brands sit directly under the departments, before any product');
+});
+
+test('V2.1 brand gallery is a disclosure: compact when closed, never hides the chosen brand', () => {
+  const tiles = summariseCategories(cats, catalogue);
+  const brands = brandLayer(catalogue, 'laptops_computers')!;
+  const row = { category: 'laptops_computers', label: 'Laptops & Computers', brands, total: 9 };
+  const base = { tiles, total: catalogue.length, selected: 'laptops_computers', onSelect: () => {}, brandRow: row, onSelectBrand: () => {}, onToggleBrands: () => {} };
+  const closed = html(React.createElement(MarketplaceCategoryTiles, { ...base, selectedBrand: '', brandsExpanded: false }));
+  assert.ok(closed.includes('aria-expanded="false"') && closed.includes('data-mh-brands-open="false"'));
+  const listId = closed.match(/aria-controls="([^"]+)"/)![1];
+  assert.ok(new RegExp(`id="${listId}" hidden=""`).test(closed), 'the gallery is hidden (out of the tab order and accessibility tree) when closed');
+  assert.ok(closed.includes('Dell, HP, Apple +3 more') && closed.includes('Show brands'), 'closed bar still names what is on offer');
+  assert.ok(closed.includes('>Dell<'), 'tiles stay mounted, so reopening is instant');
+  const open = html(React.createElement(MarketplaceCategoryTiles, { ...base, selectedBrand: '', brandsExpanded: true }));
+  assert.ok(open.includes('aria-expanded="true"') && !/ hidden=""/.test(open) && open.includes('Hide brands'));
+  const chosen = html(React.createElement(MarketplaceCategoryTiles, { ...base, selectedBrand: 'dell', brandsExpanded: false }));
+  assert.ok(chosen.includes('Showing <span class="text-white font-semibold">Dell</span>') && chosen.includes('3 items') && chosen.includes('Change brand'), 'a collapsed bar states the chosen brand and count');
+  assert.equal((chosen.match(/Clear/g) || []).length, 0, 'no second Clear control: the results chips own clearing');
+  assert.equal((chosen.match(/Shop Laptops &amp; Computers by brand/g) || []).length, 2, 'one heading (nav label + bar text), no duplicate panel heading');
+});
+
+test('V2.1 page wiring: expansion is presentation state, separate from URL, history and results', () => {
+  const page = source('src/components/marketplace/MarketplacePage.tsx');
+  const panel = page.slice(page.indexOf('const brandPanelKey'), page.indexOf('const activeCategoryLabel'));
+  assert.ok(panel.includes('setBrandPanel') && !/history|serializeBrowseState|navigateBrowse|updateBrowse|scroll/.test(panel), 'toggling never writes the URL, history, filters or scroll');
+  assert.ok(panel.includes('!browse.brand') && panel.includes('window.innerWidth < 640'), 'chosen brand folds the gallery; only phones start it open');
+  assert.ok(page.includes('brandsExpanded={brandsExpanded} onToggleBrands={toggleBrands}'));
+  assert.ok(page.includes("next.delete('product')") && page.includes('.catch(unavailable)'), 'a dead shared product link is explained and cleaned up');
+  const tiles = source('src/components/marketplace/MarketplaceCategoryTiles.tsx');
+  assert.ok(tiles.includes('aria-expanded={expanded}') && tiles.includes('aria-controls={listId}') && tiles.includes('focus({ preventScroll: true })'));
 });
 
 test('brands never leak into departments where they mean nothing', () => {

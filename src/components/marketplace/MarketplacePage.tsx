@@ -226,16 +226,26 @@ export const MarketplacePage: React.FC = () => {
       timers.push(setTimeout(() => document.getElementById(`marketplace-product-${targetProduct.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150));
       timers.push(setTimeout(() => setHighlightedProductId(null), 5000));
     };
+    // A shared link to a listing that was sold, unpublished or mistyped used to land silently on the catalogue
+    // with ?product= still in the address. Say so once and drop the dead parameter.
+    const unavailable = () => {
+      if (cancelled) return;
+      const next = new URLSearchParams(window.location.search);
+      next.delete('product');
+      const qs = next.toString();
+      window.history.replaceState(historyState(), '', `/marketplace${qs ? `?${qs}` : ''}`);
+      showToast('That product link isn’t available any more. Here’s what’s in the Marketplace now.', 'info', 'marketplace-product-unavailable');
+    };
     const local = findProduct(products, slug);
     if (local) land(local);
-    else getPublicMarketplaceProductBySlug(slug).then(res => { if (res.success && res.product) land(res.product); }).catch(() => {});
+    else getPublicMarketplaceProductBySlug(slug).then(res => { if (res.success && res.product) land(res.product); else unavailable(); }).catch(unavailable);
     return () => { cancelled = true; timers.forEach(clearTimeout); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, products]);
 
   const categoryTiles = useMemo(() => summariseCategories(categories, products), [categories, products]);
   // Departments → brands → products. The selected department shows its own brands; the landing
-  // view shows brands only when exactly one department has them (or there is one department).
+  // view ("All products") shows brands only when the whole catalogue is a single department.
   const brandRow = useMemo<BrandRow | null>(() => {
     const slug = browse.category !== 'all' ? browse.category : landingBrandCategory(products, categoryTiles);
     const brands = slug ? brandLayer(products, slug) : null;
@@ -243,6 +253,16 @@ export const MarketplacePage: React.FC = () => {
     const total = slug === 'all' ? products.length : products.filter(p => p.category === slug).length;
     return { category: slug, label: slug === 'all' ? '' : categoryLabel(slug, categories, products), brands, total };
   }, [browse.category, products, categoryTiles, categories]);
+  // The brand gallery's open/closed state is presentation only: it never touches the URL, history or results.
+  // Closed it is a one-line bar (brand photos, names, the chosen brand). It starts open only where it is cheap:
+  // a phone's compact swipe row on a screen tall enough to still show products. Tablet and desktop galleries are
+  // large photo cards, so they start closed. A chosen brand always folds it away, and the customer's own toggle
+  // holds until the department or brand changes.
+  const brandPanelKey = `${brandRow?.category ?? ''}|${browse.brand}`;
+  const [brandPanel, setBrandPanel] = useState<{ key: string; open: boolean } | null>(null);
+  if (brandPanel && brandPanel.key !== brandPanelKey) setBrandPanel(null); // Back to an earlier brand starts from its default again
+  const brandsExpanded = brandPanel?.key === brandPanelKey ? brandPanel.open : !browse.brand && typeof window !== 'undefined' && window.innerWidth < 640 && window.innerHeight >= 700;
+  const toggleBrands = useCallback((open: boolean) => setBrandPanel({ key: brandPanelKey, open }), [brandPanelKey]);
   const activeCategoryLabel = categoryLabel(browse.category, categories, products);
   const activeBrandLabel = browse.brand ? brandLabel(browse.brand, products) : '';
   const filteredProducts = useMemo(() => sortProducts(applyRefinements(products, browse), browse.sort), [products, browse]);
@@ -456,7 +476,7 @@ export const MarketplacePage: React.FC = () => {
             2. VISUAL CATEGORY DISCOVERY (admin categories, live counts, real product photos)
             ========================================================= */}
         {!loading && !error && products.length > 0 && (
-          <MarketplaceCategoryTiles tiles={categoryTiles} total={products.length} selected={browse.category} onSelect={selectCategory} brandRow={brandRow} selectedBrand={browse.brand} onSelectBrand={selectBrand} brandRowRef={brandRowRef} />
+          <MarketplaceCategoryTiles tiles={categoryTiles} total={products.length} selected={browse.category} onSelect={selectCategory} brandRow={brandRow} selectedBrand={browse.brand} onSelectBrand={selectBrand} brandRowRef={brandRowRef} brandsExpanded={brandsExpanded} onToggleBrands={toggleBrands} />
         )}
 
         {/* =========================================================
@@ -467,7 +487,7 @@ export const MarketplacePage: React.FC = () => {
           <div className="space-y-2.5">
             <div className="flex items-end justify-between gap-2 sm:gap-3">
               <div className="min-w-0">
-                <h2 className="text-base sm:text-xl font-bold text-white tracking-tight truncate">{browse.brand ? `${activeBrandLabel}${browse.category !== 'all' ? ` · ${activeCategoryLabel}` : ''}` : activeCategoryLabel}</h2>
+                <h2 className="text-base sm:text-xl font-bold text-white tracking-tight leading-tight line-clamp-2 break-words">{browse.brand ? `${activeBrandLabel}${browse.category !== 'all' ? ` · ${activeCategoryLabel}` : ''}` : activeCategoryLabel}</h2>
                 <p className="text-xs text-slate-400" aria-live="polite">
                   <span className="font-semibold text-slate-200 tabular-nums">{filteredProducts.length}</span> {filteredProducts.length === 1 ? 'product' : 'products'}
                   {browse.q.trim() && <> for <span className="text-slate-200">“{browse.q.trim()}”</span></>}

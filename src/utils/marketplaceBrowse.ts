@@ -161,14 +161,14 @@ export function brandLayer(products: MarketplaceProduct[], category: string): Br
 }
 
 /**
- * Which department's brands the landing view shows: the only department when there is one,
- * otherwise the single department that has a brand row. With several such departments the
- * customer picks a department first, so the landing view never stacks several galleries.
+ * Which department's brands the landing view ("All products") offers. Only a catalogue with one
+ * department leads with brands, because there the brands are the only way to narrow it. With
+ * several departments the landing view is the whole catalogue: brands belong to the department
+ * the customer chooses, so a laptop gallery never sits over phones or digital products.
  */
 export function landingBrandCategory(products: MarketplaceProduct[], categories: CategorySummary[]): string | null {
-  if (categories.length < 2) return brandLayer(products, 'all') ? (categories[0]?.slug ?? 'all') : null;
-  const withBrands = categories.filter(c => brandLayer(products, c.slug));
-  return withBrands.length === 1 ? withBrands[0].slug : null;
+  if (categories.length >= 2) return null;
+  return brandLayer(products, 'all') ? (categories[0]?.slug ?? 'all') : null;
 }
 
 export const brandLabel = (id: string, products: MarketplaceProduct[] = []) =>
