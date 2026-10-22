@@ -1,4 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { AdminAttentionOrders } from './AdminAttentionOrders';
+import { createAdminRequestScope } from '../../../utils/adminRequestScope';
 import { AdminBusinessSummary, ReportOrdersSheet } from './AdminBusinessSummary';
 import { AdminRecentOrders } from './AdminRecentOrders';
 import { AdminEarnPulse } from './AdminEarnPulse';
@@ -58,20 +60,30 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
   const [withdrawals, setWithdrawals] = useState<{ waiting: number; reviewNeeded: number } | null>(null);
   const [sideErrors, setSideErrors] = useState<string[]>([]);
   const [todayMetric, setTodayMetric] = useState<ReportMetric | null>(null);
+  const scope = useRef(createAdminRequestScope()).current;
+  scope.setContext(sessionToken);
+  useEffect(() => () => scope.invalidate(), [scope, sessionToken]);
 
   const fetchOverview = useCallback(async (force = false) => {
+    const current = scope.begin('overview');
     if (force) { setIsRefreshing(true); setRevision(n => n + 1); } else setIsLoading(true);
     setError(null);
     const errors: string[] = [];
-    await Promise.all([
-      loadAdminOverview(sessionToken, force).then(result => { setMetrics(result.metrics); setLoadedAt(result.at); }).catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to fetch overview metrics.')),
-      getAdminSystemOnServer(sessionToken).then(data => setSystem((data.system?.components as unknown as SystemSnapshot) || null)).catch(() => errors.push('System health')),
-      operationsRequest<{ report: AdminFinancialReport }>(sessionToken, 'report?period=today').then(data => setTodayReport(data.report)).catch(() => { setTodayReport(null); errors.push("Today's deliveries"); }),
-      marketplaceControlRequest('metrics', sessionToken).then(data => setMarketplace(data.metrics || null)).catch(() => errors.push('Marketplace')),
+    const results = await Promise.allSettled([
+      loadAdminOverview(sessionToken, force),
+      getAdminSystemOnServer(sessionToken),
+      operationsRequest<{ report: AdminFinancialReport }>(sessionToken, 'report?period=today'),
+      marketplaceControlRequest('metrics', sessionToken),
       financeRequest<Array<{ state: string; restricted?: boolean; earn?: { reconciliationRequired?: boolean } }>>(sessionToken, '/withdrawals?offset=0', undefined, true)
-        .then(rows => setWithdrawals({ waiting: rows.filter(r => ['pending_review', 'approved'].includes(r.state)).length, reviewNeeded: rows.filter(r => ['pending_review', 'approved'].includes(r.state) && (r.restricted || r.earn?.reconciliationRequired)).length }))
-        .catch(() => errors.push('Withdrawals')),
     ]);
+    if (!current()) return;
+    const [overview, health, report, market, payout] = results;
+    if (overview.status === 'fulfilled') { setMetrics(overview.value.metrics); setLoadedAt(overview.value.at); }
+    else setError(overview.reason instanceof Error ? overview.reason.message : 'Overview could not refresh.');
+    if (health.status === 'fulfilled') setSystem((health.value.system?.components as unknown as SystemSnapshot) || null); else errors.push('System health');
+    if (report.status === 'fulfilled') setTodayReport(report.value.report); else errors.push("Today's deliveries");
+    if (market.status === 'fulfilled') setMarketplace(market.value.metrics || null); else errors.push('Marketplace');
+    if (payout.status === 'fulfilled') { const rows = payout.value; setWithdrawals({ waiting: rows.filter(r => ['pending_review', 'approved'].includes(r.state)).length, reviewNeeded: rows.filter(r => ['pending_review', 'approved'].includes(r.state) && (r.restricted || r.earn?.reconciliationRequired)).length }); } else errors.push('Withdrawals');
     setSideErrors(errors);
     setIsLoading(false);
     setIsRefreshing(false);
@@ -82,7 +94,7 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
 
   const todayLabel = new Date().toLocaleDateString('en-GH', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Africa/Accra' });
   if (isLoading) return <AdminLoading label="Loading today's operations…" />;
-  if (error || !metrics) return <div className="space-y-4"><AdminPageHeader eyebrow={todayLabel} title="Overview" /><AdminError title="Overview could not load" message={error || 'Unknown server response'} onRetry={() => void fetchOverview(true)} /></div>;
+  if (!metrics) return <div className="space-y-4"><AdminPageHeader eyebrow={todayLabel} title="Overview" /><AdminError title="Overview could not load" message={error || 'Unknown server response'} onRetry={() => void fetchOverview(true)} /></div>;
 
   const { today, allTime, supplier } = metrics;
   const threshold = system?.successBizHub?.lowBalanceThresholdGhc;
@@ -129,8 +141,9 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
             {sideErrors.length ? 'No issues in the checks that completed. Some checks are unavailable.' : 'Nothing needs action in the loaded records. Each area keeps its full queue.'}
           </p>
         )}
-        {sideErrors.length > 0 && <p className="mt-3 text-xs text-amber-300">Could not check: {sideErrors.join(', ')}. Those areas may still need attention.</p>}
+        {sideErrors.length > 0 && <p className="mt-3 text-xs text-amber-300">Could not check: {sideErrors.join(', ')}. Any previous values for those checks may be out of date; they may still need attention.</p>}
       </div>
+      <AdminAttentionOrders token={sessionToken} revision={revision} onOpen={reference => onNavigateTab('orders', `ref/${reference}`)} onOpenAll={() => onNavigateTab('orders', 'needs_attention')} />
     </AdminPanel>
   );
 
@@ -158,6 +171,7 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
 
   return (
     <div className="space-y-6">
+      {error && <AdminError title="Overview refresh failed · showing last loaded figures" message={error} onRetry={() => void fetchOverview(true)} />}
       <AdminPageHeader
         eyebrow={todayLabel}
         title="Overview"

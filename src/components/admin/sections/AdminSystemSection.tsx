@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createAdminRequestScope } from '../../../utils/adminRequestScope';
 import {
   AdminSystemStatus,
   getAdminSystemOnServer,
@@ -44,14 +45,19 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
+  const scope = useRef(createAdminRequestScope()).current;
+  scope.setContext(sessionToken);
+  useEffect(() => () => scope.invalidate(), [scope, sessionToken]);
 
   const fetchSystemAndAudit = useCallback(async (isRefresh = false) => {
+    const current = scope.begin('health');
     if (isRefresh) setIsRefreshing(true);
     else setIsLoading(true);
     setError(null);
 
     try {
       const sysRes = await getAdminSystemOnServer(sessionToken);
+      if (!current()) return;
       if (sysRes.success && sysRes.system) {
         setSystemData(sysRes.system);
         setCheckedAt(Date.now());
@@ -62,18 +68,18 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
           headers: { Authorization: `Bearer ${sessionToken}` },
         });
         const auditJson = await auditRes.json();
-        if (auditJson.success && Array.isArray(auditJson.logs)) {
+        if (!current()) return;
+        if (auditRes.ok && auditJson.success && Array.isArray(auditJson.logs)) {
           setAuditLogs(auditJson.logs);
           setAuditError(false);
         } else setAuditError(true);
       } catch {
-        setAuditError(true);
+        if (current()) setAuditError(true);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to retrieve system status.');
+      if (current()) setError(err instanceof Error ? err.message : 'Failed to retrieve system status.');
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (current()) { setIsLoading(false); setIsRefreshing(false); }
     }
   }, [sessionToken]);
 
@@ -82,7 +88,7 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
   }, [fetchSystemAndAudit]);
 
   if (isLoading) return <div className="space-y-5"><AdminPageHeader title="System Health" /><AdminLoading label="Checking services…" /></div>;
-  if (error || !systemData) return <div className="space-y-5"><AdminPageHeader title="System Health" /><AdminError title="System diagnostics failed" message={error || 'Unable to communicate with the system diagnostic service.'} onRetry={() => fetchSystemAndAudit(true)} /></div>;
+  if (!systemData) return <div className="space-y-5"><AdminPageHeader title="System Health" /><AdminError title="System diagnostics failed" message={error || 'Unable to communicate with the system diagnostic service.'} onRetry={() => fetchSystemAndAudit(true)} /></div>;
 
   const { components, environment, nodeVersion, uptimeSeconds } = systemData;
   const hours = Math.floor(uptimeSeconds / 3600);
@@ -140,6 +146,7 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
 
   return (
     <div className="space-y-5">
+      {error && <AdminError title="Health refresh failed · showing last checked state" message={error} onRetry={() => fetchSystemAndAudit(true)} />}
       <AdminPageHeader title="System Health" description="What the server checked just now, what each check proves, and the admin audit trail." actions={<><Freshness at={checkedAt} prefix="Checked" /><RefreshButton busy={isRefreshing} onClick={() => fetchSystemAndAudit(true)} label="Check again" /></>} />
 
       {problems.length

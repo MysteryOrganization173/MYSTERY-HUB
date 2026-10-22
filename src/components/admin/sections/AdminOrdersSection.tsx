@@ -17,10 +17,12 @@ import { AdminOrderDetails } from '../../../../server/types/orders';
 import { describeOrderCase, orderTimeline, parseSupplierStatus, ORDER_LENSES, type OrderLensId } from '../../../utils/adminOrderCase';
 import {
   AdminPageHeader, AdminPanel, AdminLoading, AdminError, AdminEmpty, AdminNotice, AdminButton, AdminSheet, StatusPill, RefreshButton, Freshness,
-  DefinitionList, adminField, adminLabel, ghs,
+  DefinitionList, ConfirmAction, adminField, adminLabel, ghs,
 } from '../ui/AdminUi';
 import { Search, SlidersHorizontal, Copy, Check, Flag, ChevronLeft, ChevronRight, X, RefreshCw, MessageCircle, Circle, CheckCircle2, XCircle } from 'lucide-react';
 import { whatsappLink } from '../../../../shared/marketplacePolicy';
+import { createAdminRequestScope } from '../../../utils/adminRequestScope';
+import { adminOrderSearchParams, type AdminOrderView } from '../../../utils/adminOrderView';
 
 interface AdminOrdersSectionProps {
   sessionToken: string;
@@ -30,27 +32,33 @@ interface AdminOrdersSectionProps {
   /** Opens with the created-date filter set to today in Ghana time (from the Overview "Today" figures). */
   initialCreatedToday?: boolean;
   onChanged?: () => void;
+  initialView?: AdminOrderView;
+  onViewChange?: (view: AdminOrderView) => void;
 }
 
 const lensFromFilter = (filter: string): OrderLensId => (ORDER_LENSES.some(l => l.id === filter) ? filter as OrderLensId : filter ? 'active' : 'active');
 
 const ghanaToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Accra' });
 
-export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionToken, initialStatusFilter = '', initialReference, initialCreatedToday = false, onChanged }) => {
+export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionToken, initialStatusFilter = '', initialReference, initialCreatedToday = false, onChanged, initialView, onViewChange }) => {
   // Query & filter state. A lens maps to the existing server filters; nothing new is queried.
-  const [searchTerm, setSearchTerm] = useState(initialReference || '');
-  const [debouncedSearch, setDebouncedSearch] = useState(initialReference || '');
-  const [lens, setLens] = useState<OrderLensId>(initialReference ? 'active' : lensFromFilter(initialStatusFilter));
-  const [serviceTypeFilter, setServiceTypeFilter] = useState<string>('');
-  const [networkFilter, setNetworkFilter] = useState<string>('');
-  const [manualReviewFilter, setManualReviewFilter] = useState<string>('');
-  const [dateFrom, setDateFrom] = useState(initialCreatedToday ? ghanaToday : '');
-  const [dateTo, setDateTo] = useState(initialCreatedToday ? ghanaToday : '');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showFilters, setShowFilters] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(initialView?.search ?? initialReference ?? '');
+  const [debouncedSearch, setDebouncedSearch] = useState(initialView?.search ?? initialReference ?? '');
+  const [lens, setLens] = useState<OrderLensId>(initialView?.lens ?? (initialReference ? 'active' : lensFromFilter(initialStatusFilter)));
+  const [serviceTypeFilter, setServiceTypeFilter] = useState(initialView?.service || '');
+  const [networkFilter, setNetworkFilter] = useState(initialView?.network || '');
+  const [manualReviewFilter, setManualReviewFilter] = useState(initialView?.review || '');
+  const [dateFrom, setDateFrom] = useState(initialView?.from ?? (initialCreatedToday ? ghanaToday() : ''));
+  const [dateTo, setDateTo] = useState(initialView?.to ?? (initialCreatedToday ? ghanaToday() : ''));
+  const [currentPage, setCurrentPage] = useState(initialView?.page || 1);
+  const [showFilters, setShowFilters] = useState(initialView?.filtersOpen || false);
   const pageSize = 20;
-  const listRequest=useRef(0);
-  useEffect(()=>()=>{listRequest.current++;},[]);
+  const requests = useRef(createAdminRequestScope()).current;
+  requests.setContext(sessionToken);
+  useEffect(() => () => requests.invalidate(), [requests, sessionToken]);
+  const actionPending = useRef(false);
+  const [isActing, setIsActing] = useState(false);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
   // Data state
   const [ordersData, setOrdersData] = useState<AdminOrdersResponse | null>(null);
@@ -62,6 +70,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
   // Selected order (stable ref prevents stale list refreshes overwriting a newer detail)
   const [selectedOrder, setSelectedOrder] = useState<AdminOrderDetails | null>(null);
   const selectedOrderRef = useRef<AdminOrderDetails | null>(null);
+  const refreshList = useRef<() => Promise<void>>(async () => {});
   const [detailError, setDetailError] = useState<string | null>(null);
   const [isRefreshingSupplier, setIsRefreshingSupplier] = useState(false);
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
@@ -78,30 +87,53 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
   const [isClosingTest, setIsClosingTest] = useState(false);
   const [closeTestError, setCloseTestError] = useState<string | null>(null);
 
-  useEffect(() => { const timer = setTimeout(() => { setDebouncedSearch(searchTerm.trim()); setCurrentPage(1); }, 300); return () => clearTimeout(timer); }, [searchTerm]);
+  useEffect(() => { const timer = setTimeout(() => { if (searchTerm.trim() !== debouncedSearch) { setDebouncedSearch(searchTerm.trim()); setCurrentPage(1); } }, 300); return () => clearTimeout(timer); }, [searchTerm, debouncedSearch]);
+  useEffect(() => { onViewChange?.({ search: searchTerm, lens, service: serviceTypeFilter, network: networkFilter, review: manualReviewFilter, from: dateFrom, to: dateTo, page: currentPage, filtersOpen: showFilters }); }, [searchTerm, lens, serviceTypeFilter, networkFilter, manualReviewFilter, dateFrom, dateTo, currentPage, showFilters, onViewChange]);
 
   const setSelected = (order: AdminOrderDetails | null) => { selectedOrderRef.current = order; setSelectedOrder(order); };
 
   const closeOrderDrawer = useCallback(() => {
+    if (actionPending.current) return;
+    requests.invalidate('detail'); requests.invalidate('copy');
     setSelected(null);
+    setIsLoadingDetail(false);
     setActionSuccessMessage(null); setActionError(null); setDetailError(null); setCopiedKey(null);
     setShowCloseTestConfirm(false); setConfirmPaidCheckbox(false); setCloseTestReason(''); setIsClosingTest(false); setCloseTestError(null);
-  }, []);
+  }, [requests]);
+
+  const loadOrderDetails = useCallback(async (reference: string) => {
+    const current = requests.begin('detail');
+    setIsLoadingDetail(true); setDetailError(null);
+    try {
+      const res = await getAdminOrderOnServer(sessionToken, reference);
+      if (!res.success || !res.order) throw new Error('Full order details were not returned.');
+      if (current()) {
+        const previous = selectedOrderRef.current;
+        // Deep links have no list row to initialise notes. Preserve a typed note,
+        // but refresh untouched text when the authoritative record changes.
+        setAdminNoteInput(note => !previous || note === (previous.admin_note || '') ? res.order.admin_note || '' : note);
+        setSelected(res.order);
+        if (previous && previous.updated_at !== res.order.updated_at) { void refreshList.current(); onChanged?.(); }
+      }
+    } catch (err) {
+      if (current()) setDetailError(err instanceof Error ? err.message : 'Full order details could not be refreshed.');
+    } finally { if (current()) setIsLoadingDetail(false); }
+  }, [sessionToken, requests, onChanged]);
 
   const openOrderDrawer = useCallback((order: AdminOrderDetails) => {
+    if (actionPending.current) return;
+    requests.invalidate('copy');
     setSelected(order);
     setActionSuccessMessage(null); setActionError(null); setDetailError(null); setCopiedKey(null);
     setAdminNoteInput(order.admin_note || '');
     setShowCloseTestConfirm(false); setConfirmPaidCheckbox(false); setCloseTestReason(''); setIsClosingTest(false); setCloseTestError(null);
     // The list projection omits operational extras (for example AFA registration details); load the full record.
-    getAdminOrderOnServer(sessionToken, order.public_reference)
-      .then(res => { if (res.success && res.order && selectedOrderRef.current?.public_reference === res.order.public_reference) setSelected(res.order); })
-      .catch(err => { if (selectedOrderRef.current?.public_reference === order.public_reference) setDetailError(err instanceof Error ? err.message : 'Full order details could not be refreshed.'); });
-  }, [sessionToken]);
+    void loadOrderDetails(order.public_reference);
+  }, [requests, loadOrderDetails]);
 
-  const lensParams = ORDER_LENSES.find(l => l.id === lens)?.params || {};
+  const lensParams = adminOrderSearchParams(lens, debouncedSearch);
   const fetchOrders = useCallback(async () => {
-    const ticket=++listRequest.current;
+    const current = requests.begin('list');
     setIsSearching(true);
     setError(null);
     try {
@@ -116,108 +148,122 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
         page: currentPage,
         limit: pageSize,
       });
-      if (res.success && ticket===listRequest.current) {
+      if (!res.success) throw new Error('Orders were not returned.');
+      if (current()) {
+        if (res.pagination.page > res.pagination.totalPages) { setCurrentPage(res.pagination.totalPages); return; }
         setOrdersData(res);
         setLoadedAt(Date.now());
-        if (selectedOrderRef.current) {
-          const updated = res.orders.find(o => o.public_reference === selectedOrderRef.current?.public_reference);
-          if (updated && selectedOrderRef.current) setSelected({ ...selectedOrderRef.current, ...updated });
-        }
       }
     } catch (err: unknown) {
-      if(ticket===listRequest.current)setError(err instanceof Error ? err.message : 'Failed to retrieve orders.');
+      if(current())setError(err instanceof Error ? err.message : 'Failed to retrieve orders.');
     } finally {
-      if(ticket===listRequest.current){setIsLoading(false);setIsSearching(false);}
+      if(current()){setIsLoading(false);setIsSearching(false);}
     }
   }, [sessionToken, debouncedSearch, serviceTypeFilter, networkFilter, lens, manualReviewFilter, dateFrom, dateTo, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
+  refreshList.current = fetchOrders;
 
   useEffect(() => { void fetchOrders(); }, [fetchOrders]);
 
-  // Deep link: open the referenced order once.
-  const deepLinked = useRef(false);
+  // One passive detail request per link. Closing invalidates it, including before it arrives.
+  const deepLinked = useRef('');
   useEffect(() => {
-    if (!initialReference || deepLinked.current) return;
-    deepLinked.current = true;
-    getAdminOrderOnServer(sessionToken, initialReference).then(res => { if (res.success && res.order) openOrderDrawer(res.order); }).catch(() => setError(`Order ${initialReference} could not be opened.`));
-  }, [initialReference, sessionToken, openOrderDrawer]);
+    const link = `${sessionToken}:${initialReference || ''}`;
+    if (!initialReference || deepLinked.current === link) return;
+    deepLinked.current = link;
+    void loadOrderDetails(initialReference);
+  }, [initialReference, sessionToken, loadOrderDetails]);
 
   const afterAction = () => { void fetchOrders(); onChanged?.(); };
+  const beginAction = () => {
+    if (actionPending.current) return null;
+    actionPending.current = true; setIsActing(true);
+    requests.invalidate('detail');
+    setIsLoadingDetail(false);
+    return requests.begin('action');
+  };
+  const finishAction = (current: () => boolean) => { if (current()) { actionPending.current = false; setIsActing(false); } };
 
   const handleCopy = async (text: string, key: string) => {
-    try { await navigator.clipboard.writeText(text); setCopiedKey(key); setTimeout(() => setCopiedKey(null), 2000); } catch { setActionError('Copy is unavailable here. Select the text and copy it manually.'); }
+    const current = requests.begin('copy');
+    try { await navigator.clipboard.writeText(text); if (current()) { setCopiedKey(key); setTimeout(() => { if (current()) setCopiedKey(null); }, 2000); } } catch { if (current()) setActionError('Copy is unavailable here. Select the text and copy it manually.'); }
   };
 
   const handleRefreshSupplierStatus = async (reference: string) => {
+    const current = beginAction(); if (!current) return;
     setIsRefreshingSupplier(true); setActionSuccessMessage(null); setActionError(null);
     try {
       const res = await refreshAdminOrderOnServer(sessionToken, reference);
-      if (res.success && res.order && selectedOrderRef.current?.public_reference === res.order.public_reference) {
+      if (current() && res.success && res.order && selectedOrderRef.current?.public_reference === res.order.public_reference) {
         setSelected(res.order);
         setActionSuccessMessage(res.message || 'Supplier status checked.');
         afterAction();
       }
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : 'Failed to refresh supplier status.');
-    } finally { setIsRefreshingSupplier(false); }
+      if (current()) setActionError(err instanceof Error ? err.message : 'Failed to refresh supplier status.');
+    } finally { if (current()) setIsRefreshingSupplier(false); finishAction(current); }
   };
 
   const handleToggleManualReview = async (order: AdminOrderDetails) => {
+    const current = beginAction(); if (!current) return;
     setActionSuccessMessage(null); setActionError(null);
     try {
       const newFlag = !order.manual_review;
       const res = await updateAdminOrderReviewOnServer(sessionToken, order.public_reference, { manualReview: newFlag });
-      if (res.success && res.order && selectedOrderRef.current?.public_reference === res.order.public_reference) {
+      if (current() && res.success && res.order && selectedOrderRef.current?.public_reference === res.order.public_reference) {
         setSelected({ ...selectedOrderRef.current, ...res.order });
         setActionSuccessMessage(newFlag ? 'Flagged for manual review.' : 'Review flag removed; customer refund resolution is unchanged.');
         afterAction();
       }
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : 'Failed to update review flag.');
-    }
+      if (current()) setActionError(err instanceof Error ? err.message : 'Failed to update review flag.');
+    } finally { finishAction(current); }
   };
 
   const handleSaveAdminNote = async (order: AdminOrderDetails) => {
+    const current = beginAction(); if (!current) return;
     setIsSavingNote(true); setActionSuccessMessage(null); setActionError(null);
     try {
       const res = await updateAdminOrderReviewOnServer(sessionToken, order.public_reference, { adminNote: adminNoteInput.trim() || null });
-      if (res.success && res.order && selectedOrderRef.current?.public_reference === res.order.public_reference) {
+      if (current() && res.success && res.order && selectedOrderRef.current?.public_reference === res.order.public_reference) {
         setSelected({ ...selectedOrderRef.current, ...res.order });
         setActionSuccessMessage('Internal note saved.');
         afterAction();
       }
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : 'Failed to save admin note.');
-    } finally { setIsSavingNote(false); }
+      if (current()) setActionError(err instanceof Error ? err.message : 'Failed to save admin note.');
+    } finally { if (current()) setIsSavingNote(false); finishAction(current); }
   };
 
   const handleCloseTestOrder = async () => {
     if (!selectedOrder) return;
+    const current = beginAction(); if (!current) return;
     setIsClosingTest(true); setCloseTestError(null); setActionSuccessMessage(null);
     try {
       const res = await closeAdminTestOrderOnServer(sessionToken, selectedOrder.public_reference, { confirmPaidTestOrder: confirmPaidCheckbox, reason: closeTestReason.trim() || undefined });
-      if (res.success && res.order) {
+      if (current() && res.success && res.order) {
         setSelected(res.order);
         setActionSuccessMessage(res.message || 'Test order closed. It will no longer block new MTN orders.');
         setShowCloseTestConfirm(false); setConfirmPaidCheckbox(false); setCloseTestReason('');
         afterAction();
       }
     } catch (err: unknown) {
-      setCloseTestError(err instanceof Error ? err.message : 'Failed to close test order.');
-    } finally { setIsClosingTest(false); }
+      if (current()) setCloseTestError(err instanceof Error ? err.message : 'Failed to close test order.');
+    } finally { if (current()) setIsClosingTest(false); finishAction(current); }
   };
 
   const handleUpdateOrderStatus = async (order: AdminOrderDetails, newStatus: string) => {
+    const current = beginAction(); if (!current) return;
     setIsUpdatingStatus(true); setActionSuccessMessage(null); setActionError(null);
     try {
       const res = await updateAdminOrderStatusOnServer(sessionToken, order.public_reference, { marketplaceStatus: newStatus, adminNote: adminNoteInput.trim() || undefined });
-      if (res.success && res.order) {
+      if (current() && res.success && res.order) {
         setSelected({ ...selectedOrderRef.current, ...res.order });
         setActionSuccessMessage(`Fulfilment step updated to "${(res.order.marketplace_status || res.order.status).replace(/_/g, ' ')}".`);
         afterAction();
       }
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to update the fulfilment step.');
-    } finally { setIsUpdatingStatus(false); }
+      if (current()) setActionError(err instanceof Error ? err.message : 'Failed to update the fulfilment step.');
+    } finally { if (current()) setIsUpdatingStatus(false); finishAction(current); }
   };
 
   const activeFilterCount = [serviceTypeFilter, networkFilter, manualReviewFilter, dateFrom, dateTo].filter(Boolean).length;
@@ -279,7 +325,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
             {activeFilterCount > 0 && <button type="button" onClick={clearFilters} className="justify-self-start text-sm font-semibold text-[#00c365]">Clear filters</button>}
           </div>
         )}
-        {!showFilters && (dateFrom || dateTo) && (
+        {(dateFrom || dateTo) && (
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
             <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900 pl-3 pr-1">
               {dateFrom && dateFrom === dateTo && dateFrom === ghanaToday() ? 'Created today' : `Created ${dateFrom || '…'} to ${dateTo || '…'}`}
@@ -287,14 +333,24 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
             </span>
           </div>
         )}
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300" aria-label="Active order filters">
+          {serviceTypeFilter && <span>Service: {serviceTypeFilter}</span>}
+          {networkFilter && <span>Network: {networkFilter}</span>}
+          {manualReviewFilter && <span>Review: {manualReviewFilter === 'true' ? 'flagged' : 'not flagged'}</span>}
+          {(searchTerm || activeFilterCount > 0 || lens !== 'active') && <AdminButton variant="ghost" onClick={() => { clearFilters(); setSearchTerm(''); setDebouncedSearch(''); setLens('active'); }}>Reset view</AdminButton>}
+        </div>
         {lens === 'needs_attention' && <p className="text-xs text-slate-400">Needs Attention covers all dates: flagged orders, uncertain supplier submissions, refunds in progress and paid orders that failed without a recorded customer remedy. Resolved cases leave this list but stay searchable.</p>}
-        {lens === 'active' && <p className="text-xs text-slate-500">Active orders hide abandoned checkouts. Use the Abandoned checkouts lens to see them.</p>}
+        {lens === 'active' && <p className="text-xs text-slate-500">{debouncedSearch ? 'Searching all order states, including cancelled and expired attempts. Any additional filters still apply.' : 'Active orders hide abandoned checkouts. Searching here includes all order states.'}</p>}
       </div>
 
       {/* Results */}
-      {isLoading ? <AdminLoading label="Loading orders…" /> : error ? <AdminError message={error} onRetry={() => void fetchOrders()} /> : !ordersData || ordersData.orders.length === 0 ? (
-        <AdminEmpty title={lens === 'needs_attention' ? 'No orders need attention' : 'No orders found'}>
-          {lens === 'needs_attention' ? 'Every paid order is delivered, in progress or has a recorded customer remedy.' : 'Nothing matches this search and filter. Try another lens or clear the filters.'}
+      {!selectedOrder && isLoadingDetail && <p role="status" className="text-sm text-slate-400">Opening order details… <button type="button" className="min-h-11 px-2 text-[#00c365]" onClick={closeOrderDrawer}>Cancel opening</button></p>}
+      {!selectedOrder && detailError && initialReference && <AdminError title="Order details could not load" message={detailError} onRetry={() => void loadOrderDetails(initialReference)} />}
+      {error && <AdminError title={ordersData ? 'Refresh failed · showing last loaded orders' : 'Orders could not load'} message={error} onRetry={() => void fetchOrders()} />}
+      {isSearching && !isLoading && <p role="status" className="text-sm text-slate-400">Updating results… Previous results remain visible until the request completes.</p>}
+      {isLoading ? <AdminLoading label="Loading orders…" /> : !ordersData || ordersData.orders.length === 0 ? (
+        <AdminEmpty title={error ? 'Current orders unavailable' : lens === 'needs_attention' ? 'No orders need attention' : 'No orders found'}>
+          {error ? 'The current results could not be verified. Try refreshing again.' : lens === 'needs_attention' ? 'No actionable orders match these filters in the last successful check. Normal processing is not a failure.' : 'Nothing matches this search and filter. Try another lens or clear the filters.'}
         </AdminEmpty>
       ) : (
         <div className="space-y-3">
@@ -326,7 +382,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                       <span className="block text-slate-100">{productLabel(order)}</span>
                       <span className="block text-xs uppercase text-slate-500">{order.service_type === 'marketplace' ? 'Marketplace' : order.network}{order.service_type === 'instant_bundle' ? ' · Instant' : ''}</span>
                     </td>
-                    <td className="px-4 py-3">{caseLabel(order)}</td>
+                    <td className="px-4 py-3">{caseLabel(order)}{lens === 'needs_attention' && <p className="mt-2 max-w-xs text-xs text-slate-400">{describeOrderCase(order).explanation}</p>}</td>
                     <td className="px-4 py-3 text-right font-semibold tabular-nums text-white">{ghs(order.amount)}</td>
                     <td className="px-4 py-3 text-xs text-slate-400">{new Date(order.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}<span className="block">{new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></td>
                   </tr>
@@ -352,6 +408,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
                     <span className="shrink-0 text-xs text-slate-500">{new Date(order.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                   </span>
                   <span className="block">{caseLabel(order)}</span>
+                  {lens === 'needs_attention' && <span className="block text-xs leading-relaxed text-slate-400">{describeOrderCase(order).explanation}</span>}
                 </button>
               </li>
             ))}
@@ -361,8 +418,8 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
             <nav aria-label="Order pages" className="flex items-center justify-between gap-3 text-sm text-slate-400">
               <span>Page {ordersData.pagination.page} of {ordersData.pagination.totalPages}</span>
               <span className="flex gap-2">
-                <AdminButton aria-label="Previous page" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1}><ChevronLeft className="h-4 w-4" /></AdminButton>
-                <AdminButton aria-label="Next page" onClick={() => setCurrentPage(p => Math.min(ordersData.pagination.totalPages, p + 1))} disabled={currentPage >= ordersData.pagination.totalPages}><ChevronRight className="h-4 w-4" /></AdminButton>
+                <AdminButton aria-label="Previous page" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={isSearching || currentPage <= 1}><ChevronLeft className="h-4 w-4" /></AdminButton>
+                <AdminButton aria-label="Next page" onClick={() => setCurrentPage(p => Math.min(ordersData.pagination.totalPages, p + 1))} disabled={isSearching || currentPage >= ordersData.pagination.totalPages}><ChevronRight className="h-4 w-4" /></AdminButton>
               </span>
             </nav>
           )}
@@ -371,10 +428,14 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
 
       {selectedOrder && (
         <OrderDetailSheet
+          key={selectedOrder.id}
           order={selectedOrder}
           token={sessionToken}
           onClose={closeOrderDrawer}
           detailError={detailError}
+          loadingDetail={isLoadingDetail}
+          acting={isActing}
+          onReload={() => void loadOrderDetails(selectedOrder.public_reference)}
           message={actionSuccessMessage}
           actionError={actionError}
           copiedKey={copiedKey}
@@ -388,7 +449,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
           onRefreshSupplier={() => void handleRefreshSupplierStatus(selectedOrder.public_reference)}
           updatingStatus={isUpdatingStatus}
           onMarketplaceStep={step => void handleUpdateOrderStatus(selectedOrder, step)}
-          onResolutionUpdated={updated => { if (selectedOrderRef.current?.id === updated.id) { setSelected({ ...selectedOrderRef.current, ...updated }); afterAction(); } }}
+          onResolutionUpdated={updated => { if (selectedOrderRef.current?.id === updated.id) { requests.invalidate('detail'); setIsLoadingDetail(false); setSelected({ ...selectedOrderRef.current, ...updated }); afterAction(); } }}
           testClosure={{ show: showCloseTestConfirm, setShow: v => { setShowCloseTestConfirm(v); setCloseTestError(null); setConfirmPaidCheckbox(false); setCloseTestReason(''); }, confirmPaid: confirmPaidCheckbox, setConfirmPaid: setConfirmPaidCheckbox, reason: closeTestReason, setReason: setCloseTestReason, busy: isClosingTest, error: closeTestError, run: () => void handleCloseTestOrder() }}
         />
       )}
@@ -396,8 +457,9 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
   );
 };
 
-function OrderDetailSheet({ order, token, onClose, detailError, message, actionError, copiedKey, onCopy, note, setNote, savingNote, onSaveNote, onToggleFlag, refreshingSupplier, onRefreshSupplier, updatingStatus, onMarketplaceStep, onResolutionUpdated, testClosure }: {
+function OrderDetailSheet({ order, token, onClose, detailError, loadingDetail, acting, onReload, message, actionError, copiedKey, onCopy, note, setNote, savingNote, onSaveNote, onToggleFlag, refreshingSupplier, onRefreshSupplier, updatingStatus, onMarketplaceStep, onResolutionUpdated, testClosure }: {
   order: AdminOrderDetails; token: string; onClose: () => void; detailError: string | null; message: string | null; actionError: string | null;
+  loadingDetail: boolean; acting: boolean; onReload: () => void;
   copiedKey: string | null; onCopy: (text: string, key: string) => void; note: string; setNote: (v: string) => void; savingNote: boolean; onSaveNote: () => void; onToggleFlag: () => void;
   refreshingSupplier: boolean; onRefreshSupplier: () => void; updatingStatus: boolean; onMarketplaceStep: (step: string) => void; onResolutionUpdated: (order: AdminOrderDetails) => void;
   testClosure: { show: boolean; setShow: (v: boolean) => void; confirmPaid: boolean; setConfirmPaid: (v: boolean) => void; reason: string; setReason: (v: string) => void; busy: boolean; error: string | null; run: () => void };
@@ -410,6 +472,7 @@ function OrderDetailSheet({ order, token, onClose, detailError, message, actionE
   const digital = ['digital_delivery', 'manual_activation'].includes(order.fulfilment_method || '');
   const customerWhatsapp = whatsappLink(order.customer_phone);
   const [showRaw, setShowRaw] = useState(false);
+  const [confirmStep, setConfirmStep] = useState<string | null>(null);
   const copyButton = (text: string, key: string, label: string) => (
     <button type="button" onClick={() => onCopy(text, key)} aria-label={label} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-800 hover:text-white">
       {copiedKey === key ? <Check className="h-4 w-4 text-[#00c365]" /> : <Copy className="h-4 w-4" />}
@@ -419,11 +482,16 @@ function OrderDetailSheet({ order, token, onClose, detailError, message, actionE
   const paidButHeld = order.payment_status === 'success' && ['paid', 'queued'].includes(order.status) && !order.supplier_order_id && !isMarketplace && order.resolution?.stage !== 'resolved';
 
   return (
-    <AdminSheet wide onClose={onClose}
+    <AdminSheet wide onClose={onClose} busy={acting}
       title={<span className="font-mono">{order.public_reference}</span>}
       subtitle={<span>{order.service_type === 'airtime' ? `${order.network.toUpperCase()} Airtime` : order.product_name_snapshot} · {ghs(order.amount)}</span>}
-      footer={<div className="flex items-center justify-between gap-2"><AdminButton onClick={() => onCopy(order.public_reference, 'ref-footer')}>{copiedKey === 'ref-footer' ? <Check className="h-4 w-4 text-[#00c365]" /> : <Copy className="h-4 w-4" />}Copy reference</AdminButton><AdminButton variant="primary" onClick={onClose}>Done</AdminButton></div>}>
-      <div className="space-y-4 text-sm">
+      footer={<div className="flex items-center justify-between gap-2"><AdminButton onClick={() => onCopy(order.public_reference, 'ref-footer')}>{copiedKey === 'ref-footer' ? <Check className="h-4 w-4 text-[#00c365]" /> : <Copy className="h-4 w-4" />}Copy reference</AdminButton><AdminButton variant="primary" disabled={acting} onClick={onClose}>Done</AdminButton></div>}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <span role="status" className="text-xs text-slate-400">{acting ? 'Updating this order… Keep this window open.' : loadingDetail ? 'Loading current order details…' : detailError ? 'Details could not be refreshed. Actions are paused.' : 'Latest order details loaded.'}</span>
+        <AdminButton onClick={onReload} busy={loadingDetail} disabled={acting}>Refresh details</AdminButton>
+      </div>
+      {detailError && <AdminNotice tone="warning" title="Showing the last loaded copy">{detailError} Refresh details before using an order action.</AdminNotice>}
+      <fieldset disabled={acting || loadingDetail || Boolean(detailError)} className="min-w-0 space-y-4 border-0 p-0 text-sm">
         {/* Where this customer stands */}
         <div className={`space-y-2 rounded-2xl border p-4 ${kase.tone === 'danger' ? 'border-rose-500/40 bg-rose-500/5' : kase.tone === 'warning' ? 'border-amber-500/40 bg-amber-500/5' : kase.tone === 'success' ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-slate-700 bg-slate-900/40'}`}>
           <div className="flex flex-wrap items-center gap-2">
@@ -437,7 +505,6 @@ function OrderDetailSheet({ order, token, onClose, detailError, message, actionE
 
         {message && <AdminNotice tone="success">{message}</AdminNotice>}
         {actionError && <AdminNotice tone="danger">{actionError}</AdminNotice>}
-        {detailError && <AdminNotice tone="warning" title="Showing the list copy of this order">{detailError}</AdminNotice>}
 
         {/* Timeline */}
         <ol className="flex flex-col gap-0 rounded-2xl border border-slate-800 p-4 sm:flex-row sm:gap-2">
@@ -525,7 +592,7 @@ function OrderDetailSheet({ order, token, onClose, detailError, message, actionE
                   .filter(step => order.fulfilment_method !== 'pickup' || step.id !== 'out_for_delivery')
                   .map(step => {
                     const current = order.marketplace_status === step.id || order.status === step.id;
-                    return <button key={step.id} type="button" disabled={updatingStatus || current} aria-pressed={current} onClick={() => onMarketplaceStep(step.id)} className={`min-h-11 rounded-xl border px-3 text-sm font-semibold ${current ? 'border-[#00c365] bg-[#00c365] text-black' : 'border-slate-700 text-slate-200 hover:border-slate-500'} disabled:cursor-default`}>{step.label}</button>;
+                    return <button key={step.id} type="button" disabled={updatingStatus || current} aria-pressed={current} onClick={() => setConfirmStep(step.id)} className={`min-h-11 rounded-xl border px-3 text-sm font-semibold ${current ? 'border-[#00c365] bg-[#00c365] text-black' : 'border-slate-700 text-slate-200 hover:border-slate-500'} disabled:cursor-default`}>{step.label}</button>;
                   })}
               </div>
               <p className="text-xs text-slate-500">Cancelling a paid order does not refund the customer. Paid refunds go through Customer resolution.</p>
@@ -595,7 +662,18 @@ function OrderDetailSheet({ order, token, onClose, detailError, message, actionE
             </div>
           </details>
         )}
-      </div>
+      </fieldset>
+      {confirmStep && <ConfirmAction
+        title="Confirm Marketplace fulfilment step"
+        summary={<span>{order.public_reference}: record <strong>{confirmStep.replace(/_/g, ' ')}</strong>.</span>}
+        warning={confirmStep === 'cancelled' || confirmStep === 'refunded' ? 'This records the fulfilment state. It does not refund or verify a customer payment. Paid customer remedies require Customer resolution.' : 'Record only what actually happened. This updates the customer-visible fulfilment step; it does not submit another supplier order.'}
+        acknowledgement="I checked this order and the recorded fulfilment step is accurate."
+        confirmLabel="Record fulfilment step"
+        busy={updatingStatus}
+        error={null}
+        onClose={() => setConfirmStep(null)}
+        onConfirm={() => { const step = confirmStep; setConfirmStep(null); onMarketplaceStep(step); }}
+      />}
     </AdminSheet>
   );
 }
