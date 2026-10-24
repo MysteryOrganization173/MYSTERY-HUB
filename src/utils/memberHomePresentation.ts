@@ -18,3 +18,32 @@ export function memberTrackingOrder(o:AuthenticatedCustomerOrderDetails):OrderRe
     bundle:{id:'account-'+o.public_reference,network:o.network,dataAmount:o.bundle_size_snapshot||o.product_name_snapshot||'Order',dataBytesValue:0,validity:'',validityCategory:'Daily',priceGhc:o.amount_ghc,description:o.product_name_snapshot},recipientPhone:o.recipient_phone,network:o.network,paymentMethod:'paystack',amountGhc:o.amount_ghc,
     status:o.status==='delivered'?'delivered':['submitted','processing'].includes(o.status)?'processing':['paid','queued'].includes(o.status)?'placed':['failed','refund_pending','refunded'].includes(o.status)?'failed':'verifying',createdAt:o.created_at,updatedAt:o.created_at};
 }
+
+/** How the member home should treat an order: needs the customer's attention, still moving, delivered, or closed without delivery. */
+export type MemberOrderTone='attention'|'active'|'done'|'closed';
+const RESOLVED=['refund_confirmed','manual_fulfillment','external_compensation'];
+const isDataLike=(o:SafePublicOrderDetails)=>!o.service_type||['data','airtime','instant_bundle'].includes(o.service_type);
+export function memberOrderTone(o:SafePublicOrderDetails):MemberOrderTone {
+  if(o.customer_resolution&&RESOLVED.includes(o.customer_resolution))return 'closed';
+  if(o.manual_review||['failed','refund_pending'].includes(o.status)||['review','refund_pending'].includes(o.customer_resolution||''))return 'attention';
+  if(o.status==='delivered')return 'done';
+  if(['pending_payment','paid','queued','submitted','processing'].includes(o.status))return 'active';
+  return 'closed';
+}
+/** Truthful progress for data/airtime only: a step is complete only when the server status says so. */
+export function memberOrderSteps(o:SafePublicOrderDetails) {
+  if(!isDataLike(o)||memberOrderTone(o)!=='active')return null;
+  const paid=o.status!=='pending_payment',sent=['submitted','processing'].includes(o.status);
+  return [{label:'Payment confirmed',done:paid},{label:'With the network',done:sent},{label:'Delivered',done:false}];
+}
+/** The next step the customer should take, reusing the order page's own wording for data and airtime. */
+export function memberOrderNext(o:SafePublicOrderDetails) {
+  if(isDataLike(o))return dataOrderPresentation(o.status,!!o.manual_review,o.customer_resolution,o.payment_basis).next;
+  const tone=memberOrderTone(o);
+  return tone==='attention'?'Contact support with your order reference before placing the same order again.':tone==='active'?'Open the order for its latest status.':'Open the order for its details.';
+}
+/** "Buy again" only opens the catalogue for the same network; it never repeats a payment. */
+export function memberReorder(o:SafePublicOrderDetails):{mode:'data'|'airtime';network:SafePublicOrderDetails['network']}|null {
+  if(memberOrderTone(o)!=='done'||!isDataLike(o)||!['mtn','telecel','airteltigo'].includes(o.network))return null;
+  return {mode:o.service_type==='airtime'?'airtime':'data',network:o.network};
+}
