@@ -12,7 +12,7 @@ export function memberOrderLabel(order:SafePublicOrderDetails) {
 }
 export function memberOrderSelection(orders:SafePublicOrderDetails[]) {
   const sorted=[...orders].sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at));
-  const latest=sorted.find(o=>o.manual_review||['paid','queued','submitted','processing','pending_payment','refund_pending','failed'].includes(o.status))??sorted[0];
+  const latest=sorted.find(o=>memberOrderTone(o)==='attention')??sorted.find(o=>memberOrderTone(o)==='active')??sorted[0];
   return {latest,prioritizesActive:latest!==sorted[0],recent:sorted.filter(o=>o.public_reference!==latest?.public_reference).slice(0,3)};
 }
 export function memberTrackingOrder(o:AuthenticatedCustomerOrderDetails):OrderRecord {
