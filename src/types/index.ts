@@ -260,7 +260,7 @@ export interface DigitalService {
   artworkUrl?: string;
 }
 
-export type ActivePage = 'wallet' | 'home' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'help' | 'orders' | 'admin' | 'earn' | 'afa';
+export type ActivePage = 'wallet' | 'home' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'help' | 'orders' | 'admin' | 'earn' | 'afa' | 'app';
 
 export type MarketplaceAvailability = 'available' | 'check_availability' | 'limited' | 'coming_soon';
 

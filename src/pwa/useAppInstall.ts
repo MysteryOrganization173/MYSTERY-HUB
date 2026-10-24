@@ -29,5 +29,6 @@ export function useAppInstall() {
     return outcome;
   }, [dismiss]);
 
-  return { mode, progress, install, dismiss };
+  // The /app landing page explains installing even after a dismissal, so it also needs the raw capabilities.
+  return { mode, progress, install, dismiss, hasPrompt, installed: environment.installed, apple: environment.apple };
 }

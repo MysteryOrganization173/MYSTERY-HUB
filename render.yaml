@@ -9,6 +9,14 @@ services:
     buildCommand: npm run build
     staticPublishPath: dist
     routes:
+      # The app landing page has its own HTML so link previews (WhatsApp, Facebook, X) show the app's title and
+      # image. It must come before the catch-all. The page itself is the same SPA.
+      - type: rewrite
+        source: /app
+        destination: /app/index.html
+      - type: rewrite
+        source: /app/
+        destination: /app/index.html
       - type: rewrite
         source: /*
         destination: /index.html

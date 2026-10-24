@@ -2,6 +2,8 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig, type Plugin} from 'vite';
+import {publicPageHead} from './src/utils/socialMetadata';
+import {injectSocialHead} from './src/utils/socialHtml';
 
 /**
  * main.tsx loads the Mystery Hub app on demand so business websites (/sites/:slug) skip it. This inline hint
@@ -25,9 +27,28 @@ function preloadMainApp(): Plugin {
   };
 }
 
+/**
+ * WhatsApp and other link previews read the first HTML response and never run JavaScript. The Render static site
+ * answers every route with the same index.html, so /app gets its own copy carrying the app's title, description and
+ * preview image. render.yaml (and public/_redirects) rewrite /app to it ahead of the SPA catch-all. Express serves the
+ * same tags from the same publicPageHead('app') when it answers the request instead.
+ */
+function appSharePage(): Plugin {
+  return {
+    name: 'mh-app-share-page',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      const index = bundle['index.html'];
+      if (!index || index.type !== 'asset') return;
+      this.emitFile({type: 'asset', fileName: 'app/index.html', source: injectSocialHead(String(index.source), publicPageHead('app'))});
+    },
+  };
+}
+
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss(), preloadMainApp()],
+    plugins: [react(), tailwindcss(), preloadMainApp(), appSharePage()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

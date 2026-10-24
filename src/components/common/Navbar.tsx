@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useOverlayLock } from '../../utils/overlayStack';
+import { ShareAppButton } from '../app/ShareAppButton';
 import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { BrandLogo } from './BrandLogo';
 import { ActivePage } from '../../types';
@@ -286,6 +287,7 @@ export const Navbar: React.FC = () => {
 
                   <button onClick={() => { accountTrigger.current?.focus(); setAccountDropdownOpen(false); openAccount(); }} className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2"><UserIcon className="w-4 h-4" />My Account</button>
                   <a href="/help" onClick={event => { event.preventDefault(); handleNavClick('help'); }} className="w-full min-h-11 px-3.5 flex items-center gap-2 hover:bg-slate-800"><MessageCircle className="w-4 h-4" />Help &amp; FAQs</a>
+                  <ShareAppButton onDone={() => setAccountDropdownOpen(false)} className="w-full min-h-11 text-left px-3.5 flex items-center gap-2 hover:bg-slate-800 cursor-pointer" />
                   {/* Sign Out */}
                   <div className="pt-1 border-t border-slate-800">
                     <button
@@ -398,6 +400,8 @@ export const Navbar: React.FC = () => {
               </span>
             </a>
           </div>
+
+          <ShareAppButton onDone={() => setMobileMenuOpen(false)} className="flex items-center gap-2 w-full min-h-11 px-3 rounded-xl text-sm text-slate-300 hover:bg-slate-900 cursor-pointer" />
 
           {!user && (
             <div className="pt-2 border-t border-slate-800 flex gap-2">

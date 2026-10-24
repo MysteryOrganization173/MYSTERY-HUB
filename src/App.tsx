@@ -32,6 +32,7 @@ const AboutPage = lazyPage(() => import('./components/about/AboutPage'), 'AboutP
 const OrdersPage = lazyPage(() => import('./components/orders/OrdersPage'), 'OrdersPage', { warm: true });
 const MysteryEarnPage = lazyPage(() => import('./components/earn/MysteryEarnPage'), 'MysteryEarnPage');
 const WalletPage = lazyPage(() => import('./components/finance/FinancialPanel'), 'WalletPage');
+const AppLandingPage = lazyPage(() => import('./components/app/AppLandingPage'), 'AppLandingPage');
 const AdminPage = lazyPage(() => import('./components/admin/AdminPage'), 'AdminPage');
 // Overlays carrying the website templates and the assistant load the first time they are needed, then stay mounted.
 const TemplatePreviewModal = lazyPage(() => import('./components/website/TemplatePreviewModal'), 'TemplatePreviewModal', { fallback: null });
@@ -84,6 +85,7 @@ const AppContent: React.FC = () => {
         {activePage === 'orders' && <OrdersPage />}
         {activePage === 'earn' && <MysteryEarnPage />}
         {activePage === 'wallet' && <WalletPage />}
+        {activePage === 'app' && <AppLandingPage />}
       </main>
 
       {/* Footer */}
