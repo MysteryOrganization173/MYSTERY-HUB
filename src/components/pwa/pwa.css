@@ -38,6 +38,7 @@
 /* Compact: for a slot inside another surface (for example the member home). */
 .mh-install-promo-compact { padding: 14px; gap: 10px 12px; }
 .mh-install-promo-compact .mh-install-icon { width: 48px; height: 48px; border-radius: 13px; }
+.mh-install-promo-compact .mh-install-icon > * { width: 34px; height: 34px; }
 .mh-install-promo-compact .mh-install-note { display: none; }
 
 /* Home placement: a band between catalogue sections with the page's usual rhythm. */
