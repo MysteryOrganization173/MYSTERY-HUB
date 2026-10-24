@@ -10,6 +10,7 @@ import { WhyMysteryHub } from './WhyMysteryHub';
 import { HomeFaqPreview } from './HomeFaqPreview';
 import { HomeComingSoonSection } from './HomeComingSoonSection';
 import { MemberHome } from './MemberHome';
+import { InstallAppPromo } from '../pwa/InstallAppPromo';
 
 export const HomePage: React.FC = () => {
   const { user, isAuthChecking } = useApp();
@@ -40,6 +41,8 @@ export const HomePage: React.FC = () => {
       <Hero />
       <QuickServicesBar />
       <HomeFeaturedData />
+      {/* P0-C: install card (renders nothing where installing cannot work). Layout around it belongs to Homepage V3. */}
+      <div className="home-container home-install-band empty:hidden"><InstallAppPromo /></div>
       <HomeWebsiteSection />
       <HomeMarketplaceSection />
       <HomeComingSoonSection />

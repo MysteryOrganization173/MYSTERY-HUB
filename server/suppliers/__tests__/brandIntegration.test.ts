@@ -61,7 +61,8 @@ describe('Mystery Hub Brand Asset & Logo Integration', () => {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     assert.equal(manifest.name, 'Mystery Hub');
     assert.equal(manifest.short_name, 'Mystery Hub');
-    assert.equal(manifest.theme_color, '#00c365');
+    // P0-C: system bars match the dark navigation; green stays the accent inside the app.
+    assert.equal(manifest.theme_color, '#0a0e11');
     assert.equal(manifest.background_color, '#070b0e');
     assert.ok(Array.isArray(manifest.icons) && manifest.icons.length >= 2);
 

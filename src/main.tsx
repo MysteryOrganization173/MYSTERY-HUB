@@ -1,6 +1,7 @@
 import {createRoot} from 'react-dom/client';
 import type {ReactElement} from 'react';
 import './index.css';
+import {captureInstallPrompt} from './pwa/installPrompt';
 
 /**
  * Each surface downloads only its own code: a customer opening a business website at /sites/:slug never
@@ -9,6 +10,9 @@ import './index.css';
 const params = new URLSearchParams(window.location.search);
 const isolatedTemplateId = params.get('isolated_template_preview') || params.get('preview_template_id');
 const siteSlug = window.location.pathname.match(/^\/sites\/([^/?#]+)/)?.[1];
+
+// Before any surface downloads: Chromium may offer installation before the app code has arrived.
+captureInstallPrompt();
 
 const surface: Promise<ReactElement> = isolatedTemplateId
   ? import('./components/website/IsolatedTemplatePreview').then(({IsolatedTemplatePreview}) => <IsolatedTemplatePreview templateId={isolatedTemplateId} />)
