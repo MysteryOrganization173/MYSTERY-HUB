@@ -1,370 +1,264 @@
-import { dataOrderPresentation, dataRecipientDisplay } from '../../utils/dataPurchasePresentation';
-import { afaStatusLabel } from '../../../shared/afa';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { GHANA_NETWORKS } from '../../data/bundles';
-import { lookupOrderOnServer, getAccountOrdersOnServer } from '../../services/apiClient';
-import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
+import { getAccountOrdersOnServer } from '../../services/apiClient';
 import { OrderRecord } from '../../types';
-import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { PendingPaymentBanner } from '../checkout/PendingPaymentBanner';
-import { orderRecordFromLookup } from '../../utils/checkoutRecovery';
-import { Clock, Search, ArrowRight, CheckCircle2, RefreshCw, AlertTriangle, Smartphone, ShieldCheck, ShoppingBag, X } from 'lucide-react';
+import { CustomerOrderCard } from './CustomerOrderCard';
+import { TrackOrderPanel } from './TrackOrderPanel';
+import {
+  CustomerOrderFilter,
+  ORDER_FILTERS,
+  accountOrderRecord,
+  classifyTrackInput,
+  customerOrderStatus,
+  mergeCustomerOrders,
+  orderMatchesFilter,
+  orderMatchesQuery,
+} from '../../utils/customerOrderPresentation';
+import { RefreshCw, Search, X } from 'lucide-react';
+
+/** The account orders API returns at most this many recent orders and has no paging yet. */
+const ACCOUNT_ORDER_LIMIT = 50;
+const VIEW_KEY = 'mh_orders_view';
+
+function readView(key: string): { query: string; filter: CustomerOrderFilter } {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
+    if (saved && typeof saved.query === 'string' && ORDER_FILTERS.some(f => f.id === saved.filter)) return { query: saved.query.slice(0, 80), filter: saved.filter };
+  } catch { /* Storage can be unavailable; the view simply starts fresh. */ }
+  return { query: '', filter: 'all' };
+}
 
 export const OrdersPage: React.FC = () => {
-  const { orders: localOrders, openOrderStatus, setActivePage, showToast, user, sessionToken } = useApp();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchingServer, setIsSearchingServer] = useState(false);
+  const { user, sessionToken } = useApp();
+  // Remount before rendering another account: old rows and late requests cannot cross sessions.
+  return <OrdersHistory key={`${user?.id || 'guest'}:${sessionToken || ''}`} />;
+};
+
+const OrdersHistory: React.FC = () => {
+  const { orders: localOrders, openOrderStatus, activeOrder, setActivePage, openAuth, user, sessionToken } = useApp();
+  const viewKey = `${VIEW_KEY}:${user?.id || 'guest'}`;
+  const [searchQuery, setSearchQuery] = useState(() => readView(viewKey).query);
+  const [filter, setFilter] = useState<CustomerOrderFilter>(() => readView(viewKey).filter);
   const [serverOrders, setServerOrders] = useState<OrderRecord[]>([]);
-  const [accountLoading,setAccountLoading]=useState(false),[accountError,setAccountError]=useState(''),[refresh,setRefresh]=useState(0);
+  const [accountLoading, setAccountLoading] = useState(false), [accountLoaded, setAccountLoaded] = useState(false), [accountError, setAccountError] = useState(''), [refresh, setRefresh] = useState(0);
+  const [trackOpen, setTrackOpen] = useState(false);
+  const [trackPrefill, setTrackPrefill] = useState<string | undefined>();
+  const [now] = useState(() => new Date());
 
   // Fetch account-linked orders when authenticated
   useEffect(() => {
     if (!user || !sessionToken) {
       setServerOrders([]);
       setAccountLoading(false);
+      setAccountLoaded(false);
       setAccountError('');
       return;
     }
 
     let isMounted = true;
-    setAccountLoading(true);setAccountError('');
-    getAccountOrdersOnServer(sessionToken, 50)
+    setAccountLoading(true); setAccountError('');
+    getAccountOrdersOnServer(sessionToken, ACCOUNT_ORDER_LIMIT)
       .then((res) => {
         if (isMounted && res.success && Array.isArray(res.orders)) {
-          const mapped: OrderRecord[] = res.orders.map((o) => {
-            const isDelivered = o.status === 'delivered';
-            const isProcessing = o.status === 'processing' || o.status === 'submitted';
-            const isPlaced = o.status === 'paid' || o.status === 'queued';
-            const isFailed = o.status === 'failed' || o.status === 'refund_pending' || o.status === 'refunded';
-
-            return {
-              id: o.public_reference,
-              publicReference: o.public_reference,
-              serverReference: o.public_reference,
-              serverStatus: o.status,
-              customerResolution:o.customer_resolution,
-              paymentBasis:o.payment_basis,
-              manualReview: o.manual_review,
-              commercialPricing: o.commercial_pricing,
-              serviceType: o.service_type || (o.product_name_snapshot?.toLowerCase().includes('airtime') ? 'airtime' : 'data'),
-              bundle: {
-                id: 'server-bundle-' + o.public_reference,
-                network: o.network,
-                dataAmount: o.bundle_size_snapshot || o.product_name_snapshot || 'Data Order',
-                dataBytesValue: 0,
-                validity: 'Standard',
-                validityCategory: 'Daily',
-                priceGhc: o.amount_ghc,
-                description: o.product_name_snapshot,
-              },
-              recipientPhone: o.recipient_phone,
-              buyerRecipientVisible: true,
-              journey: 'account',
-              network: o.network,
-              paymentMethod: 'paystack',
-              amountGhc: o.amount_ghc,
-              status: isDelivered ? 'delivered' : isProcessing ? 'processing' : isPlaced ? 'placed' : isFailed ? 'failed' : 'verifying',
-              paymentReference: o.public_reference,
-              createdAt: o.created_at,
-              updatedAt: o.created_at,
-            };
-          });
-          setServerOrders(mapped);
+          setServerOrders(res.orders.map(accountOrderRecord));
+          setAccountLoaded(true);
         }
       })
-      .catch(() => {if(isMounted)setAccountError('We couldn’t load your account orders. Saved orders on this device are still shown.');})
-      .finally(()=>{if(isMounted)setAccountLoading(false);});
+      .catch(() => { if (isMounted) setAccountError('We couldn’t load your account orders.'); })
+      .finally(() => { if (isMounted) setAccountLoading(false); });
 
     return () => {
       isMounted = false;
     };
-  }, [user, sessionToken, refresh]);
+    // Keyed on the account id so a refreshed profile object does not refetch the list.
+  }, [user?.id, sessionToken, refresh]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The receipt already checks the server while open; carry what it learned back to this list
+  // so a card never contradicts the receipt the customer just saw. No extra requests are made.
+  useEffect(() => {
+    const ref = activeOrder?.publicReference;
+    if (!ref) return;
+    setServerOrders((prev) => {
+      const index = prev.findIndex((o) => o.publicReference === ref);
+      const current = prev[index];
+      if (index < 0 || (current.status === activeOrder.status && current.serverStatus === activeOrder.serverStatus && current.manualReview === activeOrder.manualReview)) return prev;
+      const next = [...prev];
+      next[index] = { ...current, status: activeOrder.status, serverStatus: activeOrder.serverStatus, manualReview: activeOrder.manualReview, statusMessage: activeOrder.statusMessage };
+      return next;
+    });
+  }, [activeOrder]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(viewKey, JSON.stringify({ query: searchQuery, filter })); } catch { /* ignore */ }
+  }, [searchQuery, filter, viewKey]);
 
   // Combine server orders with local orders without duplicates
-  const allOrders = React.useMemo(() => {
-    const combined = [...serverOrders];
-    for (const localOrd of localOrders) {
-      const ref = localOrd.publicReference || localOrd.id;
-      if (!combined.some((s) => s.publicReference === ref || s.id === ref || s.id === localOrd.id)) {
-        combined.push(localOrd);
-      }
-    }
-    return combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [serverOrders, localOrders]);
+  const allOrders = React.useMemo(() => mergeCustomerOrders(serverOrders, localOrders).map((order) => ({ order, status: customerOrderStatus(order) })), [serverOrders, localOrders]);
+  const groupCounts = React.useMemo(() => {
+    const counts = new Map<CustomerOrderFilter, number>();
+    for (const f of ORDER_FILTERS) counts.set(f.id, allOrders.filter(({ status }) => orderMatchesFilter(status.group, f.id)).length);
+    return counts;
+  }, [allOrders]);
+  const availableFilters = ORDER_FILTERS.filter((f) => f.id === 'all' || (groupCounts.get(f.id) || 0) > 0);
+  const showFilters = allOrders.length >= 4 && availableFilters.length > 2;
+  const activeFilter = showFilters && availableFilters.some((f) => f.id === filter) ? filter : 'all';
 
-  const handleServerLookup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const query = searchQuery.trim();
-    if (!query) return;
+  const visibleOrders = allOrders.filter(({ order, status }) => orderMatchesFilter(status.group, activeFilter) && orderMatchesQuery(order, searchQuery));
+  const query = searchQuery.trim();
+  const hasOrders = allOrders.length > 0;
+  const reachedLimit = serverOrders.length >= ACCOUNT_ORDER_LIMIT;
+  const awaitingAccount = accountLoading || (Boolean(user) && !accountLoaded && !accountError);
+  const filterLabel = ORDER_FILTERS.find((f) => f.id === activeFilter)!.label;
 
-    setIsSearchingServer(true);
-    try {
-      const res = await lookupOrderOnServer(query);
-      if (res.success && res.order) {
-        openOrderStatus(orderRecordFromLookup(res.order));
-      } else {
-        showToast('We couldn’t find that order. Check the reference and try again.', 'warning');
-      }
-    } catch {
-      showToast('We couldn’t check this order. Check the reference or try again.', 'warning');
-    } finally {
-      setIsSearchingServer(false);
-    }
+  const openTracking = (prefill?: string) => {
+    setTrackPrefill(prefill);
+    setTrackOpen(true);
+    requestAnimationFrame(() => document.getElementById('mh-track-order')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
   };
 
-  const filteredOrders = allOrders.filter((o) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    const pubRef = o.publicReference ? o.publicReference.toLowerCase() : '';
-    return (
-      pubRef.includes(q) ||
-      o.id.toLowerCase().includes(q) ||
-      o.recipientPhone.includes(q) ||
-      o.bundle.dataAmount.toLowerCase().includes(q) ||
-      o.network.toLowerCase().includes(q)
-    );
-  });
+  // A guest with nothing saved here most likely came to track an order.
+  const trackExpanded = trackOpen || (!user && !hasOrders);
 
   return (
     <div className="py-6 sm:py-10 text-slate-100">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/30 text-xs font-semibold text-[#00c365] mb-2">
-              {user ? <ShieldCheck className="w-3.5 h-3.5 text-[#00c365]" /> : <Clock className="w-3.5 h-3.5" />}
-              <span>{user ? 'Account Orders' : 'Order Tracking'}</span>
-            </div>
-            <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-              {user ? 'Your Orders' : 'Order History & Tracking'}
-            </h1>
-            <p className="text-xs text-slate-400 mt-1">
-              {user
-                ? 'Your purchases linked to this Mystery Hub account.'
-                : 'Check delivery progress and view your order details.'}
-            </p>
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 space-y-4 sm:space-y-5">
+        <header className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">My Orders</h1>
+            <p className="text-sm text-slate-400 mt-1">Find a purchase or check its delivery.</p>
           </div>
-
           <button
+            type="button"
             onClick={() => setActivePage('data')}
-            className="px-4 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all self-start sm:self-auto cursor-pointer"
+            className="shrink-0 min-h-11 px-3.5 rounded-xl border border-[#00c365]/40 text-[#44df95] hover:bg-[#00c365]/10 text-sm font-semibold transition-colors cursor-pointer"
           >
-            Buy Data
+            Buy data
           </button>
-        </div>
+        </header>
 
         <PendingPaymentBanner />
 
-        {/* Search Filter & Server Lookup Form */}
-        <form onSubmit={handleServerLookup} className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              aria-label="Order reference or saved recipient phone"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Enter an order reference or recipient number"
-              className="w-full bg-[#0e141a] border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#00c365]"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={isSearchingServer || !searchQuery.trim()}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-colors shrink-0 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
-          >
-            {isSearchingServer ? (
-              <RefreshCw className="w-4 h-4 animate-spin text-[#00c365]" />
-            ) : (
-              'Track Order'
-            )}
-          </button>
-        </form>
-        <p className="text-xs text-slate-400">Enter your Mystery Hub reference to check the latest status. A phone-number search filters orders already shown here.</p>
+        <div id="mh-track-order" className="scroll-mt-20">
+          <TrackOrderPanel open={trackExpanded} onOpenChange={setTrackOpen} prefill={trackPrefill} />
+        </div>
 
-<div aria-live="polite">{accountLoading&&<p className="text-sm text-slate-400">Loading your account orders…</p>}{accountError&&<div className="mh-surface text-sm"><p role="alert" className="text-amber-300">{accountError}</p><button className="mh-button-secondary mt-3" onClick={()=>setRefresh(x=>x+1)}>Try again</button></div>}</div>
-        {/* Orders List */}
-        {filteredOrders.length > 0 ? (
-          <div className="space-y-3">
-            {filteredOrders.map((order) => {
-              const net = GHANA_NETWORKS[order.network] || GHANA_NETWORKS['mtn'];
+        <section aria-labelledby="mh-orders-heading" aria-busy={accountLoading} className="space-y-3">
+          <h2 id="mh-orders-heading" className="sr-only">{user ? 'Your account and device orders' : 'Orders saved on this device'}</h2>
 
-              const isAfa = order.serviceType === 'afa';
+          {accountError && (
+            <div role="alert" className="flex items-center justify-between gap-3 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] px-3.5 py-2.5">
+              <p className="text-xs text-amber-100 leading-relaxed">{accountError}{hasOrders ? ' Orders saved on this device are still shown.' : ''}</p>
+              <button type="button" onClick={() => setRefresh((x) => x + 1)} disabled={accountLoading} className="shrink-0 min-h-11 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-sm font-semibold cursor-pointer disabled:opacity-70">
+                Try again
+              </button>
+            </div>
+          )}
 
-              const statusBadge = isAfa ? (
-                <span className={`inline-flex items-center gap-1 text-[11px] font-semibold border px-2.5 py-1 rounded-full ${order.serverStatus === 'delivered' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-amber-400 bg-amber-500/10 border-amber-500/20'}`}>
-                  {order.serverStatus === 'delivered' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                  {afaStatusLabel(order.serverStatus, order.manualReview)}
-                </span>
-              ) : {
-                verifying: (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-full animate-pulse">
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                    Verifying
-                  </span>
-                ),
-                delivered: (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Delivered
-                  </span>
-                ),
-                processing: (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2.5 py-1 rounded-full animate-pulse">
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                    Processing
-                  </span>
-                ),
-                placed: (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
-                    <Clock className="w-3 h-3" />
-                    Queued
-                  </span>
-                ),
-                failed: (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-full">
-                    <AlertTriangle className="w-3 h-3" />
-                    Failed
-                  </span>
-                ),
-              }[order.status];
+          {hasOrders && (
+            <>
+              <div className="relative">
+                <Search aria-hidden="true" className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="search"
+                  aria-label="Search my orders"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search my orders"
+                  enterKeyHint="search"
+                  className="mh-field pl-10 pr-11 text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#00c365] [&::-webkit-search-cancel-button]:hidden"
+                />
+                {searchQuery && (
+                  <button type="button" onClick={() => setSearchQuery('')} aria-label="Clear search" className="absolute right-0 top-0 h-full min-w-11 flex items-center justify-center text-slate-400 hover:text-white cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
 
-              const isInstantBundle =
-                order.serviceType === 'instant_bundle' ||
-                (order.bundle.id && order.bundle.id.startsWith('instant-')) ||
-                (order.bundle.packageId && order.bundle.packageId.length > 0);
-              const isAirtime =
-                order.serviceType === 'airtime' ||
-                (order.bundle.id && order.bundle.id.startsWith('airtime-'));
-              const isMarketplace =
-                order.serviceType === 'marketplace' ||
-                (order.bundle.id && order.bundle.id.startsWith('marketplace-'));
-              const instantInfo = isInstantBundle
-                ? getInstantBundlePresentation({
-                    category: order.bundle.category,
-                    name: order.bundle.description || order.bundle.dataAmount,
-                    dataAmount: order.bundle.dataAmount,
-                    isFlexi: order.bundle.isFlexi,
-                  })
-                : null;
-
-              return (
-                <div
-                  key={order.id}
-                  role="button" tabIndex={0} aria-label={`Track order ${order.publicReference||order.id}`}
-                  onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openOrderStatus(order);}}}
-                  onClick={() => openOrderStatus(order)}
-                  className="p-4 sm:p-5 rounded-2xl bg-[#0f151b] border border-slate-800 hover:border-[#00c365]/40 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 sm:gap-4 cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365]"
-                >
-                  <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
-                    {isMarketplace ? (
-                      <div className="w-8 h-8 rounded-lg bg-[#00c365]/15 border border-[#00c365]/30 text-[#00c365] flex items-center justify-center shrink-0 shadow-sm">
-                        <ShoppingBag className="w-4 h-4" />
-                      </div>
-                    ) : (
-                      <NetworkBrandBadge network={order.network} size="md" />
-                    )}
-
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-white text-sm sm:text-base group-hover:text-[#00c365] transition-colors truncate max-w-[240px] sm:max-w-none">
-                          {isAfa
-                            ? 'AFA Registration'
-                            : isMarketplace
-                            ? order.bundle.description || order.bundle.dataAmount || 'Marketplace Item'
-                            : isInstantBundle && instantInfo
-                            ? `${instantInfo.formattedAmount} ${instantInfo.categoryLabel} ⚡`
-                            : isAirtime
-                            ? order.bundle.dataAmount
-                            : `${order.bundle.dataAmount} Data Bundle`}
-                        </span>
-                        <span className="font-mono text-[11px] text-slate-300 break-all">
-                          #{order.publicReference || order.id}
-                        </span>
-                      </div>
-                      <div className="text-[11px] sm:text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-x-2.5 sm:gap-x-3 gap-y-1">
-                        <span>Recipient: {order.serviceType==='data'?dataRecipientDisplay(order.recipientPhone,order.buyerRecipientVisible):order.recipientPhone}</span>
-                        <span>·</span>
-                        <span>
-                          {new Date(order.createdAt).toLocaleDateString()}{' '}
-                          {new Date(order.createdAt).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                        {instantInfo?.restrictionNote && (
-                          <>
-                            <span>·</span>
-                            <span
-                              className={`text-[11px] font-semibold ${
-                                instantInfo.isMidnight
-                                  ? 'text-amber-400'
-                                  : instantInfo.isVideo
-                                  ? 'text-indigo-400'
-                                  : instantInfo.isIdd
-                                  ? 'text-emerald-400'
-                                  : 'text-slate-300'
-                              }`}
-                            >
-                              {instantInfo.badgeEmoji ? `${instantInfo.badgeEmoji} ` : ''}
-                              {instantInfo.restrictionNote}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                      {order.serviceType==='data'&&<p className="text-xs text-slate-400 mt-2 leading-relaxed">{dataOrderPresentation(order.serverStatus,order.manualReview,order.customerResolution,order.paymentBasis).next}</p>}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-800/80 shrink-0">
-                    <div className="text-left sm:text-right">
-                      <div className="text-sm sm:text-base font-extrabold text-white tabular-nums">
-                        GH₵{order.amountGhc.toFixed(2)}
-                      </div>
-                      {Boolean(order.commercialPricing?.discountMinor)&&<p className="text-xs text-emerald-300">Welcome saving GH₵{(order.commercialPricing!.discountMinor/100).toFixed(2)} from GH₵{(order.commercialPricing!.regularMinor/100).toFixed(2)}</p>}
-                      <div className="mt-1">{order.serviceType==='data'||order.customerResolution?<span className="text-xs font-semibold text-slate-200">{dataOrderPresentation(order.serverStatus,order.manualReview,order.customerResolution,order.paymentBasis).label}</span>:statusBadge}</div>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-[#00c365] group-hover:translate-x-1 transition-all shrink-0" />
-                  </div>
+              {showFilters && (
+                <div role="group" aria-label="Filter orders by status" className="mh-tabbar -mx-4 px-4 sm:mx-0 sm:px-0 py-0">
+                  {availableFilters.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      aria-pressed={activeFilter === f.id}
+                      onClick={() => setFilter(f.id)}
+                      className={`px-3.5 rounded-full border text-sm font-semibold transition-colors cursor-pointer ${activeFilter === f.id ? 'bg-[#00c365] border-[#00c365] text-[#05140c]' : 'border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white'}`}
+                    >
+                      {f.label}{f.id !== 'all' && <span className={activeFilter === f.id ? 'text-[#05140c]/70' : 'text-slate-500'}> {groupCounts.get(f.id)}</span>}
+                    </button>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-        ) : searchQuery.trim() ? (
-          <div className="text-center py-12 px-4 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-3 max-w-md mx-auto shadow-sm">
-            <Search className="w-8 h-8 text-slate-500 mx-auto" />
-            <h3 className="text-base font-bold text-white">No matching orders</h3>
-            <p className="text-xs text-slate-400">
-              No orders matched &ldquo;{searchQuery}&rdquo;. Check the reference or phone number.
-            </p>
-            <div className="pt-1">
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-                <span>Clear Filter</span>
-              </button>
+              )}
+
+              <div className="flex items-center justify-between gap-3 text-xs text-slate-400 min-h-6">
+                <p aria-live="polite">
+                  {query || activeFilter !== 'all'
+                    ? `${visibleOrders.length} of ${allOrders.length} ${allOrders.length === 1 ? 'order' : 'orders'}`
+                    : `${allOrders.length} ${allOrders.length === 1 ? 'order' : 'orders'}`}
+                  {accountLoading && <span> · Updating…</span>}
+                </p>
+                {user && (
+                  <button type="button" onClick={() => setRefresh((x) => x + 1)} disabled={accountLoading} className="min-h-11 -my-2.5 px-2 inline-flex items-center gap-1.5 text-slate-400 hover:text-white cursor-pointer disabled:opacity-60">
+                    <RefreshCw aria-hidden="true" className={`w-3.5 h-3.5 ${accountLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+
+          {visibleOrders.length > 0 ? (
+            <ul className="space-y-2.5">
+              {visibleOrders.map(({ order, status }) => (
+                <li key={order.id}>
+                  <CustomerOrderCard order={order} status={status} now={now} onOpen={() => openOrderStatus(order)} />
+                </li>
+              ))}
+            </ul>
+          ) : hasOrders ? (
+            <div className="text-center py-10 px-4 rounded-2xl border border-slate-800 bg-[#0f151b] space-y-3">
+              <p className="text-base font-bold text-white">{query ? 'No orders match your search' : `No ${filterLabel.toLowerCase()} orders`}</p>
+              <p className="text-sm text-slate-400 max-w-sm mx-auto">
+                {query ? 'This search only covers the orders listed here.' : 'Try another status.'}
+                {query && classifyTrackInput(query).kind === 'reference' ? ' If you have an order reference, you can track it directly.' : ''}
+              </p>
+              <div className="flex flex-wrap justify-center gap-2 pt-1">
+                {query && classifyTrackInput(query).kind === 'reference' && (
+                  <button type="button" onClick={() => openTracking(query)} className="mh-button">Track this reference</button>
+                )}
+                <button type="button" onClick={() => { setSearchQuery(''); setFilter('all'); }} className="mh-button-secondary">Show all orders</button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="text-center py-14 px-4 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-3.5 max-w-md mx-auto shadow-sm">
-            <Smartphone className="w-9 h-9 text-slate-500 mx-auto" />
-            <h3 className="text-base sm:text-lg font-bold text-white">No orders found</h3>
-            <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
-              No orders to show yet. Buy data, airtime or AFA registration to track your purchases here.
-            </p>
-            <div className="pt-1">
-              <button
-                onClick={() => setActivePage('data')}
-                className="px-5 py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-95"
-              >
-                Browse Data Bundles
-              </button>
+          ) : awaitingAccount ? (
+            <ul aria-hidden="true" className="space-y-2.5">
+              {[0, 1, 2].map((i) => (
+                <li key={i} className="h-[92px] rounded-2xl border border-slate-800 bg-[#0f151b] motion-safe:animate-pulse" />
+              ))}
+            </ul>
+          ) : (
+            <div className="text-center py-10 px-4 rounded-2xl border border-slate-800 bg-[#0f151b] space-y-3">
+              <p className="text-base font-bold text-white">{user ? (accountError ? 'Your orders couldn’t load' : 'No orders yet') : 'No orders on this device yet'}</p>
+              <p className="text-sm text-slate-400 max-w-sm mx-auto leading-relaxed">
+                {user
+                  ? accountError ? 'Try again in a moment, or track an order with its reference.' : 'Data, airtime and other purchases linked to your account will appear here.'
+                  : 'Orders you buy on this device appear here. Sign in to see orders linked to your account.'}
+              </p>
+              <div className="flex flex-wrap justify-center gap-2 pt-1">
+                {!user && <button type="button" onClick={() => openAuth('login')} className="mh-button-secondary">Sign in</button>}
+                <button type="button" onClick={() => setActivePage('data')} className="mh-button">Buy data</button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {hasOrders && (reachedLimit || !user) && (
+            <p className="text-xs text-slate-500 leading-relaxed pt-1">
+              {reachedLimit
+                ? `Showing your ${ACCOUNT_ORDER_LIMIT} most recent account orders. To check an older order, track it with its reference.`
+                : <>These orders are saved on this device. <button type="button" onClick={() => openAuth('login')} className="text-[#44df95] hover:underline font-semibold cursor-pointer">Sign in</button> to see orders linked to your account.</>}
+            </p>
+          )}
+        </section>
       </div>
     </div>
   );
