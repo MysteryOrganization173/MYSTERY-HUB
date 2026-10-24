@@ -1,40 +1,123 @@
 import React from 'react';
-import {Wifi,Smartphone,Globe,Gift,Clock,ArrowUpRight,ShoppingBag,ShieldCheck,Grid2X2} from 'lucide-react';
+import {Wifi,Smartphone,Globe,Gift,ArrowRight,ArrowUpRight,ShoppingBag,ShieldCheck,Grid2X2,MessageCircle,Sparkles,AlertTriangle,Check,RotateCcw} from 'lucide-react';
 import type {AuthenticatedCustomerOrderDetails} from '../../../server/types/orders';
-import {memberOrderSelection,memberOrderLabel} from '../../utils/memberHomePresentation';
+import type {NetworkId} from '../../types';
+import {memberOrderSelection,memberOrderLabel,memberOrderTone,memberOrderSteps,memberOrderNext,memberReorder} from '../../utils/memberHomePresentation';
 import {formatGhs} from '../../../shared/money';
+import {BUSINESS_CONFIG} from '../../config/business';
+
+/** What the account's existing Website Builder record says, when it has loaded. */
+export type MemberWebsiteSummary={state:'none'}|{state:'draft'|'published';name:string;slug:string};
 
 export interface MemberHomeViewProps {
   name:string; greeting:string; orders:AuthenticatedCustomerOrderDetails[]; loading:boolean; error:boolean;
   assistant:()=>void; wallet:React.ReactNode; retry:()=>void; track:(order:AuthenticatedCustomerOrderDetails)=>void;
-  actions:{data:()=>void;airtime:()=>void;website:()=>void;earn:()=>void;orders:()=>void;marketplace:()=>void;afa:()=>void;services:()=>void};
+  actions:{data:(network?:NetworkId)=>void;airtime:(network?:NetworkId)=>void;website:()=>void;earn:()=>void;orders:()=>void;marketplace:()=>void;afa:()=>void;services:()=>void};
+  /** Omitted while loading or when it could not be read; the Website card then stays generic. */
+  website?:MemberWebsiteSummary;
+  /** Reserved slot under the first actions for one compact, dismissible prompt (for example a future app-install card). */
+  promotion?:React.ReactNode;
 }
-export function MemberHomeView({name,greeting,orders,loading,error,wallet,retry,track,actions,assistant}:MemberHomeViewProps) {
+
+const NETWORKS:{id:NetworkId;label:string;color:string}[]=[{id:'mtn',label:'MTN',color:'#ffcc00'},{id:'telecel',label:'Telecel',color:'#e4002b'},{id:'airteltigo',label:'AirtelTigo',color:'#3d8bff'}];
+const orderTitle=(o:AuthenticatedCustomerOrderDetails)=>o.product_name_snapshot||o.bundle_size_snapshot||'Your order';
+
+function OrderSpotlight({order,track,reorder}:{order:AuthenticatedCustomerOrderDetails;track:()=>void;reorder:(mode:'data'|'airtime',network:NetworkId)=>void}) {
+  const tone=memberOrderTone(order),steps=memberOrderSteps(order),again=memberReorder(order);
+  const heading=tone==='attention'?'Needs attention':tone==='active'?'Order to follow':'Latest order';
+  return <section aria-labelledby="member-order-heading" className={`member-order member-order-${tone}`}>
+    <div className="member-order-head">
+      <h2 id="member-order-heading">{tone==='attention'&&<AlertTriangle className="size-4" aria-hidden="true"/>}{heading}</h2>
+      <span className="member-order-status">{tone==='active'&&<span className="member-live-dot" aria-hidden="true"/>}{tone==='done'&&<Check className="size-3.5" aria-hidden="true"/>}{memberOrderLabel(order)}</span>
+    </div>
+    <div className="member-order-body">
+      <div className="min-w-0"><h3>{orderTitle(order)}</h3><p className="member-order-meta">{order.recipient_phone} · {order.public_reference}</p></div>
+      <p className="member-order-amount">{formatGhs(order.amount)}</p>
+    </div>
+    {steps&&<ol className="member-steps" aria-label="Order progress">{steps.map(step=><li key={step.label} className={step.done?'is-done':''}><span aria-hidden="true"/>{step.label}<span className="sr-only">{step.done?': complete':': not yet'}</span></li>)}</ol>}
+    {tone!=='done'&&<p className="member-order-next">{memberOrderNext(order)}</p>}
+    <div className="member-order-actions">
+      {again&&<button className="mh-button" onClick={()=>reorder(again.mode,again.network)}><RotateCcw className="size-4" aria-hidden="true"/>Buy again</button>}
+      <button className={again||tone==='attention'?'mh-button-secondary':'mh-button'} onClick={track}>Track Order</button>
+      {tone==='attention'&&<a className="member-text-link" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" aria-hidden="true"/>WhatsApp support</a>}
+    </div>
+  </section>;
+}
+
+function FirstPurchase({data,airtime}:{data:(network?:NetworkId)=>void;airtime:()=>void}) {
+  return <section aria-labelledby="member-order-heading" className="member-order member-first">
+    <div className="member-order-head"><h2 id="member-order-heading"><Sparkles className="size-4" aria-hidden="true"/>Start here</h2></div>
+    <p className="member-first-title">Your first order starts here.</p>
+    <p className="member-order-next">Choose a network to see its bundles. After you pay, you can follow the order right here.</p>
+    <div className="member-network-picks">{NETWORKS.map(n=><button key={n.id} onClick={()=>data(n.id)} style={{'--network':n.color} as React.CSSProperties}><span aria-hidden="true"/>{n.label}<span className="sr-only"> data bundles</span></button>)}</div>
+    <button className="member-text-link" onClick={airtime}>Or top up airtime<ArrowRight className="size-4" aria-hidden="true"/></button>
+  </section>;
+}
+
+function websiteCard(website:MemberWebsiteSummary|undefined) {
+  if(website?.state==='published')return {title:'Your website is live',desc:website.name,tag:'Live',label:`Manage your website, ${website.name}`};
+  if(website?.state==='draft')return {title:'Finish your website',desc:`${website.name} · not published yet`,tag:'Draft',label:`Continue your website, ${website.name}`};
+  if(website?.state==='none')return {title:'Create a free website',desc:'Show your business or sell data online',tag:'Free plan',label:undefined};
+  return {title:'Website Builder',desc:'Create or manage your free website',tag:'Free plan',label:undefined};
+}
+
+export function MemberHomeView({name,greeting,orders,loading,error,wallet,retry,track,actions,assistant,website,promotion}:MemberHomeViewProps) {
   const {latest,recent,prioritizesActive}=memberOrderSelection(orders);
-  const shortcuts=[['Buy Data',Wifi,actions.data],['Airtime',Smartphone,actions.airtime],['Website Builder',Globe,actions.website],['Mystery Earn',Gift,actions.earn],['My Orders',Clock,actions.orders],['Marketplace',ShoppingBag,actions.marketplace]] as const;
-  const orderTitle=(o:AuthenticatedCustomerOrderDetails)=>o.product_name_snapshot||o.bundle_size_snapshot||'Your order';
-  const badge=(o:AuthenticatedCustomerOrderDetails)=><span className={`text-xs font-semibold ${o.manual_review||['failed','refund_pending'].includes(o.status)?'text-amber-300':o.status==='delivered'?'text-emerald-300':'text-sky-300'}`}>{memberOrderLabel(o)}</span>;
-  return <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 pb-24 md:pb-10 space-y-7">
-    <section aria-label="Your account overview" className="rounded-3xl border border-slate-700/80 bg-[#101a20] overflow-hidden">
-      <div className="px-5 pt-5 sm:px-7 sm:pt-7 flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="text-xs text-emerald-300 font-semibold uppercase tracking-widest">Your Mystery Hub</p><h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight break-words">{greeting}, {name}</h1><p className="mt-1 text-sm text-slate-300">What would you like to do today?</p></div></div>
-      <div className="grid md:grid-cols-2 px-5 py-5 sm:px-7 sm:py-6 gap-5 md:gap-8">
-        {wallet}
-        <section aria-label="Latest order" className="border-t md:border-t-0 md:border-l border-slate-700/80 pt-4 md:pt-0 md:pl-8 min-w-0"><h2 className="text-sm text-slate-300">{prioritizesActive?'Order to follow':'Latest order'}</h2>
-          {loading?<p role="status" className="mt-3 text-sm text-slate-400">Loading your orders…</p>:error?<div className="mt-3 space-y-2"><p role="alert" className="text-sm text-amber-300">Your orders are unavailable right now.</p><button className="mh-button-secondary" onClick={retry}>Try again</button></div>:latest?<div className="mt-2 space-y-1"><div className="flex flex-wrap justify-between items-center gap-2"><h3 className="text-base font-semibold break-words">{orderTitle(latest)}</h3>{badge(latest)}</div><p className="text-xs text-slate-300 break-all">{latest.recipient_phone} · {latest.public_reference}</p><div className="flex items-center justify-between gap-3 pt-2"><p className="font-semibold tabular-nums">{formatGhs(latest.amount)}</p><button className="mh-button-secondary" onClick={()=>track(latest)}>Track Order</button></div></div>:<div className="mt-2"><p className="font-medium">Your first order starts here.</p><p className="mt-1 text-sm text-slate-300">Choose a service below. Track its progress here.</p><button className="min-h-11 text-sm font-semibold text-emerald-300" onClick={actions.data}>Buy Data →</button></div>}
+  const tone=!loading&&!error&&latest?memberOrderTone(latest):null;
+  // A purchase that needs the customer, or is still moving, comes before new buying.
+  const urgent=tone==='attention'||tone==='active';
+  const subline=tone==='attention'?'One of your orders needs attention.':tone==='active'?(prioritizesActive?'You have an order in progress.':'Your latest order is in progress.'):!loading&&!error&&!latest?'Welcome to Mystery Hub. Let’s get you connected.':'What would you like to do today?';
+  const reorder=(mode:'data'|'airtime',network:NetworkId)=>mode==='airtime'?actions.airtime(network):actions.data(network);
+  const site=websiteCard(website);
+  const spotlight=loading?<section aria-label="Latest order" className="member-order member-order-loading"><p role="status">Loading your orders…</p><span className="member-skeleton" aria-hidden="true"/><span className="member-skeleton is-short" aria-hidden="true"/></section>
+    :error?<section aria-label="Latest order" className="member-order"><p role="alert" className="member-order-error">Your orders are unavailable right now.</p><div className="member-order-actions"><button className="mh-button-secondary" onClick={retry}>Try again</button><button className="member-text-link" onClick={actions.orders}>Open My Orders<ArrowRight className="size-4" aria-hidden="true"/></button></div></section>
+    :latest?<OrderSpotlight order={latest} track={()=>track(latest)} reorder={reorder}/>
+    :<FirstPurchase data={actions.data} airtime={()=>actions.airtime()}/>;
+  const services=[
+    {id:'website',title:site.title,desc:site.desc,tag:site.tag,label:site.label,Icon:Globe,action:actions.website},
+    {id:'earn',title:'Mystery Earn',desc:'Share your link. Earn when friends’ purchases qualify.',Icon:Gift,action:actions.earn},
+    {id:'marketplace',title:'Marketplace',desc:'Laptops and tech, by enquiry',Icon:ShoppingBag,action:actions.marketplace},
+    {id:'afa',title:'AFA Registration',desc:'Check availability',Icon:ShieldCheck,action:actions.afa},
+    {id:'services',title:'All services',desc:'Including what’s coming soon',Icon:Grid2X2,action:actions.services},
+  ];
+  return <div className="member-home">
+    <div className="member-home-inner">
+      <header aria-label="Your account overview" className="member-home-top">
+        <div className="member-greeting"><p>{greeting},</p><h1>{name}</h1><p className="member-sub">{subline}</p></div>
+        <div className="member-wallet-slot">{wallet}</div>
+      </header>
+      <div className={`member-home-primary${urgent?' is-urgent':''}`}>
+        <section aria-label="Buy now" className="member-buy">
+          <button className="member-buy-tile member-buy-data" onClick={()=>actions.data()}>
+            <span className="member-buy-icon"><Wifi className="size-5" aria-hidden="true"/></span>
+            <span className="member-buy-text"><strong>Buy Data</strong><span>MTN, Telecel & AirtelTigo</span></span>
+            <ArrowRight className="member-buy-arrow size-5" aria-hidden="true"/>
+          </button>
+          <button className="member-buy-tile member-buy-airtime" onClick={()=>actions.airtime()}>
+            <span className="member-buy-icon"><Smartphone className="size-5" aria-hidden="true"/></span>
+            <span className="member-buy-text"><strong>Airtime</strong><span>Top up any Ghana number</span></span>
+            <ArrowRight className="member-buy-arrow size-5" aria-hidden="true"/>
+          </button>
+        </section>
+        {spotlight}
+      </div>
+      {promotion&&<div className="member-home-slot">{promotion}</div>}
+      <section aria-labelledby="member-services" className="member-services">
+        <h2 id="member-services">More from Mystery Hub</h2>
+        <div className="member-service-grid">{services.map(({id,title,desc,tag,label,Icon,action})=><button key={id} onClick={action} aria-label={label} className={`member-service member-service-${id}`}>
+          <span className="member-service-icon"><Icon className="size-5" aria-hidden="true"/></span>
+          <span className="member-service-text"><span className="member-service-title">{title}{tag&&<span className="member-service-tag">{tag}</span>}</span><span className="member-service-desc">{desc}</span></span>
+          <ArrowRight className="member-service-arrow size-4" aria-hidden="true"/>
+        </button>)}</div>
+      </section>
+      <div className="member-lower">
+        <section aria-labelledby="member-recent" className="member-recent"><div className="member-section-head"><h2 id="member-recent">Recent activity</h2><button onClick={actions.orders} className="member-text-link">View all orders</button></div>
+          {loading?<p role="status" className="member-muted">Loading recent activity…</p>:error?<p className="member-muted">Try again above, or <button className="member-inline-link" onClick={actions.orders}>open My Orders</button>.</p>:recent.length?<ul>{recent.map(o=><li key={o.public_reference}><button onClick={()=>track(o)}><span className="min-w-0"><span className="member-recent-title">{orderTitle(o)}</span><span className="member-recent-ref">{o.public_reference}</span></span><span className="member-recent-end"><span className="tabular-nums">{formatGhs(o.amount)}</span><span className={`member-recent-status is-${memberOrderTone(o)}`}>{memberOrderLabel(o)}</span></span><ArrowUpRight className="size-4 shrink-0 text-slate-400" aria-hidden="true"/></button></li>)}</ul>:<p className="member-muted">{latest?'You’re all caught up. Other recent orders will appear here.':'Your account activity will appear after your first purchase.'}</p>}
+        </section>
+        <section aria-labelledby="member-help" className="member-help"><h2 id="member-help">Need a hand?</h2><p>Ask about bundles, orders or your website. For a problem with a paid order, message support with your reference.</p>
+          <div className="member-help-actions"><button className="mh-button-secondary" onClick={assistant}><Sparkles className="size-4 text-emerald-300" aria-hidden="true"/>Ask Mystery AI</button><a className="member-text-link" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" aria-hidden="true"/>WhatsApp support</a></div>
         </section>
       </div>
-    </section>
-    <section aria-labelledby="member-services"><h2 id="member-services" className="font-semibold text-lg mb-3">Quick Services</h2><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">{shortcuts.map(([title,Icon,action])=><button key={title} onClick={action} className="min-h-24 rounded-2xl border border-slate-800 bg-[#11181f] hover:border-emerald-400/60 p-3 text-left flex flex-col justify-between gap-3 transition-colors"><Icon className="size-5 text-emerald-300" aria-hidden="true"/><span className="text-sm font-semibold">{title}</span></button>)}</div></section>
-    <div className="grid lg:grid-cols-[1.4fr_1fr] gap-6">
-      <section aria-labelledby="member-recent"><div className="flex items-center justify-between gap-3 mb-2"><h2 id="member-recent" className="text-lg font-semibold">Recent activity</h2><button onClick={actions.orders} className="min-h-11 text-sm text-emerald-300">View all orders</button></div>
-        {loading?<p role="status" className="text-sm text-slate-400 py-5">Loading recent activity…</p>:error?<p className="text-sm text-slate-300 py-5">Try again above, or <button className="text-emerald-300 underline min-h-11" onClick={actions.orders}>open My Orders</button>.</p>:recent.length?<ul className="divide-y divide-slate-800">{recent.map(o=><li key={o.public_reference}><button onClick={()=>track(o)} className="w-full min-h-20 py-3 text-left flex gap-3 items-center justify-between"><div className="min-w-0"><p className="font-semibold text-sm break-words">{orderTitle(o)}</p><p className="text-xs text-slate-400 mt-1 break-all">{o.public_reference}</p></div><div className="text-right shrink-0 max-w-[55%]"><p className="text-sm tabular-nums">{formatGhs(o.amount)}</p>{badge(o)}</div><ArrowUpRight className="size-4 shrink-0 text-slate-400" aria-hidden="true"/></button></li>)}</ul>:<div className="rounded-2xl border border-dashed border-slate-700 p-5 text-sm"><Clock className="size-5 text-slate-400 mb-3" aria-hidden="true"/><p className="font-medium">{latest?'You’re all caught up.':'A fresh start.'}</p><p className="mt-1 text-slate-300">{latest?'Other recent orders will appear here.':'Your account activity will appear after your first purchase.'}</p></div>}
-      </section>
-      <section aria-label="Build and earn" className="rounded-2xl bg-[#121c24] border border-slate-800 divide-y divide-slate-700/70">
-        <button onClick={actions.website} className="w-full text-left p-5 flex items-start gap-3"><Globe className="size-5 text-sky-300 shrink-0 mt-1" aria-hidden="true"/><div><h2 className="font-semibold">Your business, online</h2><p className="text-sm text-slate-300 mt-1">Create a free website or return to your dashboard.</p><span className="text-sm text-emerald-300 block mt-3">Open Website Builder →</span></div></button>
-        <button onClick={actions.earn} className="w-full text-left p-5 flex items-start gap-3"><Gift className="size-5 text-amber-300 shrink-0 mt-1" aria-hidden="true"/><div><h2 className="font-semibold">Your referrals & rewards</h2><p className="text-sm text-slate-300 mt-1">Find your referral link and check eligible rewards.</p><span className="text-sm text-emerald-300 block mt-3">Open Mystery Earn →</span></div></button>
-      </section>
     </div>
-    <button className="mh-button-secondary" onClick={assistant}>Ask Mystery AI</button>
-    <nav aria-label="More services" className="flex flex-wrap gap-x-6 gap-y-1 border-t border-slate-800 pt-3 text-sm text-slate-300"><button className="min-h-11 flex items-center gap-2" onClick={actions.afa}><ShieldCheck className="size-4"/>AFA · Check availability</button><button className="min-h-11 flex items-center gap-2" onClick={actions.services}><Grid2X2 className="size-4"/>More services · Coming soon</button></nav>
   </div>;
 }

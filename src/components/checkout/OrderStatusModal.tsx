@@ -9,6 +9,7 @@ import { lookupOrderOnServer } from '../../services/apiClient';
 import { clearPendingCheckout, isSettledForRecovery } from '../../utils/checkoutRecovery';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
+import { customerOrderStatus, orderDateLabel } from '../../utils/customerOrderPresentation';
 import { OrderRecord } from '../../types';
 import { PostPurchaseInvite } from './PostPurchaseInvite';
 import { CheckCircle2, Clock, AlertTriangle, ArrowRight, MessageSquare, Copy, Check, RefreshCw, X, ShieldAlert, Phone as PhoneIcon } from 'lucide-react';
@@ -76,7 +77,7 @@ export const OrderStatusModal: React.FC = () => {
             statusMessage = dataOrderPresentation(serverStatus,res.order.manual_review,res.order.customer_resolution,res.order.payment_basis).next;
           } else if (serverStatus === 'failed') {
             mappedStatus = 'failed';
-            statusMessage = res.order.service_type === 'afa' ? 'Registration needs support review. Do not start another registration until support confirms it is safe.' : 'The mobile network was unable to complete the delivery. Please contact support or retry.';
+            statusMessage = res.order.service_type === 'afa' ? 'Registration needs support review. Do not start another registration until support confirms it is safe.' : 'This order could not be completed. Contact support with your order reference before placing the same order again.';
           } else if (serverStatus === 'pending_payment') {
             mappedStatus = 'verifying';
           }
@@ -130,11 +131,16 @@ export const OrderStatusModal: React.FC = () => {
   const dataView = dataOrderPresentation(activeOrder.serverStatus, activeOrder.manualReview,activeOrder.customerResolution,activeOrder.paymentBasis);
   const isRefundIssue = activeOrder.serverStatus === 'refund_pending' || activeOrder.serverStatus === 'refunded';
 
-  const handleCopyOrderId = () => {
-    navigator.clipboard.writeText(displayRef);
-    setCopied(true);
-    showToast('Order reference copied to clipboard');
-    setTimeout(() => setCopied(false), 2000);
+  // Copies the public order reference only, never recipient or account details.
+  const handleCopyOrderId = async () => {
+    try {
+      await navigator.clipboard.writeText(displayRef);
+      setCopied(true);
+      showToast('Order reference copied');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      showToast('Couldn’t copy. Press and hold the reference to copy it.', 'warning');
+    }
   };
 
   const statusConfig = {
@@ -173,7 +179,7 @@ export const OrderStatusModal: React.FC = () => {
         activeOrder.statusMessage ||
         (isRefundIssue
           ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
-          : 'The mobile network was unable to process the request. Please check phone number or retry.'),
+          : 'This order could not be completed. Contact support with your order reference before placing the same order again.'),
       icon: AlertTriangle,
       step: 0,
     },
@@ -182,6 +188,7 @@ export const OrderStatusModal: React.FC = () => {
   const isAfa = activeOrder.serviceType === 'afa';
   if (isAfa) statusConfig.label = afaStatusLabel(activeOrder.serverStatus, activeOrder.manualReview);
   if(activeOrder.customerResolution)statusConfig.label=dataView.label;
+  else if (activeOrder.serviceType === 'marketplace' && activeOrder.marketplaceStatus) statusConfig.label = customerOrderStatus(activeOrder).label;
 
   const headingText = isDataOrder ? dataView.title : isAfa
     ? afaStatusLabel(activeOrder.serverStatus, activeOrder.manualReview)
@@ -241,7 +248,7 @@ export const OrderStatusModal: React.FC = () => {
   // Data journey steps come only from verified server state; a stopped order marks where it stopped.
   const stopped = Boolean(activeOrder.manualReview) || ['failed', 'refund_pending', 'refunded', 'cancelled', 'expired'].includes(activeOrder.serverStatus || '') || Boolean(activeOrder.customerResolution && !dataView.delivered);
   const journey: { label: string; detail: string; complete: boolean }[] = [
-    { label: dataView.paymentLabel, detail: activeOrder.paymentBasis === 'complimentary' ? 'No customer payment required' : activeOrder.paymentBasis === 'operator_recorded' ? 'Collection recorded by support' : dataView.paymentConfirmed ? 'Confirmed by Paystack' : 'Waiting for Paystack to confirm', complete: dataView.paymentStageComplete },
+    { label: dataView.paymentLabel, detail: activeOrder.paymentBasis === 'complimentary' ? 'No customer payment required' : activeOrder.paymentBasis === 'operator_recorded' ? 'Collection recorded by support' : dataView.paymentConfirmed ? 'Verified by Mystery Hub' : 'Waiting for Paystack to confirm', complete: dataView.paymentStageComplete },
     { label: 'Processing', detail: dataView.processing || dataView.delivered ? 'Sent to the network' : 'Queued after payment', complete: dataView.delivered },
     { label: 'Delivered', detail: dataView.delivered ? 'Check the recipient’s balance' : 'Timing depends on the network', complete: dataView.delivered },
   ];
@@ -366,6 +373,16 @@ export const OrderStatusModal: React.FC = () => {
               <span className="text-slate-400">Recipient Phone</span>
               <span className="font-semibold text-white tabular-nums">{isDataOrder ? dataRecipientDisplay(activeOrder.recipientPhone, activeOrder.buyerRecipientVisible) : activeOrder.recipientPhone}</span>
             </div>
+            <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+              <span className="text-slate-400">Ordered</span>
+              <span className="font-semibold text-white text-right">{orderDateLabel(activeOrder.createdAt)}</span>
+            </div>
+            {activeOrder.deliveredAt && (dataView.delivered || activeOrder.status === 'delivered') && (
+              <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+                <span className="text-slate-400">{isAfa ? 'Registered' : activeOrder.serviceType === 'marketplace' ? 'Completed' : 'Delivered'}</span>
+                <span className="font-semibold text-white text-right">{orderDateLabel(activeOrder.deliveredAt)}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-2 pl-3.5 pr-1 py-1">
               <span className="text-slate-400 shrink-0">Order Reference</span>
               <span className="flex items-center min-w-0">

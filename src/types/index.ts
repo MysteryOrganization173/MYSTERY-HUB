@@ -62,6 +62,8 @@ export interface OrderRecord {
   manualReview?: boolean;
   customerResolution?:import('../../server/types/orderResolution').CustomerResolution;
   paymentBasis?:'complimentary'|'operator_recorded';
+  marketplaceStatus?: string | null; // Presentation only: Marketplace fulfilment stage from the server.
+  deliveredAt?: string | null; // Server delivery time, when reported.
   serverStatus?: string; // Raw backend status e.g. 'refund_pending', 'delivered'
   statusMessage?: string; // Customer-friendly status message (e.g. for refund pending)
   paymentReference?: string;

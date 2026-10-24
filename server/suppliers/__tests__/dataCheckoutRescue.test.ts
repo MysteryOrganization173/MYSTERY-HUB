@@ -72,8 +72,12 @@ test('buyer recipient presentation is opt-in; public lookup retains masking',()=
   const orders=source('src/components/orders/OrdersPage.tsx');
   const status=source('src/components/checkout/OrderStatusModal.tsx');
   assert.match(checkout,/openOrderStatus\(newOrder\)/);
-  assert.match(orders,/recipientPhone: o.recipient_phone,\s+buyerRecipientVisible: true/);
-  assert.ok(!orders.slice(orders.indexOf('const handleServerLookup')).includes('buyerRecipientVisible: true'));
+  const presentation=source('src/utils/customerOrderPresentation.ts');
+  assert.match(orders,/res.orders.map\(accountOrderRecord\)/);
+  assert.match(presentation,/recipientPhone: o.recipient_phone,\s+buyerRecipientVisible: true/);
+  const track=source('src/components/orders/TrackOrderPanel.tsx');
+  assert.match(track,/openOrderStatus\(orderRecordFromLookup\(res.order\)\)/);
+  assert.ok(!track.includes('buyerRecipientVisible'));
   assert.match(status,/dataRecipientDisplay\(activeOrder.recipientPhone, activeOrder.buyerRecipientVisible\)/);
   assert.match(source('src/context/AppContext.tsx'),/recipientPhone: phone,\s+buyerRecipientVisible: true/);
   assert.equal(dataRecipientDisplay('0241234567',true),'024 123 4567');

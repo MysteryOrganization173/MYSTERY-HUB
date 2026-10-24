@@ -163,8 +163,8 @@ describe('Member Home & Logged-In Experience', () => {
     );
 
     assert.ok(
-      ordersPageCode.includes('user ? \'Your Orders\' : \'Order History & Tracking\''),
-      'OrdersPage must customize heading based on authentication state'
+      ordersPageCode.includes('My Orders') && ordersPageCode.includes("user ? 'Your account and device orders' : 'Orders saved on this device'"),
+      'OrdersPage must describe account-linked and device orders based on authentication state'
     );
     assert.ok(
       ordersPageCode.includes('getAccountOrdersOnServer(sessionToken'),

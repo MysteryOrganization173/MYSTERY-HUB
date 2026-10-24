@@ -92,6 +92,7 @@ export function orderRecordFromLookup(order: import('../services/apiClient').Loo
     serviceType: order.service_type,
     manualReview: order.manual_review,
     commercialPricing: order.commercial_pricing,
+    marketplaceStatus: order.marketplace_status,
     statusMessage: status === 'refund_pending' || status === 'refunded' ? presentation.next : undefined,
     bundle: {
       id: 'lookup-bundle',
@@ -113,6 +114,7 @@ export function orderRecordFromLookup(order: import('../services/apiClient').Loo
       : status === 'failed' || status === 'refund_pending' || status === 'refunded' ? 'failed'
       : 'verifying',
     paymentReference: order.public_reference,
+    deliveredAt: order.delivered_at,
     createdAt: order.created_at,
     updatedAt: order.created_at,
   };
