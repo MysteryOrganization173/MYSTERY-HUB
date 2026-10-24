@@ -76,7 +76,7 @@ const BRAND_IMAGE = BUSINESS_CONFIG.brandMarkUrl;
 /** WhatsApp preview for /app: a finished 1200x630 JPEG (logo, headline, phone) stored as its own Cloudinary original.
  * It is already the exact social size, so it is served untouched instead of through socialImage()'s padded rendition.
  */
-export const APP_SHARE_IMAGE = { image: '__APP_SHARE_IMAGE__', imageWidth: 1200, imageHeight: 630, imageType: 'image/jpeg' } as const;
+export const APP_SHARE_IMAGE = { image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1792879753/mystery-hub/app-share/mystery-hub-app-preview-v1.jpg', imageWidth: 1200, imageHeight: 630, imageType: 'image/jpeg' } as const;
 
 export const PUBLIC_PAGE_METADATA: Record<string, { title: string; description: string; image?: string; path: string; shareImage?: Pick<SocialHead, 'image' | 'imageWidth' | 'imageHeight' | 'imageType'>; imageAlt?: string }> = {
   home: { path: '/', title: 'Mystery Hub — Digital Services Marketplace in Ghana', description: 'Buy data and airtime in Ghana, create a free business website and track your orders. Explore Mystery Wallet, referral rewards and Marketplace enquiries.' },
