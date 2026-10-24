@@ -196,8 +196,8 @@ test('shared name confirmation and browser cleanup used by the Danger Zone',()=>
 
 test('template chrome never shows a real customer or sample business as the design name',()=>{
   for(const template of WEBSITE_TEMPLATES){assert.doesNotMatch(template.title,/QuickByte/i);assert.doesNotMatch(template.demoBusinessName,/QuickByte/i);}
-  assert.equal(getTemplateById('tmpl-data-reseller').title,'Signal');
-  assert.equal(templateDesignLabel(getTemplateById('tmpl-data-reseller')),'Signal design · Data & Telecom');
+  assert.equal(getTemplateById('tmpl-data-reseller').title,'Data Store');
+  assert.equal(templateDesignLabel(getTemplateById('tmpl-data-reseller')),'Data Store design · Data & Telecom');
   assert.equal(new Set(WEBSITE_TEMPLATES.map(t=>t.title)).size,WEBSITE_TEMPLATES.length,'design names are unique');
 });
 

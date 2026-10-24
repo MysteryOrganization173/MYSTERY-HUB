@@ -118,6 +118,20 @@
 [data-state="info"] .website-check-icon{background:#1b2730;color:#b8c6c0}
 
 /* V3 command centre: what needs the owner, then how the site is doing. */
+.website-launch{border:1px solid #1d3b2c;border-radius:16px;padding:14px;background:linear-gradient(180deg,#0c1d16,#0b161c)}
+.website-launch ol{margin-top:10px;display:grid;gap:8px;list-style:none;padding:0}
+.website-launch li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 12px;align-items:start;padding:12px;border-radius:12px;background:#0a1218;border:1px solid #1a252d}
+.website-launch li[data-next="yes"]{border-color:#00c365}
+.website-launch li>span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;background:#1e293b;color:#cbd5e1}
+.website-launch li[data-done="yes"]>span{background:#00c365;color:#04120b}
+.website-launch li[data-next="yes"]>span{background:#0f2a1f;color:#00e575;box-shadow:inset 0 0 0 1.5px #00c365}
+.website-launch strong{display:block;font-size:14px}
+.website-launch p{font-size:13px;color:#94a3b8;margin-top:2px;line-height:1.45}
+.website-launch li>button{grid-column:2;justify-self:start;min-height:44px;margin-top:6px;padding:0 14px;border-radius:10px;font-size:13px;font-weight:700;border:1px solid #334155;color:#e2e8f0;transition:transform .15s ease}
+.website-launch li[data-next="yes"]>button{background:#00c365;border-color:#00c365;color:#04120b}
+.website-launch li>button:active{transform:scale(.97)}
+.website-launch li>button:focus-visible{outline:2px solid #00c365;outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.website-launch li>button{transition:none}}
 .website-attention{border:1px solid #1e2a33;border-radius:16px;padding:14px;background:#0d171f}
 .website-attention ul{margin-top:10px;display:grid;gap:8px}
 .website-attention li{display:grid;grid-template-columns:8px minmax(0,1fr);gap:4px 12px;align-items:start;padding:12px;border-radius:12px;background:#0a1218;border:1px solid #1a252d}

@@ -96,7 +96,7 @@ async function runWebsiteBuilderTests() {
     assert.strictEqual(site.content_json.tagline, 'Welcome to our business', 'Legacy creation uses neutral wording rather than claiming the demo business identity');
     assert.strictEqual(site.content_json.aboutText, '');
     assert.strictEqual(site.content_json.heroImage, templateDef.heroImage);
-    assert.strictEqual(site.content_json.ctaLabel, 'Buy Data');
+    assert.strictEqual(site.content_json.ctaLabel, 'Shop Bundles');
     assert.deepStrictEqual(site.content_json.items, [], 'Managed Data availability must come from the live catalogue, never demo bundles');
     for (const field of ['phone', 'whatsapp', 'email'] as const) assert.strictEqual(site.content_json[field], '');
 

@@ -63,6 +63,12 @@ export const TemplatePreviewModal: React.FC = () => {
   }, [selectedTemplatePreview, previewName]);
   const shownTemplate = selectedTemplatePreview?.siteContent ? selectedTemplatePreview : starterTemplate;
   const shownRef = useRef(shownTemplate); shownRef.current = shownTemplate;
+  // Data Store keeps its labelled example catalogue in the gallery, so only the typed name is sent to the frame.
+  const dataDemo = !!selectedTemplatePreview && !selectedTemplatePreview.siteContent && selectedTemplatePreview.id === 'tmpl-data-reseller';
+  const namedPreview = !!starterTemplate || dataDemo;
+  const nameRef = useRef(''); nameRef.current = dataDemo ? previewName.trim() : '';
+  const sendPreviewName = () => { if (nameRef.current || dataDemo) iframeRef.current?.contentWindow?.postMessage({type:'MYSTERYHUB_PREVIEW_NAME',name:nameRef.current},window.location.origin); };
+  useEffect(() => { if (dataDemo) sendPreviewName(); }, [dataDemo, previewName]);
   useEffect(() => { setPreviewName(''); setStarting(false); }, [selectedTemplatePreview?.id]);
   useEffect(() => {
     if (starterTemplate) iframeRef.current?.contentWindow?.postMessage({type:'MYSTERYHUB_PREVIEW_CONTENT',template:starterTemplate},window.location.origin);
@@ -158,6 +164,7 @@ export const TemplatePreviewModal: React.FC = () => {
       if (selectedTemplatePreview && event.data?.type === 'MYSTERYHUB_TEMPLATE_LOADED' && event.data.templateId === selectedTemplatePreview.id && shownRef.current) {
         iframeRef.current?.contentWindow?.postMessage({type:'MYSTERYHUB_PREVIEW_CONTENT',template:shownRef.current,siteId:selectedTemplatePreview.previewSiteId},window.location.origin);
       }
+      if (selectedTemplatePreview && event.data?.type === 'MYSTERYHUB_TEMPLATE_LOADED' && event.data.templateId === selectedTemplatePreview.id && nameRef.current) sendPreviewName();
       if (event.data?.type === 'MYSTERYHUB_PREVIEW_CLOSE') handleClose();
       if (event.data?.type === 'MYSTERYHUB_TEMPLATE_CTA') {
         if (selectedTemplatePreview?.siteContent) showToast('Preview only. Open your published website to contact the business.', 'info');
@@ -314,7 +321,7 @@ export const TemplatePreviewModal: React.FC = () => {
       <div className="relative w-full h-full sm:h-[95vh] sm:max-w-7xl bg-[#0a0f14] border-0 sm:border border-slate-800 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 z-10">
         
         {startSheet}
-        <p className="px-4 py-2 text-xs text-slate-300 bg-slate-900">{t.siteContent ? 'Your website preview · Saved content. Preview actions do not place orders or bookings.' : starterTemplate ? `This is exactly how your website starts.${starterTemplate.items?.length ? ' Items marked Example are there for you to edit, keep or remove.' : ''}` : 'Design preview · Sample content and interactions. Reservations and purchases are not submitted.'}</p>
+        <p className="px-4 py-2 text-xs text-slate-300 bg-slate-900">{t.siteContent ? 'Your website preview · Saved content. Preview actions do not place orders or bookings.' : dataDemo ? 'This is how your store starts. Bundles and prices here are examples: after creating it, you choose your bundles and set your own prices.' : starterTemplate ? `This is exactly how your website starts.${starterTemplate.items?.length ? ' Items marked Example are there for you to edit, keep or remove.' : ''}` : 'Design preview · Sample content and interactions. Reservations and purchases are not submitted.'}</p>
         {/* =========================================================
             TOP CONTROL BAR: Clean, Aggressively Simplified
             - Mobile: [ Back ]  Template Name  [ Share ] [ Use ]
@@ -507,7 +514,7 @@ export const TemplatePreviewModal: React.FC = () => {
                   className="truncate font-semibold"
                   style={{ color: isDarkBackground ? '#f8fafc' : '#0f172a' }}
                 >
-                  {t.siteContent ? t.demoBusinessName : starterTemplate ? (previewName.trim() || 'your-business').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24) || 'your-business' : siteSlug}
+                  {t.siteContent ? t.demoBusinessName : namedPreview ? (previewName.trim() || 'your-business').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24) || 'your-business' : siteSlug}
                 </span>
               </div>
 
@@ -559,7 +566,7 @@ export const TemplatePreviewModal: React.FC = () => {
             - Subtly guides visitor to compare plans or explore Ultra
             - Does not overlay customer template body
             ========================================================= */}
-        {starterTemplate ? <form className="website-preview-namebar" onSubmit={event=>{event.preventDefault();void handleStartBuilding();}}>
+        {namedPreview ? <form className="website-preview-namebar" onSubmit={event=>{event.preventDefault();void handleStartBuilding();}}>
           <label className="sr-only" htmlFor="website-preview-name">Your business name</label>
           <input id="website-preview-name" value={previewName} maxLength={100} onChange={event=>setPreviewName(event.target.value.replace(/[<>]/g,''))} placeholder="Type your business name to see it" autoComplete="organization" enterKeyHint="go"/>
           <button type="submit">Use this design<ArrowRight className="w-4 h-4" aria-hidden="true"/></button>

@@ -20,6 +20,7 @@ export const IsolatedTemplatePreview: React.FC<IsolatedTemplatePreviewProps> = (
   const [ownerTemplate, setOwnerTemplate] = useState<WebsiteTemplate | null>(null);
   const [previewProducts,setPreviewProducts]=useState<WebsitePreviewProduct[]>([]);
   const [siteId,setSiteId] = useState<string | undefined>();
+  const [demoName,setDemoName] = useState('');
   const [editing,setEditing] = useState(false), [selected,setSelected] = useState<string|null>(null), [focusRequest,setFocusRequest] = useState(0), [reserveBottom,setReserveBottom] = useState(0);
   const params = new URLSearchParams(window.location.search);
   const channel = params.get('editor_channel') || '', expectedSite = params.get('editor_site') || '';
@@ -34,6 +35,8 @@ export const IsolatedTemplatePreview: React.FC<IsolatedTemplatePreviewProps> = (
     const receiveContent = (event: MessageEvent) => {
       if (event.origin !== window.location.origin || event.source !== window.parent) return;
       const validIdentity = !channel || matchesVisualMessage(event,window.location.origin,window.parent,{channel,siteId:expectedSite,templateId:template.id},'MYSTERYHUB_PREVIEW_CONTENT');
+      // Gallery Data Store: the visitor's typed business name on the example store; nothing else changes.
+      if (!ownerPreview && !channel && template.id === 'tmpl-data-reseller' && event.data?.type === 'MYSTERYHUB_PREVIEW_NAME' && typeof event.data.name === 'string') setDemoName(event.data.name.replace(/[<>]/g, '').trim().slice(0, 100));
       if (ownerPreview && validIdentity && event.data?.type === 'MYSTERYHUB_PREVIEW_CONTENT' && event.data.template?.id === template.id && event.data.template?.siteContent) {
         setOwnerTemplate(event.data.template);
         setPreviewProducts(websitePreviewCatalog(event.data.previewProducts));
@@ -74,7 +77,7 @@ export const IsolatedTemplatePreview: React.FC<IsolatedTemplatePreviewProps> = (
     }
   };
 
-  const shownTemplate = ownerPreview ? ownerTemplate : template;
+  const shownTemplate = ownerPreview ? ownerTemplate : demoName ? {...template, demoBusinessName: demoName} : template;
   if (!shownTemplate) return <p role="status" className="p-6">Loading your website preview…</p>;
   const bg = shownTemplate.colorScheme?.background || '#ffffff';
 

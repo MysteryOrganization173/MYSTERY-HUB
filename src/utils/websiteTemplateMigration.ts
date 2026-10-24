@@ -23,7 +23,7 @@ export function migrateWebsiteTemplate(content: SiteContent, fromId: string, tar
   if (fromId === targetId) return structuredClone(content);
   // Legacy templates must retain their real renderer, rather than becoming a generic section page.
   const composition = target.composition ? structuredClone(target.composition) : compatible && content.composition ? structuredClone(content.composition) : undefined;
-  const defaultCta = (id:string) => id==='tmpl-data-reseller'?'Buy Data':id==='tmpl-start-blank'?'Contact us':'Order via WhatsApp';
+  const defaultCta = (id:string) => id==='tmpl-data-reseller'?'Shop Bundles':id==='tmpl-start-blank'?'Contact us':'Order via WhatsApp';
   const genericAction = /^(contact|message|talk|call)\b/i.test(content.ctaLabel || '');
   // A contact-style label still works on other designs, but the Data store's main button always opens its
   // bundles, so there it would mislead buyers: switching into the Data store gives it Buy Data.

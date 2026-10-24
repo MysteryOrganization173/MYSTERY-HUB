@@ -50,7 +50,7 @@ export function websiteReadiness({ templateId, content, layoutMode = 'template',
     out.push({ id: 'tagline', level: 'warning', title: 'Your main heading is empty', detail: 'Visitors see a blank space at the top of your website.', ...(starter ? { fix: { label: 'Use suggested wording', patch: { tagline: starter.tagline, ...(content.aboutText?.trim() ? {} : { aboutText: starter.aboutText }) } } } : {}) });
   }
   if (data && sellableBundles === 0) out.push({ id: 'bundles', level: 'warning', title: 'No bundles on sale yet', detail: 'Your store can go live, but customers can’t buy anything until you put bundles on sale.' });
-  if (data && CONTACT_LABEL.test(content.ctaLabel || '')) out.push({ id: 'cta', level: 'warning', title: `Your main button says “${content.ctaLabel}”`, detail: 'On a Data store this button opens your bundles, so customers expect it to say Buy Data.', fix: { label: 'Use “Buy Data”', patch: { ctaLabel: 'Buy Data' } } });
+  if (data && CONTACT_LABEL.test(content.ctaLabel || '')) out.push({ id: 'cta', level: 'warning', title: `Your main button says “${content.ctaLabel}”`, detail: 'On a Data store this button opens your bundles, so customers expect it to say Shop Bundles.', fix: { label: 'Use “Shop Bundles”', patch: { ctaLabel: 'Shop Bundles' } } });
   return out;
 }
 

@@ -76,7 +76,7 @@ export function WebsiteStartSheet({templateId, initialName = '', onCreated, onCl
           <span>Area or address <em>optional</em></span>
           <input maxLength={150} value={details.location} onChange={e => setDetails({...details, location: e.target.value})} placeholder="e.g. Osu, Accra" autoComplete="address-level2" enterKeyHint="go"/>
         </label>
-        <p className="website-sheet-note">{templateId === 'tmpl-data-reseller' ? 'Your store shows Mystery Hub data bundles. You choose which to sell and set your prices after creating it.' : templateId === 'tmpl-start-blank' ? 'Your website starts as a simple page of sections that you fill in.' : 'Your website starts with a few example items for this kind of business, marked “Example”. Edit them, keep the ones that fit and remove the rest before you publish.'}</p>
+        <p className="website-sheet-note">{templateId === 'tmpl-data-reseller' ? 'Your store starts with your name and ready-made wording. Next, choose the bundles to sell and set your prices: customers can buy as soon as one bundle is on sale.' : templateId === 'tmpl-start-blank' ? 'Your website starts as a simple page of sections that you fill in.' : 'Your website starts with a few example items for this kind of business, marked “Example”. Edit them, keep the ones that fit and remove the rest before you publish.'}</p>
         {(problem || error) && <p role="alert" className="text-sm text-amber-200">{problem || error}</p>}
       </div>
       <div className="website-sheet-foot">
