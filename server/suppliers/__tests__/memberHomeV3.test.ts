@@ -82,3 +82,13 @@ test('promotion slot renders only when given content',()=>{
   assert.doesNotMatch(render(),/member-home-slot/);
   assert.match(render({promotion:React.createElement('p',null,'Install prompt')}),/member-home-slot[^>]*><p>Install prompt/);
 });
+
+test('member spotlight prioritizes unresolved attention over a newer pending purchase', () => {
+  const source = readFileSync('src/utils/memberHomePresentation.ts', 'utf8');
+  assert.match(source, /sorted\.find\(o=>memberOrderTone\(o\)==='attention'\)\?\?sorted\.find\(o=>memberOrderTone\(o\)==='active'\)/);
+  const older=order('failed',{public_reference:'MH-OLDER',created_at:'2026-10-19T00:00:00Z'});
+  const newer=order('pending_payment',{public_reference:'MH-NEWER'});
+  const html=render({orders:[newer,older]});
+  assert.match(html,/One of your orders needs attention/);
+  assert.match(html,/MH-OLDER/);
+});
