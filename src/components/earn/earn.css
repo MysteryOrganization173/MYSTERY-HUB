@@ -302,7 +302,7 @@
 .earn-hero-art picture, .earn-hero-art img { display: block; width: 100%; height: 100%; }
 .earn-hero-art img { object-fit: cover; object-position: 100% 0; }
 .earn-hero-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(1 24 17 / .1) 0%, rgb(1 24 17 / 0) 16%, rgb(1 24 17 / .55) 32%, rgb(1 24 17 / .86) 48%, #011811 82%), linear-gradient(90deg, rgb(1 24 17 / .55), transparent 70%); }
-.earn-guest-copy { position: relative; display: grid; gap: 14px; align-content: end; padding-top: clamp(112px, 32vw, 150px); }
+.earn-guest-copy { position: relative; display: grid; gap: 14px; align-content: end; padding-top: clamp(28px, 8vw, 44px); }
 .earn-page .earn-hero-pill { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: rgb(3 30 19 / .78); border: 1px solid rgb(0 195 101 / .35); color: #7cedb3; font-size: .74rem; font-weight: 650; backdrop-filter: blur(6px); }
 .earn-page .earn-guest-hero h1 { font-size: clamp(2.1rem, 8.6vw, 3.9rem); line-height: 1.02; letter-spacing: -.035em; text-shadow: 0 2px 24px rgb(0 0 0 / .45); }
 .earn-guest-hero h1 span { color: var(--earn-bright); }
@@ -312,7 +312,7 @@
 .earn-guest-hero .earn-fine { display: flex; align-items: start; gap: 8px; color: #a9bfb3; }
 .earn-guest-hero .earn-fine svg { flex-shrink: 0; margin-top: 2px; color: var(--earn-bright); }
 .earn-hero-art[data-failed] { background: radial-gradient(ellipse at 75% 30%, #0c5a33 0%, transparent 60%); }
-@media (min-width: 560px) { .earn-guest-copy { padding-top: 180px; } }
+@media (min-width: 560px) { .earn-guest-copy { padding-top: 56px; } }
 @media (min-width: 768px) {
  .earn-guest-hero { min-height: 520px; margin-inline: 0; padding: 48px; border-radius: 28px; align-items: center; }
  .earn-hero-art { inset: 0; height: auto; }

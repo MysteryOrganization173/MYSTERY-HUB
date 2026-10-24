@@ -189,21 +189,21 @@
 @media (max-width: 767px) {
   /* Phones: one poster, not a banner above the copy. The headline opens the page over the dark sky
      (globe and Wi-Fi arcs behind it), the skyline, Independence Arch and light trails show through
-     a window between headline and description, and the scene dissolves into the page under the
+     behind the closely grouped headline and description, and the scene dissolves under the
      actions. The crop is the artwork's right 60% at full height (PHONE_REGION), drawn a little
      wider than the screen and anchored right so the dark sea on its left falls off-canvas. */
-  .home-hero { --hero-art-w: 118vw; --hero-h1: clamp(2.25rem, 9.6vw, 3.25rem); --hero-window: calc(var(--hero-art-w) * .545 - 54px - var(--hero-h1) * 2.08); }
+  .home-hero { --hero-art-w: 118vw; --hero-h1: clamp(2.25rem, 9.6vw, 3.25rem); --hero-window: clamp(16px, 4vw, 22px); }
   .home-hero-art { left: auto; bottom: auto; width: var(--hero-art-w); height: calc(var(--hero-art-w) * .938); background: none; }
   .home-hero-art img { object-position: 100% 0;
     -webkit-mask-image: linear-gradient(180deg, #000 56%, #0009 72%, transparent 94%); mask-image: linear-gradient(180deg, #000 56%, #0009 72%, transparent 94%); }
-  /* Local shade only where words sit; the skyline window itself is left at full brightness. */
+  /* Local shade only where words sit; the skyline stays bright behind the copy. */
   .home-hero-art::after { background: linear-gradient(180deg, #070b0eb3 0%, transparent 16%), radial-gradient(60% 26% at 22% 17%, #070b0ecc, transparent), radial-gradient(75% 24% at 25% 70%, #070b0ecc, transparent); }
   .home-hero-content { grid-template-columns: 1fr; padding-block: 20px 24px; }
   /* No artwork: drop the band rather than leave an empty dark block above the headline. */
   .home-hero-no-art .home-hero-content { padding-top: 40px; }
   .home-hero-no-art { --hero-window: 0px; }
   .home-hero h1 { font-size: var(--hero-h1); text-shadow: 0 1px 2px #070b0e, 0 0 18px #070b0e99; }
-  .home-hero-description { font-size: .9375rem; line-height: 1.6; margin-block: max(10px, var(--hero-window)) 14px; max-width: 450px; text-shadow: 0 1px 2px #070b0e, 0 0 10px #070b0e; }
+  .home-hero-description { font-size: .9375rem; line-height: 1.6; margin-block: var(--hero-window) 14px; max-width: 450px; text-shadow: 0 1px 2px #070b0e, 0 0 10px #070b0e; }
   .home-hero-live { text-shadow: none; }
   .home-hero-caption { display: none; }
   .home-hero-live { margin-top: 14px; gap: 6px 14px; }
