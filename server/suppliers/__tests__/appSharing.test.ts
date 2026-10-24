@@ -1,19 +1,55 @@
 /** App Sharing V1: the /app landing route, its first-response share preview, install guidance and Share Mystery Hub. */
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {readFileSync} from 'node:fs';
+import {readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import express from 'express';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {AppPhonePreview} from '../../../src/components/app/AppPhonePreview.js';
 import {getPageFromPath, ROUTE_PATH_MAP} from '../../../src/utils/routing.js';
 import {APP_SHARE_IMAGE, pageIndexingHead, publicPageHead} from '../../../src/utils/socialMetadata.js';
 import {injectSocialHead} from '../../../src/utils/socialHtml.js';
-import {injectSocialHead as expressInject} from '../../routes/publicHtml.js';
+import {injectSocialHead as expressInject, createPublicHtmlRouter} from '../../routes/publicHtml.js';
 import {resolvePublicSocialMetadata} from '../../services/publicSocialMetadata.js';
 import {appLandingState, isInAppBrowser} from '../../../src/pwa/installGuidance.js';
 import {APP_SHARE_TEXT, APP_SHARE_URL, copyAppLink, shareApp} from '../../../src/utils/appShare.js';
 
-const source = (file: string) => readFileSync(file, 'utf8');
+// Source contracts must inspect the same text on Windows CRLF and Unix LF checkouts.
+const source = (file: string) => readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+
+test('raw Express responses preserve app tags and preview privacy even at the generated HTML path', async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'mh-app-share-'));
+  const index = source('index.html');
+  mkdirSync(path.join(directory, 'app'));
+  writeFileSync(path.join(directory, 'index.html'), index);
+  writeFileSync(path.join(directory, 'app/index.html'), injectSocialHead(index, publicPageHead('app')));
+  const app = express();
+  app.use(createPublicHtmlRouter(directory, {product: async () => {throw Error('Unexpected DB read');}, site: async () => {throw Error('Unexpected DB read');}} as never));
+  const server = app.listen(0, '127.0.0.1');
+  try {
+    await new Promise<void>(resolve => server.once('listening', resolve));
+    const address = server.address() as {port:number};
+    for (const route of ['/app', '/app/', '/app/index.html', '/app?ref=SYNTHETIC']) {
+      const response = await fetch(`http://127.0.0.1:${address.port}${route}`);
+      const html = await response.text();
+      assert.equal(response.status, 200);
+      assert.equal((html.match(/property="og:title"/g)||[]).length, 1);
+      assert.ok(html.includes(APP_SHARE_IMAGE.image));
+      assert.match(html, /rel="canonical" href="https:\/\/mysterybundlehub.com\/app"/);
+      assert.doesNotMatch(html, /SYNTHETIC/);
+    }
+    for (const route of ['/app?owner_preview=1', '/app/index.html?owner_preview=1']) {
+      const response = await fetch(`http://127.0.0.1:${address.port}${route}`);
+      assert.equal(response.headers.get('x-robots-tag'), 'noindex, nofollow', route);
+      assert.doesNotMatch(await response.text(), /mystery-hub-app-preview-v1/);
+    }
+  } finally {
+    await new Promise<void>((resolve,reject) => server.close(error => error ? reject(error) : resolve()));
+    rmSync(directory, {recursive:true,force:true});
+  }
+});
 const readers = {product: async () => { throw new Error('no product read for /app'); }, site: async () => { throw new Error('no site read for /app'); }};
 const UA = {
   chromeAndroid: 'Mozilla/5.0 (Linux; Android 14; SM-A156E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36',

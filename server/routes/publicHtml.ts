@@ -16,7 +16,8 @@ export function createPublicHtmlRouter(distDirectory: string, readers: PublicMet
   const staticFiles = express.static(distDirectory, { index: false, redirect: false, dotfiles: 'deny', setHeaders(res, file) {
     res.setHeader('Cache-Control', file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=31536000, immutable' : 'public, max-age=3600');
   } });
-  router.use((req, res, next) => req.path === '/index.html' ? next() : staticFiles(req, res, next));
+  // Generated entry HTML still needs query-aware preview/noindex policy on the web service.
+  router.use((req, res, next) => ['/index.html', '/app/index.html'].includes(req.path) ? next() : staticFiles(req, res, next));
   router.get('*', async (req, res) => {
     res.set('Cache-Control', 'no-store').set('X-Content-Type-Options', 'nosniff');
     if ((/\.[^/]+$/.test(req.path) && !req.path.endsWith('/index.html')) || req.path.startsWith('/assets/')) {
