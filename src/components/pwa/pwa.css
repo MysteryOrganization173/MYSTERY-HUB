@@ -1,0 +1,95 @@
+/* Installable app surfaces: the install card, the installed-app welcome sheet and the notification card. */
+
+/* Install card: a quiet band in the page, not a second hero. */
+.mh-install-promo {
+  position: relative; display: grid; grid-template-columns: auto 1fr; gap: 14px 16px; align-items: center;
+  padding: 18px; border: 1px solid #22402f; border-radius: var(--radius-panel);
+  background: radial-gradient(120% 140% at 0% 0%, #0f2a1d 0%, #0d1513 46%, #0b1210 100%);
+  box-shadow: inset 0 1px 0 #ffffff0a;
+}
+.mh-install-icon { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 16px; background: #070b0e; border: 1px solid #27453a; box-shadow: 0 10px 26px -14px #00c36599; }
+.mh-install-copy { min-width: 0; padding-right: 28px; }
+.mh-install-eyebrow { font-size: .6875rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #7fdcaa; }
+.mh-install-promo h2 { margin-top: 4px; font-size: clamp(1.15rem, 2.1vw, 1.5rem) !important; font-weight: 750; line-height: 1.2; letter-spacing: -.02em; color: #f4f8f6; }
+.mh-install-copy > p:last-child { margin-top: 4px; font-size: .875rem; line-height: 1.55; color: #c3d0ca; }
+.mh-install-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.mh-install-actions .mh-button { box-shadow: 0 8px 24px -12px #00c365aa; }
+.mh-install-later { min-height: 44px; padding-inline: 8px; font-size: .875rem; font-weight: 600; color: #a9bab2; cursor: pointer; }
+.mh-install-later:hover { color: #e6f0eb; }
+.mh-install-close { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: #8ea39a; cursor: pointer; }
+.mh-install-close:hover { color: #fff; background: #ffffff0d; }
+.mh-install-note { grid-column: 1 / -1; font-size: .75rem; line-height: 1.5; color: #93a69e; }
+.mh-install-steps { grid-column: 1 / -1; display: grid; gap: 8px; margin: 0; padding: 12px; list-style: none; border-radius: 14px; background: #070b0e99; border: 1px solid #1f2d27; }
+.mh-install-steps li { display: flex; gap: 10px; align-items: flex-start; font-size: .875rem; line-height: 1.5; color: #d8e3de; }
+.mh-install-steps li > span { display: grid; place-items: center; flex-shrink: 0; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; background: #12271d; color: #7fe0ab; font-size: .75rem; font-weight: 700; }
+.mh-install-steps strong { color: #fff; font-weight: 650; }
+.mh-install-promo-done { grid-template-columns: auto 1fr; }
+.mh-install-done-icon { width: 28px; height: 28px; color: #5fd897; }
+.mh-install-promo-done .mh-install-copy { padding-right: 0; }
+
+@media (min-width: 1024px) {
+  .mh-install-promo { grid-template-columns: auto minmax(0, 1fr) auto; padding: 22px 26px; gap: 6px 22px; }
+  .mh-install-icon { width: 68px; height: 68px; grid-row: span 2; }
+  .mh-install-actions { grid-column: 3; grid-row: 1; flex-wrap: nowrap; padding-right: 32px; }
+  .mh-install-note { grid-column: 2 / -1; }
+  .mh-install-steps { grid-column: 2 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mh-install-promo-done { grid-template-columns: auto 1fr; }
+}
+/* Compact: for a slot inside another surface (for example the member home). */
+.mh-install-promo-compact { padding: 14px; gap: 10px 12px; }
+.mh-install-promo-compact .mh-install-icon { width: 48px; height: 48px; border-radius: 13px; }
+.mh-install-promo-compact .mh-install-icon > * { width: 34px; height: 34px; }
+.mh-install-promo-compact .mh-install-note { display: none; }
+
+/* Home placement: a band between catalogue sections with the page's usual rhythm. */
+.home-install-band { padding-block: 0 8px; }
+
+/* Installed-app welcome: a bottom sheet on phones, a centred card elsewhere. */
+.mh-app-sheet-layer {
+  position: fixed; inset: 0; z-index: 95; display: flex; align-items: flex-end; justify-content: center;
+  background: #000000b8; padding: 0; animation: mh-sheet-fade 180ms ease-out;
+}
+.mh-app-sheet {
+  position: relative; width: 100%; max-width: 440px; max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain;
+  border: 1px solid #22312b; border-bottom: 0; border-radius: 24px 24px 0 0; background: linear-gradient(180deg, #0f1a16 0%, #0b1210 60%);
+  padding: 28px 20px calc(20px + env(safe-area-inset-bottom, 0px)); color: #eef4f1; box-shadow: 0 -24px 60px -20px #000;
+  animation: mh-sheet-rise 220ms cubic-bezier(.2, .8, .2, 1);
+}
+.mh-app-sheet:focus { outline: none; }
+.mh-app-sheet-close { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; color: #9fb2a9; cursor: pointer; }
+.mh-app-sheet-close:hover { color: #fff; background: #ffffff0f; }
+.mh-welcome-sheet { text-align: center; }
+.mh-welcome-mark { display: inline-grid; place-items: center; width: 72px; height: 72px; border-radius: 20px; background: #070b0e; border: 1px solid #27453a; box-shadow: 0 14px 34px -16px #00c365b3; }
+.mh-welcome-sheet h2:focus { outline: none; }
+.mh-welcome-sheet h2 { margin-top: 16px; font-size: 1.5rem; font-weight: 750; letter-spacing: -.025em; }
+.mh-welcome-sheet > p { margin: 6px auto 0; max-width: 320px; font-size: .9375rem; line-height: 1.55; color: #c3d0ca; }
+.mh-welcome-actions { display: grid; gap: 10px; margin-top: 22px; }
+.mh-welcome-actions > * { width: 100%; min-height: 50px; font-size: .9375rem; }
+.mh-welcome-guest { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; margin-top: 8px; padding-inline: 12px; font-size: .875rem; font-weight: 600; color: #8ee8b7; cursor: pointer; }
+.mh-welcome-guest:hover { color: #d1f9e1; }
+.mh-welcome-note { margin-top: 2px; font-size: .75rem !important; color: #8fa39a !important; }
+@media (min-width: 640px) {
+  .mh-app-sheet-layer { align-items: center; padding: 20px; }
+  .mh-app-sheet { border-bottom: 1px solid #22312b; border-radius: 24px; padding: 32px 28px 24px; }
+}
+
+/* Notification card: floats above the phone tab bar on Home only; never blocks the page. */
+.mh-notify-card {
+  position: relative; padding: 16px 16px 14px; border: 1px solid #26413a; border-radius: 18px;
+  background: #0f1915f2; color: #eef4f1; box-shadow: 0 18px 44px -18px #000;
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+.mh-notify-card-floating {
+  position: fixed; z-index: 45; left: 12px; right: 12px; bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  max-width: 420px; margin-inline: auto; animation: mh-sheet-rise 240ms cubic-bezier(.2, .8, .2, 1);
+}
+@media (min-width: 768px) { .mh-notify-card-floating { left: auto; right: 24px; bottom: 24px; margin: 0; } }
+.mh-notify-body { display: flex; gap: 12px; align-items: flex-start; padding-right: 30px; }
+.mh-notify-icon { width: 22px; height: 22px; flex-shrink: 0; margin-top: 2px; }
+.mh-notify-card h2 { font-size: 1rem; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+.mh-notify-card p { margin-top: 3px; font-size: .8125rem; line-height: 1.5; color: #c0cdc7; }
+.mh-notify-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 12px; padding-left: 34px; }
+.mh-notify-card .mh-app-sheet-close { top: 6px; right: 6px; width: 36px; height: 36px; }
+
+@keyframes mh-sheet-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes mh-sheet-fade { from { opacity: 0; } to { opacity: 1; } }

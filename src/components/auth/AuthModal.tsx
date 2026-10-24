@@ -4,11 +4,13 @@ import {AuthFields} from './AuthFields';
 import React,{useRef,useState} from 'react';
 import {useApp} from '../../context/AppContext';
 import {registerOnServer,loginOnServer} from '../../services/apiClient';
+import {isInstalledApp} from '../../pwa/appEnvironment';
 
 export const AuthModal:React.FC=()=>{
   const {isAuthModalOpen,closeAuth,authMode,switchAuthMode,loginUser,authContextMessage}=useApp();
   const [name,setName]=useState(''),[email,setEmail]=useState(''),[identifier,setIdentifier]=useState(''),[password,setPassword]=useState('');
-  const [rememberMe,setRememberMe]=useState(false),[busy,setBusy]=useState(false),[recovery,setRecovery]=useState(false),[emailOpen,setEmailOpen]=useState(false),[existing,setExisting]=useState(false),[error,setError]=useState('');
+  // The installed app is someone's own phone: stay signed in between launches unless they untick it.
+  const [rememberMe,setRememberMe]=useState(isInstalledApp),[busy,setBusy]=useState(false),[recovery,setRecovery]=useState(false),[emailOpen,setEmailOpen]=useState(false),[existing,setExisting]=useState(false),[error,setError]=useState('');
   const submitting=useRef(false);
   if(!isAuthModalOpen)return null;
   const signup=authMode==='signup';

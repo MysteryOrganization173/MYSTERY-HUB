@@ -165,7 +165,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (!sessionToken) { setIsAuthChecking(false); return; }
     let active = true;
-    const refresh = async () => {
+    const refresh = async (trigger?: Event | 'now') => {
+      // A hidden tab or minimised app skips the 30-second timer; coming back to it checks straight away (below).
+      if (!trigger && document.visibilityState === 'hidden') return;
       try {
         const result = await getMeOnServer(sessionToken);
         if (active) updateUserProfile(result.user);
@@ -174,14 +176,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } finally { if (active) setIsAuthChecking(false); }
     };
     const invalid = (event: Event) => { if ((event as CustomEvent).detail?.token === sessionToken) clearLocalAuth(); };
-    void refresh();
+    void refresh('now');
     const timer = window.setInterval(refresh, 30_000);
+    const visible = () => { if (document.visibilityState === 'visible') void refresh('now'); };
+    document.addEventListener('visibilitychange', visible);
     window.addEventListener('focus', refresh);
     window.addEventListener('mystery-auth-refresh', refresh);
     window.addEventListener('mystery-auth-invalid', invalid);
     const storageChanged = (event: StorageEvent) => { if (event.key === 'mystery_hub_session_token') { clearLocalAuth(); } };
     window.addEventListener('storage', storageChanged);
-    return () => { active = false; clearInterval(timer); window.removeEventListener('focus', refresh); window.removeEventListener('mystery-auth-refresh', refresh); window.removeEventListener('mystery-auth-invalid', invalid); window.removeEventListener('storage', storageChanged); };
+    return () => { active = false; clearInterval(timer); document.removeEventListener('visibilitychange', visible); window.removeEventListener('focus', refresh); window.removeEventListener('mystery-auth-refresh', refresh); window.removeEventListener('mystery-auth-invalid', invalid); window.removeEventListener('storage', storageChanged); };
   }, [sessionToken]);
 
   // Initialize and capture referral URL context across any landing route

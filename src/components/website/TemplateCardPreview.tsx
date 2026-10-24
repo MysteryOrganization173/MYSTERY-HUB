@@ -1,6 +1,6 @@
 import { SafeImage } from './SafeImage.js';
 import React, { useEffect, useRef, useState } from 'react';
-import { renderTemplateLayout } from '../../utils/templateRendererUtils';
+import type { renderTemplateLayout as RenderTemplateLayout } from '../../utils/templateRendererUtils';
 import { WebsiteTemplate } from '../../types';
 import { Eye, Check, ArrowRight, Plus } from 'lucide-react';
 
@@ -29,8 +29,17 @@ function LiveTemplateThumb({ template, onLive }: { template: WebsiteTemplate; on
     io.observe(el); ro.observe(el);
     return () => { io.disconnect(); ro.disconnect(); };
   }, []);
-  useEffect(() => { if (visible && frame.scale) onLive(frame.phone); }, [visible, frame.scale, frame.phone]);
-  const page = visible && frame.scale > 0 && <div className="template-card-live-frame" style={{ width: frame.width, transform: `scale(${frame.scale})` }}>{renderTemplateLayout(template)}</div>;
+  // The renderer (every template's code) downloads once a card nears the screen; the card's photo shows until then.
+  // This keeps it off the homepage's start-up path, where the card sits well below the first screen.
+  const [render, setRender] = useState<typeof RenderTemplateLayout | null>(null);
+  useEffect(() => {
+    if (!visible || render) return;
+    let current = true;
+    import('../../utils/templateRendererUtils').then(module => { if (current) setRender(() => module.renderTemplateLayout); }, () => undefined);
+    return () => { current = false; };
+  }, [visible, render]);
+  useEffect(() => { if (visible && render && frame.scale) onLive(frame.phone); }, [visible, render, frame.scale, frame.phone]);
+  const page = visible && render && frame.scale > 0 && <div className="template-card-live-frame" style={{ width: frame.width, transform: `scale(${frame.scale})` }}>{render(template)}</div>;
   return <div ref={box} className={`template-card-live${frame.phone ? ' is-phone' : ''}`} aria-hidden="true" inert>{page}</div>;
 }
 

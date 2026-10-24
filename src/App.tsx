@@ -1,10 +1,9 @@
-import { WalletPage } from './components/finance/FinancialPanel';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/common/Navbar';
 import { MobileNav } from './components/common/MobileNav';
@@ -12,29 +11,46 @@ import { Footer } from './components/common/Footer';
 import { ToastContainer } from './components/common/Toast';
 import { SEOHead } from './components/common/SEOHead';
 import { HomePage } from './components/home/HomePage';
-import { DataPage } from './components/data/DataPage';
-import { WebsiteBuilderPage } from './components/website/WebsiteBuilderPage';
-import { MoreServicesPage } from './components/services/MoreServicesPage';
-import { AfaRegistrationPage } from './components/services/AfaRegistrationPage';
-import { MarketplacePage } from './components/marketplace/MarketplacePage';
-import { HelpPage } from './components/help/HelpPage';
-import { AboutPage } from './components/about/AboutPage';
-import { OrdersPage } from './components/orders/OrdersPage';
-import { MysteryEarnPage } from './components/earn/MysteryEarnPage';
 import { CheckoutModal } from './components/checkout/CheckoutModal';
 import { OrderStatusModal } from './components/checkout/OrderStatusModal';
-import { TemplatePreviewModal } from './components/website/TemplatePreviewModal';
 import { WaitlistModal } from './components/common/WaitlistModal';
 import { AccountControls } from './components/auth/AccountControls';
 import { AuthModal } from './components/auth/AuthModal';
 import { MarketplaceInquiryModal } from './components/marketplace/MarketplaceInquiryModal';
-import { MysteryAiAssistant } from './components/ai/MysteryAiAssistant';
-import { IsolatedTemplatePreview } from './components/website/IsolatedTemplatePreview';
-import { PublicPublishedSite } from './components/website/PublicPublishedSite';
-import { AdminPage } from './components/admin/AdminPage';
+import { lazyPage } from './utils/lazyPage';
+import { AppLaunchLayer } from './components/pwa/AppLaunchLayer';
+
+// Home is the start URL and ships with the app. Every other page downloads when it is first opened (and is
+// warmed during idle time, see utils/lazyPage), so a phone on a slow network starts with far less JavaScript.
+const DataPage = lazyPage(() => import('./components/data/DataPage'), 'DataPage', { warm: true });
+const WebsiteBuilderPage = lazyPage(() => import('./components/website/WebsiteBuilderPage'), 'WebsiteBuilderPage');
+const MoreServicesPage = lazyPage(() => import('./components/services/MoreServicesPage'), 'MoreServicesPage');
+const AfaRegistrationPage = lazyPage(() => import('./components/services/AfaRegistrationPage'), 'AfaRegistrationPage');
+const MarketplacePage = lazyPage(() => import('./components/marketplace/MarketplacePage'), 'MarketplacePage');
+const HelpPage = lazyPage(() => import('./components/help/HelpPage'), 'HelpPage');
+const AboutPage = lazyPage(() => import('./components/about/AboutPage'), 'AboutPage');
+const OrdersPage = lazyPage(() => import('./components/orders/OrdersPage'), 'OrdersPage', { warm: true });
+const MysteryEarnPage = lazyPage(() => import('./components/earn/MysteryEarnPage'), 'MysteryEarnPage');
+const WalletPage = lazyPage(() => import('./components/finance/FinancialPanel'), 'WalletPage');
+const AdminPage = lazyPage(() => import('./components/admin/AdminPage'), 'AdminPage');
+// Overlays carrying the website templates and the assistant load the first time they are needed, then stay mounted.
+const TemplatePreviewModal = lazyPage(() => import('./components/website/TemplatePreviewModal'), 'TemplatePreviewModal', { fallback: null });
+const MysteryAiAssistant = lazyPage(() => import('./components/ai/MysteryAiAssistant'), 'MysteryAiAssistant', { fallback: null });
+// main.tsx serves these two surfaces before the app loads; the fallbacks below no longer pull them into it.
+const IsolatedTemplatePreview = lazyPage(() => import('./components/website/IsolatedTemplatePreview'), 'IsolatedTemplatePreview', { fallback: null });
+const PublicPublishedSite = lazyPage(() => import('./components/website/PublicPublishedSite'), 'PublicPublishedSite', { fallback: null });
+
+/** True from the first time `condition` holds. */
+function useOnceTrue(condition: boolean) {
+  const [reached, setReached] = useState(condition);
+  if (condition && !reached) setReached(true);
+  return reached || condition;
+}
 
 const AppContent: React.FC = () => {
-  const { activePage } = useApp();
+  const { activePage, selectedTemplatePreview, isMysteryAiOpen, activeEditorSite } = useApp();
+  const templatePreviewNeeded = useOnceTrue(Boolean(selectedTemplatePreview));
+  const assistantNeeded = useOnceTrue(isMysteryAiOpen || Boolean(activeEditorSite));
 
   // Isolated Admin Experience
   if (activePage === 'admin') {
@@ -79,13 +95,14 @@ const AppContent: React.FC = () => {
       {/* Global Interactive Overlays */}
       <CheckoutModal />
       <OrderStatusModal />
-      <TemplatePreviewModal />
+      {templatePreviewNeeded && <TemplatePreviewModal />}
       <WaitlistModal />
       <AuthModal />
       <AccountControls />
       <MarketplaceInquiryModal />
       <ToastContainer />
-      <MysteryAiAssistant />
+      {assistantNeeded && <MysteryAiAssistant />}
+      <AppLaunchLayer />
     </div>
   );
 };
