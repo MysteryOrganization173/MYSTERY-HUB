@@ -30,13 +30,13 @@ export const AppLaunchLayer: React.FC = () => {
     || app.selectedTemplatePreview || app.marketplaceInquiryProduct || app.waitlistInfo.isOpen || app.isAccountOpen || user?.mustChangePassword);
 
   useEffect(() => {
-    if (!installed || welcomeOpen) return;
+    if (!installed || welcomeOpen || busy || activePage !== 'home') return;
     if (showWelcomeSheet({ installed, signedIn: Boolean(user), authChecking: isAuthChecking, path: launchPath,
       shownThisLaunch: welcomeShownThisLaunch(), guestChosenAt: readTimestamp(STORAGE_KEYS.welcomeGuest), now: Date.now() })) {
       markWelcomeShown();
       setWelcomeOpen(true);
     }
-  }, [installed, user, isAuthChecking, launchPath, welcomeOpen]);
+  }, [installed, user, isAuthChecking, launchPath, welcomeOpen, busy, activePage]);
 
   useEffect(() => {
     setOptInReady(false);
@@ -53,7 +53,7 @@ export const AppLaunchLayer: React.FC = () => {
   }, [optInReady, busy, optInActive, installed, user]);
 
   if (!installed) return null;
-  if (welcomeOpen && !user) return <AppWelcomeSheet onClose={() => setWelcomeOpen(false)} />;
+  if (welcomeOpen && !user && !busy && activePage === 'home') return <AppWelcomeSheet onClose={() => setWelcomeOpen(false)} />;
   if (optInActive && user && activePage === 'home' && !busy) return <NotificationOptIn onDone={() => setOptInActive(false)} />;
   return null;
 };

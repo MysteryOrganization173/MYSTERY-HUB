@@ -171,3 +171,11 @@ test('installed app stays signed in by default; system bars are dark; manifest i
   assert.match(context, /if \(!trigger && document\.visibilityState === 'hidden'\) return;/);
   assert.match(context, /addEventListener\('visibilitychange', visible\)/);
 });
+
+test('welcome cannot cover checkout/auth or a navigated route; member install uses one compact slot', () => {
+  const layer = source('src/components/pwa/AppLaunchLayer.tsx');
+  assert.match(layer, /if \(!installed \|\| welcomeOpen \|\| busy \|\| activePage !== 'home'\) return;/);
+  assert.match(layer, /welcomeOpen && !user && !busy && activePage === 'home'/);
+  const member = source('src/components/home/MemberHome.tsx');
+  assert.equal((member.match(/promotion=\{<InstallAppPromo variant="compact"\/>\}/g) || []).length, 1);
+});
