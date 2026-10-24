@@ -8,6 +8,22 @@ import {
   mergeCustomerOrders, orderDateLabel, orderMatchesFilter, orderMatchesQuery, shortStatusLabel,
 } from '../../../src/utils/customerOrderPresentation';
 import { orderRecordFromLookup } from '../../../src/utils/checkoutRecovery';
+import { memberOrderLabel, memberTrackingOrder } from '../../../src/utils/memberHomePresentation';
+
+test('Orders state is remounted per session and remembered searches are account scoped', () => {
+  const page = source('src/components/orders/OrdersPage.tsx');
+  assert.match(page, /<OrdersHistory key=\{`\$\{user\?\.id \|\| 'guest'\}:\$\{sessionToken \|\| ''\}`\}/);
+  assert.match(page, /const viewKey = `\$\{VIEW_KEY\}:\$\{user\?\.id \|\| 'guest'\}`/);
+  assert.match(page, /return \(\) => \{\s*isMounted = false;/);
+});
+
+test('Home, Orders and the receipt retain the same Marketplace stage and payment basis', () => {
+  for (const marketplace_status of ['awaiting_fulfilment', 'ready_for_pickup', 'out_for_delivery', 'completed', 'refunded'] as const) {
+    const raw = {public_reference:'MH-COMPAT',status:'processing',service_type:'marketplace',marketplace_status,network:'mtn',amount_ghc:10,amount:1000,currency:'GHS',created_at:'2026-10-24T10:00:00Z',recipient_phone:'0241234567',manual_review:false} as AuthenticatedCustomerOrderDetails;
+    assert.equal(memberOrderLabel(raw),customerOrderStatus(accountOrderRecord(raw)).label);
+    assert.equal(memberTrackingOrder(raw).marketplaceStatus, marketplace_status);
+  }
+});
 
 const source = (path: string) => readFileSync(path, 'utf8');
 // Synthetic fixtures only.

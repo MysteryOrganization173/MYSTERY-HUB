@@ -21,18 +21,25 @@ import { RefreshCw, Search, X } from 'lucide-react';
 const ACCOUNT_ORDER_LIMIT = 50;
 const VIEW_KEY = 'mh_orders_view';
 
-function readView(): { query: string; filter: CustomerOrderFilter } {
+function readView(key: string): { query: string; filter: CustomerOrderFilter } {
   try {
-    const saved = JSON.parse(sessionStorage.getItem(VIEW_KEY) || 'null');
+    const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
     if (saved && typeof saved.query === 'string' && ORDER_FILTERS.some(f => f.id === saved.filter)) return { query: saved.query.slice(0, 80), filter: saved.filter };
   } catch { /* Storage can be unavailable; the view simply starts fresh. */ }
   return { query: '', filter: 'all' };
 }
 
 export const OrdersPage: React.FC = () => {
+  const { user, sessionToken } = useApp();
+  // Remount before rendering another account: old rows and late requests cannot cross sessions.
+  return <OrdersHistory key={`${user?.id || 'guest'}:${sessionToken || ''}`} />;
+};
+
+const OrdersHistory: React.FC = () => {
   const { orders: localOrders, openOrderStatus, activeOrder, setActivePage, openAuth, user, sessionToken } = useApp();
-  const [searchQuery, setSearchQuery] = useState(() => readView().query);
-  const [filter, setFilter] = useState<CustomerOrderFilter>(() => readView().filter);
+  const viewKey = `${VIEW_KEY}:${user?.id || 'guest'}`;
+  const [searchQuery, setSearchQuery] = useState(() => readView(viewKey).query);
+  const [filter, setFilter] = useState<CustomerOrderFilter>(() => readView(viewKey).filter);
   const [serverOrders, setServerOrders] = useState<OrderRecord[]>([]);
   const [accountLoading, setAccountLoading] = useState(false), [accountLoaded, setAccountLoaded] = useState(false), [accountError, setAccountError] = useState(''), [refresh, setRefresh] = useState(0);
   const [trackOpen, setTrackOpen] = useState(false);
@@ -83,8 +90,8 @@ export const OrdersPage: React.FC = () => {
   }, [activeOrder]);
 
   useEffect(() => {
-    try { sessionStorage.setItem(VIEW_KEY, JSON.stringify({ query: searchQuery, filter })); } catch { /* ignore */ }
-  }, [searchQuery, filter]);
+    try { sessionStorage.setItem(viewKey, JSON.stringify({ query: searchQuery, filter })); } catch { /* ignore */ }
+  }, [searchQuery, filter, viewKey]);
 
   // Combine server orders with local orders without duplicates
   const allOrders = React.useMemo(() => mergeCustomerOrders(serverOrders, localOrders).map((order) => ({ order, status: customerOrderStatus(order) })), [serverOrders, localOrders]);
