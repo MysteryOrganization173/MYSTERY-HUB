@@ -1,0 +1,128 @@
+/* /app landing page: one premium screen for people arriving from a WhatsApp link, then three short sections. */
+.mh-applp { --applp-line: #1f3129; overflow-x: clip; padding-bottom: 32px; }
+.mh-applp-container { width: 100%; max-width: 1180px; margin-inline: auto; padding-inline: 16px; }
+@media (min-width: 640px) { .mh-applp-container { padding-inline: 24px; } }
+@media (min-width: 1024px) { .mh-applp-container { padding-inline: 32px; } }
+
+/* Hero */
+.mh-applp-hero { position: relative; isolation: isolate; padding-block: 28px 40px; border-bottom: 1px solid #ffffff0a; }
+.mh-applp-glow {
+  position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 85% 30%, #00c36533 0%, transparent 70%),
+    radial-gradient(50% 40% at 0% 0%, #0f2a1d 0%, transparent 70%),
+    linear-gradient(180deg, #0b0f12 0%, #08110d 100%);
+}
+.mh-applp-hero-grid { display: grid; gap: 36px; align-items: center; }
+.mh-applp-copy { min-width: 0; }
+.mh-applp-eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 6px; border: 1px solid #22402f; border-radius: 999px; background: #0d1813; font-size: .75rem; font-weight: 650; letter-spacing: .02em; color: #9fe6be; }
+.mh-applp h1 { margin-top: 18px; font-size: clamp(2.2rem, 9.4vw, 4.1rem); line-height: 1.03; font-weight: 800; letter-spacing: -.045em; color: #fff; }
+.mh-applp h1 span { color: #48dc8f; }
+.mh-applp-sub { max-width: 500px; margin-top: 16px; font-size: 1rem; line-height: 1.65; color: #c5d2cc; }
+
+/* Install panel */
+.mh-applp-install { margin-top: 24px; max-width: 520px; padding: 16px; border: 1px solid #22402f; border-radius: 20px; background: linear-gradient(160deg, #0f2219 0%, #0b1310 70%); box-shadow: inset 0 1px 0 #ffffff0a, 0 20px 50px -30px #00c36566; }
+.mh-applp-install.is-done { display: flex; gap: 12px; align-items: flex-start; }
+.mh-applp-done-icon { width: 28px; height: 28px; flex-shrink: 0; color: #5fd897; }
+.mh-applp-install-title { display: flex; align-items: center; gap: 8px; font-size: 1.0625rem; font-weight: 700; line-height: 1.35; letter-spacing: -.01em; color: #f2f7f4; }
+.mh-applp-install-title svg { width: 20px; height: 20px; flex-shrink: 0; color: #5fd897; }
+.mh-applp-install-note { margin-top: 10px; font-size: .8125rem; line-height: 1.55; color: #9fb3aa; }
+.mh-applp-install-note strong { color: #e4ede8; font-weight: 650; }
+.mh-applp-install > .mh-applp-actions:first-child + .mh-applp-install-note { margin-top: 12px; }
+.mh-applp-lead { margin-top: 6px; font-size: .875rem; color: #bccbc4; }
+.mh-applp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-top: 14px; }
+.mh-applp-install > .mh-applp-actions:first-child { margin-top: 0; }
+.mh-applp-actions svg { width: 18px; height: 18px; }
+.mh-applp-actions .mh-button, .mh-applp-actions .mh-button-secondary { min-height: 52px; padding-inline: 1.25rem; font-size: .9375rem; }
+.mh-applp-primary { width: 100%; font-size: 1rem !important; box-shadow: 0 10px 30px -10px #00c365bb; }
+@media (min-width: 480px) { .mh-applp-primary { width: auto; min-width: 260px; } }
+.mh-applp-checking { display: flex; align-items: center; gap: 10px; min-height: 52px; font-size: .875rem; color: #a9bdb4; }
+.mh-applp-checking svg { width: 18px; height: 18px; color: #5fd897; }
+.mh-applp-steps { display: grid; gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
+.mh-applp-steps li { display: flex; gap: 10px; align-items: flex-start; font-size: .9rem; line-height: 1.5; color: #d8e3de; }
+.mh-applp-steps li > span { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; margin-top: 1px; border-radius: 50%; background: #12271d; color: #7fe0ab; font-size: .75rem; font-weight: 700; }
+.mh-applp-steps strong { color: #fff; font-weight: 650; }
+.mh-applp-inline-icon { display: inline; width: 16px; height: 16px; margin-top: -3px; color: #7fe0ab; }
+.mh-applp-link-button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px; border: 1px solid #2b4a3c; border-radius: 12px; font-size: .875rem; font-weight: 600; color: #a6efc6; cursor: pointer; background: #0b1512; }
+.mh-applp-link-button:hover { color: #e1fbec; border-color: #3d6b56; }
+.mh-applp-link-button svg { width: 16px; height: 16px; }
+
+.mh-applp-trust { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 16px; }
+.mh-applp-trust li { display: flex; align-items: center; gap: 6px; font-size: .8125rem; color: #b6c6be; }
+.mh-applp-trust svg { width: 15px; height: 15px; color: #48dc8f; }
+
+/* Phone presentation: a real start screen in a quiet frame, no stock mock-up. */
+.mh-applp-visual { display: flex; justify-content: center; }
+.mh-applp-phone {
+  --phone-w: 260px; position: relative; width: var(--phone-w); aspect-ratio: 9 / 18.6; padding: 9px; border-radius: 42px;
+  background: linear-gradient(150deg, #2a3632 0%, #0d1311 40%, #1b2622 100%);
+  box-shadow: 0 0 0 1px #3a4a44, 0 40px 80px -30px #000, 0 30px 90px -40px #00c36599;
+}
+.mh-applp-phone-screen { position: relative; display: flex; flex-direction: column; height: 100%; overflow: hidden; border-radius: 34px; background: #0b0f12; font-size: calc(var(--phone-w) / 26); color: #fff; }
+.mh-applp-phone-notch { position: absolute; top: 8px; left: 50%; z-index: 3; width: 30%; height: 1.55em; border-radius: 999px; background: #000; transform: translateX(-50%); }
+.mh-applp-phone-bar { display: flex; align-items: center; justify-content: space-between; padding: 3.1em 1.1em .8em; border-bottom: 1px solid #ffffff12; background: #0b0f12; }
+.mh-applp-phone-brand { display: flex; align-items: center; gap: .45em; font-size: 1.15em; letter-spacing: -.02em; }
+.mh-applp-phone-brand b { font-weight: 700; } .mh-applp-phone-brand i { font-style: normal; color: #00c365; }
+.mh-applp-phone-brand > div { width: 1.7em !important; height: 1.7em !important; }
+.mh-applp-phone-signup { padding: .45em .9em; border-radius: .7em; background: #00c365; color: #05140c; font-size: .85em; font-weight: 700; }
+.mh-applp-phone-hero { position: relative; flex: 1; min-height: 0; overflow: hidden; background: radial-gradient(90% 60% at 80% 20%, #0f3a26 0%, #0b0f12 70%); }
+.mh-applp-phone-hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 100% 0; }
+.mh-applp-phone-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, #0b0f1200 0%, #0b0f1233 35%, #0b0f12e6 72%, #0b0f12 100%); }
+.mh-applp-phone-copy { position: absolute; inset: auto 0 0; z-index: 1; padding: 0 1.1em 1em; }
+.mh-applp-phone-copy p { display: flex; align-items: center; gap: .4em; font-size: .72em; font-weight: 600; color: #88dcb2; }
+.mh-applp-phone-copy p span { width: .45em; height: .45em; border-radius: 50%; background: #00c365; }
+.mh-applp-phone-copy strong { display: block; margin: .35em 0 .8em; font-size: 2em; line-height: 1.04; font-weight: 800; letter-spacing: -.045em; }
+.mh-applp-phone-copy em { font-style: normal; color: #48dc8f; }
+.mh-applp-phone-cta { display: flex; align-items: center; justify-content: center; gap: .45em; height: 2.6em; margin-top: .5em; border-radius: .75em; background: #00c365; color: #05140c; font-size: .88em; font-weight: 700; }
+.mh-applp-phone-cta.is-secondary { background: #ffffff10; border: 1px solid #ffffff1f; color: #fff; }
+.mh-applp-phone-cta svg { width: 1.15em; height: 1.15em; }
+.mh-applp-phone-cta.is-secondary svg { color: #00c365; }
+.mh-applp-phone-live { display: flex; flex-wrap: wrap; gap: .3em .8em; padding: .3em 1.1em .9em; font-size: .72em; color: #c7d4ce; }
+.mh-applp-phone-live li { display: flex; align-items: center; gap: .3em; }
+.mh-applp-phone-live svg { width: 1.1em; height: 1.1em; color: #48dc8f; }
+.mh-applp-phone-tabs { display: grid; grid-template-columns: repeat(5, 1fr); padding: .6em .4em 1.3em; border-top: 1px solid #ffffff14; background: #0c1116; }
+.mh-applp-phone-tabs span { display: flex; flex-direction: column; align-items: center; gap: .25em; font-size: .68em; font-weight: 500; color: #94a3b8; }
+.mh-applp-phone-tabs span.is-active { color: #00c365; font-weight: 650; }
+.mh-applp-phone-tabs svg { width: 1.9em; height: 1.9em; }
+
+/* Sections */
+.mh-applp-section { padding-top: 40px; }
+.mh-applp-section h2 { font-size: clamp(1.35rem, 3vw, 1.75rem); font-weight: 750; letter-spacing: -.025em; color: #f4f8f6; }
+.mh-applp-services { display: grid; gap: 10px; margin-top: 18px; }
+.mh-applp-services a { display: flex; align-items: center; gap: 14px; min-height: 72px; padding: 14px 16px; border: 1px solid #1e2a25; border-radius: 16px; background: #0c1311; color: inherit; transition: border-color 150ms, background-color 150ms; }
+.mh-applp-services a:hover { border-color: #2f5443; background: #0e1714; }
+.mh-applp-services a:focus-visible { outline: 2px solid #00c365; outline-offset: 2px; }
+.mh-applp-service-icon { display: grid; place-items: center; flex-shrink: 0; width: 42px; height: 42px; border-radius: 12px; background: #00c3651a; color: #48dc8f; }
+.mh-applp-service-icon svg { width: 20px; height: 20px; }
+.mh-applp-services a > span:nth-child(2) { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.mh-applp-services strong { font-size: .9375rem; font-weight: 650; color: #f1f6f3; }
+.mh-applp-services a > span:nth-child(2) > span { font-size: .8125rem; line-height: 1.45; color: #a3b5ad; }
+.mh-applp-service-arrow { width: 16px; height: 16px; flex-shrink: 0; color: #5d7a6c; }
+.mh-applp-reasons { display: grid; gap: 10px; margin-top: 18px; }
+.mh-applp-reasons li { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; padding: 16px; border-radius: 16px; border: 1px solid #ffffff0d; background: #0a100e; }
+.mh-applp-reasons svg { grid-row: span 2; width: 22px; height: 22px; margin-top: 1px; color: #48dc8f; }
+.mh-applp-reasons strong { font-size: .9375rem; font-weight: 650; color: #f1f6f3; }
+.mh-applp-reasons p { font-size: .8125rem; line-height: 1.55; color: #a3b5ad; }
+.mh-applp-share-inner { display: grid; gap: 4px; padding-block: 22px; border-top: 1px solid #ffffff0d; }
+.mh-applp-share p { margin-top: 6px; font-size: .875rem; line-height: 1.6; color: #a9bbb3; }
+.mh-applp-share .mh-applp-actions svg { width: 16px; height: 16px; }
+
+@media (min-width: 640px) {
+  .mh-applp-services { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mh-applp-reasons { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mh-applp-reasons li { grid-template-columns: 1fr; gap: 8px; }
+  .mh-applp-reasons svg { grid-row: auto; }
+}
+@media (min-width: 768px) {
+  .mh-applp-phone { --phone-w: 280px; }
+}
+@media (min-width: 1024px) {
+  .mh-applp-hero { padding-block: 44px 56px; }
+  .mh-applp-hero-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 56px; }
+  .mh-applp-phone { --phone-w: 300px; transform: rotate(-2deg); }
+  .mh-applp-services { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mh-applp-share-inner { grid-template-columns: 1fr auto; align-items: center; gap: 24px; }
+  .mh-applp-share .mh-applp-actions { margin-top: 0; }
+  .mh-applp-section { padding-top: 56px; }
+}
+@media (prefers-reduced-motion: reduce) { .mh-applp-phone { transform: none; } }

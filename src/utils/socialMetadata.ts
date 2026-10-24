@@ -72,7 +72,13 @@ export function marketplaceSocialImage(value: string, framing?: ImageFraming | n
 }
 
 const BRAND_IMAGE = BUSINESS_CONFIG.brandMarkUrl;
-export const PUBLIC_PAGE_METADATA: Record<string, { title: string; description: string; image?: string; path: string }> = {
+
+/** WhatsApp preview for /app: a finished 1200x630 JPEG (logo, headline, phone) stored as its own Cloudinary original.
+ * It is already the exact social size, so it is served untouched instead of through socialImage()'s padded rendition.
+ */
+export const APP_SHARE_IMAGE = { image: '__APP_SHARE_IMAGE__', imageWidth: 1200, imageHeight: 630, imageType: 'image/jpeg' } as const;
+
+export const PUBLIC_PAGE_METADATA: Record<string, { title: string; description: string; image?: string; path: string; shareImage?: Pick<SocialHead, 'image' | 'imageWidth' | 'imageHeight' | 'imageType'>; imageAlt?: string }> = {
   home: { path: '/', title: 'Mystery Hub — Digital Services Marketplace in Ghana', description: 'Buy data and airtime in Ghana, create a free business website and track your orders. Explore Mystery Wallet, referral rewards and Marketplace enquiries.' },
   data: { path: '/data', title: 'Data & Airtime — Mystery Hub Ghana', description: 'Choose MTN, Telecel or AirtelTigo data and airtime. Review prices and recipient details, pay with Mobile Money and track your order.' },
   website: { path: '/website-builder', title: 'Website Builder for Ghanaian Businesses — Mystery Hub', description: 'Create a free business website. Choose a design, add your own details and photos, and publish a mobile-friendly site with your brand.', image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1790789160/ChatGPT_Image_Sep_30_2026_05_25_38_PM_bbopws.png' },
@@ -82,11 +88,12 @@ export const PUBLIC_PAGE_METADATA: Record<string, { title: string; description: 
   services: { path: '/services', title: 'More Services — Mystery Hub Ghana', description: 'Explore available services and what is coming next. ECG, water, TV renewals and results-checker services are not yet available.' },
   about: { path: '/about', title: 'About Mystery Hub — Reliable Digital Solutions for Ghana', description: 'Learn about Mystery Hub’s mission to provide honest, reliable data bundles, website building tools, and everyday digital utilities across Ghana.' },
   help: { path: '/help', title: 'Help & FAQs — Mystery Hub Ghana', description: 'Find answers about Data, Airtime, payments, order tracking, Mystery Earn, Website Builder, Wallet and support.' },
+  app: { path: '/app', title: 'Install Mystery Hub | Everything Digital. One Trusted Place.', description: 'Buy data, top up airtime, track orders and create your own free business website. Get Mystery Hub on your phone.', shareImage: APP_SHARE_IMAGE, imageAlt: 'Mystery Hub on a phone: everything digital, one trusted place. Free to install, no app store needed.' },
 };
 
 export function publicPageHead(page: string): SocialHead {
   const entry = PUBLIC_PAGE_METADATA[page] || PUBLIC_PAGE_METADATA.home;
-  return { title: entry.title, description: entry.description, url: `${PUBLIC_ORIGIN}${entry.path}`, ...socialImage(entry.image || BRAND_IMAGE), imageAlt: entry.title, icon: publicImageUrl(BRAND_IMAGE) };
+  return { title: entry.title, description: entry.description, url: `${PUBLIC_ORIGIN}${entry.path}`, ...(entry.shareImage || socialImage(entry.image || BRAND_IMAGE)), imageAlt: entry.imageAlt || entry.title, icon: publicImageUrl(BRAND_IMAGE) };
 }
 
 /** Explicit marketing-route allowlist: unknown/account/operational paths must not inherit an

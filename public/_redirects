@@ -1,3 +1,6 @@
 # Netlify Single-Page Application (SPA) redirect rule
 # Ensures direct visits to /data, /website-builder, /about, etc. resolve to index.html with 200 status
+# /app has its own HTML (app share preview); keep it above the catch-all.
+/app   /app/index.html   200
+/app/  /app/index.html   200
 /*    /index.html   200

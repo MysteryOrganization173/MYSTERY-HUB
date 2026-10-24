@@ -16,6 +16,7 @@ export const ROUTE_PATH_MAP: Record<ActivePage, string> = {
   admin: '/admin',
   earn: '/earn',
   afa: '/afa',
+  app: '/app',
 };
 
 /**
@@ -151,6 +152,9 @@ export function getPageFromPath(rawPath: string | null | undefined): ActivePage 
   ) {
     return 'afa';
   }
+
+  // The app landing page that WhatsApp links point to (dist/app/index.html carries its own share preview).
+  if (normalized === '/app' || normalized === '/app/index.html') return 'app';
 
   // Intentional fallback for unknown routes
   return 'home';
