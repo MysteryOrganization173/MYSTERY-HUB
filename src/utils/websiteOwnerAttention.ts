@@ -62,3 +62,22 @@ export function ownerSuggestions(input: OwnerSuggestionInput): OwnerAttentionIte
     title: 'Say where you are', detail: 'A town or area helps local customers trust and find you.'});
   return items.slice(0, 3);
 }
+
+/**
+ * A new Data store's three launch steps, from records the dashboard already loaded. The card disappears once
+ * bundles are on sale and the store is published; sharing is never marked done because it never finishes.
+ */
+export type ResellerLaunchStep = {id: 'bundles' | 'publish' | 'share'; title: string; detail: string; done: boolean; action: OwnerAttentionAction; label: string; ready: boolean};
+export function resellerLaunchSteps(input: {sellableBundles?: number | null; published: boolean}): ResellerLaunchStep[] | null {
+  const onSale = input.sellableBundles ?? null;
+  if (onSale === null || (onSale > 0 && input.published)) return null;
+  return [
+    {id: 'bundles', action: 'pricing', label: onSale > 0 ? 'Edit bundles' : 'Set up bundles', ready: true, done: onSale > 0,
+      title: onSale > 0 ? `${onSale === 1 ? '1 bundle' : `${onSale} bundles`} on sale` : 'Put bundles on sale',
+      detail: onSale > 0 ? 'Customers can buy these at the prices you set.' : 'Choose the MTN, Telecel and AirtelTigo bundles to sell and set your prices.'},
+    {id: 'publish', action: 'publish', label: 'Publish', ready: true, done: input.published,
+      title: input.published ? 'Store published' : 'Publish your store', detail: input.published ? 'Your store link works for customers.' : 'Your store link starts working for customers once you publish.'},
+    {id: 'share', action: 'share', label: 'Share link', ready: input.published, done: false,
+      title: 'Share your store link', detail: input.published ? 'Send it to customers on WhatsApp or post it on your status.' : 'Available once your store is published.'},
+  ];
+}

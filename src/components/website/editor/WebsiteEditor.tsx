@@ -930,7 +930,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                       markDirty();
                     }}
                     placeholder={
-                      isDataReseller ? 'e.g. Buy Data or Order via WhatsApp' : 'e.g. Order via WhatsApp, Book a Table, Get Quote'
+                      isDataReseller ? 'e.g. Shop Bundles or Buy Data' : 'e.g. Order via WhatsApp, Book a Table, Get Quote'
                     }
                     className="w-full bg-[#111922] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-[#00c365]"
                   />

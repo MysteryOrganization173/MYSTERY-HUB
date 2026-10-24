@@ -1,5 +1,5 @@
 /**
- * Website Builder V5.1: bundle setup planning, deletion help, publish readiness, Signal starter on a
+ * Website Builder V5.1: bundle setup planning, deletion help, publish readiness, Data Store starter on a
  * design switch and the one design count. Pure functions and source contracts only; no production data.
  */
 import assert from 'node:assert/strict';
@@ -136,15 +136,15 @@ test('delete sheet never bypasses the server check and never sends anything itse
 });
 
 // ---------- Section 7–8, 12: starter copy, WhatsApp rule, readiness ----------
-test('switching into the Data store gives Signal starter wording and a Buy Data button',()=>{
+test('switching into the Data store gives Data Store starter wording and a Shop Bundles button',()=>{
   const from:SiteContent={businessName:'Ama',tagline:'Fresh jollof daily',aboutText:'Our kitchen',ctaLabel:'Contact us',whatsapp:'0241234567'} as SiteContent;
   const next=migrateWebsiteTemplate(from,'tmpl-buka-bistro','tmpl-data-reseller');
   const starter=websiteStarterWording('tmpl-data-reseller')!;
   assert.equal(next.tagline,starter.tagline);assert.ok(next.tagline);assert.equal(next.aboutText,starter.aboutText);
-  assert.equal(next.ctaLabel,'Buy Data');assert.equal(next.businessName,'Ama');assert.equal(next.whatsapp,'0241234567');
+  assert.equal(next.ctaLabel,'Shop Bundles');assert.equal(next.businessName,'Ama');assert.equal(next.whatsapp,'0241234567');
 });
 test('button labels: industry-specific ones reset, contact-style ones stay outside the Data store',()=>{
-  assert.equal(migrateWebsiteTemplate({businessName:'Ama',ctaLabel:'Book a table'} as SiteContent,'tmpl-buka-bistro','tmpl-data-reseller').ctaLabel,'Buy Data');
+  assert.equal(migrateWebsiteTemplate({businessName:'Ama',ctaLabel:'Book a table'} as SiteContent,'tmpl-buka-bistro','tmpl-data-reseller').ctaLabel,'Shop Bundles');
   assert.equal(migrateWebsiteTemplate({businessName:'Ama',ctaLabel:'Message us'} as SiteContent,'tmpl-buka-bistro','tmpl-glow-salon').ctaLabel,'Message us');
   assert.notEqual(migrateWebsiteTemplate({businessName:'Ama',ctaLabel:'Message us'} as SiteContent,'tmpl-buka-bistro','tmpl-data-reseller').ctaLabel,'Message us');
 });
@@ -165,7 +165,7 @@ test('readiness warns about an empty heading, no bundles on sale and a contact-s
   const r=websiteReadiness({templateId:'tmpl-data-reseller',content:{businessName:'A',tagline:'',ctaLabel:'Contact us'},sellableBundles:0});
   assert.deepEqual(r.map(i=>i.id),['tagline','bundles','cta']);assert.ok(r.every(i=>i.level==='warning'));
   assert.equal(r[0].fix?.patch.tagline,websiteStarterWording('tmpl-data-reseller')!.tagline);
-  assert.equal(r[2].fix?.patch.ctaLabel,'Buy Data');
+  assert.equal(r[2].fix?.patch.ctaLabel,'Shop Bundles');
   assert.ok(!websiteReadiness({templateId:'tmpl-data-reseller',content:{businessName:'A',tagline:''},layoutMode:'sections'}).some(i=>i.id==='tagline'));
 });
 test('publish sheet holds the button only for required items and never celebrates zero sellable bundles',()=>{

@@ -24,7 +24,7 @@ import { DataResellerTemplateView, type ResellerStoreSummary } from '../componen
 import { NightKitchenTemplateView } from '../components/website/templates/NightKitchenTemplateView.js';
 import { BoutiqueTemplateView } from '../components/website/templates/BoutiqueTemplateView.js';
 import { PersonalityTemplateView, personalityPreset } from '../components/website/templates/PersonalityTemplateView';
-import { WEBSITE_TEMPLATES, LEGACY_DEMO_BUSINESS_NAMES } from '../data/templates.js';
+import { WEBSITE_TEMPLATES, LEGACY_DEMO_BUSINESS_NAMES, LEGACY_DEMO_CONTENT } from '../data/templates.js';
 import { resolveDataResellerHeroImage } from './dataResellerArtwork.js';
 
 /**
@@ -58,9 +58,9 @@ export function mergeSiteWithTemplate(
     siteContent: content,
     // Owner content without a stored name keeps the sample name it has always rendered (frozen in V5).
     demoBusinessName: content?.businessName ?? (content ? LEGACY_DEMO_BUSINESS_NAMES[baseTemplate.id] : undefined) ?? baseTemplate.demoBusinessName,
-    demoHeroTagline: content?.tagline ?? baseTemplate.demoHeroTagline,
-    demoSubtext: content?.aboutText ?? baseTemplate.demoSubtext,
-    location: content?.location ?? baseTemplate.location,
+    demoHeroTagline: content?.tagline ?? (content ? LEGACY_DEMO_CONTENT[baseTemplate.id]?.tagline : undefined) ?? baseTemplate.demoHeroTagline,
+    demoSubtext: content?.aboutText ?? (content ? LEGACY_DEMO_CONTENT[baseTemplate.id]?.aboutText : undefined) ?? baseTemplate.demoSubtext,
+    location: content?.location ?? (content ? LEGACY_DEMO_CONTENT[baseTemplate.id]?.location : undefined) ?? baseTemplate.location,
     hoursOrContact: content ? content.whatsapp || content.phone || content.email || '' : baseTemplate.hoursOrContact,
     // A Data Business owner's empty hero keeps the legacy banner it has always rendered, never the new starter.
     heroImage: content && baseTemplate.layoutType === 'reseller' ? resolveDataResellerHeroImage(content.heroImage, true) : content?.heroImage || baseTemplate.heroImage,
@@ -99,7 +99,7 @@ export function renderTemplateLayout(
     onCtaClick?: () => void;
     isMobileView?: boolean;
     managedCheckout?: React.ReactNode;
-    managedAvailability?: 'loading' | 'available' | 'empty' | 'error';
+    managedAvailability?: 'loading' | 'available' | 'empty' | 'error' | 'setup';
     managedSummary?: ResellerStoreSummary;
   }
 ): React.ReactElement {
@@ -108,7 +108,7 @@ export function renderTemplateLayout(
   const variables = { '--website-primary':template.colorScheme?.primary, '--website-accent':template.accentColor, '--website-background':template.colorScheme?.background, '--website-text':template.colorScheme?.text, '--website-on-primary':websiteActionText(template.colorScheme?.primary || '#0f172a'), '--website-on-accent':websiteActionText(template.accentColor) } as React.CSSProperties;
   return <WebsiteContrastBoundary style={variables} typeface={websiteTypePreset(template)}>{legacy}</WebsiteContrastBoundary>;
 }
-function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: () => void; isMobileView?: boolean; managedCheckout?: React.ReactNode; managedAvailability?: 'loading' | 'available' | 'empty' | 'error'; managedSummary?: ResellerStoreSummary }): React.ReactElement {
+function renderLegacyLayout(template: WebsiteTemplate, options?: { onCtaClick?: () => void; isMobileView?: boolean; managedCheckout?: React.ReactNode; managedAvailability?: 'loading' | 'available' | 'empty' | 'error' | 'setup'; managedSummary?: ResellerStoreSummary }): React.ReactElement {
   if (template.composition) return <SectionSiteRenderer template={template} onCtaClick={options?.onCtaClick} managedCheckout={options?.managedCheckout} />;
   const layout = (template.layoutType || template.category || '').toLowerCase();
   const { onCtaClick, isMobileView } = options || {};

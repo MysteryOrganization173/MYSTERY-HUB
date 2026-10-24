@@ -23,7 +23,7 @@ function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:st
   const requestId=useRef<string|null>(null),guard=useRef(false),dialog=useRef<HTMLDialogElement>(null),payButton=useRef<HTMLButtonElement>(null),restoreFocus=useRef(false);
   const lifecycle=useRef(createStoreCheckoutAttempt()),mounted=useRef(false),trackingGeneration=useRef(0),paymentReference=useRef(''),started=useRef(false),trackingInput=useRef<HTMLInputElement>(null);
   const [locked,setLocked]=useState(false),[recoveryOnly,setRecoveryOnly]=useState(false),[trackingError,setTrackingError]=useState('');
-  // V5.2 Signal is bundle-first: browse a network's bundles, tap one, then give the number, confirm its network and pay in one sheet.
+  // V5.2 Data Store is bundle-first: browse a network's bundles, tap one, then give the number, confirm its network and pay in one sheet.
   const [filter,setFilter]=useState<BundleFilter>('all'),[expanded,setExpanded]=useState(false),[hint,setHint]=useState('');
   // The buyer's own network confirmation, bound to the exact number and bundle network it was given for.
   const [confirmedFor,setConfirmedFor]=useState(''),[trackInput,setTrackInput]=useState(''),[checkedAt,setCheckedAt]=useState(''),[copied,setCopied]=useState(''),[ownReference,setOwnReference]=useState('');
@@ -100,7 +100,8 @@ function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:st
   const contact=template.siteContent?.whatsapp||template.siteContent?.phone||'';
   const contactDigits=contact.replace(/\D/g,'').replace(/^0/,'233');
   const businessContact=/^233\d{9}$/.test(contactDigits)?`https://wa.me/${contactDigits}`:null;
-  const availability=loading?'loading':products.length?'available':error?'error':'empty';
+  // A draft with nothing on sale is the owner's setup state; customers of a published store see `empty`.
+  const availability=loading?'loading':products.length?'available':error?'error':preview?'setup':'empty';
   const presentation=order?dataOrderPresentation(order.status,order.manual_review):null;
   // Only the server's eligible products, at the server's retail prices, are ever shown or sold.
   const bundles:StoreBundle[]=products.map(p=>({id:p.id,network:p.network,dataAmount:p.dataAmount,validity:p.validity||'',priceMinor:p.retailMinor}));
@@ -150,7 +151,7 @@ function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:st
     <p className="sr-only">Data bundles from {template.demoBusinessName}</p>
     {sessionOrder&&<section className="store-card" style={card} aria-label="Your order">{orderCard(true)}</section>}
     {loading&&<p role="status" className="store-note" style={muted}>Loading available bundles…</p>}{error&&!selected&&<div role="alert" className="store-card store-note break-words" style={card}><p>{error}</p>{recoveryOnly&&!reference&&businessContact&&<a href={businessContact} className="store-secondary mt-3" style={quiet}>Contact the business</a>}</div>}
-    {!loading&&!error&&!onNetwork.length&&<section role="status" className="store-card space-y-2" style={card}><h3 className="font-bold">{products.length?'No bundles available on this network right now.':preview?'No saved eligible bundles in this preview yet.':'Bundles are not available right now.'}</h3><p className="store-note" style={{color:colors.surfaceMutedText}}>{products.length?'Choose another network or check back later.':preview?'Open Bundles & pricing to configure and save your bundles. Preview never collects payments.':'Please check back later or contact the business.'}</p>{businessContact&&<a href={businessContact} className="store-primary" style={{...primary,display:'inline-flex',alignItems:'center'}}>Contact Business</a>}</section>}
+    {!loading&&!error&&!onNetwork.length&&!(preview&&!products.length)&&<section role="status" className="store-card space-y-2" style={card}><h3 className="font-bold">{products.length?'No bundles available on this network right now.':'Bundles are not available right now.'}</h3><p className="store-note" style={{color:colors.surfaceMutedText}}>{products.length?'Choose another network or check back later.':'Please check back later or contact the business.'}</p>{businessContact&&<a href={businessContact} className="store-primary" style={{...primary,display:'inline-flex',alignItems:'center'}}>Contact Business</a>}</section>}
     {bundles.length>0&&<section className="store-buy" aria-label={`${storeNetworkName(shown)} bundles`}>
       {networks.length>1?<NetworkTabs networks={networks} value={shown} onChange={switchNetwork} bundles={bundles} theme={colors}/>:<p className="store-one-network" style={muted}><i aria-hidden="true" style={{backgroundColor:storeNetworkColor(shown)}}/>{storeNetworkName(shown)} bundles</p>}
       {filters.length>1&&<div className="store-chips" role="group" aria-label="Filter bundles">{filters.map(f=><button key={f.id} type="button" aria-pressed={activeFilter===f.id} onClick={()=>setFilter(f.id)} style={activeFilter===f.id?{...primary}:{...neutral,backgroundColor:'transparent',color:colors.text}}>{f.label}{f.id==='all'?` ${f.count}`:''}</button>)}</div>}

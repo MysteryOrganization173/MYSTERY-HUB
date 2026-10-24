@@ -234,7 +234,7 @@ export class WebsiteStore {
       heroImage: sanitizeUrl(input.content?.heroImage || templateDef.heroImage || ''),
       logoUrl: sanitizeUrl(input.content?.logoUrl || ''),
       ctaLabel: sanitizeString(
-        input.content?.ctaLabel || (templateDef.id === 'tmpl-data-reseller' ? 'Buy Data' : templateDef.id === 'tmpl-start-blank' ? 'Contact us' : 'Order via WhatsApp'),
+        input.content?.ctaLabel || (templateDef.id === 'tmpl-data-reseller' ? 'Shop Bundles' : templateDef.id === 'tmpl-start-blank' ? 'Contact us' : 'Order via WhatsApp'),
         50
       ),
       ctaTarget: sanitizeUrl(input.content?.ctaTarget || input.content?.whatsapp || demoPhone || ''),

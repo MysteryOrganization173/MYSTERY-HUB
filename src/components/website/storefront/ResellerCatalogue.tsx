@@ -100,11 +100,11 @@ export function BundleTile({bundle, theme, onChoose, example = false}: {bundle: 
   </button>;
 }
 
-/* ------------------------------------ Signal (V5) ------------------------------------ */
+/* ------------------------------ Data Store (V5 "Signal") ------------------------------ */
 export type BundleFilter = 'featured' | 'all' | 'under20' | 'mid' | 'big';
 /**
  * Size and price filters computed only from the bundles on sale. "Featured" exists only when the owner
- * pinned bundles: Signal never invents popularity or best-sellers.
+ * pinned bundles: the store never invents popularity or best-sellers.
  */
 export function bundleFilters(bundles: StoreBundle[], pinned: readonly string[] = []): Array<{ id: BundleFilter; label: string; count: number }> {
   const count = (filter: BundleFilter) => filterBundles(bundles, filter, pinned).length;
@@ -307,6 +307,16 @@ export const RESELLER_STORE_CSS = `
 .store-track-form{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .store-track-form input{flex:1 1 12rem}
 
+.store-setup{display:grid;gap:16px}
+.store-setup-head h3{font-size:clamp(1.25rem,4.6vw,1.6rem);font-weight:700;line-height:1.15;margin:0 0 6px;letter-spacing:-.015em}
+.store-setup-networks{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.store-setup-networks li{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid;border-radius:999px;font-size:13.5px;font-weight:700}
+.store-setup-networks i{width:9px;height:9px;border-radius:50%;background:var(--store-network)}
+.store-setup-price{font-size:12.5px;font-weight:700;border:1px dashed;border-radius:999px;padding:5px 10px;white-space:nowrap}
+.store-setup-action{display:none!important;justify-self:start}
+.visual-selection-surface .store-setup-action{display:inline-flex!important}
+.visual-selection-surface .store-setup-hint{display:none}
+@media (max-width:479px){.store-setup-action{justify-self:stretch}}
 .store-recipient{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid;border-radius:14px;padding:10px 12px;margin-top:12px;font-size:14px}
 @media (prefers-reduced-motion:reduce){.reseller-storefront *{transition:none!important;animation:none!important}}
 `;

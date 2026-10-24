@@ -4,7 +4,7 @@ import { websiteActionText, resolveStoreTheme } from '../../../utils/websiteBran
 import { SafeImage } from '../SafeImage.js';
 import React, { useMemo, useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
-import { ArrowRight, MessageCircle, Phone, MapPin, ShieldCheck, Search, Smartphone } from 'lucide-react';
+import { ArrowRight, MessageCircle, Phone, MapPin, ShieldCheck, Search, Smartphone, SlidersHorizontal } from 'lucide-react';
 import { resolveWebsiteSections } from '../../../config/websiteContentV5';
 import { getCloudinarySrcSet } from '../../../utils/cloudinary';
 import { resolveDataResellerHeroImage } from '../../../utils/dataResellerArtwork';
@@ -12,7 +12,7 @@ import { DATA_BUNDLES } from '../../../data/bundles';
 import { formatGhs } from '../../../../shared/money';
 import {
   BundleRow, HowBuyingWorks, NetworkPicker, NetworkTabs, RESELLER_STORE_CSS, STORE_NETWORKS, networkSummaries, sortBundles,
-  storeNetworkName, storeNetworksIn, type NetworkSummary, type StoreBundle, type StoreNetwork,
+  storeNetworkColor, storeNetworkName, storeNetworksIn, type NetworkSummary, type StoreBundle, type StoreNetwork,
 } from '../storefront/ResellerCatalogue';
 
 export interface ResellerStoreSummary {
@@ -26,7 +26,8 @@ interface TemplateViewProps {
   template: WebsiteTemplate;
   onCtaClick?: () => void;
   managedCheckout?: React.ReactNode;
-  managedAvailability?: 'loading' | 'available' | 'empty' | 'error';
+  /** `setup`: the owner's own draft before any bundle is on sale. Customers never see it. */
+  managedAvailability?: 'loading' | 'available' | 'empty' | 'error' | 'setup';
   managedSummary?: ResellerStoreSummary;
 }
 
@@ -69,6 +70,8 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
 
   // Gallery: example bundles. An owner's site without managed checkout (a design-switch preview) shows its empty state.
   const examples = useMemo(() => owner ? [] : exampleBundles(), [owner]);
+  // An owner's store before its first bundle is on sale: a designed setup area in place of an empty catalogue.
+  const setup = owner && (!managedCheckout || managedAvailability === 'setup');
   const [network, setNetwork] = useState<StoreNetwork>('mtn');
   const [notice, setNotice] = useState('');
   const networks: StoreNetwork[] = managedSummary?.networks.length ? managedSummary.networks : managedCheckout ? [] : storeNetworksIn(examples);
@@ -83,9 +86,9 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
   };
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const pickNetwork = (n: StoreNetwork) => { (managedSummary?.onPickNetwork || setNetwork)(n); setNotice(''); scrollTo('bundle-catalog'); };
-  const primaryLabel = managedCheckout && managedAvailability !== 'available'
+  const primaryLabel = managedCheckout && managedAvailability !== 'available' && managedAvailability !== 'setup'
     ? managedAvailability === 'loading' ? 'Check Availability' : 'View Availability'
-    : template.siteContent?.ctaLabel || 'Buy Data';
+    : owner ? template.siteContent?.ctaLabel || 'Buy Data' : 'Shop Bundles';
 
   const line = p.hairline || p.border;
   const surface = { backgroundColor: p.surface, borderColor: line, color: p.surfaceText };
@@ -180,15 +183,11 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           </div>
           {managedCheckout && <p className="store-note store-head-note" style={{ color: p.mutedText }}>Tap a bundle to buy it. The price shown is the total you pay.</p>}
         </div>
-        {managedCheckout || (owner ? (
-          <div role="status" className="store-card store-empty" style={surface}>
-            <h3 className="font-bold text-base">Your bundles appear here</h3>
-            <p className="store-note mt-1" style={{ color: p.surfaceMutedText }}>Customers see the bundles you switch on in Bundles &amp; Pricing, at the prices you set.</p>
-          </div>
-        ) : (
+        {setup && <StoreSetup theme={p}/>}
+        {managedCheckout || (owner ? null : (
           <>
             <NetworkTabs networks={networks} value={network} onChange={n => { setNetwork(n); setNotice(''); }} bundles={examples} theme={p} />
-            {/* The same compact rows a live Signal store shows; the gallery never takes payment. */}
+            {/* The same compact rows a live Data Store shows; the gallery never takes payment. */}
             <div className="store-rows" style={{ marginTop: 14 }}>
               {sortBundles(examples.filter(b => b.network === network)).map(b => (
                 <BundleRow key={b.id} bundle={b} theme={p} onChoose={() => { if (onCtaClick) onCtaClick(); else setNotice('This is an example store. Bundles and prices appear here once a store owner sets them.'); }} />
@@ -272,3 +271,35 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
     </div>
   );
 };
+
+/** Sizes a store can sell, shown without prices: each owner sets their own, and nothing here can be bought. */
+const SETUP_EXAMPLES: Array<[StoreNetwork, string]> = [['mtn', '1GB'], ['mtn', '5GB'], ['telecel', '10GB'], ['airteltigo', '2GB']];
+
+/**
+ * The owner's view of an unconfigured store: what the catalogue will look like, the networks it can sell and
+ * the one step that turns it on. Only drafts and owner previews render this; a published store without bundles
+ * shows customers its "not available right now" state instead.
+ */
+function StoreSetup({ theme: p }: { theme: ReturnType<typeof resolveStoreTheme> }) {
+  const line = p.hairline || p.border;
+  return <div className="store-card store-setup" style={{ backgroundColor: p.surface, borderColor: line, color: p.surfaceText }} data-store-setup>
+    <div className="store-setup-head">
+      <p className="store-step-label" style={{ color: p.surfaceAccentText }}>Only you can see this</p>
+      <h3 className="site-display">Your bundles appear here</h3>
+      <p className="store-note" style={{ color: p.surfaceMutedText }}>Choose the bundles you want to sell and set your prices. Until at least one bundle is on sale, customers see “Bundles are not available right now”.</p>
+    </div>
+    <ul className="store-setup-networks" aria-label="Networks you can sell">
+      {STORE_NETWORKS.map(n => <li key={n} style={{ borderColor: line, '--store-network': storeNetworkColor(n) } as React.CSSProperties}><i aria-hidden="true" />{storeNetworkName(n)}</li>)}
+    </ul>
+    <div className="store-rows store-setup-rows" aria-label="Example layout, not for sale">
+      {SETUP_EXAMPLES.map(([n, size]) => <div key={n + size} className="store-row" aria-hidden="true" style={{ backgroundColor: p.background, borderColor: line, color: p.text, '--store-network': storeNetworkColor(n), cursor: 'default' } as React.CSSProperties}>
+        <span className="store-row-size site-display">{size}</span>
+        <span className="store-row-meta" style={{ color: p.mutedText }}><span>{storeNetworkName(n)}</span><small>Example</small></span>
+        <span className="store-setup-price" style={{ borderColor: line, color: p.mutedText }}>Your price</span>
+      </div>)}
+    </div>
+    {/* Identical markup everywhere; CSS shows the button only inside the editor, where tapping this area opens bundle setup. */}
+    <button type="button" className="store-primary store-setup-action" style={{ backgroundColor: p.accent, color: websiteActionText(p.accent) }}><SlidersHorizontal className="w-4 h-4" aria-hidden="true" />Set up bundles &amp; prices</button>
+    <p className="store-note store-setup-hint" style={{ color: p.surfaceMutedText }}>Set them up in <strong style={{ color: p.surfaceText }}>Bundles &amp; Pricing</strong> on your website dashboard, or tap this area in the editor.</p>
+  </div>;
+}

@@ -193,12 +193,12 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     id: 'tmpl-data-reseller',
     integrations: RESELLER_INTEGRATIONS,
     priority: 10,
-    title: 'Signal',
+    title: 'Data Store',
     category: 'retail',
     categoryLabel: 'Data & Telecom',
     layoutType: 'reseller',
-    industry: 'Branded Mobile Data Reselling & Telecom Airtime Storefront',
-    description: 'Your own branded data store: customers pick an MTN, Telecel or AirtelTigo bundle at your prices and pay through Mystery Hub’s managed checkout.',
+    industry: 'Branded mobile data store for resellers',
+    description: 'Create your own branded data-selling website with MTN, Telecel and AirtelTigo bundles, secure checkout and order tracking.',
     features: [
       'Build your own branded data-selling website',
       'MTN · Telecel · AirtelTigo',
@@ -207,11 +207,11 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     ],
     accentColor: '#2563eb',
     demoBusinessName: 'Your Data Store',
-    demoHeroTagline: 'Data bundles, bought in a few taps',
-    demoSubtext:
-      'Choose a bundle, enter the number that should receive it and pay securely. Keep your order reference to track your order here.',
-    location: 'Spintex Road, Accra',
-    hoursOrContact: '+233 24 555 7788',
+    // The gallery shows exactly the wording a new store starts with, and no sample address or phone number.
+    demoHeroTagline: 'Buy Data. Stay Connected.',
+    demoSubtext: 'Choose a bundle, pay securely and track your order.',
+    location: '',
+    hoursOrContact: '',
     isFreeTier: true,
     badgeText: 'Great for Resellers',
     colorScheme: {
@@ -946,8 +946,21 @@ export const LEGACY_TEMPLATE_TITLE_SLUGS: Readonly<Record<string, string>> = Obj
   'grace-city-chapel-international': 'tmpl-grace-ministry',
   'akwete-bespoke-atelier-kente-house': 'tmpl-afrochic-threads',
   'vanguard-legal-accounting-partners': 'tmpl-legon-consult',
+  // Data Store was called Signal from V5 to V5.2; shared links to it keep working.
+  'signal': 'tmpl-data-reseller',
 });
 export const LEGACY_DEMO_BUSINESS_NAMES: Readonly<Record<string, string>> = Object.freeze({ 'tmpl-data-reseller': 'QuickByte Data' });
+/**
+ * Data Store V1 gave the gallery new wording and dropped its sample address. Owner sites that never stored
+ * these fields keep rendering what they always showed, so no live store changes without its owner.
+ */
+export const LEGACY_DEMO_CONTENT: Readonly<Record<string, Readonly<{ tagline: string; aboutText: string; location: string }>>> = Object.freeze({
+  'tmpl-data-reseller': Object.freeze({
+    tagline: 'Data bundles, bought in a few taps',
+    aboutText: 'Choose a bundle, enter the number that should receive it and pay securely. Keep your order reference to track your order here.',
+    location: 'Spintex Road, Accra',
+  }),
+});
 
 /** Resolves a gallery deep link: template id, id without the prefix, current design-name slug or a legacy title slug. */
 export function findTemplateByLink(value: string): WebsiteTemplate | undefined {
