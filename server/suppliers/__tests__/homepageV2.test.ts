@@ -62,8 +62,9 @@ test('phones get an art-directed crop of the approved hero artwork, in one reque
   assert.ok(match, 'phone crop region');
   const [x, y, width, height] = match!.slice(1).map(Number);
   assert.ok(x >= 0 && y >= 0 && x + width <= 1672 && y + height <= 941, 'crop stays inside the 1672 × 941 original');
-  // The band is 64vw tall at most, so the crop matches it (≈1.56:1) and CSS barely re-crops.
-  assert.ok(Math.abs(width / height - 1 / 0.64) < 0.01, 'phone crop matches the band');
+  // The phone scene is the crop at its own aspect (height = .938 × width), so CSS never re-crops it.
+  assert.ok(Math.abs(height / width - 0.938) < 0.005, 'phone scene box matches the crop');
+  assert.equal(y, 0, 'full height: sky behind the headline, skyline in the window, trails under the copy');
   // Phone candidates never upscale past the crop's own pixels.
   const phoneWidths = hero.match(/getCloudinarySrcSet\(HERO_ARTWORK, \[([\d, ]+)\], \{ region/)![1].split(',').map(Number);
   assert.ok(Math.max(...phoneWidths) <= width);
@@ -76,7 +77,12 @@ test('phones get an art-directed crop of the approved hero artwork, in one reque
   assert.match(hero, /home-hero-no-art/);
   const css = home('homepage.css');
   assert.match(css, /\.home-hero-no-art \.home-hero-content \{ padding-top: 40px; \}/);
-  assert.match(css, /--hero-art-h: clamp\(/);
+  assert.match(css, /--hero-art-w: 118vw;/);
+  assert.match(css, /height: calc\(var\(--hero-art-w\) \* \.938\)/);
+  // Short screens shrink the scene so both actions stay above the bottom navigation.
+  assert.match(css, /\(max-width: 767px\) and \(max-height: 680px\) \{[\s\S]*?--hero-art-w: 100vw;/);
+  // Brightness is kept: no full-height dark overlay, only local shading behind words.
+  assert.doesNotMatch(css.slice(css.indexOf('/* Phones: one poster')), /\.home-hero-art::after \{ background: linear-gradient\(180deg, #070b0e[0-9a-f]{0,2} 0%, #070b0e[0-9a-f]{0,2} 100%/);
 });
 
 test('network selector keeps distinct network colours on its selected state', () => {

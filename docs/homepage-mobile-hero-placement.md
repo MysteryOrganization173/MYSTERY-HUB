@@ -56,3 +56,13 @@ Final focused homepage/copy/member routing tests: **20 passed, 0 failed, 0 skipp
 Screenshots use CSS-pixel browser viewports, not a physical Android handset. Real browser chrome, safe-area insets, font scaling and dynamic address-bar behavior still need founder device acceptance. Live public-page access was verified, but no Render revision/deployment audit or DNS inspection/mutation is part of this task. The actual artwork loaded successfully, so the correction has real-image visual evidence rather than only arithmetic or build results.
 
 Review the three-way comparisons, especially 390 × 844 and 360 × 560. This branch is for founder review only. No merge or deployment; no service-tile, network-selector, catalogue, showcase, footer, Earn, auth, financial, supplier, Admin, database or production configuration change was made in this follow-up.
+
+## Homepage V3 phone composition (24 October 2026)
+
+Supersedes the image band above. Phones now use one poster-style scene instead of a band followed by copy:
+
+- `PHONE_REGION` is the artwork's right 60% at full height (x 669, y 0, 1003 × 941). The scene box is `--hero-art-w` wide (118vw, or 100vw on screens 680px tall or less) and 0.938 of that tall, anchored right, so the dark sea on the crop's left falls off-canvas.
+- The headline opens the page over the dark sky (globe and Wi-Fi arcs). The skyline, Independence Arch and light trails show through a window between headline and description (`--hero-window`, derived from the scene width and headline size). The description, actions and availability list sit over the light trails, which dissolve into the page.
+- Shading is local only: a short top fade under the header and two soft radial shades behind the headline and description. The skyline window is not darkened.
+- If the image fails, `home-hero-no-art` sets the window to zero, so no empty block remains.
+- Tablet (768–1023px) and desktop are unchanged.
