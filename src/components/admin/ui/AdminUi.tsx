@@ -229,7 +229,12 @@ export function AdminSheet({ title, subtitle, onClose, busy = false, children, f
   }, []);
   return (
     <dialog ref={ref} aria-labelledby={titleId}
-      onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}
+      onCancel={event => {
+        // React propagates a nested dialog's cancel event to its parent sheet.
+        // Escape must close only the dialog that actually received it.
+        if (event.target !== event.currentTarget) return;
+        event.preventDefault(); if (!busy) onClose();
+      }}
       onClick={event => { if (event.target === ref.current && !busy) onClose(); }}
       className={`m-0 mt-auto max-h-[94dvh] w-full max-w-none overflow-hidden rounded-t-3xl border border-slate-700 bg-[#0b1217] p-0 text-slate-100 backdrop:bg-black/75 sm:m-auto sm:max-h-[90dvh] sm:rounded-3xl ${wide ? 'sm:max-w-3xl' : 'sm:max-w-xl'}`}>
       <div className="flex max-h-[94dvh] flex-col sm:max-h-[90dvh]">

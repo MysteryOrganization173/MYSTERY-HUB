@@ -60,6 +60,8 @@ export function parseSupplierStatus(raw: string | null | undefined): string | nu
 /** Mirrors the server's needs_attention SQL in OrdersStore.searchOrdersAdmin. */
 export function isNeedsAttention(order: AdminOrderCaseInput): boolean {
   if (order.resolution?.stage === 'resolved') return false;
+  // Match the server: unpaid pre-launch fixtures are not live operational incidents.
+  if (order.payment_status !== 'success' && /^pre-?launch/i.test(order.failure_reason || '')) return false;
   if (order.manual_review) return true;
   if (order.failure_reason === 'supplier_submission_uncertain' && ['paid', 'queued', 'submitted', 'processing'].includes(order.status)) return true;
   if (order.status === 'refund_pending') return true;
@@ -102,7 +104,7 @@ export function describeOrderCase(order: AdminOrderCaseInput): OrderCase {
 
   if (failedStates.includes(order.status)) return make('failed_remedy_open', 'Failed after payment · remedy open', 'danger', 'The customer paid but the order ended without delivery. A supplier refund only credits Mystery Hub, not the customer.', 'Record the customer remedy in Customer resolution.');
 
-  if (order.failure_reason === 'supplier_submission_uncertain') return make('supplier_uncertain', 'Supplier acceptance uncertain', 'danger', 'The request to the supplier timed out. The supplier may or may not have accepted it, so a retry could deliver twice.', 'Do not resubmit. Check the supplier dashboard or refresh supplier status, and record what you find.');
+  if (order.failure_reason === 'supplier_submission_uncertain') return make('supplier_uncertain', 'Supplier acceptance uncertain', 'danger', 'The request to the supplier timed out. The supplier may or may not have accepted it, so a retry could deliver twice.', order.supplier_order_id ? 'Do not resubmit. Check the recorded supplier reference, refresh its status and save the evidence.' : 'Do not resubmit. No supplier identifier is recorded; reconcile with supplier support and save the evidence.');
 
   if (order.service_type === 'marketplace') return make('marketplace_in_progress', `Marketplace · ${(order.marketplace_status || order.status).replace(/_/g, ' ')}`, 'info', 'Paid marketplace order fulfilled by Mystery Hub (pickup, delivery or activation).', 'Move it through the fulfilment steps as the customer receives it.');
 
@@ -113,14 +115,16 @@ export function describeOrderCase(order: AdminOrderCaseInput): OrderCase {
     return make('with_supplier', 'With supplier · awaiting delivery', 'info', 'The supplier holds this order and Mystery Hub is waiting for delivery confirmation.', 'Refresh supplier status if it has been waiting unusually long.');
   }
 
-  return make('with_supplier', 'With supplier · awaiting delivery', 'info', 'The supplier accepted the order. Delivery confirmation has not arrived yet.', 'Refresh supplier status if it has been waiting unusually long.');
+  if (!order.supplier_order_id) return make('queued_for_supplier', 'Supplier acceptance not recorded', flagged ? 'warning' : 'info', 'No supplier identifier is recorded. The processing status alone does not confirm acceptance or delivery.', 'Inspect supplier evidence or reconcile with support. Do not resend solely because the identifier is missing.');
+  return make('with_supplier', 'With supplier · awaiting delivery', 'info', 'A supplier identifier is recorded. Delivery confirmation has not arrived yet.', 'Refresh the recorded supplier status if it has been waiting unusually long.');
 }
 
 export interface OrderTimelineStep { label: string; at: string | null | undefined; state: 'done' | 'current' | 'pending' | 'failed' }
 export function orderTimeline(order: AdminOrderCaseInput & { updated_at?: string }): OrderTimelineStep[] {
   const kase = describeOrderCase(order);
   const paid = order.payment_status === 'success';
-  const failed = ['failed_refund_pending', 'failed_remedy_open', 'refund_unverified', 'refund_recorded', 'supplier_uncertain'].includes(kase.key);
+  const uncertain = kase.key === 'supplier_uncertain';
+  const failed = ['failed_refund_pending', 'failed_remedy_open', 'refund_unverified', 'refund_recorded'].includes(kase.key);
   const delivered = kase.key === 'delivered';
   const resolved = kase.key.startsWith('resolved_');
   const dispatched = Boolean(order.supplier_order_id || order.submitted_at);
@@ -128,8 +132,9 @@ export function orderTimeline(order: AdminOrderCaseInput & { updated_at?: string
     { label: 'Order created', at: order.created_at, state: 'done' },
     { label: order.payment_provider==='complimentary'?'Complimentary authorization':order.payment_provider==='admin_external'?'External collection recorded':paid ? 'Payment confirmed' : 'Payment', at: order.paid_at||(['complimentary','admin_external'].includes(order.payment_provider||'')?order.created_at:null), state: paid||['complimentary','admin_external'].includes(order.payment_provider||'') ? 'done' : 'current' },
   ];
-  if (order.service_type !== 'marketplace') steps.push({ label: dispatched ? 'Sent to supplier' : 'Supplier acceptance not recorded', at: order.submitted_at, state: dispatched ? 'done' : paid && !resolved && !delivered ? 'current' : 'pending' });
-  steps.push({ label: delivered ? 'Delivered' : failed ? 'Not delivered' : 'Delivery', at: order.delivered_at, state: delivered ? 'done' : failed ? 'failed' : dispatched && paid && !resolved ? 'current' : 'pending' });
+  if (order.service_type !== 'marketplace') steps.push({ label: uncertain ? 'Supplier submission uncertain' : dispatched ? 'Sent to supplier' : 'Supplier acceptance not recorded', at: order.submitted_at, state: uncertain ? 'current' : dispatched ? 'done' : paid && !resolved && !delivered ? 'current' : 'pending' });
+  steps.push({ label: delivered ? 'Delivered' : uncertain ? 'Delivery not confirmed' : failed ? 'Not delivered' : 'Delivery', at: order.delivered_at, state: delivered ? 'done' : failed ? 'failed' : (uncertain || dispatched) && paid && !resolved ? 'current' : 'pending' });
+  if (uncertain) steps.push({ label: 'Supplier reconciliation', at: null, state: 'current' });
   if (failed || resolved) steps.push({ label: resolved ? kase.label.replace('Resolved · ', 'Resolved: ') : 'Customer remedy', at: resolved ? order.resolution?.updatedAt ?? null : null, state: resolved ? 'done' : 'current' });
   return steps;
 }

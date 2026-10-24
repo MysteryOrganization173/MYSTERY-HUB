@@ -2,7 +2,8 @@ import {decodeAdminHash} from '../../utils/adminNavigation';
 import {AdminCommercialSection} from './sections/AdminCommercialSection';
 import {AdminFinanceSection} from './sections/AdminFinanceSection';
 import { AdminWebsiteBuilderSection } from './sections/AdminWebsiteBuilderSection';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
+import type { AdminOrderView } from '../../utils/adminOrderView';
 import { useApp } from '../../context/AppContext';
 import { AdminLoginCard } from './AdminLoginCard';
 import { AdminOverviewSection } from './sections/AdminOverviewSection';
@@ -126,6 +127,7 @@ export const AdminPage: React.FC = () => {
 
   // 3. Authenticated Admin -> Full Operational Workspace
   return <AdminWorkspace
+    key={sessionToken}
     token={sessionToken}
     adminId={user.id}
     adminLabel={user.email || user.name}
@@ -145,6 +147,13 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
   token: string; adminId: string; adminLabel: string; activeTab: AdminTab; param: string; navigate: (tab: AdminTab, param?: string) => void;
   menuOpen: boolean; setMenuOpen: (open: boolean) => void; signalRefresh: number; onSignalsChanged: () => void; onStorefront: () => void; onSignOut: () => void;
 }) {
+  // Memory only: preserve the operator's place without persisting customer searches to storage.
+  // The workspace is keyed by session so another staff session cannot inherit these queries.
+  const orderViews = useRef(new Map<string, AdminOrderView>());
+  const rememberOrders = useCallback((view: AdminOrderView) => {
+    if (!orderViews.current.has(param) && orderViews.current.size >= 20) orderViews.current.delete(orderViews.current.keys().next().value!);
+    orderViews.current.set(param, view);
+  }, [param]);
   const signals = useAdminSignals(token, signalRefresh);
   const badges: Partial<Record<AdminTab, { count: number | null; tone: 'warning' | 'danger' | 'info'; label: string }>> = {
     orders: signals.ordersAttention ? { count: signals.ordersAttention, tone: 'warning', label: `${signals.ordersAttention} orders need attention` } : undefined,
@@ -246,7 +255,7 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
             />
           )}
           {activeTab === 'orders' && (
-            <AdminOrdersSection key={param} sessionToken={token} initialStatusFilter={param.startsWith('ref/')?'':param.replace(/\/today$/,'')} initialReference={param.startsWith('ref/')?param.slice(4):undefined} initialCreatedToday={!param.startsWith('ref/')&&param.endsWith('/today')} onChanged={onSignalsChanged} />
+            <AdminOrdersSection key={param} sessionToken={token} initialStatusFilter={param.startsWith('ref/')?'':param.replace(/\/today$/,'')} initialReference={param.startsWith('ref/')?param.slice(4):undefined} initialCreatedToday={!param.startsWith('ref/')&&param.endsWith('/today')} initialView={orderViews.current.get(param)} onViewChange={rememberOrders} onChanged={onSignalsChanged} />
           )}
           {activeTab === 'marketplace' && (
             <AdminMarketplaceSection sessionToken={token} initialView={param} onChanged={onSignalsChanged} />
