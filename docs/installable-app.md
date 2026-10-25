@@ -32,3 +32,13 @@ Not built, because it needs decisions and backend pieces that do not exist yet:
 When those exist, a `src/pwa/push.ts` module can subscribe after `requestNotificationPermission()` returns
 `granted`. `NotificationOptIn` keeps its UI; only its granted state changes from "Nothing is sent yet" to a
 confirmation that alerts are on.
+
+### P0 Notification Center (frontend ready, backend pending)
+
+`src/pwa/push.ts` now exists and is wired to My Account › Notifications (`NotificationSettings.tsx`). It only
+looks up an existing service worker registration (it never registers one), subscribes only from a tap, and
+reports "on" only after the server confirms the device. The shipped client is
+`pendingCustomerNotificationsClient` (`available: false`), so production shows "Phone alerts are not available"
+and calls nothing until Codex provides items 1 to 4 above plus a preferences endpoint. The admin composer
+(`AdminNotificationsSection.tsx`) is in the same state. There is no notification inbox, because no history
+endpoint exists for customers.
