@@ -85,7 +85,8 @@ test('promotion slot renders only when given content',()=>{
 
 test('member spotlight prioritizes unresolved attention over a newer pending purchase', () => {
   const source = readFileSync('src/utils/memberHomePresentation.ts', 'utf8');
-  assert.match(source, /sorted\.find\(o=>memberOrderTone\(o\)==='attention'\)\?\?sorted\.find\(o=>memberOrderTone\(o\)==='active'\)/);
+  // The optional historical classifier (Codex contract pending) is passed through; attention still outranks active.
+  assert.match(source, /sorted\.find\(o=>memberOrderTone\(o(,classify)?\)==='attention'\)\?\?sorted\.find\(o=>memberOrderTone\(o(,classify)?\)==='active'\)/);
   const older=order('failed',{public_reference:'MH-OLDER',created_at:'2026-10-19T00:00:00Z'});
   const newer=order('pending_payment',{public_reference:'MH-NEWER'});
   const html=render({orders:[newer,older]});

@@ -1,6 +1,9 @@
 import { AdminOrderResolution } from './AdminOrderResolution';
 import { AdminOrderRecovery } from './AdminOrderRecovery';
 import { AdminAssistedOrders,AdminAssistedEvidence } from './AdminAssistedOrders';
+import { AdminOrderRecordKeeping } from './AdminOrderRecordKeeping';
+import { AdminArchivedOrders } from './AdminArchivedOrders';
+import { pendingOrderRecordClient, type OrderRecordClient } from '../../../services/orderRecordKeeping';
 import { afaStatusLabel } from '../../../../shared/afa';
 import { FULFILMENT_LABELS, FulfilmentMode } from '../../../../shared/marketplacePolicy';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -34,13 +37,16 @@ interface AdminOrdersSectionProps {
   onChanged?: () => void;
   initialView?: AdminOrderView;
   onViewChange?: (view: AdminOrderView) => void;
+  /** Archive/restore/test deletion. Waits for Codex's contract; see services/orderRecordKeeping. */
+  recordClient?: OrderRecordClient;
 }
 
 const lensFromFilter = (filter: string): OrderLensId => (ORDER_LENSES.some(l => l.id === filter) ? filter as OrderLensId : filter ? 'active' : 'active');
 
 const ghanaToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Accra' });
 
-export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionToken, initialStatusFilter = '', initialReference, initialCreatedToday = false, onChanged, initialView, onViewChange }) => {
+export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionToken, initialStatusFilter = '', initialReference, initialCreatedToday = false, onChanged, initialView, onViewChange, recordClient = pendingOrderRecordClient }) => {
+  const [listNotice, setListNotice] = useState<string | null>(null);
   // Query & filter state. A lens maps to the existing server filters; nothing new is queried.
   const [searchTerm, setSearchTerm] = useState(initialView?.search ?? initialReference ?? '');
   const [debouncedSearch, setDebouncedSearch] = useState(initialView?.search ?? initialReference ?? '');
@@ -281,8 +287,10 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
       <AdminPageHeader
         title="Orders & delivery"
         description="Find any order, see exactly where the customer stands, and act on what needs attention."
-        actions={<><AdminAssistedOrders token={sessionToken} onCreated={order=>{setSelected(order);afterAction();}}/><Freshness at={loadedAt} /><RefreshButton onClick={() => void fetchOrders()} busy={isSearching} /></>}
+        actions={<><AdminAssistedOrders token={sessionToken} onCreated={order=>{setSelected(order);afterAction();}}/><AdminArchivedOrders token={sessionToken} client={recordClient} onOpen={reference => void loadOrderDetails(reference)} /><Freshness at={loadedAt} /><RefreshButton onClick={() => void fetchOrders()} busy={isSearching} /></>}
       />
+
+      {listNotice && <AdminNotice tone="success" action={<AdminButton onClick={() => setListNotice(null)}>Dismiss</AdminButton>}>{listNotice}</AdminNotice>}
 
       {/* Lenses: one tap to the situation the founder is asking about */}
       <div role="tablist" aria-label="Order situation" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
@@ -450,6 +458,10 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
           updatingStatus={isUpdatingStatus}
           onMarketplaceStep={step => void handleUpdateOrderStatus(selectedOrder, step)}
           onResolutionUpdated={updated => { if (selectedOrderRef.current?.id === updated.id) { requests.invalidate('detail'); setIsLoadingDetail(false); setSelected({ ...selectedOrderRef.current, ...updated }); afterAction(); } }}
+          recordKeeping={<AdminOrderRecordKeeping key={selectedOrder.public_reference} token={sessionToken} reference={selectedOrder.public_reference} client={recordClient}
+            paused={isActing || isLoadingDetail || Boolean(detailError)}
+            onArchivedChange={() => afterAction()}
+            onDeleted={reference => { closeOrderDrawer(); setListNotice(`Test record ${reference} was permanently deleted.`); afterAction(); }} />}
           testClosure={{ show: showCloseTestConfirm, setShow: v => { setShowCloseTestConfirm(v); setCloseTestError(null); setConfirmPaidCheckbox(false); setCloseTestReason(''); }, confirmPaid: confirmPaidCheckbox, setConfirmPaid: setConfirmPaidCheckbox, reason: closeTestReason, setReason: setCloseTestReason, busy: isClosingTest, error: closeTestError, run: () => void handleCloseTestOrder() }}
         />
       )}
@@ -457,11 +469,12 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
   );
 };
 
-function OrderDetailSheet({ order, token, onClose, detailError, loadingDetail, acting, onReload, message, actionError, copiedKey, onCopy, note, setNote, savingNote, onSaveNote, onToggleFlag, refreshingSupplier, onRefreshSupplier, updatingStatus, onMarketplaceStep, onResolutionUpdated, testClosure }: {
+function OrderDetailSheet({ order, token, onClose, detailError, loadingDetail, acting, onReload, message, actionError, copiedKey, onCopy, note, setNote, savingNote, onSaveNote, onToggleFlag, refreshingSupplier, onRefreshSupplier, updatingStatus, onMarketplaceStep, onResolutionUpdated, recordKeeping, testClosure }: {
   order: AdminOrderDetails; token: string; onClose: () => void; detailError: string | null; message: string | null; actionError: string | null;
   loadingDetail: boolean; acting: boolean; onReload: () => void;
   copiedKey: string | null; onCopy: (text: string, key: string) => void; note: string; setNote: (v: string) => void; savingNote: boolean; onSaveNote: () => void; onToggleFlag: () => void;
   refreshingSupplier: boolean; onRefreshSupplier: () => void; updatingStatus: boolean; onMarketplaceStep: (step: string) => void; onResolutionUpdated: (order: AdminOrderDetails) => void;
+  recordKeeping: React.ReactNode;
   testClosure: { show: boolean; setShow: (v: boolean) => void; confirmPaid: boolean; setConfirmPaid: (v: boolean) => void; reason: string; setReason: (v: string) => void; busy: boolean; error: string | null; run: () => void };
 }) {
   const kase = describeOrderCase(order);
@@ -663,6 +676,7 @@ function OrderDetailSheet({ order, token, onClose, detailError, loadingDetail, a
           </details>
         )}
       </fieldset>
+      <div className="mt-4">{recordKeeping}</div>
       {confirmStep && <ConfirmAction
         title="Confirm Marketplace fulfilment step"
         summary={<span>{order.public_reference}: record <strong>{confirmStep.replace(/_/g, ' ')}</strong>.</span>}
