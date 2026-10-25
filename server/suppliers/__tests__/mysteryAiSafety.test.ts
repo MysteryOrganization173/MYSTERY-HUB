@@ -87,7 +87,7 @@ test('provider failure returns friendly 503 and never exposes or logs raw error/
   try {
     await withApi(()=>({models:{generateContent:async()=>{throw Error('sensitive-secret conversation-PII');}}}),async post=>{
       const res=await post({message:'private customer question'});assert.equal(res.status,503);
-      assert.deepEqual(await res.json(),{error:AI_FAILURE,source:'unavailable'});
+      assert.deepEqual(await res.json(),{error:AI_FAILURE,source:'unavailable',code:'PROVIDER_UNAVAILABLE',retryable:true});
       assert.doesNotMatch(logs.join(' '),/sensitive-secret|conversation-PII|private customer/);
       assert.equal(logs.length,2);
     });
@@ -153,27 +153,27 @@ test('UI wires prior-only history, identity guard, reset/close cancellation and 
 });
 
 
-test('timeout does not release a still-running provider slot or allow capacity bypass',async()=>{
+test('provider cancellation is passed to the SDK before a timed-out request can release its capacity',async()=>{
   let invocation=0;
   const releases:Array<()=>void>=[];
   const previousWarn=console.warn;console.warn=()=>{};
   try {
-    await withApi(()=>({models:{generateContent:()=>{
+    await withApi(()=>({models:{generateContent:(input:any)=>{
       invocation++;
       if(invocation===2)return Promise.resolve({text:'fallback model answer'});
-      return new Promise(resolve=>releases.push(()=>resolve({text:'eventual answer'})));
+      return new Promise((resolve,reject)=>{releases.push(()=>resolve({text:'eventual answer'}));input.config.abortSignal.addEventListener('abort',()=>reject(input.config.abortSignal.reason),{once:true});});
     }}}),async post=>{
       const first=await post({message:'hello'});assert.equal(first.status,200);
-      // First model timed out but still holds one slot; three newer calls fill the rest.
-      const pending=Array.from({length:3},()=>post({message:'hello again'}));
+      // The timed-out transport was cancelled; four new requests fill the four bounded request slots.
+      const pending=Array.from({length:4},()=>post({message:'hello again'}));
       try {
-        for(let i=0;i<100&&releases.length<4;i++)await new Promise(resolve=>setTimeout(resolve,5));
-        assert.equal(releases.length,4);
+        for(let i=0;i<100&&releases.length<5;i++)await new Promise(resolve=>setTimeout(resolve,5));
+        assert.equal(releases.length,5);
         assert.equal((await post({message:'capacity check'})).status,429);
       } finally { releases.forEach(release=>release());await Promise.all(pending); }
       const recovered=post({message:'capacity recovered'});
-      for(let i=0;i<100&&releases.length<5;i++)await new Promise(resolve=>setTimeout(resolve,5));
-      releases[4]?.();assert.equal((await recovered).status,200);
+      for(let i=0;i<100&&releases.length<6;i++)await new Promise(resolve=>setTimeout(resolve,5));
+      releases[5]?.();assert.equal((await recovered).status,200);
     });
   } finally {console.warn=previousWarn;}
 });
