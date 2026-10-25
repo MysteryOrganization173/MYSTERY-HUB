@@ -1,0 +1,10 @@
+import {Router} from 'express';
+import {requireAdmin} from '../middleware/authMiddleware.js';
+import {createRateLimiter} from '../middleware/rateLimiter.js';
+import {FinanceError} from '../db/financeStore.js';
+import {OrderManagement} from '../services/orderManagement.js';
+export const orderManagementRouter=Router();
+orderManagementRouter.use(requireAdmin,(_req,res,next)=>{res.set('Cache-Control','no-store');next();});
+orderManagementRouter.use(createRateLimiter({windowMs:60000,max:30,key:req=>req.user!.id}));
+orderManagementRouter.get('/:reference',async(req,res)=>{try{res.json(await OrderManagement.details(req.params.reference));}catch(e){res.status(e instanceof FinanceError?e.status:503).json({error:e instanceof FinanceError?e.message:'Could not inspect order management.'});}});
+orderManagementRouter.post('/:reference',async(req,res)=>{try{res.json(await OrderManagement.action(req.params.reference,req.user!.id,req.body||{}));}catch(e){res.status(e instanceof FinanceError?e.status:503).json({error:e instanceof FinanceError?e.message:'Order management failed; reload current state.'});}});

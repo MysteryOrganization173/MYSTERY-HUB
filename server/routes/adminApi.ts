@@ -1,3 +1,4 @@
+import {orderManagementRouter} from './orderManagementApi.js';
 import { OrderResolutionService } from '../services/orderResolutionService.js';
 import {adminOperationsRouter} from './adminOperationsApi.js';
 import {adminPeriod,financialReport,reportingOrders} from '../services/adminReporting.js';
@@ -45,6 +46,7 @@ adminRouter.use((_req,res,next)=>{res.setHeader('Cache-Control','no-store');next
 
 // Apply strict admin authentication and authorization to all admin routes
 adminRouter.use(requireAdmin);
+adminRouter.use('/order-management',orderManagementRouter);
 adminRouter.use('/operations',adminOperationsRouter);
 adminRouter.use('/finance', adminFinanceRouter);
 adminRouter.use('/commercial',adminCommercialRouter);
@@ -170,6 +172,7 @@ adminRouter.get('/orders', async (req: Request, res: Response) => {
       network,
       status,
       paymentStatus,
+      archived,
       manualReview,
       dateFrom,
       dateTo,
@@ -181,6 +184,7 @@ adminRouter.get('/orders', async (req: Request, res: Response) => {
       manualReview === 'true' ? true : manualReview === 'false' ? false : undefined;
 
     const result = await OrdersStore.searchOrdersAdmin({
+      archived: archived==='include'||archived==='only'?archived:'exclude',
       q: typeof q === 'string' ? q : undefined,
       serviceType: typeof serviceType === 'string' ? serviceType : undefined,
       network: typeof network === 'string' ? network : undefined,
