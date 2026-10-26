@@ -23,13 +23,13 @@ test('without a verified Codex contract the Admin calls nothing and says the con
   assert.match(html, /Waiting for the server/);
   assert.doesNotMatch(html, /Archive order|Delete test record/);
   const orders = source('src/components/admin/sections/AdminOrdersSection.tsx');
-  assert.match(orders, /recordClient = pendingOrderRecordClient/, 'production wiring stays on the pending client');
+  assert.match(orders, /recordClient = httpOrderRecordClient/, 'production uses the reviewed HTTP adapter');
 });
 
-test('no endpoint is invented for archive, restore, deletion or history', () => {
-  for (const file of ['src/services/orderRecordKeeping.ts', 'src/components/admin/sections/AdminOrderRecordKeeping.tsx', 'src/components/admin/sections/AdminArchivedOrders.tsx', 'src/services/orderHistoryClassification.ts']) {
-    assert.doesNotMatch(source(file), /\/api\/|fetch\(/, file);
-  }
+test('the production classifier consumes only the authoritative server field, never a reference or date guess', () => {
+  assert.equal(historicalOrderClass(prelaunch),null);
+  assert.equal(historicalOrderClass({...prelaunch,classification:'unpaid_attempt'}),'historical_unpaid');
+  assert.equal(historicalOrderClass({...prelaunch,classification:'order'}),null);
 });
 
 test('buttons and reasons come from the server answer; a paid customer purchase is never deletable', () => {

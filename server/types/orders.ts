@@ -134,6 +134,7 @@ export interface AdminOrderDetails extends AuthenticatedCustomerOrderDetails {
   manual_review: boolean;
   admin_note: string | null;
   updated_at: string;
+  archived_at?: string | null;
   submitted_at: string | null;
   payment_closed_at?: string | null;
   referrer_user_id?: string | null;
@@ -169,6 +170,7 @@ export function toAdminOrderDetails(order: OrderRecord): AdminOrderDetails {
     manual_review: Boolean(order.manual_review),
     admin_note: order.admin_note || null,
     updated_at: order.updated_at,
+    archived_at: order.archived_at || null,
     submitted_at: order.submitted_at || null,
     payment_closed_at: order.payment_closed_at || null,
     referrer_user_id: order.referrer_user_id || null,

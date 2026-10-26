@@ -38,7 +38,7 @@ export class OrderManagement {
     if(!id(reference))throw new FinanceError('Invalid order reference.');
     const db=getPool();if(!db)throw new FinanceError('Durable order management requires PostgreSQL.',503);
     const client=await db.connect();try{await client.query('BEGIN READ ONLY');const o=await read(client,reference);
-      const eligibility=await facts(client,o);const history=(await client.query('SELECT action,reason,created_at,actor_id FROM order_management_events WHERE order_id=$1 ORDER BY created_at DESC LIMIT 100',[o.id])).rows;
+      const eligibility=await facts(client,o);const history=(await client.query('SELECT id,action,reason,created_at,actor_id FROM order_management_events WHERE order_id=$1 ORDER BY created_at DESC LIMIT 100',[o.id])).rows;
       await client.query('COMMIT');return {success:true,order:{...toAdminOrderDetails(o),archived_at:o.archived_at||null},eligibility,history};
     }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
   }

@@ -40,9 +40,9 @@ export function AdminOrderRecordKeeping({ token, reference, client, paused = fal
     } catch (error) {
       if (id === live.current) setLoadError(error instanceof Error ? error.message : 'Record-keeping details could not be loaded.');
       return null;
-    }
+    } finally { if(id===live.current)setBusy(false); }
   }, [client, token, reference]);
-  useEffect(() => { void load(); return () => { live.current++; }; }, [load]);
+  useEffect(() => { setState(null);setHistory(null);setConfirm(null);setBusy(false);void load(); return () => { live.current++; }; }, [load]);
 
   if (!client.available) {
     return (
@@ -59,14 +59,17 @@ export function AdminOrderRecordKeeping({ token, reference, client, paused = fal
 
   const run = async (action: RecordAction, values: Record<string, string>) => {
     if (!state || busy) return;
+    const operation=live.current;
     setBusy(true); setActionError(null); setNotice(null);
     try {
       // Re-read the authoritative record and stop if anything moved since the operator reviewed it.
       const fresh = await client.getState(token, reference);
+      if(operation!==live.current)return;
       const check = freshnessCheck(action, state, fresh);
       if (!check.proceed) { setState(fresh); setConfirm(null); setActionError(check.message); return; }
       if (action === 'delete') {
         const result = await client.deleteTest(token, reference, { expectedVersion: fresh.version, confirmReference: reference, reason: values.reason });
+        if(operation!==live.current)return;
         if (!result.ok) { setActionError(failureText(result)); if (result.code === 'version_conflict') { setConfirm(null); await load(); } return; }
         setConfirm(null);
         onDeleted(reference);
@@ -75,15 +78,16 @@ export function AdminOrderRecordKeeping({ token, reference, client, paused = fal
       const result = action === 'archive'
         ? await client.archive(token, reference, { expectedVersion: fresh.version, reason: values.reason })
         : await client.restore(token, reference, { expectedVersion: fresh.version, reason: values.reason });
+      if(operation!==live.current)return;
       if (!result.ok) { setActionError(failureText(result)); if (result.code === 'version_conflict') { setConfirm(null); await load(); } return; }
       setState(result.state);
       setConfirm(null);
       setNotice(action === 'archive' ? 'Order archived. It stays searchable in Archived records.' : 'Order restored to the main order list.');
       onArchivedChange(result.state);
-      void client.history(token, reference).then(setHistory, () => {});
+      void client.history(token, reference).then(entries=>{if(operation===live.current)setHistory(entries);}, () => {});
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'The server did not confirm this action. Nothing was changed here.');
-    } finally { setBusy(false); }
+      if(operation===live.current)setActionError(error instanceof Error ? error.message : 'Could not confirm this action. Reload before retrying.');
+    } finally { if(operation===live.current)setBusy(false); }
   };
 
   return (

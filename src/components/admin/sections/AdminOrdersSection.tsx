@@ -3,7 +3,7 @@ import { AdminOrderRecovery } from './AdminOrderRecovery';
 import { AdminAssistedOrders,AdminAssistedEvidence } from './AdminAssistedOrders';
 import { AdminOrderRecordKeeping } from './AdminOrderRecordKeeping';
 import { AdminArchivedOrders } from './AdminArchivedOrders';
-import { pendingOrderRecordClient, type OrderRecordClient } from '../../../services/orderRecordKeeping';
+import { httpOrderRecordClient, type OrderRecordClient } from '../../../services/orderRecordKeeping';
 import { afaStatusLabel } from '../../../../shared/afa';
 import { FULFILMENT_LABELS, FulfilmentMode } from '../../../../shared/marketplacePolicy';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -45,7 +45,7 @@ const lensFromFilter = (filter: string): OrderLensId => (ORDER_LENSES.some(l => 
 
 const ghanaToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Accra' });
 
-export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionToken, initialStatusFilter = '', initialReference, initialCreatedToday = false, onChanged, initialView, onViewChange, recordClient = pendingOrderRecordClient }) => {
+export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionToken, initialStatusFilter = '', initialReference, initialCreatedToday = false, onChanged, initialView, onViewChange, recordClient = httpOrderRecordClient }) => {
   const [listNotice, setListNotice] = useState<string | null>(null);
   // Query & filter state. A lens maps to the existing server filters; nothing new is queried.
   const [searchTerm, setSearchTerm] = useState(initialView?.search ?? initialReference ?? '');
