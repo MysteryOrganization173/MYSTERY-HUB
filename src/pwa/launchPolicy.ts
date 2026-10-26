@@ -10,6 +10,7 @@ export const NO_SNOOZE: Snooze = { count: 0, lastAt: null };
 export const STORAGE_KEYS = {
   installPromo: 'mh_install_promo',
   notificationOptIn: 'mh_notification_optin',
+  notificationOffers: 'mh_notification_offers_answered:',
   welcomeGuest: 'mh_app_welcome_guest_at',
   welcomeShown: 'mh_app_welcome_shown',
 } as const;
@@ -45,16 +46,27 @@ export function showWelcomeSheet({ installed, signedIn, authChecking, path, show
   return guestChosenAt === null || now - guestChosenAt >= WELCOME_GUEST_REST_DAYS * DAY;
 }
 
-export function showNotificationOptIn({ installed, signedIn, permission, snooze, now }: {
-  installed: boolean; signedIn: boolean; permission: string; snooze: Snooze; now: number;
+export function showNotificationOptIn({ installed, signedIn, permission, registered, snooze, now }: {
+  installed: boolean; signedIn: boolean; permission: string; registered?: boolean; snooze: Snooze; now: number;
 }) {
-  if (!installed || !signedIn || permission !== 'default') return false;
+  if (!installed || !signedIn || !(permission === 'default' || permission === 'granted' && registered === false)) return false;
   return !resting(snooze, NOTIFICATION_REST_DAYS, NOTIFICATION_MAX_DISMISSALS, now);
 }
 
 type Store = Pick<Storage, 'getItem' | 'setItem'>;
 const local = (): Store | null => { try { return window.localStorage; } catch { return null; } };
 const session = (): Store | null => { try { return window.sessionStorage; } catch { return null; } };
+
+// A remembered prompt answer is not consent. The server preference is authoritative.
+const offersAnsweredThisSession = new Set<string>();
+export function marketingPromptAnswered(accountId: string, store: Store | null = local()): boolean {
+  if (offersAnsweredThisSession.has(accountId)) return true;
+  try { return store?.getItem(STORAGE_KEYS.notificationOffers + accountId) === '1'; } catch { return false; }
+}
+export function markMarketingPromptAnswered(accountId: string, store: Store | null = local()) {
+  offersAnsweredThisSession.add(accountId);
+  try { store?.setItem(STORAGE_KEYS.notificationOffers + accountId, '1'); } catch { /* remembered for this launch */ }
+}
 
 export function readSnooze(key: string, store: Store | null = local()): Snooze {
   try {
