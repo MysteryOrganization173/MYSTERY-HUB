@@ -706,7 +706,7 @@ CREATE TABLE IF NOT EXISTS mysteryhub_notifications.campaigns (
  id UUID PRIMARY KEY,actor_id VARCHAR(64) NOT NULL REFERENCES users(id),preview_id UUID NOT NULL UNIQUE REFERENCES mysteryhub_notifications.audiences(id),
  request_id VARCHAR(64) NOT NULL UNIQUE,input_hash VARCHAR(64) NOT NULL,recipient_count INTEGER NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE TABLE IF NOT EXISTS mysteryhub_notifications.settings (id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK(id),paused BOOLEAN NOT NULL DEFAULT FALSE);
+CREATE TABLE IF NOT EXISTS mysteryhub_notifications.settings (id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK(id),paused BOOLEAN NOT NULL DEFAULT TRUE);
 INSERT INTO mysteryhub_notifications.settings(id) VALUES(TRUE) ON CONFLICT DO NOTHING;
 INSERT INTO mysteryhub_notifications.templates(id,title,body,category,locked) VALUES
  ('payment_confirmed','Payment confirmed','Your payment is verified. Open Orders to follow delivery.','transactional',TRUE),

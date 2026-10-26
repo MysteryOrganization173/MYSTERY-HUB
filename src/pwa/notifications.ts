@@ -2,9 +2,9 @@
  * Installable app: notification permission only.
  *
  * Permission is not delivery. Sending alerts needs Web Push: a service worker, a VAPID key pair, an API that
- * stores each device's PushSubscription against its account, and a sender for order events. None of that exists
- * yet, so this module never subscribes, never registers a service worker and never tells the server anything.
- * A later push module can take over from `requestNotificationPermission` without changing the onboarding card.
+ * stores each device's PushSubscription against its account, and a sender for order events. Those are handled
+ * by push.ts and the authenticated notification APIs. This permission helper never subscribes or registers a
+ * worker; delivery remains disabled until production configuration and consenting-device acceptance pass.
  */
 export type NotificationPermissionState = 'unsupported' | 'unavailable' | 'default' | 'granted' | 'denied';
 

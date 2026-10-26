@@ -1,13 +1,4 @@
-/**
- * Customer push subscriptions and notification preferences: the frontend's view of Codex's push backend.
- *
- * Contract status (checked 2026-10-25 on main, every remote branch and open PRs): there is no service worker, no
- * VAPID key, no subscription API and no preference API yet (see docs/installable-app.md, "Deferred: Web Push").
- * `pendingCustomerNotificationsClient` reports `available: false`, so the account screen says alerts have not
- * started and never claims they are on. When Codex's contract lands, implement this interface against it.
- * No endpoint is named here because none has been agreed. There is no notification history (inbox) contract
- * either, so no inbox is shown.
- */
+/** Reviewed backend HTTP integration. Pending clients remain injectable offline fallbacks only; production uses the live adapters below. */
 export interface DeviceSubscriptionStatus { subscribed: boolean }
 
 export interface NotificationPreferences {
@@ -23,6 +14,7 @@ export type ClientResult<T = undefined> = { ok: true; value: T } | { ok: false; 
 export interface PushSubscriptionPayload { endpoint: string; expirationTime: number | null; keys: { p256dh: string; auth: string } }
 
 export interface CustomerNotificationsClient {
+  configuration?():Promise<{enabled:boolean;publicKey:string|null;workerPath:string}>;
   readonly available: boolean;
   /** The server's public application key used to register this device (base64url). */
   publicKey(token: string): Promise<string>;
@@ -40,3 +32,24 @@ export const pendingCustomerNotificationsClient: CustomerNotificationsClient = {
   available: false,
   publicKey: unavailable, deviceStatus: unavailable, register: unavailable, unregister: unavailable, preferences: unavailable, savePreferences: unavailable,
 };
+
+import {notificationHttp} from './notificationHttp';
+async function endpointHash(endpoint:string){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(endpoint));return Array.from(new Uint8Array(bytes),v=>v.toString(16).padStart(2,'0')).join('');}
+const request=(token:string,path:string,method='GET',body?:unknown)=>notificationHttp(token,'notifications/'+path,method,body);
+const preferences=(p:any):NotificationPreferences=>{if(typeof p.transactional!=='boolean'||typeof p.marketing!=='boolean')throw Error('Invalid notification preferences. Refresh before changing them.');return {transactional:p.transactional,promotional:p.marketing,version:''};}; // Atomic last-write-wins PUTs, not versioned templates.
+export const httpCustomerNotificationsClient:CustomerNotificationsClient={
+ available:true,
+ configuration:()=>notificationHttp(null,'notifications/config'),
+ async publicKey(){const c=await this.configuration!();if(!c.enabled||!c.publicKey)throw Error('Real phone alerts are disabled pending verified push configuration. Your notification choices remain available.');return c.publicKey;},
+ async deviceStatus(token,endpoint){const hash=await endpointHash(endpoint);const {devices}=await request(token,'subscriptions');return {subscribed:devices.some((d:any)=>d.endpoint_hash===hash&&d.current_session===true)};},
+ async register(token,subscription){try{const r=await request(token,'subscriptions','PUT',{subscription});if(r.success!==true||!r.deviceId)throw Error('Device registration was not confirmed.');return {ok:true,value:undefined};}catch(e){return {ok:false,message:(e as Error).message};}},
+ async unregister(token,endpoint){try{const hash=await endpointHash(endpoint);const {devices}=await request(token,'subscriptions');for(const d of devices.filter((d:any)=>d.endpoint_hash===hash)){await request(token,'subscriptions/'+encodeURIComponent(d.id),'DELETE');}return {ok:true,value:undefined};}catch(e){return {ok:false,message:(e as Error).message};}},
+ async preferences(token){return preferences(await request(token,'preferences'));},
+ async savePreferences(token,input){try{const p=await request(token,'preferences','PUT',{transactional:input.transactional,marketing:input.promotional});return {ok:true,value:preferences(p)};}catch(e){return {ok:false,message:(e as Error).message};}}
+};
+export async function readNotificationInbox(token:string,id:string,signal?:AbortSignal){
+ if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))throw Error('Invalid notification link.');
+ const result=await notificationHttp(token,'notifications/inbox/'+encodeURIComponent(id),'GET',undefined,signal);
+ if(!result.notification||!['/orders','/app'].includes(result.notification.destination))throw Error('Invalid notification destination.');
+ return result.notification as {title:string;body:string;destination:'/orders'|'/app'};
+}

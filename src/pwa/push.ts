@@ -4,7 +4,8 @@ import type { CustomerNotificationsClient, PushSubscriptionPayload } from '../se
 /**
  * Device subscription for phone alerts. Builds on the permission-only module from P0-C: permission is never
  * treated as delivery. A device counts as subscribed only after the server confirms it holds the subscription.
- * The service worker is Codex's; this module only looks for an existing registration and never registers one.
+ * Passive checks only inspect an existing registration. An explicit subscribe tap may register the reviewed
+ * push-only worker, after configuration is confirmed; customer-generated sites and iframes are excluded.
  */
 export type CustomerPushState =
   | 'unavailable'            // alerts not launched, unsupported browser, insecure page or no service worker
@@ -43,14 +44,14 @@ export const PUSH_STATE_COPY: Record<CustomerPushState, { title: string; body: s
   unsubscribed: { title: 'Alerts are off for this phone', body: 'You turned alerts off on this device. Your other devices are not affected.', action: 'Turn on again' },
 };
 
-type PushEnv = { Notification?: unknown; isSecureContext?: boolean; top?: unknown; self?: unknown; navigator?: { serviceWorker?: { getRegistration(scope?: string): Promise<{ pushManager: PushManagerLike } | undefined> } }; PushManager?: unknown };
+type PushEnv = { Notification?: unknown; isSecureContext?: boolean; top?: unknown; self?: unknown; location?:{pathname:string}; navigator?: { serviceWorker?: { getRegistration(scope?: string): Promise<{ pushManager: PushManagerLike } | undefined>;register?(path:string,options:{scope:string;updateViaCache:string}):Promise<{pushManager:PushManagerLike}>;ready?:Promise<{pushManager:PushManagerLike}> } }; PushManager?: unknown };
 type SubscriptionLike = { endpoint: string; toJSON(): unknown; unsubscribe(): Promise<boolean> };
 type PushManagerLike = { getSubscription(): Promise<SubscriptionLike | null>; subscribe(options: { userVisibleOnly: boolean; applicationServerKey: Uint8Array }): Promise<SubscriptionLike> };
 
 const env = (): PushEnv | undefined => typeof window === 'undefined' ? undefined : window as unknown as PushEnv;
 
 export function pushSupported(win: PushEnv | undefined = env()) {
-  return Boolean(win?.navigator?.serviceWorker && 'PushManager' in (win as object));
+  return Boolean(win?.navigator?.serviceWorker && 'PushManager' in (win as object)&&win.top===win.self&&win.isSecureContext!==false&&!win.location?.pathname.startsWith('/sites/'));
 }
 
 export function base64UrlToBytes(value: string): Uint8Array {
@@ -59,8 +60,10 @@ export function base64UrlToBytes(value: string): Uint8Array {
   return Uint8Array.from(raw, c => c.charCodeAt(0));
 }
 
-async function pushManager(win: PushEnv | undefined) {
-  const registration = await win?.navigator?.serviceWorker?.getRegistration('/');
+async function pushManager(win: PushEnv | undefined,register=false) {
+  const sw=win?.navigator?.serviceWorker;
+  let registration = await sw?.getRegistration('/');
+  if(register&&sw?.register){registration=await sw.register('/push-sw.js',{scope:'/',updateViaCache:'none'});if(sw.ready)registration=await sw.ready;}
   return registration?.pushManager ?? null;
 }
 
@@ -80,13 +83,15 @@ export async function readServerDeviceState(client: CustomerNotificationsClient,
  * reported as not subscribed, and a subscription the server refused is removed from the browser again.
  */
 export async function subscribeThisDevice(client: CustomerNotificationsClient, token: string, win: PushEnv | undefined = env()): Promise<{ server: ServerDeviceState; permission: NotificationPermissionState; message?: string }> {
+  if(!client.available||!pushSupported(win))return {server:'unknown',permission:notificationPermissionState(win as never),message:'Phone alerts are available only in the Mystery Hub app context.'};
+  let publicKey:string;try{publicKey=await client.publicKey(token);}catch(e){return {server:'error',permission:notificationPermissionState(win as never),message:(e as Error).message};}
   const permission = await requestNotificationPermission(win as never);
   if (permission !== 'granted') return { server: 'unknown', permission };
-  const manager = await pushManager(win).catch(() => null);
+  const manager = await pushManager(win,true).catch(() => null);
   if (!manager) return { server: 'error', permission, message: 'Alerts are not ready on this device yet.' };
   let subscription: SubscriptionLike | null = null;
   try {
-    subscription = (await manager.getSubscription()) ?? await manager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(await client.publicKey(token)) });
+    subscription = (await manager.getSubscription()) ?? await manager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(publicKey) });
     const registered = await client.register(token, subscription.toJSON() as PushSubscriptionPayload);
     if (!registered.ok) { await subscription.unsubscribe().catch(() => false); return { server: 'error', permission, message: registered.message }; }
     const confirmed = await client.deviceStatus(token, subscription.endpoint);

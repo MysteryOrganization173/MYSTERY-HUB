@@ -6,35 +6,22 @@ import type { NotificationAudience, NotificationCategory, NotificationDeliverySt
  * that reads badly on a phone.
  */
 
-export interface NotificationDraft { templateId: string | null; category: NotificationCategory; title: string; body: string; destination: string | null; audienceId: string | null }
+export interface NotificationDraft { templateId: string | null; category: NotificationCategory; title: string; body: string; destination: string | null; audienceId: string | null;userId?:string }
 
 export interface StarterTemplate { id: string; name: string; category: NotificationCategory; title: string; body: string }
 
-/** Starting points only: the founder edits them, and saved templates live on the server. Square brackets mark words to replace. */
-export const STARTER_TEMPLATES: StarterTemplate[] = [
-  { id: 'starter-payment', name: 'Payment confirmation', category: 'transactional', title: 'Payment received', body: 'Hi {{first_name}}, we have received your payment for {{product}}. Order {{order_reference}} is now being processed.' },
-  { id: 'starter-processing', name: 'Order processing', category: 'transactional', title: 'We’re working on your order', body: 'Order {{order_reference}} for {{product}} is being processed. We’ll update you as soon as it’s complete.' },
-  { id: 'starter-delivered', name: 'Delivery confirmation', category: 'transactional', title: 'Your order has been delivered', body: 'Good news, {{first_name}}. {{product}} for order {{order_reference}} has been delivered. Thank you for using Mystery Hub.' },
-  { id: 'starter-problem', name: 'Delivery problem', category: 'transactional', title: 'Your order is taking longer', body: 'Sorry, {{first_name}}. Order {{order_reference}} is taking longer than usual. Our team is on it. Please don’t pay again; we’ll update you shortly.' },
-  { id: 'starter-refund', name: 'Refund update', category: 'transactional', title: 'Update on your refund', body: 'Hi {{first_name}}, your refund for order {{order_reference}} is being processed. We’ll let you know when it’s complete.' },
-  { id: 'starter-maintenance', name: 'Maintenance', category: 'service', title: 'Short maintenance on [day]', body: 'Mystery Hub will be unavailable from [start time] to [end time] for maintenance. Orders you have already placed are not affected.' },
-  { id: 'starter-new-service', name: 'New service', category: 'marketing', title: 'New on Mystery Hub: [service]', body: 'You can now [what customers can do] on Mystery Hub. Open the app to try it.' },
-  { id: 'starter-promotion', name: 'Special promotion', category: 'marketing', title: '[Offer name]', body: '[Describe the offer in one sentence]. Available until [end date]. Terms apply.' },
-];
-
-/** Sample values used for the preview only when the server's placeholder list is not available. */
+/** Production templates are loaded from the authoritative backend, never invented locally. */
+export const STARTER_TEMPLATES: StarterTemplate[] = [];
 export const SAMPLE_PLACEHOLDERS: NotificationPlaceholder[] = [
-  { token: '{{first_name}}', label: 'First name', sample: 'Ama' },
-  { token: '{{order_reference}}', label: 'Order reference', sample: 'MH-20261025-104233' },
-  { token: '{{product}}', label: 'Product', sample: 'MTN 5GB' },
+  {token:'{{appName}}',label:'Application name',sample:'Mystery Hub'},
+  {token:'{{eventLabel}}',label:'Server event label',sample:'Service announcement'},
 ];
-
 export const CATEGORY_LABELS: Record<NotificationCategory, string> = { transactional: 'Order update', service: 'Service notice', marketing: 'Promotion' };
 
 /** Guidance, not the server's limit: Android shows about this much before cutting a title or a collapsed body. */
 export const TITLE_GUIDE = 40;
 export const BODY_GUIDE = 120;
-export const DEFAULT_LIMITS: NotificationLimits = { titleMax: 65, bodyMax: 240 };
+export const DEFAULT_LIMITS: NotificationLimits = { titleMax: 80, bodyMax: 240 };
 
 const PLACEHOLDER = /\{\{\s*([a-z0-9_]+)\s*\}\}/gi;
 export function placeholdersIn(text: string): string[] {
@@ -90,7 +77,7 @@ export function sendBlockers(draft: NotificationDraft, ctx: { audiences: Notific
 
 /** The idempotency key belongs to the exact content and audience; any edit makes a new draft with a new key. */
 export function draftFingerprint(draft: NotificationDraft) {
-  return JSON.stringify([draft.category, draft.title.trim(), draft.body.trim(), draft.destination, draft.audienceId]);
+  return JSON.stringify([draft.category, draft.title.trim(), draft.body.trim(), draft.destination, draft.audienceId,draft.userId,draft.templateId]);
 }
 
 export const DELIVERY_LABELS: Record<NotificationDeliveryState, { label: string; help: string }> = {
@@ -99,6 +86,8 @@ export const DELIVERY_LABELS: Record<NotificationDeliveryState, { label: string;
   accepted: { label: 'Accepted', help: 'The push service accepted it for the device. This does not mean the person saw it.' },
   retrying: { label: 'Retrying', help: 'A temporary problem; the server will try again.' },
   failed: { label: 'Failed', help: 'Could not be sent to this device.' },
+  invalid: {label:'Expired or invalid',help:'The subscription is no longer usable.'},
+  skipped: {label:'Not sent',help:'Account, consent, session or subscription eligibility changed.'},
 };
 
 export const SEND_STATUS_LABELS: Record<NotificationSendStatus, { label: string; tone: 'info' | 'success' | 'warning' | 'danger' | 'neutral' }> = {

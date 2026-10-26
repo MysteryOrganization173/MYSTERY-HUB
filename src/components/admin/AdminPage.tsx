@@ -263,7 +263,7 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
           {activeTab === 'marketplace' && (
             <AdminMarketplaceSection sessionToken={token} initialView={param} onChanged={onSignalsChanged} />
           )}
-          {activeTab === 'notifications' && <AdminNotificationsSection sessionToken={token} initialView={param} onNavigate={view => navigate('notifications', view)} />}
+          {activeTab === 'notifications' && <AdminNotificationsSection key={token} sessionToken={token} initialView={param} onNavigate={view => navigate('notifications', view)} />}
           {activeTab === 'waitlist' && (
             <AdminWaitlistSection sessionToken={token} />
           )}

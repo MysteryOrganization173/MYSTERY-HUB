@@ -17,7 +17,7 @@ export interface ComposerData {
   templates: NotificationTemplate[] | null;
 }
 
-const emptyDraft: NotificationDraft = { templateId: null, category: 'transactional', title: '', body: '', destination: null, audienceId: null };
+const emptyDraft: NotificationDraft = { templateId: null, category: 'marketing', title: '', body: '', destination: '/app', audienceId: null };
 const newKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `send-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
 /**
@@ -25,11 +25,12 @@ const newKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? 
  * audience count, carries an idempotency key tied to the exact content, and shows only what the server reports.
  * AI help proposes text that the founder must choose to use; it can never send.
  */
-export function AdminNotificationComposer({ token, client, ai, data, seed, onSent, onViewHistory }: {
+export function AdminNotificationComposer({ token, client, ai, data, seed, onSent, onViewHistory,onTemplateSaved }: {
   token: string; client: AdminNotificationsClient; ai: AdminAiDraftingClient; data: ComposerData;
   /** A template the founder chose elsewhere (Templates tab) to start from. */
   seed: { template: Pick<NotificationTemplate, 'id' | 'name' | 'category' | 'title' | 'body' | 'destination'>; at: number } | null;
   onSent: (send: NotificationSendSummary) => void; onViewHistory: () => void;
+  onTemplateSaved?:(template:NotificationTemplate)=>void;
 }) {
   const [draft, setDraft] = useState<NotificationDraft>(emptyDraft);
   const [templateName, setTemplateName] = useState<string | null>(null);
@@ -38,7 +39,8 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const keyRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const inFlight = useRef(false);
-  const [confirm, setConfirm] = useState<{ count: number } | null>(null);
+  const [confirm, setConfirm] = useState<{ count: number;previewId?:string;revision:number } | null>(null);
+  const revision=useRef(0);
   const [checking, setChecking] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -55,9 +57,10 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
   const placeholders = data.placeholders ?? SAMPLE_PLACEHOLDERS;
   const audiences = data.audiences ?? [];
   const locked = Boolean(result) || sending;
-  const update = (patch: Partial<NotificationDraft>) => { setDraft(d => ({ ...d, ...patch })); setReviewError(null); };
+  const update = (patch: Partial<NotificationDraft>) => {revision.current++;aiRequest.current?.abort();setProposals(null);setConfirm(null);setDraft(d => ({ ...d, ...patch })); setReviewError(null); };
 
   const applyTemplate = (t: Pick<NotificationTemplate, 'id' | 'name' | 'category' | 'title' | 'body'> & { destination?: string | null }) => {
+    revision.current++;aiRequest.current?.abort();setConfirm(null);
     setDraft(d => ({ ...d, templateId: t.id.startsWith('starter-') ? null : t.id, category: t.category, title: t.title, body: t.body, destination: t.destination ?? null,
       audienceId: d.audienceId && audiences.find(a => a.id === d.audienceId && audienceAllows(a, t.category)) ? d.audienceId : null }));
     setTemplateName(t.name); setProposals(null); setReviewError(null);
@@ -78,7 +81,7 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
     const request = new AbortController(); aiRequest.current = request;
     setAiBusy(action); setAiError(null); setProposals(null);
     try {
-      const res = await ai.propose(token, { action, title: draft.title, body: draft.body, placeholders: placeholders.map(p => p.token) }, request.signal);
+      const res = await ai.propose(token, { templateId:draft.templateId,action, title: draft.title, body: draft.body, placeholders: placeholders.map(p => p.token) }, request.signal);
       if (request.signal.aborted) return;
       if (!res.ok) setAiError(res.message);
       else if (!res.proposals.length) setAiError('No suggestion this time. Your message is unchanged.');
@@ -95,26 +98,31 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
     if (!client.available || blockers.length || !audience || inFlight.current) return;
     setChecking(true); setReviewError(null); setConfirmError(null); setAcknowledged(false);
     try {
+      const current=revision.current;
+      const saved=data.templates?.find(t=>t.id===draft.templateId);
+      if(client.prepareAudience&&(!saved||saved.locked||saved.enabled===false||saved.title!==draft.title.trim()||saved.body!==draft.body.trim()))throw Error('Save the exact marketing draft as a template before reviewing recipients.');
       // Read the audience again: the confirmation must show who would receive it right now.
-      const count = await client.countAudience(token, audience.id);
+      if(audience.id==='customer'&&!draft.userId?.trim())throw Error('Enter the customer account ID from Customers.');
+      const preview=client.prepareAudience?await client.prepareAudience(token,{templateId:draft.templateId!,...(audience.id==='customer'?{userId:draft.userId?.trim()}:{})}):{eligibleDevices:await client.countAudience(token,audience.id),previewId:undefined};
+      if(current!==revision.current)return;
+      const count=preview.eligibleDevices;
       if (count <= 0) { setReviewError('Nobody in this audience can receive notifications right now.'); return; }
-      setConfirm({ count });
+      setConfirm({ count,previewId:preview.previewId,revision:current });
     } catch (error) {
       setReviewError(error instanceof Error ? error.message : 'Could not check the audience. Nothing was sent.');
     } finally { setChecking(false); }
   };
 
   const send = async () => {
-    if (!confirm || !audience || inFlight.current) return;
+    if (!confirm || !audience || inFlight.current||confirm.revision!==revision.current) return;
     inFlight.current = true; setSending(true); setConfirmError(null);
     const fingerprint = draftFingerprint(draft);
     if (keyRef.current?.fingerprint !== fingerprint) keyRef.current = { fingerprint, key: newKey() };
     try {
-      const res = await client.createSend(token, { idempotencyKey: keyRef.current.key, templateId: draft.templateId, category: draft.category, title: draft.title.trim(), body: draft.body.trim(), destination: draft.destination, audienceId: audience.id, confirmedRecipients: confirm.count });
+      const res = await client.createSend(token, { previewId:confirm.previewId,idempotencyKey: keyRef.current.key, templateId: draft.templateId, category: draft.category, title: draft.title.trim(), body: draft.body.trim(), destination: draft.destination, audienceId: audience.id, confirmedRecipients: confirm.count });
       if (!res.ok) {
         if (res.code === 'count_changed') {
-          const fresh = await client.countAudience(token, audience.id).catch(() => null);
-          if (fresh != null) setConfirm({ count: fresh });
+          setConfirm(null);setReviewError('The audience or template changed. Prepare and review a fresh preview before sending.');
           setAcknowledged(false);
         }
         setConfirmError(res.code === 'count_changed' ? 'The audience changed while you were reviewing. Check the new number before sending.' : res.message);
@@ -135,13 +143,18 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
   const bodyGuide = lengthGuidance('body', draft.body, data.limits);
   const guideClass = (tone: string) => tone === 'over' ? 'text-rose-300' : tone === 'long' ? 'text-amber-200' : 'text-slate-500';
   const savedTemplates = data.templates ?? [];
+  const automatic=draft.category==='transactional';
+  const saveDraft=async()=>{
+    if(locked||automatic||checking)return;const current=revision.current;setChecking(true);setReviewError(null);
+    try{const r=await client.saveTemplate(token,{id:null,expectedVersion:null,name:draft.title.trim(),title:draft.title.trim(),body:draft.body.trim(),category:'marketing',destination:'/app',enabled:true});if(current!==revision.current)return;if(!r.ok)throw Error(r.message);onTemplateSaved?.(r.template);applyTemplate(r.template);}catch(e){setReviewError((e as Error).message);}finally{setChecking(false);}
+  };
 
   if (result) {
     return (
-      <AdminPanel tone="success" title={result.duplicate ? 'Already sent' : 'Message handed to the server'}>
+      <AdminPanel tone="success" title={result.duplicate ? 'Already queued' : 'Message handed to the server'}>
         <div className="space-y-3 text-sm text-slate-200">
           <p className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
-            {result.duplicate ? 'This exact message was already sent, so it was not sent again. Showing the original.' : `“${result.send.title}” is queued for ${result.send.recipients.toLocaleString()} ${result.send.recipients === 1 ? 'device' : 'devices'} in ${result.send.audienceLabel}.`}</p>
+            {result.duplicate ? 'This exact campaign was already queued. No second campaign was created.' : `“${result.send.title}” is queued for ${result.send.recipients.toLocaleString()} ${result.send.recipients === 1 ? 'device' : 'devices'} in ${result.send.audienceLabel}.`}</p>
           <p className="text-xs text-slate-400">Delivery results arrive over the next minutes in History. “Accepted” means the push service took the message, not that someone read it.</p>
           <div className="flex flex-wrap gap-2"><AdminButton variant="primary" onClick={onViewHistory}>View delivery results</AdminButton><AdminButton onClick={reset}>Write another message</AdminButton></div>
         </div>
@@ -163,41 +176,43 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
               </button>
             ))}
           </div>
-          {data.templates === null && client.available && <p className="mt-2 text-xs text-slate-500">Saved templates could not be loaded. Starter templates still work.</p>}
+          {data.templates === null && client.available && <p className="mt-2 text-xs text-slate-500">Templates could not be loaded. Refresh before reviewing a send.</p>}
         </AdminPanel>
+
+        {automatic&&<AdminNotice tone="info" title="Automatic order update">This locked template is sent only from verified server events. It cannot be edited or sent as an announcement. Select a marketing template for a manual message.</AdminNotice>}
 
         <AdminPanel title="2. Write the message">
           <div className="space-y-4">
             <label className={adminLabel}>
               <span>Message type</span>
-              <select className={adminField} value={draft.category} disabled={locked} onChange={e => update({ category: e.target.value as NotificationDraft['category'], audienceId: null })}>
-                {(Object.keys(CATEGORY_LABELS) as NotificationDraft['category'][]).map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+              <select className={adminField} value={draft.category} disabled={locked||automatic} onChange={e => update({ category: e.target.value as NotificationDraft['category'], audienceId: null })}>
+                {(automatic?['transactional']:['marketing']).map(c => <option key={c} value={c}>{CATEGORY_LABELS[c as NotificationDraft['category']]}</option>)}
               </select>
             </label>
             <div className={adminLabel}>
               <label htmlFor="notif-title" className="block">Title</label>
-              <input id="notif-title" ref={titleRef} className={adminField} value={draft.title} disabled={locked} maxLength={data.limits.titleMax + 40} onFocus={() => setFocusField('title')} onChange={e => update({ title: e.target.value })} placeholder="Short and specific" aria-describedby="notif-title-count" />
+              <input id="notif-title" ref={titleRef} className={adminField} value={draft.title} disabled={locked||automatic} maxLength={data.limits.titleMax + 40} onFocus={() => setFocusField('title')} onChange={e => update({ title: e.target.value })} placeholder="Short and specific" aria-describedby="notif-title-count" />
               <span id="notif-title-count" className={`block text-xs ${guideClass(titleGuide.tone)}`}>{titleGuide.count}/{titleGuide.max} · {titleGuide.message}</span>
             </div>
             <div className={adminLabel}>
               <label htmlFor="notif-body" className="block">Message</label>
-              <textarea id="notif-body" ref={bodyRef} className={`${adminField} min-h-28`} value={draft.body} disabled={locked} maxLength={data.limits.bodyMax + 120} onFocus={() => setFocusField('body')} onChange={e => update({ body: e.target.value })} placeholder="What happened and what, if anything, the customer should do" aria-describedby="notif-body-count" />
+              <textarea id="notif-body" ref={bodyRef} className={`${adminField} min-h-28`} value={draft.body} disabled={locked||automatic} maxLength={data.limits.bodyMax + 120} onFocus={() => setFocusField('body')} onChange={e => update({ body: e.target.value })} placeholder="What happened and what, if anything, the customer should do" aria-describedby="notif-body-count" />
               <span id="notif-body-count" className={`block text-xs ${guideClass(bodyGuide.tone)}`}>{bodyGuide.count}/{bodyGuide.max} · {bodyGuide.message}</span>
             </div>
             <div>
               <p className="mb-1.5 flex items-center gap-1.5 text-sm text-slate-300"><Braces className="h-4 w-4 text-slate-500" />Insert into the {focusField === 'title' ? 'title' : 'message'}</p>
               <div className="flex flex-wrap gap-1.5">
                 {placeholders.map(p => (
-                  <button key={p.token} type="button" disabled={locked} onMouseDown={e => e.preventDefault()} onClick={() => insertPlaceholder(p.token)}
+                  <button key={p.token} type="button" disabled={locked||automatic} onMouseDown={e => e.preventDefault()} onClick={() => insertPlaceholder(p.token)}
                     className="min-h-10 rounded-lg border border-slate-700 bg-slate-900 px-2.5 text-xs text-slate-200 hover:border-[#00c365]/50"><span className="font-mono text-[#00c365]">{p.token}</span> <span className="text-slate-400">{p.label}</span></button>
                 ))}
               </div>
-              <p className="mt-1.5 text-xs text-slate-500">{data.placeholders ? 'Each person sees their own details. The preview uses sample values.' : 'Sample placeholders for drafting. The server will confirm which ones it can fill.'}</p>
+              <p className="mt-1.5 text-xs text-slate-500">Only generic application and event labels are supported. Customer details never enter a push packet.</p>
             </div>
             <label className={adminLabel}>
               <span className="flex items-center gap-1.5"><Link2 className="h-4 w-4 text-slate-500" />Opens when tapped <span className="text-slate-500">(optional)</span></span>
-              <select className={adminField} value={draft.destination ?? ''} disabled={locked || !data.destinations} onChange={e => update({ destination: e.target.value || null })}>
-                <option value="">Mystery Hub home</option>
+              <select className={adminField} value={automatic?'/orders':'/app'} disabled>
+                {automatic&&<option value="/orders">Orders after sign-in</option>}
                 {(data.destinations ?? []).map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
               </select>
               <span aria-hidden="true" className="block text-xs text-slate-500">{data.destinations ? 'Only pages the server has approved can be linked.' : 'Approved pages will appear when the server provides them.'}</span>
@@ -206,6 +221,7 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
             {/* Optional AI help: proposals only */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-3">
               <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-200"><Sparkles className="h-4 w-4 text-[#00c365]" />AI wording help <span className="font-normal text-slate-500">· optional</span></p>
+              <p className="mb-2 text-xs text-slate-500">Uses canonical built-in template wording only. Your edited message and customer details are never sent to Gemini. Automatic order templates remain locked.</p>
               {!ai.available ? <p className="text-xs text-slate-400">AI wording help is not connected yet. Your message and preview work normally without it.</p> : (
                 <>
                   <div className="flex flex-wrap gap-1.5">
@@ -224,7 +240,7 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
                             <p className="mt-0.5 whitespace-pre-line text-slate-300">{p.body}</p>
                             {unknown.length > 0 && <p className="mt-1 text-xs text-amber-200">Contains {unknown.join(', ')}, which the server cannot fill.</p>}
                             <div className="mt-2 flex gap-2">
-                              <AdminButton variant="primary" className="!min-h-10" onClick={() => { update({ title: p.title, body: p.body }); setProposals(null); }}>Use this</AdminButton>
+                              <AdminButton variant="primary" disabled={automatic} className="!min-h-10" onClick={() => { update({ title: p.title, body: p.body }); setProposals(null); }}>Use this</AdminButton>
                             </div>
                           </div>
                         );
@@ -270,6 +286,8 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
         </AdminPanel>
 
         <div className="space-y-2">
+          {draft.audienceId==='customer'&&<label className={adminLabel}>Customer account ID<input value={draft.userId||''} disabled={locked} maxLength={64} className={adminField} onChange={e=>update({userId:e.target.value})}/></label>}
+          {client.available&&!automatic&&<AdminButton disabled={locked||checking||!draft.title.trim()||!draft.body.trim()} onClick={()=>void saveDraft()}>Save draft template</AdminButton>}
           {client.available && blockers.length > 0 && (draft.title || draft.body || draft.audienceId) && (
             <ul className="space-y-1 text-sm text-amber-200" aria-label="Before you can send">{blockers.map(b => <li key={b}>• {b}</li>)}</ul>
           )}
@@ -322,8 +340,8 @@ export function NotificationPreview({ title, body, placeholders, destination, co
         <BrandMark size="xs" className="!h-4 !w-4" />
         <span>Mystery Hub</span><span aria-hidden>·</span><span>now</span>
       </div>
-      <p className={`mt-1.5 text-[14px] font-semibold leading-snug text-white ${open ? 'break-words' : 'truncate'}`}>{shownTitle}</p>
-      <p className={`mt-0.5 text-[13px] leading-snug text-slate-300 ${open ? 'whitespace-pre-line break-words' : 'line-clamp-1'}`}>{shownBody}</p>
+      <p className={`mt-1.5 text-[14px] font-semibold leading-snug text-white ${open ? 'break-words' : 'truncate'}`}>Mystery Hub</p>
+      <p className={`mt-0.5 text-[13px] leading-snug text-slate-300 ${open ? 'whitespace-pre-line break-words' : 'line-clamp-1'}`}>An account update is available. Sign in to view it.</p>
     </div>
   );
   return (
@@ -338,7 +356,8 @@ export function NotificationPreview({ title, body, placeholders, destination, co
         </div>
       )}
       <div className="rounded-3xl bg-gradient-to-b from-[#0b1015] to-[#121a21] p-3">{card(compact ? true : expanded)}</div>
-      <p className="mt-2 text-xs text-slate-500">Opens: {destination ?? 'Mystery Hub home'}{compact ? '' : ' · Sample values shown; phones and Android versions differ slightly.'}</p>
+      <div className="mt-3 text-sm text-slate-300"><p className="text-xs text-slate-500">Account inbox content after sign-in</p><p className="font-semibold">{shownTitle}</p><p className="whitespace-pre-line">{shownBody}</p></div>
+      <p className="mt-2 text-xs text-slate-500">Opens: {destination ?? 'Mystery Hub after sign-in'}{compact ? '' : ' · Push is generic for account privacy. Device appearance still needs founder acceptance.'}</p>
       {!compact && <StatusPill tone="neutral" dot={false}>Preview only</StatusPill>}
     </section>
   );

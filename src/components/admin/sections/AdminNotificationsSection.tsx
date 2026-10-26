@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Pencil, Plus } from 'lucide-react';
 import {
-  DELIVERY_STATES, NOTIFICATIONS_UNAVAILABLE, pendingAdminNotificationsClient,
+  DELIVERY_STATES, NOTIFICATIONS_UNAVAILABLE, httpAdminNotificationsClient,
   type AdminNotificationsClient, type NotificationOverview, type NotificationSendDetail, type NotificationSendSummary, type NotificationTemplate,
 } from '../../../services/adminNotifications';
-import { pendingAiDraftingClient, type AdminAiDraftingClient } from '../../../services/adminAiDrafting';
+import { httpAiDraftingClient, type AdminAiDraftingClient } from '../../../services/adminAiDrafting';
 import { CATEGORY_LABELS, DEFAULT_LIMITS, DELIVERY_LABELS, SEND_STATUS_LABELS, STARTER_TEMPLATES, lengthGuidance, unfilledBlanks } from '../../../utils/notificationComposer';
 import {
   AdminButton, AdminEmpty, AdminError, AdminLoading, AdminNotice, AdminPageHeader, AdminPanel, AdminSheet, AdminStat, AdminTabs, Freshness, RefreshButton, StatusPill, adminField, adminLabel,
@@ -18,10 +18,10 @@ const settle = <T,>(promise: Promise<T>) => promise.then(value => value, () => n
 
 /**
  * Admin Notification Center: overview, composer, delivery history and reusable templates. Every count and status
- * is the server's. Without Codex's backend contract the founder can still draft and preview; everything that
- * needs the server says it is waiting.
+ * is the server's. The production client uses the reviewed HTTP contract. Configuration and operational pause
+ * are shown separately from template/history availability; neither browser permission nor preview proves delivery.
  */
-export function AdminNotificationsSection({ sessionToken, initialView = '', client = pendingAdminNotificationsClient, ai = pendingAiDraftingClient, onNavigate }: {
+export function AdminNotificationsSection({ sessionToken, initialView = '', client = httpAdminNotificationsClient, ai = httpAiDraftingClient, onNavigate }: {
   sessionToken: string; initialView?: string; client?: AdminNotificationsClient; ai?: AdminAiDraftingClient; onNavigate?: (view: string) => void;
 }) {
   const [view, setView] = useState<View>(VIEWS.includes(initialView as View) ? initialView as View : 'compose');
@@ -57,18 +57,20 @@ export function AdminNotificationsSection({ sessionToken, initialView = '', clie
 
       {client.available ? (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <AdminStat compact label="Phones with alerts on" value={overview?.subscribedDevices ?? '—'} hint="Registered devices" />
+          <AdminStat compact label="Registered devices" value={overview?.subscribedDevices ?? '—'} hint="Registration is separate from delivery" />
           <AdminStat compact label="Agreed to promotions" value={overview?.marketingConsented ?? '—'} hint="Separate consent" />
-          <AdminStat compact label="Messages, last 7 days" value={overview?.sendsLast7Days ?? '—'} />
+          <AdminStat compact label="Account updates, 7 days" value={overview?.sendsLast7Days ?? '—'} />
           <AdminStat compact label="Failed deliveries, 7 days" value={overview?.failedLast7Days ?? '—'} tone={overview?.failedLast7Days ? 'warning' : 'neutral'} />
         </div>
       ) : (
         <AdminNotice tone="info" title="Waiting for the notification server">{NOTIFICATIONS_UNAVAILABLE} Customer phones are not registered for alerts yet, so there is no audience to count.</AdminNotice>
       )}
+      {overview&&(!overview.sendingEnabled||overview.paused)&&<AdminNotice tone="info" title={overview.paused?'Real sending is paused':'Real sending is disabled'}>Templates, preferences and history are connected. Push credentials and consenting-device acceptance must be verified before delivery is enabled. Permission alone does not prove delivery.</AdminNotice>}
 
       <AdminTabs label="Notification area" value={view} onChange={go} tabs={[{ id: 'compose', label: 'Compose' }, { id: 'history', label: 'History' }, { id: 'templates', label: 'Templates' }]} />
 
       {view === 'compose' && <AdminNotificationComposer token={sessionToken} client={client} ai={ai} data={data} seed={seed}
+        onTemplateSaved={template=>setData(d=>({...d,templates:[template,...(d.templates||[]).filter(t=>t.id!==template.id)]}))}
         onSent={() => { setHistoryVersion(v => v + 1); void settle(client.overview(sessionToken)).then(o => o && setOverview(o)); }}
         onViewHistory={() => go('history')} />}
       {view === 'history' && <NotificationHistory token={sessionToken} client={client} version={historyVersion} />}
@@ -172,7 +174,7 @@ function NotificationTemplates({ token, client, templates, limits, onSaved, onUs
 }) {
   const [editing, setEditing] = useState<NotificationTemplate | null>(null);
   const starters: NotificationTemplate[] = STARTER_TEMPLATES.map(t => ({ ...t, destination: null, updatedAt: null, version: null }));
-  const blank: NotificationTemplate = { id: '', name: '', category: 'transactional', title: '', body: '', destination: null, updatedAt: null, version: null };
+  const blank: NotificationTemplate = { id: '', name: '', category: 'marketing', title: '', body: '', destination: '/app', updatedAt: null, version: null,enabled:true };
   const row = (t: NotificationTemplate, saved: boolean) => (
     <li key={t.id} className="flex flex-col gap-2 rounded-2xl border border-slate-800 bg-[#0d151b] p-3.5 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
@@ -182,7 +184,8 @@ function NotificationTemplates({ token, client, templates, limits, onSaved, onUs
       </div>
       <div className="flex shrink-0 gap-2">
         <AdminButton onClick={() => onUse(t)}>Use</AdminButton>
-        {client.available && <AdminButton onClick={() => setEditing(saved ? t : { ...t, id: '', name: `${t.name} (copy)`, version: null })}><Pencil className="h-4 w-4" />{saved ? 'Edit' : 'Copy & edit'}</AdminButton>}
+        {t.locked&&<StatusPill tone="neutral">Automatic · locked</StatusPill>}
+        {client.available&&!t.locked&&t.category==='marketing' && <AdminButton onClick={() => setEditing(saved ? t : { ...t, id: '', name: `${t.name} (copy)`, version: null })}><Pencil className="h-4 w-4" />{saved ? 'Edit' : 'Copy & edit'}</AdminButton>}
       </div>
     </li>
   );
@@ -194,9 +197,9 @@ function NotificationTemplates({ token, client, templates, limits, onSaved, onUs
           : templates.length === 0 ? <p className="text-sm text-slate-400">No saved templates yet. Copy a starter below or create one.</p>
           : <ul className="space-y-2">{templates.map(t => row(t, true))}</ul>}
       </AdminPanel>
-      <AdminPanel title="Starter templates" description="Plain, polite wording for common moments. Replace anything in [square brackets] before sending.">
+      {starters.length>0&&<AdminPanel title="Starter templates" description="Only server-approved generic wording may be used.">
         <ul className="space-y-2">{starters.map(t => row(t, false))}</ul>
-      </AdminPanel>
+      </AdminPanel>}
       {editing && <TemplateEditor token={token} client={client} template={editing} limits={limits} onClose={() => setEditing(null)} onSaved={t => { onSaved(t); setEditing(null); }} />}
     </div>
   );
@@ -207,12 +210,12 @@ function TemplateEditor({ token, client, template, limits, onClose, onSaved }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const title = lengthGuidance('title', value.title, limits), body = lengthGuidance('body', value.body, limits);
-  const valid = value.name.trim().length >= 3 && value.title.trim() && value.body.trim() && title.tone !== 'over' && body.tone !== 'over';
+  const valid = value.title.trim().length>=3 && value.body.trim().length>=5 && title.tone !== 'over' && body.tone !== 'over';
   const save = async () => {
     if (!valid || busy) return;
     setBusy(true); setError(null);
     try {
-      const res = await client.saveTemplate(token, { id: value.id || null, expectedVersion: value.version, name: value.name.trim(), category: value.category, title: value.title.trim(), body: value.body.trim(), destination: value.destination });
+      const res = await client.saveTemplate(token, { id: value.id || null, expectedVersion: value.version, name: value.name.trim(), category: 'marketing', title: value.title.trim(), body: value.body.trim(), destination: '/app',enabled:value.enabled!==false });
       if (res.ok) onSaved(res.template);
       else setError(res.code === 'version_conflict' ? 'Someone else saved this template first. Close and reopen it to see their version.' : res.message);
     } catch (e) { setError(e instanceof Error ? e.message : 'The template was not saved.'); } finally { setBusy(false); }
@@ -222,9 +225,10 @@ function TemplateEditor({ token, client, template, limits, onClose, onSaved }: {
     <AdminSheet title={template.id ? 'Edit template' : 'New template'} onClose={onClose} busy={busy}
       footer={<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><AdminButton onClick={onClose} disabled={busy}>Cancel</AdminButton><AdminButton variant="primary" busy={busy} disabled={!valid} onClick={() => void save()}>Save template</AdminButton></div>}>
       <div className="space-y-4">
-        <label className={adminLabel}><span>Template name</span><input className={adminField} value={value.name} maxLength={80} onChange={e => setValue({ ...value, name: e.target.value })} /></label>
+        <p className="text-xs text-slate-400">The saved template is listed by its title. Only marketing wording can be edited.</p>
         <label className={adminLabel}><span>Message type</span>
-          <select className={adminField} value={value.category} onChange={e => setValue({ ...value, category: e.target.value as NotificationTemplate['category'] })}>{(Object.keys(CATEGORY_LABELS) as NotificationTemplate['category'][]).map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}</select></label>
+          <select className={adminField} value="marketing" disabled><option value="marketing">News and offers · explicit opt-in required</option></select></label>
+        <label className={adminLabel}><span>Enabled</span><input type="checkbox" checked={value.enabled!==false} onChange={e=>setValue({...value,enabled:e.target.checked})}/></label>
         <label className={adminLabel}><span>Title</span><input className={adminField} value={value.title} aria-describedby="tpl-title-count" onChange={e => setValue({ ...value, title: e.target.value })} /><span id="tpl-title-count" aria-hidden="true" className={`block text-xs ${title.tone === 'over' ? 'text-rose-300' : title.tone === 'long' ? 'text-amber-200' : 'text-slate-500'}`}>{title.count}/{title.max} · {title.message}</span></label>
         <label className={adminLabel}><span>Message</span><textarea className={`${adminField} min-h-28`} value={value.body} aria-describedby="tpl-body-count" onChange={e => setValue({ ...value, body: e.target.value })} /><span id="tpl-body-count" aria-hidden="true" className={`block text-xs ${body.tone === 'over' ? 'text-rose-300' : body.tone === 'long' ? 'text-amber-200' : 'text-slate-500'}`}>{body.count}/{body.max} · {body.message}</span></label>
         {blanks.length > 0 && <p className="text-xs text-slate-400">Blanks like {blanks.join(', ')} can stay in a template; they must be replaced before sending.</p>}

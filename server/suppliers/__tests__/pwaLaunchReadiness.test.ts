@@ -136,7 +136,7 @@ test('app shell: Home ships with the app, other pages and heavy overlays load on
   assert.match(source('src/main.tsx'), /captureInstallPrompt\(\);[\s\S]*const surface/);
 });
 
-test('no service worker, no push subscription, no offline cache, no automatic permission prompt', () => {
+test('push is isolated to explicit consent, with no offline cache or automatic permission prompt', () => {
   const files: string[] = [];
   const walk = (dir: string) => { for (const name of readdirSync(dir)) { const p = path.join(dir, name); if (statSync(p).isDirectory()) walk(p); else if (/\.(ts|tsx)$/.test(name)) files.push(p); } };
   walk('src');
@@ -151,8 +151,10 @@ test('no service worker, no push subscription, no offline cache, no automatic pe
   const push = source('src/pwa/push.ts');
   assert.doesNotMatch(push, /serviceWorker\.register\(/);
   assert.match(push, /if \(!contract \|\| !pushSupported/);
-  assert.match(source('src/services/customerNotifications.ts'), /available: false/);
-  assert.match(source('src/components/auth/NotificationSettings.tsx'), /client = pendingCustomerNotificationsClient/);
+  assert.match(source('src/services/customerNotifications.ts'), /httpCustomerNotificationsClient/);
+  assert.match(source('src/components/auth/NotificationSettings.tsx'), /client = httpCustomerNotificationsClient/);
+  assert.match(push,/register\('\/push-sw.js',\{scope:'\/',updateViaCache:'none'\}\)/);
+  assert.doesNotMatch(source('public/push-sw.js'),/addEventListener\(['"]fetch|caches\.open/);
   const optIn = source('src/components/pwa/NotificationOptIn.tsx');
   assert.match(optIn, /onClick=\{\(\) => \{ void enable\(\); \}\}/, 'requested from the button');
   assert.match(optIn, /Alerts are not switched on yet/); assert.match(optIn, /Nothing is sent yet/);

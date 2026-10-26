@@ -11,6 +11,10 @@ import {NotificationService as service,NOTIFICATIONS as n} from '../../services/
 import {processNotificationBatch} from '../../services/notificationWorker.js';
 import {hashSessionToken} from '../../utils/crypto.js';
 import {notificationRouter,adminNotificationRouter} from '../../routes/notificationApi.js';
+import {httpAdminNotificationsClient as adminHttp} from '../../../src/services/adminNotifications.js';
+import {httpCustomerNotificationsClient as customerHttp,readNotificationInbox} from '../../../src/services/customerNotifications.js';
+import {httpAiDraftingClient} from '../../../src/services/adminAiDrafting.js';
+import {OrderManagement} from '../../services/orderManagement.js';
 
 test('PostgreSQL transactional notification lifecycle and operational security',{skip:process.env.MYSTERY_NOTIFICATION_PG_TEST!=='true'},async t=>{
  assert.equal(process.env.DATABASE_URL,undefined);assert.equal(process.env.NODE_ENV,'test');
@@ -26,6 +30,8 @@ test('PostgreSQL transactional notification lifecycle and operational security',
  await make('historical','paid',true);await pool.query(NOTIFICATION_SCHEMA);await pool.query(NOTIFICATION_SCHEMA);
  await t.test('fresh/repeated startup preserves historical orders and generates no backfill',async()=>{await initDatabase();await initDatabase();assert.equal((await pool!.query(`SELECT COUNT(*) FROM ${n}.events`)).rows[0].count,'0');assert.equal((await pool!.query("SELECT status FROM orders WHERE id='historical'")).rows[0].status,'paid');});
  let deviceId='';
+ assert.equal((await service.settings()).paused,true);
+ await service.setSettings('admin',{paused:false,confirmed:true,reason:'Resume isolated synthetic delivery tests'});
  await t.test('encrypted multi-device subscriptions bind to actual active sessions and reject endpoint spoofing',async()=>{
   deviceId=(await service.subscribe('buyer1',tokens.buyer1,{subscription})).deviceId;const row=(await pool!.query(`SELECT * FROM ${n}.devices WHERE id=$1`,[deviceId])).rows[0];assert.equal(row.session_id,'session-buyer1');assert.doesNotMatch(row.encrypted_subscription,/SYNTHETIC|fcm|synthetic-session/);
   await assert.rejects(()=>service.subscribe('buyer2',tokens.buyer1,{subscription}),/Sign in again/);await assert.rejects(()=>service.subscribe('buyer2',tokens.buyer2,{subscription:{...subscription,keys:{...subscription.keys,auth:randomBytes(16).toString('base64url')}}}),/ownership/);
@@ -97,6 +103,38 @@ test('PostgreSQL transactional notification lifecycle and operational security',
   try{const base=`http://127.0.0.1:${(server.address() as any).port}`;const notification=(await service.inbox('buyer1'))[0];assert.ok(notification);
    assert.equal((await fetch(base+'/notifications/inbox/'+notification.id)).status,401);assert.equal((await fetch(base+'/notifications/inbox/'+notification.id,{headers:{authorization:'Bearer '+tokens.admin}})).status,404);assert.equal((await fetch(base+'/notifications/inbox/'+notification.id,{headers:{authorization:'Bearer '+tokens.buyer1}})).status,200);assert.equal((await fetch(base+'/admin/templates',{headers:{authorization:'Bearer '+tokens.buyer1}})).status,403);
   }finally{server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
+ });
+ await t.test('real frontend adapters use protected HTTP contracts, prepared audiences and private inbox ownership',async()=>{
+  const app=express();app.use(express.json());app.use('/api/notifications',notificationRouter);app.use('/api/admin/notifications',adminNotificationRouter);
+  const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));const base=`http://127.0.0.1:${(server.address() as any).port}`,oldFetch=globalThis.fetch;
+  const requests:Array<{path:string;body:any}>=[];globalThis.fetch=(url,init)=>{requests.push({path:String(url),body:init?.body?JSON.parse(String(init.body)):null});return oldFetch(base+String(url),init);};
+  try{
+   const templates=await adminHttp.templates(tokens.admin);assert.equal(templates.length,8);assert.equal(templates.filter(t=>t.locked).length,5);assert.equal(templates.filter(t=>!t.locked&&t.category==='marketing').length,3);
+   assert.equal((await adminHttp.saveTemplate(tokens.admin,{id:'payment_confirmed',expectedVersion:'1',category:'transactional',name:'No override',title:'Payment confirmed',body:'Fake payment confirmation',destination:'/orders'})).ok,false);
+   assert.equal((await customerHttp.savePreferences(tokens.buyer1,{transactional:true,promotional:true,expectedVersion:''})).ok,true);assert.equal((await customerHttp.preferences(tokens.buyer1)).promotional,true);
+   assert.deepEqual(Object.keys(requests.find(r=>r.path.endsWith('/preferences')&&r.body)!.body).sort(),['marketing','transactional']);
+   const sub={...subscription,expirationTime:null,endpoint:'https://fcm.googleapis.com/fcm/send/SYNTHETIC-HTTP'};assert.equal((await customerHttp.register(tokens.buyer1,sub)).ok,true);assert.equal((await customerHttp.deviceStatus(tokens.buyer1,sub.endpoint)).subscribed,true);assert.equal((await customerHttp.deviceStatus(tokens.buyer1,sub.endpoint+'OTHER')).subscribed,false);
+   const saved=await adminHttp.saveTemplate(tokens.admin,{id:null,expectedVersion:null,name:'Service notice',title:'Service notice',body:'Explore available services in {{appName}}.',category:'marketing',destination:'/app',enabled:true});assert.ok(saved.ok);if(!saved.ok)throw Error('Template save failed');
+   const preview=await adminHttp.prepareAudience!(tokens.admin,{templateId:saved.template.id,userId:'buyer1'});assert.equal(preview.eligibleDevices,1);
+   const input={previewId:preview.previewId,idempotencyKey:randomUUID(),templateId:saved.template.id,category:'marketing' as const,title:saved.template.title,body:saved.template.body,destination:'/app',audienceId:'customer',confirmedRecipients:1};
+   const sent=await adminHttp.createSend(tokens.admin,input);assert.ok(sent.ok);const duplicate=await adminHttp.createSend(tokens.admin,input);assert.ok(duplicate.ok&&duplicate.duplicate);
+   assert.equal((await adminHttp.createSend(tokens.admin,{...input,body:'Unreviewed changed body'})).ok,false);
+   assert.equal((await adminHttp.createSend(tokens.admin,{...input,idempotencyKey:randomUUID()})).ok,false);
+   await processNotificationBatch(sender,25);const page=await adminHttp.sends(tokens.admin,{page:1,limit:20});assert.ok(page.items.length>0);const detail=await adminHttp.send(tokens.admin,page.items[0].id);assert.equal(detail.recipients,1);assert.equal(Object.values(detail.counts).reduce((a,b)=>a+b,0),1);
+   const notification=(await service.inbox('buyer1'))[0];assert.ok(['/app','/orders'].includes((await readNotificationInbox(tokens.buyer1,notification.id)).destination));await assert.rejects(()=>readNotificationInbox(tokens.admin,notification.id));
+   await assert.rejects(()=>adminHttp.templates(tokens.buyer1));
+   const beforeKey=process.env.GEMINI_API_KEY;delete process.env.GEMINI_API_KEY;try{await httpAiDraftingClient.propose(tokens.admin,{templateId:'new_service',action:'friendly',title:'PRIVATE_CUSTOMER_MUST_NOT_LEAVE',body:'PRIVATE_CUSTOMER_MUST_NOT_LEAVE',placeholders:[]});}finally{if(beforeKey!==undefined)process.env.GEMINI_API_KEY=beforeKey;}
+   assert.deepEqual(requests.find(r=>r.path.endsWith('/draft'))!.body,{templateId:'new_service',mode:'friendly'});assert.doesNotMatch(JSON.stringify(requests.filter(r=>r.path.endsWith('/draft'))),/PRIVATE_CUSTOMER/);
+   process.env.WEB_PUSH_ENABLED='false';assert.equal((await customerHttp.configuration!()).enabled,false);await assert.rejects(()=>customerHttp.publicKey(tokens.buyer1));await assert.rejects(()=>adminHttp.prepareAudience!(tokens.admin,{templateId:saved.template.id}));process.env.WEB_PUSH_ENABLED='true';
+   await pool!.query("INSERT INTO sessions(id,user_id,token_hash,expires_at) VALUES('buyer2-http','buyer2',$1,NOW()+interval '1 day')",[hashSessionToken(tokens.buyer2)]);
+   assert.equal((await customerHttp.register(tokens.buyer2,sub)).ok,true);assert.equal((await customerHttp.deviceStatus(tokens.buyer1,sub.endpoint)).subscribed,false);assert.equal((await customerHttp.deviceStatus(tokens.buyer2,sub.endpoint)).subscribed,true);await assert.rejects(()=>readNotificationInbox(tokens.buyer2,notification.id));
+   assert.equal((await customerHttp.unregister(tokens.buyer2,sub.endpoint)).ok,true);assert.equal((await customerHttp.deviceStatus(tokens.buyer2,sub.endpoint)).subscribed,false);
+  }finally{globalThis.fetch=oldFetch;process.env.WEB_PUSH_ENABLED='true';server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
+ });
+ await t.test('notification foreign-key evidence prevents B1 fixture deletion in the combined schema',async()=>{
+  await make('notification-linked','failed',false);await pool!.query("UPDATE orders SET user_id=NULL,payment_status='failed' WHERE id='notification-linked'");await pool!.query("INSERT INTO order_test_fixtures(order_id,provenance) VALUES('notification-linked','synthetic_no_gateway')");
+  await pool!.query(`INSERT INTO ${n}.events(user_id,order_id,event_key,template_id,label) VALUES('buyer1','notification-linked','synthetic-evidence','delivery_attention','Synthetic evidence')`);
+  const details=await OrderManagement.details('notification-linked');assert.equal(details.eligibility.deleteTest,false);assert.ok(details.eligibility.denials.includes('CONNECTED_EVIDENCE'));
  });
  }finally{await pool?.end();await control.query(`DROP DATABASE ${name} WITH (FORCE)`);await control.end();for(const key of ['DATABASE_URL','DATABASE_SSL','MYSTERY_TEST_DATABASE_OPT_IN','WEB_PUSH_ENABLED','WEB_PUSH_VAPID_PUBLIC_KEY','WEB_PUSH_VAPID_PRIVATE_KEY','WEB_PUSH_VAPID_SUBJECT','WEB_PUSH_STORAGE_KEY']){if(original[key]===undefined)delete process.env[key];else process.env[key]=original[key];}}
 });

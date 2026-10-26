@@ -25,7 +25,8 @@ adminNotificationRouter.post('/preview',handler(req=>{exact(req.body,['templateI
 adminNotificationRouter.post('/audiences/preview',handler(req=>NotificationService.previewAudience(req.user.id,req.body)));
 adminNotificationRouter.post('/campaigns',handler(req=>NotificationService.campaign(req.user.id,req.body)));
 adminNotificationRouter.get('/campaigns',handler(async req=>({success:true,campaigns:await NotificationService.campaigns(offset(req.query.offset))})));
-adminNotificationRouter.get('/deliveries',handler(async req=>({success:true,deliveries:await NotificationService.deliveries(offset(req.query.offset))})));
+adminNotificationRouter.get('/deliveries',handler(async req=>({success:true,deliveries:await NotificationService.deliveries(offset(req.query.offset)),total:await NotificationService.deliveryCount()})));
+adminNotificationRouter.get('/deliveries/:id',handler(async req=>{const delivery=(await NotificationService.deliveries(0,req.params.id))[0];if(!delivery)throw new FinanceError('Delivery attempt not found.',404);return {success:true,delivery};}));
 adminNotificationRouter.get('/health',handler(()=>NotificationService.health()));
 adminNotificationRouter.get('/settings',handler(()=>NotificationService.settings()));
 adminNotificationRouter.put('/settings',handler(req=>NotificationService.setSettings(req.user.id,req.body)));

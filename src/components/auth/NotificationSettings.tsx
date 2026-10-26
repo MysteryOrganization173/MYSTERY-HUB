@@ -2,15 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Bell, BellOff, BellRing, Loader2 } from 'lucide-react';
 import { notificationPermissionState, type NotificationPermissionState } from '../../pwa/notifications';
 import { PUSH_STATE_COPY, customerPushState, pushSupported, readServerDeviceState, subscribeThisDevice, unsubscribeThisDevice, type LocalPushStep, type ServerDeviceState } from '../../pwa/push';
-import { pendingCustomerNotificationsClient, type CustomerNotificationsClient, type NotificationPreferences } from '../../services/customerNotifications';
+import { httpCustomerNotificationsClient, type CustomerNotificationsClient, type NotificationPreferences } from '../../services/customerNotifications';
 import { accountButton } from './SecurityDialog';
 
 /**
  * My Account › Notifications. The device card reflects the server's confirmation, never browser permission alone,
  * and each preference changes only after the server saves it. Promotional updates are a separate choice that
- * starts off. While Codex's push backend is not live, the card says so and shows no switches.
+ * starts off. Account choices remain available while real device delivery is disabled pending configuration.
  */
-export function NotificationSettings({ token, client = pendingCustomerNotificationsClient }: { token: string; client?: CustomerNotificationsClient }) {
+export function NotificationSettings({ token, client = httpCustomerNotificationsClient }: { token: string; client?: CustomerNotificationsClient }) {
+  const [configured,setConfigured]=useState(false);
   const [permission, setPermission] = useState<NotificationPermissionState>(() => notificationPermissionState());
   const [server, setServer] = useState<ServerDeviceState>('unknown');
   const [local, setLocal] = useState<LocalPushStep>('idle');
@@ -19,15 +20,18 @@ export function NotificationSettings({ token, client = pendingCustomerNotificati
   const [prefsError, setPrefsError] = useState<string | null>(null);
   const [saving, setSaving] = useState<keyof Pick<NotificationPreferences, 'transactional' | 'promotional'> | null>(null);
   const alive = useRef(true);
-  useEffect(() => () => { alive.current = false; }, []);
+  useEffect(() => {alive.current=true;return () => { alive.current = false; };}, []);
 
   useEffect(() => {
     if (!client.available) return;
-    void readServerDeviceState(client, token).then(s => { if (alive.current) setServer(s); });
-    client.preferences(token).then(p => { if (alive.current) setPrefs(p); }, e => { if (alive.current) setPrefsError(e instanceof Error ? e.message : 'Your choices could not be loaded.'); });
+    let active=true;setConfigured(false);setPrefs(null);setServer('unknown');setLocal('idle');setMessage(null);
+    void (client.configuration?client.configuration():Promise.resolve({enabled:true})).then(c=>{if(active)setConfigured(c.enabled);},()=>{if(active)setConfigured(false);});
+    void readServerDeviceState(client, token).then(s => { if (active&&alive.current) setServer(s); });
+    client.preferences(token).then(p => { if (active&&alive.current) setPrefs(p); }, e => { if (active&&alive.current) setPrefsError(e instanceof Error ? e.message : 'Your choices could not be loaded.'); });
+    return ()=>{active=false;};
   }, [client, token]);
 
-  const state = customerPushState({ contract: client.available, pushSupported: pushSupported(), permission, server, local });
+  const state = customerPushState({ contract: client.available&&configured, pushSupported: pushSupported(), permission, server, local });
   const copy = PUSH_STATE_COPY[state];
 
   const act = async () => {
@@ -74,7 +78,7 @@ export function NotificationSettings({ token, client = pendingCustomerNotificati
       </div>
       {copy.action && <button type="button" disabled={busy} onClick={() => void act()} className={`${accountButton} w-full ${state === 'active' ? '' : '!bg-[#00c365] !text-black'}`}>{copy.action}</button>}
 
-      {client.available && state !== 'unavailable' && (
+      {client.available && (
         <fieldset className="space-y-2" disabled={!prefs || Boolean(saving)}>
           <legend className="mb-1 text-sm text-slate-300">What you receive</legend>
           {([

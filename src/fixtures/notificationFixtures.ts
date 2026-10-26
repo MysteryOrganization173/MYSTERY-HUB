@@ -9,7 +9,7 @@ import type { AdminNotificationsClient, NotificationAudience, NotificationSendSu
 import type { AdminAiDraftingClient } from '../services/adminAiDrafting';
 import type { CustomerNotificationsClient, NotificationPreferences } from '../services/customerNotifications';
 
-const zero = { pending: 0, sent: 0, accepted: 0, retrying: 0, failed: 0 };
+const zero = { pending: 0, sent: 0, accepted: 0, retrying: 0, failed: 0, invalid:0,skipped:0 };
 
 export function createFixtureNotificationsClient(options: { delayMs?: number; countDrift?: number } = {}) {
   const wait = () => new Promise(resolve => setTimeout(resolve, options.delayMs ?? 0));

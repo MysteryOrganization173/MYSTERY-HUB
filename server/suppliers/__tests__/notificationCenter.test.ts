@@ -5,7 +5,7 @@ import {readFileSync, readdirSync, statSync} from 'node:fs';
 import path from 'node:path';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {pendingAdminNotificationsClient, NOTIFICATIONS_UNAVAILABLE, DELIVERY_STATES} from '../../../src/services/adminNotifications.js';
+import {pendingAdminNotificationsClient,httpAdminNotificationsClient,notificationDeliverySummary, NOTIFICATIONS_UNAVAILABLE, DELIVERY_STATES} from '../../../src/services/adminNotifications.js';
 import {pendingAiDraftingClient, AI_DRAFT_ACTIONS} from '../../../src/services/adminAiDrafting.js';
 import {pendingCustomerNotificationsClient} from '../../../src/services/customerNotifications.js';
 import {STARTER_TEMPLATES, SAMPLE_PLACEHOLDERS, placeholdersIn, unsupportedPlaceholders, unfilledBlanks, renderWithSamples, lengthGuidance, sendBlockers, draftFingerprint, audienceAllows, insertAt, DELIVERY_LABELS, DEFAULT_LIMITS, type NotificationDraft} from '../../../src/utils/notificationComposer.js';
@@ -22,23 +22,25 @@ test('without Codex contracts nothing is called, drafting and preview still work
   assert.equal(pendingAdminNotificationsClient.available, false);
   assert.equal(pendingAiDraftingClient.available, false);
   assert.equal(pendingCustomerNotificationsClient.available, false);
-  const html = renderToStaticMarkup(React.createElement(AdminNotificationsSection, {sessionToken: 't'}));
+  const html = renderToStaticMarkup(React.createElement(AdminNotificationsSection, {sessionToken: 't',client:pendingAdminNotificationsClient,ai:pendingAiDraftingClient}));
   assert.ok(html.includes(NOTIFICATIONS_UNAVAILABLE));
   assert.match(html, /Sending not connected yet/);
-  assert.match(html, /Payment confirmation/);
   assert.match(html, /Phone preview/);
   assert.match(html, /AI wording help is not connected yet/);
   const page = source('src/components/admin/AdminPage.tsx');
   assert.match(page, /notifications: \{ label: 'Notifications'/);
-  assert.match(page, /<AdminNotificationsSection sessionToken=\{token\} initialView=\{param\}/, 'production uses the pending default clients');
+  assert.match(page, /<AdminNotificationsSection key=\{token\} sessionToken=\{token\} initialView=\{param\}/, 'account changes reset notification UI');
+  const live=renderToStaticMarkup(React.createElement(AdminNotificationsSection,{sessionToken:'t'}));
+  assert.doesNotMatch(live,/Waiting for the notification server|Sending not connected yet/);assert.equal(httpAdminNotificationsClient.available,true);
 });
 
-test('no endpoint is invented; no service worker is registered here', () => {
-  for (const file of F3_FILES) assert.doesNotMatch(source(file), /\/api\/|fetch\(|serviceWorker\.register/, file);
+test('raw backend delivery states map to honest per-device labels without inventing display receipts', () => {
+  for(const state of ['queued','retry','provider_accepted','invalid','skipped','failed']){const s=notificationDeliverySummary({id:'fixture',state,created_at:'2026-10-26',history:[]});assert.equal(Object.values(s.counts).reduce((a,b)=>a+b,0),1);assert.equal(s.recipients,1);}
+  assert.equal(notificationDeliverySummary({state:'provider_accepted',history:[]}).counts.accepted,1);
 });
 
 test('delivery wording never claims read, seen or delivered', () => {
-  assert.deepEqual(DELIVERY_STATES, ['pending', 'sent', 'accepted', 'retrying', 'failed']);
+  assert.deepEqual(DELIVERY_STATES, ['pending', 'sent', 'accepted', 'retrying', 'failed','invalid','skipped']);
   assert.match(DELIVERY_LABELS.accepted.help, /does not mean the person saw it/);
   for (const file of F3_FILES) {
     const text = source(file).replace(/\/\*\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
@@ -47,19 +49,15 @@ test('delivery wording never claims read, seen or delivered', () => {
   assert.doesNotMatch(source('src/components/auth/NotificationSettings.tsx'), /You will receive updates/);
 });
 
-test('starter templates cover the eight moments with plain wording and no hype', () => {
-  assert.deepEqual(STARTER_TEMPLATES.map(t => t.name), ['Payment confirmation', 'Order processing', 'Delivery confirmation', 'Delivery problem', 'Refund update', 'Maintenance', 'New service', 'Special promotion']);
-  for (const t of STARTER_TEMPLATES) {
-    assert.doesNotMatch(`${t.title} ${t.body}`, /!{2,}|guarantee|best price|cheapest|huge|amazing|limited time only|act now|free money/i, t.name);
-    assert.ok(t.title.length <= DEFAULT_LIMITS.titleMax && t.body.length <= DEFAULT_LIMITS.bodyMax, t.name);
-  }
-  assert.equal(STARTER_TEMPLATES.filter(t => t.category === 'marketing').length, 2);
+test('the frontend does not invent a competing set of transactional templates or private placeholders', () => {
+  assert.deepEqual(STARTER_TEMPLATES,[]); // Eight defaults are verified through the actual HTTP/PostgreSQL integration test.
+  assert.deepEqual(SAMPLE_PLACEHOLDERS.map(p=>p.token),['{{appName}}','{{eventLabel}}']);
 });
 
 test('placeholders: found, checked against the server list, previewed with samples and inserted with spacing', () => {
   assert.deepEqual(placeholdersIn('Hi {{ First_Name }}, {{order_reference}} {{first_name}}'), ['{{first_name}}', '{{order_reference}}']);
-  assert.deepEqual(unsupportedPlaceholders('Hi {{first_name}} {{wallet_balance}}', SAMPLE_PLACEHOLDERS), ['{{wallet_balance}}']);
-  assert.equal(renderWithSamples('Hi {{first_name}}, {{unknown}}', SAMPLE_PLACEHOLDERS), 'Hi Ama, {{unknown}}');
+  assert.deepEqual(unsupportedPlaceholders('Hi {{appName}} {{wallet_balance}}', SAMPLE_PLACEHOLDERS), ['{{wallet_balance}}']);
+  assert.equal(renderWithSamples('Hi {{appName}}, {{unknown}}', SAMPLE_PLACEHOLDERS), 'Hi Mystery Hub, {{unknown}}');
   assert.deepEqual(unfilledBlanks('Until [end date] for [Offer name]'), ['[end date]', '[Offer name]']);
   assert.deepEqual(insertAt('Hello', 5, 5, '{{first_name}}'), {value: 'Hello {{first_name}}', caret: 20});
   assert.equal(insertAt('Hi,', 2, 2, '{{first_name}}').value, 'Hi {{first_name}},');
@@ -68,7 +66,7 @@ test('placeholders: found, checked against the server list, previewed with sampl
 test('character guidance: phone guidance first, the limit second', () => {
   assert.equal(lengthGuidance('title', 'Payment received', DEFAULT_LIMITS).tone, 'ok');
   assert.equal(lengthGuidance('title', 'x'.repeat(50), DEFAULT_LIMITS).tone, 'long');
-  assert.equal(lengthGuidance('title', 'x'.repeat(70), DEFAULT_LIMITS).tone, 'over');
+  assert.equal(lengthGuidance('title', 'x'.repeat(81), DEFAULT_LIMITS).tone, 'over');
   assert.equal(lengthGuidance('body', 'x'.repeat(241), DEFAULT_LIMITS).message, '1 over the 240-character limit');
 });
 
@@ -108,7 +106,8 @@ test('confirmation re-reads the audience and the server refuses a stale count', 
   assert.equal(res.ok ? null : res.code, 'count_changed');
   const ui = source('src/components/admin/sections/AdminNotificationComposer.tsx');
   const review = ui.slice(ui.indexOf('const review = async'), ui.indexOf('const send = async'));
-  assert.match(review, /client\.countAudience\(token, audience\.id\)/);
+  assert.match(review, /client\.prepareAudience\(token,/);
+  assert.match(review,/current!==revision.current/,'a delayed audience result cannot confirm a changed draft');
   assert.match(ui, /disabled=\{!acknowledged \|\| sending\}/);
 });
 
@@ -126,9 +125,10 @@ test('AI drafting only proposes: "Use this" fills the editor; nothing in the AI 
 });
 
 test('preview shows sample values in an Android-style card', () => {
-  const html = renderToStaticMarkup(React.createElement(NotificationPreview, {title: 'Hi {{first_name}}', body: 'Order {{order_reference}}', placeholders: SAMPLE_PLACEHOLDERS, destination: 'My Orders'}));
-  assert.match(html, /Hi Ama/);
-  assert.match(html, /MH-20261025-104233/);
+  const html = renderToStaticMarkup(React.createElement(NotificationPreview, {title: 'Hi {{appName}}', body: '{{eventLabel}}', placeholders: SAMPLE_PLACEHOLDERS, destination: 'My Orders'}));
+  assert.match(html, /Hi Mystery Hub/);
+  assert.match(html, /An account update is available. Sign in to view it./);
+  assert.match(html, /Account inbox content after sign-in/);
   assert.match(html, /Opens: My Orders/);
 });
 
@@ -167,17 +167,29 @@ test('subscribe journey: permission, subscribe, register, server confirmation; r
   assert.equal(base64UrlToBytes('AQID').length, 3);
 });
 
-test('account settings: unavailable today with no switches; promotions are a separate choice', () => {
+test('account settings: real preferences are available while delivery remains unconfigured; consent is separate', () => {
   const html = renderToStaticMarkup(React.createElement(NotificationSettings, {token: 't'}));
   assert.match(html, /Phone alerts are not available/);
-  assert.doesNotMatch(html, /role="switch"/);
+  assert.match(html, /role="switch"/);
   const ui = source('src/components/auth/NotificationSettings.tsx');
   assert.match(ui, /'promotional', 'News and offers'/);
   assert.match(ui, /if \(res\.ok\) setPrefs\(res\.value\); else setPrefsError/, 'a switch changes only after the server saves');
-  assert.match(source('src/components/auth/AccountControls.tsx'), /<NotificationSettings token=\{sessionToken!\} \/>/);
+  assert.match(source('src/components/auth/AccountControls.tsx'), /<NotificationSettings key=\{sessionToken!\} token=\{sessionToken!\} \/>/);
 });
 
 test('fixtures stay isolated: no application file imports them', () => {
   const walk = (dir: string): string[] => readdirSync(dir).flatMap(name => { const p = path.join(dir, name); return statSync(p).isDirectory() ? walk(p) : [p]; });
   for (const file of walk('src').filter(f => /\.(ts|tsx)$/.test(f) && !f.startsWith(path.join('src', 'fixtures')))) assert.doesNotMatch(source(file), /fixtures\//, file);
+});
+
+test('disabled server configuration cannot request browser permission or register a worker',async()=>{
+ const fx=createFixtureCustomerNotifications();let asked=0;
+ const client={...fx.client,publicKey:async()=>{throw Error('Delivery disabled');}};
+ const win={...fx.env,...permissionWin('granted')};win.Notification.requestPermission=async()=>{asked++;return 'granted';};
+ const r=await subscribeThisDevice(client,'synthetic-token',win as never);assert.equal(r.server,'error');assert.equal(asked,0);assert.equal(fx.registered.size,0);
+});
+
+test('campaign identity changes with the selected customer or template, not just visible wording',()=>{
+ const d:NotificationDraft={templateId:'template_a',category:'marketing',title:'Service update',body:'Explore current services.',destination:'/app',audienceId:'customer',userId:'customer_a'};
+ assert.notEqual(draftFingerprint(d),draftFingerprint({...d,userId:'customer_b'}));assert.notEqual(draftFingerprint(d),draftFingerprint({...d,templateId:'template_b'}));
 });
