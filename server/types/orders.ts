@@ -1,3 +1,4 @@
+import {isUnpaidFailedAttempt} from '../services/orderManagementPolicy.js';
 /**
  * Controlled Order Status Types & Core Server Domain Model
  */
@@ -16,6 +17,7 @@ export type OrderStatus =
   | 'expired';
 
 export interface OrderRecord {
+  archived_at?: string | null;
   resolution_json?: import('./orderResolution.js').OrderResolution | null;
   commercial_context?: import('../../shared/directPricing.js').CommercialSnapshot | null;
   store_context?: import('../../shared/storeEconomics.js').StoreSnapshot | null;
@@ -85,6 +87,7 @@ export type SafePublicOrderDetails = Pick<
   | 'paid_at'
   | 'delivered_at'
 > & {
+  classification?: 'unpaid_attempt'|'order';
   payment_basis?: 'complimentary'|'operator_recorded';
   commercial_pricing?: {regularMinor:number;discountMinor:number;paidMinor:number};
   customer_resolution?: import('./orderResolution.js').CustomerResolution;
@@ -131,6 +134,7 @@ export interface AdminOrderDetails extends AuthenticatedCustomerOrderDetails {
   manual_review: boolean;
   admin_note: string | null;
   updated_at: string;
+  archived_at?: string | null;
   submitted_at: string | null;
   payment_closed_at?: string | null;
   referrer_user_id?: string | null;
@@ -144,6 +148,7 @@ export function toAdminOrderDetails(order: OrderRecord): AdminOrderDetails {
   const safe = toAuthenticatedCustomerOrder(order);
   return {
     ...safe,
+    status: order.status,
     resolution: order.resolution_json || null,
     marketplace_context: order.marketplace_context || null,
     id: order.id,
@@ -165,6 +170,7 @@ export function toAdminOrderDetails(order: OrderRecord): AdminOrderDetails {
     manual_review: Boolean(order.manual_review),
     admin_note: order.admin_note || null,
     updated_at: order.updated_at,
+    archived_at: order.archived_at || null,
     submitted_at: order.submitted_at || null,
     payment_closed_at: order.payment_closed_at || null,
     referrer_user_id: order.referrer_user_id || null,
@@ -191,7 +197,8 @@ export function toSafePublicOrder(order: OrderRecord): SafePublicOrderDetails {
     amount: order.amount,
     ...(order.commercial_context?{commercial_pricing:{regularMinor:order.commercial_context.regularMinor,discountMinor:order.commercial_context.discountMinor,paidMinor:order.commercial_context.paidMinor}}:{}),
     currency: order.currency,
-    status: order.status,
+    status: isUnpaidFailedAttempt(order) && Date.now()-new Date(order.created_at).getTime()>=86_400_000 ? 'expired' : order.status,
+    classification: isUnpaidFailedAttempt(order) ? 'unpaid_attempt' : 'order',
     created_at: order.created_at,
     paid_at: order.paid_at,
     delivered_at: order.delivered_at,
