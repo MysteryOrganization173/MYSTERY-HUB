@@ -1,3 +1,4 @@
+import {isUnpaidFailedAttempt,unpaidFailedAttemptSql} from '../services/orderManagementPolicy.js';
 import { CommercialService } from '../services/commercialService.js';
 import { WebsiteBusinessService } from '../services/websiteBusinessService.js';
 /**
@@ -523,7 +524,7 @@ export class OrdersStore {
     if (pool) {
       const query = `
         SELECT * FROM orders 
-        WHERE user_id = $1 AND (status NOT IN ('cancelled', 'expired', 'pending_payment') OR (service_type = 'afa' AND status = 'pending_payment'))
+        WHERE user_id = $1 AND NOT ${unpaidFailedAttemptSql} AND (status NOT IN ('cancelled', 'expired', 'pending_payment') OR (service_type = 'afa' AND status = 'pending_payment'))
         ORDER BY created_at DESC
         ${hasLimit ? 'LIMIT $2' : ''};
       `;
@@ -535,7 +536,7 @@ export class OrdersStore {
     const results: OrderRecord[] = [];
     for (const ord of devMemoryStore.values()) {
       if (
-        ord.user_id === userId &&
+        ord.user_id === userId && !isUnpaidFailedAttempt(ord) &&
         ord.status !== 'cancelled' &&
         ord.status !== 'expired' &&
         (ord.status !== 'pending_payment' || ord.service_type === 'afa') &&
@@ -866,7 +867,7 @@ export class OrdersStore {
     if (pool) {
       const query = `
         SELECT user_id, 
-               COUNT(*)::int as order_count,
+               COUNT(CASE WHEN NOT ${unpaidFailedAttemptSql} THEN 1 END)::int as order_count,
                COALESCE(SUM(CASE WHEN payment_status = 'success' AND paid_at IS NOT NULL AND status='delivered' AND delivered_at IS NOT NULL AND currency='GHS' AND payment_provider IN ('paystack','wallet') AND COALESCE(resolution_json->>'outcome','') NOT IN ('paystack_refund','wallet_refund','external_compensation') AND COALESCE(marketplace_status,'') NOT IN ('refund_pending','refunded','cancelled') THEN amount ELSE 0 END), 0)::bigint as total_spent_minor
         FROM orders
         WHERE user_id = ANY($1::text[])
@@ -890,7 +891,7 @@ export class OrdersStore {
 
       if (ord.user_id && map.has(ord.user_id)) {
         const entry = map.get(ord.user_id)!;
-        entry.orderCount += 1;
+        if(!isUnpaidFailedAttempt(ord))entry.orderCount += 1;
         if (ord.payment_status === 'success' && ord.paid_at && ord.status==='delivered' && ord.delivered_at && ord.currency==='GHS' && ['paystack','wallet'].includes(ord.payment_provider) && !['paystack_refund','wallet_refund','external_compensation'].includes(ord.resolution_json?.outcome||'') && !['refund_pending','refunded','cancelled'].includes(ord.marketplace_status||'')) {
           entry.totalSpentMinor += ord.amount;
         }
@@ -1528,6 +1529,7 @@ export class OrdersStore {
    * Admin: Search, filter, and paginate orders
    */
   static async searchOrdersAdmin(params: {
+    archived?: 'exclude'|'include'|'only';
     q?: string;
     serviceType?: string;
     network?: string;
@@ -1545,7 +1547,7 @@ export class OrdersStore {
 
     const pool = getPool();
     if (pool) {
-      const conditions: string[] = [];
+      const conditions: string[] = params.archived==='include'?[]:[params.archived==='only'?'archived_at IS NOT NULL':'archived_at IS NULL'];
       const values: unknown[] = [];
       let valIdx = 1;
 
@@ -1590,7 +1592,7 @@ export class OrdersStore {
         valIdx++;
       } else {
         // Default 'operational' view: exclude cancelled, expired, and initialization failures
-        conditions.push(`status NOT IN ('cancelled', 'expired') AND (failure_reason IS NULL OR failure_reason NOT LIKE 'paystack_initialization_%')`);
+        conditions.push(`NOT ${unpaidFailedAttemptSql} AND status NOT IN ('cancelled', 'expired') AND (failure_reason IS NULL OR failure_reason NOT LIKE 'paystack_initialization_%')`);
       }
 
       if (params.paymentStatus) {
@@ -1639,6 +1641,7 @@ export class OrdersStore {
 
     // In-memory fallback
     let all = Array.from(devMemoryStore.values()).filter((ord, idx, arr) => arr.findIndex((x) => x.id === ord.id) === idx);
+    if(params.archived!=='include')all=all.filter(o=>params.archived==='only'?!!o.archived_at:!o.archived_at);
 
     if (params.q && params.q.trim()) {
       const qLower = params.q.trim().toLowerCase();
@@ -1683,7 +1686,7 @@ export class OrdersStore {
       // Default 'operational' view: exclude cancelled, expired, and initialization failures
       all = all.filter(
         (o) =>
-          o.status !== 'cancelled' &&
+          !isUnpaidFailedAttempt(o) && o.status !== 'cancelled' &&
           o.status !== 'expired' &&
           (!o.failure_reason || !o.failure_reason.startsWith('paystack_initialization_'))
       );
