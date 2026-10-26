@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { changePasswordOnServer, updateProfileOnServer, revokeOwnSessionsOnServer, getMyReferralSummary } from '../../services/apiClient';
 import { SecurityDialog, accountInput, accountButton } from './SecurityDialog';
+import { NotificationSettings } from './NotificationSettings';
 
 function PasswordForm({ forced }: { forced: boolean }) {
   const { sessionToken, replaceAuthSession, showToast, logoutUser } = useApp();
@@ -52,6 +53,7 @@ function MyAccount() {
       {error && <p role="alert" className="text-rose-300 text-sm">{error}</p>}
       <button disabled={busy} className={accountButton}>{busy ? 'Saving…' : 'Save profile'}</button>
     </form>
+    <NotificationSettings token={sessionToken!} />
     <section className="mt-6 border-t border-slate-700 pt-4 space-y-4"><h3 className="font-bold">Security · Change Password</h3><PasswordForm forced={false} />
       <button onClick={logoutUser} className={`${accountButton} w-full`}>Sign Out</button>
       {!confirmSignOut ? <button onClick={() => setConfirmSignOut(true)} className={`${accountButton} w-full`}>Sign out of all devices</button> : <div className="space-y-2"><p className="text-sm">This signs out this device too.</p><button disabled={busy} className={`${accountButton} w-full !text-rose-300`} onClick={async () => { setBusy(true); try { await revokeOwnSessionsOnServer(sessionToken!); logoutUser(); } catch (err) { setError(err instanceof Error ? err.message : 'Could not sign out devices.'); } finally { setBusy(false); } }}>Confirm sign out of all devices</button><button className={accountButton} onClick={() => setConfirmSignOut(false)}>Cancel</button></div>}
