@@ -271,13 +271,13 @@ export type MysteryAiFailureKind = 'busy' | 'limits' | 'timeout' | 'offline' | '
 export const MYSTERY_AI_TIMEOUT_MESSAGE = 'Mystery AI is taking too long to answer. Check your connection, then try again.';
 export const MYSTERY_AI_OFFLINE_MESSAGE = 'You seem to be offline. Reconnect to the internet, then try again.';
 export class MysteryAiError extends Error {
-  constructor(message: string, readonly kind: MysteryAiFailureKind) { super(message); }
+  constructor(message: string, readonly kind: MysteryAiFailureKind, readonly retryable = kind !== 'limits') { super(message); }
 }
 const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
 
 /**
  * Sends a message to the server-side Gemini API route.
- * Includes a 12-second AbortController timeout (the server's own model deadlines total 10.5 seconds).
+ * Includes a 12-second AbortController timeout around the backend's bounded request budget.
  * Falls back to the grounded local responder if the backend is unreachable or times out.
  */
 export async function sendMysteryAiMessage(
@@ -308,13 +308,26 @@ export async function sendMysteryAiMessage(
       }),
     });
     if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
-    if (res.status === 429) throw new MysteryAiError('Mystery AI is busy. Please wait a minute and try again.', 'busy');
+    if (res.status === 429) {
+      const data = await res.json().catch(() => ({}));
+      const seconds = Math.min(300, Math.max(1, Number(res.headers.get('Retry-After') || data.retryAfterSeconds) || 60));
+      throw new MysteryAiError(`Mystery AI is busy. Please wait ${Math.ceil(seconds)} seconds and try again.`, 'busy', data.retryable !== false);
+    }
     if (res.status === 400) throw new MysteryAiError('The message or conversation exceeds chat limits. Shorten your message or reset the conversation and try again.', 'limits');
     if (res.ok) {
       const data = await res.json();
-      if (typeof data.reply === 'string' && data.reply.trim() && !data.fallback) {
-        return { reply: data.reply, quickAction: inferQuickAction(userMessage, data.reply, activePage), source: 'gemini' };
+      if (typeof data.reply === 'string' && data.reply.trim()) {
+        if (data.source === 'guide' && data.fallback === true) {
+          return {reply:data.reply,quickAction:inferQuickAction(userMessage,data.reply,activePage),source:'scripted'};
+        }
+        if (!data.fallback && (data.source === 'gemini' || data.source === undefined)) {
+          return { reply: data.reply, quickAction: inferQuickAction(userMessage, data.reply, activePage), source: 'gemini' };
+        }
       }
+    } else if (res.status === 503) {
+      const data = await res.json().catch(() => ({}));
+      if (data.code === 'TIMEOUT') throw new MysteryAiError(MYSTERY_AI_TIMEOUT_MESSAGE,'timeout');
+      if (data.retryable === false) throw new MysteryAiError("Mystery AI is unavailable. You can still use Mystery Hub's services and help guides.",'unavailable',false);
     }
   } catch (error) {
     if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');

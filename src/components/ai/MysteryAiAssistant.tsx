@@ -64,7 +64,7 @@ export const MysteryAiAssistant: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [slowReply, setSlowReply] = useState(false);
-  const [failure, setFailure] = useState<{query: string; messageId: string; error: string; kind: ChatFailureKind} | null>(null);
+  const [failure, setFailure] = useState<{query: string; messageId: string; error: string; kind: ChatFailureKind; retryable?:boolean} | null>(null);
   const [showJump, setShowJump] = useState(false);
   const requestGate = useRef(new AiRequestGate());
   const pendingQuestion = useRef<{query: string; messageId: string} | null>(null);
@@ -271,7 +271,8 @@ export const MysteryAiAssistant: React.FC = () => {
       // The service exposes only safe product-facing errors, never provider details.
       setFailure({query, messageId: userMsg.id,
         error: error instanceof Error ? error.message : "Couldn't reach Mystery AI just now. Try again.",
-        kind: error instanceof MysteryAiError ? error.kind : 'unavailable'});
+        kind: error instanceof MysteryAiError ? error.kind : 'unavailable',
+        retryable: error instanceof MysteryAiError ? error.retryable : true});
     } finally {
       if (requestGate.current.accepts(request)) { setIsTyping(false); pendingQuestion.current = null; }
       requestGate.current.finish(request);
@@ -510,7 +511,7 @@ export const MysteryAiAssistant: React.FC = () => {
                   </p>
                   <p className="mt-1 text-[13px] leading-relaxed text-slate-300">{failure.error}</p>
                   <div className="mt-2.5 flex flex-wrap gap-2">
-                    {canRetry(failure.kind) && (
+                    {canRetry(failure.kind) && failure.retryable !== false && (
                       <button type="button" onClick={() => handleSendMessage(failure.query, true)} disabled={isTyping}
                         className="min-h-11 inline-flex items-center gap-1.5 rounded-xl bg-[#00c365] px-4 text-sm font-bold text-black disabled:opacity-50 cursor-pointer"><RotateCcw className="h-4 w-4" aria-hidden="true" />Retry</button>
                     )}
