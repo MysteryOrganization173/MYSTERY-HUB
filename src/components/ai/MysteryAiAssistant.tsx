@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ActivePage } from '../../types';
 import { MysteryAiIcon } from './MysteryAiIcon';
@@ -7,18 +7,36 @@ import {useDialogFocus} from '../../hooks/useDialogFocus';
 import { AiRequestGate } from '../../utils/aiRequestGate';
 import {
   ChatMessage,
+  MysteryAiError,
   SuggestedQuestion,
   getSuggestedQuestionsForPage,
   sendMysteryAiMessage,
 } from '../../services/mysteryAiService';
 import {
+  CHAT_MAX_CHARS,
+  canRetry,
+  composerCountLabel,
+  failureHeading,
+  isNearBottom,
+  shouldSendOnEnter,
+  type ChatFailureKind,
+} from '../../utils/chatComposer';
+import {
   X,
   Send,
   RotateCcw,
   ArrowRight,
-  Sparkles,
+  ArrowDown,
   ExternalLink,
+  AlertCircle,
+  Pencil,
+  Square,
+  ShieldCheck,
 } from 'lucide-react';
+
+const timeLabel = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const phoneQuery = '(max-width: 639px)';
 
 export const MysteryAiAssistant: React.FC = () => {
   const {
@@ -45,17 +63,22 @@ export const MysteryAiAssistant: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [failure, setFailure] = useState<{query: string; messageId: string; error: string} | null>(null);
+  const [slowReply, setSlowReply] = useState(false);
+  const [failure, setFailure] = useState<{query: string; messageId: string; error: string; kind: ChatFailureKind; retryable?:boolean} | null>(null);
+  const [showJump, setShowJump] = useState(false);
   const requestGate = useRef(new AiRequestGate());
+  const pendingQuestion = useRef<{query: string; messageId: string} | null>(null);
   const cancelPending = () => {
     requestGate.current.cancel();
+    pendingQuestion.current = null;
     setIsTyping(false);
     setFailure(null);
   };
   useEffect(() => () => requestGate.current.cancel(), []);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(true);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const promptTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dismissPromptTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasTriggeredPromptRef = useRef(false);
@@ -88,27 +111,6 @@ export const MysteryAiAssistant: React.FC = () => {
     return () => { if (timer) clearTimeout(timer); };
   }, [isMysteryAiOpen, mysteryAiInitialPrompt]);
 
-  const getPageDisplayName = (page: ActivePage) => {
-    if (isInsideEditor) {
-      return 'Website Editor';
-    }
-    switch (page) {
-      case 'data':
-        return 'Data & Airtime';
-      case 'website':
-        return 'Website Builder';
-      case 'services':
-        return 'More Services';
-      case 'orders':
-        return 'Order Tracking';
-      case 'about':
-        return 'About Mystery Hub';
-      case 'home':
-      default:
-        return 'Home';
-    }
-  };
-
   const getPageGreeting = (page: ActivePage): string => {
     if (isInsideEditor) {
       return "Building your website? I can guide you through the editor.";
@@ -126,23 +128,34 @@ export const MysteryAiAssistant: React.FC = () => {
         return "Hi 👋 I'm Mystery AI. Want to learn more about Mystery Hub's mission and who we serve in Ghana?";
       case 'home':
       default:
-        return "Hi, I’m Mystery AI. What would you like help with?";
+        return user
+          ? `Hi ${user.name.trim().split(/\s+/)[0] || 'there'}, I’m Mystery AI. Ask me how anything on Mystery Hub works.`
+          : "Hi, I’m Mystery AI. What would you like help with?";
     }
   };
+  const welcomeMessage = (): ChatMessage => ({
+    id: `welcome-${activePage}-${Date.now()}`,
+    role: 'assistant',
+    content: getPageGreeting(activePage),
+    timestamp: timeLabel(),
+  });
 
   // Initialize or update opening message when chat opens or page changes with no conversation yet
   useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([
-        {
-          id: `welcome-${activePage}-${Date.now()}`,
-          role: 'assistant',
-          content: getPageGreeting(activePage),
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
-    }
+    if (messages.length === 0) setMessages([welcomeMessage()]);
   }, [activePage, isInsideEditor, messages.length]);
+
+  // The conversation lives only in this component. A different account (or signing out) must never see it,
+  // so a change of account cancels any pending reply and starts a fresh chat.
+  const accountId = user?.id ?? null;
+  const previousAccount = useRef(accountId);
+  useEffect(() => {
+    if (previousAccount.current === accountId) return;
+    previousAccount.current = accountId;
+    cancelPending();
+    setInputValue('');
+    setMessages([]);
+  }, [accountId]);
 
   // Inactivity expansion trigger: gently expand prompt once
   useEffect(() => {
@@ -166,20 +179,56 @@ export const MysteryAiAssistant: React.FC = () => {
     };
   }, [isOpen, isInsideEditor]);
 
-  // Scroll to bottom when messages update
+  // A reply that takes longer than usual says so, instead of leaving three dots running silently.
   useEffect(() => {
-    if (isOpen) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, isOpen, isTyping]);
+    if (!isTyping) { setSlowReply(false); return; }
+    const timer = setTimeout(() => setSlowReply(true), 6000);
+    return () => clearTimeout(timer);
+  }, [isTyping]);
+
+  /** Scrolls only the message list (never the page behind it) to the newest message. */
+  const scrollToLatest = (smooth = true) => {
+    const box = scrollRef.current;
+    if (!box) return;
+    box.scrollTo({ top: box.scrollHeight, behavior: smooth && !reducedMotion() ? 'smooth' : 'auto' });
+    stickToBottom.current = true;
+    setShowJump(false);
+  };
+  const handleScroll = () => {
+    const box = scrollRef.current;
+    if (!box) return;
+    stickToBottom.current = isNearBottom(box);
+    if (stickToBottom.current) setShowJump(false);
+  };
+
+  // New messages follow the reader only while they are at the bottom; someone reading an earlier answer
+  // keeps their place and gets a "New reply" button instead. Their own question always scrolls into view.
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const last = messages.at(-1);
+    if (stickToBottom.current || last?.role === 'user') scrollToLatest(messages.length > 1);
+    else if (last?.role === 'assistant') setShowJump(true);
+  }, [messages, isOpen]);
+  useLayoutEffect(() => {
+    if (isOpen && (isTyping || failure) && stickToBottom.current) scrollToLatest();
+  }, [isTyping, failure, slowReply, isOpen]);
 
   // Focus input when chat opens
   useEffect(() => {
     if (isOpen) {
       setIsExpandedPrompt(false);
-      setTimeout(() => inputRef.current?.focus(), 150);
+      stickToBottom.current = true;
+      setTimeout(() => { scrollToLatest(false); inputRef.current?.focus(); }, 150);
     }
   }, [isOpen]);
+
+  // The question box grows with its text (up to about five lines) and shrinks back after sending.
+  useLayoutEffect(() => {
+    const box = inputRef.current;
+    if (!box) return;
+    box.style.height = 'auto';
+    box.style.height = `${Math.min(box.scrollHeight, 132)}px`;
+  }, [inputValue, isOpen]);
 
   const handleToggle = () => {
     if (isOpen) {
@@ -195,47 +244,64 @@ export const MysteryAiAssistant: React.FC = () => {
 
   const handleSendMessage = async (textToSend?: string, retry = false) => {
     const query = (textToSend || inputValue).trim();
-    if (!query || !chatAvailable.current || requestGate.current.busy) return;
+    if (!query || query.length > CHAT_MAX_CHARS || !chatAvailable.current || requestGate.current.busy) return;
     const request = requestGate.current.begin();
     const userMsg: ChatMessage = {
       id: retry && failure ? failure.messageId : `user-${Date.now()}`,
       role: 'user', content: query,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: timeLabel(),
     };
     // History contains prior turns only. The server appends the current question once.
     const priorHistory = retry ? messages.filter(m => m.id !== userMsg.id) : messages;
     if (!retry) setMessages(prev => [...prev, userMsg]);
+    pendingQuestion.current = { query, messageId: userMsg.id };
     setFailure(null);
-    setInputValue('');
+    if (!textToSend || textToSend === inputValue) setInputValue('');
     setIsTyping(true);
     try {
       const response = await sendMysteryAiMessage(query, activePage, priorHistory, undefined, request.signal);
       if (!requestGate.current.accepts(request)) return;
       setMessages(prev => [...prev, {
         id: `ai-${Date.now()}`, role: 'assistant', content: response.reply,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: timeLabel(),
         quickAction: response.quickAction, source: response.source,
       }]);
     } catch (error) {
       if (!requestGate.current.accepts(request)) return;
       // The service exposes only safe product-facing errors, never provider details.
-      setFailure({query, messageId: userMsg.id, error: error instanceof Error ? error.message : "Couldn't reach Mystery AI just now. Try again."});
+      setFailure({query, messageId: userMsg.id,
+        error: error instanceof Error ? error.message : "Couldn't reach Mystery AI just now. Try again.",
+        kind: error instanceof MysteryAiError ? error.kind : 'unavailable',
+        retryable: error instanceof MysteryAiError ? error.retryable : true});
     } finally {
-      if (requestGate.current.accepts(request)) setIsTyping(false);
+      if (requestGate.current.accepts(request)) { setIsTyping(false); pendingQuestion.current = null; }
       requestGate.current.finish(request);
     }
   };
 
+  /** Stops waiting for the current reply. The question stays in the chat and can be sent again. */
+  const handleStop = () => {
+    const pending = pendingQuestion.current;
+    cancelPending();
+    if (pending) setFailure({ ...pending, error: 'You stopped this reply. Send it again whenever you are ready.', kind: 'stopped' });
+    inputRef.current?.focus();
+  };
+
+  /** Puts a failed question back into the box for changes; it is removed from the chat until sent again. */
+  const handleEditFailed = () => {
+    if (!failure) return;
+    const { query, messageId } = failure;
+    cancelPending();
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+    setInputValue(query);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
   const handleClearHistory = () => {
     cancelPending();
-    setMessages([
-      {
-        id: `welcome-${activePage}-${Date.now()}`,
-        role: 'assistant',
-        content: getPageGreeting(activePage),
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ]);
+    setInputValue('');
+    setMessages([welcomeMessage()]);
+    inputRef.current?.focus();
   };
 
   const handleQuickActionClick = (targetPage: ActivePage) => {
@@ -257,14 +323,22 @@ export const MysteryAiAssistant: React.FC = () => {
         { id: 'web-edit-publish', text: 'How do I publish my website live?' },
         { id: 'web-edit-orders', text: 'How do WhatsApp customer orders work?' },
       ]
-    : getSuggestedQuestionsForPage(activePage);
+    : getSuggestedQuestionsForPage(activePage, { signedIn: Boolean(user) });
+  const conversationStarted = messages.some(m => m.role === 'user');
 
   useEffect(() => { if (isAnyModalActive) cancelPending(); }, [isAnyModalActive]);
   const dialogRef = useDialogFocus(isOpen && !isAnyModalActive, ()=>{cancelPending();closeMysteryAi();setIsOpen(false);});
   const [viewport, setViewport] = useState({height:window.visualViewport?.height||window.innerHeight,top:window.visualViewport?.offsetTop||0});
+  const [isPhone, setIsPhone] = useState(() => window.matchMedia?.(phoneQuery).matches ?? window.innerWidth < 640);
   useEffect(()=>{
     if(!isOpen)return;
-    const update=()=>setViewport({height:window.visualViewport?.height||window.innerHeight,top:window.visualViewport?.offsetTop||0});
+    // The Android keyboard shrinks the visual viewport. The chat follows it so the question box stays above
+    // the keyboard, and the newest message stays in view if the reader was already there.
+    const update=()=>{
+      setViewport({height:window.visualViewport?.height||window.innerHeight,top:window.visualViewport?.offsetTop||0});
+      setIsPhone(window.matchMedia?.(phoneQuery).matches ?? window.innerWidth < 640);
+      if(stickToBottom.current)requestAnimationFrame(()=>scrollToLatest(false));
+    };
     update(); window.visualViewport?.addEventListener('resize',update);window.visualViewport?.addEventListener('scroll',update);window.addEventListener('resize',update);
     return()=>{window.visualViewport?.removeEventListener('resize',update);window.visualViewport?.removeEventListener('scroll',update);window.removeEventListener('resize',update);};
   },[isOpen]);
@@ -273,10 +347,15 @@ export const MysteryAiAssistant: React.FC = () => {
     return null;
   }
 
+  const countLabel = composerCountLabel(inputValue.length);
+  const canSend = Boolean(inputValue.trim()) && inputValue.length <= CHAT_MAX_CHARS && !isTyping;
+  // Phones get a near full-height sheet whose own header closes it; larger screens keep the floating panel above its button.
+  const panelHeight = isPhone ? Math.max(240, viewport.height - 16) : undefined;
+
   return (
     <div
       style={isOpen?{height:viewport.height,top:viewport.top}:undefined}
-      className={isOpen?'fixed inset-x-0 z-[80] bg-black/60 flex flex-col items-end justify-end p-3 sm:p-6 pb-[calc(.75rem+env(safe-area-inset-bottom,0px))]':`${isInsideEditor ? '' : 'hidden'} fixed ${isInsideEditor?'z-[55] bottom-4':'z-40 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]'} right-3 sm:bottom-6 sm:right-6 pointer-events-none max-w-[calc(100vw-1.5rem)]`}
+      className={isOpen?'fixed inset-x-0 z-[80] bg-black/60 flex flex-col items-center sm:items-end justify-end p-2 sm:p-6 pb-[calc(.5rem+env(safe-area-inset-bottom,0px))] sm:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]':`${isInsideEditor ? '' : 'hidden'} fixed ${isInsideEditor?'z-[55] bottom-4':'z-40 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))]'} right-3 sm:bottom-6 sm:right-6 pointer-events-none max-w-[calc(100vw-1.5rem)]`}
 
     >
       {/* Floating Chat Panel */}
@@ -285,36 +364,40 @@ export const MysteryAiAssistant: React.FC = () => {
           ref={dialogRef}
           tabIndex={-1}
           role="dialog"
-          aria-label="Mystery AI Assistant"
+          aria-labelledby="mystery-ai-title"
           aria-modal="true"
-          style={{maxHeight:Math.max(160,viewport.height-88)}}
-          className="pointer-events-auto mb-3 w-[calc(100vw-1.5rem)] sm:w-96 md:w-[420px] max-w-[calc(100vw-1.5rem)] h-[min(620px,calc(100dvh-5.5rem))] max-h-full sm:h-[560px] bg-[#0c1217] border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-200"
+          style={isPhone ? { height: panelHeight, maxHeight: panelHeight } : {maxHeight:Math.max(160,viewport.height-88)}}
+          className="pointer-events-auto sm:mb-3 w-full sm:w-96 md:w-[420px] max-w-[calc(100vw-1rem)] sm:max-w-[calc(100vw-1.5rem)] sm:h-[560px] bg-[#0c1217] border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-200"
         >
           {/* Clean, Premium Header */}
-          <div className="px-4 py-3 bg-[#090e13] border-b border-slate-800 flex items-center justify-between gap-3 shrink-0">
-            <div className="flex items-center gap-2.5">
+          <div className="px-3 sm:px-4 py-2 bg-[#090e13] border-b border-slate-800 flex items-center justify-between gap-3 shrink-0">
+            <div className="flex min-w-0 items-center gap-2.5">
               <MysteryAiIcon size="md" active={isTyping} className="shrink-0" />
-              <div className="leading-tight">
+              <div className="min-w-0 leading-tight">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-sm text-white tracking-tight">Mystery AI</h3>
+                  <h3 id="mystery-ai-title" className="font-bold text-sm text-white tracking-tight">Mystery AI</h3>
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#00c365]/10 border border-[#00c365]/20 text-[10px] font-medium text-[#00c365]">
                     Guide
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">Your guide to Mystery Hub</p>
+                <p className="truncate text-[11px] text-slate-400 mt-0.5">{isTyping ? 'Writing a reply…' : 'Your guide to Mystery Hub'}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-1">
+              {conversationStarted && (
+                <button
+                  type="button"
+                  onClick={handleClearHistory}
+                  className="min-h-11 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Start a new chat"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>New chat</span>
+                </button>
+              )}
               <button
-                onClick={handleClearHistory}
-                className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Reset conversation"
-                aria-label="Reset conversation"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
-              <button
+                type="button"
                 onClick={() => {
                   cancelPending();
                   closeMysteryAi();
@@ -324,129 +407,188 @@ export const MysteryAiAssistant: React.FC = () => {
                 title="Close chat"
                 aria-label="Close chat"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
           </div>
 
           {/* Messages Scroll Area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
-            {messages.map((msg) => {
-              const isAssistant = msg.role === 'assistant';
-              return (
-                <div
-                  key={msg.id}
-                  className={`flex flex-col ${isAssistant ? 'items-start' : 'items-end'}`}
-                >
+          <div className="relative flex-1 min-h-0">
+            <div
+              ref={scrollRef}
+              onScroll={handleScroll}
+              role="log"
+              aria-label="Conversation with Mystery AI"
+              aria-live="polite"
+              aria-relevant="additions"
+              aria-busy={isTyping}
+              className="h-full overflow-y-auto overscroll-contain p-3 sm:p-4 space-y-4 text-[15px] sm:text-sm"
+            >
+              {messages.map((msg) => {
+                const isAssistant = msg.role === 'assistant';
+                const failedHere = failure?.messageId === msg.id;
+                return (
                   <div
-                    className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 shadow-sm leading-relaxed whitespace-pre-wrap ${
-                      isAssistant
-                        ? 'bg-[#141b22] text-slate-200 border border-slate-800 rounded-tl-sm'
-                        : 'bg-[#00c365] text-black font-semibold rounded-tr-sm'
-                    }`}
+                    key={msg.id}
+                    className={`flex flex-col ${isAssistant ? 'items-start' : 'items-end'}`}
                   >
-                    {isAssistant?<AssistantText text={msg.content}/>:msg.content}
+                    <div
+                      className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 shadow-sm leading-relaxed ${
+                        isAssistant
+                          ? 'bg-[#141b22] text-slate-100 border border-slate-800 rounded-tl-sm'
+                          : `whitespace-pre-wrap break-words bg-[#00c365] text-black font-medium rounded-tr-sm ${failedHere ? 'opacity-80' : ''}`
+                      }`}
+                    >
+                      {isAssistant ? <span className="sr-only">Mystery AI: </span> : <span className="sr-only">You: </span>}
+                      {isAssistant?<AssistantText text={msg.content}/>:msg.content}
 
-                    {/* Actionable Redirection Button */}
-                    {msg.quickAction && (
-                      <div className="mt-3 pt-2.5 border-t border-slate-700/60 flex flex-col gap-1.5">
-                        <button
-                          onClick={() => handleQuickActionClick(msg.quickAction!.targetPage)}
-                          className="w-full py-2 px-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(0,195,101,0.25)] flex items-center justify-between group cursor-pointer"
-                        >
-                          <span className="flex items-center gap-1.5">
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            <span>{msg.quickAction.label}</span>
-                          </span>
-                          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                        </button>
-                      </div>
-                    )}
+                      {/* Actionable Redirection Button */}
+                      {msg.quickAction && (
+                        <div className="mt-3 pt-2.5 border-t border-slate-700/60 flex flex-col gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleQuickActionClick(msg.quickAction!.targetPage)}
+                            className="w-full min-h-11 py-2 px-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(0,195,101,0.25)] flex items-center justify-between group cursor-pointer"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              <span>{msg.quickAction.label}</span>
+                            </span>
+                            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-slate-500 mt-1 px-1">
+                      {msg.source === 'scripted' ? 'Help guide · ' : msg.source === 'gemini' ? 'AI answer · ' : ''}{failedHere ? 'Not answered · ' : ''}{msg.timestamp}
+                    </span>
                   </div>
-                  <span className="text-[10px] text-slate-500 mt-1 px-1">
-                    {msg.source === 'scripted' ? 'Help guide · ' : msg.source === 'gemini' ? 'AI answer · ' : ''}{msg.timestamp}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })}
 
-            {/* Typing Indicator */}
-            {isTyping && (
-              <div className="flex items-center gap-2 text-slate-400 text-xs py-1">
-                <MysteryAiIcon size="sm" active className="shrink-0" />
-                <div className="flex items-center gap-1 bg-[#141b22] border border-slate-800 rounded-xl px-3 py-2">
-                  <span className="w-1.5 h-1.5 bg-[#00c365] rounded-full animate-bounce [animation-delay:-0.3s]" />
-                  <span className="w-1.5 h-1.5 bg-[#00c365] rounded-full animate-bounce [animation-delay:-0.15s]" />
-                  <span className="w-1.5 h-1.5 bg-[#00c365] rounded-full animate-bounce" />
+              {/* First visit: suggested questions sit under the greeting as full-width, easy-to-tap choices */}
+              {!conversationStarted && !isTyping && suggestedQuestions.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <p className="px-0.5 text-xs font-semibold text-slate-400">Try asking</p>
+                  <ul className="space-y-2">
+                    {suggestedQuestions.map((sq) => (
+                      <li key={sq.id}>
+                        <button
+                          type="button"
+                          onClick={() => handleSendMessage(sq.text)}
+                          className="w-full min-h-11 rounded-xl border border-slate-800 bg-[#10171e] px-3.5 py-2.5 text-left text-sm text-slate-200 hover:border-[#00c365]/50 hover:text-white transition-colors flex items-center justify-between gap-3 cursor-pointer"
+                        >
+                          <span>{sq.text}</span>
+                          <ArrowRight className="w-4 h-4 shrink-0 text-[#00c365]" aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="flex items-start gap-2 px-0.5 pt-2 text-xs leading-relaxed text-slate-500">
+                    <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden="true" />
+                    <span>Mystery AI explains how Mystery Hub works. It can’t see your account, orders or Wallet, and this chat isn’t saved: it clears when you start a new chat or reload. Never share PINs or passwords.</span>
+                  </p>
                 </div>
-              </div>
+              )}
+
+              {/* Typing Indicator */}
+              {isTyping && (
+                <div className="flex items-center gap-2 text-slate-400 text-xs py-1">
+                  <MysteryAiIcon size="sm" active className="shrink-0" />
+                  <div className="flex items-center gap-1 bg-[#141b22] border border-slate-800 rounded-xl px-3 py-2" aria-hidden="true">
+                    <span className="w-1.5 h-1.5 bg-[#00c365] rounded-full animate-bounce [animation-delay:-0.3s]" />
+                    <span className="w-1.5 h-1.5 bg-[#00c365] rounded-full animate-bounce [animation-delay:-0.15s]" />
+                    <span className="w-1.5 h-1.5 bg-[#00c365] rounded-full animate-bounce" />
+                  </div>
+                  <span role="status">{slowReply ? 'Still working on it…' : <span className="sr-only">Mystery AI is writing a reply</span>}</span>
+                </div>
+              )}
+
+              {failure && (
+                <div role="alert" className="rounded-xl border border-amber-400/30 bg-amber-400/[0.06] p-3 text-sm text-slate-200">
+                  <p className="flex items-center gap-2 font-semibold text-amber-100">
+                    <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />{failureHeading(failure.kind)}
+                  </p>
+                  <p className="mt-1 text-[13px] leading-relaxed text-slate-300">{failure.error}</p>
+                  <div className="mt-2.5 flex flex-wrap gap-2">
+                    {canRetry(failure.kind) && failure.retryable !== false && (
+                      <button type="button" onClick={() => handleSendMessage(failure.query, true)} disabled={isTyping}
+                        className="min-h-11 inline-flex items-center gap-1.5 rounded-xl bg-[#00c365] px-4 text-sm font-bold text-black disabled:opacity-50 cursor-pointer"><RotateCcw className="h-4 w-4" aria-hidden="true" />Retry</button>
+                    )}
+                    <button type="button" onClick={handleEditFailed}
+                      className="min-h-11 inline-flex items-center gap-1.5 rounded-xl border border-slate-700 px-4 text-sm font-semibold text-slate-200 hover:text-white cursor-pointer"><Pencil className="h-4 w-4" aria-hidden="true" />Edit question</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {showJump && (
+              <button
+                type="button"
+                onClick={() => scrollToLatest()}
+                className="absolute bottom-3 left-1/2 -translate-x-1/2 min-h-10 inline-flex items-center gap-1.5 rounded-full border border-[#00c365]/40 bg-[#0c1217] px-3.5 text-xs font-semibold text-white shadow-xl cursor-pointer"
+              >
+                <ArrowDown className="h-3.5 w-3.5 text-[#00c365]" aria-hidden="true" />New reply
+              </button>
             )}
-
-            <div ref={messagesEndRef} />
           </div>
 
-          {/* Suggested Questions */}
-          {suggestedQuestions.length > 0 && (
-            <div className="px-3.5 py-2 bg-[#090d12] border-t border-slate-800/80 shrink-0">
-              <div className="text-xs font-medium text-slate-400 mb-1 px-0.5 flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3 text-[#00c365]" />
-                <span>Suggested Questions</span>
-              </div>
-              <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 no-scrollbar">
-                {suggestedQuestions.map((sq) => (
-                  <button
-                    key={sq.id}
-                    onClick={() => handleSendMessage(sq.text)}
-                    disabled={isTyping}
-                    className="px-2.5 py-1 rounded-lg bg-[#121921] hover:bg-[#1a2530] text-slate-300 hover:text-white border border-slate-800/90 hover:border-[#00c365]/40 text-xs min-h-11 whitespace-nowrap transition-colors shrink-0 disabled:opacity-50 cursor-pointer shadow-2xs"
-                  >
-                    {sq.text}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {failure && (
-            <div role="alert" className="px-4 py-2 text-xs text-slate-300 border-t border-slate-800">
-              {failure.error}
-              <button type="button" onClick={() => handleSendMessage(failure.query, true)} disabled={isTyping}
-                className="ml-2 underline text-[#00c365] disabled:opacity-50">Retry</button>
-            </div>
-          )}
           {/* Input Footer */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSendMessage();
             }}
-            className="p-2.5 sm:p-3 bg-[#090e13] border-t border-slate-800 flex items-center gap-2 shrink-0"
+            className="p-2.5 sm:p-3 bg-[#090e13] border-t border-slate-800 shrink-0"
           >
-            <input
-              ref={inputRef}
-              aria-label="Message Mystery AI"
-              data-autofocus
-              type="text"
-              maxLength={2000}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Ask Mystery AI about data, websites, pricing..."
-              className="flex-1 bg-[#10171f] border border-slate-700/80 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
-            />
-            <button
-              type="submit"
-              disabled={!inputValue.trim() || isTyping}
-              className="w-11 h-11 rounded-xl bg-[#00c365] hover:bg-[#00e575] disabled:opacity-40 text-black flex items-center justify-center transition-all cursor-pointer shrink-0"
-              aria-label="Send message"
-            >
-              <Send className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={inputRef}
+                aria-label="Message Mystery AI"
+                aria-describedby={countLabel ? 'mystery-ai-count' : undefined}
+                data-autofocus
+                rows={1}
+                maxLength={CHAT_MAX_CHARS}
+                enterKeyHint="send"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (shouldSendOnEnter({ key: e.key, shiftKey: e.shiftKey, isComposing: e.nativeEvent.isComposing, keyCode: e.keyCode })) {
+                    e.preventDefault();
+                    if (canSend) handleSendMessage();
+                  }
+                }}
+                placeholder={isInsideEditor ? 'Ask about editing your website…' : 'Ask about data, Wallet, websites…'}
+                className="flex-1 min-h-11 max-h-[132px] resize-none bg-[#10171f] border border-slate-700/80 rounded-xl px-3.5 py-[11px] text-base sm:text-sm leading-snug text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
+              />
+              {isTyping ? (
+                <button
+                  type="button"
+                  onClick={handleStop}
+                  className="w-11 h-11 rounded-xl border border-slate-600 bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  aria-label="Stop waiting for this reply"
+                  title="Stop"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!canSend}
+                  className="w-11 h-11 rounded-xl bg-[#00c365] hover:bg-[#00e575] disabled:opacity-40 text-black flex items-center justify-center transition-all cursor-pointer shrink-0"
+                  aria-label="Send message"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            {countLabel && <p id="mystery-ai-count" className="mt-1.5 px-1 text-right text-[11px] text-amber-200" aria-live="polite">{countLabel}</p>}
           </form>
         </div>
       )}
 
-      {/* Floating Control Button & Gentle Expanded Prompt */}
-      <div className="pointer-events-auto flex items-center gap-2 justify-end">
+      {/* Floating Control Button & Gentle Expanded Prompt (phones close the open sheet from its header) */}
+      <div className={`pointer-events-auto items-center gap-2 justify-end ${isOpen ? 'hidden sm:flex self-end' : 'flex'}`}>
         {/* Subtle, gentle expansion prompt after dwell */}
         {isExpandedPrompt && !isOpen && (
           <div
@@ -476,6 +618,7 @@ export const MysteryAiAssistant: React.FC = () => {
 
         {/* Primary Mystery AI Compact Control */}
         <button
+          type="button"
           onClick={handleToggle}
           className={`relative group w-12 h-12 rounded-full bg-[#0d1419] border transition-all duration-200 shadow-2xl flex items-center justify-center active:scale-95 cursor-pointer ${
             isOpen

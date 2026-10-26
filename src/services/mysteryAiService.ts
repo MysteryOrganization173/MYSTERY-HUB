@@ -211,7 +211,16 @@ export function resolveInstantBuilderHelp(
 /**
  * Returns strictly page-aware suggested question chips based on the active page
  */
-export function getSuggestedQuestionsForPage(page: ActivePage): SuggestedQuestion[] {
+export function getSuggestedQuestionsForPage(page: ActivePage, options: { signedIn?: boolean } = {}): SuggestedQuestion[] {
+  // Signed-in Home opens the chat from the member card: lead with what members come back for.
+  if (page === 'home' && options.signedIn) {
+    return [
+      { id: 'member-track', text: 'How do I track my order?' },
+      { id: 'member-delayed', text: 'What should I do if my bundle is delayed?' },
+      { id: 'member-wallet', text: 'How do I add money to my Wallet?' },
+      { id: 'member-web', text: 'Can I create a free website?' },
+    ];
+  }
   switch (page) {
     case 'data':
       return [
@@ -257,9 +266,18 @@ export function getSuggestedQuestionsForPage(page: ActivePage): SuggestedQuestio
   }
 }
 
+/** Why a question got no answer, so the chat can say what happened and what to do next. */
+export type MysteryAiFailureKind = 'busy' | 'limits' | 'timeout' | 'offline' | 'unavailable';
+export const MYSTERY_AI_TIMEOUT_MESSAGE = 'Mystery AI is taking too long to answer. Check your connection, then try again.';
+export const MYSTERY_AI_OFFLINE_MESSAGE = 'You seem to be offline. Reconnect to the internet, then try again.';
+export class MysteryAiError extends Error {
+  constructor(message: string, readonly kind: MysteryAiFailureKind, readonly retryable = kind !== 'limits') { super(message); }
+}
+const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+
 /**
  * Sends a message to the server-side Gemini API route.
- * Includes a 25-second AbortController timeout.
+ * Includes a 12-second AbortController timeout around the backend's bounded request budget.
  * Falls back to the grounded local responder if the backend is unreachable or times out.
  */
 export async function sendMysteryAiMessage(
@@ -267,7 +285,8 @@ export async function sendMysteryAiMessage(
   activePage: ActivePage,
   history: ChatMessage[],
   editorContext?: SafeEditorAiContext | null,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  timeoutMs = 12000
 ): Promise<{ reply: string; quickAction?: ChatMessage['quickAction']; source: 'scripted' | 'gemini' }> {
   if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
   if (editorContext?.experienceMode === 'website_editor' || activePage === 'website') {
@@ -276,8 +295,9 @@ export async function sendMysteryAiMessage(
   }
   const controller = new AbortController();
   const abort = () => controller.abort();
+  let timedOut = false;
   signal?.addEventListener('abort', abort, { once: true });
-  const timeout = setTimeout(abort, 12000);
+  const timeout = setTimeout(() => { timedOut = true; abort(); }, timeoutMs);
   try {
     const res = await fetch(`${API_BASE_URL}/api/mystery-ai/chat`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
@@ -288,17 +308,30 @@ export async function sendMysteryAiMessage(
       }),
     });
     if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
-    if (res.status === 429) throw new Error('Mystery AI is busy. Please wait a minute and try again.');
-    if (res.status === 400) throw new Error('The message or conversation exceeds chat limits. Shorten your message or reset the conversation and try again.');
+    if (res.status === 429) {
+      const data = await res.json().catch(() => ({}));
+      const seconds = Math.min(300, Math.max(1, Number(res.headers.get('Retry-After') || data.retryAfterSeconds) || 60));
+      throw new MysteryAiError(`Mystery AI is busy. Please wait ${Math.ceil(seconds)} seconds and try again.`, 'busy', data.retryable !== false);
+    }
+    if (res.status === 400) throw new MysteryAiError('The message or conversation exceeds chat limits. Shorten your message or reset the conversation and try again.', 'limits');
     if (res.ok) {
       const data = await res.json();
-      if (typeof data.reply === 'string' && data.reply.trim() && !data.fallback) {
-        return { reply: data.reply, quickAction: inferQuickAction(userMessage, data.reply, activePage), source: 'gemini' };
+      if (typeof data.reply === 'string' && data.reply.trim()) {
+        if (data.source === 'guide' && data.fallback === true) {
+          return {reply:data.reply,quickAction:inferQuickAction(userMessage,data.reply,activePage),source:'scripted'};
+        }
+        if (!data.fallback && (data.source === 'gemini' || data.source === undefined)) {
+          return { reply: data.reply, quickAction: inferQuickAction(userMessage, data.reply, activePage), source: 'gemini' };
+        }
       }
+    } else if (res.status === 503) {
+      const data = await res.json().catch(() => ({}));
+      if (data.code === 'TIMEOUT') throw new MysteryAiError(MYSTERY_AI_TIMEOUT_MESSAGE,'timeout');
+      if (data.retryable === false) throw new MysteryAiError("Mystery AI is unavailable. You can still use Mystery Hub's services and help guides.",'unavailable',false);
     }
   } catch (error) {
     if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
-    if (error instanceof Error && (error.message.startsWith('Mystery AI is busy') || error.message.startsWith('The message or conversation'))) throw error;
+    if (error instanceof MysteryAiError) throw error;
   } finally {
     clearTimeout(timeout);
     signal?.removeEventListener('abort', abort);
@@ -306,7 +339,9 @@ export async function sendMysteryAiMessage(
   if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
   const help = getGroundedLocalResponse(userMessage, activePage, editorContext);
   if (help) return { ...help, source: 'scripted' };
-  throw new Error("Couldn't reach Mystery AI just now. Try again.");
+  if (isOffline()) throw new MysteryAiError(MYSTERY_AI_OFFLINE_MESSAGE, 'offline');
+  if (timedOut) throw new MysteryAiError(MYSTERY_AI_TIMEOUT_MESSAGE, 'timeout');
+  throw new MysteryAiError("Couldn't reach Mystery AI just now. Try again.", 'unavailable');
 }
 
 /**
