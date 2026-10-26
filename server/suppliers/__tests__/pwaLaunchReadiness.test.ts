@@ -7,7 +7,7 @@ import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {installPromoMode, showNotificationOptIn, showWelcomeSheet, readSnooze, recordDismissal, NO_SNOOZE, INSTALL_PROMO_MAX_DISMISSALS} from '../../../src/pwa/launchPolicy.js';
 import {isInstalledApp, supportsAppleHomeScreen, supportsInstallPrompt} from '../../../src/pwa/appEnvironment.js';
-import {notificationPermissionState, requestNotificationPermission, PUSH_DELIVERY_ENABLED} from '../../../src/pwa/notifications.js';
+import {notificationPermissionState, requestNotificationPermission} from '../../../src/pwa/notifications.js';
 import {captureInstallPrompt, hasInstallPrompt, promptInstall, subscribeInstallPrompt, isPlatformPage, INSTALLED_AT_KEY} from '../../../src/pwa/installPrompt.js';
 import {retryOnce, canWarm} from '../../../src/utils/lazyPage.js';
 import {RouteLoadError} from '../../../src/components/common/RouteFallback.js';
@@ -85,7 +85,7 @@ test('notification permission: every state, callback-style Safari, and no reques
   const safari = page('default'); assert.equal(await requestNotificationPermission(safari), 'granted', 'callback form resolves');
   const modern: any = page('default'); modern.Notification.requestPermission = function () { this.permission = 'denied'; return Promise.resolve('denied'); };
   assert.equal(await requestNotificationPermission(modern), 'denied');
-  assert.equal(PUSH_DELIVERY_ENABLED, false);
+  const alreadyAllowed=page('granted');assert.equal(await requestNotificationPermission(alreadyAllowed),'granted');assert.equal(alreadyAllowed.Notification.calls,0);
 });
 
 test('install prompt is captured early, shown only from the button, and never on business websites', async () => {
@@ -146,8 +146,7 @@ test('push is isolated to explicit consent, with no offline cache or automatic p
     if (/requestPermission\(/.test(code)) assert.equal(file, path.join('src', 'pwa', 'notifications.ts'), 'permission is requested in one place only');
     if (/\.subscribe\(\{\s*userVisibleOnly/.test(code)) assert.equal(file, path.join('src', 'pwa', 'push.ts'), 'device subscription lives in one place only');
   }
-  // P0 Notification Center: push.ts may subscribe, but only from a tap, through an existing registration, and never
-  // while the push contract is unavailable (the shipped client is a pending one with available:false).
+  // Subscription stays in the reviewed helper, and configuration is checked before permission.
   const push = source('src/pwa/push.ts');
   assert.doesNotMatch(push, /serviceWorker\.register\(/);
   assert.match(push, /if \(!contract \|\| !pushSupported/);
@@ -156,9 +155,11 @@ test('push is isolated to explicit consent, with no offline cache or automatic p
   assert.match(push,/register\('\/push-sw.js',\{scope:'\/',updateViaCache:'none'\}\)/);
   assert.doesNotMatch(source('public/push-sw.js'),/addEventListener\(['"]fetch|caches\.open/);
   const optIn = source('src/components/pwa/NotificationOptIn.tsx');
-  assert.match(optIn, /onClick=\{\(\) => \{ void enable\(\); \}\}/, 'requested from the button');
-  assert.match(optIn, /Alerts are not switched on yet/); assert.match(optIn, /Nothing is sent yet/);
-  assert.doesNotMatch(optIn, /you will (now )?receive|subscribed/i);
+  assert.match(optIn, /onClick=\{\(\)=>\{void enable\(\);\}\}/, 'requested from the button');
+  assert.match(optIn, /activateNotificationOnboarding/);
+  assert.match(optIn, /Want offers, discounts and news too\?/);
+  assert.match(optIn, /Yes, send me offers/);
+  assert.doesNotMatch(optIn, /Alerts are not switched on yet|Nothing is sent yet/);
 });
 
 test('install card copy is honest and the homepage change is one slot', () => {

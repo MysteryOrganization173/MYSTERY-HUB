@@ -82,19 +82,27 @@ export async function readServerDeviceState(client: CustomerNotificationsClient,
  * subscription with the server and then asks the server to confirm it. Anything short of that confirmation is
  * reported as not subscribed, and a subscription the server refused is removed from the browser again.
  */
-export async function subscribeThisDevice(client: CustomerNotificationsClient, token: string, win: PushEnv | undefined = env()): Promise<{ server: ServerDeviceState; permission: NotificationPermissionState; message?: string }> {
+export async function subscribeThisDevice(client: CustomerNotificationsClient, token: string, win: PushEnv | undefined = env(), signal?: AbortSignal): Promise<{ server: ServerDeviceState; permission: NotificationPermissionState; message?: string }> {
+  const current = () => { if (signal?.aborted) throw new Error('Alert setup cancelled.'); };
+  current();
   if(!client.available||!pushSupported(win))return {server:'unknown',permission:notificationPermissionState(win as never),message:'Phone alerts are available only in the Mystery Hub app context.'};
   let publicKey:string;try{publicKey=await client.publicKey(token);}catch(e){return {server:'error',permission:notificationPermissionState(win as never),message:(e as Error).message};}
+  current();
   const permission = await requestNotificationPermission(win as never);
+  current();
   if (permission !== 'granted') return { server: 'unknown', permission };
   const manager = await pushManager(win,true).catch(() => null);
+  current();
   if (!manager) return { server: 'error', permission, message: 'Alerts are not ready on this device yet.' };
   let subscription: SubscriptionLike | null = null;
   try {
     subscription = (await manager.getSubscription()) ?? await manager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(publicKey) });
+    current();
     const registered = await client.register(token, subscription.toJSON() as PushSubscriptionPayload);
+    current();
     if (!registered.ok) { await subscription.unsubscribe().catch(() => false); return { server: 'error', permission, message: registered.message }; }
     const confirmed = await client.deviceStatus(token, subscription.endpoint);
+    current();
     return confirmed.subscribed ? { server: 'subscribed', permission } : { server: 'not_subscribed', permission, message: 'Mystery Hub could not confirm this phone yet. Try again in a moment.' };
   } catch (error) {
     return { server: 'error', permission, message: error instanceof Error ? error.message : undefined };

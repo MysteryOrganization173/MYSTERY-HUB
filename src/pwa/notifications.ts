@@ -26,7 +26,8 @@ export function notificationPermissionState(win: Win | undefined = typeof window
 /** Call only from a click. Older Safari versions answer through a callback rather than a promise. */
 export function requestNotificationPermission(win: Win | undefined = typeof window === 'undefined' ? undefined : window as unknown as Win): Promise<NotificationPermissionState> {
   const notification = api(win);
-  if (!notification || notificationPermissionState(win) === 'unavailable') return Promise.resolve(notificationPermissionState(win));
+  const state = notificationPermissionState(win);
+  if (!notification || state !== 'default') return Promise.resolve(state);
   return new Promise(resolve => {
     let settled = false;
     const done = () => { if (!settled) { settled = true; resolve(notificationPermissionState(win)); } };
@@ -36,6 +37,3 @@ export function requestNotificationPermission(win: Win | undefined = typeof wind
     } catch { done(); }
   });
 }
-
-/** Web Push delivery is deferred; see the comment at the top of this file. */
-export const PUSH_DELIVERY_ENABLED = false;
