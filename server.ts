@@ -1,5 +1,7 @@
 import { corsMiddleware } from './server/middleware/cors.js';
 import express from 'express';
+import {notificationRouter,adminNotificationRouter} from './server/routes/notificationApi.js';
+import {startNotificationWorker} from './server/services/notificationWorker.js';
 import { loadApplicationEnvironment } from './server/utils/environment.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -69,6 +71,8 @@ app.post(
 app.use(express.json({ limit: '1mb' }));
 
 // Mount Core Payments & Orders API Router
+app.use('/api/notifications',notificationRouter);
+app.use('/api/admin/notifications',adminNotificationRouter);
 app.use('/api', apiRouter);
 
 // Mount Protected Admin V1 API Router
@@ -81,6 +85,8 @@ app.use('/api/mystery-ai', createMysteryAiRouter());
 async function startServer() {
   await initDatabase();
   await bootstrapAdminAccount();
+  const stopNotifications=startNotificationWorker();
+  process.once('SIGTERM',stopNotifications);
   const isProd = process.env.NODE_ENV === 'production';
 
   if (!isProd) {

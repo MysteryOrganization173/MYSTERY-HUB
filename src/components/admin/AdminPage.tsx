@@ -13,6 +13,7 @@ import { AdminWaitlistSection } from './sections/AdminWaitlistSection';
 import { AdminCustomersSection } from './sections/AdminCustomersSection';
 import { AdminSystemSection } from './sections/AdminSystemSection';
 import { AdminMysteryEarnSection } from './sections/AdminMysteryEarnSection';
+import { AdminNotificationsSection } from './sections/AdminNotificationsSection';
 import { BrandLogo } from '../common/BrandLogo';
 import { useAdminSignals } from './adminSignals';
 import {
@@ -32,9 +33,10 @@ import {
   Menu,
   X,
   Shield,
+  Bell,
 } from 'lucide-react';
 
-export type AdminTab = 'commercial' | 'finance' | 'overview' | 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system' | 'earn' | 'websites';
+export type AdminTab = 'commercial' | 'finance' | 'overview' | 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system' | 'earn' | 'websites' | 'notifications';
 
 /**
  * Every admin area, grouped by the job the founder is doing. One definition drives the
@@ -50,6 +52,7 @@ const ADMIN_AREAS: Record<AdminTab, { label: string; short: string; group: strin
   commercial: { label: 'Commercial Pricing', short: 'Pricing', group: 'Sell', icon: Tags },
   finance: { label: 'Finance', short: 'Finance', group: 'Money', icon: Wallet },
   earn: { label: 'Mystery Earn', short: 'Earn', group: 'Money', icon: Gift },
+  notifications: { label: 'Notifications', short: 'Alerts', group: 'Platform', icon: Bell },
   waitlist: { label: 'Launch requests', short: 'Waitlist', group: 'Platform', icon: ClipboardList },
   system: { label: 'System Health', short: 'System', group: 'Platform', icon: Server },
 };
@@ -260,6 +263,7 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
           {activeTab === 'marketplace' && (
             <AdminMarketplaceSection sessionToken={token} initialView={param} onChanged={onSignalsChanged} />
           )}
+          {activeTab === 'notifications' && <AdminNotificationsSection key={token} sessionToken={token} initialView={param} onNavigate={view => navigate('notifications', view)} />}
           {activeTab === 'waitlist' && (
             <AdminWaitlistSection sessionToken={token} />
           )}

@@ -19,16 +19,10 @@ service worker and no offline cache. Chrome no longer needs one to offer install
 `mh_install_promo`, `mh_notification_optin` (`{count, lastAt}`), `mh_app_welcome_guest_at`,
 `mh_app_installed_at` in localStorage; `mh_app_welcome_shown` in sessionStorage (one app launch).
 
-## Deferred: Web Push delivery
+## Web Push integration
 
-Not built, because it needs decisions and backend pieces that do not exist yet:
+The P0 notification slice implements a push-only worker, encrypted session-bound subscriptions, preferences, durable order-event delivery and Admin templates/history. Production clients use the reviewed HTTP contracts, not waiting placeholders. See `docs/backend-p0-v1.md`, `docs/notifications-b3.md` and `docs/p0-notifications-integration.md`.
 
-1. A service worker (scope `/`) that only handles `push` and `notificationclick`. It must not cache API
-   responses, orders, Wallet or payment state.
-2. A VAPID key pair. The public key is served to the browser; the private key stays on the server.
-3. An authenticated API to store and delete each device's `PushSubscription` against its account.
-4. A sender that turns order events into messages, with per-user opt-out and expired-subscription cleanup.
+Permission remains distinct from subscription and provider acceptance. Registration happens only from an explicit account-screen action, after enabled configuration is checked. Marketing consent is separate and defaults off. Generated customer websites/iframes cannot request subscriptions through the app helper. There is no fetch interception or offline cache. Notification links require authenticated ownership lookup.
 
-When those exist, a `src/pwa/push.ts` module can subscribe after `requestNotificationPermission()` returns
-`granted`. `NotificationOptIn` keeps its UI; only its granted state changes from "Nothing is sent yet" to a
-confirmation that alerts are on.
+New deployments initialize sending paused. VAPID, subscription encryption, the enable flag and an explicitly consenting founder-device test must be verified before delivery is resumed. Backend and UI availability do not prove native-device acceptance or live Gemini access. No bulk send or production transaction is part of release verification.

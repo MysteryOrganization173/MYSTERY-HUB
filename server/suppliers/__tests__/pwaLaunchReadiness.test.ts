@@ -136,7 +136,7 @@ test('app shell: Home ships with the app, other pages and heavy overlays load on
   assert.match(source('src/main.tsx'), /captureInstallPrompt\(\);[\s\S]*const surface/);
 });
 
-test('no service worker, no push subscription, no offline cache, no automatic permission prompt', () => {
+test('push is isolated to explicit consent, with no offline cache or automatic permission prompt', () => {
   const files: string[] = [];
   const walk = (dir: string) => { for (const name of readdirSync(dir)) { const p = path.join(dir, name); if (statSync(p).isDirectory()) walk(p); else if (/\.(ts|tsx)$/.test(name)) files.push(p); } };
   walk('src');
@@ -144,7 +144,17 @@ test('no service worker, no push subscription, no offline cache, no automatic pe
     const code = source(file);
     assert.doesNotMatch(code, /serviceWorker\.register|pushManager\.subscribe|caches\.open/i, file);
     if (/requestPermission\(/.test(code)) assert.equal(file, path.join('src', 'pwa', 'notifications.ts'), 'permission is requested in one place only');
+    if (/\.subscribe\(\{\s*userVisibleOnly/.test(code)) assert.equal(file, path.join('src', 'pwa', 'push.ts'), 'device subscription lives in one place only');
   }
+  // P0 Notification Center: push.ts may subscribe, but only from a tap, through an existing registration, and never
+  // while the push contract is unavailable (the shipped client is a pending one with available:false).
+  const push = source('src/pwa/push.ts');
+  assert.doesNotMatch(push, /serviceWorker\.register\(/);
+  assert.match(push, /if \(!contract \|\| !pushSupported/);
+  assert.match(source('src/services/customerNotifications.ts'), /httpCustomerNotificationsClient/);
+  assert.match(source('src/components/auth/NotificationSettings.tsx'), /client = httpCustomerNotificationsClient/);
+  assert.match(push,/register\('\/push-sw.js',\{scope:'\/',updateViaCache:'none'\}\)/);
+  assert.doesNotMatch(source('public/push-sw.js'),/addEventListener\(['"]fetch|caches\.open/);
   const optIn = source('src/components/pwa/NotificationOptIn.tsx');
   assert.match(optIn, /onClick=\{\(\) => \{ void enable\(\); \}\}/, 'requested from the button');
   assert.match(optIn, /Alerts are not switched on yet/); assert.match(optIn, /Nothing is sent yet/);
