@@ -14,10 +14,11 @@ import { validateAndNormalizeGhanaPhone } from '../../../server/utils/phone';
 import type { SafePublicOrderDetails } from '../../../server/types/orders';
 import { formatGhanaPhone } from '../../utils/checkoutRecovery';
 import { formatGhanaCardInput, afaJourney } from '../../utils/afaForm';
+import { afaHighlights, afaPackagePrices, afaPackageCell } from '../../utils/afaPresentation';
+import { smoothScrollToElement } from '../../utils/scroll';
 import { Money } from '../purchase/Money';
 import { useTapFeedback } from '../../hooks/useTapFeedback';
 import {
-  ShieldCheck,
   Check,
   ArrowRight,
   AlertCircle,
@@ -25,7 +26,16 @@ import {
   Copy,
   RefreshCw,
   Info,
+  Users,
+  Phone,
+  PhoneOutgoing,
+  Wifi,
+  ChevronDown,
 } from 'lucide-react';
+
+const HIGHLIGHT_ICONS = { cug: Users, onNet: Phone, offNet: PhoneOutgoing, data: Wifi } as const;
+const highlights = afaHighlights(AFA_PACKAGES);
+const prices = afaPackagePrices(AFA_PACKAGES);
 
 interface AfaFormData {
   fullName: string;
@@ -95,6 +105,10 @@ export const AfaRegistrationPage: React.FC = () => {
   const [formData, setFormData] = useState<AfaFormData>(initialFormData);
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof AfaFormData, string>>>({});
   const [activePackageTab, setActivePackageTab] = useState<'monthly' | 'weekly'>('monthly');
+  // Phones keep the comparison folded so the form stays close; from lg it sits open beside the form.
+  const [packagesOpen, setPackagesOpen] = useState(false);
+  const packagesRef = React.useRef<HTMLElement>(null);
+  const formRef = React.useRef<HTMLFormElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -196,6 +210,22 @@ export const AfaRegistrationPage: React.FC = () => {
         ? 'We couldn’t reach Mystery Hub, so no payment was started. Check your connection and try again.' : message);
       setIsSubmitting(false);
     }
+  };
+
+  const goToForm = () => {
+    smoothScrollToElement(formRef.current, { block: 'start' });
+    // Focus without a second jump; the scroll above already brought the form into view.
+    document.getElementById(fullNameId)?.focus({ preventScroll: true });
+  };
+  // Guests sign in before typing anything: the form is cleared whenever the account changes, so details typed as a
+  // guest would be lost at the sign-in that payment needs.
+  const startRegistration = () => {
+    if (!user) { openAuth('login', 'Sign in to register your MTN line for AFA.', goToForm); return; }
+    goToForm();
+  };
+  const showPackages = () => {
+    setPackagesOpen(true);
+    requestAnimationFrame(() => smoothScrollToElement(packagesRef.current, { block: 'start' }));
   };
 
   const filteredPackages = AFA_PACKAGES.filter((p) => p.period === activePackageTab);
@@ -307,7 +337,7 @@ export const AfaRegistrationPage: React.FC = () => {
       <dl className="space-y-2.5 text-sm">
         <div className="flex justify-between gap-3"><dt className="text-slate-400">Service</dt><dd className="font-semibold text-white">AFA registration</dd></div>
         <div className="flex justify-between gap-3"><dt className="text-slate-400">MTN line</dt>
-          <dd className="font-semibold text-white tabular-nums">{formData.mtnNumber || <span className="font-normal text-slate-500">Not entered yet</span>}</dd></div>
+          <dd className="font-semibold text-white tabular-nums">{formData.mtnNumber || <span className="font-normal text-slate-400">Not entered yet</span>}</dd></div>
         <div className="flex justify-between gap-3"><dt className="text-slate-400">Pay with</dt><dd className="text-slate-200">{paymentMethod==='wallet'?'Mystery Wallet':'Mobile Money or card (Paystack)'}</dd></div>
         <div className="flex items-end justify-between gap-3 border-t border-slate-800 pt-3">
           <dt><span className="block font-semibold text-white">One-time fee</span><span className="block text-xs text-slate-400">Charged once by Mystery Hub</span></dt>
@@ -317,54 +347,94 @@ export const AfaRegistrationPage: React.FC = () => {
     </section>
   );
 
-  const submitLabel = !user ? 'Sign in to continue' : paymentMethod === 'wallet' ? `Pay ${feeText} with Mystery Wallet` : `Continue to payment · ${feeText}`;
+  // Says where the next tap goes: sign-in, the Wallet debit, or Paystack's page. Registration itself follows payment.
+  const submitLabel = !user ? 'Sign in to continue' : paymentMethod === 'wallet' ? `Pay ${feeText} from Mystery Wallet` : `Continue to Paystack · ${feeText}`;
 
   return (
     <div className="py-5 sm:py-10 pb-24 sm:pb-12 text-slate-100 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
-      {/* Hero: what this is, what it costs, how it works. */}
-      {/* Phones: title, fee and a one-line route, so the form starts on the first screen. */}
-      <section className="relative overflow-hidden rounded-3xl border border-slate-800 bg-[#0a0f14] p-4 sm:p-8">
-        <div aria-hidden="true" className="pointer-events-none absolute -top-24 -right-16 w-72 h-72 rounded-full bg-[#00c365]/10 blur-3xl" />
-        <div className="relative grid gap-3 sm:gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-end">
-          <div className="space-y-2 sm:space-y-3 max-w-xl">
-            <p className="text-xs font-semibold text-[#44df95]">MTN AFA</p>
-            <h1 className="text-[1.5rem] leading-[1.15] sm:text-4xl font-extrabold text-white tracking-tight">Register your MTN line for AFA</h1>
-            <p className="hidden sm:block text-base text-slate-300 leading-relaxed">{afaConfig.tagline}</p>
-            <ul className="hidden sm:flex flex-wrap gap-x-4 gap-y-1.5 pt-1 text-sm text-slate-300">
-              <li className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[#44df95]" />Details encrypted</li>
-              <li className="flex items-center gap-1.5"><Lock className="w-4 h-4 text-[#44df95]" />Mobile Money or Wallet</li>
-              <li className="flex items-center gap-1.5"><Check className="w-4 h-4 text-[#44df95]" />Track in Orders</li>
-            </ul>
+      {/* Hero: why people register first (benefits of MTN's AFA packages), then the one-time fee and how to start.
+          Phones see what AFA is, what it offers, what registration costs and the start button on the first screen. */}
+      <section aria-labelledby="afa-title" className="rounded-3xl border border-slate-800 bg-[#0a0f14] p-4 sm:p-7 lg:p-8">
+        <div className="grid gap-4 sm:gap-6 lg:grid-cols-[1.35fr_1fr] lg:gap-8 lg:items-stretch">
+          <div className="space-y-3 sm:space-y-4 min-w-0">
+            <div className="space-y-1.5 sm:space-y-2">
+              <p className="text-xs font-semibold text-[#44df95]">MTN AFA registration</p>
+              <h1 id="afa-title" className="text-[1.6rem] leading-[1.12] sm:text-4xl font-extrabold text-white tracking-tight">More ways to stay connected</h1>
+              <p className="text-[15px] sm:text-base text-slate-300 leading-relaxed max-w-xl">{afaConfig.tagline}</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-slate-400"><span className="sm:hidden">Up to, on a monthly AFA package from MTN</span><span className="hidden sm:inline">What a monthly AFA package from MTN can include</span></p>
+              {/* Phones: one compact strip of four figures. From sm: tiles with an icon and a line of detail each. */}
+              <ul className="grid grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 rounded-2xl border border-slate-800 bg-[#0e141a] divide-x divide-slate-800 sm:divide-x-0 sm:rounded-none sm:border-0 sm:bg-transparent sm:gap-2" aria-label="AFA package highlights">
+                {highlights.map(item => {
+                  const Icon = HIGHLIGHT_ICONS[item.key];
+                  return (
+                    <li key={item.key} className="min-w-0 px-1 py-2.5 text-center sm:text-left sm:rounded-2xl sm:border sm:border-slate-800 sm:bg-[#0e141a] sm:p-3.5">
+                      <span className="flex items-center justify-center sm:justify-start gap-1.5">
+                        <Icon aria-hidden="true" className="hidden sm:block w-4 h-4 text-[#44df95] shrink-0" />
+                        <span className="text-base min-[360px]:text-lg sm:text-2xl font-extrabold text-white tabular-nums leading-none whitespace-nowrap">{item.key !== 'data' && <span className="hidden sm:inline text-xs font-semibold text-slate-400 mr-1">Up to</span>}{item.value}</span>
+                      </span>
+                      <span className="block mt-1 sm:mt-1.5 text-[11px] sm:text-[13px] font-semibold text-slate-300 sm:text-slate-200 leading-tight"><span className="sm:hidden">{item.short}</span><span className="hidden sm:inline">{item.label}</span></span>
+                      <span className="hidden sm:block mt-0.5 text-xs text-slate-400 leading-snug">{item.detail}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                <span className="sm:hidden">CUG minutes are for calls within your AFA group. </span>
+                <span className="hidden sm:inline">Bought separately from MTN after you register{prices.monthly !== null && <>: monthly packages from <span className="text-slate-200 font-semibold tabular-nums">GH₵{prices.monthly}</span></>}
+                {prices.weekly !== null && <>, weekly from <span className="text-slate-200 font-semibold tabular-nums">GH₵{prices.weekly}</span></>}.</span>{' '}
+                <button type="button" onClick={showPackages} className="text-[#44df95] font-semibold underline underline-offset-2 cursor-pointer mh-compact-control">Compare packages</button>
+              </p>
+            </div>
           </div>
-          <div className="rounded-2xl border border-[#00c365]/25 sm:border-slate-800 bg-[#0e141a] p-3.5 sm:p-5">
-            <div className="flex items-center justify-between gap-3 sm:block">
-              <p className="text-sm sm:text-xs font-semibold text-slate-200 sm:text-slate-400 sm:mb-2">One-time registration fee</p>
+
+          {/* The fee, what it covers, and the start button. */}
+          <div className="rounded-2xl border border-[#00c365]/25 bg-[#0e141a] p-3.5 sm:p-5 flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3 lg:block">
+              <div className="lg:mb-2">
+                <p className="text-sm font-semibold text-white"><span className="sm:hidden">Registration fee</span><span className="hidden sm:inline">One-time registration fee</span></p>
+                <p className="text-xs text-slate-400"><span className="sm:hidden">One-time, paid to Mystery Hub</span><span className="hidden sm:inline">Paid once to Mystery Hub</span></p>
+              </div>
               {feeBlock}
             </div>
-            <p className="text-xs text-slate-400 mt-1.5 sm:mt-2 leading-relaxed">Paid to Mystery Hub once. AFA call and data packages are bought from MTN afterwards. <a href="#afa-packages" className="text-[#44df95] underline underline-offset-2">See what they include</a></p>
+            <p className="sm:hidden -mt-1 text-xs text-slate-400 leading-relaxed">Packages are not included: you buy them from MTN{prices.monthly !== null && <>, from <span className="text-slate-200 font-semibold tabular-nums">GH₵{prices.monthly}</span> a month</>}.</p>
+            <ul className="hidden sm:block space-y-1.5 text-xs text-slate-300 leading-relaxed">
+              <li className="flex gap-2"><Check aria-hidden="true" className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[#44df95]" />Covers registering your MTN line for AFA only</li>
+              <li className="flex gap-2"><Info aria-hidden="true" className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />AFA packages are not included; you buy them from MTN</li>
+              <li className="hidden sm:flex gap-2"><Lock aria-hidden="true" className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />Your Ghana Card details are encrypted</li>
+            </ul>
+            {(isPriceLoading || priceAvailable) && (<>
+              <button type="button" onClick={startRegistration}
+                className="mh-buy mt-auto w-full min-h-12 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e070] text-[#03160c] font-bold text-base flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+                {user ? 'Start registration' : 'Sign in to start'}<ArrowRight className="w-4 h-4" />
+              </button>
+              <p className="text-[11px] text-slate-400 text-center -mt-1">{user ? 'You check your details and the fee before paying.' : 'Sign in first, so your details stay with your account.'}</p>
+            </>)}
           </div>
         </div>
-        <ol className="relative mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-300 sm:hidden" aria-label="How AFA registration works">
-          {['Your details', 'Pay', 'We submit it', 'Track in Orders'].map((label, i) => (
-            <li key={label} className="flex items-center gap-1.5">
-              {i > 0 && <span aria-hidden="true" className="text-slate-600">›</span>}
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#00c365]/15 text-[11px] font-bold text-[#44df95]">{i + 1}</span>{label}
-            </li>
-          ))}
-        </ol>
-        <ol className="relative mt-6 hidden sm:grid grid-cols-2 lg:grid-cols-4 gap-3" aria-label="How AFA registration works">
+
+        <ol className="mt-4 sm:mt-6 grid grid-cols-2 lg:grid-cols-4 gap-x-3 gap-y-2 sm:gap-3" aria-label="How AFA registration works">
           {afaConfig.howItWorks.map((step) => (
-            <li key={step.step} className="rounded-xl border border-slate-800/80 bg-[#0e141a]/80 p-2.5 sm:p-3 flex gap-2 sm:block">
-              <span className="text-xs font-bold text-[#44df95] leading-5"><span className="sm:hidden">{step.step}</span><span className="hidden sm:inline">Step {step.step}</span></span>
-              <p className="text-[13px] sm:text-sm font-semibold text-white leading-5 sm:mt-0.5">{step.title}</p>
-              <p className="hidden sm:block text-xs text-slate-400 leading-relaxed mt-0.5">{step.desc}</p>
+            <li key={step.step} className="flex gap-2 sm:rounded-xl sm:border sm:border-slate-800/80 sm:bg-[#0e141a]/80 sm:p-3">
+              <span aria-hidden="true" className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#00c365]/15 text-[11px] font-bold text-[#44df95]">{step.step}</span>
+              <span className="min-w-0">
+                <span className="block text-xs sm:text-sm font-semibold text-white leading-5">{step.title}</span>
+                <span className="hidden sm:block text-xs text-slate-400 leading-relaxed mt-0.5">{step.desc}</span>
+              </span>
             </li>
           ))}
         </ol>
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <form aria-label="AFA registration" noValidate onSubmit={handleSubmit} className="lg:col-span-7 space-y-4 text-left">
+        <form ref={formRef} aria-label="AFA registration" noValidate onSubmit={handleSubmit} className="lg:col-span-7 space-y-4 text-left scroll-mt-24">
+          {!user && (
+            <div className="rounded-2xl border border-slate-700 bg-[#0e141a] p-3.5 flex flex-wrap items-center justify-between gap-3 text-sm">
+              <p className="text-slate-300 min-w-0 flex-1 basis-56">Registration needs a Mystery Hub account. Sign in first so nothing you type is lost.</p>
+              <button type="button" onClick={startRegistration} className="mh-button-secondary">Sign in</button>
+            </div>
+          )}
           {submitError && (
             <div role="alert" className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-sm text-rose-200 flex items-start gap-2.5">
               <AlertCircle className="w-5 h-5 shrink-0 text-rose-300" />
@@ -467,65 +537,71 @@ export const AfaRegistrationPage: React.FC = () => {
           </div>
         </form>
 
-        <aside className="lg:col-span-5 space-y-5 text-left">
+        <aside className="lg:col-span-5 space-y-5 text-left order-first lg:order-none">
           <div className="hidden lg:block">{summary}</div>
 
           {/* MTN AFA packages: information only. They are bought from MTN, not from Mystery Hub. */}
-          <section id="afa-packages" aria-labelledby="afa-packages-title" className="scroll-mt-24 rounded-2xl border border-slate-800 bg-[#0b1015] p-4 sm:p-5 space-y-4">
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 id="afa-packages-title" className="text-base font-bold text-white">MTN AFA packages, after you register</h2>
-                <span className="inline-flex items-center gap-1 rounded-full border border-slate-700 px-2 py-0.5 text-[11px] font-semibold text-slate-300">
-                  <Info className="w-3 h-3" />Bought on MTN, not here
-                </span>
-              </div>
+          <section ref={packagesRef} id="afa-packages" aria-labelledby="afa-packages-title" className="scroll-mt-24 rounded-2xl border border-slate-800 bg-[#0b1015] p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id="afa-packages-title" className="text-base font-bold text-white">MTN AFA packages, after you register</h2>
+              <span className="hidden lg:inline-flex items-center gap-1 rounded-full border border-slate-700 px-2 py-0.5 text-[11px] font-semibold text-slate-300">
+                <Info className="w-3 h-3" />Bought on MTN, not here
+              </span>
+            </div>
+            <button type="button" aria-expanded={packagesOpen} aria-controls="afa-packages-body" onClick={() => setPackagesOpen(open => !open)}
+              className="lg:hidden mt-2 w-full min-h-11 -mb-1 flex items-center justify-between gap-3 text-left text-sm text-slate-300 cursor-pointer">
+              <span>Compare weekly and monthly packages. <span className="text-slate-400">Bought on MTN, not here.</span></span>
+              <ChevronDown aria-hidden="true" className={`w-4 h-4 shrink-0 text-slate-400 transition-transform motion-reduce:transition-none ${packagesOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <div id="afa-packages-body" className={`${packagesOpen ? 'block' : 'hidden'} lg:block mt-4 space-y-4`}>
               <p className="text-sm text-slate-400 leading-relaxed">Examples of what registered lines can buy from MTN. Your order shows how to reach the MTN AFA menu once it is Registered.</p>
-            </div>
-            <div role="group" aria-label="Package period" className="grid grid-cols-2 p-1 rounded-xl bg-[#080c10] border border-slate-800">
-              {(['monthly', 'weekly'] as const).map(period => (
-                <button key={period} type="button" aria-pressed={activePackageTab === period} onClick={() => setActivePackageTab(period)}
-                  className={`min-h-10 rounded-lg text-sm font-semibold cursor-pointer transition-colors ${activePackageTab === period ? 'bg-slate-200 text-[#0b1015]' : 'text-slate-400 hover:text-white'}`}>
-                  {period === 'monthly' ? 'Monthly' : 'Weekly'}
-                </button>
-              ))}
-            </div>
-            <table className="w-full text-sm border-separate border-spacing-0">
-              <caption className="sr-only">{activePackageTab === 'monthly' ? 'Monthly' : 'Weekly'} MTN AFA package examples</caption>
-              <thead>
-                <tr>
-                  <th scope="col" className="sr-only">Includes</th>
-                  {filteredPackages.map(pkg => (
-                    <th key={pkg.id} scope="col" className="pb-3 text-left align-bottom font-normal pl-3 first-of-type:pl-0">
-                      <span className="block text-xs font-semibold text-slate-400">{pkg.hasData ? 'With data' : 'Calls and SMS'}</span>
-                      <span className="block text-2xl font-extrabold text-white tabular-nums leading-tight"><span className="text-sm font-semibold text-slate-400 mr-0.5">GH₵</span>{pkg.priceGhc}</span>
-                      <span className="block text-xs text-slate-400">on MTN · {pkg.validity}</span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {([
-                  ['On-net minutes', 'onNetMins'],
-                  ['Off-net minutes', 'offNetMins'],
-                  ['CUG minutes', 'cugMins'],
-                  ['SMS', 'sms'],
-                  ['Data', 'dataMb'],
-                ] as const).map(([label, key]) => (
-                  <tr key={key}>
-                    <th scope="row" className="py-2 pr-2 text-left text-xs font-medium text-slate-400 border-t border-slate-800/80 w-[38%]">{label}</th>
-                    {filteredPackages.map(pkg => {
-                      const value = pkg[key];
-                      return (
-                        <td key={pkg.id} className="py-2 pl-3 border-t border-slate-800/80 font-semibold tabular-nums text-white">
-                          {value ? (key === 'dataMb' ? `${value}MB` : value) : <span className="font-normal text-slate-500">None</span>}
-                        </td>
-                      );
-                    })}
-                  </tr>
+              <div role="group" aria-label="Package period" className="grid grid-cols-2 p-1 rounded-xl bg-[#080c10] border border-slate-800">
+                {(['monthly', 'weekly'] as const).map(period => (
+                  <button key={period} type="button" aria-pressed={activePackageTab === period} onClick={() => setActivePackageTab(period)}
+                    className={`min-h-10 rounded-lg text-sm font-semibold cursor-pointer transition-colors ${activePackageTab === period ? 'bg-slate-200 text-[#0b1015]' : 'text-slate-400 hover:text-white'}`}>
+                    {period === 'monthly' ? 'Monthly' : 'Weekly'}
+                  </button>
                 ))}
-              </tbody>
-            </table>
-            <p className="text-xs text-slate-500 leading-relaxed">{afaConfig.disclaimer}</p>
+              </div>
+              <table className="w-full text-sm border-separate border-spacing-0">
+                <caption className="sr-only">{activePackageTab === 'monthly' ? 'Monthly' : 'Weekly'} MTN AFA package examples</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="sr-only">Includes</th>
+                    {filteredPackages.map(pkg => (
+                      <th key={pkg.id} scope="col" className="pb-3 text-left align-bottom font-normal pl-3 first-of-type:pl-0">
+                        <span className="block text-xs font-semibold text-slate-400">{pkg.hasData ? 'With data' : 'Calls and SMS'}</span>
+                        <span className="block text-2xl font-extrabold text-white tabular-nums leading-tight"><span className="text-sm font-semibold text-slate-400 mr-0.5">GH₵</span>{pkg.priceGhc}</span>
+                        <span className="block text-xs text-slate-400">on MTN · {pkg.validity}</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {([
+                    ['MTN minutes', 'onNetMins'],
+                    ['Other-network minutes', 'offNetMins'],
+                    ['CUG minutes', 'cugMins'],
+                    ['SMS', 'sms'],
+                    ['Data', 'dataMb'],
+                  ] as const).map(([label, key]) => (
+                    <tr key={key}>
+                      <th scope="row" className="py-2 pr-2 text-left text-xs font-medium text-slate-400 border-t border-slate-800/80 w-[38%]">{label}</th>
+                      {filteredPackages.map(pkg => {
+                        const value = afaPackageCell(pkg, key);
+                        return (
+                          <td key={pkg.id} className="py-2 pl-3 border-t border-slate-800/80 font-semibold tabular-nums text-white">
+                            {value ?? <span className="font-normal text-slate-400">None</span>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-xs text-slate-400 leading-relaxed">CUG minutes are for calls within your AFA group. Where SMS shows Included, MTN's AFA menu shows the current amount.</p>
+              <p className="text-xs text-slate-400 leading-relaxed">{afaConfig.disclaimer}</p>
+            </div>
           </section>
         </aside>
       </div>

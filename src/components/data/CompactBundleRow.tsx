@@ -84,7 +84,7 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
 
         <span
           aria-hidden="true"
-          className="mh-buy min-h-11 px-2.5 min-[360px]:px-3.5 rounded-xl border border-[#00c365]/40 bg-[#00c365]/10 text-[#44df95] group-hover:bg-[#00c365] group-hover:border-[#00c365] group-hover:text-[#03160c] group-focus-visible:bg-[#00c365] group-focus-visible:text-[#03160c] font-bold text-sm flex items-center justify-center gap-1 shrink-0"
+          className="mh-buy min-h-11 px-2.5 min-[360px]:px-3.5 rounded-xl border border-[#00c365]/50 bg-[#00c365]/[0.14] text-[#5ae6a0] group-hover:bg-[#00c365] group-hover:border-[#00c365] group-hover:text-[#03160c] group-focus-visible:bg-[#00c365] group-focus-visible:text-[#03160c] font-bold text-sm flex items-center justify-center gap-1 shrink-0"
         >
           <span>Buy</span>
           <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
