@@ -58,7 +58,8 @@ test('valid conversation preserves history order and latest question occurs once
     assert.equal(captured.contents[0].parts[0].text,'older question');
     assert.equal(captured.contents[1].parts[0].text,'older answer');
     assert.equal(JSON.stringify(captured.contents).split('unique current question').length-1,1);
-    assert.equal(captured.config.maxOutputTokens,1024);
+    assert.equal(captured.config.maxOutputTokens,512);
+    assert.equal(captured.config.thinkingConfig.thinkingLevel,'MINIMAL');
   });
 });
 
