@@ -96,9 +96,10 @@ export const MoreServicesPage: React.FC = () => {
     event?.preventDefault();
     if (isUpcoming(service)) {
       if (!previewSlug) { listScroll.current = window.scrollY; returnFocus.current = service.id; }
-      // servicePreview counts the previews pushed since the list, so "All services" can step straight back to it.
-      const depth = previewSlug ? Number(window.history.state?.servicePreview) || 0 : 0;
-      window.history.pushState({ page: 'services', servicePreview: depth + 1 }, '', servicesHref({ service: serviceSlug(service) }));
+      // servicePreview counts the previews pushed since the list (fromList), so "All services" can step straight back to it.
+      const state = previewSlug ? window.history.state : null;
+      const depth = Number(state?.servicePreview) || 0;
+      window.history.pushState({ page: 'services', servicePreview: depth + 1, fromList: previewSlug ? Boolean(state?.fromList) : true }, '', servicesHref({ service: serviceSlug(service) }));
       setPreviewSlug(serviceSlug(service));
       return;
     }
@@ -109,7 +110,7 @@ export const MoreServicesPage: React.FC = () => {
   const closePreview = useCallback(() => {
     // Opened from this list: step back through history. Arrived by a link: replace the preview with the list.
     const depth = Number(window.history.state?.servicePreview) || 0;
-    if (depth > 0) { window.history.go(-depth); return; }
+    if (depth > 0 && window.history.state?.fromList) { window.history.go(-depth); return; }
     window.history.replaceState({ page: 'services' }, '', servicesHref({ q: query, category }));
     setPreviewSlug('');
   }, [query, category]);
