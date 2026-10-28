@@ -15,7 +15,9 @@ test('future services remain coming soon with explicit unavailable descriptions'
     const service = DIGITAL_SERVICES.find(s => s.id === id)!;
     assert.equal(service.status, 'coming_soon'); assert.match(service.description, /not available yet/i);
   }
-  assert.match(source('src/components/home/HomeComingSoonSection.tsx'), /openWaitlist\(svc.title\)/);
+  // Planned services open their preview first; the launch list is offered only from the preview.
+  const home = source('src/components/home/HomeComingSoonSection.tsx');
+  assert.match(home, /openServicesAt\(setActivePage, \{ service \}\)/); assert.doesNotMatch(home, /openWaitlist/);
   assert.match(source('src/components/home/QuickServicesBar.tsx'), /Check Status/);
 });
 test('checkout retains recipient, receipt, confirmation, wrong-number, total and support protection', () => {

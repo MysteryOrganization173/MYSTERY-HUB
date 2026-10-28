@@ -2,6 +2,8 @@ import { useDialogFocus } from '../../hooks/useDialogFocus';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { X, Bell, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react';
+
+const CHANNEL_LABELS = { whatsapp: 'WhatsApp number', sms: 'phone number', email: 'email address' } as const;
 import { joinWaitlistOnServer } from '../../services/apiClient';
 
 export const WaitlistModal: React.FC = () => {
@@ -95,9 +97,9 @@ export const WaitlistModal: React.FC = () => {
               </h4>
               <p className="text-xs text-slate-400 max-w-xs mx-auto">
                 {alreadyJoined
-                  ? `Your contact is already confirmed. We will notify you via ${channel} as soon as `
-                  : `We will notify you via ${channel} as soon as `}
-                <span className="text-white font-medium">{waitlistInfo.serviceTitle}</span> goes live in Ghana.
+                  ? `This ${CHANNEL_LABELS[channel]} is already saved for `
+                  : `We saved your ${CHANNEL_LABELS[channel]} for `}
+                <span className="text-white font-medium">{waitlistInfo.serviceTitle}</span>. The Mystery Hub team can use it to tell you when the service is available.
               </p>
               <button type="button" onClick={closeWaitlist} className="mh-button w-full">Done</button>
             </div>
@@ -111,7 +113,7 @@ export const WaitlistModal: React.FC = () => {
                   Get notified when {waitlistInfo.serviceTitle} launches
                 </h3>
                 <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                  This service is being prepared. Join the launch list for availability updates.
+                  This service is not available yet. Leave a contact if you would like an update when it launches.
                 </p>
               </div>
 
@@ -124,7 +126,7 @@ export const WaitlistModal: React.FC = () => {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-300">Preferred Alert Method</label>
+                  <label className="text-xs font-semibold text-slate-300">How should we contact you?</label>
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
@@ -193,6 +195,9 @@ export const WaitlistModal: React.FC = () => {
                     </span>
                   )}
                 </button>
+                <p className="text-[11px] leading-relaxed text-slate-400">
+                  Your contact is saved with this service's launch list only. Joining does not sign you up for other promotions.
+                </p>
               </form>
             </>
           )}

@@ -89,23 +89,16 @@ describe('Mobile Nav Restructure, Mystery Earn & Services Compression', () => {
     assert.match(page, /<FinancialPanel mode="earn"/);
   });
 
-  test('7. MoreServicesPage compressed mobile hero and horizontal card rows', () => {
+  test('7. MoreServicesPage leads with services, not a promotional hero (Service Discovery V2)', () => {
     const servicesCode = fs.readFileSync(
       path.join(process.cwd(), 'src/components/services/MoreServicesPage.tsx'),
       'utf-8'
     );
+    const css = fs.readFileSync(path.join(process.cwd(), 'src/components/services/services.css'), 'utf-8');
 
-    assert.ok(
-      servicesCode.includes('block sm:hidden'),
-      'MoreServicesPage must provide compact mobile view'
-    );
-    assert.ok(
-      servicesCode.includes('line-clamp-2'),
-      'MoreServicesPage mobile rows must clamp long descriptions to 2 lines'
-    );
-    assert.ok(
-      servicesCode.includes('Secure checkout powered by Paystack'),
-      'MoreServicesPage must display grounded Paystack trust line'
-    );
+    assert.match(servicesCode, /<h1>Explore Mystery Hub<\/h1>/, 'compact introduction heads the page');
+    assert.ok(!servicesCode.includes("setActivePage('wallet')}"), 'no Wallet promotion above the heading');
+    assert.ok(!servicesCode.includes('block sm:hidden'), 'one card structure at every width');
+    assert.match(css, /\.sd-card-tile \.sd-card-tagline/, 'phones get compact Data and Airtime tiles');
   });
 });
