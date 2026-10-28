@@ -67,7 +67,9 @@ export function createReliableMysteryAiRouter(validate:(body:any)=>Input,deps:{g
    const models=complex?['gemini-3.8-flash','gemini-3.1-flash-lite']:['gemini-3.1-flash-lite','gemini-3.8-flash'];let failure:AiFailureCode='PROVIDER_UNAVAILABLE';
    for(const model of models){
      try{const ms=Math.min(deps.attemptTimeoutMs??(model==='gemini-3.8-flash'?4500:3000),9500-(Date.now()-started));if(ms<=0){failure='TIMEOUT';break;}
-       const result=await bounded(signal=>client.models.generateContent({model,contents,config:{systemInstruction:instruction,temperature:.7,topP:.9,maxOutputTokens:1024,abortSignal:signal,httpOptions:{timeout:ms,retryOptions:{attempts:1}}}}),ms,request.signal);
+       // SDK HttpOptions.timeout injects X-Server-Timeout, rejected with HTTP400 in this deployment.
+       // Keep the same hard deadline via bounded() + transport abortSignal, without that server hint.
+       const result=await bounded(signal=>client.models.generateContent({model,contents,config:{systemInstruction:instruction,temperature:.7,topP:.9,maxOutputTokens:1024,abortSignal:signal,httpOptions:{retryOptions:{attempts:1}}}}),ms,request.signal);
        if(request.signal.aborted)return;
        if(result.promptFeedback?.blockReason||result.candidates?.some(c=>['SAFETY','BLOCKLIST','PROHIBITED_CONTENT','SPII'].includes(c.finishReason||''))){failure='SAFETY';counts.SAFETY=(counts.SAFETY||0)+1;break;}
        if(typeof result.text==='string'&&result.text.trim()){successfulGenerations++;lastSuccessAt=new Date().toISOString();res.json({reply:result.text,source:'gemini',fallback:false,model,routingClass:complex?'complex':'simple',latencyMs:Date.now()-started});return;}failure='EMPTY_RESPONSE';

@@ -11,12 +11,19 @@ import {notificationWorkerHealth,startNotificationWorker} from '../../services/n
 
 async function rawProvider(status:number,body:unknown,run:(base:string,calls:()=>number)=>Promise<void>){
  let calls=0;
- const client=new GoogleGenAI({apiKey:'synthetic-not-a-secret',httpOptions:{fetch:async()=>{calls++;return new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json'}});}}});
+ const client=new GoogleGenAI({apiKey:'synthetic-not-a-secret',httpOptions:{fetch:async(_url,init)=>{calls++;assert.equal(new Headers(init?.headers).get('x-server-timeout'),null,'Router must use its abort deadline without the rejected server-timeout hint');assert.ok(init?.signal);return new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json'}});}}});
  const app=express();app.use(express.json(),createMysteryAiRouter({getClient:()=>client,catalog:async()=>({products:[]}) as any,attemptTimeoutMs:100}));
  const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));
  try{await run(`http://127.0.0.1:${(server.address() as any).port}`,()=>calls);}finally{server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
 }
 const post=(base:string,message='Unmatched synthetic question')=>fetch(base+'/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message})});
+test('real SDK reproduces the rejected timeout hint; transport cancellation without it succeeds',async()=>{
+ const hints:Array<string|null>=[];
+ const client=new GoogleGenAI({apiKey:'synthetic-not-a-secret',httpOptions:{fetch:async(_url,init)=>{const hint=new Headers(init?.headers).get('x-server-timeout');hints.push(hint);return new Response(JSON.stringify(hint?{error:{code:400,status:'INVALID_ARGUMENT',message:'Invalid server timeout'}}:{candidates:[{content:{parts:[{text:'OK'}]}}]}),{status:hint?400:200,headers:{'content-type':'application/json'}});}}});
+ await assert.rejects(()=>client.models.generateContent({model:'gemini-3.1-flash-lite',contents:'Synthetic',config:{httpOptions:{timeout:3000,retryOptions:{attempts:1}}}}),e=>(e as any).status===400);
+ const result=await client.models.generateContent({model:'gemini-3.1-flash-lite',contents:'Synthetic',config:{abortSignal:AbortSignal.timeout(1000),httpOptions:{retryOptions:{attempts:1}}}});
+ assert.equal(result.text,'OK');assert.deepEqual(hints,['3',null]);
+});
 test('raw Gemini success is explicitly labelled as a model response',async()=>{
  await rawProvider(200,{candidates:[{content:{role:'model',parts:[{text:'Synthetic provider response'}]},finishReason:'STOP'}]},async(base,calls)=>{
   const r=await post(base),b=await r.json();assert.equal(r.status,200);assert.equal(b.source,'gemini');assert.equal(b.fallback,false);assert.equal(b.reply,'Synthetic provider response');assert.equal(calls(),1);
