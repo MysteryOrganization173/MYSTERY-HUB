@@ -59,7 +59,10 @@ export async function processNotificationBatch(sender:Sender=send,max=10){
   });processed++;
  }return {processed,disabled:false};
 }
-export function startNotificationWorker(){if(!pushConfiguration().enabled)return ()=>{};let busy=false;
- const tick=async()=>{if(busy)return;busy=true;try{await processNotificationBatch();}catch{console.warn('[Notifications] Durable queue processing deferred.');}finally{busy=false;}};
- const timer=setInterval(tick,10000);timer.unref();void tick();return ()=>clearInterval(timer);
+const workerHealth:{running:boolean;inFlight:boolean;lastCompletedAt:string|null;lastErrorAt:string|null;lastResult:'paused_or_disabled'|'processed'|null}={running:false,inFlight:false,lastCompletedAt:null,lastErrorAt:null,lastResult:null};
+/** Process-local observation only, not proof of provider acceptance or phone receipt. Admin route only. */
+export const notificationWorkerHealth=()=>({...workerHealth,scope:'process_since_start' as const});
+export function startNotificationWorker(){if(!pushConfiguration().enabled)return ()=>{};let busy=false;workerHealth.running=true;
+ const tick=async()=>{if(busy)return;busy=true;workerHealth.inFlight=true;try{const result=await processNotificationBatch();workerHealth.lastResult=result.disabled?'paused_or_disabled':'processed';workerHealth.lastCompletedAt=new Date().toISOString();}catch{workerHealth.lastErrorAt=new Date().toISOString();console.warn('[Notifications] Durable queue processing deferred.');}finally{busy=false;workerHealth.inFlight=false;}};
+ const timer=setInterval(tick,10000);timer.unref();void tick();return ()=>{clearInterval(timer);workerHealth.running=false;};
 }

@@ -8,7 +8,7 @@ import webPush from 'web-push';
 import {NOTIFICATION_SCHEMA} from '../../db/notificationSchema.js';
 import {getPool,initDatabase} from '../../db/connection.js';
 import {NotificationService as service,NOTIFICATIONS as n} from '../../services/notificationService.js';
-import {processNotificationBatch} from '../../services/notificationWorker.js';
+import {processNotificationBatch,startNotificationWorker,notificationWorkerHealth} from '../../services/notificationWorker.js';
 import {hashSessionToken} from '../../utils/crypto.js';
 import {notificationRouter,adminNotificationRouter} from '../../routes/notificationApi.js';
 import {httpAdminNotificationsClient as adminHttp} from '../../../src/services/adminNotifications.js';
@@ -31,6 +31,14 @@ test('PostgreSQL transactional notification lifecycle and operational security',
  await t.test('fresh/repeated startup preserves historical orders and generates no backfill',async()=>{await initDatabase();await initDatabase();assert.equal((await pool!.query(`SELECT COUNT(*) FROM ${n}.events`)).rows[0].count,'0');assert.equal((await pool!.query("SELECT status FROM orders WHERE id='historical'")).rows[0].status,'paid');});
  let deviceId='';
  assert.equal((await service.settings()).paused,true);
+ await t.test('paused worker health observes actual ticks without expanding events or attempting delivery',async()=>{
+  const before=(await pool!.query(`SELECT (SELECT COUNT(*) FROM ${n}.events) AS events,(SELECT COUNT(*) FROM ${n}.attempts) AS attempts`)).rows[0];
+  const stop=startNotificationWorker();try{for(let i=0;i<100&&!notificationWorkerHealth().lastCompletedAt;i++)await new Promise(r=>setTimeout(r,5));
+   assert.equal(notificationWorkerHealth().running,true);assert.equal(notificationWorkerHealth().lastResult,'paused_or_disabled');assert.ok(notificationWorkerHealth().lastCompletedAt);
+   const health=await service.health();assert.equal(health.paused,true);assert.equal(health.deliveryAttempts,0);assert.equal(health.providerAccepted,0);assert.equal(health.savedEvents,Number(before.events));
+   assert.deepEqual((await pool!.query(`SELECT (SELECT COUNT(*) FROM ${n}.events) AS events,(SELECT COUNT(*) FROM ${n}.attempts) AS attempts`)).rows[0],before);
+  }finally{stop();}assert.equal(notificationWorkerHealth().running,false);
+ });
  await service.setSettings('admin',{paused:false,confirmed:true,reason:'Resume isolated synthetic delivery tests'});
  await t.test('encrypted multi-device subscriptions bind to actual active sessions and reject endpoint spoofing',async()=>{
   deviceId=(await service.subscribe('buyer1',tokens.buyer1,{subscription})).deviceId;const row=(await pool!.query(`SELECT * FROM ${n}.devices WHERE id=$1`,[deviceId])).rows[0];assert.equal(row.session_id,'session-buyer1');assert.doesNotMatch(row.encrypted_subscription,/SYNTHETIC|fcm|synthetic-session/);
@@ -101,6 +109,10 @@ test('PostgreSQL transactional notification lifecycle and operational security',
   await control.query("DO $$ BEGIN IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon; END IF; END $$;");await pool!.query(NOTIFICATION_SCHEMA);const c=await pool!.connect();try{await c.query('SET ROLE anon');await assert.rejects(()=>c.query(`SELECT * FROM ${n}.devices`),/permission denied/);}finally{await c.query('RESET ROLE');c.release();}
   const app=express();app.use(express.json());app.use('/notifications',notificationRouter);app.use('/admin',adminNotificationRouter);const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));
   try{const base=`http://127.0.0.1:${(server.address() as any).port}`;const notification=(await service.inbox('buyer1'))[0];assert.ok(notification);
+   assert.equal((await fetch(base+'/admin/health')).status,401);
+   assert.equal((await fetch(base+'/admin/health',{headers:{authorization:'Bearer '+tokens.buyer1}})).status,403);
+   const health=await(await fetch(base+'/admin/health',{headers:{authorization:'Bearer '+tokens.admin}})).json();
+   assert.equal(health.worker.scope,'process_since_start');assert.equal(typeof health.savedEvents,'number');assert.equal(typeof health.deliveryAttempts,'number');assert.equal(typeof health.providerAccepted,'number');
    assert.equal((await fetch(base+'/notifications/inbox/'+notification.id)).status,401);assert.equal((await fetch(base+'/notifications/inbox/'+notification.id,{headers:{authorization:'Bearer '+tokens.admin}})).status,404);assert.equal((await fetch(base+'/notifications/inbox/'+notification.id,{headers:{authorization:'Bearer '+tokens.buyer1}})).status,200);assert.equal((await fetch(base+'/admin/templates',{headers:{authorization:'Bearer '+tokens.buyer1}})).status,403);
   }finally{server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
  });

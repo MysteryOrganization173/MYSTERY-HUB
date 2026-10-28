@@ -61,11 +61,16 @@ export function AdminNotificationsSection({ sessionToken, initialView = '', clie
           <AdminStat compact label="Agreed to promotions" value={overview?.marketingConsented ?? '—'} hint="Separate consent" />
           <AdminStat compact label="Account updates, 7 days" value={overview?.sendsLast7Days ?? '—'} />
           <AdminStat compact label="Failed deliveries, 7 days" value={overview?.failedLast7Days ?? '—'} tone={overview?.failedLast7Days ? 'warning' : 'neutral'} />
+          <AdminStat compact label="Saved events" value={overview?.savedEvents ?? '—'} hint="Recording an event does not send it" />
+          <AdminStat compact label="Queued deliveries" value={overview?.queuedDeliveries ?? '—'} />
+          <AdminStat compact label="Delivery attempts" value={overview?.deliveryAttempts ?? '—'} />
+          <AdminStat compact label="Provider accepted" value={overview?.providerAccepted ?? '—'} hint="Phone display and receipt are unconfirmed" />
         </div>
       ) : (
         <AdminNotice tone="info" title="Waiting for the notification server">{NOTIFICATIONS_UNAVAILABLE} Customer phones are not registered for alerts yet, so there is no audience to count.</AdminNotice>
       )}
       {overview&&(!overview.sendingEnabled||overview.paused)&&<AdminNotice tone="info" title={overview.paused?'Real sending is paused':'Real sending is disabled'}>Templates, preferences and history are connected. Push credentials and consenting-device acceptance must be verified before delivery is enabled. Permission alone does not prove delivery.</AdminNotice>}
+      {overview?.worker&&<p className="text-sm text-slate-400">Worker: {overview.worker.running?'started':'not started'}. Last completed check: {overview.worker.lastCompletedAt?when(overview.worker.lastCompletedAt):'not observed'}{overview.worker.lastResult==='paused_or_disabled'?' (sending paused or disabled)':''}. This is process health, not proof of phone receipt. Recent saved events may become eligible on resume; review them before activation.</p>}
 
       <AdminTabs label="Notification area" value={view} onChange={go} tabs={[{ id: 'compose', label: 'Compose' }, { id: 'history', label: 'History' }, { id: 'templates', label: 'Templates' }]} />
 

@@ -88,10 +88,10 @@ async function runMysteryAiTests() {
       false,
       'Must NOT promise guaranteed instant delivery'
     );
-    assert.ok(instruction.includes('AirtelTigo (AT iShare): INSTANT DELIVERY'), 'Must state AirtelTigo is INSTANT DELIVERY');
+    assert.ok(instruction.includes('Do not promise instant delivery'), 'Must avoid unverified instant delivery claims');
     assert.ok(instruction.includes('MTN Orders: Fast under normal conditions, but NOT instant'), 'Must state MTN is NOT instant');
-    assert.ok(instruction.includes('15–45 minutes'), 'Must mention typical 15-45 minutes for MTN');
-    assert.ok(instruction.includes('48 hours'), 'Must mention exceptional delay up to 48 hours');
+    assert.ok(instruction.includes('Do not invent a delivery estimate'), 'Must rely on authoritative status instead of a fabricated estimate');
+    assert.ok(!instruction.includes('48 hours'), 'Must not promise an unsupported maximum delay');
     assert.ok(
       instruction.includes('wait for their current active MTN order to complete'),
       'Must instruct waiting for active MTN order to complete'
@@ -108,7 +108,7 @@ async function runMysteryAiTests() {
   // 5. Emergency local fallback response verification
   {
     const priceResponse = getGroundedLocalResponse('How much is 1GB?', 'data');
-    assert.ok(priceResponse?.reply.includes('current network, bundle and checkout prices'), 'Offline fallback must direct customers to live prices instead of seed prices');
+    assert.ok(priceResponse?.reply.includes('checkout prices') && !/GH₵[0-9]/.test(priceResponse.reply), 'Offline fallback must direct customers to live prices instead of seed prices');
     assert.strictEqual(
       priceResponse!.reply.toLowerCase().includes('7 days'),
       false,
@@ -116,15 +116,15 @@ async function runMysteryAiTests() {
     );
 
     const speedResponse = getGroundedLocalResponse('How fast is delivery?', 'data');
-    assert.ok(speedResponse!.reply.includes('Instant Delivery'), 'Fallback must describe AirtelTigo as Instant Delivery');
-    assert.ok(speedResponse!.reply.includes('15–45 minutes'), 'Fallback must state MTN typical 15-45 minutes');
-    assert.ok(speedResponse!.reply.includes('48 hours'), 'Fallback must state MTN exceptional 48 hours');
+    assert.ok(speedResponse!.reply.includes('Orders'), 'Fallback directs customers to authoritative order status');
+    assert.ok(!speedResponse!.reply.includes('15–45 minutes'), 'No unsupported delivery estimate');
+    assert.ok(!speedResponse!.reply.includes('48 hours'), 'No unsupported maximum delay');
 
     const identityResponse = getGroundedLocalResponse('Who are you?', 'home');
     assert.ok(identityResponse!.reply.includes('Mystery AI'));
     assert.ok(
-      identityResponse!.reply.indexOf('AirtelTigo') < identityResponse!.reply.indexOf('Telecel'),
-      'Identity reply must list networks in order MTN -> AirtelTigo -> Telecel'
+      identityResponse!.reply.includes('Mystery Wallet') && identityResponse!.reply.includes('Website Builder'),
+      'Identity explains the wider platform, not only bundles'
     );
 
     console.log('✓ 5. Emergency local fallback returns grounded facts without stale data');

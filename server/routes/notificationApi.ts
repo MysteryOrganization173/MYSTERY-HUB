@@ -4,6 +4,7 @@ import {createRateLimiter} from '../middleware/rateLimiter.js';
 import {FinanceError} from '../db/financeStore.js';
 import {NotificationService,exact} from '../services/notificationService.js';
 import {draftNotification} from '../services/notificationDraft.js';
+import {notificationWorkerHealth} from '../services/notificationWorker.js';
 const handler=(work:(req:any)=>Promise<unknown>)=>async(req:any,res:any)=>{try{res.json(await work(req));}catch(error){res.status(error instanceof FinanceError?error.status:503).json({error:error instanceof FinanceError?error.message:'Notification service unavailable. No send success is confirmed.'});}};
 const offset=(value:unknown)=>{const n=value===undefined?0:Number(value);if(!Number.isInteger(n)||n<0||n>100000)throw new FinanceError('Invalid pagination.');return n;};
 export const notificationRouter=Router();notificationRouter.use((_req,res,next)=>{res.set('Cache-Control','no-store');next();});
@@ -27,7 +28,7 @@ adminNotificationRouter.post('/campaigns',handler(req=>NotificationService.campa
 adminNotificationRouter.get('/campaigns',handler(async req=>({success:true,campaigns:await NotificationService.campaigns(offset(req.query.offset))})));
 adminNotificationRouter.get('/deliveries',handler(async req=>({success:true,deliveries:await NotificationService.deliveries(offset(req.query.offset)),total:await NotificationService.deliveryCount()})));
 adminNotificationRouter.get('/deliveries/:id',handler(async req=>{const delivery=(await NotificationService.deliveries(0,req.params.id))[0];if(!delivery)throw new FinanceError('Delivery attempt not found.',404);return {success:true,delivery};}));
-adminNotificationRouter.get('/health',handler(()=>NotificationService.health()));
+adminNotificationRouter.get('/health',handler(async()=>({...await NotificationService.health(),worker:notificationWorkerHealth()})));
 adminNotificationRouter.get('/settings',handler(()=>NotificationService.settings()));
 adminNotificationRouter.put('/settings',handler(req=>NotificationService.setSettings(req.user.id,req.body)));
 adminNotificationRouter.post('/draft',createRateLimiter({windowMs:60000,max:6,enforceInTests:true,key:req=>req.user!.id}),handler(req=>draftNotification(req.body)));
