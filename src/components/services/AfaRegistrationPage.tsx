@@ -404,13 +404,13 @@ export const AfaRegistrationPage: React.FC = () => {
               <li className="flex gap-2"><Info aria-hidden="true" className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />AFA packages are not included; you buy them from MTN</li>
               <li className="hidden sm:flex gap-2"><Lock aria-hidden="true" className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />Your Ghana Card details are encrypted</li>
             </ul>
-            {(isPriceLoading || priceAvailable) && (
+            {(isPriceLoading || priceAvailable) && (<>
               <button type="button" onClick={startRegistration}
                 className="mh-buy mt-auto w-full min-h-12 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e070] text-[#03160c] font-bold text-base flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
                 {user ? 'Start registration' : 'Sign in to start'}<ArrowRight className="w-4 h-4" />
               </button>
-            )}
-            <p className="text-[11px] text-slate-400 text-center -mt-1">{user ? 'You check your details and the fee before paying.' : 'Sign in first, so your details stay with your account.'}</p>
+              <p className="text-[11px] text-slate-400 text-center -mt-1">{user ? 'You check your details and the fee before paying.' : 'Sign in first, so your details stay with your account.'}</p>
+            </>)}
           </div>
         </div>
 
