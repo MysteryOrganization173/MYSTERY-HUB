@@ -62,6 +62,11 @@ export interface NotificationSendDetail extends NotificationSendSummary {
 export interface NotificationOverview {
   sendingEnabled?:boolean;
   paused?:boolean;
+  savedEvents?:number;
+  queuedDeliveries?:number;
+  providerAccepted?:number;
+  deliveryAttempts?:number;
+  worker?:{running:boolean;lastCompletedAt:string|null;lastResult:string|null};
   subscribedDevices: number | null;
   marketingConsented: number | null;
   sendsLast7Days: number | null;
@@ -127,7 +132,7 @@ export function notificationDeliverySummary(d:any):NotificationSendDetail{
 }
 export const httpAdminNotificationsClient:AdminNotificationsClient={
  available:true,
- async overview(token){const h=await request(token,'health');return {subscribedDevices:h.devices,marketingConsented:h.marketingConsented??null,sendsLast7Days:h.eventsLast7Days??null,failedLast7Days:h.failedLast7Days??null,sendingEnabled:h.configuration.enabled,paused:h.paused};},
+ async overview(token){const h=await request(token,'health');return {subscribedDevices:h.devices,marketingConsented:h.marketingConsented??null,sendsLast7Days:h.eventsLast7Days??null,failedLast7Days:h.failedLast7Days??null,sendingEnabled:h.configuration.enabled,paused:h.paused,savedEvents:h.savedEvents,queuedDeliveries:h.pending,providerAccepted:h.providerAccepted,deliveryAttempts:h.deliveryAttempts,worker:h.worker};},
  async audiences(){return [{id:'marketing',label:'Opted-in customers',description:'Active subscribed customers who chose news and offers.',eligibleCount:null,marketingConsentOnly:true,allowedCategories:['marketing'],consentNote:'Explicit marketing opt-in is required, including maintenance and service announcements.'},{id:'customer',label:'One opted-in customer',description:'Choose a customer account ID below; eligibility is checked by the server.',eligibleCount:null,marketingConsentOnly:true,allowedCategories:['marketing'],consentNote:'Selecting a customer never bypasses their marketing preference.'}];},
  async countAudience(){throw Error('Choose a saved marketing template and prepare its audience.');},
  async prepareAudience(token,input){const h=await request(token,'health');if(!h.configuration.enabled||h.paused)throw Error('Real sending is disabled or paused until push configuration and founder-device acceptance are complete. Templates and history are available.');const r=await request(token,'audiences/preview','POST',input);if(r.success!==true||!Number.isInteger(r.eligibleDevices)||!r.previewId)throw Error('Invalid audience preview. Nothing can be sent.');return r;},

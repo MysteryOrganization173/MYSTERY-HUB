@@ -1,6 +1,6 @@
 import { ActivePage, SafeEditorAiContext } from '../types';
 import { API_BASE_URL } from './apiClient';
-import { AIRTIME_SERVICE_FEE_PERCENT } from '../../server/data/airtimePricing';
+import {mysteryHubGuide} from '../../shared/mysteryAiKnowledge';
 
 export interface ChatMessage {
   id: string;
@@ -303,7 +303,7 @@ export async function sendMysteryAiMessage(
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
       body: JSON.stringify({
         message: userMessage, activePage,
-        history: history.slice(-8).map(m => ({ role: m.role, content: m.content })),
+        history: history.filter(m=>!m.id.startsWith('welcome-')).slice(-8).map(m => ({ role: m.role, content: m.content })),
         editorContext: editorContext || undefined,
       }),
     });
@@ -318,9 +318,9 @@ export async function sendMysteryAiMessage(
       const data = await res.json();
       if (typeof data.reply === 'string' && data.reply.trim()) {
         if (data.source === 'guide' && data.fallback === true) {
-          return {reply:data.reply,quickAction:inferQuickAction(userMessage,data.reply,activePage),source:'scripted'};
+          return {reply:data.reply,quickAction:getGroundedLocalResponse(userMessage,activePage,editorContext)?.quickAction??inferQuickAction(userMessage,data.reply,activePage),source:'scripted'};
         }
-        if (!data.fallback && (data.source === 'gemini' || data.source === undefined)) {
+        if (!data.fallback && data.source === 'gemini') {
           return { reply: data.reply, quickAction: inferQuickAction(userMessage, data.reply, activePage), source: 'gemini' };
         }
       }
@@ -435,228 +435,9 @@ export function getGroundedLocalResponse(
   activePage: ActivePage,
   editorContext?: SafeEditorAiContext | null
 ): { reply: string; quickAction?: ChatMessage['quickAction'] } | null {
-  const q = query.toLowerCase().trim();
-  if (q.includes('wallet')) return { reply: "Mystery Wallet is live. Sign in, open Wallet and choose Add Money to fund it through Paystack. You can use an available Wallet balance for supported purchases. Funding requires a valid profile email; payment configuration must be available. I cannot access your balance or move money.",quickAction:{type:'navigate',targetPage:'wallet',label:'Open Wallet'}};
-
-
-  // 0. If in website editor or on website page, check builder help FIRST
   if (editorContext?.experienceMode === 'website_editor' || activePage === 'website') {
-    const builderHelp = resolveInstantBuilderHelp(query, editorContext);
-    if (builderHelp) {
-      return builderHelp;
-    }
+    const help=resolveInstantBuilderHelp(query,editorContext);if(help)return help;
   }
-
-  // 1. Identity & Introduction
-  if (
-    q.includes('who are you') ||
-    q.includes('who r u') ||
-    q.includes('who you') ||
-    q.includes('whats your name') ||
-    q.includes('what is your name') ||
-    q.includes('what’s your name') ||
-    q.includes('tell me about you') ||
-    q.includes('tell me about urself') ||
-    q.includes('are you ai') ||
-    q.includes('are u ai') ||
-    q.includes('are you an ai') ||
-    q.includes('what are you')
-  ) {
-    return {
-      reply:
-        "I am Mystery AI, the official digital assistant for Mystery Hub in Ghana! 🇬🇭\n\nI'm here to help you get the most out of our platform — whether that's purchasing discounted data for MTN, AirtelTigo, and Telecel, creating a professional website for your business without coding, or tracking your order status.",
-      quickAction:
-        activePage === 'website'
-          ? { type: 'navigate', targetPage: 'website', label: '👉 Explore Website Builder' }
-          : { type: 'navigate', targetPage: 'data', label: '👉 Buy Data Bundles' },
-    };
-  }
-
-  // 2. What is Mystery Hub
-  if (
-    q.includes('what is mystery hub') ||
-    q.includes('what’s mystery hub') ||
-    q.includes('whats mystery hub') ||
-    q.includes('what can i do here') ||
-    q.includes('what do you do') ||
-    q.includes('tell me about mystery hub')
-  ) {
-    return {
-      reply:
-        "Mystery Hub is Ghana's all-in-one digital utility platform. Our live service provides discounted data bundles for MTN, AirtelTigo, and Telecel delivered directly to your SIM via Mobile Money. We also provide an interactive Website Builder for Ghanaian businesses, with utilities like ECG tokens and WAEC checkers coming soon!",
-      quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Browse Data Offers' },
-    };
-  }
-
-  // 3. Navigation Direct Requests
-  if (q.includes('take me to data') || q.includes('go to data') || q.includes('open data')) {
-    return {
-      reply: "Taking you to our Data page where you can choose bundles for MTN, AirtelTigo, and Telecel.",
-      quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Go to Data Page' },
-    };
-  }
-  if (q.includes('take me to website') || q.includes('go to website') || q.includes('open website builder')) {
-    return {
-      reply: "Taking you to our Website Builder page where you can explore templates for construction, restaurants, salons, churches, and more.",
-      quickAction: { type: 'navigate', targetPage: 'website', label: '👉 Go to Website Builder' },
-    };
-  }
-  if (q.includes('take me to services') || q.includes('go to services') || q.includes('more services')) {
-    return {
-      reply: "Taking you to our More Services page where you can preview upcoming utilities like ECG tokens and WAEC PINs.",
-      quickAction: { type: 'navigate', targetPage: 'services', label: '👉 Go to More Services' },
-    };
-  }
-  if (q.includes('take me to orders') || q.includes('go to orders') || q.includes('track order')) {
-    return {
-      reply: "Taking you to our Order Tracking page where you can check the live delivery status of your purchases.",
-      quickAction: { type: 'navigate', targetPage: 'orders', label: '👉 Go to Order Tracking' },
-    };
-  }
-
-  // 4. Buying Data & How it Works
-  if (
-    q.includes('airtime') ||
-    q.includes('buy airtime') ||
-    q.includes('recharge airtime') ||
-    q.includes('top up airtime') ||
-    q.includes('top-up airtime') ||
-    q.includes('phone credit')
-  ) {
-    return {
-      reply:
-        `Airtime Top-Up is live on Mystery Hub! ⚡\n1. Go to our Data & Airtime page and select 'Airtime Top-Up'.\n2. Choose your network (MTN, AirtelTigo, or Telecel).\n3. Enter your phone number and amount (GH₵1.00 – GH₵1,000.00).\n4. Pay via Mobile Money or Card. The current service fee is ${AIRTIME_SERVICE_FEE_PERCENT}%. Your airtime is credited to the recipient SIM after verified payment and successful fulfilment.`,
-      quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Top Up Airtime Now' },
-    };
-  }
-
-  if (
-    q.includes('how do i buy data') ||
-    q.includes('how does buying data work') ||
-    q.includes('buy data') ||
-    q.includes('purchase data') ||
-    q.includes('buy bundle')
-  ) {
-    return {
-      reply: `Buying data takes just 3 simple steps:\n1. Go to our Data page and select your network (MTN, AirtelTigo, or Telecel).\n2. Pick your bundle at the live price shown on the Data page.\n3. Enter your recipient phone number and authorize the Mobile Money prompt on your phone.\n\nYour data is credited directly to your SIM!`,
-      quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Buy Data on Data Page' },
-    };
-  }
-
-  // 5. Supported Networks & Payment
-  if (
-    q.includes('network') ||
-    q.includes('mtn') ||
-    q.includes('telecel') ||
-    q.includes('airteltigo') ||
-    q.includes('vodafone') ||
-    q.includes('momo') ||
-    q.includes('mobile money')
-  ) {
-    return {
-      reply:
-        "We support Ghana's major networks: MTN Ghana (Express Data), AirtelTigo (AT), and Telecel Ghana. We accept payments via MTN MoMo, AT Money, Telecel Cash, and Bank Card via Paystack with transparent pricing and no hidden charges.",
-      quickAction: { type: 'navigate', targetPage: 'data', label: '👉 Select Your Network' },
-    };
-  }
-
-  // 6. Pricing & Current Rates
-  if (
-    q.includes('price') ||
-    q.includes('cost') ||
-    q.includes('rate') ||
-    q.includes('how much') ||
-    q.includes('cheap')
-  ) {
-    return {
-      reply: "Check the Data page for current network, bundle and checkout prices. I cannot confirm live prices while the AI service is unavailable.",
-      quickAction: { type: 'navigate', targetPage: 'data', label: '👉 View All Bundle Prices' },
-    };
-  }
-
-  // 7. Delivery Time & Conditions
-  if (
-    q.includes('speed') ||
-    q.includes('how long') ||
-    q.includes('fast') ||
-    q.includes('instant') ||
-    q.includes('when will it arrive')
-  ) {
-    return {
-      reply:
-        "Delivery depends on your network:\n• ⚡ AirtelTigo (AT iShare): Instant Delivery directly to your AT number.\n• MTN Ghana: Fast direct processing under normal telecom conditions (usually 15–45 minutes). Network congestion can sometimes cause delays, up to 48 hours in exceptional cases. Please note that MTN allows only one active order per recipient number at a time.\n• Telecel Ghana: Standard bundle delivery as configured.\n\nAll orders remain continuously trackable on our Orders page!",
-      quickAction: { type: 'navigate', targetPage: 'orders', label: '👉 Track Order Status' },
-    };
-  }
-
-  // 8. Order Tracking & Specific Orders
-  if (
-    q.includes('order') ||
-    q.includes('delay') ||
-    q.includes('track') ||
-    q.includes('status') ||
-    q.includes('where is my data')
-  ) {
-    return {
-      reply:
-        "To check your order, head to our Orders page or click 'Track Order' in the header. Enter your public Order Reference (e.g. MH-20260930-...) to see real-time delivery status. If you need manual help, our Accra WhatsApp helpdesk link is right on that page!",
-      quickAction: { type: 'navigate', targetPage: 'orders', label: '👉 Track Your Order' },
-    };
-  }
-
-  // 9. Website Builder
-  if (
-    q.includes('reseller') ||
-    q.includes('website') ||
-    q.includes('free website') ||
-    q.includes('create a website') ||
-    q.includes('build a website') ||
-    q.includes('template') ||
-    q.includes('business website')
-  ) {
-    return {
-      reply:
-        "Mystery Hub offers an interactive Website Builder designed for Ghanaian businesses — from restaurants and chop bars to salons, churches, and contractors. Sites are mobile-friendly. Managed Data Reseller storefronts support Mystery Hub-managed checkout and automatic supplier fulfilment when the store is configured and enabled; other business ordering can use WhatsApp. You can test live previews on our Website Builder page!",
-      quickAction: { type: 'navigate', targetPage: 'website', label: '👉 Open Website Builder' },
-    };
-  }
-
-  // 10. Coming Soon / Utilities
-  if (
-    q.includes('coming soon') ||
-    q.includes('future') ||
-    q.includes('ecg') ||
-    q.includes('water') ||
-    q.includes('electricity') ||
-    q.includes('waec') ||
-    q.includes('dstv') ||
-    q.includes('tv') ||
-    q.includes('esim')
-  ) {
-    return {
-      reply:
-        "We are developing direct utility settlement for ECG power tokens, Ghana Water bills, and WAEC Results Checker PINs. You can join the free notification waitlist on our More Services page to be notified when each service goes live!",
-      quickAction: { type: 'navigate', targetPage: 'services', label: '👉 View Upcoming Services' },
-    };
-  }
-
-  // 11. Support & Contact
-  const isGenericSupportQuery =
-    q.includes('mystery hub support') ||
-    q.includes('contact support') ||
-    q.includes('customer service') ||
-    q.includes('talk to support') ||
-    q.includes('help desk') ||
-    (!editorContext && activePage !== 'website' && (q.includes('support') || q.includes('contact') || q.includes('whatsapp') || q.includes('phone') || q.includes('help')));
-
-  if (isGenericSupportQuery) {
-    return {
-      reply:
-        "Our support team is based in Accra, Ghana 🇬🇭. You can reach out directly via WhatsApp for quick assistance with order status or questions using the WhatsApp link on our Orders or checkout page.",
-      quickAction: { type: 'navigate', targetPage: 'orders', label: '👉 View Orders & Support' },
-    };
-  }
-
-  // Unmatched questions need a genuine AI response; do not mask an outage with a greeting.
-  return null;
+  const help=mysteryHubGuide(query);
+  return help ? {reply:help.reply,quickAction:{type:'navigate',targetPage:help.page,label:help.page==='orders'?'Open Orders & Support':'Open '+({services:'All Services',data:'Data & Airtime',wallet:'Wallet',website:'Website Builder',afa:'AFA Registration',earn:'Mystery Earn',marketplace:'Marketplace'}[help.page]||help.page)}} : null;
 }

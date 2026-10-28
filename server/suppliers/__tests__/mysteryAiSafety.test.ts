@@ -64,8 +64,8 @@ test('valid conversation preserves history order and latest question occurs once
 
 test('network limit rejects thirteenth request even with spoofed identity headers',async()=>{
   await withApi(()=>null,async post=>{
-    for(let i=0;i<12;i++)assert.equal((await post({message:'hello'},{'X-Forwarded-For':`192.0.2.${i}`,'Authorization':`Bearer fabricated-${i}`})).status,503);
-    const res=await post({message:'hello'},{'X-Forwarded-For':'192.0.2.99'});
+    for(let i=0;i<12;i++)assert.equal((await post({message:'Unmatched synthetic question'},{'X-Forwarded-For':`192.0.2.${i}`,'Authorization':`Bearer fabricated-${i}`})).status,503);
+    const res=await post({message:'Unmatched synthetic question'},{'X-Forwarded-For':'192.0.2.99'});
     assert.equal(res.status,429);const body=await res.json();assert.match(body.error,/wait a minute/);assert.doesNotMatch(JSON.stringify(body),/192\.0\.2/);
   });
 });
