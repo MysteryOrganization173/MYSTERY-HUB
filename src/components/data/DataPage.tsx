@@ -12,7 +12,7 @@ import { NetworkId, DataBundle } from '../../types';
 import { CompactBundleRow } from './CompactBundleRow';
 import { PendingPaymentBanner } from '../checkout/PendingPaymentBanner';
 import { InstantBundlesCatalog } from './InstantBundlesCatalog';
-import { smoothScrollToElement } from '../../utils/scroll';
+import { smoothScrollToElement, revealPressedChip, revealFocusedChip } from '../../utils/scroll';
 import { serviceNotices } from '../../config/serviceNotices';
 import {
   Smartphone,
@@ -29,6 +29,13 @@ import {
   Check,
   AlertTriangle,
 } from 'lucide-react';
+
+/** Brings a section into view only when it is not already; the sticky header covers the top 5rem on phones. */
+const revealSection = (element: HTMLElement | null) => {
+  if (!element) return;
+  const top = element.getBoundingClientRect().top;
+  if (top < 80 || top > window.innerHeight * 0.6) smoothScrollToElement(element, { block: 'start' });
+};
 
 const shortNetworkName = (id: NetworkId) => DATA_NETWORK_CHOICES.find(choice => choice.id === id)?.name || id;
 
@@ -56,9 +63,7 @@ export const DataPage: React.FC = () => {
   useEffect(() => {
     if (dataProductMode === 'instant') {
       const timer = setTimeout(() => {
-        if (bundlesSectionRef.current) {
-          smoothScrollToElement(bundlesSectionRef.current, { block: 'start' });
-        }
+        revealSection(bundlesSectionRef.current);
       }, 80);
       return () => clearTimeout(timer);
     }
@@ -187,17 +192,17 @@ export const DataPage: React.FC = () => {
               <div className="p-2.5 rounded-xl bg-[#090d10] border border-slate-800">
                 <div className="text-amber-400 font-bold text-xs mb-0.5">MTN Ghana</div>
                 <div className="font-mono text-white text-xs font-semibold">Dial *138# or *310#</div>
-                <p className="text-[10px] text-slate-500 mt-1">Or check MyMTN App</p>
+                <p className="text-[10px] text-slate-400 mt-1">Or check MyMTN App</p>
               </div>
               <div className="p-2.5 rounded-xl bg-[#090d10] border border-slate-800">
                 <div className="text-red-400 font-bold text-xs mb-0.5">AirtelTigo (AT)</div>
                 <div className="font-mono text-white text-xs font-semibold">Dial *124# or *138#</div>
-                <p className="text-[10px] text-slate-500 mt-1">Checks iShare & core balance</p>
+                <p className="text-[10px] text-slate-400 mt-1">Checks iShare & core balance</p>
               </div>
               <div className="p-2.5 rounded-xl bg-[#090d10] border border-slate-800">
                 <div className="text-red-500 font-bold text-xs mb-0.5">Telecel Ghana</div>
                 <div className="font-mono text-white text-xs font-semibold">Dial *126# or *110#</div>
-                <p className="text-[10px] text-slate-500 mt-1">Telecel data balance</p>
+                <p className="text-[10px] text-slate-400 mt-1">Telecel data balance</p>
               </div>
             </div>
           </div>
@@ -247,7 +252,7 @@ export const DataPage: React.FC = () => {
   const handleSelectAirtime = () => {
     setDataProductMode('airtime');
     setTimeout(() => {
-      smoothScrollToElement(airtimeSectionRef.current, { block: 'start' });
+      revealSection(airtimeSectionRef.current);
     }, 50);
   };
 
@@ -323,11 +328,11 @@ export const DataPage: React.FC = () => {
           <div>
             <p className="text-xs font-semibold text-[#44df95] mb-1">Data & Airtime</p>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Stay connected.</h1>
-            <p className="text-sm text-slate-400 mt-1 max-w-xl">Pick a bundle, enter the number and pay with Mobile Money. You check the total before paying.</p>
+            <p className="text-sm text-slate-400 mt-1 max-w-xl">Data, Instant Bundles and airtime for MTN, AirtelTigo and Telecel. Pay with Mobile Money and see the total before you pay.</p>
           </div>
 
           {/* 4 Product Mode Navigation Tabs / Discovery Shortcuts */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div onFocus={revealFocusedChip} className="mh-chip-scroll items-center gap-2 -mx-4 px-4 sm:mx-0 sm:px-0">
             <div role="group" aria-label="Choose a service" className="inline-flex shrink-0 rounded-2xl bg-[#0c1217] border border-slate-800 p-1 gap-1">
               <button
                 type="button"
@@ -335,9 +340,7 @@ export const DataPage: React.FC = () => {
                 aria-pressed={dataProductMode === 'data'}
                 onClick={() => {
                   setDataProductMode('data');
-                  setTimeout(() => {
-                    smoothScrollToElement(bundlesSectionRef.current, { block: 'start' });
-                  }, 50);
+                  setTimeout(() => revealSection(bundlesSectionRef.current), 50);
                 }}
                 className={`min-h-11 px-4 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer ${
                   dataProductMode === 'data' ? 'bg-[#00c365] text-[#03160c]' : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
@@ -351,15 +354,13 @@ export const DataPage: React.FC = () => {
                 aria-pressed={dataProductMode === 'instant'}
                 onClick={() => {
                   setDataProductMode('instant');
-                  setTimeout(() => {
-                    smoothScrollToElement(bundlesSectionRef.current, { block: 'start' });
-                  }, 50);
+                  setTimeout(() => revealSection(bundlesSectionRef.current), 50);
                 }}
                 className={`min-h-11 px-4 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer inline-flex items-center gap-1.5 ${
-                  dataProductMode === 'instant' ? 'bg-amber-400 text-black' : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                  dataProductMode === 'instant' ? 'bg-[#00c365] text-[#03160c]' : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <Zap className={`w-3.5 h-3.5 ${dataProductMode === 'instant' ? 'fill-current' : 'text-amber-400'}`} />
+                <Zap aria-hidden="true" className={`w-3.5 h-3.5 ${dataProductMode === 'instant' ? 'fill-current' : 'text-amber-300'}`} />
                 Instant
               </button>
               <button
@@ -391,7 +392,7 @@ export const DataPage: React.FC = () => {
 
         {/* Dynamic Mode: Instant Bundles vs Airtime vs Standard Data */}
         {dataProductMode === 'instant' ? (
-          <div id="instant-bundles-section" ref={bundlesSectionRef} className="scroll-mt-6">
+          <div id="instant-bundles-section" ref={bundlesSectionRef} className="scroll-mt-24">
             <InstantBundlesCatalog
               onSwitchToData={() => setDataProductMode('data')}
               activeNetwork={activeNetwork}
@@ -439,7 +440,7 @@ export const DataPage: React.FC = () => {
                     </div>
                   ) : detectedAirtimeNet && isCompleteGhanaPhone(airtimePhone) ? (
                     <p className="text-slate-400 flex items-center gap-1"><Check className="w-3.5 h-3.5 text-[#44df95]" />{shortNetworkName(detectedAirtimeNet)} number</p>
-                  ) : <p className="text-slate-500">Check the number carefully. Airtime cannot be moved once sent.</p>}
+                  ) : <p className="text-slate-400">Check the number carefully. Airtime cannot be moved once sent.</p>}
               </div>
             </div>
 
@@ -535,19 +536,20 @@ export const DataPage: React.FC = () => {
                   />
                 </div>
               ) : (
-                <div role="group" aria-label="Filter by bundle size" className="flex items-center gap-1.5 overflow-x-auto no-scrollbar min-w-0 flex-1 -ml-4 pl-4 sm:ml-0 sm:pl-0">
+                <div ref={revealPressedChip} onFocus={revealFocusedChip} role="group" aria-label="Filter by bundle size" className="mh-chip-scroll items-center gap-1.5 min-w-0 flex-1 -ml-4 pl-4 sm:ml-0 sm:pl-0">
                   {([
-                    ['all', 'All sizes'],
-                    ['small', '1GB – 5GB'],
-                    ['medium', '6GB – 20GB'],
-                    ['large', '25GB+'],
-                  ] as const).map(([id, label]) => (
+                    ['all', 'All', 'All sizes'],
+                    ['small', '1–5GB', '1GB to 5GB'],
+                    ['medium', '6–20GB', '6GB to 20GB'],
+                    ['large', '25GB+', '25GB and more'],
+                  ] as const).map(([id, label, name]) => (
                     <button
                       key={id}
                       type="button"
+                      aria-label={name}
                       aria-pressed={sizeFilter === id}
                       onClick={() => setSizeFilter(id)}
-                      className={`min-h-10 px-3.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer shrink-0 border ${
+                      className={`min-h-10 px-3 rounded-full text-[13px] font-semibold tabular-nums whitespace-nowrap transition-colors cursor-pointer shrink-0 border ${
                         sizeFilter === id
                           ? 'bg-white text-[#0b1015] border-white'
                           : 'border-slate-700/80 text-slate-300 hover:text-white hover:border-slate-500'
@@ -597,7 +599,7 @@ export const DataPage: React.FC = () => {
             {/* Bundles: one list; the whole row opens checkout */}
             {filteredBundles.length > 0 ? (
               <>
-                <p className="text-xs text-slate-500" aria-live="polite">
+                <p className="text-xs text-slate-400" aria-live="polite">
                   {filteredBundles.length} {filteredBundles.length === 1 ? 'bundle' : 'bundles'}
                   {activeNetwork !== 'all' ? ` · ${GHANA_NETWORKS[activeNetwork].name}` : ' · all networks'}
                 </p>

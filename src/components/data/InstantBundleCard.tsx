@@ -58,14 +58,17 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({ product, o
     onBuy(product, { flexiAmount: Number(flexiValue.toFixed(2)) });
   };
 
+  // Special packages carry a coloured condition chip; standard data stays plain text, so the chips stand out as
+  // the packages that are not general-purpose data.
   const conditions = (
-    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-      <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold ${tone.chip}`}>
-        <CategoryIcon className="w-3 h-3 shrink-0" aria-hidden="true" />
-        {info.restrictionNote || info.categoryLabel}
-      </span>
-      {product.validity && <span className="text-xs text-slate-400">{product.validity}</span>}
-    </div>
+    <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-1">
+      {info.categoryKey === 'data' ? <span className="text-xs font-semibold text-slate-300">Standard data</span> : (
+        <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold ${tone.chip}`}>
+          <CategoryIcon className="w-3 h-3 shrink-0" aria-hidden="true" />
+          {info.restrictionNote || info.categoryLabel}
+        </span>
+      )}
+    </span>
   );
 
   if (product.isFlexi) {
@@ -76,7 +79,7 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({ product, o
           <NetworkBrandBadge network={product.network} size="sm" />
           <div className="min-w-0 flex-1">
             <p className="font-extrabold text-lg text-white leading-tight">You choose the amount</p>
-            <p className="text-xs text-slate-300 mt-0.5">{network.name}</p>
+            <p className="text-xs text-slate-300 mt-0.5">{network.name}{product.validity ? ` · ${product.validity}` : ''}</p>
             {conditions}
           </div>
         </div>
@@ -131,21 +134,24 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({ product, o
         : `Buy ${info.formattedAmount} ${network.name} ${info.categoryLabel} for ${ghs(product.retailPriceGhc)}${fee ? ` plus ${ghs(fee)} checkout fee` : ''}`}
       className={`mh-press group w-full text-left rounded-2xl border bg-[#0e141a] p-3.5 sm:p-4 flex items-center gap-3 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] disabled:cursor-not-allowed ${
         isOutOfStock ? 'border-slate-800/70 opacity-60' : 'border-slate-800/90 hover:border-[#00c365]/50 hover:bg-[#111922]'}`}>
-      <span className="self-start mt-0.5 shrink-0"><NetworkBrandBadge network={product.network} size="sm" /></span>
+      <span className="shrink-0"><NetworkBrandBadge network={product.network} size="sm" /></span>
       <span className="min-w-0 flex-1">
-        <span className="block font-extrabold text-lg text-white tracking-tight leading-tight">{info.formattedAmount}</span>
-        <span className="block text-xs text-slate-300 mt-0.5 truncate">{network.name}{info.restrictionNote ? ` · ${info.categoryLabel}` : ''}</span>
+        <span className="flex flex-wrap items-baseline gap-x-2">
+          <span className="font-extrabold text-lg text-white tracking-tight leading-tight">{info.formattedAmount}</span>
+          {product.validity && <span className="text-xs text-slate-400">{product.validity}</span>}
+        </span>
         {conditions}
       </span>
-      <span className="shrink-0 flex flex-col items-end gap-1.5">
+      {/* Price and fee above Buy, so the conditions keep the width they need on phones. */}
+      <span className="shrink-0 flex flex-col items-end gap-2">
         <span className="text-right">
           <Money ghc={product.retailPriceGhc} text="text-lg min-[360px]:text-xl" />
-          {fee ? <span className="block text-[11px] text-slate-400 mt-0.5 tabular-nums">+ {ghs(fee)} fee</span> : null}
-          {hasReferencePrice && <span className="block text-[11px] text-slate-500 tabular-nums">Network price {ghs(product.networkReferencePriceGhc!)}</span>}
+          {fee ? <span className="block text-[11px] text-slate-400 mt-1 tabular-nums">+ {ghs(fee)} fee</span> : null}
+          {hasReferencePrice && <span className="block text-[11px] text-slate-400 tabular-nums">Network price {ghs(product.networkReferencePriceGhc!)}</span>}
         </span>
-        <span aria-hidden="true" className={`mh-buy min-h-10 px-3 rounded-xl border font-bold text-sm flex items-center gap-1 ${isOutOfStock
+        <span aria-hidden="true" className={`mh-buy min-h-11 px-3.5 rounded-xl border font-bold text-sm flex items-center gap-1 ${isOutOfStock
           ? 'border-slate-700 bg-slate-800 text-slate-500'
-          : 'border-[#00c365]/40 bg-[#00c365]/10 text-[#44df95] group-hover:bg-[#00c365] group-hover:border-[#00c365] group-hover:text-[#03160c] group-focus-visible:bg-[#00c365] group-focus-visible:text-[#03160c]'}`}>
+          : 'border-[#00c365]/50 bg-[#00c365]/[0.14] text-[#5ae6a0] group-hover:bg-[#00c365] group-hover:border-[#00c365] group-hover:text-[#03160c] group-focus-visible:bg-[#00c365] group-focus-visible:text-[#03160c]'}`}>
           {isOutOfStock ? 'Unavailable' : <>Buy<ArrowRight className="w-3.5 h-3.5" /></>}
         </span>
       </span>

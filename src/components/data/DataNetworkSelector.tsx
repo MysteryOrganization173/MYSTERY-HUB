@@ -13,7 +13,7 @@ export function DataNetworkSelector({ value, onChange }: { value: NetworkId | 'a
       className="min-h-11 min-w-0 rounded-xl border px-1.5 sm:px-4 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
       style={value === network.id ? { backgroundColor: network.color, color: network.ink, borderColor: network.color }
         : { backgroundColor: '#101820', color: '#dce4ee', borderColor: '#334155' }}>
-      <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle" aria-hidden="true" style={{ backgroundColor: value === network.id ? network.ink : network.color }} />{network.label}
+      <span className="hidden min-[360px]:inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle" aria-hidden="true" style={{ backgroundColor: value === network.id ? network.ink : network.color }} />{network.label}
     </button>)}
   </div>;
 }

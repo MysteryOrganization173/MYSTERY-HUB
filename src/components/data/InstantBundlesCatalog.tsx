@@ -2,13 +2,14 @@ import { DataNetworkSelector } from './DataNetworkSelector';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getInstantBundlesOnServer, PublicInstantBundle } from '../../services/apiClient';
-import { InstantBundleCard } from './InstantBundleCard';
+import { InstantBundleCard, INSTANT_CATEGORY_TONE } from './InstantBundleCard';
 import { NetworkId, DataBundle } from '../../types';
 import { GHANA_NETWORKS } from '../../data/bundles';
 import {
   getInstantBundlePresentation,
   InstantBundleCategoryType,
 } from '../../utils/instantBundleUtils';
+import { revealPressedChip, revealFocusedChip } from '../../utils/scroll';
 import { Search, RefreshCw, WifiOff, Clock, PackageX, X, Info } from 'lucide-react';
 
 interface InstantBundlesCatalogProps {
@@ -178,7 +179,7 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
         <div>
           <h2 id="instant-title" className="text-lg sm:text-xl font-bold text-white tracking-tight">Instant Bundles</h2>
           <p className="text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
-            Network packages such as video, social and midnight bundles. Each one shows its conditions, and a small checkout fee is added and shown before you pay.
+            Video, social, midnight and standard network packages. Each one shows its conditions, and a small checkout fee is added and shown before you pay.
           </p>
         </div>
         <DataNetworkSelector value={selectedNetwork} onChange={setSelectedNetwork} />
@@ -195,12 +196,12 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
                 className="w-full bg-[#0c1217] border border-slate-700 rounded-xl pl-10 pr-3 min-h-11 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]" />
             </div>
           ) : (
-            <div role="group" aria-label="Filter by bundle type" className="flex items-center gap-1.5 overflow-x-auto no-scrollbar min-w-0 flex-1">
+            <div ref={revealPressedChip} onFocus={revealFocusedChip} role="group" aria-label="Filter by bundle type" className="mh-chip-scroll items-center gap-1.5 min-w-0 flex-1 -ml-4 pl-4 sm:ml-0 sm:pl-0">
               {(['all', ...(presentCategories.length > 1 ? presentCategories : [])] as const).map((catKey) => (
                 <button key={catKey} type="button" aria-pressed={selectedCategory === catKey} onClick={() => setSelectedCategory(catKey)}
-                  className={`mh-press min-h-10 px-3.5 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer shrink-0 border ${
+                  className={`mh-press min-h-10 px-3.5 rounded-full text-[13px] font-semibold whitespace-nowrap cursor-pointer shrink-0 border ${
                     selectedCategory === catKey ? 'bg-white text-[#0b1015] border-white' : 'border-slate-700/80 text-slate-300 hover:text-white hover:border-slate-500'}`}>
-                  {catKey === 'all' ? 'All types' : getCategoryFilterLabel(catKey)}
+                  {catKey === 'all' ? 'All types' : <span className="inline-flex items-center gap-1.5">{React.createElement(INSTANT_CATEGORY_TONE[catKey].icon, { 'aria-hidden': true, className: 'w-3.5 h-3.5 shrink-0' })}{getCategoryFilterLabel(catKey)}</span>}
                 </button>
               ))}
             </div>
@@ -259,7 +260,7 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
 
       {!isLoading && !error && isAvailable && filteredProducts.length > 0 && (
         <>
-          <p className="text-xs text-slate-500" aria-live="polite">
+          <p className="text-xs text-slate-400" aria-live="polite">
             {filteredProducts.length} {filteredProducts.length === 1 ? 'package' : 'packages'}
             {selectedNetwork !== 'all' ? ` · ${GHANA_NETWORKS[selectedNetwork].name}` : ' · all networks'}
           </p>

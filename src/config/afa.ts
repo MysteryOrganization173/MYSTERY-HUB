@@ -8,7 +8,12 @@ export interface AfaPackageInfo {
   onNetMins: number;
   offNetMins: number;
   cugMins: number;
-  sms: number;
+  /**
+   * null = included, but the amount is not confirmed. The previous monthly value (255) is not supported by any
+   * source checked on 2026-10-28: current AFA guides list 25, MTN's undated Help Center article lists 1,000 on-net
+   * and 50 off-net. Set the number here once the founder confirms it with the registration provider or MTN.
+   */
+  sms: number | null;
   dataMb?: number;
 }
 
@@ -28,35 +33,41 @@ export interface AfaConfig {
 export const AFA_CONFIG: AfaConfig = {
   serviceId: 'srv-afa',
   title: 'AFA Registration',
-  tagline: 'Register your MTN number for eligible AFA offers securely through Mystery Hub.',
+  tagline: 'Register your MTN line once, then buy AFA call and data packages from MTN.',
   disclaimer:
-    'Package information may change. Registration gives access to eligible AFA offers; package purchase and availability remain subject to MTN.',
+    'Package examples reported for AFA lines; MTN sets the packages and can change them, and its AFA menu shows the current ones before you pay. Registration gives access to eligible AFA offers; package purchase and availability remain subject to MTN.',
   privacyStatement:
     'Registration details are encrypted and handled securely by Mystery Hub. Never share your Ghana Card PIN or account passwords.',
   howItWorks: [
     {
       step: 1,
-      title: 'Enter registration details',
+      title: 'Enter your details',
       desc: 'Enter your legal details & MTN line.',
     },
     {
       step: 2,
-      title: 'Pay securely',
+      title: 'Pay the one-time fee',
       desc: 'Pay registration fee via Paystack or Mystery Wallet.',
     },
     {
       step: 3,
-      title: 'Mystery Hub submits registration',
+      title: 'We submit your registration',
       desc: 'After verified payment, our supplier processes registration.',
     },
     {
       step: 4,
-      title: 'Track progress in Orders',
+      title: 'Track it in Orders',
       desc: 'Track status in your Orders tab.',
     },
   ],
 };
 
+/**
+ * Package examples reported for AFA lines. They are information only: Mystery Hub sells the registration, and
+ * registered lines buy these packages from MTN, which sets and can change them. Minutes, CUG minutes and data below
+ * match the AFA package guides checked on 2026-10-28 (asetenapa.com, unorthodoxdigital.com); MTN's own undated
+ * Help Center article shows an older GH₵6 version.
+ */
 export const AFA_PACKAGES: AfaPackageInfo[] = [
   {
     id: 'afa-monthly-nodata',
@@ -68,7 +79,7 @@ export const AFA_PACKAGES: AfaPackageInfo[] = [
     onNetMins: 250,
     offNetMins: 30,
     cugMins: 500,
-    sms: 255,
+    sms: null,
   },
   {
     id: 'afa-monthly-data',
@@ -80,7 +91,7 @@ export const AFA_PACKAGES: AfaPackageInfo[] = [
     onNetMins: 180,
     offNetMins: 30,
     cugMins: 500,
-    sms: 255,
+    sms: null,
     dataMb: 250,
   },
   {
