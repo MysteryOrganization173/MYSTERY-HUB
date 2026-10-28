@@ -175,6 +175,9 @@
   .sd-chips { margin-inline: 0; padding-inline: 0; flex-wrap: wrap; overflow: visible; }
   .sd-preview-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+@media (min-width: 640px) and (max-width: 1023px) {
+  .sd-featured .sd-card:not(.sd-card-tile) { grid-column: 1 / -1; }
+}
 @media (min-width: 1024px) {
   .sd-inner { padding: 40px 32px 72px; }
   .sd-intro { grid-template-columns: minmax(0, 1fr) minmax(320px, 420px); align-items: end; gap: 20px 32px; }
