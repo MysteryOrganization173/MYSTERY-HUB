@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import {GoogleGenAI} from '@google/genai';
+import {GoogleGenAI,ThinkingLevel} from '@google/genai';
 import {createMysteryAiRouter} from '../../routes/mysteryAiApi.js';
 import {aiProviderDiagnostic,classifyAiError,knownServiceHelp} from '../../services/mysteryAiReliability.js';
 import {getGroundedLocalResponse,sendMysteryAiMessage} from '../../../src/services/mysteryAiService.js';
@@ -17,6 +17,26 @@ async function rawProvider(status:number,body:unknown,run:(base:string,calls:()=
  try{await run(`http://127.0.0.1:${(server.address() as any).port}`,()=>calls);}finally{server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
 }
 const post=(base:string,message='Unmatched synthetic question')=>fetch(base+'/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message})});
+test('default router allows a realistic answer beyond the old 3s cutoff without a duplicate model call',async()=>{
+ let calls=0;
+ const client=new GoogleGenAI({apiKey:'synthetic-not-a-secret',httpOptions:{fetch:async(_url,init)=>{
+  calls++;const body=JSON.parse(String(init?.body));assert.equal(body.generationConfig.thinkingConfig.thinkingLevel,ThinkingLevel.MINIMAL);assert.equal(body.generationConfig.maxOutputTokens,512);
+  await new Promise<void>((resolve,reject)=>{const timer=setTimeout(done,3200);function done(){init?.signal?.removeEventListener('abort',abort);resolve();}function abort(){clearTimeout(timer);reject(init?.signal?.reason);}init?.signal?.addEventListener('abort',abort,{once:true});});
+  return new Response(JSON.stringify({candidates:[{content:{parts:[{text:'A real delayed model answer'}]},finishReason:'STOP'}]}),{headers:{'content-type':'application/json'}});
+ }}});
+ const app=express();app.use(express.json(),createMysteryAiRouter({getClient:()=>client,catalog:async()=>({products:[]}) as any}));
+ const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));
+ try{const result=await(await post(`http://127.0.0.1:${(server.address() as any).port}`)).json();assert.equal(result.source,'gemini');assert.equal(result.fallback,false);assert.equal(calls,1);}finally{server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
+});
+
+test('complex routing uses supported low effort on Flash and keeps one transport attempt',async()=>{
+ let captured:any;
+ const client={models:{generateContent:async(input:any)=>{captured=input;return {text:'A concise comparison'};}}};
+ const app=express();app.use(express.json(),createMysteryAiRouter({getClient:()=>client as any,catalog:async()=>({products:[]}) as any}));
+ const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));
+ try{const result=await(await post(`http://127.0.0.1:${(server.address() as any).port}`,'Compare Website Builder and Ultra')).json();assert.equal(result.source,'gemini');assert.equal(captured.model,'gemini-3.8-flash');assert.equal(captured.config.thinkingConfig.thinkingLevel,ThinkingLevel.LOW);assert.equal(captured.config.httpOptions.retryOptions.attempts,1);assert.ok(captured.config.abortSignal);}finally{server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
+});
+
 test('real SDK reproduces the rejected timeout hint; transport cancellation without it succeeds',async()=>{
  const hints:Array<string|null>=[];
  const client=new GoogleGenAI({apiKey:'synthetic-not-a-secret',httpOptions:{fetch:async(_url,init)=>{const hint=new Headers(init?.headers).get('x-server-timeout');hints.push(hint);return new Response(JSON.stringify(hint?{error:{code:400,status:'INVALID_ARGUMENT',message:'Invalid server timeout'}}:{candidates:[{content:{parts:[{text:'OK'}]}}]}),{status:hint?400:200,headers:{'content-type':'application/json'}});}}});

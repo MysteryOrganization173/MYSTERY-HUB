@@ -56,6 +56,8 @@ Voice should be explicit tap-to-record with a permission request only at that ta
 - Developer/reseller API; custom domains and Builder monetization.
 - Existing operational/financial maintenance issues.
 
-Next priority: confirm genuine generation through the released chat after the timeout transport correction, then complete separately approved consenting-customer-device push acceptance. Neither requires another general feature sprint.
+Full-context live probes after removing the rejected header returned genuine text in 7.617s (default), 2.282s (explicit minimal effort), and 5.279s (Wallet question, minimal effort). The old 3s first-model cutoff cancelled legitimate answers. A follow-up allocates up to 8s to the selected model within the unchanged 9.5s total server and 12s frontend budgets. Any alternate call receives only the remaining total budget; the two-model maximum, cancellation, concurrency and cooldowns remain. Chat output is capped at 512 tokens, Flash-Lite uses supported minimal thinking and Flash uses low. Generic notification drafting also uses minimal effort within its unchanged 5s deadline and 250-token cap. This is evidence-based bounded tuning, not a guarantee against provider outages. Regressions cover a delayed raw-SDK answer beyond the old cutoff without a duplicate model call and supported complex routing.
+
+Next priority: confirm genuine generation through the released chat after bounded tuning, then complete separately approved consenting-customer-device push acceptance. Neither requires another general feature sprint.
 
 Official references: [Gemini Flash-Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite), [Gemini Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash), [SDK HTTP options](https://googleapis.github.io/js-genai/release_docs/interfaces/types.HttpOptions.html), [Google troubleshooting](https://ai.google.dev/gemini-api/docs/troubleshooting).

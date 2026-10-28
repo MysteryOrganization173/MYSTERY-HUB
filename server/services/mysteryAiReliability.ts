@@ -3,6 +3,7 @@ import {getGeminiClient} from './geminiClient.js';
 import {CommercialService} from './commercialService.js';
 import {buildMysteryAiSystemInstruction} from './mysteryAiContext.js';
 import {Router} from 'express';
+import {ThinkingLevel} from '@google/genai';
 import {requireAdmin} from '../middleware/authMiddleware.js';
 import {createRateLimiter} from '../middleware/rateLimiter.js';
 
@@ -66,10 +67,12 @@ export function createReliableMysteryAiRouter(validate:(body:any)=>Input,deps:{g
    const complex=input.message.trim().split(/\s+/).length>25||/rewrite|compose|draft a|compare|troubleshoot|explain why|critique|analy[sz]e|audit|marketing strategy|copywriting|professional tone/i.test(input.message);
    const models=complex?['gemini-3.8-flash','gemini-3.1-flash-lite']:['gemini-3.1-flash-lite','gemini-3.8-flash'];let failure:AiFailureCode='PROVIDER_UNAVAILABLE';
    for(const model of models){
-     try{const ms=Math.min(deps.attemptTimeoutMs??(model==='gemini-3.8-flash'?4500:3000),9500-(Date.now()-started));if(ms<=0){failure='TIMEOUT';break;}
+     // Full-context production probes completed in 2.3–7.6s. Give the selected model
+     // a useful share of the EXISTING overall budget instead of cancelling at 3s.
+     try{const ms=Math.min(deps.attemptTimeoutMs??8000,9500-(Date.now()-started));if(ms<=0){failure='TIMEOUT';break;}
        // SDK HttpOptions.timeout injects X-Server-Timeout, rejected with HTTP400 in this deployment.
        // Keep the same hard deadline via bounded() + transport abortSignal, without that server hint.
-       const result=await bounded(signal=>client.models.generateContent({model,contents,config:{systemInstruction:instruction,temperature:.7,topP:.9,maxOutputTokens:1024,abortSignal:signal,httpOptions:{retryOptions:{attempts:1}}}}),ms,request.signal);
+       const result=await bounded(signal=>client.models.generateContent({model,contents,config:{systemInstruction:instruction,temperature:.7,topP:.9,maxOutputTokens:512,thinkingConfig:{thinkingLevel:model==='gemini-3.1-flash-lite'?ThinkingLevel.MINIMAL:ThinkingLevel.LOW},abortSignal:signal,httpOptions:{retryOptions:{attempts:1}}}}),ms,request.signal);
        if(request.signal.aborted)return;
        if(result.promptFeedback?.blockReason||result.candidates?.some(c=>['SAFETY','BLOCKLIST','PROHIBITED_CONTENT','SPII'].includes(c.finishReason||''))){failure='SAFETY';counts.SAFETY=(counts.SAFETY||0)+1;break;}
        if(typeof result.text==='string'&&result.text.trim()){successfulGenerations++;lastSuccessAt=new Date().toISOString();res.json({reply:result.text,source:'gemini',fallback:false,model,routingClass:complex?'complex':'simple',latencyMs:Date.now()-started});return;}failure='EMPTY_RESPONSE';
