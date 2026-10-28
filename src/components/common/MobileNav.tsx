@@ -1,27 +1,32 @@
 import React from 'react';
 import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { ActivePage } from '../../types';
-import { Home, Wifi, Globe, Gift, Clock } from 'lucide-react';
+import { Home, Wifi, Globe, Gift, ReceiptText } from 'lucide-react';
 
+/**
+ * Phone tab bar (<768px): five fixed destinations with labels. The selected tab carries aria-current and a quiet
+ * green indicator behind its icon. Styling lives in index.css (.mh-bottom-nav-*), so it stays pure CSS.
+ */
 export const MobileNav: React.FC = () => {
-  const { activePage, setActivePage, orders, activeEditorSite, isMysteryAiOpen, isCheckoutOpen, isStatusModalOpen, isAuthModalOpen, selectedTemplatePreview, marketplaceInquiryProduct, waitlistInfo, isAccountOpen } = useApp();
+  const { activePage, setActivePage, activeEditorSite, isMysteryAiOpen, isCheckoutOpen, isStatusModalOpen, isAuthModalOpen, selectedTemplatePreview, marketplaceInquiryProduct, waitlistInfo, isAccountOpen } = useApp();
 
-  const navItems: { id: ActivePage; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  const navItems: { id: ActivePage; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number; 'aria-hidden'?: boolean }> }[] = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'data', label: 'Data', icon: Wifi },
     { id: 'website', label: 'Website', icon: Globe },
     { id: 'earn', label: 'Earn', icon: Gift },
-    { id: 'orders', label: 'Orders', icon: Clock },
+    { id: 'orders', label: 'Orders', icon: ReceiptText },
   ];
 
+  // Never cover an editor, payment, dialog or sheet: those surfaces own the bottom of the screen.
   if (activeEditorSite || isMysteryAiOpen || isCheckoutOpen || isStatusModalOpen || isAuthModalOpen || selectedTemplatePreview || marketplaceInquiryProduct || waitlistInfo.isOpen || isAccountOpen) return null;
 
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c1116]/95 backdrop-blur-lg border-t border-slate-800/90 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom,0px))] max-w-full overflow-hidden"
+      className="mh-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-40 pb-[env(safe-area-inset-bottom,0px)] max-w-full overflow-hidden"
     >
-      <div className="grid grid-cols-5 items-center h-13 max-w-md mx-auto w-full">
+      <div className="mh-bottom-nav-row grid grid-cols-5 max-w-md mx-auto w-full">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activePage === item.id;
@@ -29,35 +34,21 @@ export const MobileNav: React.FC = () => {
             <a
               key={item.id}
               href={ROUTE_PATH_MAP[item.id]}
-              aria-label={item.label}
-              aria-current={isActive ? "page" : undefined}
+              aria-current={isActive ? 'page' : undefined}
               onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                 e.preventDefault();
                 setActivePage(item.id);
               }}
-              className="flex flex-col items-center justify-center min-h-[44px] min-w-[44px] py-1 transition-colors relative cursor-pointer"
+              className="mh-bottom-nav-item"
             >
-              <div
-                className={`p-1 rounded-xl transition-all duration-200 ${
-                  isActive ? 'text-[#00c365] scale-110' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-              </div>
-              <span
-                className={`text-[11px] font-medium tracking-tight mt-0.5 ${
-                  isActive ? 'text-[#00c365] font-semibold' : 'text-slate-400'
-                }`}
-              >
-                {item.label}
+              <span className="mh-bottom-nav-indicator" aria-hidden="true">
+                <Icon className="mh-bottom-nav-icon" strokeWidth={isActive ? 2.25 : 1.85} aria-hidden />
               </span>
-              {item.id === 'orders' && orders.length > 0 && !isActive && (
-                <span className="absolute top-1 right-3 w-1.5 h-1.5 bg-[#00c365] rounded-full" />
-              )}
+              <span className="mh-bottom-nav-label">{item.label}</span>
             </a>
           );
         })}
-
       </div>
     </nav>
   );

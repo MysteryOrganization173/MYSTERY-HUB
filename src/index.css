@@ -232,3 +232,28 @@ html.mh-isolated-preview, html.mh-isolated-preview body { overscroll-behavior-y:
 .mh-route-fallback-indicator > span { width: 1rem; height: 1rem; border-radius: 9999px; border: 2px solid #2b3a45; border-top-color: #00c365; animation: mh-route-spin 800ms linear infinite; }
 @keyframes mh-route-reveal { to { opacity: 1; } }
 @keyframes mh-route-spin { to { transform: rotate(360deg); } }
+
+/* Mobile Navigation V2: a graphite tab bar. Precise rather than loud: hairline edge, soft depth, and a Material-style
+   green pill behind the selected icon. Labels always show; motion is a short colour change and respects reduced motion. */
+.mh-bottom-nav {
+  background: linear-gradient(180deg, rgb(17 23 27 / .88), rgb(9 13 16 / .95));
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+  border-top: 1px solid rgb(255 255 255 / .07);
+  box-shadow: 0 -12px 28px -14px rgb(0 0 0 / .75), inset 0 1px 0 rgb(255 255 255 / .03);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .mh-bottom-nav { background: #0b1013; } }
+.mh-bottom-nav-row { height: 64px; padding-inline: 4px; }
+.mh-bottom-nav-item { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 44px; min-height: 48px; height: 100%; color: #95a4ac; text-decoration: none; border-radius: 16px; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.mh-bottom-nav-indicator { display: grid; place-items: center; width: 56px; height: 30px; border-radius: 999px; transition: background-color 180ms ease, transform 120ms ease; }
+.mh-bottom-nav-icon { width: 22px; height: 22px; transition: color 180ms ease; }
+.mh-bottom-nav-label { font-size: .75rem; font-weight: 600; line-height: 1; letter-spacing: .005em; white-space: nowrap; transition: color 180ms ease; }
+.mh-bottom-nav-item[aria-current='page'] { color: #eef8f2; }
+.mh-bottom-nav-item[aria-current='page'] .mh-bottom-nav-indicator { background: rgb(0 195 101 / .16); box-shadow: inset 0 0 0 1px rgb(0 195 101 / .22); }
+.mh-bottom-nav-item[aria-current='page'] .mh-bottom-nav-icon { color: #48e292; }
+.mh-bottom-nav-item[aria-current='page'] .mh-bottom-nav-label { font-weight: 700; }
+.mh-bottom-nav-item:active .mh-bottom-nav-indicator { background: rgb(255 255 255 / .07); transform: scale(.96); }
+.mh-bottom-nav-item[aria-current='page']:active .mh-bottom-nav-indicator { background: rgb(0 195 101 / .24); }
+.mh-bottom-nav-item:focus-visible { outline: 2px solid #34d399; outline-offset: -3px; }
+@media (hover: hover) { .mh-bottom-nav-item:not([aria-current='page']):hover { color: #d3dde1; } }
+@media (prefers-reduced-motion: reduce) { .mh-bottom-nav-indicator, .mh-bottom-nav-icon, .mh-bottom-nav-label { transition: none; } .mh-bottom-nav-item:active .mh-bottom-nav-indicator { transform: none; } }
