@@ -1,0 +1,197 @@
+/* Service Discovery V2: All Services (/services) and its planned-service previews.
+   Same family as the signed-in home: deep green-black surfaces, one green accent, quiet borders, no glow. */
+.sd-page {
+  --sd-line: #1f2d27; --sd-line-2: #2c4a3b; --sd-surface: #0d1513; --sd-raised: #111c18;
+  --sd-text: #f1f6f3; --sd-text-2: #b6c4be; --sd-text-3: #93a69e; --sd-accent: #8ee8b7;
+  position: relative; isolation: isolate; background: #070b0e; color: var(--sd-text);
+}
+.sd-page::before { content: ''; position: absolute; inset: 0 0 auto; height: 320px; z-index: -1; pointer-events: none;
+  background: radial-gradient(55% 90% at 88% 0%, #0f5a3459, transparent 70%), radial-gradient(40% 70% at 0% 0%, #0b3a2433, transparent 70%); }
+.sd-inner { max-width: 1180px; margin-inline: auto; padding: 20px 16px 40px; display: grid; gap: 22px; min-width: 0; }
+.sd-page :is(button, a, input):focus-visible { outline: 2px solid var(--brand-green); outline-offset: 2px; }
+.sd-page h2 { font-family: var(--font-heading); font-size: 1.1875rem; font-weight: 700; letter-spacing: -.01em; color: var(--sd-text); }
+.sd-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Introduction: compact, so services start in the first screen. */
+.sd-intro { display: grid; gap: 12px; min-width: 0; }
+.sd-eyebrow { color: var(--sd-accent); font-size: .8125rem; font-weight: 700; letter-spacing: .02em; }
+.sd-intro h1 { font-family: var(--font-heading); font-size: clamp(1.75rem, 7.4vw, 2.75rem); font-weight: 750; letter-spacing: -.03em; line-height: 1.08; }
+.sd-intro-copy > p:last-child { margin-top: 6px; color: var(--sd-text-2); font-size: .9375rem; line-height: 1.55; max-width: 40rem; }
+
+/* Search + categories */
+.sd-search { position: relative; display: flex; align-items: center; }
+.sd-search > svg { position: absolute; left: 14px; color: var(--sd-text-3); pointer-events: none; }
+.sd-search input { width: 100%; min-height: 50px; padding: 0 48px 0 44px; border-radius: 14px; border: 1px solid #2a3a33; background: #0b1311; color: var(--sd-text); font-size: 1rem; transition: border-color 150ms, background-color 150ms; }
+.sd-search input::placeholder { color: #7f948b; }
+.sd-search input:focus { outline: none; border-color: var(--brand-green); background: #0d1714; }
+.sd-search input::-webkit-search-cancel-button { display: none; }
+.sd-search-clear { position: absolute; right: 4px; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: var(--sd-text-2); cursor: pointer; }
+.sd-search-clear:hover { color: var(--sd-text); background: #15211c; }
+.sd-chips { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: none; margin-inline: -16px; padding: 2px 16px; scroll-padding-inline: 16px; }
+.sd-chips::-webkit-scrollbar { display: none; }
+.sd-chip { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #24342d; background: #0c1412; color: var(--sd-text-2); font-size: .8125rem; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background-color 150ms, border-color 150ms, color 150ms; }
+.mh-app .sd-chip { min-height: 40px; }
+.sd-chip:hover { border-color: #35574a; color: var(--sd-text); }
+.sd-chip[aria-pressed='true'] { background: #e8f7ef; border-color: #e8f7ef; color: #05140c; }
+.sd-chip-count { font-size: .6875rem; font-weight: 700; color: var(--sd-text-3); font-variant-numeric: tabular-nums; }
+.sd-chip[aria-pressed='true'] .sd-chip-count { color: #2c5a41; }
+.sd-results { color: var(--sd-text-2); font-size: .875rem; }
+
+/* Sections */
+.sd-section { display: grid; gap: 12px; min-width: 0; }
+.sd-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sd-section-head p { color: var(--sd-text-3); font-size: .8125rem; }
+.sd-count { margin-left: 8px; font-family: var(--font-body); font-size: .75rem; font-weight: 700; color: var(--sd-text-3); font-variant-numeric: tabular-nums; }
+
+/* Status badges: green for usable today, neutral for planned, amber for paused. */
+.sd-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: .6875rem; font-weight: 700; letter-spacing: .01em; white-space: nowrap; line-height: 1.4; }
+.sd-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.sd-badge-available { background: #10301f; color: #7ee2aa; }
+.sd-badge-checking { background: #1c252c; color: #c3ced6; }
+.sd-badge-unavailable { background: #3a2a0b; color: #fcd34d; }
+.sd-badge-coming_soon { background: #1b2230; color: #c7d2fe; }
+.sd-badge-coming_soon::before { background: transparent; border: 1.5px solid currentColor; width: 7px; height: 7px; }
+
+/* Service icon tile, tinted by the service accent (set inline as --accent). */
+.sd-icon { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, #0b1311); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+
+/* Available services: one card structure at every width; the grid decides the layout. */
+.sd-grid { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+.sd-card { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; align-content: start; padding: 16px; border-radius: var(--radius-panel); border: 1px solid var(--sd-line); background: var(--sd-surface); color: inherit; text-decoration: none; cursor: pointer; transition: border-color 150ms, background-color 150ms, transform 150ms; min-width: 0; }
+.sd-card:hover { border-color: #33584a; background: #0f1916; }
+.sd-card:active { transform: translateY(1px); }
+.sd-card .sd-icon { grid-row: span 3; }
+.sd-card-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.sd-card h3 { font-family: var(--font-heading); font-size: 1.0625rem; font-weight: 700; letter-spacing: -.01em; line-height: 1.25; overflow-wrap: anywhere; }
+.sd-card-desc { color: var(--sd-text-2); font-size: .8125rem; line-height: 1.55; }
+.sd-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.sd-card-action { display: inline-flex; align-items: center; gap: 6px; color: var(--sd-accent); font-size: .875rem; font-weight: 700; }
+.sd-card-action svg { transition: transform 150ms; }
+.sd-card:hover .sd-card-action svg { transform: translateX(3px); }
+.sd-card-meta { color: var(--sd-text-3); font-size: .75rem; }
+.sd-networks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.sd-networks span { padding: 2px 8px; border-radius: 6px; background: #0a1210; border: 1px solid #1d2b25; color: var(--sd-text-2); font-size: .6875rem; font-weight: 600; }
+
+/* Featured: the everyday purchases and the free website, with a little more presence. */
+.sd-card-featured { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 11%, #0d1513) 0%, var(--sd-surface) 62%); border-color: color-mix(in srgb, var(--accent) 22%, var(--sd-line)); }
+.sd-card-featured:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--sd-line)); }
+.sd-card-featured .sd-icon { width: 48px; height: 48px; border-radius: 14px; }
+.sd-card-featured h3 { font-size: 1.1875rem; }
+.sd-card-primary .sd-card-action { display: inline-flex; min-height: 40px; padding: 0 14px; border-radius: 11px; background: var(--brand-green); color: #05140c; }
+.sd-card-primary:hover .sd-card-action { background: #16d577; }
+
+/* Phones: Data and Airtime sit side by side as compact tiles (a short line instead of the full description),
+   so the first screen reaches real services; Website Builder keeps the full width below them. */
+.sd-card-tagline { display: none; }
+@media (max-width: 639px) {
+  .sd-featured { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sd-featured .sd-card:not(.sd-card-tile) { grid-column: 1 / -1; }
+  .sd-card-tile { grid-template-columns: minmax(0, 1fr); padding: 14px; gap: 6px; }
+  .sd-card-tile .sd-icon { grid-row: auto; width: 40px; height: 40px; border-radius: 12px; }
+  .sd-card-tile h3 { font-size: 1.0625rem; }
+  .sd-card-tile .sd-card-desc, .sd-card-tile .sd-networks { display: none; }
+  .sd-card-tile .sd-card-tagline { display: block; color: var(--sd-text-2); font-size: .75rem; line-height: 1.45; }
+  .sd-card-tile .sd-card-foot { margin-top: 2px; }
+  .sd-card-tile.sd-card-primary .sd-card-action { padding: 0 12px; }
+}
+
+/* Paused (AFA when its runtime check says so): a quiet row, never in "Available now". */
+.sd-paused { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-card); border: 1px dashed #4a3d1d; background: #13110b; color: inherit; text-decoration: none; }
+.sd-paused p { flex: 1; min-width: 0; color: var(--sd-text-2); font-size: .8125rem; line-height: 1.45; }
+.sd-paused strong { color: var(--sd-text); }
+
+/* Coming soon cards: a visual, the plan in one line, and a preview (never a waitlist) as the action. */
+.sd-soon-grid { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+.sd-soon { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 14px; align-items: center; padding: 10px 14px 10px 10px; border-radius: var(--radius-panel); border: 1px solid var(--sd-line); background: #0b1210; color: inherit; text-decoration: none; cursor: pointer; transition: border-color 150ms, background-color 150ms; min-width: 0; }
+.sd-soon:hover { border-color: #2f4a5c; background: #0d1517; }
+.sd-soon .sd-visual { height: 88px; border-radius: 14px; }
+.sd-soon-body { display: grid; gap: 4px; min-width: 0; justify-items: start; }
+.sd-soon h3 { font-family: var(--font-heading); font-size: 1rem; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.sd-soon-body > p { color: var(--sd-text-2); font-size: .8125rem; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sd-soon .sd-card-action { color: #c7d2fe; font-size: .8125rem; }
+
+/* Visual: approved artwork where it exists, otherwise an icon composition in the service accent. */
+.sd-visual { position: relative; overflow: hidden; display: grid; place-items: center; background: radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--accent) 30%, #0b1311) 0%, #0a1110 65%); color: var(--accent); }
+.sd-visual::before { content: ''; position: absolute; inset: 0; opacity: .5; background-image: linear-gradient(#ffffff0a 1px, transparent 1px), linear-gradient(90deg, #ffffff0a 1px, transparent 1px); background-size: 18px 18px; mask-image: radial-gradient(circle at 70% 30%, #000, transparent 75%); }
+.sd-visual > svg { position: relative; width: 38%; height: auto; max-width: 64px; opacity: .95; }
+.sd-visual img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sd-visual-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, #0a111099); }
+
+/* Help strip and empty state */
+.sd-help { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px; border-radius: var(--radius-panel); border: 1px solid var(--sd-line); background: var(--sd-surface); }
+.sd-help p { color: var(--sd-text-2); font-size: .875rem; }
+.sd-help strong { display: block; color: var(--sd-text); font-family: var(--font-heading); font-size: 1rem; }
+.sd-empty { display: grid; justify-items: center; gap: 10px; padding: 32px 16px; text-align: center; border-radius: var(--radius-panel); border: 1px dashed #2a3a33; }
+.sd-empty h2 { font-size: 1.0625rem; }
+.sd-empty p { color: var(--sd-text-2); font-size: .875rem; max-width: 26rem; }
+.sd-empty-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+
+/* ---------------- Planned-service preview ---------------- */
+.sd-preview { display: grid; gap: 18px; min-width: 0; }
+.sd-back { justify-self: start; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding-right: 8px; color: var(--sd-accent); font-size: .875rem; font-weight: 600; text-decoration: none; cursor: pointer; }
+.sd-back:hover { color: #d1f9e1; }
+.sd-preview-hero { display: grid; gap: 16px; }
+.sd-preview-hero .sd-visual { aspect-ratio: 16 / 9; border-radius: var(--radius-panel); border: 1px solid var(--sd-line); }
+.sd-preview-hero .sd-visual > svg { max-width: 96px; width: 22%; }
+.sd-preview-head { display: grid; gap: 8px; align-content: center; }
+.sd-preview-kicker { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--sd-text-3); font-size: .8125rem; font-weight: 600; }
+.sd-preview-head h1, .sd-preview-title, .sd-preview-missing { font-family: var(--font-heading); font-size: clamp(1.625rem, 6.6vw, 2.5rem); font-weight: 750; letter-spacing: -.025em; line-height: 1.1; overflow-wrap: anywhere; outline: none; }
+.sd-preview-head > p { color: var(--sd-text-2); font-size: .9375rem; line-height: 1.6; max-width: 38rem; }
+.sd-notice { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--radius-card); background: #121a2a; border: 1px solid #2b3856; color: #dbe3ff; font-size: .875rem; line-height: 1.5; }
+.sd-notice svg { flex: none; margin-top: 2px; color: #a5b4fc; }
+.sd-preview-cols { display: grid; gap: 12px; }
+.sd-panel { display: grid; gap: 10px; align-content: start; padding: 16px; border-radius: var(--radius-panel); border: 1px solid var(--sd-line); background: var(--sd-surface); min-width: 0; }
+.sd-panel h2 { font-size: 1.0625rem; }
+.sd-list { display: grid; gap: 8px; }
+.sd-list li { display: flex; gap: 10px; align-items: flex-start; color: var(--sd-text-2); font-size: .875rem; line-height: 1.5; }
+.sd-list li svg { flex: none; margin-top: 3px; color: var(--accent); }
+.sd-fine { color: var(--sd-text-3); font-size: .75rem; line-height: 1.5; }
+/* Planned journey: an illustration of steps, deliberately nothing like a form (no fields, prices or pay button). */
+.sd-journey ol { display: grid; gap: 0; counter-reset: sd-step; }
+.sd-journey li { position: relative; display: flex; gap: 12px; align-items: flex-start; padding-bottom: 14px; color: var(--sd-text); font-size: .9375rem; font-weight: 600; line-height: 1.4; counter-increment: sd-step; }
+.sd-journey li:last-child { padding-bottom: 0; }
+.sd-journey li::before { content: counter(sd-step); flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, #0b1311); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); color: var(--accent); font-size: .8125rem; font-weight: 700; }
+.sd-journey li:not(:last-child)::after { content: ''; position: absolute; left: 13.5px; top: 30px; bottom: 2px; width: 1px; background: #26372f; }
+.sd-journey li span { padding-top: 4px; }
+.sd-notify { display: grid; gap: 12px; padding: 18px 16px; border-radius: var(--radius-panel); border: 1px solid var(--sd-line-2); background: linear-gradient(150deg, #0f2219, #0c1513 70%); }
+.sd-notify p { color: var(--sd-text-2); font-size: .875rem; line-height: 1.55; max-width: 44rem; }
+.sd-notify .mh-button { justify-self: start; }
+.sd-explore { display: grid; gap: 12px; }
+.sd-explore-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.sd-explore-links a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid #24342d; background: #0c1412; color: var(--sd-text); font-size: .8125rem; font-weight: 600; text-decoration: none; }
+.sd-explore-links a:hover { border-color: #35574a; }
+.sd-explore-links a svg { color: var(--accent); }
+.sd-explore h3 { font-size: .8125rem; font-weight: 700; color: var(--sd-text-3); }
+
+@media (min-width: 480px) {
+  .sd-soon-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .sd-soon { grid-template-columns: minmax(0, 1fr); align-items: stretch; align-content: start; padding: 0; overflow: hidden; }
+  .sd-soon .sd-visual { height: auto; aspect-ratio: 16 / 8; border-radius: 0; }
+  .sd-soon-body { padding: 4px 16px 16px; }
+}
+@media (min-width: 640px) {
+  .sd-inner { padding: 32px 24px 56px; gap: 28px; }
+  .sd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .sd-chips { margin-inline: 0; padding-inline: 0; flex-wrap: wrap; overflow: visible; }
+  .sd-preview-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  .sd-featured .sd-card:not(.sd-card-tile) { grid-column: 1 / -1; }
+}
+@media (min-width: 1024px) {
+  .sd-inner { padding: 40px 32px 72px; }
+  .sd-intro { grid-template-columns: minmax(0, 1fr) minmax(320px, 420px); align-items: end; gap: 20px 32px; }
+  .sd-intro .sd-chips, .sd-intro .sd-results { grid-column: 1 / -1; }
+  .sd-featured { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sd-grid:not(.sd-featured) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .sd-grid:not(.sd-featured) .sd-card { grid-template-columns: minmax(0, 1fr); }
+  .sd-grid:not(.sd-featured) .sd-card .sd-icon { grid-row: auto; margin-bottom: 6px; }
+  .sd-soon-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .sd-preview { gap: 24px; }
+  .sd-preview-hero { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 28px; align-items: center; }
+  .sd-preview-hero .sd-visual { order: 2; }
+  .sd-preview-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sd-page *, .sd-page *::before, .sd-page *::after { transition: none !important; }
+}

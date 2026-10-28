@@ -256,7 +256,13 @@ export interface DigitalService {
   status: ServiceStatus;
   iconName: string;
   accentColor: string;
-  targetPage?: 'wallet' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'afa';
+  targetPage?: 'wallet' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'afa' | 'earn';
+  /** Data page mode to open with (Airtime shares the Data page). */
+  dataMode?: 'data' | 'airtime';
+  /** Short line for the compact phone tile of a featured service. */
+  tagline?: string;
+  /** Extra words people search with (e.g. "light bill" for ECG). */
+  keywords?: string[];
   artworkUrl?: string;
 }
 

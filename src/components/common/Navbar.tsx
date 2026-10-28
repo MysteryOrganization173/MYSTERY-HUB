@@ -5,6 +5,7 @@ import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { BrandLogo } from './BrandLogo';
 import { ActivePage } from '../../types';
 import { openMarketplaceAt } from '../../utils/marketplaceBrowse';
+import { openServicesAt } from '../../utils/serviceDirectory';
 import {
   Search,
   ShoppingBag,
@@ -106,7 +107,8 @@ export const Navbar: React.FC = () => {
       // Land on matching products rather than the full feed ("marketplace" itself is just navigation).
       openMarketplaceAt(setActivePage, { q: /market/.test(q) ? '' : searchQuery.trim() });
     } else {
-      setActivePage('services');
+      // Anything else is looked up in the service directory (e.g. "electricity", "dstv").
+      openServicesAt(setActivePage, { q: searchQuery.trim() });
     }
     setSearchOpen(false);
     setSearchQuery('');
