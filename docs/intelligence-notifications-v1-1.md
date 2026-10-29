@@ -62,4 +62,6 @@ Production acceptance after bounded tuning returned nine genuine model answers a
 
 Next priority: complete separately approved consenting-customer-device push acceptance. It does not require another general feature sprint.
 
+The final complex comparison exposed a missing knowledge entry: the model denied Ultra existed. The shared guide/context now include the existing ULTRA_SERVICE identity and custom-build enquiry contract, distinct from Free self-service Builder, with no invented quote, acceptance, subscription or generation capability. No Ultra workflow, price or enquiry record changes.
+
 Official references: [Gemini Flash-Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite), [Gemini Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash), [SDK HTTP options](https://googleapis.github.io/js-genai/release_docs/interfaces/types.HttpOptions.html), [Google troubleshooting](https://ai.google.dev/gemini-api/docs/troubleshooting).

@@ -89,6 +89,13 @@ test('Wallet guide rejects withdrawals; Earn guide never invents economics or re
  assert.match(knownServiceHelp('How does Mystery Earn work?')!,/effective reward policy/);
  assert.match(buildMysteryAiSystemInstruction(undefined,[]),/current availability/);
 });
+
+test('Ultra comparison is grounded in the existing custom-build enquiry, never denied or sold as a subscription',()=>{
+ const q='Compare Website Builder and Ultra',guide=knownServiceHelp(q)!;
+ assert.match(guide,/custom website-build enquiry/);assert.match(guide,/free self-service Website Builder/);assert.match(guide,/confirm scope, quote and acceptance/);assert.match(guide,/not an instant AI website generator or a subscription/);
+ assert.equal(getGroundedLocalResponse(q,'home')?.reply,guide);assert.ok(buildMysteryAiSystemInstruction(undefined,[]).includes(guide));assert.doesNotMatch(guide,/GH₵|accepted your project|does not exist/);
+ assert.match(knownServiceHelp('My Ultra order refund')!,/Refunds remain unconfirmed until verified/);
+});
 test('a response with missing provenance is never labelled genuine AI',async()=>{
  const old=globalThis.fetch;globalThis.fetch=async()=>new Response(JSON.stringify({reply:'unverified answer'}),{status:200});
  try{await assert.rejects(()=>sendMysteryAiMessage('Explain quantum physics','home',[]));const answer=await sendMysteryAiMessage('Hi','home',[]);assert.equal(answer.source,'scripted');assert.notEqual(answer.reply,'unverified answer');}finally{globalThis.fetch=old;}
