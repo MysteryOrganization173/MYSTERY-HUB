@@ -4,7 +4,7 @@
  * real delivery conditions, and active services without exposing internal supplier plumbing.
  */
 
-import {publicServiceKnowledge} from '../../shared/mysteryAiKnowledge.js';
+import {publicServiceKnowledge,ultraServiceKnowledge} from '../../shared/mysteryAiKnowledge.js';
 import { AIRTIME_SERVICE_FEE_PERCENT } from '../data/airtimePricing.js';
 import { AUTHORITATIVE_PRODUCTS, type AuthoritativeProduct } from '../data/productCatalog.js';
 
@@ -87,6 +87,7 @@ CURRENT MYSTERY HUB SERVICES & STATUS:
 
 AUTHORITATIVE PUBLIC SERVICE DIRECTORY (descriptions, not a guarantee of runtime availability):
 ${publicServiceKnowledge()}
+${ultraServiceKnowledge()}
 - AFA availability must be checked on its page; a catalogue entry does not confirm live supplier availability.
 - Mystery Earn rewards follow the effective policy and qualifying purchases. Never invent a percentage, fixed reward or customer eligibility.
 
