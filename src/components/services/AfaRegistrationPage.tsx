@@ -359,7 +359,7 @@ export const AfaRegistrationPage: React.FC = () => {
           <div className="space-y-3 sm:space-y-4 min-w-0">
             <div className="space-y-1.5 sm:space-y-2">
               <p className="text-xs font-semibold text-[#44df95]">MTN AFA registration</p>
-              <h1 id="afa-title" className="text-[1.6rem] leading-[1.12] sm:text-4xl font-extrabold text-white tracking-tight">More ways to stay connected</h1>
+              <h1 id="afa-title" className="text-[1.6rem] leading-[1.12] sm:text-4xl font-extrabold text-white tracking-tight">Get more from your MTN line</h1>
               <p className="text-[15px] sm:text-base text-slate-300 leading-relaxed max-w-xl">{afaConfig.tagline}</p>
             </div>
             <div className="space-y-2">
