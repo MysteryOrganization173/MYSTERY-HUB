@@ -5,6 +5,7 @@
  * downloaded and would otherwise be missed. No React here, so the entry script stays tiny. Business websites
  * (/sites/:slug) never offer Mystery Hub's install: their visitors are the owner's customers.
  */
+import {trackGrowth} from '../utils/growthAnalytics';
 export interface InstallPromptEvent extends Event {
   prompt(): Promise<void>;
   readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform?: string }>;
@@ -35,6 +36,7 @@ export function captureInstallPrompt(win: Window = window) {
   win.addEventListener('appinstalled', () => {
     deferred = null;
     installedThisVisit = true;
+    trackGrowth('installed',{page:win.location.pathname==='/app'?'app':'home'});
     try { win.localStorage.setItem(INSTALLED_AT_KEY, new Date().toISOString()); } catch { /* storage unavailable */ }
     notify();
   });
@@ -50,13 +52,16 @@ export function subscribeInstallPrompt(listener: () => void) {
 
 /** Must be called from a click handler. A prompt can be shown once, so it is released whatever the answer. */
 export async function promptInstall(): Promise<InstallOutcome> {
+  trackGrowth('install_action',{page:typeof location!=='undefined'&&location.pathname==='/app'?'app':'home'});
   const event = deferred;
   if (!event) return 'unavailable';
   deferred = null;
   notify();
   try {
     await event.prompt();
+    trackGrowth('install_prompt',{page:typeof location!=='undefined'&&location.pathname==='/app'?'app':'home'});
     const { outcome } = await event.userChoice;
+    trackGrowth(outcome==='accepted'?'install_accepted':'install_dismissed',{page:typeof location!=='undefined'&&location.pathname==='/app'?'app':'home'});
     return outcome;
   } catch {
     return 'unavailable';

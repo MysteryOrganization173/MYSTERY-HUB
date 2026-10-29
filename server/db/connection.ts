@@ -8,6 +8,7 @@ import { WEBSITE_CHECKPOINT_SCHEMA } from './websiteCheckpointSchema.js';
 import { COMMERCIAL_SCHEMA } from './commercialSchema.js';
 import { WEBSITE_BUSINESS_SCHEMA } from './websiteBusinessSchema.js';
 import { WEBSITE_FREE_SCHEMA } from './websiteFreeSchema.js';
+import {GROWTH_ANALYTICS_SCHEMA} from './growthAnalyticsSchema.js';
 import { FINANCE_SCHEMA } from './financeSchema.js';
 import { AFA_SCHEMA } from './afaSchema.js';
 import { MARKETPLACE_FLEXIBILITY_SCHEMA } from './marketplaceFlexibilitySchema.js';
@@ -383,6 +384,7 @@ export async function initDatabase(): Promise<void> {
     baseTables.push({ name: 'website_publishing_snapshots', sql: WEBSITE_PUBLISHING_SCHEMA });
     baseTables.push({ name: 'website_draft_checkpoints', sql: WEBSITE_CHECKPOINT_SCHEMA });
     baseTables.push({ name: 'website_free_media_analytics', sql: WEBSITE_FREE_SCHEMA });
+    baseTables.push({name:'growth_analytics_indexes_access',sql:GROWTH_ANALYTICS_SCHEMA});
     baseTables.push({ name: 'website_ultra_enquiries', sql: ULTRA_ENQUIRY_SCHEMA });
     baseTables.push({ name: 'marketplace_assets', sql: MARKETPLACE_ASSET_SCHEMA });
     for (const table of baseTables) {

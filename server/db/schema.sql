@@ -757,3 +757,14 @@ DO $$ DECLARE t text;r text;BEGIN
 END $$;
 REVOKE ALL ON FUNCTION mysteryhub_notifications.capture_order_event() FROM PUBLIC;
 REVOKE ALL ON FUNCTION mysteryhub_notifications.snapshot_template() FROM PUBLIC;
+
+-- Analytics & Growth V1: additive indexes, backend-only access, no backfill.
+ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON analytics_events FROM PUBLIC;
+DO $$ BEGIN
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') THEN REVOKE ALL ON analytics_events FROM anon; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN REVOKE ALL ON analytics_events FROM authenticated; END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_analytics_growth_dedupe ON analytics_events(event_name,visitor_id,session_id,entity_id,created_at);
+CREATE INDEX IF NOT EXISTS idx_analytics_visitor_history ON analytics_events(visitor_id,event_name,created_at);
+CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics_events(created_at);
