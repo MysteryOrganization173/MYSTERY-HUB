@@ -27,6 +27,19 @@ export function classifyAiError(error:unknown):AiFailureCode {
 }
 /** Same public guide as the offline frontend; never represented as model generation. */
 export const knownServiceHelp = (message:string) => mysteryHubGuide(message)?.reply ?? null;
+/** Conservative boundary for the unverified delivery promises observed in live replies.
+ * This is not a general fact-checker; unrelated website publishing stays unaffected.
+ */
+export function hasUnsupportedDeliveryClaim(reply:string):boolean {
+ return reply.split(/[.!?\n]/).some(sentence=>{
+   if(!/\b(?:airtime|recharge|bundles?|delivery|delivered|fulfilment)\b/i.test(sentence))return false;
+   for(const match of sentence.matchAll(/\b(?:instant(?:ly)?|immediate(?:ly)?|guaranteed)\b/gi)){
+     const before=sentence.slice(Math.max(0,match.index!-40),match.index);
+     if(!/\b(?:not|never|cannot|can't|no|without|isn't|aren't|don't|doesn't)(?:\W+\w+){0,3}\W*$/i.test(before))return true;
+   }
+   return false;
+ });
+}
 export async function bounded<T>(work:(signal:AbortSignal)=>Promise<T>,ms:number,parent?:AbortSignal):Promise<T> {
  const controller=new AbortController();const cancel=()=>controller.abort(parent?.reason||new DOMException('Cancelled','AbortError'));
  if(parent?.aborted)cancel();else parent?.addEventListener('abort',cancel,{once:true});
@@ -51,7 +64,7 @@ export function createReliableMysteryAiRouter(validate:(body:any)=>Input,deps:{g
  const finish=(code:AiFailureCode)=>{
    if(request.signal.aborted||res.destroyed)return;
    const reply=knownServiceHelp(input.message);
-   if(reply){res.json({reply,source:'guide',fallback:true,code,retryable:code!=='CONFIGURATION',latencyMs:Date.now()-started});return;}
+   if(reply){res.json({reply,source:'guide',fallback:true,code,retryable:!['CONFIGURATION','SAFETY'].includes(code),latencyMs:Date.now()-started});return;}
    const quota=code==='QUOTA';if(quota)res.set('Retry-After','60');res.status(quota?429:503).json({error:AI_FAILURE,source:'unavailable',code,retryable:!['CONFIGURATION','SAFETY'].includes(code),...(quota?{retryAfterSeconds:60}:{})});
  };
  active++;
@@ -74,7 +87,7 @@ export function createReliableMysteryAiRouter(validate:(body:any)=>Input,deps:{g
        // Keep the same hard deadline via bounded() + transport abortSignal, without that server hint.
        const result=await bounded(signal=>client.models.generateContent({model,contents,config:{systemInstruction:instruction,temperature:.7,topP:.9,maxOutputTokens:512,thinkingConfig:{thinkingLevel:model==='gemini-3.1-flash-lite'?ThinkingLevel.MINIMAL:ThinkingLevel.LOW},abortSignal:signal,httpOptions:{retryOptions:{attempts:1}}}}),ms,request.signal);
        if(request.signal.aborted)return;
-       if(result.promptFeedback?.blockReason||result.candidates?.some(c=>['SAFETY','BLOCKLIST','PROHIBITED_CONTENT','SPII'].includes(c.finishReason||''))){failure='SAFETY';counts.SAFETY=(counts.SAFETY||0)+1;break;}
+       if(result.promptFeedback?.blockReason||result.candidates?.some(c=>['SAFETY','BLOCKLIST','PROHIBITED_CONTENT','SPII'].includes(c.finishReason||''))||typeof result.text==='string'&&hasUnsupportedDeliveryClaim(result.text)){failure='SAFETY';counts.SAFETY=(counts.SAFETY||0)+1;break;}
        if(typeof result.text==='string'&&result.text.trim()){successfulGenerations++;lastSuccessAt=new Date().toISOString();res.json({reply:result.text,source:'gemini',fallback:false,model,routingClass:complex?'complex':'simple',latencyMs:Date.now()-started});return;}failure='EMPTY_RESPONSE';
      }catch(error){failure=classifyAiError(error);if(request.signal.aborted)return;lastFailure={code:failure,at:new Date().toISOString(),...aiProviderDiagnostic(error)};}
      counts[failure]=(counts[failure]||0)+1;
