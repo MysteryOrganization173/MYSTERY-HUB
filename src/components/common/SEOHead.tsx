@@ -7,6 +7,7 @@ const OTHER_PAGES: Record<string, {title:string;description:string}> = {
   wallet: {title:'Mystery Wallet — Mystery Hub',description:'Top up your Wallet and use your available balance for supported Mystery Hub purchases.'},
   about: {title:'About Mystery Hub — Reliable Digital Solutions for Ghana',description:'Learn about Mystery Hub’s mission to provide honest, reliable data bundles, website building tools, and everyday digital utilities across Ghana.'},
   orders: {title:'Track Your Order & Receipts — Mystery Hub Ghana',description:'Track your Mystery Hub orders using your reference or recipient number. Check payment and delivery status, and find support if you need help.'},
+  business: {title:'My Business — Mystery Hub',description:'Manage your business website, orders, prices, earnings and visitors.'},
   admin: {title:'Staff & Operations Portal — Mystery Hub Ghana',description:'Authorized administrator and staff operations portal for Mystery Hub Ghana order processing, customers, and fulfillment.'},
 };
 

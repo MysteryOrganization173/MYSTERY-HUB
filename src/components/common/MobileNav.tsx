@@ -29,7 +29,8 @@ export const MobileNav: React.FC = () => {
       <div className="mh-bottom-nav-row grid grid-cols-5 max-w-md mx-auto w-full">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activePage === item.id;
+          // My Business belongs to the Website tab: it is where an owner runs the website they built.
+          const isActive = activePage === item.id || (item.id === 'website' && activePage === 'business');
           return (
             <a
               key={item.id}

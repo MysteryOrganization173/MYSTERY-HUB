@@ -8,7 +8,7 @@ const DEVICES = [['mobile',Smartphone,'Phone'],['tablet',Tablet,'Tablet'],['desk
 export function WebsiteEditorToolbar(p: {
   name:string; mode:'edit'|'preview'; device:Device; status:string; published:boolean; saving:boolean; publishing:boolean;
   settingsOpen?:boolean; colorsOpen?:boolean;
-  onExit:()=>void; onMode:(v:'edit'|'preview')=>void; onDevice:(v:Device)=>void; onSave:()=>void; onPublish:()=>void; onUnpublish:()=>void; onSettings:()=>void; onBrand:()=>void; onCopy:()=>void; onFullPreview?:()=>void; liveUrl:string;
+  onExit:()=>void; backLabel?:string; onMode:(v:'edit'|'preview')=>void; onDevice:(v:Device)=>void; onSave:()=>void; onPublish:()=>void; onUnpublish:()=>void; onSettings:()=>void; onBrand:()=>void; onCopy:()=>void; onFullPreview?:()=>void; liveUrl:string;
   undoLabel?:string; onUndo?:()=>void;
   /** The saved draft differs from what visitors see. */
   liveBehind?:boolean;
@@ -34,7 +34,7 @@ export function WebsiteEditorToolbar(p: {
 
   return <>
     <header className="visual-editor-toolbar">
-      <button type="button" aria-label="Back to Dashboard" onClick={p.onExit} className="visual-icon-button"><ArrowLeft size={19}/></button>
+      <button type="button" aria-label={p.backLabel||'Back to Dashboard'} title={p.backLabel||'Back to Dashboard'} onClick={p.onExit} className="visual-icon-button"><ArrowLeft size={19}/></button>
       <div className="visual-editor-identity">
         <h2>{p.name}</h2>
         <p role="status" aria-live="polite" data-state={p.status}><span className="visual-status-dot" aria-hidden="true"/><span className="visual-status-long">{status}</span><span className="visual-status-short">{shortStatus}</span></p>

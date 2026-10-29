@@ -1,0 +1,142 @@
+/* Business Workspace V1 (/my-business). Same dark surfaces, type and green as the owner card and dashboard
+   (websiteBuilder.css); phones get a compact header and a menu sheet, desktops a restrained sidebar. */
+.bw{max-width:80rem;margin:0 auto;padding:12px 16px 32px;color:#eef3f1;text-align:left}
+.bw-side{min-width:0}
+.bw-main{min-width:0;display:flex;flex-direction:column;gap:16px}
+.bw :is(a,button):focus-visible,.bw-drawer :is(a,button):focus-visible{outline:2px solid #00c365;outline-offset:2px}
+
+/* Identity: avatar, business name, one status line. On phones it is the workspace header with the Menu button. */
+.bw-identity{display:flex;align-items:center;gap:12px;padding:12px 0 14px;border-bottom:1px solid #1a252d;margin-bottom:12px}
+.bw-avatar{width:42px;height:42px;flex-shrink:0;border-radius:12px;display:grid;place-items:center;overflow:hidden;background:#0f2a1f;color:#3ee08f;font-weight:800;font-size:18px;border:1px solid #1e3a2d}
+.bw-avatar img{width:100%;height:100%;object-fit:contain;background:#fff}
+.bw-name{font-weight:700;font-size:16px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bw-state{display:flex;align-items:center;gap:6px;margin-top:2px;font-size:13px;color:#9fb0a8}
+.bw-state>span:first-child{width:7px;height:7px;border-radius:50%;background:#f2b24c;flex-shrink:0}
+.bw-state[data-live="live"]>span:first-child,.bw-state[data-live="live-changes"]>span:first-child{background:#00c365}
+.bw-state-text{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bw-menu-button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid #2a3a46;background:#0f171e;color:#eef3f1;font-size:14px;font-weight:600;flex-shrink:0}
+.bw-menu-button:hover{background:#16212a}
+@media (max-width:359px){.bw-identity{gap:10px}.bw-avatar{width:38px;height:38px}.bw-menu-button{padding:0 10px;gap:4px}}
+
+/* Navigation list: sidebar on desktops, the menu sheet on phones. */
+.bw-nav ul,.bw-nav[data-drawer]{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.bw-nav a{display:flex;align-items:center;gap:12px;min-height:46px;padding:8px 12px;border-radius:12px;color:#b8c6c0;text-decoration:none;font-size:14.5px}
+.bw-nav a:hover{background:#111a21;color:#eef3f1}
+.bw-nav a[aria-current="page"]{background:rgba(0,195,101,.12);color:#3ee08f}
+.bw-nav a[aria-current="page"] svg{color:#3ee08f}
+.bw-nav svg{flex-shrink:0;color:#7f948b}
+.bw-nav-text{min-width:0;flex:1;display:flex;flex-direction:column}
+.bw-nav-text strong{font-weight:600}
+.bw-nav-text small{font-size:12.5px;color:#8fa29a;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bw-nav[data-drawer] a{min-height:56px}
+.bw-badge{min-width:22px;height:22px;padding:0 6px;border-radius:999px;display:inline-grid;place-items:center;font-size:12px;font-weight:800;background:#1e293b;color:#e2e8f0;flex-shrink:0}
+.bw-badge[data-tone="warn"]{background:#f2b24c;color:#1a1204}
+
+.bw-side .bw-nav,.bw-side-foot{display:none}
+.bw-side-foot{gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid #1a252d}
+.bw-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 16px;border-radius:12px;border:1px solid #334155;background:#111a21;color:#eef3f1;font-weight:600;font-size:14px;text-decoration:none}
+.bw-button:hover{background:#18232b}
+.bw-button[data-primary]{background:#00c365;border-color:#00c365;color:#05140c;font-weight:800}
+.bw-button[data-primary]:hover{background:#02d870}
+.bw-quiet-link{display:inline-flex;align-items:center;gap:8px;min-height:44px;font-size:13.5px;color:#8fa29a;text-decoration:none}
+.bw-quiet-link:hover{color:#eef3f1}
+
+/* Area header */
+.bw-head{display:grid;gap:4px}
+.bw-back{display:inline-flex;align-items:center;gap:6px;min-height:40px;align-self:start;justify-self:start;font-size:14px;font-weight:600;color:#3ee08f;text-decoration:none}
+.bw-head-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+.bw-head h1{font-size:24px;font-weight:800;letter-spacing:-.01em;line-height:1.2;outline:none;min-width:0}
+.bw-head-kicker{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#3ee08f;margin-bottom:2px}
+.bw-icon-button{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid #2a3a46;color:#cbd5d1;font-size:14px;font-weight:600;flex-shrink:0}
+.bw-icon-button:hover{background:#111a21}
+.bw-icon-button:disabled{opacity:.6}
+/* Phones: the Overview's header is the identity bar above, so its title stays for screen readers only. */
+@media (max-width:1023px){
+  .bw-head h1[data-overview]{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  /* The Overview reloads every time it opens; its Refresh lives in each area instead of taking a row here. */
+  .bw[data-section="overview"] .bw-head{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .bw[data-section="overview"] .bw-head .bw-icon-button{display:none}
+  .bw-icon-button span{display:none}
+  .bw-icon-button{padding:0 12px}
+}
+
+/* Website card */
+.bw-site{grid-template-columns:minmax(0,1fr);border:1px solid #1f2a32;background:linear-gradient(180deg,#0f181e 0%,#0b1217 100%);border-radius:18px;padding:16px;display:grid;gap:12px}
+.bw-site-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12.5px;color:#9fb0a8}
+.bw-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-weight:700;background:rgba(242,178,76,.14);color:#fcd9a0}
+.bw-pill>span{width:6px;height:6px;border-radius:50%;background:currentColor}
+.bw-pill[data-live="live"]{background:rgba(0,195,101,.14);color:#6ee7b7}
+.bw-pill[data-live="live-changes"]{background:rgba(56,189,248,.14);color:#bae6fd}
+.bw-site-note{font-size:13px;color:#9fb0a8;line-height:1.45}
+.bw-site .website-owner-address{max-width:none}
+.bw-site .website-owner-review{margin-top:0;max-width:none}
+
+/* Phone shortcuts into each area (desktops have the sidebar) */
+.bw-hub{border:1px solid #1e2a33;border-radius:16px;background:#0d171f;padding:6px}
+.bw-hub h2{font-size:13px;font-weight:700;color:#9fb0a8;padding:10px 10px 6px}
+.bw-hub ul{list-style:none;margin:0;padding:0}
+.bw-hub li+li{border-top:1px solid #16212a}
+.bw-hub a{display:flex;align-items:center;gap:12px;min-height:60px;padding:8px 10px;color:#eef3f1;text-decoration:none;border-radius:12px}
+.bw-hub a:hover{background:#111a21}
+.bw-hub a>svg:first-child{color:#3ee08f;flex-shrink:0}
+.bw-hub-chevron{color:#5b6b64;flex-shrink:0}
+
+/* Orders: every status filter stays visible (wraps) instead of hiding behind a sideways scroll. */
+.bw [data-order-filters]{display:flex;flex-wrap:wrap;overflow:visible}
+.bw-order-search{display:grid;gap:8px;padding:12px;border-radius:14px;border:1px solid #1e2a33;background:#0d171f}
+.bw-order-search label{font-size:14px;font-weight:600;display:grid;gap:2px}
+.bw-order-search small{font-weight:400;font-size:12.5px;color:#94a3b8}
+.bw-order-search>div{display:flex;flex-wrap:wrap;gap:8px}
+.bw-order-search input{flex:1 1 9rem;width:auto}
+.bw-order{border:1px solid #1e2a33;border-radius:14px;background:#0d171f}
+.bw-order>summary{cursor:pointer;list-style:none;display:grid;gap:4px;padding:12px 14px;min-height:44px}
+.bw-order>summary::-webkit-details-marker{display:none}
+.bw-order>summary .website-order-facts{margin-top:4px}
+.bw-order[open]>summary{border-bottom:1px solid #1a252d}
+.bw-order-detail{display:grid;gap:6px;padding:12px 14px}
+@media (min-width:768px){.bw-order>summary{grid-template-columns:minmax(0,1fr) auto;align-items:center}.bw-order>summary .website-order-facts{margin-top:0;justify-content:flex-end}}
+.bw-empty{border:1px dashed #2a3a46;border-radius:14px;padding:18px;display:grid;gap:4px}
+.bw-empty p{font-size:14px;color:#94a3b8}
+.bw-error{display:grid;gap:8px;justify-items:start;border:1px solid rgba(244,63,94,.35);background:rgba(244,63,94,.06);border-radius:14px;padding:14px;color:#fecdd3}
+.bw-error p{font-size:14px;color:#cbd5d1}
+
+/* Products & pricing: the bulk tool folds away once bundles are on sale. */
+.bw-quick-setup{border:1px solid rgba(0,195,101,.3);border-radius:14px;background:rgba(0,195,101,.04)}
+.bw-quick-setup>summary{cursor:pointer;list-style:none;display:grid;gap:2px;padding:12px 14px;min-height:44px}
+.bw-quick-setup>summary::-webkit-details-marker{display:none}
+.bw-quick-setup>summary strong{font-size:14.5px}
+.bw-quick-setup>summary strong::after{content:' +';color:#3ee08f}
+.bw-quick-setup[open]>summary strong::after{content:' −'}
+.bw-quick-setup>summary small{font-size:13px;color:#94a3b8}
+.bw-quick-setup>fieldset{margin:0 10px 10px}
+
+/* Loading: quiet placeholder bars of fixed height so the page does not jump when figures arrive. */
+.bw-loading{display:grid;gap:10px}
+.bw-loading>span:not(.sr-only){display:block;height:64px;border-radius:14px;background:#0f171e}
+.bw-loading>span:nth-child(2){height:120px}
+@media (prefers-reduced-motion:no-preference){.bw-loading>span:not(.sr-only){animation:bw-pulse 1.4s ease-in-out infinite}}
+@keyframes bw-pulse{50%{opacity:.55}}
+
+/* Signed out, loading or no website yet */
+.bw-gate{max-width:40rem;margin:0 auto;padding:32px 16px 48px}
+.bw-gate-card{border:1px solid #1f2a32;background:#0d141b;border-radius:20px;padding:22px;display:grid;gap:10px;text-align:left}
+.bw-gate-card h1{font-size:24px;font-weight:800;line-height:1.2}
+.bw-gate-card p{font-size:15px;color:#b8c6c0;line-height:1.5}
+.bw-gate-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+
+/* Menu sheet */
+.bw-drawer .website-sheet-body{display:grid;gap:14px}
+.bw-drawer-actions{display:grid;gap:8px;padding-top:12px;border-top:1px solid #1a252d}
+
+@media (min-width:640px){.bw{padding:16px 24px 40px}.bw-site{padding:20px}}
+@media (min-width:1024px){
+  .bw{display:grid;grid-template-columns:248px minmax(0,1fr);gap:32px;padding:24px 32px 48px;align-items:start}
+  .bw-side{position:sticky;top:80px;max-height:calc(100dvh - 96px);overflow-y:auto;padding-right:4px}
+  .bw-identity{padding-top:4px}
+  .bw-menu-button,.bw-hub{display:none}
+  .bw-side .bw-nav,.bw-side-foot{display:grid}
+  .bw-back{display:none}
+  .bw-head{padding-bottom:4px}
+  .bw-head h1{font-size:28px}
+  .bw-main{gap:20px}
+}

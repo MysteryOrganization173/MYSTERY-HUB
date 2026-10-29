@@ -66,7 +66,12 @@ interface WebsiteEditorProps {
   /** Open the publish checklist straight away (the dashboard's Publish button). */
   openPublish?: boolean;
   showToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
+  /** Where the editor's back arrow returns to, read by screen readers. */
+  backLabel?: string;
 }
+
+/** Open editors: a design switch remounts the editor, and the new one keeps the same history entry. */
+let editorMounts = 0;
 
 export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   site: initialSite,
@@ -75,6 +80,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   onSiteUpdated,
   openPublish = false,
   showToast,
+  backLabel = 'Back to Dashboard',
 }) => {
   const { openMysteryAi } = useApp();
   const [mediaOpen, setMediaOpen] = useState(false);
@@ -224,6 +230,46 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     setIsDirty(true);
     setSaveStatusText('unsaved');
   };
+
+  // Business Workspace V1: leaving saves the draft first (it never publishes). If that save fails, the changes stay on
+  // this device (draft recovery offers them next time) and the owner decides whether to leave anyway.
+  const exiting = useRef(false), restoreBackEntry = useRef(() => {});
+  const exitEditor = async (viaBack = false) => {
+    if (exiting.current) return;
+    exiting.current = true;
+    try {
+      for (let attempt = 0; attempt < 2 && (editVersion.current !== savedVersion.current || savingJob.current); attempt++) {
+        if (!(await handleSaveDraft())) {
+          if (window.confirm('Your latest changes could not be saved yet. They are kept on this device and offered again when you reopen the editor. Leave anyway?')) break;
+          if (viaBack) restoreBackEntry.current();
+          return;
+        }
+      }
+      onClose();
+    } finally { exiting.current = false; }
+  };
+  // The phone's Back button closes the editor the same way, instead of leaving the page underneath it. The editor
+  // owns one history entry at the same address while it is open.
+  const exitRef = useRef(exitEditor);
+  exitRef.current = exitEditor;
+  useEffect(() => {
+    if (!window.history?.pushState) return;
+    editorMounts++;
+    let entered = false;
+    const enter = () => { entered = true; if (!window.history.state?.mhEditor) window.history.pushState({ ...window.history.state, mhEditor: true }, ''); };
+    restoreBackEntry.current = enter;
+    // Opened straight from a design preview: that preview is still stepping back over its own entry, so wait for it.
+    const previewClosing = Boolean(window.history.state?.mhPreview);
+    const fallback = previewClosing ? window.setTimeout(() => { if (!entered) enter(); }, 600) : 0;
+    if (!previewClosing) enter();
+    const onPop = () => { if (!entered) { enter(); return; } if (!window.history.state?.mhEditor) void exitRef.current(true); };
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop); window.clearTimeout(fallback); editorMounts--;
+      // Closed with its own button: step back over the editor's entry, unless a remounted editor kept it.
+      window.setTimeout(() => { if (!editorMounts && window.history.state?.mhEditor) window.history.back(); }, 0);
+    };
+  }, []);
 
   // Warn before closing tab if dirty
   useEffect(() => {
@@ -510,7 +556,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         onEditField={target=>{setPublishOpen(false);setActiveTab('edit');if(target==='name')selectTarget('content:businessName');else if(target==='contact')openSettings('contact');else selectTarget(target);}}/>}
       {mediaOpen && <WebsiteImageLibrary siteId={currentSite.id} token={sessionToken} onClose={()=>setMediaOpen(false)} onChoose={url=>{setContent({...content,heroImage:url});markDirty();setMediaOpen(false);}} />}
       <WebsiteEditorToolbar name={content.businessName || siteName} mode={activeTab} device={previewDevice} status={saveStatusText} published={currentSite.status==='published'} saving={isSaving} publishing={isPublishing}
-        onExit={()=>{if(!isDirty || window.confirm('You have unsaved changes. Exit anyway?'))onClose();}} onMode={changeMode} onDevice={device=>{setPreviewDevice(device);if(isPhone && device!=='mobile')changeMode('preview');}} onSave={()=>void handleSaveDraft()} onPublish={()=>{setVisualSelection(null);setPublishOpen(true);}} onUnpublish={()=>void handleUnpublish()} onSettings={()=>openSettings()} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`} undoLabel={undoTop ? undoLabel(undoTop) : ''} onUndo={handleUndo} liveBehind={currentSite.status==='published' && websitePublishChanges(currentSite.published_snapshot_json, {templateId: currentSite.template_id, content: currentSite.content_json, settings: currentSite.settings_json}).length>0}/>
+        onExit={()=>void exitEditor()} backLabel={backLabel} onMode={changeMode} onDevice={device=>{setPreviewDevice(device);if(isPhone && device!=='mobile')changeMode('preview');}} onSave={()=>void handleSaveDraft()} onPublish={()=>{setVisualSelection(null);setPublishOpen(true);}} onUnpublish={()=>void handleUnpublish()} onSettings={()=>openSettings()} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`} undoLabel={undoTop ? undoLabel(undoTop) : ''} onUndo={handleUndo} liveBehind={currentSite.status==='published' && websitePublishChanges(currentSite.published_snapshot_json, {templateId: currentSite.template_id, content: currentSite.content_json, settings: currentSite.settings_json}).length>0}/>
       {/* =========================================================
           WORKSPACE: LEFT EDITOR / RIGHT LIVE PREVIEW
           ========================================================= */}

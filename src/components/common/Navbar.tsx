@@ -22,6 +22,7 @@ import {
   Gift,
   Wallet,
   MessageCircle,
+  Briefcase,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -137,7 +138,7 @@ export const Navbar: React.FC = () => {
         {/* Zone 2: Navigation Links (Desktop) */}
         <nav className="hidden xl:flex items-center gap-3 text-xs font-medium text-slate-300">
           {navLinks.map((link) => {
-            const isActive = activePage === link.id;
+            const isActive = activePage === link.id || (link.id === 'website' && activePage === 'business');
             return (
               <a
                 key={link.id}
@@ -258,6 +259,14 @@ export const Navbar: React.FC = () => {
                     </button>
 
                     <button
+                      onClick={() => handleNavClick('business')}
+                      className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <Briefcase className="w-3.5 h-3.5 text-emerald-300" />
+                      <span>My Business</span>
+                    </button>
+
+                    <button
                       onClick={() => handleNavClick('website')}
                       className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
                     >
@@ -375,7 +384,7 @@ export const Navbar: React.FC = () => {
                   handleNavClick(link.id);
                 }}
                 className={`block w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  activePage === link.id
+                  activePage === link.id || (link.id === 'website' && activePage === 'business')
                     ? 'bg-[#00c365]/10 text-[#00c365] font-semibold'
                     : 'text-slate-300 hover:bg-slate-900 hover:text-white'
                 }`}

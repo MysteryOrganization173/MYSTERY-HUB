@@ -1,43 +1,29 @@
-import { WebsiteBusinessDashboard } from './WebsiteBusinessDashboard';
 import { WebsiteSettingsControls } from './WebsiteSettingsControls';
-import { isDeletedWebsite, withoutDeletedWebsites } from '../../utils/websiteDeletion';
+import { isDeletedWebsite } from '../../utils/websiteDeletion';
+import { useOwnerWebsites } from '../../hooks/useOwnerWebsites';
 import { trackWebsiteEvent } from '../../utils/websiteAnalytics';
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { TEMPLATE_CATEGORIES, WEBSITE_TEMPLATES, orderedWebsiteTemplates, findTemplateByLink, templateDesignLabel, readyDesignCount, isReadyDesign } from '../../data/templates';
-import { TemplateCategory, WebsiteSiteRecord, WebsiteTemplate } from '../../types';
+import { TemplateCategory, WebsiteSiteRecord } from '../../types';
 import { TemplateCardPreview } from './TemplateCardPreview';
 import { WebsiteStartSheet } from './WebsiteStartSheet';
 import { SafeImage } from './SafeImage';
-import { websiteItemVocabulary } from '../../config/websiteStarters';
 import { WebsiteEditor } from './editor/WebsiteEditor';
 import { WebsitePlansAndUltra } from './WebsitePlansAndUltra';
 import './websiteBuilder.css';
-import { mergeSiteWithTemplate } from '../../utils/templateRendererUtils';
 import { WEBSITE_LIVE_LABELS, websiteLiveState } from '../../utils/websiteReadiness';
 import {
-  getMyWebsitesOnServer,
-  createWebsiteOnServer,
-  publishWebsiteOnServer,
-  unpublishWebsiteOnServer,
-} from '../../services/apiClient';
-import {
   Globe,
-  Smartphone,
-  Eye,
   ArrowRight,
-  Zap,
-  Layout,
   Search,
-  Copy,
   Compass,
-  Layers,
   ChevronDown,
   ChevronUp,
   RefreshCw,
   AlertCircle,
-  Settings,
-  Share2,
+  LayoutDashboard,
+  PenLine,
 } from 'lucide-react';
 
 export const WebsiteBuilderPage: React.FC = () => {
@@ -50,47 +36,40 @@ export const WebsiteBuilderPage: React.FC = () => {
     activeEditorSite,
     openWebsiteEditor,
     closeWebsiteEditor,
+    setActivePage,
   } = useApp();
 
   const [selectedCategory, setSelectedCategory] = useState<TemplateCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAllTemplates, setShowAllTemplates] = useState(false);
-  const [mySites, setMySites] = useState<WebsiteSiteRecord[]>([]);
-  const [isLoadingSites, setIsLoadingSites] = useState(false);
-  const [siteFetchError, setSiteFetchError] = useState<string | null>(null);
-  const [actionLoadingSiteId, setActionLoadingSiteId] = useState<string | null>(null);
+  // Business Workspace V1: this page is for discovering designs and starting a website. Running an existing website
+  // (orders, prices, earnings, analytics, settings) happens in My Business (/my-business).
+  const { sites: mySites, setSites: setMySites, loading: isLoadingSites, error: siteFetchError, reload: reloadSites } = useOwnerWebsites(sessionToken);
   const [changeTarget,setChangeTarget]=useState('');
   const [startTemplate,setStartTemplate]=useState('');
-  // The dashboard's Publish opens the editor's publish checklist, never a blind publish.
-  const [editorPublish,setEditorPublish]=useState(false);
-  const [pricingDirty,setPricingDirty]=useState(false);
-  const confirmPricingLeave=()=>!pricingDirty||window.confirm('You have unsaved bundle prices. Leave without saving them?');
-  const editSite=(site:WebsiteSiteRecord,publish=false)=>{if(confirmPricingLeave()){setPricingDirty(false);setEditorPublish(publish);openWebsiteEditor(site);}};
-  const [dashboardTab, setDashboardTab] = useState('Overview');
-  // Leaving the fullscreen editor returns the owner to their website card (or the pricing area they
-  // asked for), never to wherever the collapsed page happened to leave the window scrolled.
-  const exitTarget = useRef<string>('website-owner-card');
+  const editSite=(site:WebsiteSiteRecord)=>openWebsiteEditor(site);
+  // Leaving the fullscreen editor returns the owner to their website card, never to wherever the collapsed page
+  // happened to leave the window scrolled.
   const wasEditing = useRef(false);
   useEffect(() => {
     if (activeEditorSite) { wasEditing.current = true; return; }
     if (!wasEditing.current) return;
     wasEditing.current = false;
-    const id = exitTarget.current; exitTarget.current = 'website-owner-card';
     requestAnimationFrame(() => {
-      const target = document.getElementById(id);
-      if (id === 'website-owner-card' || !target) window.scrollTo({ top: 0 });
-      else target.scrollIntoView({ block: 'start' });
-      (target?.querySelector('h1,h2') as HTMLElement | null)?.focus({ preventScroll: true });
+      window.scrollTo({ top: 0 });
+      (document.getElementById('website-owner-name') as HTMLElement | null)?.focus({ preventScroll: true });
     });
   }, [activeEditorSite]);
+  // Leaving this page (another page, or signing out) never leaves an editor open behind it.
+  useEffect(() => () => closeWebsiteEditor(), []);
   // After deletion the owner lands on the gallery to start again: new design, new name, new address.
   const handleWebsiteDeleted = (siteId: string) => {
     setMySites(prev => prev.filter(site => site.id !== siteId));
-    setChangeTarget(''); setDashboardTab('Overview'); setPricingDirty(false);
+    setChangeTarget('');
     if (activeEditorSite?.id === siteId) closeWebsiteEditor();
     showToast('Website deleted. Choose a design to start a new website.', 'success');
     requestAnimationFrame(() => { const gallery = document.getElementById('templates-showcase'); if (gallery) gallery.scrollIntoView({ block: 'start' }); else window.scrollTo({ top: 0 }); });
-    if (sessionToken) getMyWebsitesOnServer(sessionToken).then(res => { if (res.success) setMySites(withoutDeletedWebsites(res.sites || [])); }).catch(() => {});
+    reloadSites();
   };
   const updateSite = (updated: WebsiteSiteRecord) => {
     setMySites(prev => prev.map(site => site.id === updated.id ? updated : site));
@@ -103,30 +82,6 @@ export const WebsiteBuilderPage: React.FC = () => {
   useEffect(()=>{if(activeEditorSite&&!isDeletedWebsite(activeEditorSite.id))setMySites(prev=>prev.some(site=>site.id===activeEditorSite.id)?prev.map(site=>site.id===activeEditorSite.id?activeEditorSite:site):[activeEditorSite,...prev]);},[activeEditorSite]);
 
   useEffect(() => { trackWebsiteEvent('website_builder_viewed', {source:'builder'}, sessionToken || undefined); }, [sessionToken]);
-
-  // Load authenticated user's sites
-  useEffect(() => {
-    if (sessionToken) {
-      setIsLoadingSites(true);
-      setSiteFetchError(null);
-      getMyWebsitesOnServer(sessionToken)
-        .then((res) => {
-          if (res.success) {
-            setMySites(withoutDeletedWebsites(res.sites || []));
-          }
-        })
-        .catch((err: any) => {
-          console.warn('[WebsiteBuilder] Failed loading user sites:', err);
-          setSiteFetchError(err.message || 'Unable to connect to website services. Please try again.');
-        })
-        .finally(() => {
-          setIsLoadingSites(false);
-        });
-    } else {
-      setMySites([]);
-      setSiteFetchError(null);
-    }
-  }, [sessionToken]);
 
   // Deep-link template preview support (e.g. /website-builder?template=tmpl-data-reseller)
   useEffect(() => {
@@ -164,11 +119,6 @@ export const WebsiteBuilderPage: React.FC = () => {
     ? WEBSITE_TEMPLATES.find((t) => t.id === activeSite.template_id) || WEBSITE_TEMPLATES[0]
     : null;
 
-  // Merged template with user's customized content and styling
-  const activeMergedTemplate: WebsiteTemplate | null =
-    activeSite && activeBaseTemplate
-      ? mergeSiteWithTemplate(activeBaseTemplate, activeSite.content_json, activeSite.settings_json)
-      : null;
 
   const filteredTemplates = orderedWebsiteTemplates().filter((t) => {
     const matchesCategory = selectedCategory === 'all' || t.category === selectedCategory;
@@ -195,7 +145,7 @@ export const WebsiteBuilderPage: React.FC = () => {
   const displayedTemplates = isFiltering || showAllTemplates ? filteredTemplates : filteredTemplates.slice(0, 6);
 
   const handleCreateSite = async (templateId: string, _templateName?: string) => {
-    if(activeSite && activeSite.template_id!==templateId){if(!confirmPricingLeave())return;setChangeTarget(templateId);return;}
+    if(activeSite && activeSite.template_id!==templateId){setChangeTarget(templateId);return;}
     if(activeSite){editSite(activeSite);return;}
     setStartTemplate(templateId);
   };
@@ -232,61 +182,6 @@ export const WebsiteBuilderPage: React.FC = () => {
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleTogglePublish = async (site: WebsiteSiteRecord): Promise<boolean> => {
-    if (!sessionToken) return false;
-    setActionLoadingSiteId(site.id);
-    try {
-      if (site.status === 'published') {
-        const res = await unpublishWebsiteOnServer(sessionToken, site.id, site.updated_at);
-        if (res.success && res.site) {
-          setMySites((prev) => prev.map((s) => (s.id === res.site.id ? res.site : s)));
-          showToast('Your website is now a draft and is no longer public.', 'info');
-          return true;
-        }
-      } else {
-        const res = await publishWebsiteOnServer(sessionToken, site.id, site.updated_at);
-        if (res.success && res.site) {
-          setMySites((prev) => prev.map((s) => (s.id === res.site.id ? res.site : s)));
-          showToast(`Website published! Live at /sites/${res.site.slug}`, 'success');
-          return true;
-        }
-      }
-      return false;
-    } catch (err: any) {
-      showToast(err.message || 'Action failed.', 'warning');
-      return false;
-    } finally {
-      setActionLoadingSiteId(null);
-    }
-  };
-
-  const handleCopyLink = (slug: string) => {
-    const fullUrl = `${window.location.origin}/sites/${slug}`;
-    // Some in-app browsers block the clipboard; say so instead of failing silently.
-    Promise.resolve().then(() => navigator.clipboard.writeText(fullUrl)).then(
-      () => showToast('Website link copied to clipboard!', 'success'),
-      () => showToast(`Copy didn’t work here. Your link is ${fullUrl.replace(/^https?:\/\//, '')}`, 'info'),
-    );
-  };
-
-  // Phones open the native share sheet (WhatsApp, SMS…); elsewhere the link is copied.
-  const handleShare = async (slug: string) => {
-    const url = `${window.location.origin}/sites/${slug}`;
-    if (navigator.share) {
-      try { await navigator.share({ title: displaySiteName, url }); return; }
-      catch (error: any) { if (error?.name === 'AbortError') return; }
-    }
-    handleCopyLink(slug);
-  };
-
-  const handlePreviewCurrentSite = () => {
-    if (activeMergedTemplate) {
-      openTemplatePreview({...activeMergedTemplate,previewSiteId:activeSite!.id});
-    } else if (activeBaseTemplate) {
-      openTemplatePreview(activeBaseTemplate);
-    }
-  };
-
   // If currently inside the full-screen Website Editor workspace
   if (activeEditorSite && sessionToken) {
     return (
@@ -294,47 +189,40 @@ export const WebsiteBuilderPage: React.FC = () => {
         key={`${activeEditorSite.id}:${activeEditorSite.template_id}`}
         site={activeEditorSite}
         sessionToken={sessionToken}
-        openPublish={editorPublish}
-        onClose={()=>{setEditorPublish(false);closeWebsiteEditor();}}
+        onClose={closeWebsiteEditor}
         onSiteUpdated={updateSite}
         showToast={showToast}
       />
     );
   }
 
-  const isPublished = activeSite?.status === 'published';
-  // Compared with what visitors see (the published snapshot), the same rule the editor uses.
-  const draftAhead = !!activeSite && websiteLiveState(activeSite) === 'live-changes';
-  const exampleCount = (activeSite?.content_json?.items || []).filter(item => item.isExample).length;
-  const itemWord = websiteItemVocabulary(activeSite?.template_id || '');
+  const liveState = activeSite ? websiteLiveState(activeSite) : 'not-published';
   const displaySiteName =
     activeSite?.content_json?.businessName || activeSite?.name || 'My Business Website';
-  const publicSiteUrl = activeSite
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/sites/${activeSite.slug}`
-    : '';
 
   return (
     <div className="py-6 sm:py-10 text-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
 
-        {startTemplate&&<WebsiteStartSheet templateId={startTemplate} onClose={()=>setStartTemplate('')} onCreated={(site,alreadyExists)=>{const requested=startTemplate;setStartTemplate('');setMySites([site]);if(alreadyExists&&site.template_id!==requested){setChangeTarget(requested);return;}setEditorPublish(false);openWebsiteEditor(site);showToast(alreadyExists?'Opening your existing website.':'Your website is ready. Tap anything to change it.',alreadyExists?'info':'success');}}/>}
+        {startTemplate&&<WebsiteStartSheet templateId={startTemplate} onClose={()=>setStartTemplate('')} onCreated={(site,alreadyExists)=>{const requested=startTemplate;setStartTemplate('');setMySites([site]);if(alreadyExists&&site.template_id!==requested){setChangeTarget(requested);return;}openWebsiteEditor(site);showToast(alreadyExists?'Opening your existing website.':'Your website is ready. Tap anything to change it.',alreadyExists?'info':'success');}}/>}
         {activeSite&&sessionToken&&changeTarget&&<WebsiteSettingsControls site={activeSite} token={sessionToken} requestedTemplateId={changeTarget} selectionOnly onClosed={()=>setChangeTarget('')} onDeleted={handleWebsiteDeleted} onUpdated={updated=>{setMySites([updated]);setChangeTarget('');openWebsiteEditor(updated);}}/>}
         {/* =========================================================
             LOADING / ERROR STATE FOR AUTHENTICATED USERS
             ========================================================= */}
-        {user && isLoadingSites && (
+        {user && isLoadingSites && !activeSite && (
           <div className="p-8 rounded-3xl bg-[#0d141b] border border-slate-800 text-center space-y-3 animate-pulse">
             <RefreshCw className="w-6 h-6 text-[#00c365] animate-spin mx-auto" />
             <p className="text-sm font-semibold text-slate-300">Loading your website…</p>
           </div>
         )}
 
-        {user && !isLoadingSites && siteFetchError && (
-          <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 flex items-start gap-3 text-left text-xs">
+        {user && !isLoadingSites && siteFetchError && !activeSite && (
+          <div role="alert" className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 flex items-start gap-3 text-left text-xs">
             <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <span className="font-bold text-amber-300">Dashboard notice</span>
-              <p>{siteFetchError}</p>
+              <span className="font-bold text-amber-300">We couldn’t check your website</span>
+              <p>{/fetch|network/i.test(siteFetchError) ? 'Check your connection, then try again.' : siteFetchError}</p>
+              <button type="button" className="min-h-11 font-semibold text-amber-200 underline underline-offset-4" onClick={reloadSites}>Try again</button>
             </div>
           </div>
         )}
@@ -343,36 +231,19 @@ export const WebsiteBuilderPage: React.FC = () => {
             1. AUTHENTICATED USER'S "MY WEBSITE" MANAGEMENT DASHBOARD
                (PRIORITIZED FOR LOGGED-IN USERS WITH AN ACTIVE WEBSITE)
             ========================================================= */}
-        {user && !isLoadingSites && activeSite ? (
-          <div className="space-y-5">
-            <section id="website-owner-card" data-website-owner-card aria-labelledby="website-owner-name" className="website-owner-card scroll-mt-24 text-left">
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ${isPublished?'bg-emerald-500/15 text-emerald-300':'bg-amber-500/15 text-amber-200'}`}><span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${isPublished?'bg-emerald-400':'bg-amber-300'}`}/>{isPublished?WEBSITE_LIVE_LABELS.live.short:WEBSITE_LIVE_LABELS['not-published'].short}</span>
-                {isPublished&&draftAhead&&<span className="inline-flex items-center rounded-full px-2.5 py-1 font-semibold bg-sky-500/15 text-sky-200">Changes waiting to go live</span>}
-                <span className="text-slate-400">{templateDesignLabel(activeBaseTemplate)} · Free plan</span>
-              </div>
-              <h1 id="website-owner-name" tabIndex={-1} className="mt-3 text-2xl sm:text-3xl font-bold break-words outline-none">{displaySiteName}</h1>
-              <div className="website-owner-address mt-3">
-                <Globe className="w-4 h-4 shrink-0 text-slate-400" aria-hidden="true"/>
-                <span className="min-w-0 truncate" title={publicSiteUrl}>{publicSiteUrl.replace(/^https?:\/\//,'')}</span>
-                {isPublished&&<button type="button" className="website-owner-icon" aria-label="Copy website link" onClick={()=>handleCopyLink(activeSite.slug)}><Copy className="w-4 h-4"/></button>}
-              </div>
-              {!isPublished&&<p className="mt-2 text-xs text-slate-400">Publish when you are ready. This address starts working once your website is live.</p>}
-              {isPublished&&activeSite.published_at&&<p className="mt-2 text-xs text-slate-400">Last published {new Intl.DateTimeFormat(undefined,{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}).format(new Date(activeSite.published_at))}.{draftAhead?' Your newer edits are saved as a draft until you update the live site.':''}</p>}
-              {exampleCount>0&&<button type="button" className="website-owner-review" onClick={()=>editSite(activeSite,true)}><span aria-hidden="true">{exampleCount}</span><span><strong>{exampleCount} example {exampleCount===1?itemWord.singular.toLowerCase():itemWord.many} to review</strong><small>Keep the ones that fit your business and remove the rest before publishing.</small></span></button>}
-              <div className="website-owner-actions mt-4">
-                <button className="website-owner-primary" onClick={()=>editSite(activeSite)}>Edit website</button>
-                {isPublished?<a className="website-owner-secondary" href={`/sites/${encodeURIComponent(activeSite.slug)}`} target="_blank" rel="noopener noreferrer"><Eye className="w-4 h-4" aria-hidden="true"/>View site</a>:<button className="website-owner-secondary" onClick={handlePreviewCurrentSite}><Eye className="w-4 h-4" aria-hidden="true"/>Preview</button>}
-                {isPublished&&!draftAhead?<button className="website-owner-secondary" onClick={()=>void handleShare(activeSite.slug)}><Share2 className="w-4 h-4" aria-hidden="true"/>Share</button>:<button className="website-owner-secondary" onClick={()=>editSite(activeSite,true)}><Globe className="w-4 h-4" aria-hidden="true"/>{isPublished?'Update live site':'Publish'}</button>}
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
-                {activeSite.template_id==='tmpl-data-reseller'&&<><button className="min-h-11 text-emerald-300" onClick={()=>setDashboardTab('Orders')}>Manage orders</button><button className="min-h-11 text-emerald-300" onClick={()=>setDashboardTab('Bundles & Pricing')}>Bundles &amp; pricing</button></>}
-                {isPublished&&<button disabled={actionLoadingSiteId===activeSite.id} className="min-h-11 text-slate-400 hover:text-slate-200 disabled:opacity-50 sm:ml-auto" onClick={()=>void handleTogglePublish(activeSite)}>{actionLoadingSiteId===activeSite.id?'Updating…':'Unpublish'}</button>}
-              </div>
-            </section>
-            <WebsiteBusinessDashboard site={activeSite} token={sessionToken!} requestedTab={dashboardTab} onTabChange={setDashboardTab} onEdit={()=>editSite(activeSite)} onPricingDirty={setPricingDirty} onPublish={()=>editSite(activeSite,true)} onShare={isPublished?()=>void handleShare(activeSite.slug):undefined} onCopyLink={isPublished?()=>handleCopyLink(activeSite.slug):undefined}
-              settings={policy=><WebsiteSettingsControls site={activeSite} token={sessionToken!} withdrawalMinimumMinor={policy.withdrawalMinimumMinor} onUnpublish={isPublished?()=>handleTogglePublish(activeSite):undefined} onUpdated={updated=>{updateSite(updated);openWebsiteEditor(updated);}} onDeleted={handleWebsiteDeleted} onResolve={tab=>{setDashboardTab(tab);requestAnimationFrame(()=>document.getElementById('website-business-dashboard')?.scrollIntoView({block:'start'}));}}/>}/>
-          </div>
+        {user && activeSite ? (
+          <section id="website-owner-card" data-website-owner-card aria-labelledby="website-owner-name" className="website-owner-card website-owner-banner scroll-mt-24 text-left">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ${liveState==='not-published'?'bg-amber-500/15 text-amber-200':'bg-emerald-500/15 text-emerald-300'}`}><span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${liveState==='not-published'?'bg-amber-300':'bg-emerald-400'}`}/>{WEBSITE_LIVE_LABELS[liveState].short}</span>
+              <span className="text-slate-400">{templateDesignLabel(activeBaseTemplate)} · Free plan</span>
+            </div>
+            <h1 id="website-owner-name" tabIndex={-1} className="mt-3 text-2xl sm:text-3xl font-bold break-words outline-none">{displaySiteName}</h1>
+            <p className="mt-1 text-sm text-slate-400 max-w-xl">{activeSite.template_id==='tmpl-data-reseller'?'Your orders, bundle prices, Store Earnings and settings are in My Business.':'Your visitors, website settings and sharing are in My Business.'} Browse other designs below; switching always shows a preview first.</p>
+            <div className="website-owner-actions mt-4">
+              <a className="website-owner-primary inline-flex items-center justify-center gap-2" href="/my-business" onClick={event=>{event.preventDefault();setActivePage('business');}}><LayoutDashboard className="w-4 h-4" aria-hidden="true"/>Open My Business</a>
+              <button type="button" className="website-owner-secondary" onClick={()=>editSite(activeSite)}><PenLine className="w-4 h-4" aria-hidden="true"/>Edit website</button>
+            </div>
+          </section>
         ) : (
           /* =========================================================
              2. HERO SECTION FOR VISITORS & USERS WITHOUT A WEBSITE

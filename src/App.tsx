@@ -25,6 +25,7 @@ import {GrowthTracker} from './components/common/GrowthTracker';
 // warmed during idle time, see utils/lazyPage), so a phone on a slow network starts with far less JavaScript.
 const DataPage = lazyPage(() => import('./components/data/DataPage'), 'DataPage', { warm: true });
 const WebsiteBuilderPage = lazyPage(() => import('./components/website/WebsiteBuilderPage'), 'WebsiteBuilderPage');
+const BusinessWorkspacePage = lazyPage(() => import('./components/website/BusinessWorkspacePage'), 'BusinessWorkspacePage');
 const MoreServicesPage = lazyPage(() => import('./components/services/MoreServicesPage'), 'MoreServicesPage');
 const AfaRegistrationPage = lazyPage(() => import('./components/services/AfaRegistrationPage'), 'AfaRegistrationPage');
 const MarketplacePage = lazyPage(() => import('./components/marketplace/MarketplacePage'), 'MarketplacePage');
@@ -79,6 +80,7 @@ const AppContent: React.FC = () => {
         {activePage === 'home' && <HomePage />}
         {activePage === 'data' && <DataPage />}
         {activePage === 'website' && <WebsiteBuilderPage />}
+        {activePage === 'business' && <BusinessWorkspacePage />}
         {activePage === 'marketplace' && <MarketplacePage />}
         {activePage === 'services' && <MoreServicesPage />}
         {activePage === 'afa' && <AfaRegistrationPage />}

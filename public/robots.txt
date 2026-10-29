@@ -8,6 +8,7 @@ Allow: /about
 
 # Private or internal transaction endpoints
 Disallow: /orders
+Disallow: /my-business
 Disallow: /api/
 
 Sitemap: https://mysteryhub.site/sitemap.xml
