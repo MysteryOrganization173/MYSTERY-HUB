@@ -107,6 +107,8 @@
 @media(max-width:400px){.website-preview-namebar button{padding:0 14px;font-size:14px}}
 
 /* Dashboard: examples still to review, one tap from the checklist. */
+.website-owner-banner .website-owner-secondary{grid-column:1/-1}
+.website-owner-banner .website-owner-primary{text-decoration:none}
 .website-owner-review{margin-top:12px;width:100%;max-width:560px;display:flex;align-items:center;gap:12px;text-align:left;padding:12px 14px;border-radius:14px;border:1px solid rgba(242,178,76,.4);background:rgba(242,178,76,.08);color:#eef3f1}
 .website-owner-review>span:first-child{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#f2b24c;color:#1a1204;font-weight:800;flex-shrink:0}
 .website-owner-review strong{display:block;font-size:14.5px}

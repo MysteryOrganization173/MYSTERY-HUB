@@ -8,6 +8,7 @@ export const ROUTE_PATH_MAP: Record<ActivePage, string> = {
   wallet: '/wallet',
   data: '/data',
   website: '/website-builder',
+  business: '/my-business',
   marketplace: '/marketplace',
   services: '/services',
   about: '/about',
@@ -75,6 +76,7 @@ export function normalizePathname(rawPath: string | null | undefined): string {
  * - /index.html -> 'home'
  * - /data (or /data/index.html) -> 'data'
  * - /website-builder, /website (or /website-builder/index.html) -> 'website'
+ * - /my-business and its sections (/my-business/orders...) -> 'business'
  * - /marketplace (or /marketplace/index.html) -> 'marketplace'
  * - /services (or /services/index.html) -> 'services'
  * - /about (or /about/index.html) -> 'about'
@@ -107,6 +109,11 @@ export function getPageFromPath(rawPath: string | null | undefined): ActivePage 
     normalized === '/website/index.html'
   ) {
     return 'website';
+  }
+
+  // An owner's Business Workspace; each section has its own address so it can be bookmarked.
+  if (normalized === '/my-business' || normalized.startsWith('/my-business/')) {
+    return 'business';
   }
 
   if (

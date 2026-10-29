@@ -31,7 +31,7 @@ function MemberDashboard(){
     }).catch(()=>{}),600);
     return()=>{active=false;window.clearTimeout(timer);};
   },[sessionToken]);
-  return <MemberHomeView name={user?.name.trim().split(/\s+/)[0]||'Member'} greeting={memberGreeting(new Date().getHours())} orders={orders} loading={loading} error={error} retry={()=>setRetry(x=>x+1)} track={o=>openOrderStatus(memberTrackingOrder(o))} wallet={<HomeWalletSummary compact/>} promotion={<InstallAppPromo variant="compact"/>} website={website} assistant={()=>openMysteryAi()} actions={{data:network=>openDataPage('data',network),airtime:network=>openDataPage('airtime',network),website:()=>setActivePage('website'),earn:()=>setActivePage('earn'),orders:()=>setActivePage('orders'),marketplace:()=>setActivePage('marketplace'),afa:()=>setActivePage('afa'),services:()=>setActivePage('services')}}/>;
+  return <MemberHomeView name={user?.name.trim().split(/\s+/)[0]||'Member'} greeting={memberGreeting(new Date().getHours())} orders={orders} loading={loading} error={error} retry={()=>setRetry(x=>x+1)} track={o=>openOrderStatus(memberTrackingOrder(o))} wallet={<HomeWalletSummary compact/>} promotion={<InstallAppPromo variant="compact"/>} website={website} assistant={()=>openMysteryAi()} actions={{data:network=>openDataPage('data',network),airtime:network=>openDataPage('airtime',network),website:()=>setActivePage(website&&website.state!=='none'?'business':'website'),earn:()=>setActivePage('earn'),orders:()=>setActivePage('orders'),marketplace:()=>setActivePage('marketplace'),afa:()=>setActivePage('afa'),services:()=>setActivePage('services')}}/>;
 }
 export const MemberHome:React.FC=()=>{
   const {user,sessionToken}=useApp();

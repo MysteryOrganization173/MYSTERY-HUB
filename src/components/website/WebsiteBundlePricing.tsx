@@ -53,19 +53,7 @@ export function WebsiteBundlePricing({siteId,token,onDirty,published=true,onSave
  const byNetwork=NETWORKS.map(([id,label])=>({id,label,total:products.filter(p=>p.network===id).length,ready:products.filter(p=>p.network===id&&canPrice(p)).length,onSale:products.filter(p=>p.network===id&&isSellableDraft(p,original[p.id])).length}));
  const s=plan?.summary;
  const example=plan&&catalog.policy?planExample(products,plan,catalog.policy):null;
- return <section aria-label="Bundles & Pricing" className="website-bundles space-y-4" data-bundle-setup={variant}>
- <div className="website-bundles-status" data-sellable={sellableNow}>
-  <strong>{sellableNow?`${count(sellableNow,'bundle')} on sale`:'No bundles on sale yet'}</strong>
-  <span>{byNetwork.filter(n=>n.total).map(n=>`${n.label} ${n.onSale} of ${n.ready||n.total}`).join(' · ')}</span>
- </div>
- {/* How pricing works, in the owner's words. The minimum and the estimate both come from the server catalogue and policy. */}
- <p className="text-sm text-slate-400" data-pricing-explainer>Each bundle has a minimum price from Mystery Hub that covers the bundle’s cost and payment processing. What you charge above the minimum is your profit, less a small processing share. “You earn about” shows the estimate for each sale; the order record decides the final amount.</p>
- {!catalog.policy?.enabled?<p role="status" data-checkout-paused className="rounded-xl border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200">Mystery Hub has paused online checkout for reseller stores, so customers can’t buy right now and prices can’t be changed. Your saved prices are kept for when checkout reopens.</p>
-  :!configurable.length?<p role="status" className="rounded-xl border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200">No bundles are available from Mystery Hub right now, so none can go on sale. Your saved prices are kept.</p>
-  :<>{!sellableNow&&!changed.length&&<p role="status" className="text-sm text-amber-200">Customers can’t buy from your store until you price and switch on some bundles. Quick setup below does it in one go.</p>}
-  {configurable.length<products.length&&<p role="status" className="rounded-xl border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200">{count(products.length-configurable.length,'bundle')} {products.length-configurable.length===1?'is':'are'} not available from Mystery Hub right now, so {products.length-configurable.length===1?'it':'they'} can’t go on sale. The other {count(configurable.length,'bundle')} can.</p>}</>}
-
- {notice.startsWith('Your bundle setup is saved')&&!changed.length&&<p role="status" className="website-bundles-saved" data-bundle-saved>{notice}</p>}
+ const quickSetup=<>
  <fieldset disabled={busy||!configurable.length} className="website-bundles-setup min-w-0 rounded-xl border border-emerald-800/60 bg-emerald-950/10 p-3 space-y-4">
   <legend className="px-1 font-semibold">Quick setup</legend>
   <div><p className="text-xs font-semibold text-slate-300 mb-2" id={`bundle-networks-${variant}`}>1. Networks</p>
@@ -109,10 +97,27 @@ export function WebsiteBundlePricing({siteId,token,onDirty,published=true,onSave
    </div>
   </div>}
  </fieldset>
+ </>;
+ return <section aria-label="Bundles & Pricing" className="website-bundles space-y-4" data-bundle-setup={variant}>
+ <div className="website-bundles-status" data-sellable={sellableNow}>
+  <strong>{sellableNow?`${count(sellableNow,'bundle')} on sale`:'No bundles on sale yet'}</strong>
+  <span>{byNetwork.filter(n=>n.total).map(n=>`${n.label} ${n.onSale} of ${n.ready||n.total}`).join(' · ')}</span>
+ </div>
+ {/* How pricing works, in the owner's words. The minimum and the estimate both come from the server catalogue and policy. */}
+ <p className="text-sm text-slate-400" data-pricing-explainer>Each bundle has a minimum price from Mystery Hub that covers the bundle’s cost and payment processing. What you charge above the minimum is your profit, less a small processing share. “You earn about” shows the estimate for each sale; the order record decides the final amount.</p>
+ {!catalog.policy?.enabled?<p role="status" data-checkout-paused className="rounded-xl border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200">Mystery Hub has paused online checkout for reseller stores, so customers can’t buy right now and prices can’t be changed. Your saved prices are kept for when checkout reopens.</p>
+  :!configurable.length?<p role="status" className="rounded-xl border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200">No bundles are available from Mystery Hub right now, so none can go on sale. Your saved prices are kept.</p>
+  :<>{!sellableNow&&!changed.length&&<p role="status" className="text-sm text-amber-200">Customers can’t buy from your store until you price and switch on some bundles. Quick setup below does it in one go.</p>}
+  {configurable.length<products.length&&<p role="status" className="rounded-xl border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200">{count(products.length-configurable.length,'bundle')} {products.length-configurable.length===1?'is':'are'} not available from Mystery Hub right now, so {products.length-configurable.length===1?'it':'they'} can’t go on sale. The other {count(configurable.length,'bundle')} can.</p>}</>}
+
+ {notice.startsWith('Your bundle setup is saved')&&!changed.length&&<p role="status" className="website-bundles-saved" data-bundle-saved>{notice}</p>}
+ {/* Business Workspace: once bundles are on sale, the list of prices leads and the bulk tool waits behind one tap. */}
+ {variant==='dashboard'&&sellableNow>0?<details className="bw-quick-setup" data-quick-setup><summary><strong>Change many bundles at once</strong><small>Quick setup: choose networks, add your profit and switch bundles on or off together.</small></summary>{quickSetup}</details>:quickSetup}
 
  <div ref={listRef} className="scroll-mt-24 space-y-3">
  <h3 className="font-semibold">Each bundle</h3>
  <nav aria-label="Bundle pricing networks" className="flex flex-wrap gap-2">{NETWORKS.map(([id,label])=><button className={`${button} ${network===id?'border-emerald-500 text-emerald-300 bg-emerald-500/10':''}`} aria-pressed={network===id} key={id} onClick={()=>setNetwork(id)}>{label}</button>)}</nav>
+ <div aria-hidden="true" className="hidden sm:grid grid-cols-[minmax(0,1fr)_8rem_8rem_7rem] gap-x-3 px-3 text-xs font-semibold text-slate-400" data-bundle-columns><span>Bundle · minimum price</span><span>Your price</span><span>Estimated earning</span><span>Customers can buy</span></div>
  <fieldset disabled={busy} className="space-y-2 min-w-0">{products.filter(p=>p.network===network).map(p=>{const draft=drafts[p.id],message=sellerPriceError(p,draft);let earn='—';if(canPrice(p)&&!message&&draft.price&&catalog.policy){const minor=estimatedEarningMinor(p,parseGhs(draft.price),catalog.policy);if(minor!==null)earn=formatGhs(minor);}
  return <article key={p.id} data-bundle-row={p.id} data-on-sale={isSellableDraft(p,draft)?'yes':'no'} className="rounded-xl border border-slate-800 p-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:grid-cols-[minmax(0,1fr)_8rem_8rem_7rem] gap-x-3 gap-y-1 items-center">
  <div><h4 className="font-semibold text-sm">{p.networkName} {p.dataAmount}</h4><p className="text-xs text-slate-400">{canPrice(p)?`Min ${formatGhs(p.minimumMinor!)}`:'Not available yet'}</p></div>

@@ -15,6 +15,7 @@ const FIELDS: [keyof SiteContent, string][] = [
   ['imageMeta', 'Photo focus and descriptions'], ['copy', 'Headings and labels'], ['social', 'Social links'], ['composition', 'Custom sections'],
   ['pinnedBundles', 'Featured bundles'], ['features', 'Feature details'], ['stats', 'Business facts'],
 ];
+const publicItem = (item: unknown) => { if (!item || typeof item !== 'object') return item; const { isExample, ...rest } = item as { isExample?: boolean }; return isExample ? item : rest; };
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export function websitePublishChanges(snapshot: WebsitePublishedSnapshot | null | undefined, draft: { templateId: string; content: SiteContent; settings: SiteSettings }, itemWord = 'item'): string[] {
@@ -28,7 +29,8 @@ export function websitePublishChanges(snapshot: WebsitePublishedSnapshot | null 
   const after = new Map((draft.content.items || []).map((i, n) => [i.id || `#${n}`, i]));
   const added = [...after.keys()].filter(id => !before.has(id)).length;
   const removed = [...before.keys()].filter(id => !after.has(id)).length;
-  const changed = [...after.entries()].filter(([id, item]) => before.has(id) && !same(before.get(id), item)).length;
+  // A kept example is saved as isExample:false, while the public snapshot leaves the flag out; both mean "a real item".
+  const changed = [...after.entries()].filter(([id, item]) => before.has(id) && !same(publicItem(before.get(id)), publicItem(item))).length;
   const order = !added && !removed && !changed && !same([...before.keys()], [...after.keys()]);
   if (added) out.push(`${plural(added, itemWord)} added`);
   if (removed) out.push(`${plural(removed, itemWord)} removed`);

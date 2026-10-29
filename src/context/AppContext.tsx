@@ -444,6 +444,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const clearLocalAuth = () => {
     feedbackToken.current = null;
     setUser(null); setSessionToken(null); setAccountOpen(false); setPendingAuthAction(null); setIsCheckoutOpen(false);
+    // A signed-out device never keeps the previous owner's website open in the editor.
+    setActiveEditorSite(null); setEditorAiContext(null);
     try { for (const storage of [localStorage, sessionStorage]) { storage.removeItem('mystery_hub_user'); storage.removeItem('mystery_hub_session_token'); } } catch { /* Ignore unavailable storage. */ }
   };
   const logoutUser = () => {
