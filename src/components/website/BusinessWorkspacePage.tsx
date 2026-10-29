@@ -193,7 +193,7 @@ export const BusinessWorkspacePage: React.FC = () => {
 
   const identity = <div className="bw-identity">
     <WorkspaceAvatar logo={site.content_json?.logoUrl} name={name} />
-    <div className="min-w-0 flex-1"><p className="bw-name" title={name}>{name}</p><p className="bw-state" data-live={live}><span aria-hidden="true" />{reseller && summary?.storeLabel ? summary.storeLabel : WEBSITE_LIVE_LABELS[live].short}</p></div>
+    <div className="min-w-0 flex-1"><p className="bw-name" title={name}>{name}</p><p className="bw-state" data-live={live}><span aria-hidden="true" /><span className="bw-state-text">{reseller && summary?.storeLabel ? summary.storeLabel : WEBSITE_LIVE_LABELS[live].short}</span></p></div>
     {/* Shows where the owner is, so it never reads as a second copy of the site menu above it. */}
     <button type="button" className="bw-menu-button" aria-haspopup="dialog" aria-expanded={menuOpen} aria-label={`Business areas. Now showing ${info.label}`} onClick={() => setMenuOpen(true)}><span>{info.short}</span><ChevronDown size={17} aria-hidden="true" /></button>
   </div>;

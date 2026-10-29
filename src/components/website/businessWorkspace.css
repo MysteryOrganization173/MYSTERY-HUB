@@ -11,10 +11,12 @@
 .bw-avatar img{width:100%;height:100%;object-fit:contain;background:#fff}
 .bw-name{font-weight:700;font-size:16px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bw-state{display:flex;align-items:center;gap:6px;margin-top:2px;font-size:13px;color:#9fb0a8}
-.bw-state>span{width:7px;height:7px;border-radius:50%;background:#f2b24c;flex-shrink:0}
-.bw-state[data-live="live"]>span,.bw-state[data-live="live-changes"]>span{background:#00c365}
+.bw-state>span:first-child{width:7px;height:7px;border-radius:50%;background:#f2b24c;flex-shrink:0}
+.bw-state[data-live="live"]>span:first-child,.bw-state[data-live="live-changes"]>span:first-child{background:#00c365}
+.bw-state-text{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bw-menu-button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid #2a3a46;background:#0f171e;color:#eef3f1;font-size:14px;font-weight:600;flex-shrink:0}
 .bw-menu-button:hover{background:#16212a}
+@media (max-width:359px){.bw-identity{gap:10px}.bw-avatar{width:38px;height:38px}.bw-menu-button{padding:0 10px;gap:4px}}
 
 /* Navigation list: sidebar on desktops, the menu sheet on phones. */
 .bw-nav ul,.bw-nav[data-drawer]{list-style:none;margin:0;padding:0;display:grid;gap:2px}
