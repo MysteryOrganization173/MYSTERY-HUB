@@ -2,7 +2,7 @@
  * What an owner should look at next, worked out only from records the dashboard already loaded.
  * Nothing here is a guess: every item points at a real gap and at the place that fixes it.
  */
-export type OwnerAttentionAction = 'edit' | 'pricing' | 'earnings' | 'share' | 'publish' | 'orders';
+export type OwnerAttentionAction = 'edit' | 'pricing' | 'earnings' | 'share' | 'publish' | 'orders' | 'support';
 export interface OwnerAttentionItem {id: string; title: string; detail: string; action: OwnerAttentionAction; label: string; tone: 'warn' | 'info'}
 
 export interface OwnerAttentionInput {
@@ -67,6 +67,69 @@ export function ownerSuggestions(input: OwnerSuggestionInput): OwnerAttentionIte
  * A new Data store's three launch steps, from records the dashboard already loaded. The card disappears once
  * bundles are on sale and the store is published; sharing is never marked done because it never finishes.
  */
+/**
+ * Reseller Experience V1: one answer to "can customers buy from my store right now, and if not, what next?".
+ * Built only from the owner bundle catalogue the dashboard already loads (`/bundles`: each product's server
+ * `eligible`, `configured`, `enabled`, `retailMinor`, and the store `policy.enabled` switch) plus the site's
+ * publish state. It never says a store is open unless the server would let a customer start checkout.
+ */
+export interface ResellerCatalogueSummary {
+  /** Bundles customers can buy now (server `eligible`: checkout on, Mystery Hub cost set, owner on sale at or above the minimum). */
+  sellable: number;
+  /** Bundles the owner priced and switched on, whatever Mystery Hub's side currently allows. */
+  ownerOnSale: number;
+  /** Bundles Mystery Hub can supply to reseller stores right now (server `configured`). */
+  available: number;
+  /** Mystery Hub's store checkout switch (server `policy.enabled`). */
+  checkoutEnabled: boolean;
+}
+export function resellerCatalogueSummary(response: {products?: Array<{eligible?: boolean; configured?: boolean; enabled?: boolean; retailMinor?: number}>; policy?: {enabled?: boolean}} | null | undefined): ResellerCatalogueSummary | null {
+  if (!response || !Array.isArray(response.products)) return null;
+  const products = response.products;
+  return {
+    sellable: products.filter(p => p.eligible).length,
+    ownerOnSale: products.filter(p => p.enabled && Number(p.retailMinor) > 0).length,
+    available: products.filter(p => p.configured).length,
+    checkoutEnabled: response.policy?.enabled === true,
+  };
+}
+
+export type ResellerStoreState = 'checkout-paused' | 'catalogue-unavailable' | 'needs-bundles' | 'needs-publish' | 'open';
+export interface ResellerStoreStatus {
+  state: ResellerStoreState;
+  /** ready: customers can buy; setup: the owner has a step to take; blocked: waiting on Mystery Hub, nothing for the owner to fix. */
+  tone: 'ready' | 'setup' | 'blocked';
+  label: string;
+  title: string;
+  detail: string;
+  action?: {action: OwnerAttentionAction; label: string};
+}
+const bundles = (n: number) => n === 1 ? '1 bundle' : `${n} bundles`;
+export function resellerStoreStatus(input: {published: boolean; catalogue: ResellerCatalogueSummary | null}): ResellerStoreStatus | null {
+  const c = input.catalogue;
+  if (!c) return null;
+  if (!c.checkoutEnabled) return {state: 'checkout-paused', tone: 'blocked', label: 'Checkout paused',
+    title: 'Customers can’t pay on your store right now',
+    detail: `Mystery Hub has paused online checkout for reseller stores, so no orders can be placed.${c.ownerOnSale ? ' Your prices are kept, and bundles priced at or above their minimum go back on sale when checkout reopens.' : ' You can still set up your bundles and prices now.'}`,
+    action: {action: 'support', label: 'Ask Mystery Hub'}};
+  if (!c.available) return {state: 'catalogue-unavailable', tone: 'blocked', label: 'Bundles unavailable',
+    title: 'Mystery Hub can’t supply bundles right now',
+    detail: 'None of the bundles can be sold at the moment, so your store shows no bundles. Your prices are kept. Nothing for you to fix; check back later.',
+    action: {action: 'support', label: 'Ask Mystery Hub'}};
+  if (!c.sellable) return {state: 'needs-bundles', tone: 'setup', label: input.published ? 'Live, no bundles' : 'Not ready yet',
+    title: input.published ? 'Your store is live but has nothing to buy' : 'Choose the bundles you want to sell',
+    detail: c.ownerOnSale ? 'None of the bundles you switched on can be sold right now. Open Bundles & Pricing to see which need a new price or are unavailable.' : 'Pick your networks and add your profit. Quick setup does it in one go.',
+    action: {action: 'pricing', label: 'Set up bundles'}};
+  if (!input.published) return {state: 'needs-publish', tone: 'setup', label: 'Not published',
+    title: 'Publish to open your store',
+    detail: `${bundles(c.sellable)} ready at your prices. Your store link starts working for customers once you publish.`,
+    action: {action: 'publish', label: 'Publish'}};
+  return {state: 'open', tone: 'ready', label: 'Open for orders',
+    title: `Customers can buy ${bundles(c.sellable)}`,
+    detail: 'Each order is paid on your store and sent by Mystery Hub. A bundle can still be briefly unavailable if the network has a problem.',
+    action: {action: 'share', label: 'Share your store'}};
+}
+
 export type ResellerLaunchStep = {id: 'bundles' | 'publish' | 'share'; title: string; detail: string; done: boolean; action: OwnerAttentionAction; label: string; ready: boolean};
 export function resellerLaunchSteps(input: {sellableBundles?: number | null; published: boolean}): ResellerLaunchStep[] | null {
   const onSale = input.sellableBundles ?? null;

@@ -1,9 +1,8 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {websiteBusinessRequest} from '../../services/websiteBusinessApi';
 import {formatGhs,parseGhs} from '../../../shared/money';
-import {storeReserve} from '../../../shared/storeEconomics';
 import {pricingReviewLines} from '../../utils/websiteOwnerOrders';
-import {bundleSaveRows,canPrice,isSellableDraft,planBundleSetup,sellableCount,sellerDrafts,sellerPriceError,type BundleSetupChoice,type BundleSetupPlan,type SellerBundle,type SellerDraft} from '../../utils/websitePricing';
+import {bundleSaveRows,canPrice,estimatedEarningMinor,isSellableDraft,planBundleSetup,planExample,sellableCount,sellerDrafts,sellerPriceError,type BundleSetupChoice,type BundleSetupPlan,type SellerBundle,type SellerDraft} from '../../utils/websitePricing';
 const button='min-h-11 px-3 rounded-lg border border-slate-700 text-sm disabled:opacity-50';
 const field='min-h-11 rounded-lg px-3 bg-slate-950 border border-slate-700 min-w-0';
 const NETWORKS=[['mtn','MTN'],['telecel','Telecel'],['airteltigo','AirtelTigo']] as const;
@@ -53,14 +52,18 @@ export function WebsiteBundlePricing({siteId,token,onDirty,published=true,onSave
  const sellableNow=sellableCount(products,original);
  const byNetwork=NETWORKS.map(([id,label])=>({id,label,total:products.filter(p=>p.network===id).length,ready:products.filter(p=>p.network===id&&canPrice(p)).length,onSale:products.filter(p=>p.network===id&&isSellableDraft(p,original[p.id])).length}));
  const s=plan?.summary;
+ const example=plan&&catalog.policy?planExample(products,plan,catalog.policy):null;
  return <section aria-label="Bundles & Pricing" className="website-bundles space-y-4" data-bundle-setup={variant}>
  <div className="website-bundles-status" data-sellable={sellableNow}>
-  <strong>{sellableNow?`${count(sellableNow,'bundle')} configured`:'No eligible bundles are configured yet'}</strong>
-  <span>{byNetwork.filter(n=>n.total).map(n=>`${n.label} ${n.onSale}/${n.ready||n.total}`).join(' · ')}</span>
+  <strong>{sellableNow?`${count(sellableNow,'bundle')} on sale`:'No bundles on sale yet'}</strong>
+  <span>{byNetwork.filter(n=>n.total).map(n=>`${n.label} ${n.onSale} of ${n.ready||n.total}`).join(' · ')}</span>
  </div>
- <p className="text-sm text-slate-400">Configure bundles and selling prices. Eligible means enabled under the current pricing policy; customers also need a published Data store, available checkout and supplier availability. Estimated earnings per sale allow for bundle costs and payment processing.</p>
- {!catalog.policy?.enabled?<p role="status" className="text-sm text-amber-200">Online checkout is not enabled for reseller stores yet. Contact Mystery Hub before offering online purchases.</p>:!sellableNow&&!changed.length&&<p role="status" className="text-sm text-amber-200">Customers can’t buy from your store until you price and switch on some bundles. Quick setup below does it in one go.</p>}
- {configurable.length<products.length&&<p role="status" className="rounded-xl border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200">{count(products.length-configurable.length,'bundle')} {products.length-configurable.length===1?'is':'are'} not available from Mystery Hub right now, so {products.length-configurable.length===1?'it':'they'} can’t go on sale. The rest can.</p>}
+ {/* How pricing works, in the owner's words. The minimum and the estimate both come from the server catalogue and policy. */}
+ <p className="text-sm text-slate-400" data-pricing-explainer>Each bundle has a minimum price from Mystery Hub that covers the bundle’s cost and payment processing. What you charge above the minimum is your profit, less a small processing share. “You earn about” shows the estimate for each sale; the order record decides the final amount.</p>
+ {!catalog.policy?.enabled?<p role="status" data-checkout-paused className="rounded-xl border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200">Mystery Hub has paused online checkout for reseller stores, so customers can’t buy right now and prices can’t be changed. Your saved prices are kept for when checkout reopens.</p>
+  :!configurable.length?<p role="status" className="rounded-xl border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200">No bundles are available from Mystery Hub right now, so none can go on sale. Your saved prices are kept.</p>
+  :<>{!sellableNow&&!changed.length&&<p role="status" className="text-sm text-amber-200">Customers can’t buy from your store until you price and switch on some bundles. Quick setup below does it in one go.</p>}
+  {configurable.length<products.length&&<p role="status" className="rounded-xl border border-amber-700/50 bg-amber-950/20 p-3 text-sm text-amber-200">{count(products.length-configurable.length,'bundle')} {products.length-configurable.length===1?'is':'are'} not available from Mystery Hub right now, so {products.length-configurable.length===1?'it':'they'} can’t go on sale. The other {count(configurable.length,'bundle')} can.</p>}</>}
 
  {notice.startsWith('Your bundle setup is saved')&&!changed.length&&<p role="status" className="website-bundles-saved" data-bundle-saved>{notice}</p>}
  <fieldset disabled={busy||!configurable.length} className="website-bundles-setup min-w-0 rounded-xl border border-emerald-800/60 bg-emerald-950/10 p-3 space-y-4">
@@ -94,6 +97,7 @@ export function WebsiteBundlePricing({siteId,token,onDirty,published=true,onSave
     {s.needsPrice>0&&<li data-tone="warn"><strong>{s.needsPrice}</strong> need a price first</li>}
    </ul>
    <p className="text-sm">After saving: <strong>{count(s.sellableAfter,'bundle')} on sale</strong>{s.sellableAfter!==s.sellableBefore?` (now ${s.sellableBefore})`:''}.</p>
+   {example&&<p className="text-sm text-slate-300" data-plan-example>For example, {example.name} sells for <strong className="text-white">{formatGhs(example.retailMinor)}</strong> and you earn about <strong className="text-emerald-300">{formatGhs(example.earningMinor)}</strong> per sale.</p>}
    {s.needsPrice>0&&<p className="text-xs text-amber-200">Bundles without a valid price stay off sale. Choose “Add my profit” or set their prices in the list below.</p>}
    {s.liveRemoved>0&&published&&<p role="alert" className="text-sm text-amber-200">{count(s.liveRemoved,'bundle')} customers can buy right now will be removed from your store.</p>}
    {(s.priceChanges+s.newlyEnabled+s.newlyDisabled)>0&&<details className="text-sm"><summary className="cursor-pointer min-h-11 flex items-center text-slate-300">See each change</summary><ul className="max-h-48 overflow-y-auto">{pricingReviewLines(plan.rows.filter(r=>r.priceChanged||r.enabledChanged).map(r=>{const p=products.find(x=>x.id===r.id)!;return {id:r.id,networkName:p.networkName,dataAmount:p.dataAmount,before:r.before,after:r.after};})).map((line,i)=><li key={i} className="border-b border-slate-800 py-2">{line}</li>)}</ul></details>}
@@ -109,7 +113,7 @@ export function WebsiteBundlePricing({siteId,token,onDirty,published=true,onSave
  <div ref={listRef} className="scroll-mt-24 space-y-3">
  <h3 className="font-semibold">Each bundle</h3>
  <nav aria-label="Bundle pricing networks" className="flex flex-wrap gap-2">{NETWORKS.map(([id,label])=><button className={`${button} ${network===id?'border-emerald-500 text-emerald-300 bg-emerald-500/10':''}`} aria-pressed={network===id} key={id} onClick={()=>setNetwork(id)}>{label}</button>)}</nav>
- <fieldset disabled={busy} className="space-y-2 min-w-0">{products.filter(p=>p.network===network).map(p=>{const draft=drafts[p.id],message=sellerPriceError(p,draft);let earn='—';if(canPrice(p)&&!message&&draft.price){const retail=parseGhs(draft.price);earn=formatGhs(retail-p.wholesaleMinor!-storeReserve(retail,catalog.policy));}
+ <fieldset disabled={busy} className="space-y-2 min-w-0">{products.filter(p=>p.network===network).map(p=>{const draft=drafts[p.id],message=sellerPriceError(p,draft);let earn='—';if(canPrice(p)&&!message&&draft.price&&catalog.policy){const minor=estimatedEarningMinor(p,parseGhs(draft.price),catalog.policy);if(minor!==null)earn=formatGhs(minor);}
  return <article key={p.id} data-bundle-row={p.id} data-on-sale={isSellableDraft(p,draft)?'yes':'no'} className="rounded-xl border border-slate-800 p-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:grid-cols-[minmax(0,1fr)_8rem_8rem_7rem] gap-x-3 gap-y-1 items-center">
  <div><h4 className="font-semibold text-sm">{p.networkName} {p.dataAmount}</h4><p className="text-xs text-slate-400">{canPrice(p)?`Min ${formatGhs(p.minimumMinor!)}`:'Not available yet'}</p></div>
  <label className="text-xs text-slate-400">Your price (GH₵)<input aria-label={`${p.networkName} ${p.dataAmount} selling price`} inputMode="decimal" enterKeyHint="done" className={`${field} w-full mt-1 text-white`} value={draft.price} disabled={!canPrice(p)} aria-invalid={!!message} aria-describedby={message?`price-error-${p.id}`:undefined} onChange={e=>update(p.id,{price:e.target.value})}/></label>

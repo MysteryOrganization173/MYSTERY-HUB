@@ -1,4 +1,5 @@
 import {MAX_MONEY_MINOR, moneyMinor, parseGhs, formatGhs} from '../../shared/money.js';
+import {storeReserve, type StorePolicy} from '../../shared/storeEconomics.js';
 export interface SellerBundle { id:string; network:string; networkName:string; dataAmount:string; retailMinor:number; enabled:boolean; minimumMinor:number|null; wholesaleMinor:number|null; configured:boolean; }
 export interface SellerDraft {price:string;enabled:boolean;}
 export function sellerDrafts(products:SellerBundle[]):Record<string,SellerDraft> {
@@ -87,4 +88,20 @@ export function planBundleSetup(products:SellerBundle[],drafts:Record<string,Sel
 export function bundleSaveRows(products:SellerBundle[],saved:Record<string,SellerDraft>,drafts:Record<string,SellerDraft>) {
   return products.filter(p=>drafts[p.id]&&saved[p.id]&&(draftMinor(drafts[p.id].price)!==draftMinor(saved[p.id].price)||drafts[p.id].enabled!==saved[p.id].enabled))
     .map(p=>({productId:p.id,enabled:drafts[p.id].enabled,retailMinor:draftMinor(drafts[p.id].price)??0}));
+}
+/**
+ * The owner's estimated earning on one sale at a given price: the same sum the server snapshots for a store order
+ * (price − Mystery Hub's bundle cost − the configured processing reserve). An estimate only; the order snapshot decides.
+ */
+export function estimatedEarningMinor(p:SellerBundle,retailMinor:number,policy:StorePolicy):number|null {
+  if(!canPrice(p)||p.wholesaleMinor===null||!Number.isSafeInteger(retailMinor)||retailMinor<p.minimumMinor!)return null;
+  return retailMinor-p.wholesaleMinor-storeReserve(retailMinor,policy);
+}
+/** One representative bundle from a setup plan to show "sells for … · you earn about …" before saving (5GB when it is in the plan). */
+export function planExample(products:SellerBundle[],plan:BundleSetupPlan,policy:StorePolicy) {
+  const candidates=plan.rows.filter(r=>r.after.enabled&&r.status!=='ineligible'&&r.status!=='needs-price').map(r=>({row:r,p:products.find(x=>x.id===r.id)!})).filter(x=>x.p&&draftMinor(x.row.after.price)!==null);
+  const pick=candidates.find(x=>/^5\s*GB$/i.test(x.p.dataAmount))||candidates[0];
+  if(!pick)return null;
+  const retail=draftMinor(pick.row.after.price)!;const earn=estimatedEarningMinor(pick.p,retail,policy);
+  return earn===null?null:{name:`${pick.p.networkName} ${pick.p.dataAmount}`,retailMinor:retail,earningMinor:earn};
 }

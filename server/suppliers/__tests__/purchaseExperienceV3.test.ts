@@ -44,7 +44,8 @@ test('the unverified 255 SMS figure is gone; unconfirmed SMS shows Included, not
 });
 
 test('AFA hero leads with value, the one-time fee, the separate MTN purchase and a start button, before the form', () => {
-  assert.match(hero, /More ways to stay connected/);
+  assert.match(hero, /Get more from your MTN line/);
+  assert.doesNotMatch(hero, /More ways to stay connected/);
   assert.match(hero, /aria-label="AFA package highlights"/);
   assert.match(hero, /One-time registration fee/);
   assert.match(hero, /Packages are not included: you buy them from MTN/);
@@ -52,7 +53,8 @@ test('AFA hero leads with value, the one-time fee, the separate MTN purchase and
   assert.match(hero, /Covers registering your MTN line for AFA only/);
   assert.match(hero, /onClick=\{startRegistration\}/);
   assert.ok(afa.indexOf('aria-label="AFA package highlights"') < afa.indexOf('<form ref={formRef}'));
-  assert.match(AFA_CONFIG.tagline, /buy AFA .*packages from MTN/);
+  assert.match(AFA_CONFIG.tagline, /eligible AFA call and data packages/);
+  assert.match(AFA_CONFIG.tagline, /buy the packages separately from MTN/);
 });
 
 test('AFA makes no unsupported promises and keeps the MTN menu code until the line is Registered', () => {

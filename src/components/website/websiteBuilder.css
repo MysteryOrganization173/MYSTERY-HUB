@@ -118,28 +118,28 @@
 [data-state="info"] .website-check-icon{background:#1b2730;color:#b8c6c0}
 
 /* V3 command centre: what needs the owner, then how the site is doing. */
-.website-launch{border:1px solid #1d3b2c;border-radius:16px;padding:14px;background:linear-gradient(180deg,#0c1d16,#0b161c)}
-.website-launch ol{margin-top:10px;display:grid;gap:8px;list-style:none;padding:0}
-.website-launch li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 12px;align-items:start;padding:12px;border-radius:12px;background:#0a1218;border:1px solid #1a252d}
-.website-launch li[data-next="yes"]{border-color:#00c365}
-.website-launch li>span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;background:#1e293b;color:#cbd5e1}
-.website-launch li[data-done="yes"]>span{background:#00c365;color:#04120b}
-.website-launch li[data-next="yes"]>span{background:#0f2a1f;color:#00e575;box-shadow:inset 0 0 0 1.5px #00c365}
-.website-launch strong{display:block;font-size:14px}
-.website-launch p{font-size:13px;color:#94a3b8;margin-top:2px;line-height:1.45}
-.website-launch li>button{grid-column:2;justify-self:start;min-height:44px;margin-top:6px;padding:0 14px;border-radius:10px;font-size:13px;font-weight:700;border:1px solid #334155;color:#e2e8f0;transition:transform .15s ease}
-.website-launch li[data-next="yes"]>button{background:#00c365;border-color:#00c365;color:#04120b}
-.website-launch li>button:active{transform:scale(.97)}
-.website-launch li>button:focus-visible{outline:2px solid #00c365;outline-offset:2px}
-@media (prefers-reduced-motion:reduce){.website-launch li>button{transition:none}}
+.website-launch-steps{margin-top:12px;display:grid;gap:8px;list-style:none;padding:0}
+.website-launch-steps li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 12px;align-items:start;padding:12px;border-radius:12px;background:#0a1218;border:1px solid #1a252d}
+.website-launch-steps li[data-next="yes"]{border-color:#00c365}
+.website-launch-steps li>span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;background:#1e293b;color:#cbd5e1}
+.website-launch-steps li[data-done="yes"]>span{background:#00c365;color:#04120b}
+.website-launch-steps li[data-next="yes"]>span{background:#0f2a1f;color:#00e575;box-shadow:inset 0 0 0 1.5px #00c365}
+.website-launch-steps strong{display:block;font-size:14px}
+.website-launch-steps p{font-size:13px;color:#94a3b8;margin-top:2px;line-height:1.45}
+.website-launch-steps li>button{grid-column:2;justify-self:start;min-height:44px;margin-top:6px;padding:0 14px;border-radius:10px;font-size:13px;font-weight:700;border:1px solid #334155;color:#e2e8f0;transition:transform .15s ease}
+.website-launch-steps li[data-next="yes"]>button{background:#00c365;border-color:#00c365;color:#04120b}
+.website-launch-steps li>button:active{transform:scale(.97)}
+.website-launch-steps li>button:focus-visible{outline:2px solid #00c365;outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.website-launch-steps li>button{transition:none}}
 .website-attention{border:1px solid #1e2a33;border-radius:16px;padding:14px;background:#0d171f}
 .website-attention ul{margin-top:10px;display:grid;gap:8px}
 .website-attention li{display:grid;grid-template-columns:8px minmax(0,1fr);gap:4px 12px;align-items:start;padding:12px;border-radius:12px;background:#0a1218;border:1px solid #1a252d}
 .website-attention li>span{width:8px;height:8px;border-radius:50%;margin-top:6px;background:#38bdf8}
 .website-attention li[data-tone="warn"]>span{background:#fbbf24}
+.website-attention li[data-tone="warn"]>button{border-color:#a16207;color:#fde68a}
 .website-attention strong{display:block;font-size:14px}
 .website-attention p{font-size:13px;color:#94a3b8;margin-top:2px;line-height:1.45}
-.website-attention li>button{grid-column:2;justify-self:start;min-height:44px;margin-top:6px;padding:0 14px;border-radius:10px;font-size:13px;font-weight:700;background:#00c365;color:#04120b;transition:transform .15s ease,background-color .15s ease}
+.website-attention li>button{grid-column:2;justify-self:start;min-height:44px;margin-top:6px;padding:0 14px;border-radius:10px;font-size:13px;font-weight:700;background:transparent;color:#e2e8f0;border:1px solid #334155;transition:transform .15s ease,background-color .15s ease}
 .website-attention li>button:active{transform:scale(.97)}
 .website-attention li>button:focus-visible,.website-period button:focus-visible{outline:2px solid #00c365;outline-offset:2px}
 @media (min-width:640px){.website-attention li{grid-template-columns:8px minmax(0,1fr) auto;align-items:center}.website-attention li>span{margin-top:0}.website-attention li>button{grid-column:auto;margin-top:0}}
@@ -222,16 +222,13 @@
 .website-recovery-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 @media(min-width:1024px){.website-recovery{bottom:20px}}
 /* V5 owner dashboard: live strip, order facts, earnings definitions. */
-.website-live-strip{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 14px;border-radius:999px;border:1px solid #1e2a33;background:#0d171f;font-size:14px;font-weight:700}
-.website-live-strip>span{width:8px;height:8px;border-radius:50%;background:#94a3b8}
-.website-live-strip[data-live="yes"]>span{background:#00c365;box-shadow:0 0 0 4px rgba(0,195,101,.18)}
 .website-order-facts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .website-order-facts>span{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:700;background:#16212a;color:#cbd5e1}
 .website-order-facts>span[data-paid="yes"]{background:rgba(0,195,101,.14);color:#6ee7b7}
 .website-order-facts>span[data-group="delivered"]{background:rgba(0,195,101,.14);color:#6ee7b7}
 .website-order-facts>span[data-group="check"],.website-order-facts>span[data-group="failed"]{background:rgba(251,191,36,.14);color:#fcd34d}
 .website-earnings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-@media (min-width:1024px){.website-earnings{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media (min-width:1024px){.website-earnings{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .website-earnings>div{border:1px solid #1e2a33;border-radius:14px;padding:12px;background:#0d171f;min-width:0}
 .website-earnings dt{font-size:12px;color:#94a3b8}
 .website-earnings dd strong{display:block;font-size:20px;margin-top:2px;overflow-wrap:anywhere}
@@ -287,3 +284,37 @@
 
 /* V5.1: a logo preview shows the whole logo on a checkerboard, so a transparent PNG reads as transparent. */
 .website-logo-preview[data-image-state="loaded"]{background:repeating-conic-gradient(#1e293b 0 25%,#0f172a 0 50%) 0 0/16px 16px!important}
+/* Reseller Experience V1: one store status card (state, why, one next step), a compact money strip and the earnings summary. */
+.website-store-status{border:1px solid #1e2a33;border-radius:16px;padding:14px;background:#0d171f}
+.website-store-status[data-tone="ready"]{border-color:#1d4a33;background:linear-gradient(180deg,#0c1d16,#0b161c)}
+.website-store-status[data-tone="blocked"]{border-color:#4a3a14}
+.website-store-status-label{display:inline-flex;align-items:center;gap:8px;min-height:28px;padding:0 12px;border-radius:999px;background:#16212a;font-size:12px;font-weight:700;color:#cbd5e1}
+.website-store-status-label>span{width:8px;height:8px;border-radius:50%;background:#94a3b8}
+.website-store-status[data-tone="ready"] .website-store-status-label{background:rgba(0,195,101,.14);color:#6ee7b7}
+.website-store-status[data-tone="ready"] .website-store-status-label>span{background:#00c365}
+.website-store-status[data-tone="setup"] .website-store-status-label>span{background:#38bdf8}
+.website-store-status[data-tone="blocked"] .website-store-status-label{background:rgba(251,191,36,.12);color:#fcd34d}
+.website-store-status[data-tone="blocked"] .website-store-status-label>span{background:#fbbf24}
+.website-store-status>h3{margin-top:10px;font-size:17px;font-weight:700;line-height:1.3;overflow-wrap:anywhere}
+.website-store-status>p:not(.website-store-status-label){margin-top:4px;font-size:14px;color:#94a3b8;line-height:1.5}
+.website-store-status-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.website-store-status-actions>button{min-height:44px;padding:0 16px;border-radius:10px;font-size:14px;font-weight:700;background:#00c365;color:#04120b;border:1px solid #00c365}
+.website-store-status-actions>button[data-quiet]{background:transparent;color:#e2e8f0;border-color:#334155}
+.website-store-status[data-tone="blocked"] .website-store-status-actions>button{background:transparent;color:#e2e8f0;border-color:#334155}
+.website-store-status-actions>button:focus-visible{outline:2px solid #00c365;outline-offset:2px}
+.website-money{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;min-height:64px;padding:12px 14px;border-radius:14px;border:1px solid #1e2a33;background:#0a1218;text-align:left}
+.website-money small{display:block;font-size:12px;color:#94a3b8}
+.website-money strong{display:block;font-size:18px;font-variant-numeric:tabular-nums;color:#fff}
+.website-money-link{font-size:13px;font-weight:700;color:#44df95;white-space:nowrap}
+.website-money:focus-visible{outline:2px solid #00c365;outline-offset:2px}
+.website-earnings-summary{border:1px solid #1e2a33;border-radius:16px;padding:14px;background:#0d171f}
+.website-earnings-summary[data-can-withdraw="yes"]{border-color:#1d4a33;background:linear-gradient(180deg,#0c1d16,#0b161c)}
+.website-earnings-summary>p:first-child{font-size:13px;font-weight:600;color:#94a3b8}
+.website-earnings-summary>strong{display:block;margin-top:2px;font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;color:#fff}
+.website-earnings-note{margin-top:6px;font-size:14px;line-height:1.5;color:#cbd5e1}
+.website-earnings-flow{display:grid;gap:6px;list-style:none;padding:0;counter-reset:flow}
+.website-earnings-flow li{counter-increment:flow;display:grid;grid-template-columns:24px minmax(0,1fr);gap:0 10px;font-size:13px;line-height:1.45;color:#94a3b8}
+.website-earnings-flow li::before{content:counter(flow);grid-row:span 2;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;background:#16212a;color:#cbd5e1}
+.website-earnings-flow strong{color:#e2e8f0;font-size:13px}
+@media (min-width:768px){.website-earnings-flow{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}}
+@media (max-width:379px){.website-money{grid-template-columns:repeat(2,minmax(0,1fr))}.website-money-link{grid-column:1/-1}}

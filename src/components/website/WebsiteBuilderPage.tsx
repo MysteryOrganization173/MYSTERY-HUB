@@ -262,9 +262,11 @@ export const WebsiteBuilderPage: React.FC = () => {
 
   const handleCopyLink = (slug: string) => {
     const fullUrl = `${window.location.origin}/sites/${slug}`;
-    navigator.clipboard.writeText(fullUrl).then(() => {
-      showToast('Website link copied to clipboard!', 'success');
-    });
+    // Some in-app browsers block the clipboard; say so instead of failing silently.
+    Promise.resolve().then(() => navigator.clipboard.writeText(fullUrl)).then(
+      () => showToast('Website link copied to clipboard!', 'success'),
+      () => showToast(`Copy didn’t work here. Your link is ${fullUrl.replace(/^https?:\/\//, '')}`, 'info'),
+    );
   };
 
   // Phones open the native share sheet (WhatsApp, SMS…); elsewhere the link is copied.
@@ -368,7 +370,7 @@ export const WebsiteBuilderPage: React.FC = () => {
                 {isPublished&&<button disabled={actionLoadingSiteId===activeSite.id} className="min-h-11 text-slate-400 hover:text-slate-200 disabled:opacity-50 sm:ml-auto" onClick={()=>void handleTogglePublish(activeSite)}>{actionLoadingSiteId===activeSite.id?'Updating…':'Unpublish'}</button>}
               </div>
             </section>
-            <WebsiteBusinessDashboard site={activeSite} token={sessionToken!} requestedTab={dashboardTab} onTabChange={setDashboardTab} onEdit={()=>editSite(activeSite)} onPricingDirty={setPricingDirty} onPublish={()=>editSite(activeSite,true)} onShare={isPublished?()=>void handleShare(activeSite.slug):undefined}
+            <WebsiteBusinessDashboard site={activeSite} token={sessionToken!} requestedTab={dashboardTab} onTabChange={setDashboardTab} onEdit={()=>editSite(activeSite)} onPricingDirty={setPricingDirty} onPublish={()=>editSite(activeSite,true)} onShare={isPublished?()=>void handleShare(activeSite.slug):undefined} onCopyLink={isPublished?()=>handleCopyLink(activeSite.slug):undefined}
               settings={policy=><WebsiteSettingsControls site={activeSite} token={sessionToken!} withdrawalMinimumMinor={policy.withdrawalMinimumMinor} onUnpublish={isPublished?()=>handleTogglePublish(activeSite):undefined} onUpdated={updated=>{updateSite(updated);openWebsiteEditor(updated);}} onDeleted={handleWebsiteDeleted} onResolve={tab=>{setDashboardTab(tab);requestAnimationFrame(()=>document.getElementById('website-business-dashboard')?.scrollIntoView({block:'start'}));}}/>}/>
           </div>
         ) : (

@@ -33,7 +33,7 @@ export interface AfaConfig {
 export const AFA_CONFIG: AfaConfig = {
   serviceId: 'srv-afa',
   title: 'AFA Registration',
-  tagline: 'Register your MTN line once, then buy AFA call and data packages from MTN.',
+  tagline: 'Register your MTN line once to access eligible AFA call and data packages. You buy the packages separately from MTN after you register.',
   disclaimer:
     'Package examples reported for AFA lines; MTN sets the packages and can change them, and its AFA menu shows the current ones before you pay. Registration gives access to eligible AFA offers; package purchase and availability remain subject to MTN.',
   privacyStatement:
