@@ -36,7 +36,7 @@ test('earnings definitions follow the ledger buckets and every figure is a serve
   assert.match(finance,/reservedMinor:sum\(operations\.filter\(x=>x\.kind==='withdrawal'&&x\.payload\.source==='store'&&\['pending_review','approved'\]/);
   const dash=readFileSync('src/components/website/WebsiteBusinessDashboard.tsx','utf8');
   assert.match(dash,/formatGhs\(Number\(e\[key\]\|\|0\)\)/);
-  assert.match(dash,/\{!e\.reconciliationRequired&&<form/,'withdraw is hidden while earnings are under review');
+  assert.match(dash,/\{!e\.reconciliationRequired&&canWithdraw&&<form/,'withdraw is hidden while earnings are under review or below the minimum');
   // Non-Data owners without Data history get no Orders, pricing or earnings tabs.
   assert.match(dash,/\.\.\.\(reseller\|\|data\?\.capabilities\?\.hasStoreHistory\|\|data\?\.capabilities\?\.hasStoreFundsOrWithdrawals\|\|data\?\.earnings\?\.lifetimeMinor\?\['Orders'/);
   assert.match(dash,/Recipient numbers are partly hidden/);
