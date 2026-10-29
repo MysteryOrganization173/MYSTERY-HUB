@@ -14,6 +14,7 @@ import { AdminCustomersSection } from './sections/AdminCustomersSection';
 import { AdminSystemSection } from './sections/AdminSystemSection';
 import { AdminMysteryEarnSection } from './sections/AdminMysteryEarnSection';
 import { AdminNotificationsSection } from './sections/AdminNotificationsSection';
+import {AdminAnalyticsSection} from './sections/AdminAnalyticsSection';
 import { BrandLogo } from '../common/BrandLogo';
 import { useAdminSignals } from './adminSignals';
 import {
@@ -34,9 +35,10 @@ import {
   X,
   Shield,
   Bell,
+  BarChart3,
 } from 'lucide-react';
 
-export type AdminTab = 'commercial' | 'finance' | 'overview' | 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system' | 'earn' | 'websites' | 'notifications';
+export type AdminTab = 'analytics' | 'commercial' | 'finance' | 'overview' | 'orders' | 'marketplace' | 'waitlist' | 'customers' | 'system' | 'earn' | 'websites' | 'notifications';
 
 /**
  * Every admin area, grouped by the job the founder is doing. One definition drives the
@@ -45,6 +47,7 @@ export type AdminTab = 'commercial' | 'finance' | 'overview' | 'orders' | 'marke
  */
 const ADMIN_AREAS: Record<AdminTab, { label: string; short: string; group: string; icon: React.ComponentType<{ className?: string }> }> = {
   overview: { label: 'Overview', short: 'Overview', group: 'Operate', icon: LayoutDashboard },
+  analytics:{label:'Analytics & Growth',short:'Growth',group:'Operate',icon:BarChart3},
   orders: { label: 'Orders & delivery', short: 'Orders', group: 'Operate', icon: ShoppingBag },
   customers: { label: 'Customers & security', short: 'Customers', group: 'Operate', icon: Users },
   marketplace: { label: 'Marketplace', short: 'Marketplace', group: 'Sell', icon: Store },
@@ -276,6 +279,7 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
             />
           )}
           {activeTab === 'websites' && <AdminWebsiteBuilderSection sessionToken={token} initialView={param} />}
+          {activeTab === 'analytics' && <AdminAnalyticsSection sessionToken={token}/>}
           {activeTab === 'system' && (
             <AdminSystemSection sessionToken={token} />
           )}

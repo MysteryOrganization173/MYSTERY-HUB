@@ -2,6 +2,7 @@ import React, { useEffect, useId, useState } from 'react';
 import { CheckCircle2, Download, Share, SquarePlus, X } from 'lucide-react';
 import { BrandMark } from '../common/BrandLogo';
 import { useAppInstall } from '../../pwa/useAppInstall';
+import {trackGrowth} from '../../utils/growthAnalytics';
 import './pwa.css';
 
 const coarsePointer = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
@@ -45,7 +46,7 @@ export const InstallAppPromo: React.FC<{ variant?: 'section' | 'compact'; classN
     </div>
     <div className="mh-install-actions">
       {apple
-        ? <button type="button" className="mh-button" aria-expanded={stepsOpen} aria-controls={stepsId} onClick={() => setStepsOpen(open => !open)}>
+        ? <button type="button" className="mh-button" aria-expanded={stepsOpen} aria-controls={stepsId} onClick={() => {if(!stepsOpen)trackGrowth('install_action',{page:'home'});setStepsOpen(open => !open);}}>
             <SquarePlus className="size-4" aria-hidden="true" />{stepsOpen ? 'Hide steps' : 'Add to Home Screen'}
           </button>
         : <button type="button" className="mh-button" onClick={() => { void install(); }}>

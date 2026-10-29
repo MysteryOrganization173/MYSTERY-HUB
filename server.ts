@@ -2,6 +2,7 @@ import { corsMiddleware } from './server/middleware/cors.js';
 import express from 'express';
 import {notificationRouter,adminNotificationRouter} from './server/routes/notificationApi.js';
 import {startNotificationWorker} from './server/services/notificationWorker.js';
+import {growthAnalyticsRouter,adminGrowthAnalyticsRouter} from './server/routes/growthAnalyticsApi.js';
 import { loadApplicationEnvironment } from './server/utils/environment.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -69,6 +70,8 @@ app.post(
 );
 
 app.use(express.json({ limit: '1mb' }));
+app.use('/api/analytics',growthAnalyticsRouter);
+app.use('/api/admin/analytics',adminGrowthAnalyticsRouter);
 
 // Mount Core Payments & Orders API Router
 app.use('/api/notifications',notificationRouter);
