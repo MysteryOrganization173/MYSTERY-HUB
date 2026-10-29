@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import {GoogleGenAI,ThinkingLevel} from '@google/genai';
 import {createMysteryAiRouter} from '../../routes/mysteryAiApi.js';
-import {aiProviderDiagnostic,classifyAiError,knownServiceHelp} from '../../services/mysteryAiReliability.js';
+import {aiProviderDiagnostic,classifyAiError,knownServiceHelp,hasUnsupportedDeliveryClaim} from '../../services/mysteryAiReliability.js';
 import {getGroundedLocalResponse,sendMysteryAiMessage} from '../../../src/services/mysteryAiService.js';
 import {buildMysteryAiSystemInstruction} from '../../services/mysteryAiContext.js';
 import {validateUltraEnquiry} from '../../services/websiteValidation.js';
@@ -66,6 +66,16 @@ test('candidate safety block never retries a different model or exposes partial 
   const b=await(await post(base)).json();assert.equal(b.code,'SAFETY');assert.equal(b.retryable,false);assert.equal(b.reply,undefined);assert.equal(calls(),1);
  });
 });
+test('an observed raw-model instant recharge claim becomes labelled safe guide help, never a model answer',async()=>{
+ await rawProvider(200,{candidates:[{content:{parts:[{text:'Airtime Top-Up: Instant recharge for all major networks.'}]},finishReason:'STOP'}]},async(base,calls)=>{
+  const b=await(await post(base,'Hi, what can you help me with?')).json();assert.equal(b.source,'guide');assert.equal(b.fallback,true);assert.equal(b.code,'SAFETY');assert.equal(b.retryable,false);assert.doesNotMatch(b.reply,/instant recharge/i);assert.equal(calls(),1);
+ });
+});
+test('unverified speed promises are rejected while honest delivery caveats and website publishing remain valid',()=>{
+ for(const text of ['Your bundle is guaranteed.','Immediate airtime delivery.','The recharge arrives instantly.'])assert.equal(hasUnsupportedDeliveryClaim(text),true,text);
+ for(const text of ['MTN orders are not instant.','Airtime delivery cannot be guaranteed.','Do not expect instant recharge.','Publish your website instantly.','Payment confirmation is separate from delivery.'])assert.equal(hasUnsupportedDeliveryClaim(text),false,text);
+});
+
 test('diagnostics allow only fixed status/reason/network codes; arbitrary provider metadata stays private',()=>{
  assert.equal(classifyAiError({statusCode:402}),'CONFIGURATION');
  assert.deepEqual(aiProviderDiagnostic({message:JSON.stringify({error:{code:400,details:[{reason:'SECRET-VALUE'}]}}),cause:{code:'SECRET-NETWORK'}}),{httpStatus:400,reason:null,networkCode:null});

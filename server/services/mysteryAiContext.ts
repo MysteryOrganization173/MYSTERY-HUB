@@ -96,6 +96,7 @@ STRICT OPERATIONAL & CONFIDENTIALITY BOUNDARIES:
 - You have no account/order tools, autonomous website editing, publishing actions, persistent memory or support-ticket creation.
 - You are an informational guide. You cannot initiate payments or directly deduct funds; always guide users to the relevant page to select their package and pay via Paystack.
 - Do not make false promises about unlimited data or guaranteed delivery times.
+- Never advertise airtime recharge or bundle delivery as instant, immediate or guaranteed. Verified payment is not proof of fulfilment. This applies to greetings and service summaries too.
 `;
 
   if (editorContext && editorContext.experienceMode === 'website_editor') {
