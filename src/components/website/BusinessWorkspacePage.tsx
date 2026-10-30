@@ -14,9 +14,8 @@ import { formatGhs } from '../../../shared/money';
 import { lazyPage } from '../../utils/lazyPage';
 import { initialWorkspaceTabs, sectionForTab, workspacePath, workspaceRangeLabel, workspaceSectionFromPath, workspaceSections, WORKSPACE_SECTIONS, type WorkspaceSection } from '../../utils/businessWorkspace';
 
-// The editor and the design-switch sheet (which renders whole templates) download only when an owner opens them,
-// so the workspace itself stays light on a phone.
-const WebsiteEditor = lazyPage(() => import('./editor/WebsiteEditor'), 'WebsiteEditor', { fallback: <div className="fixed inset-0 z-[80] grid place-items-center bg-[#060a0e] text-sm text-slate-300" role="status">Opening the editor…</div> });
+// The design-switch sheet (which renders whole templates) downloads only when an owner opens it, so the workspace
+// itself stays light on a phone. Builder V6: the editor is its own page and download (/website-builder/edit/:id).
 const WebsiteSettingsControls = lazyPage(() => import('./WebsiteSettingsControls'), 'WebsiteSettingsControls', { fallback: <p role="status" className="text-sm text-slate-400">Loading website settings…</p> });
 
 const ICONS: Record<WorkspaceSection, React.ComponentType<{ size?: number; 'aria-hidden'?: boolean }>> = { overview: LayoutDashboard, orders: ReceiptText, products: Tags, earnings: PiggyBank, analytics: ChartColumn, website: Globe };
@@ -26,7 +25,7 @@ const ICONS: Record<WorkspaceSection, React.ComponentType<{ size?: number; 'aria
  * the place to discover designs and start a website; the full-screen editor stays the place to change the site itself.
  */
 export const BusinessWorkspacePage: React.FC = () => {
-  const { user, sessionToken, isAuthChecking, openAuth, showToast, activeEditorSite, openWebsiteEditor, closeWebsiteEditor, openTemplatePreview, setActivePage } = useApp();
+  const { user, sessionToken, isAuthChecking, openAuth, showToast, openWebsiteEditor, openTemplatePreview, setActivePage } = useApp();
   const { sites, setSites, loading, error, reload } = useOwnerWebsites(sessionToken);
   const site = sites[0] || null;
   const reseller = site?.template_id === 'tmpl-data-reseller';
@@ -57,22 +56,12 @@ export const BusinessWorkspacePage: React.FC = () => {
   useEffect(() => { if (site && summary?.loaded && !available.includes(section)) go('overview', { replace: true }); }, [site?.id, summary?.loaded, available.join(), section]);
   const refreshRef = useRef<(() => void) | null>(null);
 
-  const [editorPublish, setEditorPublish] = useState(false);
   const [pricingDirty, setPricingDirty] = useState(false);
   const confirmPricingLeave = () => !pricingDirty || window.confirm('You have unsaved bundle prices. Leave without saving them?');
-  const editSite = (target: WebsiteSiteRecord, publish = false) => { if (!confirmPricingLeave()) return; setPricingDirty(false); setMenuOpen(false); setEditorPublish(publish); openWebsiteEditor(target); };
+  // Builder V6: Edit website opens the editor's own page; Back or its arrow returns here, to the same area, and
+  // the website is re-read from the server when the workspace opens again.
+  const editSite = (target: WebsiteSiteRecord, publish = false) => { if (!confirmPricingLeave()) return; setPricingDirty(false); setMenuOpen(false); openWebsiteEditor(target, { publish }); };
   const updateSite = (updated: WebsiteSiteRecord) => setSites(prev => prev.map(item => item.id === updated.id ? updated : item));
-
-  // Back from the editor: the same area, its heading focused, and the website re-read from the server.
-  const wasEditing = useRef(false);
-  useEffect(() => {
-    if (activeEditorSite) { wasEditing.current = true; return; }
-    if (!wasEditing.current) return;
-    wasEditing.current = false; reload();
-    requestAnimationFrame(() => { window.scrollTo({ top: 0 }); heading.current?.focus({ preventScroll: true }); });
-  }, [activeEditorSite]);
-  // Leaving the workspace (another page, or signing out) never leaves an editor open behind it.
-  useEffect(() => () => closeWebsiteEditor(), []);
 
   const [unpublishing, setUnpublishing] = useState(false);
   const unpublish = async (): Promise<boolean> => {
@@ -88,7 +77,6 @@ export const BusinessWorkspacePage: React.FC = () => {
   const confirmUnpublish = () => { if (window.confirm(reseller ? 'Unpublish your store? Customers won’t be able to open it or buy until you publish again. Your orders, prices and Store Earnings stay.' : 'Unpublish your website? Visitors won’t be able to open it until you publish again. Your draft stays.')) void unpublish(); };
   const handleDeleted = (siteId: string) => {
     setSites(prev => prev.filter(item => item.id !== siteId)); setPricingDirty(false);
-    if (activeEditorSite?.id === siteId) closeWebsiteEditor();
     showToast('Website deleted. Choose a design to start a new website.', 'success');
     setActivePage('website');
   };
@@ -126,11 +114,6 @@ export const BusinessWorkspacePage: React.FC = () => {
   if (!site) return <WorkspaceGate title="You don’t have a business website yet" detail="Choose a free design, add your details and publish. Your Business Workspace opens here once your website exists.">
     <button type="button" className="bw-button" data-primary onClick={() => setActivePage('website')}>Choose a free design</button>
   </WorkspaceGate>;
-
-  // ---------- The full-screen editor replaces the workspace while it is open ----------
-  if (activeEditorSite && sessionToken && sites.some(item => item.id === activeEditorSite.id)) return <WebsiteEditor
-    key={`${activeEditorSite.id}:${activeEditorSite.template_id}`} site={activeEditorSite} sessionToken={sessionToken} openPublish={editorPublish}
-    onClose={() => { setEditorPublish(false); closeWebsiteEditor(); }} onSiteUpdated={updateSite} showToast={showToast} backLabel="Back to My Business" />;
 
   const live = websiteLiveState(site), published = site.status === 'published';
   const template = WEBSITE_TEMPLATES.find(t => t.id === site.template_id) || null;

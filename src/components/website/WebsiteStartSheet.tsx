@@ -7,17 +7,25 @@ import {WEBSITE_STARTER_VERSION} from '../../config/websiteStarters';
 import {getTemplateById} from '../../utils/templateRendererUtils';
 import {trackWebsiteEvent} from '../../utils/websiteAnalytics';
 import {hasWorkingWhatsApp, websiteContactNeed} from '../../utils/websiteReadiness';
+import {saveWebsiteStartIntent, takeWebsiteStartIntent} from '../../utils/websiteStartIntent';
 import './websiteBuilder.css';
 
 export interface WebsiteStartDetails {businessName: string; whatsapp: string; location: string}
 const freshToken = () => localStorage.getItem('mystery_hub_session_token') || sessionStorage.getItem('mystery_hub_session_token');
+
+/** Creates the owner's draft through the existing starter endpoint (the server keeps the one-website rule). */
+export async function createWebsiteFromDetails(token: string, templateId: string, input: WebsiteStartDetails) {
+  trackWebsiteEvent('website_build_started', {templateId, source: 'builder'}, token);
+  const content = {...(input.whatsapp.trim() ? {whatsapp: input.whatsapp.trim()} : {}), ...(input.location.trim() ? {location: input.location.trim()} : {})};
+  return createWebsiteStarter(token, templateId, input.businessName.trim(), WEBSITE_STARTER_VERSION, content);
+}
 
 /**
  * The only questions before a new website exists: its real name, and optionally how customers
  * reach it and where it is. Everything else starts from the design's starter and is edited later.
  */
 export function WebsiteStartSheet({templateId, initialName = '', onCreated, onClose}: {
-  templateId: string; initialName?: string; onCreated: (site: WebsiteSiteRecord, alreadyExists: boolean) => void; onClose: () => void;
+  templateId: string; initialName?: string; onCreated: (site: WebsiteSiteRecord, alreadyExists: boolean, requestedTemplateId: string) => void; onClose: () => void;
 }) {
   const {user, sessionToken, openAuth, showToast} = useApp();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -32,21 +40,21 @@ export function WebsiteStartSheet({templateId, initialName = '', onCreated, onCl
   const problem = !name ? '' : name.length < 2 ? 'Use at least 2 characters.' : /[<>]/.test(details.businessName + details.whatsapp + details.location) ? 'Use plain text without < or >.' : whatsappProblem;
 
   const create = async (token: string, input: WebsiteStartDetails) => {
-    trackWebsiteEvent('website_build_started', {templateId, source: 'builder'}, token);
-    const content = {...(input.whatsapp.trim() ? {whatsapp: input.whatsapp.trim()} : {}), ...(input.location.trim() ? {location: input.location.trim()} : {})};
-    const res = await createWebsiteStarter(token, templateId, input.businessName.trim(), WEBSITE_STARTER_VERSION, content);
-    onCreated(res.site, res.alreadyExists);
+    const res = await createWebsiteFromDetails(token, templateId, input);
+    onCreated(res.site, res.alreadyExists, templateId);
   };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!name || problem || busy) return;
     const input = {...details};
     if (!user || !sessionToken) {
-      // Sign-up happens in between; the owner's answers are kept and used straight after.
+      // Sign-up happens in between; the owner's answers are kept (also across a reload, see websiteStartIntent) and
+      // used straight after. Whichever resumes first takes the saved choice, so only one website is ever created.
+      saveWebsiteStartIntent({templateId, ...input});
       onClose();
       openAuth('signup', `Create your free account to save ${input.businessName.trim()}.`, () => {
-        const token = freshToken();
-        if (token) void create(token, input).catch((e: any) => showToast(e.message || 'We could not create your website. Please try again.', 'warning'));
+        const token = freshToken(), saved = takeWebsiteStartIntent();
+        if (token && saved) void createWebsiteFromDetails(token, saved.templateId, saved).then(res => onCreated(res.site, res.alreadyExists, saved.templateId)).catch((e: any) => showToast(e.message || 'We could not create your website. Please try again.', 'warning'));
       });
       return;
     }

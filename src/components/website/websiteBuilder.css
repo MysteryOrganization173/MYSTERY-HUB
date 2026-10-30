@@ -86,6 +86,13 @@
 .website-publish-actions{display:grid;gap:8px;width:100%}
 .website-publish-actions a{min-height:50px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;text-decoration:none}
 @media(min-width:640px){.website-publish-actions{grid-template-columns:1fr 1fr}}
+/* Builder V6: after publishing, the hand-off to My Business. */
+.website-publish-business{width:100%;display:flex;align-items:center;gap:12px;text-align:left;min-height:56px;padding:12px 14px;border-radius:14px;border:1px solid rgba(0,195,101,.4);background:rgba(0,195,101,.08);color:#eef3f1;cursor:pointer}
+.website-publish-business>svg{color:#3ee08f;flex-shrink:0}
+.website-publish-business strong{display:block;font-size:15px}
+.website-publish-business small{display:block;font-size:13px;color:#cbd5d1;margin-top:2px}
+.website-publish-business:hover{background:rgba(0,195,101,.13)}
+.website-publish-business:focus-visible{outline:2px solid #00c365;outline-offset:2px}
 
 /* Start sheet: one name, two optional details. */
 .website-start-field{display:flex;flex-direction:column;gap:6px}

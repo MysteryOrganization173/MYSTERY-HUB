@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {ArrowLeft, Copy, ExternalLink, Eye, Maximize2, Monitor, MoreHorizontal, Palette, PenLine, Save, SlidersHorizontal, Smartphone, Tablet, Undo2, X, EyeOff} from 'lucide-react';
+import {ArrowLeft, Copy, ExternalLink, Eye, LayoutDashboard, Maximize2, Monitor, MoreHorizontal, Palette, PenLine, Save, SlidersHorizontal, Smartphone, Tablet, Undo2, X, EyeOff} from 'lucide-react';
 
 type Device = 'desktop'|'tablet'|'mobile';
 const DEVICES = [['mobile',Smartphone,'Phone'],['tablet',Tablet,'Tablet'],['desktop',Monitor,'Desktop']] as const;
@@ -12,6 +12,8 @@ export function WebsiteEditorToolbar(p: {
   undoLabel?:string; onUndo?:()=>void;
   /** The saved draft differs from what visitors see. */
   liveBehind?:boolean;
+  /** Builder V6: leave for My Business (orders, prices, earnings, settings). */
+  onBusiness?:()=>void;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null), opener = useRef<HTMLElement | null>(null);
@@ -66,6 +68,7 @@ export function WebsiteEditorToolbar(p: {
       {p.onFullPreview && <button type="button" role="menuitem" onClick={run(p.onFullPreview)}><Maximize2 size={18}/>Full preview</button>}
       {p.published && <a role="menuitem" href={p.liveUrl} target="_blank" rel="noopener noreferrer" onClick={()=>setMoreOpen(false)}><ExternalLink size={18}/>View live site</a>}
       {p.published && <button type="button" role="menuitem" onClick={run(p.onCopy)}><Copy size={18}/>Copy link</button>}
+      {p.onBusiness && <button type="button" role="menuitem" onClick={run(p.onBusiness)}><LayoutDashboard size={18}/>Open My Business</button>}
       {p.published && <button type="button" role="menuitem" onClick={run(p.onUnpublish)} disabled={p.publishing} className="visual-more-danger"><EyeOff size={18}/>Unpublish</button>}
       <div className="visual-more-devices"><span>Preview size</span><div className="visual-segment" role="group" aria-label="Preview size">{DEVICES.map(([device,Icon,label])=><button type="button" key={device} aria-pressed={p.device===device} onClick={()=>p.onDevice(device)}><Icon size={15}/>{label}</button>)}</div></div>
     </div>}

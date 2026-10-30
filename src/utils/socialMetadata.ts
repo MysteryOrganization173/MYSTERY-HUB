@@ -107,6 +107,9 @@ export function pageIndexingHead(pathname: string, search = ''): SocialHead {
   const clean = path.replace(/\/index\.html$/, '');
   const page = Object.entries(PUBLIC_PAGE_METADATA).find(([, entry]) => entry.path === clean)?.[0] || aliases[clean] || aliases[path];
   if (page && !preview) return publicPageHead(page);
+  // Builder V6: an owner's editor is private; its title never echoes the website id.
+  if (path.startsWith('/website-builder/edit')) return { title: 'Website Editor — Mystery Hub', description: 'Sign in where required to access your account or workspace.',
+    url: `${PUBLIC_ORIGIN}/website-builder`, image: '', icon: publicImageUrl(BRAND_IMAGE), noindex: true };
   const area = path.split('/')[1];
   const titles: Record<string, string> = { admin: 'Staff & Operations Portal', wallet: 'Mystery Wallet', orders: 'Your Orders', account: 'My Account', dashboard: 'Your Dashboard', 'my-business': 'My Business', login: 'Sign In', signup: 'Create Account', register: 'Create Account', auth: 'Account Access' };
   // Never include arbitrary path components, references, editor channels or account query values.
