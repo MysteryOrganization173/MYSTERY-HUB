@@ -1109,8 +1109,9 @@ export async function getWebsiteByIdOnServer(
     },
   });
 
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to load website project.');
+  const data = await res.json().catch(() => ({}));
+  // The status lets the editor tell "not yours" (403), "deleted" (404) and "signed out" (401) apart.
+  if (!res.ok) throw Object.assign(new Error(data.error || 'Failed to load website project.'), { status: res.status });
   return data;
 }
 

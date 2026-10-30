@@ -10,6 +10,13 @@ import { withoutDeletedWebsites } from '../utils/websiteDeletion';
  */
 let cache: { token: string; sites: WebsiteSiteRecord[] } | null = null;
 
+/** Builder V6: the editor is its own page, so it tells the shared list about each save; Builder and My Business
+ * then paint the latest draft at once when the owner returns (and still ask the server again). Same account only. */
+export function rememberOwnerWebsite(token: string | null, site: WebsiteSiteRecord) {
+  if (!token || cache?.token !== token) return;
+  cache = { token, sites: cache.sites.some(item => item.id === site.id) ? cache.sites.map(item => item.id === site.id ? site : item) : [site, ...cache.sites] };
+}
+
 export function useOwnerWebsites(token: string | null) {
   const [state, setState] = useState<{ token: string | null; sites: WebsiteSiteRecord[] }>(() => ({ token, sites: token && cache?.token === token ? cache.sites : [] }));
   const [loading, setLoading] = useState(Boolean(token && cache?.token !== token));

@@ -26,6 +26,8 @@ import {GrowthTracker} from './components/common/GrowthTracker';
 const DataPage = lazyPage(() => import('./components/data/DataPage'), 'DataPage', { warm: true });
 const WebsiteBuilderPage = lazyPage(() => import('./components/website/WebsiteBuilderPage'), 'WebsiteBuilderPage');
 const BusinessWorkspacePage = lazyPage(() => import('./components/website/BusinessWorkspacePage'), 'BusinessWorkspacePage');
+// Builder V6: the editor is its own download, opened only by owners editing a website.
+const WebsiteEditorPage = lazyPage(() => import('./components/website/WebsiteEditorPage'), 'WebsiteEditorPage', { fallback: <div className="mh-editor-shell grid place-items-center text-sm text-slate-300" role="status">Opening the editor…</div> });
 const MoreServicesPage = lazyPage(() => import('./components/services/MoreServicesPage'), 'MoreServicesPage');
 const AfaRegistrationPage = lazyPage(() => import('./components/services/AfaRegistrationPage'), 'AfaRegistrationPage');
 const MarketplacePage = lazyPage(() => import('./components/marketplace/MarketplacePage'), 'MarketplacePage');
@@ -51,9 +53,23 @@ function useOnceTrue(condition: boolean) {
 }
 
 const AppContent: React.FC = () => {
-  const { activePage, selectedTemplatePreview, isMysteryAiOpen, activeEditorSite } = useApp();
+  const { activePage, selectedTemplatePreview, isMysteryAiOpen } = useApp();
   const templatePreviewNeeded = useOnceTrue(Boolean(selectedTemplatePreview));
-  const assistantNeeded = useOnceTrue(isMysteryAiOpen || Boolean(activeEditorSite));
+  const assistantNeeded = useOnceTrue(isMysteryAiOpen);
+
+  // Builder V6: the website editor is an application of its own. No Mystery Hub header, footer, bottom bar or
+  // assistant launcher competes with the editor's toolbar and dock; sign-in, account prompts and toasts stay.
+  if (activePage === 'editor') {
+    return (
+      <div className="mh-editor-shell font-sans">
+        <SEOHead />
+        <WebsiteEditorPage />
+        <AuthModal />
+        <AccountControls />
+        <ToastContainer />
+      </div>
+    );
+  }
 
   // Isolated Admin Experience
   if (activePage === 'admin') {

@@ -1,5 +1,4 @@
 import { WebsiteSettingsControls } from './WebsiteSettingsControls';
-import { isDeletedWebsite } from '../../utils/websiteDeletion';
 import { useOwnerWebsites } from '../../hooks/useOwnerWebsites';
 import { trackWebsiteEvent } from '../../utils/websiteAnalytics';
 import React, { useState, useEffect, useRef } from 'react';
@@ -7,12 +6,13 @@ import { useApp } from '../../context/AppContext';
 import { TEMPLATE_CATEGORIES, WEBSITE_TEMPLATES, orderedWebsiteTemplates, findTemplateByLink, templateDesignLabel, readyDesignCount, isReadyDesign } from '../../data/templates';
 import { TemplateCategory, WebsiteSiteRecord } from '../../types';
 import { TemplateCardPreview } from './TemplateCardPreview';
-import { WebsiteStartSheet } from './WebsiteStartSheet';
+import { WebsiteStartSheet, createWebsiteFromDetails } from './WebsiteStartSheet';
 import { SafeImage } from './SafeImage';
-import { WebsiteEditor } from './editor/WebsiteEditor';
+import { takeWebsiteStartIntent } from '../../utils/websiteStartIntent';
 import { WebsitePlansAndUltra } from './WebsitePlansAndUltra';
 import './websiteBuilder.css';
 import { WEBSITE_LIVE_LABELS, websiteLiveState } from '../../utils/websiteReadiness';
+import { websiteEditorPath } from '../../utils/routing';
 import {
   Globe,
   ArrowRight,
@@ -33,9 +33,8 @@ export const WebsiteBuilderPage: React.FC = () => {
     user,
     sessionToken,
     openAuth,
-    activeEditorSite,
+    isAuthModalOpen,
     openWebsiteEditor,
-    closeWebsiteEditor,
     setActivePage,
   } = useApp();
 
@@ -47,39 +46,36 @@ export const WebsiteBuilderPage: React.FC = () => {
   const { sites: mySites, setSites: setMySites, loading: isLoadingSites, error: siteFetchError, reload: reloadSites } = useOwnerWebsites(sessionToken);
   const [changeTarget,setChangeTarget]=useState('');
   const [startTemplate,setStartTemplate]=useState('');
+  // Builder V6: the editor is its own page (/website-builder/edit/:siteId); this page only opens it.
   const editSite=(site:WebsiteSiteRecord)=>openWebsiteEditor(site);
-  // Leaving the fullscreen editor returns the owner to their website card, never to wherever the collapsed page
-  // happened to leave the window scrolled.
-  const wasEditing = useRef(false);
+  // A new website goes straight into its editor. An owner who already has a website on another design is offered
+  // the design switch (preview first), never switched silently and never given a second website.
+  const handleStarted = (site: WebsiteSiteRecord, alreadyExists: boolean, requested: string) => {
+    setStartTemplate(''); setMySites([site]);
+    if (alreadyExists && site.template_id !== requested) { setChangeTarget(requested); return; }
+    openWebsiteEditor(site);
+    showToast(alreadyExists ? 'Opening your existing website.' : 'Your website is ready. Tap anything to change it.', alreadyExists ? 'info' : 'success');
+  };
+  // A design chosen before signing up or logging in is resumed once the account exists, even after a reload.
+  const resuming = useRef(false);
   useEffect(() => {
-    if (activeEditorSite) { wasEditing.current = true; return; }
-    if (!wasEditing.current) return;
-    wasEditing.current = false;
-    requestAnimationFrame(() => {
-      window.scrollTo({ top: 0 });
-      (document.getElementById('website-owner-name') as HTMLElement | null)?.focus({ preventScroll: true });
-    });
-  }, [activeEditorSite]);
-  // Leaving this page (another page, or signing out) never leaves an editor open behind it.
-  useEffect(() => () => closeWebsiteEditor(), []);
+    if (!user || !sessionToken || isAuthModalOpen || resuming.current) return;
+    const intent = takeWebsiteStartIntent();
+    if (!intent) return;
+    resuming.current = true;
+    createWebsiteFromDetails(sessionToken, intent.templateId, intent)
+      .then(res => handleStarted(res.site, res.alreadyExists, intent.templateId))
+      .catch((e: any) => showToast(e?.message || 'We could not create your website. Please try again.', 'warning'))
+      .finally(() => { resuming.current = false; });
+  }, [user?.id, sessionToken, isAuthModalOpen]);
   // After deletion the owner lands on the gallery to start again: new design, new name, new address.
   const handleWebsiteDeleted = (siteId: string) => {
     setMySites(prev => prev.filter(site => site.id !== siteId));
     setChangeTarget('');
-    if (activeEditorSite?.id === siteId) closeWebsiteEditor();
     showToast('Website deleted. Choose a design to start a new website.', 'success');
     requestAnimationFrame(() => { const gallery = document.getElementById('templates-showcase'); if (gallery) gallery.scrollIntoView({ block: 'start' }); else window.scrollTo({ top: 0 }); });
     reloadSites();
   };
-  const updateSite = (updated: WebsiteSiteRecord) => {
-    setMySites(prev => prev.map(site => site.id === updated.id ? updated : site));
-    if (activeEditorSite?.id === updated.id && activeEditorSite.template_id !== updated.template_id) openWebsiteEditor(updated);
-  };
-
-  // A switch started in the global template preview must also update the owner dashboard.
-  // A website created from the template preview joins the dashboard too.
-  // A deleted website never comes back from editor state or a stale response.
-  useEffect(()=>{if(activeEditorSite&&!isDeletedWebsite(activeEditorSite.id))setMySites(prev=>prev.some(site=>site.id===activeEditorSite.id)?prev.map(site=>site.id===activeEditorSite.id?activeEditorSite:site):[activeEditorSite,...prev]);},[activeEditorSite]);
 
   useEffect(() => { trackWebsiteEvent('website_builder_viewed', {source:'builder'}, sessionToken || undefined); }, [sessionToken]);
 
@@ -182,20 +178,6 @@ export const WebsiteBuilderPage: React.FC = () => {
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // If currently inside the full-screen Website Editor workspace
-  if (activeEditorSite && sessionToken) {
-    return (
-      <WebsiteEditor
-        key={`${activeEditorSite.id}:${activeEditorSite.template_id}`}
-        site={activeEditorSite}
-        sessionToken={sessionToken}
-        onClose={closeWebsiteEditor}
-        onSiteUpdated={updateSite}
-        showToast={showToast}
-      />
-    );
-  }
-
   const liveState = activeSite ? websiteLiveState(activeSite) : 'not-published';
   const displaySiteName =
     activeSite?.content_json?.businessName || activeSite?.name || 'My Business Website';
@@ -204,7 +186,7 @@ export const WebsiteBuilderPage: React.FC = () => {
     <div className="py-6 sm:py-10 text-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
 
-        {startTemplate&&<WebsiteStartSheet templateId={startTemplate} onClose={()=>setStartTemplate('')} onCreated={(site,alreadyExists)=>{const requested=startTemplate;setStartTemplate('');setMySites([site]);if(alreadyExists&&site.template_id!==requested){setChangeTarget(requested);return;}openWebsiteEditor(site);showToast(alreadyExists?'Opening your existing website.':'Your website is ready. Tap anything to change it.',alreadyExists?'info':'success');}}/>}
+        {startTemplate&&<WebsiteStartSheet templateId={startTemplate} onClose={()=>setStartTemplate('')} onCreated={(site,alreadyExists,requested)=>handleStarted(site,alreadyExists,requested)}/>}
         {activeSite&&sessionToken&&changeTarget&&<WebsiteSettingsControls site={activeSite} token={sessionToken} requestedTemplateId={changeTarget} selectionOnly onClosed={()=>setChangeTarget('')} onDeleted={handleWebsiteDeleted} onUpdated={updated=>{setMySites([updated]);setChangeTarget('');openWebsiteEditor(updated);}}/>}
         {/* =========================================================
             LOADING / ERROR STATE FOR AUTHENTICATED USERS
@@ -238,10 +220,10 @@ export const WebsiteBuilderPage: React.FC = () => {
               <span className="text-slate-400">{templateDesignLabel(activeBaseTemplate)} · Free plan</span>
             </div>
             <h1 id="website-owner-name" tabIndex={-1} className="mt-3 text-2xl sm:text-3xl font-bold break-words outline-none">{displaySiteName}</h1>
-            <p className="mt-1 text-sm text-slate-400 max-w-xl">{activeSite.template_id==='tmpl-data-reseller'?'Your orders, bundle prices, Store Earnings and settings are in My Business.':'Your visitors, website settings and sharing are in My Business.'} Browse other designs below; switching always shows a preview first.</p>
+            <p className="mt-1 text-sm text-slate-400 max-w-xl">{activeSite.template_id==='tmpl-data-reseller'?'Change your store’s look and wording in the editor. Orders, bundle prices and Store Earnings are in My Business.':'Change your website in the editor. Visitors, sharing and settings are in My Business.'} Other designs are below; switching always shows a preview first.</p>
             <div className="website-owner-actions mt-4">
-              <a className="website-owner-primary inline-flex items-center justify-center gap-2" href="/my-business" onClick={event=>{event.preventDefault();setActivePage('business');}}><LayoutDashboard className="w-4 h-4" aria-hidden="true"/>Open My Business</a>
-              <button type="button" className="website-owner-secondary" onClick={()=>editSite(activeSite)}><PenLine className="w-4 h-4" aria-hidden="true"/>Edit website</button>
+              <a className="website-owner-primary inline-flex items-center justify-center gap-2" href={websiteEditorPath(activeSite.id)} onClick={event=>{if(event.metaKey||event.ctrlKey||event.shiftKey||event.button!==0)return;event.preventDefault();editSite(activeSite);}}><PenLine className="w-4 h-4" aria-hidden="true"/>Continue editing</a>
+              <a className="website-owner-secondary" href="/my-business" onClick={event=>{event.preventDefault();setActivePage('business');}}><LayoutDashboard className="w-4 h-4" aria-hidden="true"/>My Business</a>
             </div>
           </section>
         ) : (

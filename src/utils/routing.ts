@@ -18,7 +18,28 @@ export const ROUTE_PATH_MAP: Record<ActivePage, string> = {
   earn: '/earn',
   afa: '/afa',
   app: '/app',
+  // The editor's real address carries the website (websiteEditorPath); without one it falls back to the Builder.
+  editor: '/website-builder',
 };
+
+/** Builder V6: the dedicated editor of one owned website. */
+export const WEBSITE_EDITOR_PREFIX = '/website-builder/edit/';
+export function websiteEditorPath(siteId: string): string {
+  return WEBSITE_EDITOR_PREFIX + encodeURIComponent(siteId);
+}
+/** An in-app address the editor may return to: a local path, never the editor itself or another origin. */
+export function safeEditorReturnPath(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || value.length > 300) return null;
+  if (/^\/website-builder\/edit\//i.test(value) || /[\s\\]/.test(value)) return null;
+  return value;
+}
+/** The website id in an editor address (case kept, as the server issued it), or null. */
+export function editorSiteIdFromPath(rawPath: string | null | undefined): string | null {
+  const path = String(rawPath || '').split(/[?#]/)[0].replace(/\/+/g, '/');
+  const match = path.match(/^\/website-builder\/edit\/([^/]+)\/?$/i);
+  if (!match) return null;
+  try { const id = decodeURIComponent(match[1]); return /^[A-Za-z0-9_-]{1,120}$/.test(id) ? id : null; } catch { return null; }
+}
 
 /**
  * Normalizes any incoming pathname or URL to a clean, lowercase path string.
@@ -75,6 +96,7 @@ export function normalizePathname(rawPath: string | null | undefined): string {
  * - / -> 'home'
  * - /index.html -> 'home'
  * - /data (or /data/index.html) -> 'data'
+ * - /website-builder/edit/:siteId -> 'editor' (Builder V6 dedicated editor)
  * - /website-builder, /website (or /website-builder/index.html) -> 'website'
  * - /my-business and its sections (/my-business/orders...) -> 'business'
  * - /marketplace (or /marketplace/index.html) -> 'marketplace'
@@ -99,6 +121,9 @@ export function getPageFromPath(rawPath: string | null | undefined): ActivePage 
   if (normalized === '/data' || normalized === '/data/index.html') {
     return 'data';
   }
+
+  // The dedicated editor has its own application shell (before the Builder's catch-all below).
+  if (editorSiteIdFromPath(normalized)) return 'editor';
 
   if (
     normalized === '/website-builder' ||

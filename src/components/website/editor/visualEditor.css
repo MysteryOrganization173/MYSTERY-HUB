@@ -57,6 +57,54 @@
 .visual-canvas-hint button{min-height:32px;min-width:32px;border-radius:999px;border:0;background:var(--ve-hover);color:var(--ve-text);display:grid;place-items:center;cursor:pointer;flex-shrink:0}
 .visual-canvas-hint.is-preview svg{color:var(--ve-green-text)}
 
+/* Builder V6: Data Store setup line at the top of the canvas; it opens to the four steps over the canvas. */
+.visual-setup{position:relative;flex-shrink:0;z-index:20;padding:8px 12px 0;font-family:var(--font-body);color:var(--ve-text)}
+.visual-setup-bar{display:flex;align-items:center;gap:8px;max-width:960px;margin:0 auto;background:var(--ve-raised);border:1px solid var(--ve-line);border-radius:16px;padding:4px}
+[data-store-setup="ready"] .visual-setup-bar{border-color:rgba(0,195,101,.45)}
+[data-store-setup="blocked"] .visual-setup-bar{border-color:rgba(242,178,76,.45)}
+.visual-setup-toggle{flex:1;min-width:0;min-height:44px;display:flex;align-items:center;gap:10px;padding:0 10px;border:0;background:transparent;color:inherit;font:700 14px/1.25 var(--font-body);text-align:left;cursor:pointer;border-radius:12px}
+.visual-setup-toggle:hover{background:var(--ve-hover)}
+.visual-setup-summary{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.visual-setup-icon{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;background:var(--ve-green-soft);color:var(--ve-green-text)}
+[data-store-setup="blocked"] .visual-setup-icon{background:rgba(242,178,76,.16);color:#fcd38a}
+.visual-setup-chevron{flex-shrink:0;color:var(--ve-muted);margin-left:auto;transition:transform .15s}
+.visual-setup-toggle[aria-expanded="true"] .visual-setup-chevron{transform:rotate(180deg)}
+.visual-setup-next{flex-shrink:0;min-height:40px;padding:0 14px;border-radius:999px;border:0;background:var(--ve-green);color:#05140c;font:800 13.5px/1 var(--font-body);display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
+.visual-setup-next[data-quiet]{background:var(--ve-field);color:var(--ve-text);border:1px solid var(--ve-line-strong)}
+.visual-setup-steps{position:absolute;left:12px;right:12px;top:calc(100% + 6px);max-width:960px;margin:0 auto;list-style:none;padding:6px;background:var(--ve-raised);border:1px solid var(--ve-line-strong);border-radius:16px;box-shadow:0 18px 44px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:2px;max-height:min(70vh,440px);overflow-y:auto;overscroll-behavior:contain}
+.visual-setup-steps li{display:flex;align-items:center;gap:12px;padding:12px 10px}
+.visual-setup-steps li+li{border-top:1px solid var(--ve-line)}
+.visual-setup-steps strong{display:block;font-size:14.5px;color:var(--ve-text)}
+.visual-setup-steps p{margin:2px 0 0;font-size:13px;line-height:1.45;color:var(--ve-muted)}
+.visual-setup-mark{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;border:1.5px dashed var(--ve-line-strong);color:var(--ve-muted)}
+[data-state="done"]>.visual-setup-mark{border:0;background:var(--ve-green);color:#05140c}
+[data-state="blocked"]>.visual-setup-mark{border:0;background:rgba(242,178,76,.2);color:#fcd38a}
+[data-state="info"]>.visual-setup-mark{border-style:solid}
+.visual-setup-steps li>button{flex-shrink:0;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--ve-line-strong);background:var(--ve-field);color:var(--ve-text);font:700 13.5px/1 var(--font-body);cursor:pointer}
+.visual-setup-steps li[data-state="todo"]>button{background:var(--ve-green);border-color:transparent;color:#05140c}
+.visual-setup :is(button):focus-visible{outline:2px solid var(--ve-green);outline-offset:2px}
+.visual-setup-short{display:none}
+/* Phones and tablets: while a bottom sheet edits something, the canvas keeps every pixel for the selected element. */
+@media(max-width:1023px){.visual-canvas[data-selecting] .visual-setup{display:none}}
+@media(max-width:560px){.visual-setup-toggle[aria-expanded="false"] .visual-setup-long{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.visual-setup-toggle[aria-expanded="false"] .visual-setup-short{display:inline}}
+@media(max-width:380px){.visual-setup{padding:6px 8px 0}.visual-setup-next{padding:0 11px}.visual-setup-toggle{gap:8px;padding:0 6px;font-size:13.5px}.visual-setup-icon{display:none}}
+
+/* Builder V6: the editor's own application shell (no Mystery Hub header, footer or bottom bar). */
+.mh-editor-shell{min-height:100dvh;background:#070b0e;color:#eef3f1}
+.mh-editor-gate{min-height:100dvh;display:grid;place-items:center;padding:24px 16px;padding-top:max(24px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom));background:radial-gradient(120% 80% at 50% 0%,#0f171d 0%,#070b0e 70%);font-family:var(--font-body)}
+.mh-editor-gate-card{width:100%;max-width:440px;background:#111a21;border:1px solid #1f2a32;border-radius:22px;padding:24px;display:flex;flex-direction:column;gap:12px;text-align:left}
+.mh-editor-gate-card .mh-editor-kicker{margin:0;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3ee08f}
+.mh-editor-gate-card h1{margin:0;font-family:var(--font-heading);font-size:22px;line-height:1.25;color:#eef3f1}
+.mh-editor-gate-card p{margin:0;font-size:15px;line-height:1.55;color:#cbd5d1}
+.mh-editor-gate-actions{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.mh-editor-gate-actions :is(button,a){min-height:48px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font:700 15px/1.2 var(--font-body);text-decoration:none;cursor:pointer;border:1px solid #334155;background:#0a1117;color:#eef3f1;padding:0 16px}
+.mh-editor-gate-actions [data-primary]{background:#00c365;border-color:transparent;color:#05140c}
+.mh-editor-gate-actions :is(button,a):focus-visible{outline:2px solid #00c365;outline-offset:2px}
+.mh-editor-loading{display:flex;flex-direction:column;align-items:center;gap:14px;color:#cbd5d1;font-size:15px}
+.mh-editor-loading span[aria-hidden]{width:34px;height:34px;border-radius:50%;border:3px solid #1f2a32;border-top-color:#00c365;animation:mh-editor-spin .9s linear infinite}
+@keyframes mh-editor-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.mh-editor-loading span[aria-hidden]{animation:none}}
+
 /* Contextual editing panel: side panel on desktop, bottom sheet on phones and tablets. */
 .visual-context-panel{width:340px;min-width:0;flex-shrink:0;border-left:1px solid var(--ve-line);background:var(--ve-raised);color:var(--ve-text);display:flex;flex-direction:column;z-index:40;max-height:100%;overflow:hidden;font-family:var(--font-body)}
 .visual-context-grabber{display:none;width:40px;height:5px;border-radius:5px;background:var(--ve-line-strong);margin:8px auto 0;flex-shrink:0}

@@ -100,7 +100,8 @@ export const TemplatePreviewModal: React.FC = () => {
     try {
       const url = selectedTemplatePreview.siteContent ? window.location.href : `/website-builder?template=${encodeURIComponent(selectedTemplatePreview.id)}&preview=1`;
       if (window.history.state?.mhPreview) window.history.replaceState({ ...window.history.state, templatePreview: selectedTemplatePreview.id }, '', url);
-      else window.history.pushState({ mhPreview: true, templatePreview: selectedTemplatePreview.id }, '', url);
+      // Where the preview was opened from, so an editor started here returns there (Builder V6).
+      else window.history.pushState({ mhPreview: true, templatePreview: selectedTemplatePreview.id, mhPreviewFrom: window.location.pathname }, '', url);
     } catch {
       // Non-invasive URL update
     }
@@ -176,10 +177,11 @@ export const TemplatePreviewModal: React.FC = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [selectedTemplatePreview]);
 
-  const startSheet = starting && selectedTemplatePreview ? <WebsiteStartSheet templateId={selectedTemplatePreview.id} initialName={previewName.trim()} onClose={()=>setStarting(false)} onCreated={(site,alreadyExists)=>{setStarting(false);
+  const startSheet = starting && selectedTemplatePreview ? <WebsiteStartSheet templateId={selectedTemplatePreview.id} initialName={previewName.trim()} onClose={()=>setStarting(false)} onCreated={(site,alreadyExists,requested)=>{setStarting(false);
     // An owner who already has a website on another design is offered the change, never switched silently.
-    if(alreadyExists&&site.template_id!==selectedTemplatePreview.id){setChangeSite(site);setChangeTarget(selectedTemplatePreview.id);return;}
-    handleClose();openWebsiteEditor(site);showToast(alreadyExists?'Opening your existing website.':'Your website is ready. Tap anything to change it.',alreadyExists?'info':'success');}}/> : null;
+    if(alreadyExists&&site.template_id!==requested){setChangeSite(site);setChangeTarget(requested);return;}
+    // Builder V6: the editor's address takes the preview's history entry (Back returns to the gallery).
+    openWebsiteEditor(site);showToast(alreadyExists?'Opening your existing website.':'Your website is ready. Tap anything to change it.',alreadyExists?'info':'success');}}/> : null;
   if(changeSite&&sessionToken)return <WebsiteSettingsControls site={changeSite} token={sessionToken} requestedTemplateId={changeTarget} selectionOnly onClosed={()=>setChangeSite(null)} onDeleted={()=>setChangeSite(null)} onUpdated={updated=>{setChangeSite(null);openWebsiteEditor(updated);}}/>;
   if (!selectedTemplatePreview) return null;
 
@@ -216,8 +218,7 @@ export const TemplatePreviewModal: React.FC = () => {
         const {getMyWebsitesOnServer} = await import('../../services/apiClient');
         const mine = (await getMyWebsitesOnServer(sessionToken)).sites || [];
         if (mine[0]) {
-          handleClose();
-          if (mine[0].template_id !== t.id) { setChangeSite(mine[0]); setChangeTarget(t.id); }
+          if (mine[0].template_id !== t.id) { handleClose(); setChangeSite(mine[0]); setChangeTarget(t.id); }
           else { openWebsiteEditor(mine[0]); showToast('Opening your website.', 'info'); }
           return;
         }

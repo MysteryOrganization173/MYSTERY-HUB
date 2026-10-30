@@ -30,6 +30,8 @@ import { websiteItemVocabulary, websiteStarterWording } from '../../../config/we
 import { websiteTemplateItemFields } from '../../../config/websiteBuilder';
 import { websiteLayoutMode, type WebsiteLayoutMode } from '../../../utils/websiteLayout';
 import type { TemplateItem } from '../../../types';
+import { resellerCatalogueSummary, type ResellerCatalogueSummary } from '../../../utils/websiteOwnerAttention';
+import { WebsiteStoreSetup } from './WebsiteStoreSetup';
 import { DATA_RESELLER_STARTER_HERO_IMAGE, resolveDataResellerHeroImage, showsLegacyDataResellerArtwork } from '../../../utils/dataResellerArtwork';
 import {
   ArrowLeft,
@@ -68,10 +70,9 @@ interface WebsiteEditorProps {
   showToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
   /** Where the editor's back arrow returns to, read by screen readers. */
   backLabel?: string;
+  /** Builder V6: leave for My Business (saving first, like the back arrow). */
+  onOpenBusiness?: () => void;
 }
-
-/** Open editors: a design switch remounts the editor, and the new one keeps the same history entry. */
-let editorMounts = 0;
 
 export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   site: initialSite,
@@ -81,6 +82,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   openPublish = false,
   showToast,
   backLabel = 'Back to Dashboard',
+  onOpenBusiness,
 }) => {
   const { openMysteryAi } = useApp();
   const [mediaOpen, setMediaOpen] = useState(false);
@@ -186,12 +188,14 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const [previewProducts,setPreviewProducts]=useState<WebsitePreviewProduct[]>([]);
   const [catalogRevision,setCatalogRevision]=useState(0);
   const [sellableBundles, setSellableBundles] = useState<number | null>(null);
+  // The same owner catalogue answer My Business reads (one readiness model, no extra request).
+  const [catalogue, setCatalogue] = useState<ResellerCatalogueSummary | null>(null);
   const [frameGeneration, setFrameGeneration] = useState(0);
   useEffect(() => {
     setPreviewProducts([]);
-    if (!isDataReseller) {setSellableBundles(null); return;}
+    if (!isDataReseller) {setSellableBundles(null);setCatalogue(null); return;}
     let live = true;
-    websiteBusinessRequest(`websites/${currentSite.id}/bundles`, sessionToken).then((r: any) => {if (live) {setSellableBundles((r?.products || []).filter((p: any) => p.eligible).length);setPreviewProducts(websitePreviewCatalog(r?.products,true));}}).catch(() => {if (live) setSellableBundles(null);});
+    websiteBusinessRequest(`websites/${currentSite.id}/bundles`, sessionToken).then((r: any) => {if (live) {setSellableBundles((r?.products || []).filter((p: any) => p.eligible).length);setCatalogue(resellerCatalogueSummary(r));setPreviewProducts(websitePreviewCatalog(r?.products,true));}}).catch(() => {if (live) {setSellableBundles(null);setCatalogue(null);}});
     return () => {live = false;};
   }, [currentSite.id, isDataReseller, sessionToken,catalogRevision]);
   // B1 server actions (review, layout, restore) run against the saved draft; the editor waits for them.
@@ -233,9 +237,10 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
   // Business Workspace V1: leaving saves the draft first (it never publishes). If that save fails, the changes stay on
   // this device (draft recovery offers them next time) and the owner decides whether to leave anyway.
-  const exiting = useRef(false), restoreBackEntry = useRef(() => {});
-  const exitEditor = async (viaBack = false) => {
-    if (exiting.current) return;
+  // Builder V6: the same exit serves the back arrow, Android Back and "My Business"; `leave` says where to go.
+  const exiting = useRef(false), closing = useRef(false), restoreBackEntry = useRef(() => {});
+  const exitEditor = async (viaBack = false, leave: () => void = onClose) => {
+    if (exiting.current || closing.current) return;
     exiting.current = true;
     try {
       for (let attempt = 0; attempt < 2 && (editVersion.current !== savedVersion.current || savingJob.current); attempt++) {
@@ -245,30 +250,23 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
           return;
         }
       }
-      onClose();
+      closing.current = true;
+      leave();
     } finally { exiting.current = false; }
   };
-  // The phone's Back button closes the editor the same way, instead of leaving the page underneath it. The editor
-  // owns one history entry at the same address while it is open.
+  // The phone's Back button closes the editor the same way (saving first) instead of leaving it unsaved. On top of
+  // the editor's own address the editor keeps one guard entry at the same address; the page that hosts the editor
+  // decides where leaving goes and steps back over the guard entry if it is still there.
   const exitRef = useRef(exitEditor);
   exitRef.current = exitEditor;
   useEffect(() => {
     if (!window.history?.pushState) return;
-    editorMounts++;
-    let entered = false;
-    const enter = () => { entered = true; if (!window.history.state?.mhEditor) window.history.pushState({ ...window.history.state, mhEditor: true }, ''); };
+    const enter = () => { if (!window.history.state?.mhEditor) window.history.pushState({ ...window.history.state, mhEditor: true }, '', window.location.href); };
     restoreBackEntry.current = enter;
-    // Opened straight from a design preview: that preview is still stepping back over its own entry, so wait for it.
-    const previewClosing = Boolean(window.history.state?.mhPreview);
-    const fallback = previewClosing ? window.setTimeout(() => { if (!entered) enter(); }, 600) : 0;
-    if (!previewClosing) enter();
-    const onPop = () => { if (!entered) { enter(); return; } if (!window.history.state?.mhEditor) void exitRef.current(true); };
+    enter();
+    const onPop = () => { if (!closing.current && !window.history.state?.mhEditor) void exitRef.current(true); };
     window.addEventListener('popstate', onPop);
-    return () => {
-      window.removeEventListener('popstate', onPop); window.clearTimeout(fallback); editorMounts--;
-      // Closed with its own button: step back over the editor's entry, unless a remounted editor kept it.
-      window.setTimeout(() => { if (!editorMounts && window.history.state?.mhEditor) window.history.back(); }, 0);
-    };
+    return () => window.removeEventListener('popstate', onPop);
   }, []);
 
   // Warn before closing tab if dirty
@@ -539,6 +537,9 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const step = (delta:number) => {if(stepIndex<0 || !stepIds.length)return;setVisualSelection(stepIds[(stepIndex+delta+stepIds.length)%stepIds.length]);};
   // Phones and tablets show the panel as a bottom sheet over roughly half of the canvas.
   const sheetReserve = typeof window!=='undefined' && window.innerWidth<1024 ? 0.5 : 0;
+  // The saved draft differs from what visitors see.
+  const liveBehind = currentSite.status==='published' && websitePublishChanges(currentSite.published_snapshot_json, {templateId: currentSite.template_id, content: currentSite.content_json, settings: currentSite.settings_json}).length>0;
+  const openBusiness = onOpenBusiness ? () => {setPublishOpen(false);void exitEditor(false, onOpenBusiness);} : undefined;
 
   return (
     <div ref={workspaceRef} role="dialog" aria-modal="true" aria-label="Website editor" className="visual-workspace fixed inset-0 z-[80] text-slate-100 flex flex-col font-sans overflow-hidden">
@@ -553,10 +554,10 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         suggestions={publishSuggestions} readiness={websiteReadiness({templateId:currentSite.template_id,content,layoutMode,sellableBundles,publishedSnapshot:currentSite.status==='published'?currentSite.published_snapshot_json:null})} sellableBundles={sellableBundles}
         onFix={item=>{if(item.fix){changeContent(item.fix.patch);showToast(`${item.fix.label.replace(/^Use /,'Using ')}. You can edit it any time.`,'success');}}} onBundles={()=>{setPublishOpen(false);setBundleSheet(true);}}
         changes={websitePublishChanges(currentSite.published_snapshot_json, {templateId: currentSite.template_id, content, settings}, word.singular.toLowerCase())}
-        onEditField={target=>{setPublishOpen(false);setActiveTab('edit');if(target==='name')selectTarget('content:businessName');else if(target==='contact')openSettings('contact');else selectTarget(target);}}/>}
+        onEditField={target=>{setPublishOpen(false);setActiveTab('edit');if(target==='name')selectTarget('content:businessName');else if(target==='contact')openSettings('contact');else selectTarget(target);}} onBusiness={openBusiness}/>}
       {mediaOpen && <WebsiteImageLibrary siteId={currentSite.id} token={sessionToken} onClose={()=>setMediaOpen(false)} onChoose={url=>{setContent({...content,heroImage:url});markDirty();setMediaOpen(false);}} />}
       <WebsiteEditorToolbar name={content.businessName || siteName} mode={activeTab} device={previewDevice} status={saveStatusText} published={currentSite.status==='published'} saving={isSaving} publishing={isPublishing}
-        onExit={()=>void exitEditor()} backLabel={backLabel} onMode={changeMode} onDevice={device=>{setPreviewDevice(device);if(isPhone && device!=='mobile')changeMode('preview');}} onSave={()=>void handleSaveDraft()} onPublish={()=>{setVisualSelection(null);setPublishOpen(true);}} onUnpublish={()=>void handleUnpublish()} onSettings={()=>openSettings()} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`} undoLabel={undoTop ? undoLabel(undoTop) : ''} onUndo={handleUndo} liveBehind={currentSite.status==='published' && websitePublishChanges(currentSite.published_snapshot_json, {templateId: currentSite.template_id, content: currentSite.content_json, settings: currentSite.settings_json}).length>0}/>
+        onExit={()=>void exitEditor()} backLabel={backLabel} onMode={changeMode} onDevice={device=>{setPreviewDevice(device);if(isPhone && device!=='mobile')changeMode('preview');}} onSave={()=>void handleSaveDraft()} onPublish={()=>{setVisualSelection(null);setPublishOpen(true);}} onUnpublish={()=>void handleUnpublish()} onSettings={()=>openSettings()} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`} undoLabel={undoTop ? undoLabel(undoTop) : ''} onUndo={handleUndo} liveBehind={liveBehind} onBusiness={openBusiness}/>
       {/* =========================================================
           WORKSPACE: LEFT EDITOR / RIGHT LIVE PREVIEW
           ========================================================= */}
@@ -1073,7 +1074,9 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             )}
           </div>
         </div>}
-        <div className="visual-canvas">
+        <div className="visual-canvas" data-selecting={contextualTargets.length>0 || selectedItemIndex>=0 || settingsNotice ? '' : undefined}>
+          {activeTab==='edit' && isDataReseller && <WebsiteStoreSetup businessName={content.businessName || ''} published={currentSite.status==='published'} liveChanges={liveBehind || (currentSite.status==='published' && isDirty)} catalogue={catalogue}
+            onBrand={()=>selectTarget('branding')} onBundles={()=>{setVisualSelection(null);setBundleSheet(true);}} onPublish={()=>{setVisualSelection(null);setPublishOpen(true);}} onBusiness={openBusiness}/>}
           {activeTab==='edit' && !canvasHintSeen && !visualSelection && !allSettings && <div className="visual-canvas-hint" role="note"><span>{isDataReseller||layoutMode==='sections'?'Tap a heading, photo or contact detail to change it':`Tap any heading, photo or ${word.singular.toLowerCase()} to change it`}</span><button type="button" aria-label="Dismiss tip" onClick={()=>setCanvasHintSeen(true)}><X size={15}/></button></div>}
           {activeTab==='preview' && !previewHintSeen && <div className="visual-canvas-hint is-preview" role="note"><Eye size={15}/><span>{canvasDevice==='mobile'?'Preview of your draft':`${canvasDevice==='tablet'?'Tablet':'Desktop'} preview, scaled to fit`} · payments are off</span><button type="button" aria-label="Dismiss preview note" onClick={()=>setPreviewHintSeen(true)}><X size={15}/></button></div>}
           <div ref={canvasRef} className="visual-canvas-viewport">

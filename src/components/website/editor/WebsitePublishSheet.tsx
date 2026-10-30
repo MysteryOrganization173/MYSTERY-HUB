@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {AlertTriangle, Check, CheckCircle2, Copy, ExternalLink, MessageCircle, PenLine, X} from 'lucide-react';
+import {AlertTriangle, Check, CheckCircle2, Copy, ExternalLink, LayoutDashboard, MessageCircle, PenLine, X} from 'lucide-react';
 import type {SiteContent, TemplateItem} from '../../../types';
 import {SafeImage} from '../SafeImage';
 import type {WebsiteReadinessItem} from '../../../utils/websiteReadiness';
@@ -14,7 +14,7 @@ const formatDate = (value?: string | null) => {
  * One place to decide "is this ready to be public?": the owner's name, a way to be reached and the
  * example items the server will not publish until each is kept or removed. Never confirms for them.
  */
-export function WebsitePublishSheet({content, published, publishedAt, publicUrl, word, managed, suggestions = [], changes, readiness = [], sellableBundles = null, onFix, onBundles, onReview, onEditItem, onEditField, onPublish, onClose}: {
+export function WebsitePublishSheet({content, published, publishedAt, publicUrl, word, managed, suggestions = [], changes, readiness = [], sellableBundles = null, onFix, onBundles, onBusiness, onReview, onEditItem, onEditField, onPublish, onClose}: {
   content: SiteContent; published: boolean; publishedAt?: string | null; publicUrl: string; word: {singular: string; plural: string; many: string}; managed: boolean;
   /** Design wording and sample photos still in use. Shown for a final look; never blocks publishing. */
   suggestions?: {label: string; target: string}[];
@@ -25,6 +25,8 @@ export function WebsitePublishSheet({content, published, publishedAt, publicUrl,
   /** V5.1 readiness checks: required ones hold the publish button, warnings never do. */
   readiness?: WebsiteReadinessItem[]; sellableBundles?: number | null;
   onFix?: (item: WebsiteReadinessItem) => void; onBundles?: () => void;
+  /** Builder V6: after publishing, the next place to go is My Business (orders, earnings, visitors). */
+  onBusiness?: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   // Remember whether this publish creates or replaces the live site, for the result's wording.
@@ -61,6 +63,9 @@ export function WebsitePublishSheet({content, published, publishedAt, publicUrl,
           <a className="website-sheet-confirm" href={`https://wa.me/?text=${encodeURIComponent(`${content.businessName || 'My website'}: ${publicUrl}`)}`} target="_blank" rel="noopener noreferrer"><MessageCircle size={18}/>Share on WhatsApp</a>
           <a className="website-sheet-cancel" href={publicUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={18}/>View website</a>
         </div>
+        {onBusiness && <button type="button" className="website-publish-business" data-publish-business onClick={onBusiness}>
+          <LayoutDashboard size={18} aria-hidden="true"/><span><strong>{managed ? 'Manage orders & earnings' : 'Open My Business'}</strong><small>{managed ? 'Orders, bundle prices, Store Earnings and analytics are in My Business.' : 'See visitors, share your link and change website settings in My Business.'}</small></span>
+        </button>}
       </div> : <>{published && changes && <div className="website-publish-changes" data-publish-changes>
         <strong>{changes.length ? 'What changes on your live website' : 'No changes since your last publish'}</strong>
         {changes.length > 0 ? <ul>{changes.map(change => <li key={change}>{change}</li>)}</ul> : <p>Visitors already see this version.</p>}

@@ -21,9 +21,19 @@ import {
   ROUTE_PATH_MAP,
   getPageFromPath,
   normalizePathname,
+  websiteEditorPath,
+  safeEditorReturnPath,
 } from '../utils/routing';
+import { clearWebsiteStartIntent } from '../utils/websiteStartIntent';
 
-export { ROUTE_PATH_MAP, getPageFromPath, normalizePathname };
+export { ROUTE_PATH_MAP, getPageFromPath, normalizePathname, safeEditorReturnPath };
+
+export interface WebsiteEditorLaunch {
+  siteId: string;
+  /** The session the website record was loaded with; another session never reuses it. */
+  token: string | null;
+  publish: boolean;
+}
 
 interface ToastMessage {
   id: string;
@@ -82,9 +92,18 @@ interface AppContextType {
   closeAccount: () => void;
   updateUserProfile: (profile: SafeUserProfile) => void;
   replaceAuthSession: (profile: SafeUserProfile, token: string) => void;
+  /** The website the dedicated editor shows (or is about to show). */
   activeEditorSite: WebsiteSiteRecord | null;
-  openWebsiteEditor: (site: WebsiteSiteRecord) => void;
+  /** How the editor was opened in this tab: which session loaded the website and whether to open the publish checklist. */
+  editorLaunch: WebsiteEditorLaunch | null;
+  /** Builder V6: go to the website's editor address (/website-builder/edit/:siteId). */
+  openWebsiteEditor: (site: WebsiteSiteRecord, options?: { publish?: boolean }) => void;
+  /** Forget the editor's website (the editor page calls this when it closes). Never navigates. */
   closeWebsiteEditor: () => void;
+  /** The editor page records the website it loaded from the server. */
+  setEditorSite: (site: WebsiteSiteRecord | null) => void;
+  /** Leave for another app address without adding a history entry (the editor's exit). */
+  replacePath: (path: string) => void;
   selectedTemplatePreview: WebsiteTemplate | null;
   openTemplatePreview: (template: WebsiteTemplate) => void;
   closeTemplatePreview: () => void;
@@ -352,6 +371,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authContextMessage, setAuthContextMessage] = useState<string | null>(null);
   const [pendingAuthAction, setPendingAuthAction] = useState<(() => void) | null>(null);
   const [activeEditorSite, setActiveEditorSite] = useState<WebsiteSiteRecord | null>(null);
+  const [editorLaunch, setEditorLaunch] = useState<WebsiteEditorLaunch | null>(null);
+  // Read when a sign-in callback created before this render opens the editor.
+  const tokenRef = useRef(sessionToken);
+  tokenRef.current = sessionToken;
   const [editorAiContext, setEditorAiContext] = useState<SafeEditorAiContext | null>(null);
 
   const [isMysteryAiOpen, setIsMysteryAiOpen] = useState(false);
@@ -369,14 +392,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMysteryAiInitialPrompt(null);
   };
 
-  const openWebsiteEditor = (site: WebsiteSiteRecord) => {
+  // Builder V6: the editor is a page with its own address, so refresh, Back and a reopened tab find it again.
+  // The record passed here only paints the editor at once; the editor page reloads it from the server whenever
+  // it was not loaded with the current session.
+  const openWebsiteEditor = (site: WebsiteSiteRecord, options: { publish?: boolean } = {}) => {
     setActiveEditorSite(site);
+    setEditorLaunch({ siteId: site.id, token: tokenRef.current, publish: Boolean(options.publish) });
+    setSelectedTemplatePreview(null);
+    const path = websiteEditorPath(site.id);
+    if (typeof window !== 'undefined' && window.history?.pushState) {
+      // Chosen in a design preview: the editor takes the preview's history entry, so Back returns to the gallery.
+      const fromPreview = Boolean(window.history.state?.mhPreview);
+      const current = safeEditorReturnPath(window.location.pathname + window.location.search);
+      const onEditor = getPageFromPath(window.location.pathname) === 'editor';
+      const from = fromPreview ? safeEditorReturnPath(window.history.state?.mhPreviewFrom) || '/website-builder' : onEditor ? safeEditorReturnPath(window.history.state?.mhEditorFrom) : current;
+      const state = { page: 'editor', mhEditorFrom: from };
+      if (fromPreview || window.location.pathname === path) window.history.replaceState(state, '', path);
+      else window.history.pushState(state, '', path);
+    }
+    setActivePageState('editor');
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   };
 
-  const closeWebsiteEditor = () => {
+  const closeWebsiteEditor = useCallback(() => {
     setActiveEditorSite(null);
+    setEditorLaunch(null);
     setEditorAiContext(null);
-  };
+  }, []);
+
+  const replacePath = useCallback((path: string) => {
+    const page = getPageFromPath(path);
+    window.history.replaceState({ page }, '', path);
+    setActivePageState(page);
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+  }, []);
 
   const openAuth = (
     mode: 'login' | 'signup' = 'login',
@@ -392,6 +441,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const switchAuthMode = (mode: 'login' | 'signup') => setAuthMode(mode);
 
   const closeAuth = () => {
+    // A visitor who closes sign-in without an account gives up the website they were starting.
+    clearWebsiteStartIntent();
     setIsAuthModalOpen(false);
     setAuthContextMessage(null);
     setPendingAuthAction(null);
@@ -445,7 +496,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     feedbackToken.current = null;
     setUser(null); setSessionToken(null); setAccountOpen(false); setPendingAuthAction(null); setIsCheckoutOpen(false);
     // A signed-out device never keeps the previous owner's website open in the editor.
-    setActiveEditorSite(null); setEditorAiContext(null);
+    setActiveEditorSite(null); setEditorAiContext(null); setEditorLaunch(null);
     try { for (const storage of [localStorage, sessionStorage]) { storage.removeItem('mystery_hub_user'); storage.removeItem('mystery_hub_session_token'); } } catch { /* Ignore unavailable storage. */ }
   };
   const logoutUser = () => {
@@ -515,8 +566,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logoutUser,
         isAccountOpen, openAccount, closeAccount, updateUserProfile, replaceAuthSession,
         activeEditorSite,
+        editorLaunch,
         openWebsiteEditor,
         closeWebsiteEditor,
+        setEditorSite: setActiveEditorSite,
+        replacePath,
         selectedTemplatePreview,
         openTemplatePreview,
         closeTemplatePreview,
