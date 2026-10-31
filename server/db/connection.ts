@@ -14,6 +14,7 @@ import { AFA_SCHEMA } from './afaSchema.js';
 import { MARKETPLACE_FLEXIBILITY_SCHEMA } from './marketplaceFlexibilitySchema.js';
 import { ULTRA_ENQUIRY_SCHEMA } from './websiteUltraSchema.js';
 import { MARKETPLACE_ASSET_SCHEMA } from './marketplaceAssetSchema.js';
+import { BACKEND_RLS_SCHEMA } from './backendRlsSchema.js';
 /**
  * Shared PostgreSQL Connection Pool & Initialization
  * Ensures Orders, Auth, Waitlist, and Admin use ONE single database connection pool.
@@ -606,6 +607,7 @@ export async function initDatabase(): Promise<void> {
     await client.query(ADMIN_ASSISTED_SCHEMA);
     await client.query(ORDER_MANAGEMENT_SCHEMA);
     await client.query(NOTIFICATION_SCHEMA);
+    await client.query(BACKEND_RLS_SCHEMA);
 
     // 3. INDEX CREATION (Non-critical failures logged as warnings)
     const indexStatements = [
