@@ -431,6 +431,7 @@ export class FulfilmentService {
         if (!instantRes.success && !instantRes.supplierOrderId) {
           throw Object.assign(new Error(instantRes.errorMessage || 'Success Biz Hub Instant Bundle placement failed.'), {
             isTimeout: (instantRes.rawResponse as { isTimeout?: boolean } | undefined)?.isTimeout === true,
+            isUncertainSubmission: (instantRes.rawResponse as { isUncertainSubmission?: boolean } | undefined)?.isUncertainSubmission === true,
           });
         }
 
@@ -462,16 +463,17 @@ export class FulfilmentService {
         return { order: submittedOrder || claimedOrder, alreadyHandled: false };
       } catch (err: unknown) {
         const isTimeout = Boolean((err as { isTimeout?: boolean })?.isTimeout);
+        const isUncertainSubmission = (err as { isUncertainSubmission?: boolean }).isUncertainSubmission === true;
         const errorMessage = err instanceof Error ? err.message : 'Unknown instant bundle supplier error';
 
-        if (isTimeout) {
+        if (isTimeout || isUncertainSubmission) {
           console.error(
-            `[Fulfilment Dispatch] Ambiguous timeout communicating with Success Biz Hub Instant Bundle API for order ${claimedOrder.public_reference}. Preserving order in safe queued state.`
+            `[Fulfilment Dispatch] Uncertain response from Success Biz Hub Instant Bundle API for order ${claimedOrder.public_reference}. Preserving order in safe queued state.`
           );
           const uncertainOrder = await OrdersStore.saveSupplierUncertainSubmission(
             claimedOrder.id,
-            'Network timeout awaiting response from Success Biz Hub Instant Bundle API',
-            { isTimeout: true, message: errorMessage }
+            'Uncertain response from Success Biz Hub Instant Bundle API',
+            { isTimeout, isUncertainSubmission, message: errorMessage }
           );
           return { order: uncertainOrder || claimedOrder, alreadyHandled: false };
         }
@@ -523,6 +525,7 @@ export class FulfilmentService {
         if (!airtimeRes.success && !airtimeRes.supplierOrderId) {
           throw Object.assign(new Error(airtimeRes.errorMessage || 'Success Biz Hub Airtime placement failed.'), {
             isTimeout: (airtimeRes.rawResponse as { isTimeout?: boolean } | undefined)?.isTimeout === true,
+            isUncertainSubmission: (airtimeRes.rawResponse as { isUncertainSubmission?: boolean } | undefined)?.isUncertainSubmission === true,
           });
         }
 
@@ -554,17 +557,18 @@ export class FulfilmentService {
         return { order: submittedOrder || claimedOrder, alreadyHandled: false };
       } catch (err: unknown) {
         const isTimeout = Boolean((err as { isTimeout?: boolean })?.isTimeout);
+        const isUncertainSubmission = (err as { isUncertainSubmission?: boolean }).isUncertainSubmission === true;
         const errorMessage = err instanceof Error ? err.message : 'Unknown airtime supplier error';
 
-        if (isTimeout) {
+        if (isTimeout || isUncertainSubmission) {
           // CRITICAL: Ambiguous timeout! Do NOT automatically resubmit.
           console.error(
-            `[Fulfilment Dispatch] Ambiguous timeout communicating with Success Biz Hub Airtime API for order ${claimedOrder.public_reference}. Preserving order in safe queued state.`
+            `[Fulfilment Dispatch] Uncertain response from Success Biz Hub Airtime API for order ${claimedOrder.public_reference}. Preserving order in safe queued state.`
           );
           const uncertainOrder = await OrdersStore.saveSupplierUncertainSubmission(
             claimedOrder.id,
-            'Network timeout awaiting response from Success Biz Hub Airtime API',
-            { isTimeout: true, message: errorMessage }
+            'Uncertain response from Success Biz Hub Airtime API',
+            { isTimeout, isUncertainSubmission, message: errorMessage }
           );
           return { order: uncertainOrder || claimedOrder, alreadyHandled: false };
         }
@@ -672,18 +676,19 @@ export class FulfilmentService {
         return {order:held||claimedOrder,alreadyHandled:false};
       }
       const isTimeout = Boolean((err as { isTimeout?: boolean })?.isTimeout);
+      const isUncertainSubmission = (err as { isUncertainSubmission?: boolean }).isUncertainSubmission === true;
       const errorMessage = err instanceof Error ? err.message : 'Unknown supplier error';
 
-      if (isTimeout) {
+      if (isTimeout || isUncertainSubmission) {
         // CRITICAL: Ambiguous timeout! Do NOT automatically resubmit.
         // Success Biz Hub might have accepted the order. Save uncertain state for reconciliation.
         console.error(
-          `[Fulfilment Dispatch] Ambiguous timeout communicating with Success Biz Hub for order ${claimedOrder.public_reference}. Preserving order in safe queued state.`
+          `[Fulfilment Dispatch] Uncertain response from Success Biz Hub for order ${claimedOrder.public_reference}. Preserving order in safe queued state.`
         );
         const uncertainOrder = await OrdersStore.saveSupplierUncertainSubmission(
           claimedOrder.id,
-          'Network timeout awaiting response from Success Biz Hub',
-          { isTimeout: true, message: errorMessage }
+          'Uncertain response from Success Biz Hub',
+          { isTimeout, isUncertainSubmission, message: errorMessage }
         );
         return { order: uncertainOrder || claimedOrder, alreadyHandled: false };
       }

@@ -34,6 +34,23 @@ export class SuccessBizHubClient {
   private cache = SuccessBizHubClient.sharedCache;
   private static afaDiscoveryFlights = new Map<string, Promise<SbhServicesResponse & {success?:boolean}>>();
 
+  private responseError(statusCode: number, code: unknown, uncertain = false): Error {
+    const safeCode = typeof code === 'string' && /^[A-Z_]{1,64}$/.test(code) ? code : 'INVALID_SUPPLIER_RESPONSE';
+    // Provider messages may echo keys, phones or identity fields. Preserve the
+    // machine code and HTTP status, but use controlled, non-sensitive wording.
+    const messages: Record<string, string> = {
+      UNAUTHORIZED: 'Supplier authentication failed.',
+      FORBIDDEN: 'Supplier service permission is unavailable.',
+      BAD_REQUEST: 'Supplier rejected the request.',
+      NOT_FOUND: 'Supplier resource was not found.',
+      RATE_LIMITED: 'Supplier rate limit reached. Please try again later.',
+      SERVICE_UNAVAILABLE: 'Supplier service is temporarily unavailable.',
+    };
+    return Object.assign(new Error(messages[safeCode] || 'Supplier returned an invalid or unsuccessful response.'), {
+      code: safeCode, statusCode, ...(uncertain ? { isUncertainSubmission: true } : {}),
+    });
+  }
+
   private getBaseUrl(): string {
     const raw = process.env.SUCCESS_BIZ_HUB_BASE_URL || 'https://api.successbizhub.com/v2';
     return raw.trim().replace(/\/+$/, '');
@@ -116,33 +133,29 @@ export class SuccessBizHubClient {
 
       const res = await fetch(url, fetchOptions);
 
-      let responseJson: unknown = null;
+      let responseJson: unknown;
       // fetch resolves at headers. Keep the deadline through body consumption too.
       const text = await res.text();
       clearTimeout(timeoutHandle);
       try {
         responseJson = JSON.parse(text);
       } catch {
-        // Raw non-JSON response
-        responseJson = { status: 'error', message: text };
+        throw this.responseError(res.status, undefined, method === 'POST' && endpoint !== '/beneficiary-check');
       }
 
-      if (options.privateAfa && (!res.ok || (responseJson as { success?: boolean })?.success !== true)) {
-        // AFA errors may echo identity fields. Never retain raw response/body/message.
-        const nested = (responseJson as { error?: { code?: unknown } })?.error;
-        const code = typeof nested?.code === 'string' && /^[A-Z_]{1,64}$/.test(nested.code) ? nested.code : 'SUPPLIER_ERROR';
-        throw Object.assign(new Error('AFA supplier request failed.'), { statusCode: res.status, code });
+      const envelope = responseJson && typeof responseJson === 'object' && !Array.isArray(responseJson)
+        ? responseJson as { success?: unknown; data?: unknown; error?: { code?: unknown } } : undefined;
+      if (!res.ok || envelope?.success !== true || !envelope.data || typeof envelope.data !== 'object') {
+        // A 2xx submission with no trustworthy envelope is not evidence that an
+        // order failed. Existing reconciliation must own that uncertainty.
+        throw this.responseError(res.status, envelope?.error?.code,
+          res.ok && method === 'POST' && endpoint !== '/beneficiary-check');
       }
-      if (!res.ok) {
-        const errorMsg =
-          (responseJson as { message?: string; error?: string })?.message ||
-          (responseJson as { message?: string; error?: string })?.error ||
-          `HTTP ${res.status}: ${res.statusText}`;
-
-        const err = new Error(`Success Biz Hub request failed: ${errorMsg}`);
-        (err as unknown as { statusCode: number; responseBody: unknown }).statusCode = res.status;
-        (err as unknown as { statusCode: number; responseBody: unknown }).responseBody = responseJson;
-        throw err;
+      // An explicitly unavailable Instant catalogue is not a sellable snapshot.
+      // Reject before the cache write, so a subsequent recovery is observable.
+      if (method === 'GET' && endpoint === '/instant-bundles'
+        && (envelope.data as { available?: unknown }).available === false) {
+        throw this.responseError(503, 'SERVICE_UNAVAILABLE');
       }
 
       // Store in cache if configured
@@ -309,6 +322,13 @@ export class SuccessBizHubClient {
     productCount: number;
     reason?: string;
   }> {
+    return this.checkServiceAvailability('instant_bundles', skipCache);
+  }
+
+  /** Shared v2 discovery gate for the three checkout capabilities. */
+  async checkServiceAvailability(serviceId: 'orders' | 'airtime' | 'instant_bundles', skipCache = false): Promise<{
+    permitted: boolean; available: boolean; productCount: number; reason?: string;
+  }> {
     try {
       const res = await this.getServices(skipCache);
       const data = res.data as {
@@ -316,21 +336,22 @@ export class SuccessBizHubClient {
         services?: Array<{ id: string; keyGranted?: boolean; available?: boolean; productCount?: number }>;
       } | undefined;
 
-      const keyPermitted = data?.keyPermissions?.instant_bundles;
-      const serviceItem = Array.isArray(data?.services)
-        ? data?.services.find((s) => s.id === 'instant_bundles')
-        : undefined;
-
-      const isGranted = Boolean(keyPermitted || serviceItem?.keyGranted);
-      const isAvailable = Boolean(serviceItem?.available);
-      const productCount = typeof serviceItem?.productCount === 'number' ? serviceItem.productCount : 0;
+      const matches = Array.isArray(data?.services) ? data.services.filter(s => s?.id === serviceId) : [];
+      const serviceItem = matches.length === 1 ? matches[0] : undefined;
+      const isGranted = res.success === true && data?.keyPermissions?.[serviceId] === true && serviceItem?.keyGranted === true;
+      const count = serviceItem?.productCount;
+      const productCount = typeof count === 'number' && Number.isSafeInteger(count) && count >= 0 ? count : 0;
+      // Candidate fail-closed policy: no flag overrides another. The snapshot
+      // does not define contradictory flags or available:true with zero products;
+      // this policy requires supplier clarification before release.
+      const isAvailable = serviceItem?.available === true && productCount > 0;
 
       if (!isGranted) {
         return {
           permitted: false,
           available: false,
           productCount: 0,
-          reason: 'API key does not have permission for instant_bundles.',
+          reason: 'Supplier service permission could not be confirmed.',
         };
       }
 
@@ -339,7 +360,7 @@ export class SuccessBizHubClient {
           permitted: true,
           available: false,
           productCount,
-          reason: 'Instant Bundles service is currently unavailable from supplier.',
+          reason: 'Supplier service availability could not be confirmed.',
         };
       }
 
