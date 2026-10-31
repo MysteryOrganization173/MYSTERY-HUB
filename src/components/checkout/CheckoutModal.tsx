@@ -353,7 +353,7 @@ export const CheckoutModal: React.FC = () => {
             supportingNote:
               'Mystery Hub pre-checks telecom channels before payment so you are never charged for an unfulfillable request.',
             networkName,
-            canViewInstant: !isInstantBundle,
+            canViewInstant: false,
           });
           return;
         }
@@ -369,11 +369,11 @@ export const CheckoutModal: React.FC = () => {
                 ? 'Package temporarily unavailable'
                 : 'Service temporarily unavailable',
             message:
-              "We can't complete this purchase right now.\nNo payment has been taken.\n\nPlease try again shortly or choose another package.",
+              "We can't confirm availability for this purchase right now.\nNo payment has been taken.\n\nPlease try again shortly. You don't need to change your number.",
             supportingNote:
               'Mystery Hub pre-checks telecom channels before payment so you are never charged for an unfulfillable request.',
             networkName,
-            canViewInstant: !isInstantBundle,
+            canViewInstant: false,
           });
           return;
         }
@@ -675,7 +675,7 @@ export const CheckoutModal: React.FC = () => {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
+                {preflightIssue.code === 'BENEFICIARY_NOT_ELIGIBLE' && <button
                   type="button"
                   onClick={() => {
                     setPreflightIssue(null);
@@ -688,7 +688,7 @@ export const CheckoutModal: React.FC = () => {
                   className="min-h-11 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Try Another Number
-                </button>
+                </button>}
 
                 {preflightIssue.canViewInstant && (
                   <button
@@ -701,7 +701,7 @@ export const CheckoutModal: React.FC = () => {
                   </button>
                 )}
 
-                {preflightIssue.code === 'SUPPLIER_WALLET_LOW' && (
+                {preflightIssue.code !== 'BENEFICIARY_NOT_ELIGIBLE' && (
                   <button
                     type="button"
                     onClick={(event) => {

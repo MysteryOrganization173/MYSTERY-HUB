@@ -115,9 +115,9 @@ export class SuccessBizHubClient {
       }
 
       const res = await fetch(url, fetchOptions);
-      if (!options.privateAfa) clearTimeout(timeoutHandle);
 
       let responseJson: unknown = null;
+      // fetch resolves at headers. Keep the deadline through body consumption too.
       const text = await res.text();
       clearTimeout(timeoutHandle);
       try {

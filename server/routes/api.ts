@@ -435,8 +435,11 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
       // 1. Check service availability
       const serviceCheck = await provider.client.checkInstantBundlesService();
       if (!serviceCheck.permitted || !serviceCheck.available) {
-        res.status(400).json({
-          error: serviceCheck.reason || 'Instant Bundles are temporarily unavailable. Please select a standard Data Bundle.',
+        const message = 'Instant Bundles are temporarily unavailable. No payment has been taken. Please try again shortly.';
+        res.status(503).json({
+          code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
+          message,
+          error: message,
         });
         return;
       }
@@ -691,7 +694,7 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
         const safeMessage =
           preflight.customerMessage ||
           'Airtime Top-Up is temporarily unavailable. Please try again shortly.';
-        res.status(400).json({
+        res.status(safeCode === 'SERVICE_TEMPORARILY_UNAVAILABLE' || safeCode === 'SUPPLIER_WALLET_LOW' ? 503 : 400).json({
           code: safeCode,
           message: safeMessage,
           error: safeMessage,
@@ -860,7 +863,7 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
       const safeMessage =
         preflight.customerMessage ||
         'This bundle is temporarily unavailable. Please try another package or try again shortly.';
-      res.status(400).json({
+      res.status(safeCode === 'SERVICE_TEMPORARILY_UNAVAILABLE' || safeCode === 'SUPPLIER_WALLET_LOW' ? 503 : 400).json({
         code: safeCode,
         message: safeMessage,
         error: safeMessage,

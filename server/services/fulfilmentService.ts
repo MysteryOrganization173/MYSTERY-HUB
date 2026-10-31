@@ -104,7 +104,7 @@ export class FulfilmentService {
         return {
           allowed: false,
           code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
-          customerMessage: 'This bundle is temporarily unavailable. Please try another package or try again shortly.',
+          customerMessage: 'We could not confirm service availability. No payment has been taken. Please try again shortly.',
           internalReason: servicesCheckResult.res.reason,
           timings: { servicesMs, catalogMs, beneficiaryMs: 0, walletMs: 0, totalMs: Math.round(performance.now() - startPreflight) },
         };
@@ -429,7 +429,9 @@ export class FulfilmentService {
         });
 
         if (!instantRes.success && !instantRes.supplierOrderId) {
-          throw new Error(instantRes.errorMessage || 'Success Biz Hub Instant Bundle placement failed.');
+          throw Object.assign(new Error(instantRes.errorMessage || 'Success Biz Hub Instant Bundle placement failed.'), {
+            isTimeout: (instantRes.rawResponse as { isTimeout?: boolean } | undefined)?.isTimeout === true,
+          });
         }
 
         const supplierOrderId = instantRes.supplierOrderId;
@@ -519,7 +521,9 @@ export class FulfilmentService {
         });
 
         if (!airtimeRes.success && !airtimeRes.supplierOrderId) {
-          throw new Error(airtimeRes.errorMessage || 'Success Biz Hub Airtime placement failed.');
+          throw Object.assign(new Error(airtimeRes.errorMessage || 'Success Biz Hub Airtime placement failed.'), {
+            isTimeout: (airtimeRes.rawResponse as { isTimeout?: boolean } | undefined)?.isTimeout === true,
+          });
         }
 
         const supplierOrderId = airtimeRes.supplierOrderId;
