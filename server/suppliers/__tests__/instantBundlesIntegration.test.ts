@@ -120,7 +120,7 @@ async function runInstantBundlesTests() {
 
     // Mock GET /services with instant_bundles granted and available
     client.getServices = async () => ({
-      status: 'success',
+      success: true,
       data: {
         keyPermissions: { instant_bundles: true },
         services: [
@@ -137,7 +137,7 @@ async function runInstantBundlesTests() {
 
     // Mock GET /services where instant_bundles is not permitted for this key
     client.getServices = async () => ({
-      status: 'success',
+      success: true,
       data: {
         keyPermissions: { instant_bundles: false },
         services: [{ id: 'data_bundles', available: true }],

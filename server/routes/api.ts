@@ -104,7 +104,7 @@ apiRouter.get('/instant-bundles/:productKey/quote', async (req: Request, res: Re
     const productKey = String(req.params.productKey || '');
     const target = productKey.startsWith('instant-') ? productKey.replace('instant-', '') : productKey;
     const pkg = rawList.find((p) => p.id === target || p.id === productKey || `instant-${p.id}` === productKey);
-    if (!pkg || pkg.enabled === false) {
+    if (!pkg || pkg.enabled === false || pkg.available === false) {
       res.status(404).json({ success: false, error: 'Selected Instant Bundle package is no longer available.' });
       return;
     }
@@ -180,8 +180,8 @@ apiRouter.get('/instant-bundles', async (_req: Request, res: Response) => {
 
     res.json({
       success: true,
-      available: publicProducts.length > 0,
-      reason: publicProducts.length === 0 ? 'No sellable instant bundle packages are currently available.' : undefined,
+      available: publicProducts.some(p => p.availability === 'in_stock'),
+      reason: !publicProducts.some(p => p.availability === 'in_stock') ? 'No sellable instant bundle packages are currently available.' : undefined,
       products: publicProducts,
     });
   } catch (err) {
@@ -445,7 +445,14 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
       }
 
       // 2. Resolve package from live catalogue
-      const catalogRes = await provider.client.getInstantBundles();
+      let catalogRes: Awaited<ReturnType<typeof provider.client.getInstantBundles>>;
+      try {
+        catalogRes = await provider.client.getInstantBundles();
+      } catch {
+        const message = 'Instant Bundles are temporarily unavailable. No payment has been taken. Please try again shortly.';
+        res.status(503).json({ code: 'SERVICE_TEMPORARILY_UNAVAILABLE', message, error: message });
+        return;
+      }
       let rawList: SbhInstantBundlePackage[] = [];
       if (Array.isArray(catalogRes.data)) {
         rawList = catalogRes.data;
@@ -458,7 +465,7 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
       const targetPkgId = productId.startsWith('instant-') ? productId.replace('instant-', '') : productId;
       const pkg = rawList.find((p) => p.id === targetPkgId || p.id === productId || `instant-${p.id}` === productId);
 
-      if (!pkg || pkg.enabled === false) {
+      if (!pkg || pkg.enabled === false || pkg.available === false) {
         res.status(404).json({ error: 'Selected Instant Bundle package is no longer available.' });
         return;
       }
