@@ -46,7 +46,8 @@ test('Marketplace V2 native additive migration, permissions and framing persiste
    await observer.query('GRANT USAGE ON SCHEMA public TO marketplace_v2_reader; GRANT SELECT ON ALL TABLES IN SCHEMA public TO marketplace_v2_reader');
    const readerUrl=new URL(url!);readerUrl.username='marketplace_v2_reader';readerUrl.password='';
    const reader=new pg.Pool({connectionString:readerUrl.href,ssl:false,max:1});
-   try{assert.equal((await reader.query('SELECT count(*) FROM marketplace_products')).rows[0].count,'1');await assert.rejects(reader.query(MARKETPLACE_FLEXIBILITY_SCHEMA),(e:any)=>e.code==='42501');}finally{await reader.end();}
+   // Backend-only RLS also denies reads to a non-owner even when SELECT is granted.
+   try{assert.equal((await reader.query('SELECT count(*) FROM marketplace_products')).rows[0].count,'0');await assert.rejects(reader.query(MARKETPLACE_FLEXIBILITY_SCHEMA),(e:any)=>e.code==='42501');}finally{await reader.end();}
   });
   const input={name:'Synthetic framed laptop',category:'laptops_computers',priceType:'fixed',priceGhc:1500,availability:'available',productKind:'physical',fulfilmentMode:'delivery',deliveryAvailable:true,imageUrl:'https://images.example.com/laptop.jpg',description:'Synthetic description'};
   let product:any;
