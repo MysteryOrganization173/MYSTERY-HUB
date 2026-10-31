@@ -54,6 +54,8 @@ with sync_playwright() as playwright:
         request = route.request
         path = urllib.parse.urlparse(request.url).path
         calls.append((request.method, path))
+        if path == '/api/analytics/events':
+            return route.fulfill(json={'success': True})
         if path == '/api/commercial/products':
             return route.fulfill(json={'products': CATALOG})
         if path.startswith('/api/commercial/quote/'):
@@ -71,6 +73,8 @@ with sync_playwright() as playwright:
                 return route.fulfill(status=409, json={'error': 'An MTN order is already processing for this number.', 'code': 'ACTIVE_MTN_ORDER_EXISTS', 'existingOrderReference': REF, 'existingOrderStatus': 'processing'})
             if state['init'] == 'unavailable':
                 return route.fulfill(status=409, json={'error': 'Package unavailable', 'code': 'PACKAGE_UNAVAILABLE'})
+            if state['init'] == 'supplier_timeout':
+                return route.fulfill(status=503, json={'error': 'Service temporarily unavailable', 'code': 'SERVICE_TEMPORARILY_UNAVAILABLE'})
             if state['init'] == 'offline':
                 return route.abort('internetdisconnected')
             return route.fulfill(json={'success': True, 'orderRef': REF, 'reference': 'review_ref', 'accessCode': 'review_access',
@@ -140,6 +144,27 @@ with sync_playwright() as playwright:
 
     page.set_viewport_size({'width': 390, 'height': 844})
 
+    # A supplier outage is not a recipient problem or a verified Instant Bundle fallback.
+    for width, height in [(360, 780), (390, 844)]:
+        page.set_viewport_size({'width': width, 'height': height})
+        state['init'] = 'supplier_timeout'
+        data_page(); page.evaluate('window.__payments = []'); open_checkout(); fill_recipient(); pay()
+        issue = page.get_by_role('alert').filter(has_text='Service temporarily unavailable')
+        expect(issue).to_be_visible()
+        expect(issue).to_contain_text('No payment has been taken.')
+        expect(issue).to_contain_text("You don't need to change your number.")
+        expect(issue.get_by_role('button', name='Try Another Number')).to_have_count(0)
+        expect(issue.get_by_role('button', name='View Instant Bundles')).to_have_count(0)
+        expect(issue.get_by_role('button', name='Try Again')).to_be_visible()
+        assert page.evaluate('window.__payments.length') == 0
+        fits(); shot(f'{width}-supplier-timeout')
+        # Recovery is a customer action and still goes through the same checkout.
+        state['init'] = 'ok'; issue.get_by_role('button', name='Try Again').click()
+        page.wait_for_function('window.__payments.length === 1')
+        popup('onCancel'); page.keyboard.press('Escape')
+
+    page.set_viewport_size({'width': 390, 'height': 844})
+
     # Wrong-number feedback.
     data_page(); open_checkout(); page.locator('#checkout-phone').type('0201234'); pay(); shot('390-checkout-invalid')
     fill_recipient('0201234567'); shot('390-checkout-mismatch'); page.keyboard.press('Escape')
@@ -188,7 +213,10 @@ with sync_playwright() as playwright:
     # Receipt when the status check cannot reach the server.
     state.update(order='processing', lookup_fails=False)
     page.goto(URL + '/orders', wait_until='networkidle')
-    page.get_by_role('textbox').first.fill(REF); page.keyboard.press('Enter')
+    reference_input = page.get_by_role('textbox', name='Order reference')
+    if not reference_input.is_visible():
+        page.get_by_role('button', name=re.compile('Track another order')).click()
+    reference_input.fill(REF); page.keyboard.press('Enter')
     page.wait_for_timeout(800); state['lookup_fails'] = True; page.wait_for_timeout(7000); shot('390-receipt-offline')
     state['lookup_fails'] = False; page.keyboard.press('Escape')
     shot('390-orders', full=True)
@@ -199,6 +227,6 @@ with sync_playwright() as playwright:
     shot('1280-receipt-processing')
 
     assert not page_errors, page_errors
-    assert not [c for c in calls if c[0] != 'GET' and c[1] not in ('/api/payments/initialize', '/api/payments/cancel')], calls
+    assert not [c for c in calls if c[0] != 'GET' and c[1] not in ('/api/payments/initialize', '/api/payments/cancel', '/api/analytics/events')], calls
     print(json.dumps({'phase': PHASE, 'screens': len(list(OUTPUT.glob(f'{PHASE}-*.png'))), 'pageErrors': page_errors}))
     browser.close()

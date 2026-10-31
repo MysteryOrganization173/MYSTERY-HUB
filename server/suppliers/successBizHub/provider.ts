@@ -407,8 +407,10 @@ export class SuccessBizHubProvider implements SupplierProvider {
 
       return { available: true };
     } catch (err) {
-      console.warn('[SBH Provider] Unable to query services endpoint for airtime availability:', err);
-      return { available: true }; // Soft fallback if services endpoint is transiently slow
+      return {
+        available: false,
+        reason: err instanceof Error ? err.message : 'Unable to query supplier airtime availability.',
+      };
     }
   }
 
