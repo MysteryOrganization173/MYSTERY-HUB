@@ -1239,7 +1239,7 @@ export async function deleteWebsiteOnServer(
 }
 
 import type { WebsiteAsset, WebsiteUploadIntent } from '../config/websiteMedia';
-import type { WebsiteAnalyticsInput, WebsiteAdminSummary } from '../config/websiteAnalytics';
+import type { WebsiteAnalyticsInput, WebsiteAdminSummary, AdminWebsiteInspection } from '../config/websiteAnalytics';
 /** Uses the same API base/session contract as the existing website methods. */
 async function websiteFreeRequest<T>(path: string, token?: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${API_BASE_URL}/api/${path}`, { method, headers: { 'Content-Type':'application/json', ...(token ? { Authorization:`Bearer ${token}` } : {}) }, ...(body === undefined ? {} : { body:JSON.stringify(body) }), signal });
@@ -1274,7 +1274,12 @@ export function uploadWebsiteImage(intent: WebsiteUploadIntent, file: File, onPr
 }
 export function changeWebsiteTemplate(token: string, id: string, targetTemplateId: string, expectedUpdatedAt: string) { return websiteFreeRequest<{success:true;site:WebsiteSiteRecord}>(`websites/${encodeURIComponent(id)}/change-template`,token,'POST',{targetTemplateId,confirmed:true,expectedUpdatedAt}); }
 export function recordWebsiteAnalytics(input: WebsiteAnalyticsInput, token?: string) { return websiteFreeRequest<{success:true}>('websites/analytics',token,'POST',input); }
-export function getAdminWebsiteSummary(token: string, filters: {range:string;search?:string;status?:string;template?:string;offset?:number}) { return websiteFreeRequest<WebsiteAdminSummary>(`admin/website-builder?${new URLSearchParams(Object.entries(filters).map(([key,value])=>[key,String(value)]))}`,token); }
+export function getAdminWebsiteSummary(token: string, filters: {range:string;search?:string;status?:string;template?:string;offset?:number}, signal?:AbortSignal) { return websiteFreeRequest<WebsiteAdminSummary>(`admin/website-builder?${new URLSearchParams(Object.entries(filters).map(([key,value])=>[key,String(value)]))}`,token,'GET',undefined,signal); }
+export async function getAdminWebsiteInspection(token:string,id:string,signal?:AbortSignal){
+  const result=await websiteFreeRequest<{success:true;site:AdminWebsiteInspection}>(`admin/website-builder/${encodeURIComponent(id)}`,token,'GET',undefined,signal);
+  if(result.site?.id!==id)throw Error('Website inspection could not be verified. Please retry.');
+  return result.site;
+}
 export function getAdminUltraEnquiries(token: string, search: string, offset: number) {
   return websiteFreeRequest<{success:true; enquiries:import('../../server/db/websiteUltraStore').UltraEnquiryRecord[]; total:number; limit:number; offset:number}>(`admin/websites/ultra-enquiries?${new URLSearchParams({search,offset:String(offset),limit:'25'})}`, token);
 }
