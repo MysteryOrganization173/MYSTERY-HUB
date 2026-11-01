@@ -1,7 +1,9 @@
-import React,{useState,useEffect} from 'react';
+import React,{useState,useEffect,useRef} from 'react';
 import { MessageCircle, Mail, Phone } from 'lucide-react';
 import { marketplaceControlRequest,ManagedCategory,MarketplaceInquiry } from '../../../services/marketplaceControls';
 import { whatsappLink } from '../../../../shared/marketplacePolicy';
+import {LeadWorkflowEditor} from './LeadWorkflowEditor';
+import {readLeadWorkflow} from '../../../../shared/leadOperations';
 import { MarketplaceProduct } from '../../../types';
 import { categoryMismatches } from '../../../utils/marketplaceCategoryCheck';
 import { AdminButton,AdminEmpty,AdminLoading,AdminNotice,AdminPanel,ConfirmAction,StatusPill,adminField as field,adminLabel,type AdminTone } from '../ui/AdminUi';
@@ -10,14 +12,17 @@ const INQUIRY_STATUS:Record<string,{label:string;tone:AdminTone}>={new:{label:'N
 const STATUS_FILTERS=[{id:'new',label:'New'},{id:'contacted',label:'Contacted'},{id:'resolved',label:'Resolved'},{id:'closed',label:'Closed'},{id:'',label:'All'}];
 
 /** Inquiries inbox and category manager. `view` is controlled by the Marketplace tabs. */
-export function MarketplaceControlPanels({token,view,categories,onCategoriesChanged,products,onChanged,onEditProduct}:{token:string;view:'categories'|'inquiries';categories:ManagedCategory[];onCategoriesChanged:()=>void;products:MarketplaceProduct[];onChanged:()=>void;onEditProduct?:(product:MarketplaceProduct)=>void}) {
+export function MarketplaceControlPanels({token,view,categories,onCategoriesChanged,products,onChanged,onEditProduct,initialFilter=''}:{initialFilter?:string;token:string;view:'categories'|'inquiries';categories:ManagedCategory[];onCategoriesChanged:()=>void;products:MarketplaceProduct[];onChanged:()=>void;onEditProduct?:(product:MarketplaceProduct)=>void}) {
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false);
  const [slug,setSlug]=useState(''),[label,setLabel]=useState('');
- const [rows,setRows]=useState<MarketplaceInquiry[]>([]),[status,setStatus]=useState('new'),[search,setSearch]=useState(''),[searchDraft,setSearchDraft]=useState(''),[product,setProduct]=useState(''),[page,setPage]=useState(1),[total,setTotal]=useState(0);
- const [inquiryProducts,setInquiryProducts]=useState(products);
- async function run(action:()=>Promise<void>){setBusy(true);setError('');try{await action();}catch(e){setError(e instanceof Error?e.message:'Operation failed.');}finally{setBusy(false);}}
- async function load(){const params=new URLSearchParams({page:String(page),pageSize:'10'});if(status)params.set('status',status);if(search)params.set('search',search);if(product)params.set('productId',product);const data=await marketplaceControlRequest(`inquiries?${params}`,token);setRows(data.inquiries);setTotal(data.total);}
- useEffect(()=>{if(view!=='inquiries')return;setLoading(true);run(load).finally(()=>setLoading(false));},[view,status,search,product,page,token]);
+ const [rows,setRows]=useState<MarketplaceInquiry[]>([]),[status,setStatus]=useState(['','new','contacted','resolved','closed'].includes(initialFilter)?initialFilter:''),[search,setSearch]=useState(''),[searchDraft,setSearchDraft]=useState(''),[product,setProduct]=useState(''),[page,setPage]=useState(1),[total,setTotal]=useState(0);
+ const [inquiryProducts,setInquiryProducts]=useState(products),[notice,setNotice]=useState('');
+ const [followUp,setFollowUp]=useState(['due','overdue','recent'].includes(initialFilter)?initialFilter:''),[inquiryId,setInquiryId]=useState(initialFilter.startsWith('inq_')?initialFilter:'');
+ const sequence=useRef(0),context=useRef(token);context.current=token;
+ useEffect(()=>()=>{sequence.current++;},[token]);
+ async function run(action:()=>Promise<void>){const owner=token;setBusy(true);setError('');try{await action();}catch(e){if(context.current===owner)setError(e instanceof Error?e.message:'Operation failed.');}finally{if(context.current===owner)setBusy(false);}}
+ async function load(){const ticket=++sequence.current;const params=new URLSearchParams({page:String(page),pageSize:'10'});if(status)params.set('status',status);if(followUp)params.set('followUp',followUp);if(inquiryId)params.set('inquiryId',inquiryId);if(search)params.set('search',search);if(product)params.set('productId',product);try{const data=await marketplaceControlRequest(`inquiries?${params}`,token);if(ticket===sequence.current){if(page>1&&(page-1)*10>=data.total){setPage(1);return;}setRows(data.inquiries);setTotal(data.total);}}catch(e){if(ticket===sequence.current)throw e;}}
+ useEffect(()=>{if(view!=='inquiries')return;let active=true;setRows([]);setLoading(true);run(load).finally(()=>{if(active)setLoading(false);});return()=>{active=false;sequence.current++;};},[view,status,search,product,page,token,followUp,inquiryId]);
  useEffect(()=>{const timer=setTimeout(()=>{if(searchDraft!==search){setSearch(searchDraft);setPage(1);}},350);return()=>clearTimeout(timer);},[searchDraft]);
  useEffect(()=>{let active=true;if(view==='inquiries'||view==='categories')marketplaceControlRequest('products',token).then(data=>{if(active)setInquiryProducts(data.products);}).catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to load products.');});return()=>{active=false;};},[view,token,products]);
  async function categorySave(c:ManagedCategory,body:unknown){await marketplaceControlRequest(`categories/${encodeURIComponent(c.slug)}`,token,'PATCH',body);onCategoriesChanged();onChanged();}
@@ -35,7 +40,9 @@ export function MarketplaceControlPanels({token,view,categories,onCategoriesChan
  </AdminPanel>;
 
  return <AdminPanel title="Customer inquiries" description="Questions and quote requests from product pages. Contact the customer, then mark where the conversation stands." actions={<AdminButton disabled={busy} onClick={()=>run(load)}>Refresh inquiries</AdminButton>}>
-  <div role="group" aria-label="Filter inquiries by status" className="mb-3 flex flex-wrap gap-1.5">{STATUS_FILTERS.map(f=><button key={f.id||'all'} type="button" aria-pressed={status===f.id} onClick={()=>{setStatus(f.id);setPage(1);}} className={`min-h-9 rounded-full border px-3 text-xs font-semibold ${status===f.id?'border-[#00c365]/60 bg-[#00c365]/10 text-[#7dffbf]':'border-slate-700 text-slate-300 hover:border-slate-500'}`}>{f.label}</button>)}</div>
+  <div role="group" aria-label="Filter inquiries by status" className="mb-3 flex flex-wrap gap-1.5">{STATUS_FILTERS.map(f=><button key={f.id||'all'} type="button" aria-pressed={status===f.id} onClick={()=>{setStatus(f.id);setFollowUp('');setInquiryId('');setPage(1);}} className={`min-h-9 rounded-full border px-3 text-xs font-semibold ${status===f.id?'border-[#00c365]/60 bg-[#00c365]/10 text-[#7dffbf]':'border-slate-700 text-slate-300 hover:border-slate-500'}`}>{f.label}</button>)}</div>
+  {notice&&<p role="status" className="my-2 text-sm text-emerald-300">{notice}</p>}
+  <label className={adminLabel}>Follow-up view<select aria-label="Marketplace follow-up filter" className={field} value={followUp} onChange={e=>{setFollowUp(e.target.value);setStatus('');setInquiryId('');setPage(1);}}><option value="">All dates</option><option value="due">Due today</option><option value="overdue">Overdue</option><option value="recent">Updated in last 7 days</option></select></label>
   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
    <label className={adminLabel}><span className="text-xs">Search inquiries</span><input type="search" className={field} maxLength={200} value={searchDraft} placeholder="Name, phone, product or message" onChange={e=>setSearchDraft(e.target.value)} /></label>
    <label className={adminLabel}><span className="text-xs">Product</span><select className={field} value={product} onChange={e=>{setProduct(e.target.value);setPage(1);}}><option value="">All products</option>{inquiryProducts.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
@@ -43,7 +50,7 @@ export function MarketplaceControlPanels({token,view,categories,onCategoriesChan
   {error&&<p role="alert" className="mt-3 text-sm text-rose-300">{error}</p>}
   <div className="mt-4 space-y-3">
    {loading&&!rows.length?<AdminLoading label="Loading inquiries…"/>:!rows.length?<AdminEmpty title={status==='new'?'No new inquiries':'No inquiries match these filters'}>{status==='new'?'You are up to date. New questions from product pages land here.':'Try another status or clear the search.'}</AdminEmpty>:
-   rows.map(row=><InquiryRow key={`${row.id}-${row.updated_at}`} row={row} busy={busy} save={body=>run(async()=>{await marketplaceControlRequest(`inquiries/${row.id}`,token,'PATCH',body);await load();onChanged();})} />)}
+   rows.map(row=><InquiryRow key={`${token}-${row.id}-${row.workflow_version||0}`} row={row} token={token} onReload={()=>run(load)} onSaved={()=>{setNotice('Follow-up saved.');void run(load);onChanged();}} />)}
   </div>
   <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-400"><AdminButton disabled={page===1||busy} onClick={()=>setPage(page-1)}>Previous</AdminButton><span>Page {page} · {total} inquir{total===1?'y':'ies'}</span><AdminButton disabled={page*10>=total||busy} onClick={()=>setPage(page+1)}>Next</AdminButton></div>
  </AdminPanel>;
@@ -73,7 +80,7 @@ function CategoryRow({category:c,live,busy,save}:{category:ManagedCategory;live:
   {confirm&&<ConfirmAction title={`Hide "${c.label}"?`} summary="Hide this category filter? Live products retain their category and stay accessible." confirmLabel="Deactivate category" busy={busy} onClose={()=>setConfirm(false)} onConfirm={()=>{setConfirm(false);save({active:false});}}/>}
  </form>;
 }
-function InquiryRow({row,busy,save}:{row:MarketplaceInquiry;busy:boolean;save:(body:unknown)=>void}) {
+function InquiryRow({row,token,onSaved,onReload}:{row:MarketplaceInquiry;token:string;onSaved:()=>void;onReload:()=>void}) {
  const [note,setNote]=useState(row.admin_note||'');const link=whatsappLink(row.customer_phone);const state=INQUIRY_STATUS[row.status]||{label:row.status,tone:'neutral' as AdminTone};
  const transitions=row.status==='new'?['contacted','resolved','closed']:row.status==='contacted'?['resolved','closed']:['new'];
  return <article className={`min-w-0 space-y-3 break-words rounded-2xl border p-4 text-sm ${row.status==='new'?'border-amber-500/30 bg-amber-500/[0.04]':'border-slate-800 bg-[#0b1116]'}`}>
@@ -86,8 +93,7 @@ function InquiryRow({row,busy,save}:{row:MarketplaceInquiry;busy:boolean;save:(b
    {!row.customer_phone&&!row.customer_email&&<AdminNotice tone="warning">No phone or email was supplied, so this customer cannot be contacted from here.</AdminNotice>}
   </div>
   <p className="text-xs text-slate-500">Received {new Date(row.created_at).toLocaleString()} · Updated {new Date(row.updated_at).toLocaleString()}{row.contacted_at&&` · First contacted ${new Date(row.contacted_at).toLocaleString()}`}</p>
-  <details className="group" open={Boolean(row.admin_note)}><summary className="cursor-pointer text-xs font-semibold text-slate-300">Internal note</summary><label className="mt-2 block"><span className="sr-only">Internal note</span><textarea className={`${field} min-h-20`} maxLength={1000} value={note} placeholder="What was agreed, price quoted, next follow-up…" onChange={e=>setNote(e.target.value)} /></label><AdminButton className="mt-2" disabled={busy||note===(row.admin_note||'')} onClick={()=>save({adminNote:note})}>Save note</AdminButton></details>
-  <div className="flex flex-wrap gap-2 border-t border-slate-800 pt-3">{transitions.map(s=><AdminButton key={s} variant={s==='contacted'||s==='resolved'?'secondary':'ghost'} disabled={busy} onClick={()=>save({status:s,adminNote:note})}>{s==='new'?'Reopen':s==='closed'?'Close':s==='contacted'?'Mark contacted':'Mark resolved'}</AdminButton>)}</div>
+  <LeadWorkflowEditor token={token} source="marketplace" id={row.id} auditId={row.id} value={readLeadWorkflow('marketplace',row)} onSaved={onSaved} onReload={onReload}/>
  </article>;
 }
 

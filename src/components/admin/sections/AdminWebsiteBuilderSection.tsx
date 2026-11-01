@@ -18,7 +18,7 @@ export function AdminWebsiteBuilderSection({sessionToken,initialView}:{sessionTo
   const [reveal,setReveal]=useState(0);
   const data=loaded?.token===sessionToken&&loaded.range===range?loaded.data:null;
   const listReady=Boolean(data&&loaded?.key===key);
-  const [view,setView]=useState<BuilderView>(initialView==='enquiries'||initialView==='reseller'?initialView:'websites');
+  const [view,setView]=useState<BuilderView>(initialView?.split('/')[0]==='enquiries'?'enquiries':initialView==='reseller'?'reseller':'websites');
   useEffect(()=>setSelected(null),[sessionToken]);
   useEffect(()=>{
     if(view!=='websites')return;
@@ -44,7 +44,7 @@ export function AdminWebsiteBuilderSection({sessionToken,initialView}:{sessionTo
   return <section className="space-y-5 text-left min-w-0">
     <AdminPageHeader title="Website Builder" description="Customer websites, Ultra launch enquiries and reseller storefront settings."/>
     <AdminTabs label="Website Builder views" value={view} onChange={setView} tabs={[{id:'websites',label:'Websites',count:data?.metrics.total??null},{id:'enquiries',label:'Ultra enquiries'},{id:'reseller',label:'Reseller settings'}]}/>
-    {view==='enquiries'&&<AdminUltraEnquiries token={sessionToken} />}
+    {view==='enquiries'&&<AdminUltraEnquiries initialFilter={initialView?.split('/').slice(1).join('/')||''} token={sessionToken} />}
     {view==='reseller'&&<AdminResellerControls token={sessionToken} defaultOpen/>}
     {view==='websites'&&<>
     <div className="flex flex-wrap gap-2"><input aria-label="Search websites" placeholder="Name, owner, slug or site ID" value={search} onChange={e=>filter('search',e.target.value)} maxLength={100} className="min-h-11 basis-full sm:basis-56 p-2 rounded-xl bg-slate-900 border border-slate-700 min-w-0 flex-1" /><select aria-label="Website date range" value={range} onChange={e=>filter('range',e.target.value)} className="min-h-11 p-2 rounded-xl bg-slate-900 border border-slate-700">{['7','30','90','all'].map(r=><option key={r} value={r}>{r==='all'?'All time':`${r} days`}</option>)}</select><select aria-label="Website status" value={status} onChange={e=>filter('status',e.target.value)} className="min-h-11 p-2 rounded-xl bg-slate-900 border border-slate-700"><option value="">All statuses</option><option value="draft">Draft</option><option value="published">Published</option></select><select aria-label="Website template" value={template} onChange={e=>filter('template',e.target.value)} className="min-h-11 p-2 rounded-xl bg-slate-900 border border-slate-700 max-w-full"><option value="">All templates</option>{WEBSITE_TEMPLATES.map(t=><option key={t.id} value={t.id}>{t.title}</option>)}</select><AdminButton busy={loading} onClick={()=>{setNotice('Refreshing website records…');setRefresh(n=>n+1);}}>Refresh</AdminButton></div>

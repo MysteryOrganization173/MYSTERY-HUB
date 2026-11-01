@@ -10,6 +10,9 @@ import { adminFinanceRouter } from './financeApi.js';
 import { AfaService } from '../services/afaService.js';
 import { adminMarketplaceRouter } from './adminMarketplaceApi.js';
 import { WebsiteUltraStore } from '../db/websiteUltraStore.js';
+import {LeadOperationsStore} from '../db/leadOperationsStore.js';
+import {LeadError} from '../services/leadWorkflow.js';
+import {MarketplaceControlStore} from '../db/marketplaceControlStore.js';
 import { adminWebsiteRouter } from './websiteFreeApi.js';
 /**
  * Production Admin V1 API Routes
@@ -47,6 +50,14 @@ adminRouter.use((_req,res,next)=>{res.setHeader('Cache-Control','no-store');next
 
 // Apply strict admin authentication and authorization to all admin routes
 adminRouter.use(requireAdmin);
+adminRouter.get('/leads',async(_req,res)=>{try{res.json({success:true,data:await LeadOperationsStore.summary()});}catch{res.status(503).json({error:'Lead counts unavailable. Retry shortly.'});}});
+adminRouter.patch('/leads/marketplace/:id',async(req,res)=>{if(!/^inq_[a-zA-Z0-9_-]{1,64}$/.test(req.params.id)){res.status(400).json({error:'Invalid enquiry.'});return;}try{res.json({success:true,inquiry:await MarketplaceControlStore.updateInquiry(req.params.id,req.body,req.user!.id)});}catch(e){res.status(e instanceof LeadError?e.status:503).json({error:e instanceof LeadError?e.message:'Could not save follow-up. Reload before retrying.'});}});
+adminRouter.get('/leads/:source/:id/history',async(req,res)=>{if(!['ultra','marketplace'].includes(req.params.source)||!/^[a-zA-Z0-9_-]{1,80}$/.test(req.params.id)){res.status(400).json({error:'Invalid lead.'});return;}try{res.json({success:true,history:await LeadOperationsStore.history(req.params.source as 'ultra'|'marketplace',req.params.id)});}catch{res.status(503).json({error:'History unavailable.'});}});
+adminRouter.patch('/websites/ultra-enquiries/:reference',async(req,res)=>{
+ if(!/^MH-ULTRA-[A-Z0-9]{8}$/.test(req.params.reference)){res.status(400).json({error:'Invalid enquiry reference.'});return;}
+ try{const enquiry=await WebsiteUltraStore.updateWorkflow(req.params.reference,req.body,req.user!.id);if(!enquiry){res.status(404).json({error:'Enquiry not found.'});return;}res.json({success:true,enquiry});}
+ catch(e){res.status(e instanceof LeadError?e.status:503).json({error:e instanceof LeadError?e.message:'Could not save follow-up. Reload before retrying.'});}
+});
 adminRouter.get('/sales-reliability',async(_req,res)=>{
   res.json({success:true,data:await salesCollector.view()});
 });
@@ -59,12 +70,13 @@ adminRouter.use(adminAccountRouter);
 adminRouter.use('/marketplace', adminMarketplaceRouter);
 adminRouter.use('/referrals', adminEarnRouter);
 adminRouter.get('/websites/ultra-enquiries', async (req, res) => {
+  if(Object.keys(req.query).some(k=>!['limit','offset','search','filter'].includes(k)||typeof req.query[k]!=='string')){res.status(400).json({error:'Invalid enquiry filters.'});return;}
   const limit = Number(req.query.limit ?? 25), offset = Number(req.query.offset ?? 0);
   if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0 || offset > 100000) { res.status(400).json({ error: 'Invalid pagination.' }); return; }
   const search = req.query.search ?? '';
   if (typeof search !== 'string' || search.length > 100) { res.status(400).json({ error: 'Invalid enquiry search.' }); return; }
-  try { res.json({ success: true, ...(await WebsiteUltraStore.list(limit, offset, search.trim())), limit, offset }); }
-  catch { res.status(503).json({ error: 'Could not retrieve enquiries.' }); }
+  try { res.json({ success: true, ...(await WebsiteUltraStore.list(limit, offset, search.trim(),req.query.filter as string??'')), limit, offset }); }
+  catch(e) { if(e instanceof LeadError){res.status(e.status).json({error:e.message});return;}res.status(503).json({ error: 'Could not retrieve enquiries.' }); }
 });
 adminRouter.get('/websites/ultra-enquiries/:reference', async (req, res) => {
   if (!/^MH-ULTRA-[A-Z0-9]{8}$/.test(req.params.reference)) { res.status(400).json({ error: 'Invalid enquiry reference.' }); return; }

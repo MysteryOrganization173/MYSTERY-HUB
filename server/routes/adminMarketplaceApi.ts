@@ -7,10 +7,11 @@ import { toAdminMarketplaceProduct } from '../types/marketplace.js';
 import { MarketplaceAssetStore, marketplaceImageMaxBytes } from '../db/marketplaceAssetStore.js';
 import { cloudinaryConfigured } from '../services/websiteCloudinary.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
+import {LeadError} from '../services/leadWorkflow.js';
 // Mounted after requireAdmin on adminRouter; none of these routes are public.
 export const adminMarketplaceRouter = Router();
 const handle = (action: (req:Request,res:Response)=>Promise<void>) => async (req:Request,res:Response) => {
-  try { await action(req,res); } catch (e) { res.status(e instanceof MarketplaceInputError ? e.status : 500).json({error:e instanceof MarketplaceInputError ? e.message : 'Marketplace operation failed.'}); }
+  try { await action(req,res); } catch (e) { res.status(e instanceof MarketplaceInputError||e instanceof LeadError ? e.status : 500).json({error:e instanceof MarketplaceInputError||e instanceof LeadError ? e.message : 'Marketplace operation failed.'}); }
 };
 async function adminProducts() {
   const categories = await MarketplaceControlStore.getCategories();
@@ -66,5 +67,9 @@ for (const action of ['publish','unpublish','feature','unfeature','archive','res
 adminMarketplaceRouter.get('/categories',handle(async(_req,res)=>{res.json({success:true,categories:await MarketplaceControlStore.getCategories()});}));
 adminMarketplaceRouter.post('/categories',handle(async(req,res)=>{res.status(201).json({success:true,category:await MarketplaceControlStore.saveCategory(req.body || {},req.user!.id)});}));
 adminMarketplaceRouter.patch('/categories/:slug',handle(async(req,res)=>{res.json({success:true,category:await MarketplaceControlStore.saveCategory(req.body || {},req.user!.id,req.params.slug)});}));
-adminMarketplaceRouter.get('/inquiries',handle(async(req,res)=>{res.json({success:true,...await MarketplaceControlStore.listInquiries({status:typeof req.query.status==='string'?req.query.status:undefined,productId:typeof req.query.productId==='string'?req.query.productId:undefined,search:typeof req.query.search==='string'?req.query.search:undefined,page:req.query.page?Number(req.query.page):1,pageSize:req.query.pageSize?Number(req.query.pageSize):20})});}));
+adminMarketplaceRouter.get('/inquiries',handle(async(req,res)=>{
+ const allowed=['status','productId','search','page','pageSize','followUp','inquiryId'];
+ if(Object.keys(req.query).some(k=>!allowed.includes(k)||typeof req.query[k]!=='string')||String(req.query.search||'').length>200||String(req.query.productId||'').length>64||req.query.inquiryId&&!/^inq_[a-zA-Z0-9_-]{1,64}$/.test(String(req.query.inquiryId)))throw new MarketplaceInputError('Invalid inquiry filters.');
+ res.json({success:true,...await MarketplaceControlStore.listInquiries({followUp:req.query.followUp as string,inquiryId:req.query.inquiryId as string,status:req.query.status as string,productId:req.query.productId as string,search:req.query.search as string,page:req.query.page?Number(req.query.page):1,pageSize:req.query.pageSize?Number(req.query.pageSize):20})});
+}));
 adminMarketplaceRouter.patch('/inquiries/:id',handle(async(req,res)=>{res.json({success:true,inquiry:await MarketplaceControlStore.updateInquiry(req.params.id,req.body || {},req.user!.id)});}));

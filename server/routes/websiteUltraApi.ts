@@ -9,6 +9,7 @@ export function ultraWhatsAppUrl(record: UltraEnquiryRecord): string {
   return `${BUSINESS_CONFIG.contact.supportWhatsAppUrl}?text=${encodeURIComponent(message)}`;
 }
 export const ultraRouter = Router();
+ultraRouter.use((_req,res,next)=>{res.setHeader('Cache-Control','no-store');next();});
 const limiter = createRateLimiter({ windowMs: 600_000, max: 10, key: req => req.ip || req.socket.remoteAddress || 'unknown' });
 // Guests are welcome. An invalid supplied session must not silently become an anonymous lead.
 ultraRouter.post('/enquiries', limiter, optionalAuth, async (req, res) => {

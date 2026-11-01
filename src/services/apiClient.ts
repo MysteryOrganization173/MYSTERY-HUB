@@ -1280,8 +1280,8 @@ export async function getAdminWebsiteInspection(token:string,id:string,signal?:A
   if(result.site?.id!==id)throw Error('Website inspection could not be verified. Please retry.');
   return result.site;
 }
-export function getAdminUltraEnquiries(token: string, search: string, offset: number) {
-  return websiteFreeRequest<{success:true; enquiries:import('../../server/db/websiteUltraStore').UltraEnquiryRecord[]; total:number; limit:number; offset:number}>(`admin/websites/ultra-enquiries?${new URLSearchParams({search,offset:String(offset),limit:'25'})}`, token);
+export function getAdminUltraEnquiries(token: string, search: string, offset: number,filter='') {
+  return websiteFreeRequest<{success:true; enquiries:import('../../server/db/websiteUltraStore').UltraEnquiryRecord[]; total:number; limit:number; offset:number}>(`admin/websites/ultra-enquiries?${new URLSearchParams({search,offset:String(offset),limit:'25',filter})}`, token);
 }
 export function getAdminUltraEnquiry(token: string, reference: string) {
   return websiteFreeRequest<{success:true; enquiry:import('../../server/db/websiteUltraStore').UltraEnquiryRecord}>(`admin/websites/ultra-enquiries/${encodeURIComponent(reference)}`, token);
