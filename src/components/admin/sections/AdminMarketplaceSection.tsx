@@ -60,7 +60,7 @@ const MARKETPLACE_VIEWS: MarketplaceView[] = ['products', 'inquiries', 'categori
 
 export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = ({ sessionToken, initialView, onChanged }) => {
   const { showToast } = useApp();
-  const [view, setView] = useState<MarketplaceView>(MARKETPLACE_VIEWS.includes(initialView as MarketplaceView) ? initialView as MarketplaceView : 'products');
+  const [view, setView] = useState<MarketplaceView>(MARKETPLACE_VIEWS.includes(initialView?.split('/')[0] as MarketplaceView) ? initialView!.split('/')[0] as MarketplaceView : 'products');
   const changeView = (next: MarketplaceView) => {
     setView(next);
     if (typeof window !== 'undefined') window.history.replaceState(null, '', `#marketplace${next === 'products' ? '' : `/${next}`}`);
@@ -420,7 +420,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
       )}
       </>}
 
-      {view!=='products'&&<MarketplaceControlPanels token={sessionToken} view={view} categories={categories} onCategoriesChanged={loadCategories} products={products} onChanged={()=>{void fetchProducts();onChanged?.();}} onEditProduct={openEditModal} />}
+      {view!=='products'&&<MarketplaceControlPanels initialFilter={initialView?.split('/').slice(1).join('/')||'new'} token={sessionToken} view={view} categories={categories} onCategoriesChanged={loadCategories} products={products} onChanged={()=>{void fetchProducts();onChanged?.();}} onEditProduct={openEditModal} />}
       {preview&&<MarketplaceProductDetailModal product={preview} onClose={()=>setPreview(null)} onBuyNow={()=>showToast('Internal draft preview: purchasing is disabled.','info')} onInquire={()=>showToast('Internal draft preview.','info')} onShare={()=>showToast('Drafts cannot be shared publicly.','info')} formatGhcReward={n=>'GH₵'+(n ?? 0).toFixed(2)} />}
       {publishWarnings && (
         <ConfirmAction

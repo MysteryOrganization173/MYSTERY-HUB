@@ -13,6 +13,7 @@ import { FINANCE_SCHEMA } from './financeSchema.js';
 import { AFA_SCHEMA } from './afaSchema.js';
 import { MARKETPLACE_FLEXIBILITY_SCHEMA } from './marketplaceFlexibilitySchema.js';
 import { ULTRA_ENQUIRY_SCHEMA } from './websiteUltraSchema.js';
+import {LEAD_OPERATIONS_SCHEMA} from './leadOperationsSchema.js';
 import { MARKETPLACE_ASSET_SCHEMA } from './marketplaceAssetSchema.js';
 import { BACKEND_RLS_SCHEMA } from './backendRlsSchema.js';
 import { SALES_RELIABILITY_SCHEMA } from './salesReliabilitySchema.js';
@@ -388,6 +389,7 @@ export async function initDatabase(): Promise<void> {
     baseTables.push({ name: 'website_free_media_analytics', sql: WEBSITE_FREE_SCHEMA });
     baseTables.push({name:'growth_analytics_indexes_access',sql:GROWTH_ANALYTICS_SCHEMA});
     baseTables.push({ name: 'website_ultra_enquiries', sql: ULTRA_ENQUIRY_SCHEMA });
+    baseTables.push({name:'lead_operations',sql:LEAD_OPERATIONS_SCHEMA});
     baseTables.push({ name: 'marketplace_assets', sql: MARKETPLACE_ASSET_SCHEMA });
     for (const table of baseTables) {
       try {

@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { getPool } from './connection.js';
 import { AdminAuditStore } from './adminAuditStore.js';
 import { CATEGORY_LABELS } from '../types/marketplace.js';
+import {saveLead} from '../services/leadWorkflow.js';
+import {leadFilter} from './leadOperationsStore.js';
 
 export class MarketplaceInputError extends Error { constructor(message: string, public status = 400) { super(message); } }
 export interface MarketplaceCategoryRecord { slug: string; label: string; active: boolean; sort_order: number; created_at: string; updated_at: string; }
@@ -10,7 +12,7 @@ export interface MarketplaceInquiryRecord {
   id: string; product_id?: string | null; product_name: string; customer_name?: string | null;
   customer_phone?: string | null; customer_email?: string | null; inquiry_type: string;
   message?: string | null; budget?: string | null; status: string; admin_note?: string | null;
-  created_at: string; updated_at: string; contacted_at?: string | null;
+  created_at: string; updated_at: string; contacted_at?: string | null;workflow_version?:number;follow_up_on?:string|null;lead_updated_by?:string|null;
 }
 const categories = new Map<string, MarketplaceCategoryRecord>();
 const inquiries = new Map<string, MarketplaceInquiryRecord>();
@@ -71,41 +73,30 @@ export class MarketplaceControlStore {
     else inquiries.set(record.id,record);
     return {id:record.id,createdAt:now};
   }
-  static async listInquiries(filters: { status?: string; productId?: string; search?: string; page?: number; pageSize?: number } = {}) {
+  static async listInquiries(filters: { status?: string; productId?: string; search?: string; page?: number; pageSize?: number;followUp?:string;inquiryId?:string } = {}) {
+    const followUp=leadFilter('marketplace',filters.followUp||'');
     if (filters.status && !['new','contacted','resolved','closed'].includes(filters.status)) throw new MarketplaceInputError('Invalid inquiry status.');
     const page = filters.page ?? 1; const pageSize = filters.pageSize ?? 20;
     if (!Number.isSafeInteger(page) || page < 1 || page > 100000 || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100) throw new MarketplaceInputError('Invalid pagination.');
     const pool = getPool(); let rows: MarketplaceInquiryRecord[]; let total: number;
     if (pool) {
-      const values: unknown[] = []; const clauses: string[] = [];
+      const values: unknown[] = []; const clauses: string[] = [followUp];
+      if(filters.inquiryId){values.push(filters.inquiryId);clauses.push(`id=$${values.length}`);}
       if (filters.status) { values.push(filters.status); clauses.push(`status=$${values.length}`); }
       if (filters.productId) { values.push(filters.productId); clauses.push(`product_id=$${values.length}`); }
-      if (filters.search) { values.push(`%${filters.search.slice(0,200)}%`); clauses.push(`(product_name ILIKE $${values.length} OR customer_name ILIKE $${values.length} OR customer_phone ILIKE $${values.length} OR customer_email ILIKE $${values.length} OR message ILIKE $${values.length})`); }
+      if (filters.search) { values.push(`%${filters.search.slice(0,200).replace(/[\\%_]/g,'\\$&')}%`); clauses.push(`(product_name ILIKE $${values.length} OR customer_name ILIKE $${values.length} OR customer_phone ILIKE $${values.length} OR customer_email ILIKE $${values.length} OR message ILIKE $${values.length})`); }
       const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
       total = Number((await pool.query(`SELECT COUNT(*) AS total FROM marketplace_inquiries ${where}`,values)).rows[0].total);
       rows = (await pool.query(`SELECT * FROM marketplace_inquiries ${where} ORDER BY created_at DESC,id LIMIT $${values.length+1} OFFSET $${values.length+2}`, [...values,pageSize,(page-1)*pageSize])).rows;
     } else {
       rows = [...inquiries.values()].filter(r => (!filters.status || r.status === filters.status) && (!filters.productId || r.product_id === filters.productId) && (!filters.search || [r.product_name,r.customer_name,r.customer_phone,r.customer_email,r.message].join(' ').toLowerCase().includes(filters.search.toLowerCase()))).sort((a,b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id));
+      const {followUpState}=await import('../../shared/leadOperations.js');rows=rows.filter(r=>(!filters.inquiryId||r.id===filters.inquiryId)&&(!filters.followUp||(['due','overdue'].includes(filters.followUp)?followUpState(r.follow_up_on||null,r.status)===filters.followUp:filters.followUp==='recent'?Boolean(r.workflow_version&&Date.parse(r.updated_at)>=Date.now()-7*86400000):r.status===filters.followUp)));
       total = rows.length; rows = rows.slice((page-1)*pageSize,page*pageSize);
     }
     return { inquiries: rows, total, page, pageSize };
   }
   static async updateInquiry(id: string, input: Record<string, unknown>, adminId: string) {
-    const status = input.status;
-    if (status !== undefined && (typeof status !== 'string' || !['new','contacted','resolved','closed'].includes(status))) throw new MarketplaceInputError('Invalid inquiry status.');
-    const note = input.adminNote !== undefined ? plainText(input.adminNote,'Admin note',1000) : undefined;
-    const pool = getPool(); let record: MarketplaceInquiryRecord;
-    if (pool) {
-      const result = await pool.query(`UPDATE marketplace_inquiries SET status=COALESCE($2,status), admin_note=CASE WHEN $3 THEN $4 ELSE admin_note END, updated_at=NOW(), contacted_at=CASE WHEN $2='contacted' THEN COALESCE(contacted_at,NOW()) ELSE contacted_at END WHERE id=$1 RETURNING *`,[id,status ?? null,note !== undefined,note ?? null]);
-      record = result.rows[0];
-    } else {
-      const existing = inquiries.get(id); if (!existing) throw new MarketplaceInputError('Inquiry not found.',404);
-      record = {...existing,status:status === undefined ? existing.status : String(status),admin_note:note ?? existing.admin_note,updated_at:new Date().toISOString(),contacted_at:status === 'contacted' ? existing.contacted_at || new Date().toISOString() : existing.contacted_at};
-      inquiries.set(id,record);
-    }
-    if (!record) throw new MarketplaceInputError('Inquiry not found.',404);
-    await AdminAuditStore.record({adminUserId:adminId,action:'marketplace_inquiry_updated',entityType:'marketplace_inquiry',entityId:id,metadata:{status:record.status,noteChanged:note !== undefined}});
-    return record;
+    return saveLead('marketplace',id,input,adminId,{read:()=>structuredClone(inquiries.get(id)),write:row=>inquiries.set(id,row)});
   }
   static resetMemory() { categories.clear(); inquiries.clear(); }
 }

@@ -15,6 +15,9 @@ import { AdminSystemSection } from './sections/AdminSystemSection';
 import { AdminMysteryEarnSection } from './sections/AdminMysteryEarnSection';
 import { AdminNotificationsSection } from './sections/AdminNotificationsSection';
 import {AdminAnalyticsSection} from './sections/AdminAnalyticsSection';
+import {useLeadAlerts} from './leadAlerts';
+import {AdminLeadSummary} from './sections/AdminLeadSummary';
+import {leadDestination} from '../../../shared/leadOperations';
 import { BrandLogo } from '../common/BrandLogo';
 import { useAdminSignals } from './adminSignals';
 import {
@@ -161,9 +164,11 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
     orderViews.current.set(param, view);
   }, [param]);
   const signals = useAdminSignals(token, signalRefresh);
+  const leads=useLeadAlerts(token);
   const badges: Partial<Record<AdminTab, { count: number | null; tone: 'warning' | 'danger' | 'info'; label: string }>> = {
     orders: signals.ordersAttention ? { count: signals.ordersAttention, tone: 'warning', label: `${signals.ordersAttention} orders need attention` } : undefined,
-    marketplace: signals.newInquiries ? { count: signals.newInquiries, tone: 'info', label: `${signals.newInquiries} new inquiries` } : undefined,
+    marketplace: leads.data?.marketplace.new ? { count: leads.data.marketplace.new, tone: 'info', label: `${leads.data.marketplace.new} new Marketplace enquiries` } : undefined,
+    websites:leads.data?.ultra.new?{count:leads.data.ultra.new,tone:'info',label:`${leads.data.ultra.new} new Ultra enquiries`}:undefined,
     finance: signals.pendingWithdrawals ? { count: signals.pendingWithdrawals, tone: 'warning', label: `${signals.pendingWithdrawals} withdrawal requests waiting` } : undefined,
     system: signals.supplierAlert ? { count: null, tone: 'danger', label: 'Supplier needs attention' } : undefined,
   };
@@ -176,7 +181,7 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
     const active = activeTab === tab;
     const badge = badges[tab];
     return (
-      <button key={tab} type="button" onClick={() => navigate(tab)} aria-current={active ? 'page' : undefined}
+      <button key={tab} type="button" onClick={() => navigate(tab,tab==='websites'&&badges.websites?'enquiries/new':tab==='marketplace'&&badges.marketplace?'inquiries/new':'')} aria-current={active ? 'page' : undefined}
         className={`group relative flex w-full min-h-11 items-center gap-3 rounded-xl px-3 text-left text-sm font-medium transition-colors ${active ? 'bg-[#00c365]/12 text-white' : 'text-slate-400 hover:bg-slate-800/60 hover:text-white'}`}>
         {active && <span className="absolute inset-y-2 left-0 w-1 rounded-full bg-[#00c365]" aria-hidden />}
         <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-[#00c365]' : 'text-slate-500 group-hover:text-slate-300'}`} />
@@ -250,6 +255,8 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
         )}
 
         <main className="min-w-0 flex-1">
+          {leads.fresh.length>0&&<div role="status" className="mb-4 rounded-xl border border-sky-700 bg-sky-950/30 p-3 text-sm"><p>New enquiries received while Admin was open.</p>{leads.fresh.map(row=><button key={row.source+row.id} className="mr-3 min-h-11 text-sky-200" onClick={()=>{const d=leadDestination(row.source,row.reference);navigate(d.tab as AdminTab,d.param);}}>{row.source==='ultra'?'Ultra':'Marketplace'} · open enquiry</button>)}<button className="min-h-11 text-slate-400" onClick={leads.dismiss}>Dismiss alert</button></div>}
+          {activeTab==='overview'&&<div className="mb-5"><AdminLeadSummary state={leads} navigate={navigate}/></div>}
           {activeTab==='commercial'&&<AdminCommercialSection token={token}/>}
           {activeTab==='finance'&&<AdminFinanceSection sessionToken={token} initialView={param} onOpenCustomer={id=>navigate('customers',id)} onChanged={onSignalsChanged}/>}
           {activeTab === 'earn' && <AdminMysteryEarnSection sessionToken={token} initialReferrerId={param||null} onOpenCustomer={id => navigate('customers', id)} />}
@@ -264,7 +271,7 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
             <AdminOrdersSection key={param} sessionToken={token} initialStatusFilter={param.startsWith('ref/')?'':param.replace(/\/today$/,'')} initialReference={param.startsWith('ref/')?param.slice(4):undefined} initialCreatedToday={!param.startsWith('ref/')&&param.endsWith('/today')} initialView={orderViews.current.get(param)} onViewChange={rememberOrders} onChanged={onSignalsChanged} />
           )}
           {activeTab === 'marketplace' && (
-            <AdminMarketplaceSection sessionToken={token} initialView={param} onChanged={onSignalsChanged} />
+            <AdminMarketplaceSection key={param} sessionToken={token} initialView={param} onChanged={onSignalsChanged} />
           )}
           {activeTab === 'notifications' && <AdminNotificationsSection key={token} sessionToken={token} initialView={param} onNavigate={view => navigate('notifications', view)} />}
           {activeTab === 'waitlist' && (
@@ -278,7 +285,7 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
               onOpenEarn={id => navigate('earn', id)}
             />
           )}
-          {activeTab === 'websites' && <AdminWebsiteBuilderSection sessionToken={token} initialView={param} />}
+          {activeTab === 'websites' && <AdminWebsiteBuilderSection key={param} sessionToken={token} initialView={param} />}
           {activeTab === 'analytics' && <AdminAnalyticsSection sessionToken={token}/>}
           {activeTab === 'system' && (
             <AdminSystemSection sessionToken={token} />
