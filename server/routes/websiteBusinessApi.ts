@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import {observeSalesRequest} from '../services/salesReliability.js';
 import { requireAuth, optionalAuth, requireAdmin } from '../middleware/authMiddleware.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
 import { FinanceError } from '../db/financeStore.js';
@@ -28,7 +29,7 @@ websiteBusinessRouter.put('/:id/bundles',requireAuth,sensitive,handler(req=>Busi
 websiteBusinessRouter.post('/:id/store-withdrawals',requireAuth,sensitive,handler(req=>Business.withdraw(req.params.id,req.user.id,req.body)));
 websiteBusinessRouter.get('/:id/store-orders/:reference',publicWrite,handler(req=>Business.publicOrder(req.params.id,req.params.reference)));
 websiteBusinessRouter.get('/:id/storefront',handler(req=>Business.catalog(req.params.id)));
-websiteBusinessRouter.post('/:id/store-checkout',optionalAuth,publicWrite,handler(req=>{
+websiteBusinessRouter.post('/:id/store-checkout',optionalAuth,publicWrite,observeSalesRequest('data'),handler(req=>{
   if(req.headers.authorization&&!req.user)throw new FinanceError('Invalid session.',401);
   return Business.initialize(req.params.id,req.body,req.user?.id);
 }));

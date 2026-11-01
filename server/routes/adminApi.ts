@@ -1,4 +1,5 @@
 import {orderManagementRouter} from './orderManagementApi.js';
+import {salesCollector} from '../services/salesReliability.js';
 import { OrderResolutionService } from '../services/orderResolutionService.js';
 import {adminOperationsRouter} from './adminOperationsApi.js';
 import {adminPeriod,financialReport,reportingOrders} from '../services/adminReporting.js';
@@ -46,6 +47,9 @@ adminRouter.use((_req,res,next)=>{res.setHeader('Cache-Control','no-store');next
 
 // Apply strict admin authentication and authorization to all admin routes
 adminRouter.use(requireAdmin);
+adminRouter.get('/sales-reliability',async(_req,res)=>{
+  res.json({success:true,data:await salesCollector.view()});
+});
 adminRouter.use('/order-management',orderManagementRouter);
 adminRouter.use('/operations',adminOperationsRouter);
 adminRouter.use('/finance', adminFinanceRouter);

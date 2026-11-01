@@ -542,6 +542,13 @@ export interface AdminSystemStatus {
   };
 }
 
+export async function getAdminSalesReliabilityOnServer(token:string):Promise<import('../../shared/salesReliability').SalesReliabilityView>{
+  const res=await fetch(`${API_BASE_URL}/api/admin/sales-reliability`,{headers:{Authorization:`Bearer ${token}`},cache:'no-store'});
+  const body=await res.json();
+  if(!res.ok||!body.success||!body.data)throw Error('Checkout reliability evidence could not be loaded.');
+  return body.data;
+}
+
 export async function getAdminOverviewOnServer(token: string): Promise<{ success: boolean; metrics: AdminOverviewMetrics }> {
   const url = `${API_BASE_URL}/api/admin/overview?readOnly=true`;
   const res = await fetch(url, {

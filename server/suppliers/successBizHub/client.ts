@@ -23,6 +23,7 @@ import {
 } from './types.js';
 
 import { createHash } from 'node:crypto';
+import { noteSupplierResponse, noteSupplierError, noteSalesFailure } from '../../services/salesReliability.js';
 
 interface CacheEntry<T> {
   data: T;
@@ -76,6 +77,8 @@ export class SuccessBizHubClient {
     } = {}
   ): Promise<T> {
     const method = options.method || 'GET';
+    const observed = method === 'GET' && ['/services','/catalog','/wallet','/instant-bundles'].includes(endpoint)
+      || method === 'POST' && endpoint === '/beneficiary-check';
     const identity = options.privateAfa ? `${this.getBaseUrl()}:${createHash('sha256').update(this.getApiKey()).digest('hex')}:` : '';
     const cacheKey = `${identity}${method}:${endpoint}:${options.cacheTtlMs || 0}`;
 
@@ -83,12 +86,14 @@ export class SuccessBizHubClient {
     if (method === 'GET' && !options.skipCache && options.cacheTtlMs) {
       const cached = this.cache.get(cacheKey);
       if (cached && cached.expiresAt > Date.now()) {
+        if (observed) noteSupplierResponse(endpoint, 'cache', cached.data, 200);
         return cached.data as T;
       }
     }
 
     const apiKey = this.getApiKey();
     if (!apiKey) {
+      if (observed) noteSalesFailure('application','configuration');
       throw new Error('Success Biz Hub API key is not configured.');
     }
 
@@ -97,6 +102,7 @@ export class SuccessBizHubClient {
     const controller = new AbortController();
     const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
+    let receivedHeaders = false;
     try {
       const headers: Record<string, string> = {
         'x-api-key': apiKey,
@@ -115,6 +121,7 @@ export class SuccessBizHubClient {
       }
 
       const res = await fetch(url, fetchOptions);
+      receivedHeaders = true;
 
       let responseJson: unknown = null;
       // fetch resolves at headers. Keep the deadline through body consumption too.
@@ -126,6 +133,7 @@ export class SuccessBizHubClient {
         // Raw non-JSON response
         responseJson = { status: 'error', message: text };
       }
+      if (observed) noteSupplierResponse(endpoint, 'network', responseJson, res.status);
 
       if (options.privateAfa && (!res.ok || (responseJson as { success?: boolean })?.success !== true)) {
         // AFA errors may echo identity fields. Never retain raw response/body/message.
@@ -156,6 +164,7 @@ export class SuccessBizHubClient {
       return responseJson as T;
     } catch (err: unknown) {
       clearTimeout(timeoutHandle);
+      if (observed) noteSupplierError(endpoint, err, receivedHeaders ? 'body' : 'headers');
       if (err instanceof Error && err.name === 'AbortError') {
         const timeoutErr = new Error(`Success Biz Hub request timed out after ${timeoutMs}ms.`);
         (timeoutErr as unknown as { isTimeout: boolean }).isTimeout = true;
