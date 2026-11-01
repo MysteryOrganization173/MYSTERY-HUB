@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {SalesReliabilityPanel} from './SalesReliabilityPanel';
+import type {SalesReliabilityView} from '../../../../shared/salesReliability';
 import { createAdminRequestScope } from '../../../utils/adminRequestScope';
 import {
   AdminSystemStatus,
   getAdminSystemOnServer,
+  getAdminSalesReliabilityOnServer,
   API_BASE_URL,
 } from '../../../services/apiClient';
 import { Server, Database, CreditCard, Radio, Sparkles, Zap, IdCard, History } from 'lucide-react';
@@ -45,9 +48,20 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
+  const [sales,setSales]=useState<SalesReliabilityView|null>(null);
+  const [salesError,setSalesError]=useState(false);
+  const [salesLoading,setSalesLoading]=useState(true);
   const scope = useRef(createAdminRequestScope()).current;
   scope.setContext(sessionToken);
   useEffect(() => () => scope.invalidate(), [scope, sessionToken]);
+  const fetchSales=useCallback(async()=>{
+    const current=scope.begin('sales');
+    try{const result=await getAdminSalesReliabilityOnServer(sessionToken);if(current()){setSales(result);setSalesError(false);}}
+    catch{if(current())setSalesError(true);}
+    finally{if(current())setSalesLoading(false);}
+  },[sessionToken]);
+  useEffect(()=>{setSales(null);setSalesLoading(true);void fetchSales();const timer=setInterval(()=>void fetchSales(),30_000);return()=>clearInterval(timer);},[fetchSales]);
+  const salesPanel=<SalesReliabilityPanel data={sales} error={salesError} loading={salesLoading}/>;
 
   const fetchSystemAndAudit = useCallback(async (isRefresh = false) => {
     const current = scope.begin('health');
@@ -87,8 +101,8 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
     fetchSystemAndAudit();
   }, [fetchSystemAndAudit]);
 
-  if (isLoading) return <div className="space-y-5"><AdminPageHeader title="System Health" /><AdminLoading label="Checking services…" /></div>;
-  if (!systemData) return <div className="space-y-5"><AdminPageHeader title="System Health" /><AdminError title="System diagnostics failed" message={error || 'Unable to communicate with the system diagnostic service.'} onRetry={() => fetchSystemAndAudit(true)} /></div>;
+  if (isLoading) return <div className="space-y-5"><AdminPageHeader title="System Health" />{salesPanel}<AdminLoading label="Checking services…" /></div>;
+  if (!systemData) return <div className="space-y-5"><AdminPageHeader title="System Health" />{salesPanel}<AdminError title="System diagnostics failed" message={error || 'Unable to communicate with the system diagnostic service.'} onRetry={() => fetchSystemAndAudit(true)} /></div>;
 
   const { components, environment, nodeVersion, uptimeSeconds } = systemData;
   const hours = Math.floor(uptimeSeconds / 3600);
@@ -121,7 +135,7 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
       tone: supplier.status === 'error' ? 'danger' : supplier.status !== 'connected' ? 'neutral' : supplier.isLowBalance ? 'warning' : 'success',
       verdict: supplier.status === 'error' ? 'Supplier API error' : supplier.status !== 'connected' ? 'Not configured' : supplier.isLowBalance ? 'Connected · wallet low' : 'Connected',
       checked: supplier.status === 'connected' ? 'The supplier balance endpoint answered this check.' : 'The supplier balance endpoint did not answer successfully.',
-      limits: 'A successful balance check does not mean every order was delivered. Delivery is confirmed per order from supplier status.',
+      limits: 'A balance response does not prove service discovery or checkout is working. Sales reliability is shown separately; delivery is confirmed per order.',
       detail: <>Wallet {supplier.walletBalanceGhc !== null ? <strong className="text-white">GH₵{supplier.walletBalanceGhc.toFixed(2)}</strong> : 'not available'} · warning below GH₵{supplier.lowBalanceThresholdGhc}</>,
     },
     {
@@ -147,11 +161,13 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
   return (
     <div className="space-y-5">
       {error && <AdminError title="Health refresh failed · showing last checked state" message={error} onRetry={() => fetchSystemAndAudit(true)} />}
-      <AdminPageHeader title="System Health" description="What the server checked just now, what each check proves, and the admin audit trail." actions={<><Freshness at={checkedAt} prefix="Checked" /><RefreshButton busy={isRefreshing} onClick={() => fetchSystemAndAudit(true)} label="Check again" /></>} />
+      <AdminPageHeader title="System Health" description="Checkout evidence, service checks and the admin audit trail." actions={<><Freshness at={checkedAt} prefix="Checked" /><RefreshButton busy={isRefreshing} onClick={() => {void fetchSystemAndAudit(true);void fetchSales();}} label="Check again" /></>} />
+
+      {salesPanel}
 
       {problems.length
         ? <AdminNotice tone={problems.some(row => row.tone === 'danger') ? 'danger' : 'warning'} title={`${problems.length} item${problems.length === 1 ? '' : 's'} to look at`}>{problems.map(row => `${row.name}: ${row.verdict}`).join(' · ')}</AdminNotice>
-        : <AdminNotice tone="success" title="Every check passed">These are configuration and connectivity checks. They do not replace checking individual orders.</AdminNotice>}
+        : <AdminNotice tone="success" title="Configuration and connectivity checks passed">Purchasing evidence is reported separately above. These checks do not prove checkout or delivery.</AdminNotice>}
 
       <AdminPanel title="Services">
         <ul className="divide-y divide-slate-800">

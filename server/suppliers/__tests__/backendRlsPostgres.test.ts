@@ -31,8 +31,8 @@ test('backend-only tables have RLS and no client privileges on native PostgreSQL
     assert.deepEqual(unsecured.rows,[],'Every application table must be explicitly protected; new tables require a security decision.');
     const tables=(await observer.query("SELECT n.nspname AS schema,c.relname AS name,(SELECT attname FROM pg_attribute WHERE attrelid=c.oid AND attnum>0 AND NOT attisdropped ORDER BY attnum LIMIT 1) AS column FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE (n.nspname='public' OR n.nspname LIKE 'mysteryhub_%') AND c.relkind='r' ORDER BY 1,2")).rows;
     const quote=(s:string)=>'"'+s.replaceAll('"','""')+'"';
-    await t.test('all 45 application tables are private and non-FORCE, with no permissive policies',async()=>{
-      assert.equal(tables.length,45);
+    await t.test('all 47 application tables are private and non-FORCE, with no permissive policies',async()=>{
+      assert.equal(tables.length,47);
       assert.deepEqual((await observer.query("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE (n.nspname='public' OR n.nspname LIKE 'mysteryhub_%') AND c.relkind='r' AND (NOT c.relrowsecurity OR c.relforcerowsecurity OR EXISTS(SELECT 1 FROM pg_policy p WHERE p.polrelid=c.oid))")).rows,[]);
     });
     await t.test('anonymous and authenticated roles cannot SELECT, INSERT, UPDATE, DELETE or TRUNCATE any application table',async()=>{

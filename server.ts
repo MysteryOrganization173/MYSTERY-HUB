@@ -2,6 +2,7 @@ import { corsMiddleware } from './server/middleware/cors.js';
 import express from 'express';
 import {notificationRouter,adminNotificationRouter} from './server/routes/notificationApi.js';
 import {startNotificationWorker} from './server/services/notificationWorker.js';
+import {startSalesReliabilityMonitor} from './server/services/salesReliability.js';
 import {growthAnalyticsRouter,adminGrowthAnalyticsRouter} from './server/routes/growthAnalyticsApi.js';
 import { loadApplicationEnvironment } from './server/utils/environment.js';
 import path from 'path';
@@ -90,6 +91,7 @@ async function startServer() {
   await bootstrapAdminAccount();
   const stopNotifications=startNotificationWorker();
   process.once('SIGTERM',stopNotifications);
+  process.once('SIGTERM',startSalesReliabilityMonitor());
   const isProd = process.env.NODE_ENV === 'production';
 
   if (!isProd) {

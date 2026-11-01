@@ -14,6 +14,7 @@ import { OrdersStore } from '../db/ordersStore.js';
 import { OrderRecord, OrderStatus } from '../types/orders.js';
 import { SuccessBizHubProvider } from '../suppliers/successBizHub/provider.js';
 import { SuccessBizHubClient } from '../suppliers/successBizHub/client.js';
+import {observeSalesPreflight,noteSalesFailure} from './salesReliability.js';
 
 export type PreflightErrorCode =
   | 'BENEFICIARY_NOT_ELIGIBLE'
@@ -58,6 +59,11 @@ export class FulfilmentService {
    * Executed before initializing a Paystack transaction when fulfillment is enabled.
    */
   static async preflightCheck(
+    network: string, bundleSize: string, recipientPhone: string
+  ): Promise<PreflightResult> {
+    return observeSalesPreflight('data',()=>this.preflightData(network,bundleSize,recipientPhone));
+  }
+  private static async preflightData(
     network: string,
     bundleSize: string,
     recipientPhone: string
@@ -70,6 +76,7 @@ export class FulfilmentService {
     }
 
     if (!this.provider.client.isConfigured()) {
+      noteSalesFailure('application','configuration',true);
       console.error('[Fulfilment Preflight] Fulfilment is enabled but SUCCESS_BIZ_HUB_API_KEY is not configured.');
       return {
         allowed: false,
@@ -100,6 +107,7 @@ export class FulfilmentService {
       const catalogMs = resolvedResult.ms;
 
       if (!servicesCheckResult.res.available) {
+        noteSalesFailure('services','service_unavailable',true);
         console.warn(`[Fulfilment Preflight] Services check failed: ${servicesCheckResult.res.reason}`);
         return {
           allowed: false,
@@ -160,6 +168,7 @@ export class FulfilmentService {
       }
 
       if (walletResult.error || !walletResult.res) {
+        noteSalesFailure('wallet','supplier_response',true);
         console.warn('[Fulfilment Preflight] Wallet check failed, failing closed:', walletResult.error);
         return {
           allowed: false,
@@ -171,6 +180,7 @@ export class FulfilmentService {
       }
 
       if (walletResult.res.balancePesewas < supplierPackage.supplierCostMinor) {
+        noteSalesFailure('wallet','wallet_low',true);
         console.error(
           `[Fulfilment Preflight] Insufficient supplier wallet balance! Available: GH₵${walletResult.res.balanceGhc}, required: GH₵${(supplierPackage.supplierCostMinor / 100).toFixed(2)}`
         );
@@ -189,6 +199,7 @@ export class FulfilmentService {
         timings: { servicesMs, catalogMs, beneficiaryMs, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
       };
     } catch (err) {
+      noteSalesFailure('application','internal_error',true);
       console.error('[Fulfilment Preflight] Unexpected preflight exception:', err);
       return {
         allowed: false,
@@ -206,6 +217,11 @@ export class FulfilmentService {
    * If Airtime service is unavailable on supplier, BLOCKS before Paystack.
    */
   static async preflightCheckAirtime(
+    network: string, faceValuePesewas: number, recipientPhone: string
+  ): Promise<PreflightResult> {
+    return observeSalesPreflight('airtime',()=>this.preflightAirtime(network,faceValuePesewas,recipientPhone));
+  }
+  private static async preflightAirtime(
     network: string,
     faceValuePesewas: number,
     recipientPhone: string
@@ -218,6 +234,7 @@ export class FulfilmentService {
     }
 
     if (!this.provider.client.isConfigured()) {
+      noteSalesFailure('application','configuration',true);
       console.error('[Airtime Preflight] Fulfilment is enabled but SUCCESS_BIZ_HUB_API_KEY is not configured.');
       return {
         allowed: false,
@@ -251,6 +268,7 @@ export class FulfilmentService {
       const walletMs = walletResult.ms;
 
       if (!serviceResult.res.available) {
+        noteSalesFailure('services','service_unavailable',true);
         console.warn(`[Airtime Preflight] Airtime service unavailable: ${serviceResult.res.reason}`);
         return {
           allowed: false,
@@ -262,6 +280,7 @@ export class FulfilmentService {
       }
 
       if (walletResult.error || !walletResult.res) {
+        noteSalesFailure('wallet','supplier_response',true);
         console.warn('[Airtime Preflight] Wallet check failed, failing closed:', walletResult.error);
         return {
           allowed: false,
@@ -273,6 +292,7 @@ export class FulfilmentService {
       }
 
       if (walletResult.res.balancePesewas < faceValuePesewas) {
+        noteSalesFailure('wallet','wallet_low',true);
         console.error(
           `[Airtime Preflight] Insufficient supplier wallet balance for airtime! Available: GH₵${walletResult.res.balanceGhc}, required: GH₵${(faceValuePesewas / 100).toFixed(2)}`
         );
@@ -290,6 +310,7 @@ export class FulfilmentService {
         timings: { servicesMs, catalogMs: 0, beneficiaryMs: 0, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
       };
     } catch (err) {
+      noteSalesFailure('application','internal_error',true);
       console.error('[Airtime Preflight] Unexpected preflight exception:', err);
       return {
         allowed: false,

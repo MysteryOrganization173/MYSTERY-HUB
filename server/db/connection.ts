@@ -15,6 +15,7 @@ import { MARKETPLACE_FLEXIBILITY_SCHEMA } from './marketplaceFlexibilitySchema.j
 import { ULTRA_ENQUIRY_SCHEMA } from './websiteUltraSchema.js';
 import { MARKETPLACE_ASSET_SCHEMA } from './marketplaceAssetSchema.js';
 import { BACKEND_RLS_SCHEMA } from './backendRlsSchema.js';
+import { SALES_RELIABILITY_SCHEMA } from './salesReliabilitySchema.js';
 /**
  * Shared PostgreSQL Connection Pool & Initialization
  * Ensures Orders, Auth, Waitlist, and Admin use ONE single database connection pool.
@@ -608,6 +609,9 @@ export async function initDatabase(): Promise<void> {
     await client.query(ORDER_MANAGEMENT_SCHEMA);
     await client.query(NOTIFICATION_SCHEMA);
     await client.query(BACKEND_RLS_SCHEMA);
+    // Observability may degrade independently; it must not take purchasing offline.
+    try { await client.query(SALES_RELIABILITY_SCHEMA); }
+    catch { console.error('[Sales reliability] Monitoring schema unavailable; checkout remains independent.'); }
 
     // 3. INDEX CREATION (Non-critical failures logged as warnings)
     const indexStatements = [

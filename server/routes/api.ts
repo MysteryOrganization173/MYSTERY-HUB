@@ -1,4 +1,5 @@
 import { commercialRouter } from './commercialApi.js';
+import {observeSalesRequest,salesCheckoutKind,noteSalesFailure,completeSalesPreflight} from '../services/salesReliability.js';
 import { CommercialService } from '../services/commercialService.js';
 import { WebsiteBusinessService } from '../services/websiteBusinessService.js';
 import { purchasableOptions } from '../../shared/marketplaceVariants.js';
@@ -202,7 +203,7 @@ apiRouter.get('/instant-bundles', async (_req: Request, res: Response) => {
  * If fulfillment is enabled, performs supplier preflight checks before taking customer payment.
  */
 const walletCheckoutLimiter=createRateLimiter({windowMs:60_000,max:10});
-apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.paymentMethod==='wallet'?walletCheckoutLimiter(req,res,next):next(), async (req: Request, res: Response) => {
+apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.paymentMethod==='wallet'?walletCheckoutLimiter(req,res,next):next(), observeSalesRequest(salesCheckoutKind), async (req: Request, res: Response) => {
   if (req.body?.serviceType === 'afa' || req.body?.productId === 'afa-registration') { res.status(400).json({ error: 'Use the authenticated AFA registration checkout.' }); return; }
   const reqStart = performance.now();
   try {
@@ -435,6 +436,7 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
       // 1. Check service availability
       const serviceCheck = await provider.client.checkInstantBundlesService();
       if (!serviceCheck.permitted || !serviceCheck.available) {
+        noteSalesFailure('services','service_unavailable',true);
         const message = 'Instant Bundles are temporarily unavailable. No payment has been taken. Please try again shortly.';
         res.status(503).json({
           code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
@@ -515,6 +517,7 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
         try {
           const wallet = await provider.getBalance();
           if (wallet.balancePesewas < pricing.supplierCostPesewas) {
+            noteSalesFailure('wallet','wallet_low',true);
             console.error(`[Instant Bundle Preflight] Insufficient wallet: Available ${wallet.balancePesewas}p < required ${pricing.supplierCostPesewas}p`);
             res.status(400).json({
               error: 'Instant Bundles are temporarily unavailable due to supplier limits. Please try standard Data Bundles.',
@@ -526,6 +529,7 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
         }
       }
 
+      completeSalesPreflight(true);
       // 5. Generate references
       const timestamp = Date.now();
       const randomHex = Math.floor(100000 + Math.random() * 900000);
