@@ -35,6 +35,7 @@ jobs:
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE app_owner LOGIN PASSWORD 'local-owner-only' NOSUPERUSER NOBYPASSRLS; CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS; GRANT anon,authenticated TO app_owner;"
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_rls_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_monitor_test
+          createdb -h 127.0.0.1 -U postgres -O app_owner mystery_admin_website_test
       - name: Verify RLS, client denial and backend compatibility
         env:
           MYSTERY_RLS_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_rls_test
@@ -43,3 +44,7 @@ jobs:
         env:
           MYSTERY_MONITOR_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_monitor_test
         run: node --import tsx --test server/suppliers/__tests__/salesReliabilityPostgres.test.ts
+      - name: Verify Admin website projections and query accuracy
+        env:
+          MYSTERY_ADMIN_WEBSITE_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_admin_website_test
+        run: node --import tsx --test server/suppliers/__tests__/adminWebsitePostgres.test.ts

@@ -2,11 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { getPool } from './connection.js';
 import { WebsiteStore } from './websiteStore.js';
 import { WebsiteAssetStore } from './websiteAssetStore.js';
-import { AuthStore } from './authStore.js';
-import { WEBSITE_CLIENT_EVENTS, type WebsiteAnalyticsInput, type WebsiteAdminSummary, type AdminWebsiteRow } from '../../src/config/websiteAnalytics.js';
+import { AdminWebsiteStore, adminWebsiteFilters } from './adminWebsiteStore.js';
+import { WEBSITE_CLIENT_EVENTS, type WebsiteAnalyticsInput, type WebsiteAdminSummary } from '../../src/config/websiteAnalytics.js';
 import { isValidTemplateId } from '../types/website.js';
 import { cloudinaryConfigured, websiteMediaLimits, WebsiteOperationError } from '../services/websiteCloudinary.js';
-import type { WebsiteSiteRecord } from '../types/website.js';
 interface EventRecord { id: string; event_name: string; user_id: string | null; visitor_id: string | null; session_id: string | null; entity_type: string | null; entity_id: string | null; metadata_json: Record<string,string>; created_at: string; }
 const memory: EventRecord[] = [];
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -74,20 +73,9 @@ export class WebsiteAnalyticsStore {
     if (!db) return memory.filter(e => !since || e.created_at >= since).map(e => structuredClone(e));
     return (await db.query(`SELECT * FROM analytics_events WHERE event_name LIKE 'website_%' ${since ? 'AND created_at >= $1' : ''}`,since ? [since] : [])).rows.map(row => ({...row,created_at:new Date(row.created_at).toISOString(),metadata_json:typeof row.metadata_json === 'string' ? JSON.parse(row.metadata_json) : row.metadata_json}));
   }
-  static async siteDetails(site: WebsiteSiteRecord, assets?: Awaited<ReturnType<typeof WebsiteAssetStore.all>>): Promise<AdminWebsiteRow> {
-    const owner=await AuthStore.findUserById(site.user_id);
-    const siteAssets=assets || (site.status==='archived' ? await WebsiteAssetStore.forSite(site.id) : await WebsiteAssetStore.list(site.id,site.user_id));
-    return { id:site.id,name:site.name,businessName:site.content_json.businessName,slug:site.slug,user_id:site.user_id,ownerName:owner?.name || 'Customer',template_id:site.template_id,status:site.status,created_at:site.created_at,updated_at:site.updated_at,published_at:site.published_at || null,assetCount:siteAssets.filter(a=>a.website_id===site.id && a.status==='ready').length,publicUrl:site.status==='published' ? `/sites/${encodeURIComponent(site.slug)}` : null };
-  }
   static async summary(query: Record<string, unknown>): Promise<WebsiteAdminSummary> {
-    const range=String(query.range || '30'), status=String(query.status || ''), template=String(query.template || ''), search=String(query.search || '').trim();
-    const limit=Number(query.limit || 25), offset=Number(query.offset || 0);
-    if (!['7','30','90','all'].includes(range) || !['','draft','published'].includes(status) || (template && !isValidTemplateId(template)) || search.length > 100 || !Number.isInteger(limit) || limit<1 || limit>100 || !Number.isInteger(offset) || offset<0 || offset>100000) throw new WebsiteOperationError('Invalid website filters.');
-    const since=range==='all' ? null : new Date(Date.now()-Number(range)*86400_000).toISOString();
-    const [sites,assets,events]=await Promise.all([WebsiteStore.allSites(),WebsiteAssetStore.all(),this.events(since)]);
-    const rows: AdminWebsiteRow[]=await Promise.all(sites.map(site => this.siteDetails(site,assets)));
-    const periodRows=rows.filter(row=>!since || row.created_at>=since);
-    const filtered=periodRows.filter(row=>(!status || row.status===status) && (!template || row.template_id===template) && (!search || [row.name,row.businessName,row.ownerName,row.id,row.slug].some(value=>value.toLowerCase().includes(search.toLowerCase())))).sort((a,b)=>b.created_at.localeCompare(a.created_at));
+    const filters=adminWebsiteFilters(query);
+    const [projects,events]=await Promise.all([AdminWebsiteStore.projects(query,filters),this.events(filters.since)]);
     const linkedVisitors=new Map(events.filter(e=>e.visitor_id && e.user_id).map(e=>[e.visitor_id!,e.user_id!]));
     const identities=(name:string)=>new Set(events.filter(e=>e.event_name===name).map(e=>e.user_id || (e.visitor_id ? linkedVisitors.get(e.visitor_id) || e.visitor_id : null)).filter(Boolean));
     const starters=identities('website_build_started'),creators=identities('website_created');
@@ -96,13 +84,12 @@ export class WebsiteAnalyticsStore {
     const createdSites=new Set(events.filter(e=>e.event_name==='website_created').map(e=>e.entity_id));
     const publishedCreatedSites=new Set(events.filter(e=>e.event_name==='website_published' && createdSites.has(e.entity_id) && events.some(created=>created.event_name==='website_created' && created.entity_id===e.entity_id && created.created_at<=e.created_at)).map(e=>e.entity_id));
     const count=(name:string)=>events.filter(e=>e.event_name===name).length;
-    const templateIds=new Set([...rows.map(r=>r.template_id),...events.map(e=>e.metadata_json.templateId).filter(Boolean)]);
-    return { sites:filtered.slice(offset,offset+limit),total:filtered.length,limit,offset,
-      metrics:{total:periodRows.length,draft:periodRows.filter(s=>s.status==='draft').length,published:periodRows.filter(s=>s.status==='published').length,free:periodRows.length},
-      recentCreated:[...periodRows].sort((a,b)=>b.created_at.localeCompare(a.created_at)).slice(0,5),recentPublished:rows.filter(s=>s.status==='published' && s.published_at && (!since || s.published_at>=since)).sort((a,b)=>b.published_at!.localeCompare(a.published_at!)).slice(0,5),
-      templates:[...templateIds].map(templateId=>({templateId,projects:periodRows.filter(s=>s.template_id===templateId).length,published:periodRows.filter(s=>s.template_id===templateId && s.status==='published').length,previews:events.filter(e=>e.event_name==='website_template_previewed' && e.metadata_json.templateId===templateId).length,created:events.filter(e=>e.event_name==='website_created' && e.metadata_json.templateId===templateId).length})),
+    const templateIds=new Set([...projects.templateProjects.map(r=>r.templateId),...events.map(e=>e.metadata_json.templateId).filter(Boolean)]);
+    const {templateProjects,assetMetrics,...list}=projects;
+    return { ...list,
+      templates:[...templateIds].map(templateId=>({templateId,projects:templateProjects.find(t=>t.templateId===templateId)?.projects??0,published:templateProjects.find(t=>t.templateId===templateId)?.published??0,previews:events.filter(e=>e.event_name==='website_template_previewed' && e.metadata_json.templateId===templateId).length,created:events.filter(e=>e.event_name==='website_created' && e.metadata_json.templateId===templateId).length})),
       funnel:{uniqueVisitors:identities('website_builder_viewed').size,previews:count('website_template_previewed'),buildStarts:count('website_build_started'),created:count('website_created'),published:count('website_published'),uniqueBuildStarters:starters.size,uniqueCreators:creators.size,startToCreate:starters.size ? createdAfterStart.size/starters.size*100 : null,createToPublish:createdSites.size ? publishedCreatedSites.size/createdSites.size*100 : null},
-      media:{configured:cloudinaryConfigured(),...websiteMediaLimits(),tracked:assets.length,ready:assets.filter(a=>a.status==='ready').length,cleanupPending:assets.filter(a=>['deleting','failed'].includes(a.status) || (a.status==='pending' && Date.now()>Date.parse(a.expires_at))).length},
+      media:{configured:cloudinaryConfigured(),...websiteMediaLimits(),...assetMetrics},
     };
   }
 }

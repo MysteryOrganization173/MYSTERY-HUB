@@ -1,4 +1,5 @@
 import { adminWebsiteBusinessRouter } from './websiteBusinessApi.js';
+import {AdminWebsiteStore,validateAdminWebsiteId} from '../db/adminWebsiteStore.js';
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { requireAuth, requireAdmin, optionalAuth } from '../middleware/authMiddleware.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
@@ -53,17 +54,16 @@ websiteActionsRouter.post('/:id/change-template',requireAuth,editing,websiteFree
   res.json({success:true,site});
 }));
 export const adminWebsiteRouter=Router();
-adminWebsiteRouter.use(requireAdmin);
+adminWebsiteRouter.use((_req,res,next)=>{res.set('Cache-Control','no-store');next();},requireAdmin);
 adminWebsiteRouter.use(adminWebsiteBusinessRouter);
 adminWebsiteRouter.get('/',websiteFreeHandler(async(req,res)=>{res.json({success:true,...await WebsiteAnalyticsStore.summary(req.query)});}));
 adminWebsiteRouter.get('/:id',websiteFreeHandler(async(req,res)=>{
   // Includes deleted (archived) websites so staff can still trace their history.
-  const site=await WebsiteStore.findSiteRecordById(req.params.id);
-  if(!site) throw new WebsiteOperationError('Website not found.',404);
   // Safe operational projection; no account/security/provider credentials or arbitrary content.
-  res.json({success:true,site:await WebsiteAnalyticsStore.siteDetails(site)});
+  res.json({success:true,site:await AdminWebsiteStore.inspect(req.params.id)});
 }));
 adminWebsiteRouter.post('/:id/force-unpublish',editing,websiteFreeHandler(async(req,res)=>{
+  validateAdminWebsiteId(req.params.id);
   if(Object.keys(req.body || {}).some(key=>key!=='confirmation') || typeof req.body?.confirmation!=='string') throw new WebsiteOperationError('Confirmation required.');
   const site=await WebsiteStore.forceUnpublish(req.params.id,req.user!.id,req.body.confirmation);
   if(site) await WebsiteAnalyticsStore.action('website_unpublished',req.user!.id,site.id,site.template_id);

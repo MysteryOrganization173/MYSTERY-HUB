@@ -2,6 +2,11 @@ export const WEBSITE_CLIENT_EVENTS = ['website_builder_viewed','website_template
 export type WebsiteClientEvent = typeof WEBSITE_CLIENT_EVENTS[number];
 export interface WebsiteAnalyticsInput { event: WebsiteClientEvent; visitorId: string; sessionId: string; metadata: { templateId?: string; siteId?: string; source?: 'builder' | 'editor' | 'settings' }; }
 export interface AdminWebsiteRow { id: string; name: string; businessName: string; slug: string; user_id: string; ownerName: string; template_id: string; status: string; created_at: string; updated_at: string; published_at: string | null; assetCount: number; publicUrl: string | null; }
+/** Only the protected single-site inspection returns account contacts. */
+export interface AdminWebsiteInspection extends AdminWebsiteRow {
+  owner: {name:string|null;email:string|null;phone:string|null};
+  businessContact: {phone:string|null;whatsapp:string|null;email:string|null};
+}
 export interface WebsiteAdminSummary {
   sites: AdminWebsiteRow[]; total: number; limit: number; offset: number;
   metrics: { total: number; draft: number; published: number; free: number };
