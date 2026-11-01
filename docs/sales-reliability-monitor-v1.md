@@ -160,9 +160,16 @@ events, unknown 500 classification, duplicate observations, retry uncertainty an
 read/write isolation. No second-person review is claimed.
 
 Release checks executed: full regression 2,766 passed / 35 skipped / zero failed;
-native monitoring 6/6 and RLS 10/10, no skips; mobile browser 22/22, no overflow or
+native monitoring 7/7 and RLS 10/10, no skips; mobile browser 22/22, no overflow or
 page errors; TypeScript, production build and diff checks pass. The RLS suite now
 executes 470 denied client statements across 47 tables.
+
+Final rollout review reproduced a persistence-delay edge case in native PostgreSQL:
+three attempts within ten minutes could miss detection if the first aged out of
+the writer's flush-time query. The writer now loads the oldest buffered attempt's
+event-time window. A regression proves inclusion one millisecond inside the
+boundary and exclusion exactly at ten minutes. Admin's recent counts remain based
+on the actual current ten-minute window.
 
 The established initDatabase startup schema workflow creates the private tables
 after PR #70 protections. The SQL mirror is identical. A monitoring schema/write
