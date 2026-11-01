@@ -208,8 +208,8 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
     accentColor: '#2563eb',
     demoBusinessName: 'Your Data Store',
     // The gallery shows exactly the wording a new store starts with, and no sample address or phone number.
-    demoHeroTagline: 'Buy Data. Stay Connected.',
-    demoSubtext: 'Choose a bundle, pay securely and track your order.',
+    demoHeroTagline: 'Buy data in a few taps.',
+    demoSubtext: 'Pick a network, choose a bundle and pay securely.',
     location: '',
     hoursOrContact: '',
     isFreeTier: true,

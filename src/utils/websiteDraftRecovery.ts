@@ -32,7 +32,7 @@ export function readDraftRecovery(site: Pick<WebsiteSiteRecord, 'id' | 'name' | 
 
 
 /** V5 fields merge on the server, so a field the owner removed is sent as null to clear it. */
-const V5_CLEARABLE = ['hours','policies','sections','imageMeta','gallery','pinnedBundles'] as const;
+const V5_CLEARABLE = ['hours','policies','sections','imageMeta','gallery','pinnedBundles','styleVariant'] as const;
 export function withV5Clears(saved: SiteContent, draft: SiteContent): SiteContent {
   const out: any = {...draft};
   for (const key of V5_CLEARABLE) if (saved?.[key] !== undefined && draft[key] === undefined) out[key] = null;

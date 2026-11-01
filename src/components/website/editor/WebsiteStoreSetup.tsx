@@ -23,7 +23,7 @@ export function WebsiteStoreSetup({businessName, published, liveChanges, catalog
     : catalogue.sellable ? {id: 'bundles', title: 'Bundles & prices', detail: `${catalogue.sellable === 1 ? '1 bundle' : `${catalogue.sellable} bundles`} on sale at your prices`, state: 'done', action: {label: 'Edit prices', run: onBundles}}
     : {id: 'bundles', title: 'Bundles & prices', detail: catalogue.ownerOnSale ? 'None of the bundles you switched on can be sold right now.' : 'None on sale yet. Pick networks and add your profit.', state: 'todo', action: {label: 'Set up', run: onBundles}};
   const steps: Step[] = [
-    {id: 'brand', title: 'Name & look', detail: businessName.trim() || 'Add your store name', state: businessName.trim() ? 'done' : 'todo', action: {label: 'Colours', run: onBrand}},
+    {id: 'brand', title: 'Name & look', detail: businessName.trim() || 'Add your store name', state: businessName.trim() ? 'done' : 'todo', action: {label: 'Style', run: onBrand}},
     bundleStep,
     published
       ? {id: 'publish', title: 'Published', detail: liveChanges ? 'Your newer edits are saved but not live yet.' : 'Your store link works for customers.', state: liveChanges ? 'todo' : 'done', action: liveChanges ? {label: 'Update', run: onPublish} : undefined}

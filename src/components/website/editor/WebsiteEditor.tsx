@@ -32,6 +32,8 @@ import { websiteLayoutMode, type WebsiteLayoutMode } from '../../../utils/websit
 import type { TemplateItem } from '../../../types';
 import { resellerCatalogueSummary, type ResellerCatalogueSummary } from '../../../utils/websiteOwnerAttention';
 import { WebsiteStoreSetup } from './WebsiteStoreSetup';
+import { WebsiteStoreLook, WebsiteCopyIdeas } from './WebsiteStoreLook';
+import { DATA_STORE_COPY_IDEAS } from '../../../config/websiteStyleVariants';
 import { DATA_RESELLER_STARTER_HERO_IMAGE, resolveDataResellerHeroImage, showsLegacyDataResellerArtwork } from '../../../utils/dataResellerArtwork';
 import {
   ArrowLeft,
@@ -514,7 +516,8 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const contextualTargets = visualSelection==='branding' ? targets.filter(t=>t.source.kind==='settings') : selected ? [selected,...(selected.destinationId ? targets.filter(t=>t.id===selected.destinationId) : [])] : [];
   // The design's suggested headline and description stay marked until the owner changes them.
   const starterWording = content.starterVersion ? websiteStarterWording(currentSite.template_id) : undefined;
-  const suggestedFields = starterWording && layoutMode==='template' ? (['tagline','aboutText'] as const).filter(field=>content[field]===starterWording[field]).map(field=>`content:${field}`) : [];
+  // V7.1: a Data Store's ready-made wording ideas also count as suggested, so the owner is invited to make them their own.
+  const suggestedFields = starterWording && layoutMode==='template' ? (['tagline','aboutText'] as const).filter(field=>content[field]===starterWording[field] || (isDataReseller && (DATA_STORE_COPY_IDEAS[field] as readonly string[]).includes(content[field]))).map(field=>`content:${field}`) : [];
   const publishSuggestions = [
     ...suggestedFields.map(id=>({label:id==='content:tagline'?'your headline':'your description',target:id})),
     ...(layoutMode==='template' && !isDataReseller && content.heroImage && content.heroImage===baseTemplate.heroImage?[{label:'the main photo',target:'content:heroImage'}]:[]),
@@ -527,6 +530,12 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     if(!next)return;
     draftRef.current={...draft,...next};setContent(next.content);setSettings(next.settings);markDirty();
   };
+  // V7.1 Data Store helpers: the store style (with the colour sets) on the look panel, wording ideas on text fields.
+  const applyPalette = (palette:{backgroundColor:string;primaryColor:string;accentColor:string}) => {const next={...draftRef.current.settings,backgroundColor:palette.backgroundColor,primaryColor:palette.primaryColor,accentColor:palette.accentColor};draftRef.current={...draftRef.current,settings:next};setSettings(next);markDirty();};
+  const storeLook = isDataReseller && layoutMode==='template' ? <WebsiteStoreLook layout="reseller" value={content.styleVariant} onChange={style=>changeContent({styleVariant:style})}/> : null;
+  const ideaField = isDataReseller && layoutMode==='template' && selected?.source.kind==='content' && ['tagline','aboutText','ctaLabel'].includes(selected.source.field as string) ? selected.source.field as 'tagline'|'aboutText'|'ctaLabel' : null;
+  const panelExtra = visualSelection==='branding' && storeLook ? <>{storeLook}<WebsitePaletteControl settings={settings} onApply={applyPalette}/></>
+    : ideaField ? <WebsiteCopyIdeas ideas={DATA_STORE_COPY_IDEAS[ideaField]} value={String(content[ideaField] ?? '')} onPick={text=>editVisualValue(`content:${ideaField}`,text)}/> : null;
   type Area = [typeof activeSection, string, typeof Building];
   const settingsAreas: Area[] = [['business','Business',Building],['contact','Contact',Phone],...(isDataReseller||currentSite.template_id==='tmpl-start-blank'?[]:[['items',word.plural,UtensilsCrossed] as Area,['hours','Hours & policies',Clock] as Area]),['branding','Colors',Palette],['media','Images',ImageIcon],...(isDataReseller?[['bundles','Bundles & pricing',Layers] as Area]:[]),['sections','Layout',Layers],['cta','Main button',MousePointerClick],['social','Social links',Share2],['history','History',History]];
   const openSettings=(section?: typeof activeSection)=>{setAllSettings(true);setVisualSelection(null);setSettingsNotice(false);if(section)setActiveSection(section);};
@@ -557,7 +566,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         onEditField={target=>{setPublishOpen(false);setActiveTab('edit');if(target==='name')selectTarget('content:businessName');else if(target==='contact')openSettings('contact');else selectTarget(target);}} onBusiness={openBusiness}/>}
       {mediaOpen && <WebsiteImageLibrary siteId={currentSite.id} token={sessionToken} onClose={()=>setMediaOpen(false)} onChoose={url=>{setContent({...content,heroImage:url});markDirty();setMediaOpen(false);}} />}
       <WebsiteEditorToolbar name={content.businessName || siteName} mode={activeTab} device={previewDevice} status={saveStatusText} published={currentSite.status==='published'} saving={isSaving} publishing={isPublishing}
-        onExit={()=>void exitEditor()} backLabel={backLabel} onMode={changeMode} onDevice={device=>{setPreviewDevice(device);if(isPhone && device!=='mobile')changeMode('preview');}} onSave={()=>void handleSaveDraft()} onPublish={()=>{setVisualSelection(null);setPublishOpen(true);}} onUnpublish={()=>void handleUnpublish()} onSettings={()=>openSettings()} onBrand={()=>selectTarget('branding')} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`} undoLabel={undoTop ? undoLabel(undoTop) : ''} onUndo={handleUndo} liveBehind={liveBehind} onBusiness={openBusiness}/>
+        onExit={()=>void exitEditor()} backLabel={backLabel} onMode={changeMode} onDevice={device=>{setPreviewDevice(device);if(isPhone && device!=='mobile')changeMode('preview');}} onSave={()=>void handleSaveDraft()} onPublish={()=>{setVisualSelection(null);setPublishOpen(true);}} onUnpublish={()=>void handleUnpublish()} onSettings={()=>openSettings()} onBrand={()=>selectTarget('branding')} brandLabel={storeLook?'Look':undefined} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`} undoLabel={undoTop ? undoLabel(undoTop) : ''} onUndo={handleUndo} liveBehind={liveBehind} onBusiness={openBusiness}/>
       {/* =========================================================
           WORKSPACE: LEFT EDITOR / RIGHT LIVE PREVIEW
           ========================================================= */}
@@ -753,7 +762,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
             {activeSection === 'media' && <section className="space-y-5">
               <div><h3 className="text-lg font-semibold">Images &amp; Media</h3><p className="text-sm text-slate-400 mt-2">Upload once, reuse across your website. Choose your cover image and logo here.</p></div>
               <WebsiteImageField label="Cover image" value={content.heroImage} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,heroImage:isDataReseller&&!url?DATA_RESELLER_STARTER_HERO_IMAGE:url});markDirty();}} />
-              {!isDataReseller && content.heroImage && <details className="rounded-xl border border-slate-800 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-200 min-h-8">Cover photo focus and description</summary>
+              {(!isDataReseller || (content.styleVariant && content.styleVariant!=='classic')) && content.heroImage && <details className="rounded-xl border border-slate-800 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-200 min-h-8">Cover photo focus and description</summary>
                 <div className="mt-3"><WebsiteImageDetails src={content.heroImage} focal={content.imageMeta?.heroImage} alt={content.imageMeta?.heroImage?.alt} onChange={patch=>changeContent({imageMeta:{...(content.imageMeta||{}),heroImage:{...(content.imageMeta?.heroImage||{}),...(patch.x!==undefined?{x:patch.x,y:patch.y}:{}),...(patch.alt!==undefined?{alt:patch.alt||undefined}:{})}}})}/></div>
               </details>}
               <WebsiteImageField logo label="Business logo" value={content.logoUrl||''} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,logoUrl:url});markDirty();}} />
@@ -773,6 +782,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                   </p>
                 </div>
 
+                {storeLook}
                 <WebsitePaletteControl settings={settings} onApply={palette=>{const next={...draftRef.current.settings,backgroundColor:palette.backgroundColor,primaryColor:palette.primaryColor,accentColor:palette.accentColor};draftRef.current={...draftRef.current,settings:next};setSettings(next);markDirty();}}/>
 
                 {/* Brand Colors Grid */}
@@ -1087,7 +1097,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         </div>
         {activeTab==='edit' && selectedItemIndex>=0 && <WebsiteItemPanel item={items[selectedItemIndex]} index={selectedItemIndex} total={items.length} word={word} fields={itemFields} layout={baseTemplate.layoutType || ''} pinnedCount={items.filter(i=>i.pinned).length} siteId={currentSite.id} token={sessionToken} busy={locked} cardButton={cardButton && {value:cardButton.value,max:cardButton.maxLength,onChange:value=>editVisualValue(cardButton.id,value)}}
           onChange={patch=>updateItem(items[selectedItemIndex].id!,patch)} onKeep={()=>void reviewItems([items[selectedItemIndex].id!],'confirm')} onRemove={()=>removeItem(items[selectedItemIndex].id!)} onAdd={addItem} onPrevious={()=>stepItem(-1)} onNext={()=>stepItem(1)} onDone={clearSelection}/>}
-        {activeTab==='edit' && contextualTargets.length>0 && !selectedItemId && <div className="contents" inert={locked}><VisualContextPanel title={visualSelection==='branding'?'Website colors':selected!.label} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()} position={stepIndex>=0?{index:stepIndex,total:stepIds.length}:undefined} onPrevious={()=>step(-1)} onNext={()=>step(1)} suggested={!!selected && suggestedFields.includes(selected.id)}/></div>}
+        {activeTab==='edit' && contextualTargets.length>0 && !selectedItemId && <div className="contents" inert={locked}><VisualContextPanel title={visualSelection==='branding'?(storeLook?'Store look':'Website colors'):selected!.label} extra={panelExtra} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()} position={stepIndex>=0?{index:stepIndex,total:stepIds.length}:undefined} onPrevious={()=>step(-1)} onNext={()=>step(1)} suggested={!!selected && suggestedFields.includes(selected.id)}/></div>}
         {activeTab==='edit' && settingsNotice==="settings" && !contextualTargets.length && <VisualContextPanel notice title="Change this in All Settings" targets={[]} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()}/>}
         {bundleSheet && isDataReseller && <WebsiteBundleSetupSheet siteId={currentSite.id} token={sessionToken} published={currentSite.status==='published'} onClose={()=>setBundleSheet(false)} onSaved={count=>{setSellableBundles(count);setCatalogRevision(n=>n+1);setFrameGeneration(n=>n+1);}}/>}
       </div>

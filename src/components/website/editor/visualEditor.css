@@ -237,3 +237,26 @@
 .visual-undo-button:disabled{opacity:.35;cursor:default}
 [data-state="failed"] .visual-status-dot{background:#f87171;box-shadow:0 0 0 3px rgba(248,113,113,.2)}
 [data-state="offline"] .visual-status-dot{background:#94a3b8;box-shadow:0 0 0 3px rgba(148,163,184,.2)}
+
+/* V7.1 store style picker and wording ideas (editor chrome only; never styles the customer's site). */
+.store-look{display:grid;gap:10px;margin-bottom:6px}
+.store-look-head h3{margin:0;font-size:14px;font-weight:700;color:var(--ve-text)}
+.store-look-head p,.store-look-detail{margin:3px 0 0;font-size:12.5px;line-height:1.45;color:var(--ve-muted)}
+.store-look-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.store-look-card{display:flex;flex-direction:column;text-align:left;border:1.5px solid var(--ve-line);border-radius:14px;background:var(--ve-field);overflow:hidden;min-height:44px;color:var(--ve-text);transition:border-color .15s ease}
+.store-look-card:hover{border-color:var(--ve-line-strong)}
+.store-look-card[aria-checked="true"]{border-color:var(--ve-green);box-shadow:0 0 0 3px rgba(0,195,101,.16)}
+.store-look-art{display:block;aspect-ratio:100/72;border-bottom:1px solid var(--ve-line)}
+.store-look-art .s-bg{fill:#0b1218}.store-look-art .s-img{fill:#2b4a66}.store-look-art .s-fade{fill:#0b1218;opacity:.6}
+.store-look-art .s-ink{fill:#e6eef0}.store-look-art .s-muted{fill:#4b5b66}.store-look-art .s-tab{fill:#1c2a33}.store-look-art .s-row{fill:#16222b;stroke:#2a3a45;stroke-width:.6}.store-look-art .s-accent{fill:#00c365}
+.store-look-text{display:grid;gap:2px;padding:8px 10px 10px}
+.store-look-text strong{display:inline-flex;align-items:center;gap:6px;font-size:13.5px}
+.store-look-text strong svg{color:var(--ve-green-text,#5be39b)}
+.store-look-text small{font-size:11.5px;line-height:1.35;color:var(--ve-muted)}
+.copy-ideas{display:grid;gap:6px;margin-bottom:4px}
+.copy-ideas p{margin:0;font-size:12px;font-weight:600;color:var(--ve-muted)}
+.copy-ideas ul{list-style:none;margin:0;padding:0 0 2px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.copy-ideas ul::-webkit-scrollbar{display:none}
+.copy-ideas li{flex:0 0 auto;max-width:82%}
+.copy-ideas button{min-height:40px;padding:8px 12px;border-radius:12px;border:1px solid var(--ve-line);background:var(--ve-field);color:var(--ve-text);font-size:13px;line-height:1.3;text-align:left;white-space:normal}
+.copy-ideas button[aria-pressed="true"]{border-color:var(--ve-green);background:var(--ve-green-soft,rgba(0,195,101,.12))}

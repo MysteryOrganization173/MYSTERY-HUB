@@ -28,8 +28,9 @@ test('Data Store is the design name; the permanent ID and every old link still r
 
 test('starter: real name, Data Store wording, Shop Bundles, starter artwork and no items or prices',()=>{
   const s=websiteStarter('tmpl-data-reseller','Kwame Data Hub');
-  assert.equal(s.content.businessName,'Kwame Data Hub');assert.equal(s.content.tagline,'Buy Data. Stay Connected.');
-  assert.equal(s.content.aboutText,'Choose a bundle, pay securely and track your order.');assert.equal(s.content.ctaLabel,'Shop Bundles');
+  assert.equal(s.content.businessName,'Kwame Data Hub');assert.equal(s.content.tagline,'Buy data in a few taps.');
+  // V7.1: new stores start in the Horizon style with the first wording idea.
+  assert.equal(s.content.aboutText,'Pick a network, choose a bundle and pay securely.');assert.equal(s.content.styleVariant,'horizon');assert.equal(s.content.ctaLabel,'Shop Bundles');
   assert.equal(s.content.heroImage,data.heroImage);assert.deepEqual(s.content.items,[]);assert.equal(s.capabilities.managed,true);
   assert.equal(websiteStarterWording('tmpl-data-reseller')?.tagline,s.content.tagline);
   // No speed, availability, expiry or lowest-price claims in the wording a new store starts with.
@@ -60,7 +61,7 @@ test('a new store without bundles shows the owner setup area: networks, example 
   assert.ok(html.includes('data-store-setup'));assert.ok(html.includes('Your bundles appear here'));assert.ok(html.includes('Only you can see this'));
   for(const n of ['MTN','Telecel','AirtelTigo'])assert.ok(html.includes(n),n);
   assert.ok(html.includes('Your price'));assert.ok(!PRICE.test(html),'no fabricated purchasable prices');
-  assert.ok(html.includes('Kwame Data Hub'));assert.ok(html.includes('Buy Data. Stay Connected.'));assert.ok(html.includes('Shop Bundles'));
+  assert.ok(html.includes('Kwame Data Hub'));assert.ok(html.includes('Buy data in a few taps.'));assert.ok(html.includes('Shop Bundles'));
   assert.ok(!html.includes('Spintex'));assert.ok(!html.includes('View Availability'));
 });
 
@@ -110,6 +111,6 @@ test('gallery preview: Data Store accepts only the typed name; owner previews ig
 test('creating a Data Store keeps the starter wording and stores no products or prices',async()=>{
   const {site}=await WebsiteStore.createSite('usr_data_store_v1',{template_id:'tmpl-data-reseller',name:'Kwame Data Hub',businessName:'Kwame Data Hub',starterVersion:WEBSITE_STARTER_VERSION,content:{whatsapp:'0241234567'}});
   const c=site.content_json as SiteContent;
-  assert.equal(site.template_id,'tmpl-data-reseller');assert.equal(c.businessName,'Kwame Data Hub');assert.equal(c.tagline,'Buy Data. Stay Connected.');assert.equal(c.ctaLabel,'Shop Bundles');
+  assert.equal(site.template_id,'tmpl-data-reseller');assert.equal(c.businessName,'Kwame Data Hub');assert.equal(c.tagline,'Buy data in a few taps.');assert.equal(c.ctaLabel,'Shop Bundles');assert.equal(c.styleVariant,'horizon');
   assert.deepEqual(c.items,[]);assert.equal(c.location,'');assert.equal(c.whatsapp,'0241234567');assert.ok(!PRICE.test(JSON.stringify(c)));
 });

@@ -41,9 +41,11 @@ function VisualField({target, onChange, siteId, token}: {target: VisualTarget; o
   </div>;
 }
 
-export function VisualContextPanel({title, targets, siteId, token, onChange, onDone, onAllSettings, position, onPrevious, onNext, notice, noticeText, noticeAction, suggested}: {
+export function VisualContextPanel({title, targets, siteId, token, onChange, onDone, onAllSettings, position, onPrevious, onNext, notice, noticeText, noticeAction, suggested, extra}: {
   title: string; targets: VisualTarget[]; siteId: string; token: string; onChange: (id:string,value:string)=>void; onDone:()=>void; onAllSettings:()=>void;
   position?: {index: number; total: number}; onPrevious?: () => void; onNext?: () => void; notice?: boolean; noticeText?: string; noticeAction?: string; suggested?: boolean;
+  /** V7.1: design-specific helpers shown above the fields (store style, wording ideas). */
+  extra?: React.ReactNode;
 }) {
   const root=useRef<HTMLElement>(null), heading=useRef<HTMLHeadingElement>(null);
   const firstId=targets[0]?.id;
@@ -79,6 +81,7 @@ export function VisualContextPanel({title, targets, siteId, token, onChange, onD
         <button type="button" onClick={onAllSettings} className="visual-primary-button"><SlidersHorizontal size={17}/>{noticeAction || 'Open All Settings'}</button>
       </> : <>
         {suggested && <div className="visual-example-note is-suggested" role="note"><strong>Suggested wording</strong><p>We wrote this so your page doesn’t start empty. Make it your own, or keep it if it fits your business.</p></div>}
+        {extra}
         {targets.map(target=><VisualField key={target.id} target={target} siteId={siteId} token={token} onChange={onChange}/>)}
         <button type="button" onClick={onAllSettings} className="visual-link-button"><SlidersHorizontal size={15}/>More options in All Settings</button>
       </>}

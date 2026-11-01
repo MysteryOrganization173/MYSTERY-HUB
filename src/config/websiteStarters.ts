@@ -1,6 +1,7 @@
 import {WEBSITE_TEMPLATES} from '../data/templates.js';
 import type {SiteContent,SiteSettings,TemplateItem} from '../types/index.js';
 import {websiteTemplateItemFields} from './websiteBuilder.js';
+import {DATA_STORE_COPY_IDEAS,WEBSITE_DEFAULT_STYLE} from './websiteStyleVariants.js';
 
 export const WEBSITE_STARTER_VERSION=1;
 const vocabulary:Record<string,[string,string,string]>={
@@ -105,7 +106,7 @@ const examples:Record<string,StarterExample[]>={
  * marks it as suggested until the owner changes it.
  */
 const wording:Record<string,{tagline:string;aboutText:string}>={
-  'tmpl-data-reseller':{tagline:'Buy Data. Stay Connected.',aboutText:'Choose a bundle, pay securely and track your order.'},
+  'tmpl-data-reseller':{tagline:DATA_STORE_COPY_IDEAS.tagline[0],aboutText:DATA_STORE_COPY_IDEAS.aboutText[0]},
   'tmpl-buka-bistro':{tagline:'Ghanaian flavours, cooked with care',aboutText:'Take a look at our menu, then message us to ask about a table or to place an order.'},
   'tmpl-night-kitchen':{tagline:'Home-style food, cooked fresh every day.',aboutText:'Browse the menu, add what you fancy and send your order on WhatsApp. Or come and eat with us.'},
   'tmpl-boutique':{tagline:'Pieces made to be worn every day.',aboutText:'Browse the collection, pick your size or colour and order on WhatsApp. We confirm stock and delivery with you.'},
@@ -149,7 +150,7 @@ export function websiteStarter(templateId:string,businessName:string) {
       ...(fields.includes('image') && image?{image}:{}),
     };
   });
-  const content:Partial<SiteContent>={starterVersion:WEBSITE_STARTER_VERSION,businessName,tagline:wording[templateId]?.tagline || `Welcome to ${businessName}`,aboutText:wording[templateId]?.aboutText || '',location:'',phone:'',whatsapp:'',email:'',logoUrl:'',heroImage:t.heroImage || '',ctaLabel:templateId==='tmpl-data-reseller'?'Shop Bundles':'Contact us',ctaTarget:'',social:{},items,stats:[],features:[],...(templateId==='tmpl-start-blank'?{layoutMode:'sections' as const,composition:structuredClone(t.composition!)}:{layoutMode:'template' as const})};
+  const content:Partial<SiteContent>={starterVersion:WEBSITE_STARTER_VERSION,businessName,tagline:wording[templateId]?.tagline || `Welcome to ${businessName}`,aboutText:wording[templateId]?.aboutText || '',location:'',phone:'',whatsapp:'',email:'',logoUrl:'',heroImage:t.heroImage || '',ctaLabel:templateId==='tmpl-data-reseller'?'Shop Bundles':'Contact us',...(WEBSITE_DEFAULT_STYLE[t.layoutType||'']?{styleVariant:WEBSITE_DEFAULT_STYLE[t.layoutType||'']}:{}),ctaTarget:'',social:{},items,stats:[],features:[],...(templateId==='tmpl-start-blank'?{layoutMode:'sections' as const,composition:structuredClone(t.composition!)}:{layoutMode:'template' as const})};
   const settings:SiteSettings={primaryColor:t.colorScheme?.primary || '#0f172a',accentColor:t.accentColor || '#00c365',backgroundColor:t.colorScheme?.background || '#ffffff',fontFamily:'font-sans',borderRadius:'rounded-xl'};
   return {starterVersion:WEBSITE_STARTER_VERSION,templateId,content,settings,capabilities:{layoutModes:templateId==='tmpl-start-blank'?['sections']:['template','sections'],itemFields:templateId==='tmpl-data-reseller'?[]:fields,managed:templateId==='tmpl-data-reseller',exampleCount:items.length}};
 }

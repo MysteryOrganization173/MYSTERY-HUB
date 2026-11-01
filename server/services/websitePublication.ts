@@ -4,7 +4,7 @@ const pick=(value:unknown,keys:readonly string[])=>{const input=object(value);re
 const items=(value:unknown,keys:readonly string[])=>Array.isArray(value)?value.map(item=>pick(item,keys)):[];
 /** Public field projection also removes historical unknown/editor-only nested keys. */
 export function publicWebsiteContent(value:unknown):SiteContent {
- const input=object(value),result=pick(input,['starterVersion','layoutMode','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','features','copy','gallery','pinnedBundles']);
+ const input=object(value),result=pick(input,['starterVersion','layoutMode','businessName','tagline','aboutText','location','phone','whatsapp','email','heroImage','logoUrl','ctaLabel','ctaTarget','features','copy','gallery','pinnedBundles','styleVariant']);
  // V5 additive fields: exact nested whitelists, so a draft-only or unknown key can never go live.
  if(Object.hasOwn(input,'hours')&&input.hours){const h=object(input.hours);result.hours={days:items(h.days,['closed','open','close']),...(typeof h.note==='string'?{note:h.note}:{})};}
  if(Object.hasOwn(input,'policies'))result.policies=pick(input.policies,['delivery','payment','returns']);

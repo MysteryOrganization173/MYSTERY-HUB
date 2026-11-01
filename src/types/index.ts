@@ -140,6 +140,8 @@ export interface SiteContent {
   gallery?: string[];
   /** Data stores: up to six bundle ids the owner features first. */
   pinnedBundles?: string[];
+  /** V7.1: the design's chosen style (see websiteStyleVariants). Absent: the design's original look. */
+  styleVariant?: string;
 }
 
 export interface SiteSettings {

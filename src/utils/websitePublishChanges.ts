@@ -13,7 +13,7 @@ const FIELDS: [keyof SiteContent, string][] = [
   ['heroImage', 'Main photo'], ['logoUrl', 'Logo'], ['ctaLabel', 'Main button'], ['ctaTarget', 'Main button link'],
   ['hours', 'Opening hours'], ['policies', 'Delivery, payment & returns'], ['sections', 'Page sections'], ['gallery', 'Gallery photos'],
   ['imageMeta', 'Photo focus and descriptions'], ['copy', 'Headings and labels'], ['social', 'Social links'], ['composition', 'Custom sections'],
-  ['pinnedBundles', 'Featured bundles'], ['features', 'Feature details'], ['stats', 'Business facts'],
+  ['pinnedBundles', 'Featured bundles'], ['styleVariant', 'Store style'], ['features', 'Feature details'], ['stats', 'Business facts'],
 ];
 const publicItem = (item: unknown) => { if (!item || typeof item !== 'object') return item; const { isExample, ...rest } = item as { isExample?: boolean }; return isExample ? item : rest; };
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

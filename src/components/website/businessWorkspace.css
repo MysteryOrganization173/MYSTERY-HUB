@@ -140,3 +140,18 @@
   .bw-head h1{font-size:28px}
   .bw-main{gap:20px}
 }
+
+/* V7.1 share kit: one message, one tap to WhatsApp, three tips. */
+.bw-share-kit{border:1px solid #1e3a2d;border-radius:16px;background:linear-gradient(180deg,#0f2119,#0d171f 70%);padding:16px;display:grid;gap:12px}
+.bw-share-kit h2{font-size:16px;font-weight:700;margin:0}
+.bw-share-kit>div>p{font-size:13.5px;color:#9fb0a8;margin:4px 0 0;line-height:1.45}
+.bw-share-pick{display:flex;gap:6px;flex-wrap:wrap}
+.bw-share-pick button{min-height:38px;padding:0 12px;border-radius:999px;border:1px solid #2a3a45;font-size:13px;font-weight:600;color:#cfdad5}
+.bw-share-pick button[aria-checked="true"]{border-color:#00c365;background:rgba(0,195,101,.14);color:#eef3f1}
+.bw-share-message{margin:0;border-left:3px solid #00c365;background:#0a1117;border-radius:0 12px 12px 0;padding:10px 12px;font-size:14px;line-height:1.5;color:#eef3f1;overflow-wrap:anywhere}
+.bw-share-actions{display:flex;flex-wrap:wrap;gap:8px}
+.bw-share-actions .bw-button{flex:1 1 auto;justify-content:center}
+@media (min-width:640px){.bw-share-actions .bw-button{flex:0 0 auto}}
+.bw-share-note{font-size:12.5px;color:#9fb0a8;margin:0}
+.bw-share-tips{list-style:none;margin:0;padding:10px 0 0;border-top:1px solid #1a252d;display:grid;gap:8px;font-size:13px;line-height:1.45;color:#9fb0a8}
+.bw-share-tips strong{color:#eef3f1;font-weight:600}

@@ -4,7 +4,10 @@ import { websiteActionText, resolveStoreTheme } from '../../../utils/websiteBran
 import { SafeImage } from '../SafeImage.js';
 import React, { useMemo, useState } from 'react';
 import { WebsiteTemplate } from '../../../types';
-import { ArrowRight, MessageCircle, Phone, MapPin, ShieldCheck, Search, Smartphone, SlidersHorizontal } from 'lucide-react';
+import { ArrowRight, MessageCircle, Phone, MapPin, ShieldCheck, Search, Smartphone, SlidersHorizontal, ReceiptText } from 'lucide-react';
+import { resolveWebsiteStyle } from '../../../config/websiteStyleVariants';
+import { focalPosition } from '../../../config/websiteContentV5';
+import { STORE_STYLE_CSS } from '../storefront/storeStyles';
 import { resolveWebsiteSections } from '../../../config/websiteContentV5';
 import { getCloudinarySrcSet } from '../../../utils/cloudinary';
 import { resolveDataResellerHeroImage } from '../../../utils/dataResellerArtwork';
@@ -32,6 +35,12 @@ interface TemplateViewProps {
 }
 
 export { resolveDataResellerHeroImage } from '../../../utils/dataResellerArtwork';
+
+/** "#0a0f1d" → "10 15 29", for translucent layers built from the owner's own colour. */
+function hexRgb(hex: string): string {
+  const clean = /^#[0-9a-f]{6}$/i.test(hex) ? hex.slice(1) : '0a0f1d';
+  return [0, 2, 4].map(i => parseInt(clean.slice(i, i + 2), 16)).join(' ');
+}
 
 /** Up to two letters from the business name, for a store that has not added a logo. */
 export function storeInitials(name: string): string {
@@ -64,6 +73,12 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
     primary: '#0f172a', secondary: '#2563eb', background: '#0a0f1d', accent: '#2563eb',
   });
   const onAccent = websiteActionText(p.accent);
+  // V7.1 styles: a saved choice wins; an existing owner without one keeps Classic, the original look.
+  const style = resolveWebsiteStyle('reseller', template.siteContent?.styleVariant, owner);
+  const styled = style !== 'classic';
+  const heroMeta = template.siteContent?.imageMeta?.heroImage;
+  const heroPosition = focalPosition(heroMeta) || 'center';
+  const darkStore = websiteActionText(p.background) === '#ffffff';
 
   const heroImageSrc = resolveDataResellerHeroImage(template.heroImage, owner);
   const heroSrcSet = getCloudinarySrcSet(heroImageSrc, [480, 768, 1024, 1280, 1536], { format: 'auto', quality: 'auto' });
@@ -99,7 +114,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
 
   const headerNode = <React.Fragment key="header">
       {/* 1. The store's own identity: its logo or monogram, its name and what it sells. */}
-      <header className="store-header" style={{ backgroundColor: `${p.background}eb`, borderColor: line, color: p.text }}>
+      <header className={styled ? `store-header sx-header${style === 'horizon' ? ' is-overlay' : ''}` : 'store-header'} style={{ backgroundColor: `${p.background}${style === 'horizon' ? 'b8' : 'eb'}`, borderColor: line, color: p.text }}>
         <div className="store-wrap store-header-inner">
           <div className="store-brand">
             <span className="store-mark" style={logoUrl ? { backgroundColor: p.surface, border: `1px solid ${line}` } : { backgroundColor: p.accent, color: onAccent }}>
@@ -164,6 +179,57 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           )}
         </div>
       </section>
+  </React.Fragment>;
+  // V7.1: one shared hero copy block, composed three ways. Every edit marker, label and fact is the same as Classic.
+  const heroCopy = <div className="sx-copy min-w-0">
+    {networks.length > 0 && (
+      <p className="sx-badge">
+        <span className="sx-badge-dots" aria-hidden="true">{networks.map(n => <i key={n} style={{ backgroundColor: storeNetworkColor(n) }} />)}</span>
+        <span>{networks.map(storeNetworkName).join(' · ')} data</span>
+      </p>
+    )}
+    <h2 id="store-hero-title" {...edit('content:tagline')} className="sx-title site-display" style={{ color: p.text }}>{tagline}</h2>
+    <p {...edit('content:aboutText')} className="sx-text" style={{ color: p.mutedText }}>{aboutText}</p>
+    <div className="sx-actions">
+      <button type="button" {...edit('content:ctaLabel')} data-website-primary-cta="true" onClick={() => scrollTo('bundle-catalog')}
+        className="store-primary sx-primary" style={{ backgroundColor: p.accent, color: onAccent }}>
+        <span>{primaryLabel}</span>
+        <ArrowRight className="w-4 h-4" aria-hidden="true" />
+      </button>
+      {managedCheckout && (
+        <button type="button" onClick={() => scrollTo('store-track')} className="sx-secondary" style={{ color: p.text }}>
+          <Search className="w-4 h-4" aria-hidden="true" />
+          <span {...copy.edit('secondary')}>{copy.text('secondary')}</span>
+        </button>
+      )}
+    </div>
+    <ul className="sx-facts" style={{ color: p.mutedText }}>
+      {fromMinor !== null && <li>Bundles from <strong style={{ color: p.text }}>{formatGhs(fromMinor)}</strong></li>}
+      {managedSummary && managedSummary.count > 0 && <li><strong style={{ color: p.text }}>{managedSummary.count}</strong> bundle{managedSummary.count === 1 ? '' : 's'} available</li>}
+      {!managedCheckout && !owner && <li>Example store · each owner sets their own bundles and prices</li>}
+      <li className="sx-trust"><ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />Secure checkout by Paystack</li>
+      <li className="sx-trust"><ReceiptText className="w-3.5 h-3.5" aria-hidden="true" />Order reference to track</li>
+    </ul>
+  </div>;
+  const heroPicture = (sizes: string) => <SafeImage src={heroImageSrc} srcSet={heroSrcSet || undefined} sizes={sizes} alt={heroMeta?.alt || ''} loading="eager" fetchPriority="high" width={1536} height={1024} className="w-full h-full" style={{ objectPosition: heroPosition, background: 'transparent' }} />;
+  const styledHeroNode = <React.Fragment key="hero">
+    {style === 'horizon' && <section className="sx-hero hz" aria-labelledby="store-hero-title">
+      {/* The banner is the backdrop: it runs under the header and fades into the store's own background. */}
+      <div {...edit('content:heroImage')} className="hz-media">{heroPicture('100vw')}</div>
+      <div className="hz-scrim" aria-hidden="true" />
+      <div className="store-wrap hz-inner">{heroCopy}</div>
+    </section>}
+    {style === 'market' && <section className="store-wrap sx-hero mk" aria-labelledby="store-hero-title">
+      <div {...edit('content:heroImage')} className="mk-art" style={{ borderColor: line }}>{heroPicture('(max-width: 899px) 100vw, 520px')}</div>
+      {heroCopy}
+    </section>}
+    {style === 'studio' && <section className="store-wrap sx-hero st" aria-labelledby="store-hero-title">
+      {/* No banner photo: the business's own mark leads, and the page downloads no hero image. */}
+      <span {...edit('content:logoUrl')} className="st-mark" style={logoUrl ? { backgroundColor: p.surface, borderColor: line } : { backgroundColor: p.accent, color: onAccent, borderColor: 'transparent' }}>
+        {logoUrl ? <SafeImage src={logoUrl} alt="" className="w-full h-full" style={{ objectFit: 'contain' }} /> : <span aria-hidden="true" className="site-display">{storeInitials(businessName)}</span>}
+      </span>
+      {heroCopy}
+    </section>}
   </React.Fragment>;
   const pickerNode = <React.Fragment key="picker">
       {/* 3. Shop by network: real counts and lowest prices, one tap from the catalogue. */}
@@ -258,14 +324,16 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
         <div className="store-wrap store-footer-base" style={{ color: p.surfaceMutedText, borderColor: line }}>© {year} {businessName}</div>
       </footer>
   </React.Fragment>;
-  const nodes: Record<string, React.ReactNode> = { header: headerNode, hero: heroNode, picker: pickerNode, catalogue: catalogueNode, steps: stepsNode, help: helpNode, footer: footerNode };
+  const nodes: Record<string, React.ReactNode> = { header: headerNode, hero: styled ? styledHeroNode : heroNode, picker: pickerNode, catalogue: catalogueNode, steps: stepsNode, help: helpNode, footer: footerNode };
 
   return (
     <div
       className="reseller-storefront min-h-full font-sans antialiased flex flex-col selection:bg-[var(--website-accent)] selection:text-[var(--website-on-accent)]"
-      style={{ backgroundColor: p.background, color: p.text, '--website-accent': p.accent, '--website-on-accent': onAccent, '--website-focus': p.focus, '--website-placeholder': p.mutedText, '--store-surface': p.surface, '--store-border': line } as React.CSSProperties}
+      {...(styled ? { 'data-store-style': style, 'data-store-tone': darkStore ? 'dark' : 'light' } : {})}
+      style={{ backgroundColor: p.background, color: p.text, '--website-accent': p.accent, '--website-on-accent': onAccent, '--website-focus': p.focus, '--website-placeholder': p.mutedText, '--store-surface': p.surface, '--store-border': line, ...(styled ? { '--store-bg': p.background, '--store-bg-rgb': hexRgb(p.background), '--store-accent-rgb': hexRgb(p.accent), '--store-text': p.text, '--store-muted': p.mutedText, '--store-surface-text': p.surfaceText } : {}) } as React.CSSProperties}
     >
       <style>{RESELLER_STORE_CSS}</style>
+      {styled && <style>{STORE_STYLE_CSS}</style>}
 
       {sections.map(section => section.visible ? nodes[section.id] : null)}
     </div>

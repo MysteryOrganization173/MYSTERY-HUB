@@ -47,7 +47,7 @@ const LABELS: Record<string, string> = {
   businessName: 'business name', tagline: 'headline', aboutText: 'description', location: 'location', phone: 'phone number', whatsapp: 'WhatsApp number',
   email: 'email', heroImage: 'main photo', logoUrl: 'logo', ctaLabel: 'main button', ctaTarget: 'button link', social: 'social links', items: 'items',
   copy: 'wording', hours: 'opening hours', policies: 'policies', sections: 'page sections', imageMeta: 'photo details', gallery: 'gallery',
-  composition: 'sections', primaryColor: 'colours', accentColor: 'colours', backgroundColor: 'colours',
+  composition: 'sections', styleVariant: 'store style', pinnedBundles: 'featured bundles', primaryColor: 'colours', accentColor: 'colours', backgroundColor: 'colours',
 };
 export function undoLabel(entry?: UndoEntry | null): string {
   if (!entry) return '';
