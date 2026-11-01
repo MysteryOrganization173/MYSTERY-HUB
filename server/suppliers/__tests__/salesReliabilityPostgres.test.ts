@@ -43,6 +43,16 @@ test('native PostgreSQL monitoring durability, concurrency, bounded history and 
       await Store.save([event(now+30000,{category:'passed',blocked:false,fresh:{services:now+30000}})],now+30000);
       assert.equal((await new SalesCollector().view(now+30000)).state,'recovered');
     });
+    await t.test('buffered persistence preserves the event-time ten-minute boundary',async()=>{
+      const buffered=[event(now-600000+1,{service:'airtime',stage:'catalog'}),event(now-100,{service:'airtime',stage:'catalog'}),event(now,{service:'airtime',stage:'catalog'})];
+      await Store.save(buffered,now+5000);
+      const state=await Store.read(undefined,now+5000);
+      const found=state.incidents.find(i=>i.service==='airtime'&&i.stage==='catalog');
+      assert.equal(found?.affectedAttempts,3,'flush delay must not erase a failure inside the actual event-time window');
+      const outside=[event(now-600000,{service:'instant_bundle',stage:'catalog'}),event(now-100,{service:'instant_bundle',stage:'catalog'}),event(now,{service:'instant_bundle',stage:'catalog'})];
+      await Store.save(outside,now+5000);
+      assert.equal((await Store.read(undefined,now+5000)).incidents.some(i=>i.service==='instant_bundle'),false,'the exact ten-minute boundary stays exclusive');
+    });
     await t.test('repeated initialization and all monitoring writes leave existing customer/finance tables unchanged',async()=>{
       await initDatabase();assert.deepEqual(await snapshot(),before);
       const tables=(await observer.query("SELECT c.relrowsecurity,c.relforcerowsecurity,(SELECT count(*) FROM pg_policy WHERE polrelid=c.oid) AS policies,has_table_privilege('anon',c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE') AS anon,has_table_privilege('authenticated',c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE') AS customer FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='mysteryhub_operations' AND c.relkind='r'")).rows;

@@ -25,9 +25,9 @@ export class SalesReliabilityStore {
       return result;
     }catch(error){await c.query('ROLLBACK').catch(()=>{});throw error;}finally{c.release();}
   }
-  static async read(client?:PoolClient,now=Date.now()):Promise<{observations:SalesObservation[];incidents:SalesIncident[]}>{
-    if(!client)return this.transaction(c=>this.read(c,now),true);
-    const observations=(await client.query(`SELECT * FROM ${schema}.checkout_observations WHERE observed_at>$1 ORDER BY observed_at DESC,id LIMIT 5000`,[new Date(now-SALES_WINDOW_MS)])).rows.map(observation);
+  static async read(client?:PoolClient,now=Date.now(),from=now-SALES_WINDOW_MS):Promise<{observations:SalesObservation[];incidents:SalesIncident[]}>{
+    if(!client)return this.transaction(c=>this.read(c,now,from),true);
+    const observations=(await client.query(`SELECT * FROM ${schema}.checkout_observations WHERE observed_at>$1 ORDER BY observed_at DESC,id LIMIT 5000`,[new Date(from)])).rows.map(observation);
     const incidents=(await client.query(`SELECT * FROM ${schema}.checkout_incidents ORDER BY last_failure_at DESC LIMIT 100`)).rows.map(incident);
     return {observations,incidents};
   }
@@ -35,7 +35,8 @@ export class SalesReliabilityStore {
     await this.transaction(async c=>{
       const payload=events.map(e=>({id:e.id,observed_at:iso(e.at),service:e.service,stage:e.stage,category:e.category,blocked:e.blocked,phase:e.phase,fresh:e.fresh,cached:e.cached}));
       const added=(await c.query(`INSERT INTO ${schema}.checkout_observations SELECT * FROM jsonb_populate_recordset(NULL::${schema}.checkout_observations,$1::jsonb) ON CONFLICT(id) DO NOTHING RETURNING *`,[JSON.stringify(payload)])).rows.map(observation);
-      const state=await this.read(c,now);
+      // Buffered attempts must use their event-time window, not the later flush clock.
+      const state=await this.read(c,now,Math.min(now,...added.map(e=>e.at))-SALES_WINDOW_MS);
       // Read includes newly inserted rows; IDs make retries safe after an uncertain COMMIT.
       const next=advanceSalesIncidents(state.incidents,state.observations,added);
       const before=new Map(state.incidents.map(i=>[i.id,JSON.stringify(i)]));
