@@ -11,6 +11,7 @@ import { WEBSITE_TEMPLATES, templateDesignLabel } from '../../data/templates';
 import { websiteItemVocabulary } from '../../config/websiteStarters';
 import { unpublishWebsiteOnServer } from '../../services/apiClient';
 import { formatGhs } from '../../../shared/money';
+import { StoreShareKit } from './StoreShareKit';
 import { lazyPage } from '../../utils/lazyPage';
 import { initialWorkspaceTabs, sectionForTab, workspacePath, workspaceRangeLabel, workspaceSectionFromPath, workspaceSections, WORKSPACE_SECTIONS, type WorkspaceSection } from '../../utils/businessWorkspace';
 
@@ -169,10 +170,12 @@ export const BusinessWorkspacePage: React.FC = () => {
     </div>
   </div>;
 
-  const hub = (s: BusinessDashboardSummary) => <nav className="bw-hub" aria-labelledby="bw-hub-title"><h2 id="bw-hub-title">Manage your business</h2><ul>{workspaceSections(s.tabs).filter(target => target !== 'overview').map(target => {
+  // V7.1: once customers can actually buy (published, bundles on sale), help the owner find the first ones.
+  const shareKit = (s: BusinessDashboardSummary) => reseller && published && (s.sellable ?? 0) > 0 ? <StoreShareKit name={name} url={publicUrl} /> : null;
+  const hub = (s: BusinessDashboardSummary) => <>{shareKit(s)}<nav className="bw-hub" aria-labelledby="bw-hub-title"><h2 id="bw-hub-title">Manage your business</h2><ul>{workspaceSections(s.tabs).filter(target => target !== 'overview').map(target => {
     const Icon = ICONS[target];
     return <li key={target}><a href={workspacePath(target)} onClick={event => { event.preventDefault(); go(target); }}><Icon size={20} aria-hidden={true} /><span className="bw-nav-text"><strong>{WORKSPACE_SECTIONS[target].label}</strong><small>{detail(target)}</small></span>{badge(target)}<ChevronRight size={18} aria-hidden={true} className="bw-hub-chevron" /></a></li>;
-  })}</ul></nav>;
+  })}</ul></nav></>;
 
   const identity = <div className="bw-identity">
     <WorkspaceAvatar logo={site.content_json?.logoUrl} name={name} />

@@ -30,6 +30,7 @@ import {
 } from '../types/website.js';
 import { WEBSITE_TEMPLATES, LEGACY_DEMO_BUSINESS_NAMES } from '../../src/data/templates.js';
 import {websiteStarter,WEBSITE_STARTER_VERSION} from '../../src/config/websiteStarters.js';
+import {isWebsiteStyleVariant} from '../../src/config/websiteStyleVariants.js';
 import {websiteLayoutMode,websiteExampleReview} from '../../src/utils/websiteLayout.js';
 import {safeWebsiteText, websiteV5Fields} from '../services/websiteValidation.js';
 /** V5 fields replace whole values when sent; null hours clears them. Unsent fields keep the saved value. */
@@ -246,6 +247,8 @@ export class WebsiteStore {
       items: sanitizeTemplateItems(input.content?.items ?? []),
       stats: (input.content?.stats || []).slice(0, 8).map(s => ({label:sanitizeString(s.label,50),value:sanitizeString(s.value,50)})),
       features: (input.content?.features || []).slice(0, 10).map(f => sanitizeString(f,80)),
+      // V7.1: the starter's style (already validated above); older clients send none and get the original look.
+      ...(isWebsiteStyleVariant(input.content?.styleVariant) ? { styleVariant: input.content.styleVariant } : {}),
     };
 
     this.validateLayout(templateId,initialContent);

@@ -317,6 +317,11 @@ export const RESELLER_STORE_CSS = `
 .visual-selection-surface .store-setup-action{display:inline-flex!important}
 .visual-selection-surface .store-setup-hint{display:none}
 @media (max-width:479px){.store-setup-action{justify-self:stretch}}
+/* V7.1: placeholder rows while the server catalogue loads; the status line above says what is happening. */
+.store-skeleton{display:grid;gap:8px}
+@media (min-width:720px){.store-skeleton{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.store-skeleton-row{display:block;height:64px;border:1px solid;border-radius:14px;animation:store-pulse 1.4s ease-in-out infinite}
+@keyframes store-pulse{50%{opacity:.45}}
 .store-recipient{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid;border-radius:14px;padding:10px 12px;margin-top:12px;font-size:14px}
 @media (prefers-reduced-motion:reduce){.reseller-storefront *{transition:none!important;animation:none!important}}
 `;

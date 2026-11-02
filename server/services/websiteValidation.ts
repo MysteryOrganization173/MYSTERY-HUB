@@ -2,6 +2,7 @@ import { SECTION_REGISTRY, sectionEligible, resolveWebsitePlan, type WebsiteComp
 import { sanitizeUrl } from '../types/website.js';
 import { TEMPLATE_COPY } from '../../src/config/websiteTemplateCopy.js';
 import { WEBSITE_V5_LIMITS as V5, WEBSITE_POLICY_KEYS, isWebsiteTime, isFocal, type WebsiteHours, type WebsitePolicies, type WebsiteSectionLayout, type WebsiteImageMeta } from '../../src/config/websiteContentV5.js';
+import { isWebsiteStyleVariant } from '../../src/config/websiteStyleVariants.js';
 export class WebsiteInputError extends Error {}
 function fail(message: string): never { throw new WebsiteInputError(message); }
 function object(value: unknown): Record<string, unknown> {
@@ -137,7 +138,7 @@ export function validateUltraEnquiry(value: unknown): UltraEnquiryInput {
 }
 
 /* ------------------------------ V5 additive content (all optional) ------------------------------ */
-export const WEBSITE_V5_CONTENT_KEYS = ['hours','policies','sections','imageMeta','gallery','pinnedBundles'] as const;
+export const WEBSITE_V5_CONTENT_KEYS = ['hours','policies','sections','imageMeta','gallery','pinnedBundles','styleVariant'] as const;
 const imageUrl = (value: unknown) => { const url = safeWebsiteText(value, 500); if (!url || !sanitizeUrl(url) || !/^https?:\/\//.test(url)) fail('Invalid image.'); return url; };
 const idList = (value: unknown, max: number, pattern: RegExp, message: string) => {
   if (!Array.isArray(value) || value.length > max) fail(message);
@@ -147,7 +148,7 @@ const idList = (value: unknown, max: number, pattern: RegExp, message: string) =
 };
 /** Validates and normalizes only the V5 fields that are present. Returns exactly what may be stored. */
 export function websiteV5Fields(content: Record<string, unknown>) {
-  const out: { hours?: WebsiteHours | null; policies?: WebsitePolicies | null; sections?: WebsiteSectionLayout | null; imageMeta?: WebsiteImageMeta | null; gallery?: string[] | null; pinnedBundles?: string[] | null } = {};
+  const out: { hours?: WebsiteHours | null; policies?: WebsitePolicies | null; sections?: WebsiteSectionLayout | null; imageMeta?: WebsiteImageMeta | null; gallery?: string[] | null; pinnedBundles?: string[] | null; styleVariant?: string | null } = {};
   // null clears a field: editors send it when the owner removed something the saved draft still has.
   const rest: Record<string, unknown> = { ...content };
   for (const key of WEBSITE_V5_CONTENT_KEYS) if (content[key] === null) { (out as any)[key] = null; delete rest[key]; }
@@ -191,6 +192,8 @@ export function websiteV5Fields(content: Record<string, unknown>) {
     if (!Array.isArray(content.gallery) || content.gallery.length > V5.gallery) fail(`Add up to ${V5.gallery} gallery photos.`);
     out.gallery = content.gallery.map(imageUrl);
   }
+  // V7.1: a design's named style. Only registered ids; renderers ignore an id their layout does not offer.
+  if (content.styleVariant !== undefined) { if (!isWebsiteStyleVariant(content.styleVariant)) fail('Choose one of the offered styles.'); out.styleVariant = content.styleVariant; }
   if (content.pinnedBundles !== undefined) out.pinnedBundles = idList(content.pinnedBundles, V5.pinnedBundles, /^[a-z0-9][a-z0-9-]{0,47}$/, `Feature up to ${V5.pinnedBundles} bundles.`);
   return out;
 }
