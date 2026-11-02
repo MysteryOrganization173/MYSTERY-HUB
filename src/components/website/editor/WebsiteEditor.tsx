@@ -33,6 +33,7 @@ import type { TemplateItem } from '../../../types';
 import { resellerCatalogueSummary, type ResellerCatalogueSummary } from '../../../utils/websiteOwnerAttention';
 import { WebsiteStoreSetup } from './WebsiteStoreSetup';
 import { WebsiteStoreLook, WebsiteCopyIdeas } from './WebsiteStoreLook';
+import { WebsiteDesignPanel } from './WebsiteDesignPanel';
 import { DATA_STORE_COPY_IDEAS } from '../../../config/websiteStyleVariants';
 import { DATA_RESELLER_STARTER_HERO_IMAGE, resolveDataResellerHeroImage, showsLegacyDataResellerArtwork } from '../../../utils/dataResellerArtwork';
 import {
@@ -133,6 +134,8 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   // View Mode: 'edit' or 'preview' (on mobile)
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
   const [allSettings, setAllSettings] = useState(false);
+  // V7.2 Design mode on phones: a working height that leaves the live draft visible, or more room to browse.
+  const [designExpanded, setDesignExpanded] = useState(false);
   const [visualSelection, setVisualSelection] = useState<string|null>(null);
   const [focusRequest, setFocusRequest] = useState(0);
   // A tap on content that has no tap-to-edit field explains where to change it.
@@ -530,12 +533,12 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     if(!next)return;
     draftRef.current={...draft,...next};setContent(next.content);setSettings(next.settings);markDirty();
   };
-  // V7.1 Data Store helpers: the store style (with the colour sets) on the look panel, wording ideas on text fields.
+  // Data Store helpers: V7.2 Design mode (style, colour sets, fine-tuning) and V7.1 wording ideas on text fields.
   const applyPalette = (palette:{backgroundColor:string;primaryColor:string;accentColor:string}) => {const next={...draftRef.current.settings,backgroundColor:palette.backgroundColor,primaryColor:palette.primaryColor,accentColor:palette.accentColor};draftRef.current={...draftRef.current,settings:next};setSettings(next);markDirty();};
-  const storeLook = isDataReseller && layoutMode==='template' ? <WebsiteStoreLook layout="reseller" value={content.styleVariant} onChange={style=>changeContent({styleVariant:style})}/> : null;
+  const storeLook = isDataReseller && layoutMode==='template' ? <WebsiteStoreLook layout="reseller" value={content.styleVariant} onChange={style=>changeContent({styleVariant:style})} colors={{background:settings.backgroundColor,accent:settings.accentColor}}/> : null;
   const ideaField = isDataReseller && layoutMode==='template' && selected?.source.kind==='content' && ['tagline','aboutText','ctaLabel'].includes(selected.source.field as string) ? selected.source.field as 'tagline'|'aboutText'|'ctaLabel' : null;
-  const panelExtra = visualSelection==='branding' && storeLook ? <>{storeLook}<WebsitePaletteControl settings={settings} onApply={applyPalette}/></>
-    : ideaField ? <WebsiteCopyIdeas ideas={DATA_STORE_COPY_IDEAS[ideaField]} value={String(content[ideaField] ?? '')} onPick={text=>editVisualValue(`content:${ideaField}`,text)}/> : null;
+  const designOpen = activeTab==='edit' && visualSelection==='branding';
+  const panelExtra = ideaField ? <WebsiteCopyIdeas ideas={DATA_STORE_COPY_IDEAS[ideaField]} value={String(content[ideaField] ?? '')} onPick={text=>editVisualValue(`content:${ideaField}`,text)}/> : null;
   type Area = [typeof activeSection, string, typeof Building];
   const settingsAreas: Area[] = [['business','Business',Building],['contact','Contact',Phone],...(isDataReseller||currentSite.template_id==='tmpl-start-blank'?[]:[['items',word.plural,UtensilsCrossed] as Area,['hours','Hours & policies',Clock] as Area]),['branding','Colors',Palette],['media','Images',ImageIcon],...(isDataReseller?[['bundles','Bundles & pricing',Layers] as Area]:[]),['sections','Layout',Layers],['cta','Main button',MousePointerClick],['social','Social links',Share2],['history','History',History]];
   const openSettings=(section?: typeof activeSection)=>{setAllSettings(true);setVisualSelection(null);setSettingsNotice(false);if(section)setActiveSection(section);};
@@ -545,7 +548,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
   const stepIndex = selected ? stepIds.indexOf(selected.id) : -1;
   const step = (delta:number) => {if(stepIndex<0 || !stepIds.length)return;setVisualSelection(stepIds[(stepIndex+delta+stepIds.length)%stepIds.length]);};
   // Phones and tablets show the panel as a bottom sheet over roughly half of the canvas.
-  const sheetReserve = typeof window!=='undefined' && window.innerWidth<1024 ? 0.5 : 0;
+  const sheetReserve = typeof window!=='undefined' && window.innerWidth<1024 && visualSelection!=='branding' ? 0.5 : 0;
   // The saved draft differs from what visitors see.
   const liveBehind = currentSite.status==='published' && websitePublishChanges(currentSite.published_snapshot_json, {templateId: currentSite.template_id, content: currentSite.content_json, settings: currentSite.settings_json}).length>0;
   const openBusiness = onOpenBusiness ? () => {setPublishOpen(false);void exitEditor(false, onOpenBusiness);} : undefined;
@@ -566,11 +569,11 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         onEditField={target=>{setPublishOpen(false);setActiveTab('edit');if(target==='name')selectTarget('content:businessName');else if(target==='contact')openSettings('contact');else selectTarget(target);}} onBusiness={openBusiness}/>}
       {mediaOpen && <WebsiteImageLibrary siteId={currentSite.id} token={sessionToken} onClose={()=>setMediaOpen(false)} onChoose={url=>{setContent({...content,heroImage:url});markDirty();setMediaOpen(false);}} />}
       <WebsiteEditorToolbar name={content.businessName || siteName} mode={activeTab} device={previewDevice} status={saveStatusText} published={currentSite.status==='published'} saving={isSaving} publishing={isPublishing}
-        onExit={()=>void exitEditor()} backLabel={backLabel} onMode={changeMode} onDevice={device=>{setPreviewDevice(device);if(isPhone && device!=='mobile')changeMode('preview');}} onSave={()=>void handleSaveDraft()} onPublish={()=>{setVisualSelection(null);setPublishOpen(true);}} onUnpublish={()=>void handleUnpublish()} onSettings={()=>openSettings()} onBrand={()=>selectTarget('branding')} brandLabel={storeLook?'Look':undefined} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`} undoLabel={undoTop ? undoLabel(undoTop) : ''} onUndo={handleUndo} liveBehind={liveBehind} onBusiness={openBusiness}/>
+        onExit={()=>void exitEditor()} backLabel={backLabel} onMode={changeMode} onDevice={device=>{setPreviewDevice(device);if(isPhone && device!=='mobile')changeMode('preview');}} onSave={()=>void handleSaveDraft()} onPublish={()=>{setVisualSelection(null);setPublishOpen(true);}} onUnpublish={()=>void handleUnpublish()} onSettings={()=>openSettings()} onBrand={()=>selectTarget('branding')} onBundles={isDataReseller?()=>{setVisualSelection(null);setAllSettings(false);setActiveTab('edit');setBundleSheet(true);}:undefined} onCopy={handleCopyLink} onFullPreview={()=>setIsPrivateFullPreviewOpen(true)} settingsOpen={allSettings} colorsOpen={activeTab==='edit' && visualSelection==='branding'} liveUrl={`/sites/${currentSite.slug}`} undoLabel={undoTop ? undoLabel(undoTop) : ''} onUndo={handleUndo} liveBehind={liveBehind} onBusiness={openBusiness}/>
       {/* =========================================================
           WORKSPACE: LEFT EDITOR / RIGHT LIVE PREVIEW
           ========================================================= */}
-      <div className="flex-1 min-h-0 flex overflow-hidden relative">
+      <div className="flex-1 min-h-0 flex overflow-hidden relative" data-design-open={designOpen ? '' : undefined}>
         {/* Existing structured controls remain available without a competing draft store. */}
         {allSettings && <div inert={locked} className="visual-all-settings">
           <div className="visual-settings-head">
@@ -1087,7 +1090,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         <div className="visual-canvas" data-selecting={contextualTargets.length>0 || selectedItemIndex>=0 || settingsNotice ? '' : undefined}>
           {activeTab==='edit' && isDataReseller && <WebsiteStoreSetup businessName={content.businessName || ''} published={currentSite.status==='published'} liveChanges={liveBehind || (currentSite.status==='published' && isDirty)} catalogue={catalogue}
             onBrand={()=>selectTarget('branding')} onBundles={()=>{setVisualSelection(null);setBundleSheet(true);}} onPublish={()=>{setVisualSelection(null);setPublishOpen(true);}} onBusiness={openBusiness}/>}
-          {activeTab==='edit' && !canvasHintSeen && !visualSelection && !allSettings && <div className="visual-canvas-hint" role="note"><span>{isDataReseller||layoutMode==='sections'?'Tap a heading, photo or contact detail to change it':`Tap any heading, photo or ${word.singular.toLowerCase()} to change it`}</span><button type="button" aria-label="Dismiss tip" onClick={()=>setCanvasHintSeen(true)}><X size={15}/></button></div>}
+          {activeTab==='edit' && !canvasHintSeen && !visualSelection && !allSettings && <div className="visual-canvas-hint" role="note"><span>{isDataReseller||layoutMode==='sections'?'Tap any text or photo to change it':`Tap any heading, photo or ${word.singular.toLowerCase()} to change it`} · <strong>Design</strong> changes the whole look</span><button type="button" aria-label="Dismiss tip" onClick={()=>setCanvasHintSeen(true)}><X size={15}/></button></div>}
           {activeTab==='preview' && !previewHintSeen && <div className="visual-canvas-hint is-preview" role="note"><Eye size={15}/><span>{canvasDevice==='mobile'?'Preview of your draft':`${canvasDevice==='tablet'?'Tablet':'Desktop'} preview, scaled to fit`} · payments are off</span><button type="button" aria-label="Dismiss preview note" onClick={()=>setPreviewHintSeen(true)}><X size={15}/></button></div>}
           <div ref={canvasRef} className="visual-canvas-viewport">
             <div style={{width:effectiveCanvasWidth, flexShrink:0, height:scale<1 ? 'calc(100% / '+scale+')' : '100%', transform:scale<1 ? 'scale('+scale+')' : undefined, transformOrigin:'top center'}} className="visual-canvas-page">
@@ -1097,7 +1100,8 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
         </div>
         {activeTab==='edit' && selectedItemIndex>=0 && <WebsiteItemPanel item={items[selectedItemIndex]} index={selectedItemIndex} total={items.length} word={word} fields={itemFields} layout={baseTemplate.layoutType || ''} pinnedCount={items.filter(i=>i.pinned).length} siteId={currentSite.id} token={sessionToken} busy={locked} cardButton={cardButton && {value:cardButton.value,max:cardButton.maxLength,onChange:value=>editVisualValue(cardButton.id,value)}}
           onChange={patch=>updateItem(items[selectedItemIndex].id!,patch)} onKeep={()=>void reviewItems([items[selectedItemIndex].id!],'confirm')} onRemove={()=>removeItem(items[selectedItemIndex].id!)} onAdd={addItem} onPrevious={()=>stepItem(-1)} onNext={()=>stepItem(1)} onDone={clearSelection}/>}
-        {activeTab==='edit' && contextualTargets.length>0 && !selectedItemId && <div className="contents" inert={locked}><VisualContextPanel title={visualSelection==='branding'?(storeLook?'Store look':'Website colors'):selected!.label} extra={panelExtra} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()} position={stepIndex>=0?{index:stepIndex,total:stepIds.length}:undefined} onPrevious={()=>step(-1)} onNext={()=>step(1)} suggested={!!selected && suggestedFields.includes(selected.id)}/></div>}
+        {designOpen && <div className="contents" inert={locked}><WebsiteDesignPanel layout={isDataReseller && layoutMode==='template' ? 'reseller' : undefined} styleValue={content.styleVariant} onStyle={style=>changeContent({styleVariant:style})} settings={settings} onPalette={applyPalette} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings('branding')} expanded={designExpanded} onExpanded={setDesignExpanded}/></div>}
+        {activeTab==='edit' && contextualTargets.length>0 && !selectedItemId && !designOpen && <div className="contents" inert={locked}><VisualContextPanel title={selected!.label} extra={panelExtra} targets={contextualTargets} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()} position={stepIndex>=0?{index:stepIndex,total:stepIds.length}:undefined} onPrevious={()=>step(-1)} onNext={()=>step(1)} suggested={!!selected && suggestedFields.includes(selected.id)}/></div>}
         {activeTab==='edit' && settingsNotice==="settings" && !contextualTargets.length && <VisualContextPanel notice title="Change this in All Settings" targets={[]} siteId={currentSite.id} token={sessionToken} onChange={editVisualValue} onDone={clearSelection} onAllSettings={()=>openSettings()}/>}
         {bundleSheet && isDataReseller && <WebsiteBundleSetupSheet siteId={currentSite.id} token={sessionToken} published={currentSite.status==='published'} onClose={()=>setBundleSheet(false)} onSaved={count=>{setSellableBundles(count);setCatalogRevision(n=>n+1);setFrameGeneration(n=>n+1);}}/>}
       </div>

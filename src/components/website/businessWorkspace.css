@@ -155,3 +155,95 @@
 .bw-share-note{font-size:12.5px;color:#9fb0a8;margin:0}
 .bw-share-tips{list-style:none;margin:0;padding:10px 0 0;border-top:1px solid #1a252d;display:grid;gap:8px;font-size:13px;line-height:1.45;color:#9fb0a8}
 .bw-share-tips strong{color:#eef3f1;font-weight:600}
+
+/* ---------------------------------------------------------------------------------------------
+   V7.2 business mode (phones and tablets). The business dock replaces Mystery Hub's consumer tab bar while an
+   owner manages a website: the areas they use most, with More for the rest and the way back to Mystery Hub.
+   Desktops keep the sidebar. Same height and safe-area handling as the consumer bar, so nothing else moves.
+   --------------------------------------------------------------------------------------------- */
+html[data-business-mode] .mh-bottom-nav{display:none!important}
+.bw-identity-edit{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid rgba(0,195,101,.45);background:rgba(0,195,101,.1);color:#bdf5d6;font-size:14px;font-weight:700;flex-shrink:0}
+.bw-identity-edit:hover{background:rgba(0,195,101,.18)}
+.bw-dock{position:fixed;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:repeat(var(--bw-dock-count,5),minmax(0,1fr));gap:2px;padding:4px 6px calc(4px + env(safe-area-inset-bottom,0px));background:linear-gradient(180deg,rgb(14 22 19 / .92),rgb(8 13 11 / .97));-webkit-backdrop-filter:blur(12px) saturate(140%);backdrop-filter:blur(12px) saturate(140%);border-top:1px solid rgba(0,195,101,.22);box-shadow:0 -12px 28px -14px rgb(0 0 0 / .75)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.bw-dock{background:#0a110e}}
+.bw-dock>a,.bw-dock>button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:56px;border-radius:14px;color:#9fb0a8;text-decoration:none;font:inherit;background:transparent;border:0;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.bw-dock-icon{position:relative;display:grid;place-items:center;width:52px;height:30px;border-radius:999px;transition:background-color .18s ease}
+.bw-dock-label{font-size:12px;font-weight:600;line-height:1;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.bw-dock>[aria-current="page"],.bw-dock>[data-active]{color:#eef8f2}
+.bw-dock>[aria-current="page"] .bw-dock-icon,.bw-dock>[data-active] .bw-dock-icon{background:rgba(0,195,101,.16);box-shadow:inset 0 0 0 1px rgba(0,195,101,.24);color:#48e292}
+.bw-dock>[aria-current="page"] .bw-dock-label,.bw-dock>[data-active] .bw-dock-label{font-weight:700}
+.bw-dock>:active .bw-dock-icon{background:rgba(255,255,255,.07)}
+.bw-dock>:focus-visible{outline:2px solid #34d399;outline-offset:-3px}
+.bw-dock-dot{position:absolute;top:2px;right:12px;width:9px;height:9px;border-radius:50%;background:#f2b24c;box-shadow:0 0 0 2px #0b1210}
+@media (prefers-reduced-motion:reduce){.bw-dock-icon{transition:none}}
+.bw-exit{display:flex;align-items:center;gap:12px;min-height:56px;margin-top:4px;padding:8px 12px;border-radius:12px;border:1px solid #1e2a33;color:#eef3f1;text-decoration:none}
+.bw-exit:hover{background:#111a21}
+.bw-exit svg{color:#9fb0a8;flex-shrink:0}
+.bw-exit strong{display:block;font-size:14.5px;font-weight:600}
+.bw-exit small{display:block;font-size:12.5px;color:#8fa29a}
+@media (max-width:1023px){
+  .bw{padding-bottom:calc(88px + env(safe-area-inset-bottom,0px))}
+  html[data-business-mode] .mh-app>footer{padding-bottom:calc(4.5rem + env(safe-area-inset-bottom,0px))}
+  .bw-menu-button{display:none}
+}
+@media (max-width:359px){.bw-identity-edit{padding:0 10px}.bw-dock-icon{width:44px}.bw-dock-label{font-size:11px}}
+@media (min-width:1024px){.bw-dock,.bw-identity-edit{display:none}.bw-exit{display:none}}
+
+/* ---------------------------------------------------------------------------------------------
+   V7.2 Business Analytics: grouped figures, a quiet daily chart and day-grouped activity.
+   Restrained colour: one green for the busiest day, slate for the rest; no chart library.
+   --------------------------------------------------------------------------------------------- */
+.ba{display:grid;gap:14px}
+.ba-cards{display:grid;gap:14px}
+@media (min-width:720px){.ba-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ba-card{border:1px solid #1e2a33;border-radius:16px;background:#0d161d;padding:14px 16px 16px;min-width:0}
+.ba-card>h3{display:flex;align-items:baseline;gap:8px;margin:0 0 10px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9fb0a8}
+.ba-card>h3 small{font-size:11px;font-weight:600;letter-spacing:0;text-transform:none;color:#6f8279}
+.ba-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;margin:0}
+.ba-metrics>div{min-width:0}
+.ba-metrics dt{font-size:13px;color:#b8c6c0}
+.ba-metrics dd{margin:2px 0 0;font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.15;color:#eef3f1;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.ba-metrics p{margin:3px 0 0;font-size:12px;line-height:1.4;color:#8fa29a}
+.ba-foot{margin:12px 0 0;padding-top:10px;border-top:1px solid #1a252d;font-size:12.5px;line-height:1.45;color:#9fb0a8}
+.ba-foot strong{color:#eef3f1}
+.ba-chart{margin:0}
+.ba-chart svg{display:block;width:100%;height:160px;overflow:visible}
+.ba-grid{stroke:#1c2831;stroke-width:1;stroke-dasharray:3 4;vector-effect:non-scaling-stroke}
+.ba-axis{stroke:#2a3a46;stroke-width:1;vector-effect:non-scaling-stroke}
+.ba-bar{fill:#3a4e5c}
+.ba-bar.is-peak{fill:#2fc77c}
+.ba-tick{fill:#8fa29a;font-size:11px;font-family:var(--font-body)}
+.ba-chart figcaption{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;font-size:13px;color:#9fb0a8}
+.ba-chart figcaption strong{color:#eef3f1;font-size:15px}
+.ba-scale{margin-left:auto}
+.ba-table,.ba-own,.ba-help{margin-top:10px}
+.ba-table>summary,.ba-own>summary,.ba-help>summary{display:flex;align-items:center;gap:6px;min-height:44px;cursor:pointer;list-style:none;font-size:13.5px;font-weight:600;color:#cbd5d1}
+.ba-table>summary::-webkit-details-marker,.ba-own>summary::-webkit-details-marker,.ba-help>summary::-webkit-details-marker{display:none}
+.ba-table[open]>summary svg,.ba-own[open]>summary svg,.ba-help[open]>summary svg{transform:rotate(180deg)}
+.ba-table table{width:100%;border-collapse:collapse;font-size:13px}
+.ba-table th{text-align:left;font-weight:600;color:#8fa29a;padding:6px 0;border-bottom:1px solid #1a252d}
+.ba-table th:last-child,.ba-table td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.ba-table td{padding:6px 0;border-bottom:1px solid #141e25;color:#d6e0dc}
+.ba-days{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.ba-days h4{margin:0 0 4px;font-size:12px;font-weight:700;color:#8fa29a}
+.ba-days ul{list-style:none;margin:0;padding:0}
+.ba-days ul>li{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #16212a;font-size:14px}
+.ba-days ul>li:last-child{border-bottom:0}
+.ba-row-label{min-width:0;color:#e2e9e6}
+.ba-row-label::first-letter{text-transform:uppercase}
+.ba-count{color:#8fa29a;font-variant-numeric:tabular-nums}
+.ba-days time{flex-shrink:0;font-size:12.5px;color:#8fa29a;font-variant-numeric:tabular-nums}
+.ba-more{margin-top:8px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid #2a3a46;font-size:13.5px;font-weight:600;color:#cbd5d1}
+.ba-more:hover{background:#111a21}
+.ba-empty{font-size:14px;line-height:1.5;color:#94a3b8;margin:0}
+.ba-own>summary span{margin-left:auto;min-width:24px;height:22px;padding:0 7px;border-radius:999px;display:inline-grid;place-items:center;background:#1a252d;color:#cbd5d1;font-size:12px}
+.ba-own ul{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:13px}
+.ba-own li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px;color:#cbd5d1}
+.ba-own li span:last-child{color:#8fa29a}
+.ba-own p,.ba-help p{margin:8px 0 0;font-size:12.5px;line-height:1.5;color:#8fa29a}
+.ba :is(summary,button):focus-visible{outline:2px solid #00c365;outline-offset:2px;border-radius:8px}
+@media (max-width:359px){.ba-metrics{grid-template-columns:1fr}.ba-metrics dd{font-size:22px}}
+@media (min-width:1024px){.ba{gap:18px}.ba-card{padding:18px 20px 20px}.ba-chart svg{height:180px}}
+
+/* The Overview already shows Edit website on its website card. */
+@media (max-width:1023px){.bw[data-section="overview"] .bw-identity-edit{display:none}}

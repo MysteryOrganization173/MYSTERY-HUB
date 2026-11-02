@@ -230,6 +230,29 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
       </span>
       {heroCopy}
     </section>}
+    {/* V7.2 Compact: no photo and a short hero, so the price list starts on the first screen. */}
+    {style === 'compact' && <section className="store-wrap sx-hero cp" aria-labelledby="store-hero-title">{heroCopy}</section>}
+    {/* V7.2 Editorial: a magazine spread. Headline and a framed photo with a caption line. */}
+    {style === 'editorial' && <section className="store-wrap sx-hero ed" aria-labelledby="store-hero-title">
+      <p className="ed-rule" style={{ color: p.mutedText, borderColor: line }}><span>{copy.text('brand')}</span>{location ? <span> · {location}</span> : null}</p>
+      <div className="ed-grid">
+        {heroCopy}
+        <figure className="ed-figure" style={{ borderColor: line }}>
+          <div {...edit('content:heroImage')} className="ed-photo" style={{ backgroundColor: p.surface }}>{heroPicture('(max-width: 899px) 100vw, 480px')}</div>
+          <figcaption style={{ color: p.mutedText }}>{businessName}</figcaption>
+        </figure>
+      </div>
+    </section>}
+    {/* V7.2 Signature: the owner's colour and mark lead; the photo sits in an arch above (beside, on wide screens). */}
+    {style === 'signature' && <section className="store-wrap sx-hero sg" aria-labelledby="store-hero-title">
+      <div {...edit('content:heroImage')} className="sg-arch" style={{ backgroundColor: p.surface }}>{heroPicture('(max-width: 899px) 70vw, 420px')}</div>
+      <div className="sg-panel" style={{ backgroundColor: p.accent, color: onAccent }}>
+        <span {...edit('content:logoUrl')} className="sg-mark" style={{ backgroundColor: logoUrl ? '#ffffff' : onAccent, color: p.accent }}>
+          {logoUrl ? <SafeImage src={logoUrl} alt="" className="w-full h-full" style={{ objectFit: 'contain' }} /> : <span aria-hidden="true" className="site-display">{storeInitials(businessName)}</span>}
+        </span>
+        {heroCopy}
+      </div>
+    </section>}
   </React.Fragment>;
   const pickerNode = <React.Fragment key="picker">
       {/* 3. Shop by network: real counts and lowest prices, one tap from the catalogue. */}
