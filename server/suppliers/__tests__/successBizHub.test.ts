@@ -207,7 +207,8 @@ async function runTests() {
     });
     const checkAFalse = await provider.checkBeneficiaryEligibility('0592066298', { offerSlug: 'mtn-data-direct' });
     assert.strictEqual(checkAFalse.eligible, false, 'data.results eligible false must parse to false');
-    assert.strictEqual(checkAFalse.reason, 'Line is suspended');
+    assert.strictEqual(checkAFalse.outcome, 'ineligible');
+    assert.ok(!checkAFalse.reason?.includes('Line is suspended'));
 
     // 6e. Local phone vs 233-format matching (e.g. requested '0592066298' vs supplier '+233592066298')
     mockClient.checkBeneficiary = async () => ({
@@ -234,7 +235,7 @@ async function runTests() {
     });
     const checkDirect = await provider.checkBeneficiaryEligibility('0592066298');
     assert.strictEqual(checkDirect.eligible, true, 'Direct data.eligible must parse to true');
-    assert.strictEqual(checkDirect.reason, 'Active subscriber');
+    assert.strictEqual(checkDirect.outcome, 'eligible');
 
     // 6h. Missing eligible boolean fails closed (never infers from status: "success")
     mockClient.checkBeneficiary = async () => ({
@@ -243,7 +244,7 @@ async function runTests() {
     });
     const checkMissing = await provider.checkBeneficiaryEligibility('0592066298');
     assert.strictEqual(checkMissing.eligible, false, 'Missing eligible boolean must fail closed');
-    assert.strictEqual(checkMissing.reason, 'Beneficiary response did not contain an explicit eligibility result.');
+    assert.strictEqual(checkMissing.outcome, 'unknown');
 
     // 6i. Multiple results select the correct requested phone
     mockClient.checkBeneficiary = async () => ({

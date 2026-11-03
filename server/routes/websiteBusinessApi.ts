@@ -8,11 +8,12 @@ import { WebsiteOperationError } from '../services/websiteCloudinary.js';
 import { WebsiteBusinessService as Business } from '../services/websiteBusinessService.js';
 import { WebsiteAnalyticsStore } from '../db/websiteAnalyticsStore.js';
 import { WebsiteStore } from '../db/websiteStore.js';
+import {CheckoutFailure,checkoutFailureBody} from '../services/checkoutFailure.js';
 const limit=(max:number)=>createRateLimiter({windowMs:60_000,max,key:req=>req.user?.id||req.ip||'unknown'});
 const sensitive=limit(10),publicWrite=limit(30);
 const handler=(work:(req:any)=>Promise<unknown>)=>async(req:any,res:any)=>{
   res.set('Cache-Control','no-store');
-  try{res.json({success:true,data:await work(req)});}catch(e){if(e instanceof FinanceError||e instanceof WebsiteOperationError||e instanceof MoneyValidationError){res.status(e instanceof MoneyValidationError?400:e.status).json({error:e.message,...((e as any).existingOrderReference?{existingOrderReference:(e as any).existingOrderReference}:{})});return;}console.error('[Website business] Operation unavailable');res.status(503).json({error:'Business services are temporarily unavailable.'});}
+  try{res.json({success:true,data:await work(req)});}catch(e){if(e instanceof CheckoutFailure){res.status(e.status).json(checkoutFailureBody(e));return;}if(e instanceof FinanceError||e instanceof WebsiteOperationError||e instanceof MoneyValidationError){res.status(e instanceof MoneyValidationError?400:e.status).json({error:e.message,...((e as any).existingOrderReference?{existingOrderReference:(e as any).existingOrderReference}:{})});return;}console.error('[Website business] Operation unavailable');res.status(503).json({error:'Business services are temporarily unavailable.'});}
 };
 const offset=(req:any)=>Math.max(0,Math.min(100000,Math.floor(Number(req.query.offset)||0)));
 const lastFour=(req:any)=>{

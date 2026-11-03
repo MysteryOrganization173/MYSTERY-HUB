@@ -36,7 +36,7 @@ beforeEach(()=>{
     throw Error(`Unexpected mocked SQL: ${sql}`);
   };
   pg.Pool.prototype.query=query as any;
-  pg.Pool.prototype.connect=(async()=>{let snapshot:any;return {async query(sql:string,values:any[]=[]){if(sql==='BEGIN'){snapshot=structuredClone(state);statements.push({sql,values});return {rows:[]};}if(sql==='ROLLBACK'){state=snapshot;statements.push({sql,values});return {rows:[]};}if(sql==='COMMIT'){statements.push({sql,values});return {rows:[]};}return query(sql,values);},release(){}};}) as any;
+  pg.Pool.prototype.connect=(async()=>{let snapshot:any;return {async query(sql:string,values:any[]=[]){if(sql==='BEGIN'||sql==='BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'){snapshot=structuredClone(state);statements.push({sql,values});return {rows:[]};}if(sql==='ROLLBACK'){state=snapshot;statements.push({sql,values});return {rows:[]};}if(sql==='COMMIT'){statements.push({sql,values});return {rows:[]};}return query(sql,values);},release(){}};}) as any;
   FulfilmentService.preflightCheck=async()=>({allowed:true,supplierCostMinor:200});FulfilmentService.getProvider().resolvePackage=async()=>({resolved:{supplierCostMinor:200} as any});PaystackServerService.initializeTransaction=async params=>({success:true,reference:params.reference,accessCode:'fixture-access'});
 });
 afterEach(()=>{delete process.env.DATABASE_URL;pg.Pool.prototype.query=original.query;pg.Pool.prototype.connect=original.connect;FulfilmentService.preflightCheck=original.preflight;FulfilmentService.getProvider().resolvePackage=original.resolve;FulfilmentService.getProvider().getRawCatalog=original.rawCatalog;PaystackServerService.initializeTransaction=original.init;globalThis.fetch=original.fetch;});

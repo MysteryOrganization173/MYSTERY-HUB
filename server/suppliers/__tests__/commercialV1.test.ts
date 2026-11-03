@@ -6,7 +6,7 @@ import type {Server} from 'node:http';
 import type {AddressInfo} from 'node:net';
 import {readFileSync} from 'node:fs';
 import {CommercialService as C} from '../../services/commercialService.js';
-import {FinanceStore} from '../../db/financeStore.js';
+import {FinanceStore,FinanceError} from '../../db/financeStore.js';
 import {FinanceService} from '../../services/financeService.js';
 import {AuthStore} from '../../db/authStore.js';
 import {OrdersStore} from '../../db/ordersStore.js';
@@ -41,6 +41,39 @@ const input=(extra:any={})=>({requestId:randomUUID(),customerEmail:'buyer@fixtur
 const order=(extra:any={}):any=>{const id=randomUUID();return {id,user_id:'buyer',public_reference:id,customer_name:'Buyer',customer_email:'buyer@fixture.test',customer_phone:'+233271234567',recipient_phone:'+233271234567',network:'mtn',service_type:'data',product_id:'mtn-1gb',product_name_snapshot:'MTN 1GB',bundle_size_snapshot:'1GB',amount:549,currency:'GHS',status:'pending_payment',payment_provider:'paystack',payment_reference:'MH_'+id,payment_status:'pending',supplier_provider:'success_biz_hub',supplier_order_id:null,supplier_response:null,supplier_cost_minor:400,supplier_offer_ref:null,supplier_last_checked_at:null,failure_reason:null,created_at:new Date().toISOString(),updated_at:new Date().toISOString(),paid_at:null,submitted_at:null,delivered_at:null,...extra};};
 const request=(path:string,body?:any,token='buyer-token')=>originalFetch(base+'/api/'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});
 const initialize=()=>C.initialize(order(),input());
+for(const token of ['','buyer-token'])test(`active MTN rejection is pre-init and protects ${token?'owned':'guest'} tracking references`,async()=>{
+ await OrdersStore.createOrder(order({user_id:'buyer',public_reference:'MH-owned-active',recipient_phone:'+233241234567',status:'processing',payment_status:'success',paid_at:new Date().toISOString()}));
+ const response=await request('payments/initialize',{...input(),productId:'mtn-1gb',recipientPhone:'0241234567'},token),data=await response.json();assert.equal(response.status,409);assert.equal(data.code,'ACTIVE_MTN_ORDER');assert.equal(data.checkout.paymentState,'not_started');assert.equal(data.existingOrderReference,token?'MH-owned-active':undefined);assert.equal(OrdersStore.adminDevOrders().length,1);
+ const corrected=await request('payments/initialize',{...input(),productId:'mtn-1gb',recipientPhone:'0242222222'},token);assert.equal(corrected.status,200);
+});
+test('guest pricing rejection cannot label a concurrently initialized request as not started',async()=>{
+ const original=C.prepare,requestId=randomUUID();let release!:()=>void,entered!:()=>void,calls=0;const started=new Promise<void>(r=>entered=r);
+ C.prepare=(async(...args:Parameters<typeof C.prepare>)=>{if(++calls===1){entered();await new Promise<void>(r=>release=r);throw new FinanceError('Quote changed');}return original.apply(C,args);}) as typeof C.prepare;
+ try{const details=input({requestId}),first=C.initialize(order({user_id:null,public_reference:'MH-concurrent-first'}),details);const rejection=assert.rejects(()=>first,(e:any)=>e.checkout?.paymentState==='unconfirmed'&&e.existingOrderReference==='MH-concurrent-created');await started;
+ await C.initialize(order({user_id:null,public_reference:'MH-concurrent-created'}),details);release();await rejection;assert.equal(OrdersStore.adminDevOrders().length,1);
+ }finally{C.prepare=original;}
+});
+for(const token of ['','buyer-token'])for(const code of ['BENEFICIARY_NOT_ELIGIBLE','BENEFICIARY_CHECK_UNAVAILABLE','SERVICE_TEMPORARILY_UNAVAILABLE','SUPPLIER_WALLET_LOW','PACKAGE_UNAVAILABLE'] as const)test(`direct ${token?'authenticated':'guest'} ${code} remains pre-payment and recoverable`,async()=>{
+ let count=0;P.initializeTransaction=async p=>{count++;return {success:true,reference:p.reference,accessCode:'fixture',authorizationUrl:'https://checkout.invalid/fixture'};};
+ const body={...input(),productId:'mtn-1gb',recipientPhone:'0241234567'};
+ F.preflightCheck=async()=>({allowed:false,code,customerMessage:'PRIVATE',internalReason:'PRIVATE'});
+ const denied=await request('payments/initialize',body,token),data=await denied.json();assert.equal(data.code,code);assert.equal(data.checkout.paymentState,'not_started');assert.equal(data.checkout.retryAllowed,true);assert.equal(data.checkout.verificationSubmitted,false);assert.equal(JSON.stringify(data).includes('PRIVATE'),false);assert.equal(count,0);assert.equal(OrdersStore.adminDevOrders().length,0);
+ F.preflightCheck=async()=>({allowed:true,supplierCostMinor:400});assert.equal((await request('payments/initialize',body,token)).status,200);assert.equal(count,1);
+});
+for(const token of ['','buyer-token'])test(`direct ${token?'authenticated':'guest'} same-key simultaneous requests initialize only once`,async()=>{
+ let count=0;P.initializeTransaction=async p=>{count++;await new Promise(r=>setTimeout(r,15));return {success:true,reference:p.reference,accessCode:'fixture',authorizationUrl:'https://checkout.invalid/fixture'};};
+ const body={...input(),productId:'mtn-1gb',recipientPhone:'0241234567'};
+ const responses=await Promise.all([request('payments/initialize',body,token),request('payments/initialize',body,token)]);assert.equal(count,1);assert.equal(OrdersStore.adminDevOrders().length,1);
+ const data=await Promise.all(responses.map(r=>r.json()));assert.ok(data.some(r=>r.success));assert.ok(data.every(r=>r.success||r.checkout?.paymentState==='unconfirmed'));
+ F.preflightCheck=async()=>({allowed:false,code:'BENEFICIARY_CHECK_UNAVAILABLE'});const again=await request('payments/initialize',body,token);const recovered=await again.json();assert.equal(recovered.checkout?.paymentState,'unconfirmed');assert.equal(recovered.accessCode,undefined);assert.equal(count,1);
+ F.preflightCheck=async()=>({allowed:true,supplierCostMinor:400});if(token){const resumed=await (await request('payments/initialize',body,token)).json();assert.equal(resumed.accessCode,'fixture');assert.equal(count,1);}
+ const mismatch=await request('payments/initialize',{...body,recipientPhone:'0242222222'},token),hidden=await mismatch.json();assert.equal(hidden.checkout.paymentState,'unconfirmed');assert.equal(hidden.existingOrderReference,undefined);assert.equal(hidden.accessCode,undefined);
+});
+test('direct gateway timeout retains the created reference and blocks another initialization',async()=>{
+ let count=0;P.initializeTransaction=async()=>{count++;throw new TypeError('PRIVATE gateway failure');};const body={...input(),productId:'mtn-1gb',recipientPhone:'0241234567'};
+ for(let i=0;i<2;i++){const response=await request('payments/initialize',body,''),data=await response.json();assert.equal(data.checkout.paymentState,'unconfirmed');assert.match(data.existingOrderReference,/^MH-/);assert.equal(JSON.stringify(data).includes('PRIVATE'),false);}
+ assert.equal(count,1);assert.equal(OrdersStore.adminDevOrders().length,1);
+});
 for(const [id,price] of Object.entries(DIRECT_RETAIL_MINOR))test('approved launch catalog and frontend seed '+id,async()=>{assert.equal((await C.catalog()).products.find(p=>p.id===id)?.amountPesewas,price);assert.equal(DATA_BUNDLES.find(p=>p.id===id)?.priceGhc,price/100);});
 for(const phone of ['0241234567','233241234567','+233241234567','(024) 123-4567'])test('canonical identity '+phone,()=>assert.equal(canonicalGhanaPhone(phone),'+233241234567'));
 test('older unused buyer gets exact 100 discount and 449 total independent of recipient',async()=>{const q=await C.quote('mtn-1gb','buyer');assert.equal(q.discountMinor,100);assert.equal(q.totalMinor,449);const result=await initialize();assert.equal(result.amount,449);assert.equal(parameters.amountPesewas,449);assert.notEqual(result.recipient_phone,result.commercial_context!.buyerPhone);assert.equal((await C.quote('mtn-1gb','other')).discountMinor,100);});
@@ -50,7 +83,7 @@ test('historical delivered direct buyer ineligible',async()=>{await OrdersStore.
 test('reseller history does not consume direct eligibility',async()=>{await OrdersStore.createOrder(order({status:'delivered',payment_status:'success',store_context:{siteId:'fixture'}}));assert.equal((await C.quote('mtn-1gb','buyer')).discountMinor,100);});
 test('concurrent tabs reserve one promotion',async()=>{const results=await Promise.all([initialize(),initialize()]);assert.equal(results.filter(r=>r.commercial_context!.discountMinor===100).length,1);assert.equal(results.filter(r=>r.amount===549).length,1);});
 test('same request does not initialize Paystack twice',async()=>{let calls=0;P.initializeTransaction=async p=>{calls++;return {success:true,reference:p.reference,accessCode:'fixture'};};const draft=order(),body=input();const [a,b]=await Promise.all([C.initialize(draft,body),C.initialize(draft,body)]);assert.equal(a.id,b.id);assert.equal(calls,1);});
-test('stale discounted quote cannot silently become regular checkout',async()=>{const q=await C.quote('mtn-1gb','buyer');await initialize();await assert.rejects(()=>C.initialize(order(),input({expectedTotalMinor:q.totalMinor})),/changed/);});
+test('stale discounted quote cannot silently become regular checkout',async()=>{const q=await C.quote('mtn-1gb','buyer');await initialize();await assert.rejects(()=>C.initialize(order(),input({expectedTotalMinor:q.totalMinor})),(e:any)=>e.checkout?.code==='CHECKOUT_REVIEW_REQUIRED');});
 test('price and discount tampering cannot select server total',async()=>{const result=await C.initialize(order(),input({discountMinor:500,amount:1,regularMinor:1,user_id:'other'}));assert.equal(result.amount,449);assert.equal(parameters.amountPesewas,449);});
 test('wrong amount/currency/reference cannot verify discounted payment',async()=>{const o=await initialize();for(const extra of [{amountPesewas:549},{currency:'USD'},{reference:'other'}])assert.ok(validateOrderPayment(o,{isVerified:true,status:'success',amountPesewas:449,currency:'GHS',reference:o.payment_reference,...extra}));assert.equal(validateOrderPayment(o,{isVerified:true,status:'success',amountPesewas:449,currency:'GHS',reference:o.payment_reference}),null);});
 test('Wallet exact debit and insufficient debit rollback reservation',async()=>{await assert.rejects(()=>C.initialize(order(),input({paymentMethod:'wallet'})),/Insufficient/);assert.equal((await C.quote('mtn-1gb','buyer')).discountMinor,100);await FinanceService.adjustment('admin','buyer',{confirmed:true,direction:'credit',amountMinor:1000,requestId:randomUUID(),reason:'Fixture'});const result=await C.initialize(order(),input({paymentMethod:'wallet'}));assert.equal(result.amount,449);assert.equal((await FinanceService.summary('buyer')).walletMinor,551);});

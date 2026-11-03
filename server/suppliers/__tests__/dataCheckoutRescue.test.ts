@@ -27,7 +27,7 @@ test('production confirmation stays with recipient ahead of payment choices and 
   assert.match(checkout,/value=\{phone\}/);
   assert.match(checkout,/Pay GH₵/);
   assert.match(checkout,/submissionPending.current \|\| isInitializing \|\| walletBusy/);
-  assert.match(checkout,/disabled=\{walletBusy \|\| isInitializing \|\| isRegularData && !commercial \|\| flexiPending\}/);
+  assert.match(checkout,/disabled=\{recoveryOnly \|\| walletBusy \|\| isInitializing \|\| isRegularData && !commercial \|\| flexiPending\}/);
 });
 test('production bundle card stays first with compact receipt and payment controls',()=>{
   assert.match(checkout,/Bundle \/ Airtime Summary Card/);
@@ -47,7 +47,7 @@ test('discount and authoritative quote contract remain intact',()=>{
   assert.match(checkout,/commercial\?\.discountMinor>0/);
   assert.match(checkout,/commercial.discountMinor\/100/);
   assert.match(checkout,/commercial\?\.totalMinor\/100/);
-  assert.match(checkout,/commercial&&\/price\|pricing\|quote\|welcome offer\|promotion\/i.test\(serverError\)/);
+  assert.match(checkout,/commercial&&\(\/price\|pricing\|quote\|welcome offer\|promotion\/i.test\(serverError\)/);
   assert.match(checkout,/quoteError&&<button/);
   assert.match(checkout,/setQuoteRefresh/);
   assert.match(checkout,/customerEmail: receiptEmail \|\| user\?\.email/);

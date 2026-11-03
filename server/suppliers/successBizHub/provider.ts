@@ -14,6 +14,8 @@ import {
   SupplierAirtimeResponse,
 } from '../supplierInterface.js';
 import { SuccessBizHubClient } from './client.js';
+import {parseBeneficiaryEligibility,unknownBeneficiary,type BeneficiaryEligibility} from './beneficiary.js';
+import {noteSalesFailure,noteBeneficiaryOutcome} from '../../services/salesReliability.js';
 import { resolveSupplierPackage, ResolvedSupplierPackage } from './catalogResolver.js';
 import { SbhOffer } from './types.js';
 import { parseMinorAmount } from './money.js';
@@ -189,115 +191,21 @@ export class SuccessBizHubProvider implements SupplierProvider {
    * C) data: { eligible, reason }
    * Strictly requires explicit eligible === true. Never infers from status/success.
    */
-  async checkBeneficiaryEligibility(
-    phone: string,
-    offerSelector?: { offerSlug?: string; offerId?: string }
-  ): Promise<{ eligible: boolean; reason?: string }> {
-    const cleanPhone = phone.replace(/[^\d]/g, '');
-    const formatted = cleanPhone.startsWith('233') ? `0${cleanPhone.slice(3)}` : cleanPhone;
-    const targetNorm = normalizeGhanaPhoneForComparison(formatted);
-    const maskedPhone = targetNorm.length >= 4 ? `***${targetNorm.slice(-4)}` : '***';
-
+  async checkBeneficiaryEligibility(phone:string,offerSelector?:{offerSlug?:string;offerId?:string}):Promise<BeneficiaryEligibility> {
     try {
-      const res = await this.client.checkBeneficiary([formatted], offerSelector);
-
-      let isEligible: boolean | null = null;
-      let reason: string | undefined;
-      let hasDataResults = false;
-      let resultCount = 0;
-      let matchedPhone: string | undefined;
-
-      const rawData = res.data as
-        | { results?: Array<{ phone?: string; eligible?: unknown; reason?: string }>; eligible?: unknown; reason?: string }
-        | Array<{ phone?: string; eligible?: unknown; reason?: string }>
-        | undefined;
-
-      // Shape A: data.results array
-      if (rawData && typeof rawData === 'object' && !Array.isArray(rawData) && Array.isArray(rawData.results)) {
-        hasDataResults = true;
-        resultCount = rawData.results.length;
-
-        // Find entry matching requested phone
-        let matched = rawData.results.find(
-          (item) => item.phone && normalizeGhanaPhoneForComparison(item.phone) === targetNorm
-        );
-
-        // If only 1 result exists for the single phone submitted, allow use
-        if (!matched && resultCount === 1) {
-          const single = rawData.results[0];
-          if (!single.phone || normalizeGhanaPhoneForComparison(single.phone) === targetNorm) {
-            matched = single;
-          }
-        }
-
-        if (matched) {
-          matchedPhone = matched.phone;
-          if (typeof matched.eligible === 'boolean') {
-            isEligible = matched.eligible === true;
-            reason = matched.reason;
-          }
-        }
-      }
-      // Shape B: data is an array
-      else if (Array.isArray(rawData)) {
-        resultCount = rawData.length;
-
-        let matched = rawData.find(
-          (item) => item.phone && normalizeGhanaPhoneForComparison(item.phone) === targetNorm
-        );
-
-        if (!matched && resultCount === 1) {
-          const single = rawData[0];
-          if (!single.phone || normalizeGhanaPhoneForComparison(single.phone) === targetNorm) {
-            matched = single;
-          }
-        }
-
-        if (matched) {
-          matchedPhone = matched.phone;
-          if (typeof matched.eligible === 'boolean') {
-            isEligible = matched.eligible === true;
-            reason = matched.reason;
-          }
-        }
-      }
-      // Shape C: data.eligible is direct boolean
-      else if (rawData && typeof rawData === 'object' && typeof rawData.eligible === 'boolean') {
-        isEligible = rawData.eligible === true;
-        reason = rawData.reason;
-      }
-      // Direct root eligible boolean fallback
-      else if (typeof res.eligible === 'boolean') {
-        isEligible = res.eligible === true;
-        reason = res.message;
-      }
-
-      // Safe server diagnostic logging (never logs API keys, secrets, or full credentials)
-      console.info(
-        `[SBH Beneficiary Check] Phone: ${maskedPhone}, hasDataResults: ${hasDataResults}, resultCount: ${resultCount}, matched: ${matchedPhone ? '***' + matchedPhone.slice(-4) : 'none'}, eligible: ${isEligible ?? 'undefined'}, reason: ${reason || 'none'}`
-      );
-
-      // Explicit eligible boolean requirement (Never infer from status === 'success')
-      if (isEligible === null) {
-        console.warn(
-          `[SBH Beneficiary Check] Beneficiary response did not contain an explicit eligibility result for phone ${maskedPhone}.`
-        );
-        return {
-          eligible: false,
-          reason: 'Beneficiary response did not contain an explicit eligibility result.',
-        };
-      }
-
-      return { eligible: isEligible, reason };
-    } catch (err) {
-      console.error(
-        `[SBH Beneficiary Check] Error checking beneficiary eligibility for phone ${maskedPhone}:`,
-        err instanceof Error ? err.message : err
-      );
-      return {
-        eligible: false,
-        reason: err instanceof Error ? err.message : 'Beneficiary eligibility check failed.',
-      };
+      const normalized=validateAndNormalizeGhanaPhone(phone);
+      if(!normalized.isValid)return unknownBeneficiary();
+      const response=await this.client.checkBeneficiary([normalized.formattedLocal!],offerSelector);
+      const result=parseBeneficiaryEligibility(response,phone);
+      noteBeneficiaryOutcome(result.outcome||'unknown');
+      console.info('[SBH Beneficiary Check]',result.outcome);
+      return result;
+    } catch(error) {
+      const e=error as {isTimeout?:boolean;name?:string;statusCode?:number};
+      const failure=e?.isTimeout||e?.name==='AbortError'?'timeout':[401,403].includes(e?.statusCode??0)?'permission':e?.statusCode?'unavailable':'connection';
+      noteSalesFailure('beneficiary',failure==='permission'?'authorization':failure==='unavailable'?'http_error':failure);
+      console.warn('[SBH Beneficiary Check] Eligibility unavailable:',failure);
+      return unknownBeneficiary(failure);
     }
   }
 

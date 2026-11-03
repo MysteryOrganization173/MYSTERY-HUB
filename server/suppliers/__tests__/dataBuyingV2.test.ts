@@ -38,13 +38,14 @@ test('recipient numbers format as 024 123 4567 and accept pasted +233 forms', ()
   assert.equal(isCompleteGhanaPhone('241 234 5678'), false);
 });
 
-test('only connectivity failures are described as "nothing was charged"', () => {
+test('connectivity failures never assert that the server stopped or money was not charged', () => {
   assert.equal(isConnectivityError(new TypeError('Failed to fetch')), true);
   assert.equal(isConnectivityError({code: 'CHECKOUT_TIMEOUT', message: 'slow'}), true);
   assert.equal(isConnectivityError(new Error('Price changed. Refresh and review before paying.')), false);
-  assert.match(checkout, /if \(isConnectivityError\(err\)\)/);
+  assert.ok(!checkout.includes('nothing was charged'));
+  assert.ok(checkout.includes('Payment is not confirmed. An order may already exist.'));
   // Connectivity copy appears only after initialization failed, before any Paystack window opened.
-  assert.ok(checkout.indexOf('no payment window was opened') > checkout.indexOf("err.code === 'PACKAGE_UNAVAILABLE'"));
+  assert.ok(checkout.includes("details?.paymentState==='not_started'"));
 });
 
 test('last payment is remembered by reference only and expires after a day', () => {
@@ -64,14 +65,15 @@ test('last payment is remembered by reference only and expires after a day', () 
 
 test('recovery reads server status and never retries or assumes payment', () => {
   const recovery = checkout.slice(checkout.indexOf('const checkPaymentStatus'), checkout.indexOf('const handleSubmit'));
-  assert.match(recovery, /lookupOrderOnServer\(attemptRef\)/);
+  assert.match(recovery, /lookupOrderOnServer\(reference\)/);
   assert.match(recovery, /view.paymentConfirmed/);
   assert.doesNotMatch(recovery, /initializeServerPayment|walletCheckout|createOrder/);
   assert.doesNotMatch(banner, /initializeServerPayment|walletCheckout|createOrder|verifyPayment/);
   assert.match(banner, /lookupOrderOnServer\(pending.orderRef\)/);
   // The reference is kept from the moment the server creates the order, and cleared on confirmation.
   assert.match(checkout, /onOrderCreated: \(orderRef\) => \{[\s\S]*?savePendingCheckout/);
-  assert.match(checkout, /onPaymentReceived: \(orderRef, reference\) => \{\s*clearPendingCheckout\(orderRef\)/);
+  assert.match(checkout,/Popup success is not payment confirmation/);
+  assert.match(recovery,/if\(!active\(\)\)return/);
   // Closing Paystack keeps the existing server cancel call and explains next steps instead of a toast.
   assert.match(checkout, /setPaymentClosed\(true\);\s*if \(orderRef\) \{\s*cancelPaymentOnServer\(orderRef\)/);
   assert.match(checkout, /approve the prompt on your phone with your PIN/);
