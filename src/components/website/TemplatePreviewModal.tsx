@@ -33,6 +33,8 @@ import {
   ArrowRight,
   ShieldCheck,
 } from 'lucide-react';
+// V7.2.1: closing a design link keeps the gallery (the bare /website-builder opens an owner's My Business).
+import { WEBSITE_DESIGNS_PATH } from '../../utils/businessWorkspace';
 
 export const TemplatePreviewModal: React.FC = () => {
   const {
@@ -109,7 +111,7 @@ export const TemplatePreviewModal: React.FC = () => {
   const cleanUrl = () => {
     try {
       const currentUrl = new URL(window.location.href);
-      if (currentUrl.searchParams.has('template') || currentUrl.pathname.includes('/template')) window.history.replaceState(null, '', '/website-builder');
+      if (currentUrl.searchParams.has('template') || currentUrl.pathname.includes('/template')) window.history.replaceState(null, '', WEBSITE_DESIGNS_PATH);
     } catch {
       // ignore
     }
@@ -181,7 +183,7 @@ export const TemplatePreviewModal: React.FC = () => {
     // An owner who already has a website on another design is offered the change, never switched silently.
     if(alreadyExists&&site.template_id!==requested){setChangeSite(site);setChangeTarget(requested);return;}
     // Builder V6: the editor's address takes the preview's history entry (Back returns to the gallery).
-    openWebsiteEditor(site);showToast(alreadyExists?'Opening your existing website.':'Your website is ready. Tap anything to change it.',alreadyExists?'info':'success');}}/> : null;
+    openWebsiteEditor(site,{created:!alreadyExists});showToast(alreadyExists?'Opening your existing website.':'Your website is ready. Tap anything to change it.',alreadyExists?'info':'success');}}/> : null;
   if(changeSite&&sessionToken)return <WebsiteSettingsControls site={changeSite} token={sessionToken} requestedTemplateId={changeTarget} selectionOnly onClosed={()=>setChangeSite(null)} onDeleted={()=>setChangeSite(null)} onUpdated={updated=>{setChangeSite(null);openWebsiteEditor(updated);}}/>;
   if (!selectedTemplatePreview) return null;
 

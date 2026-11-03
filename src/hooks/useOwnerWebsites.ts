@@ -17,6 +17,17 @@ export function rememberOwnerWebsite(token: string | null, site: WebsiteSiteReco
   cache = { token, sites: cache.sites.some(item => item.id === site.id) ? cache.sites.map(item => item.id === site.id ? site : item) : [site, ...cache.sites] };
 }
 
+/** V7.2.1: another page that already read this account's websites (the member home) shares the answer. */
+export function primeOwnerWebsites(token: string | null, sites: WebsiteSiteRecord[]) {
+  if (token) cache = { token, sites };
+}
+
+/** Does this account have a website? true/false when this session already knows, null when it has not asked yet.
+ * The Website tab uses it to open My Business directly; unknown falls back to the Builder, which redirects owners. */
+export function ownerHasWebsite(token: string | null): boolean | null {
+  return token && cache?.token === token ? cache.sites.length > 0 : null;
+}
+
 export function useOwnerWebsites(token: string | null) {
   const [state, setState] = useState<{ token: string | null; sites: WebsiteSiteRecord[] }>(() => ({ token, sites: token && cache?.token === token ? cache.sites : [] }));
   const [loading, setLoading] = useState(Boolean(token && cache?.token !== token));

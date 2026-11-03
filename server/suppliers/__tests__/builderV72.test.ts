@@ -144,11 +144,14 @@ test('editor: Design is the second dock tool; style and colour changes stay ordi
 
 test('business dock: at most four areas plus More, a way back to Mystery Hub, unsaved prices protected',()=>{
   const w=source('src/components/website/BusinessWorkspacePage.tsx');
-  assert.match(w,/\.slice\(0, 4\);/);
+  // V7.2.1: the dock rule lives with the other workspace rules, so the dock and More can never list the same area.
+  assert.match(source('src/utils/businessWorkspace.ts'),/\.slice\(0, 4\);/);
+  assert.match(w,/const dock = businessDock\(available, reseller\);\n  const secondary = available\.filter\(target => !dock\.includes\(target\)\);/);
   assert.match(w,/<nav className="bw-dock" aria-label="Business areas"/);
   assert.match(w,/Back to Mystery Hub/);
-  assert.match(w,/const leaveBusiness = \(\) => \{ if \(!confirmPricingLeave\(\)\) return;/);
-  assert.match(w,/go\(target\); \}\}>\s*<span className="bw-dock-icon"/,'dock links use in-app navigation (no reload) and keep their addresses');
+  assert.match(w,/const leaveBusiness = \(path = '\/'\) => \{ if \(!confirmPricingLeave\(\)\) return;/);
+  assert.match(w,/onClick=\{areaClick\(target\)\}>\s*<span className="bw-dock-icon"/,'dock links use in-app navigation (no reload) and keep their addresses');
+  assert.match(w,/const areaClick = \(target: WorkspaceSection\) => \(event: React\.MouseEvent\) => \{ if \(event\.metaKey \|\| event\.ctrlKey \|\| event\.shiftKey \|\| event\.button !== 0\) return; event\.preventDefault\(\); go\(target\); \};/);
 });
 
 test('analytics: gaps are zero only between recorded days; repeats collapse; owner visits are summarised apart',()=>{

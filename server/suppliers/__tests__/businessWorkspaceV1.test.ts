@@ -45,7 +45,9 @@ test('kept examples do not leave a permanent "changes waiting" after publishing'
 
 test('the workspace is lazy, light and reuses the existing business records and controls',()=>{
   assert.match(source('src/App.tsx'),/BusinessWorkspacePage = lazyPage\(/);
-  assert.match(source('src/App.tsx'),/activePage === 'business' && <BusinessWorkspacePage \/>/);
+  // V7.2.1: My Business renders in its own shell (no consumer header, footer or tab bar).
+  const shell=source('src/App.tsx').slice(source('src/App.tsx').indexOf("if (activePage === 'business')"));
+  assert.match(shell.slice(0,shell.indexOf('  return (\n    <div className="mh-app')),/<BusinessWorkspacePage \/>/);
   // Builder V6: the editor is its own page and download; the workspace only navigates to it.
   assert.match(source('src/App.tsx'),/const WebsiteEditorPage = lazyPage\(\(\) => import\('\.\/components\/website\/WebsiteEditorPage'\)/,'the editor stays a separate download');
   assert.doesNotMatch(workspace,/import\('\.\/editor\/WebsiteEditor'\)|<WebsiteEditor\b/,'the workspace never renders the editor itself');
@@ -75,13 +77,16 @@ test('navigation: one bottom bar, entries from the account menu, home and the bu
   const head=pageIndexingHead('/my-business/orders');
   assert.equal(head.noindex,true);assert.equal(head.title,'My Business — Mystery Hub');assert.equal(head.url.endsWith('/my-business'),true,'never echoes the area or query');
   assert.match(workspace,/aria-label="Business areas/);
-  // V7.2: one bottom bar at a time. The business dock replaces the consumer tab bar only while a website is managed.
+  // V7.2.1: one navigation system. My Business is its own shell: the consumer header, footer and tab bar are not
+  // rendered there at all, and the business dock is its only bottom bar.
+  const app=source('src/App.tsx');
+  const shell=app.slice(app.indexOf("if (activePage === 'business')"),app.indexOf('  return (\n    <div className="mh-app'));
+  for(const chrome of ['<Navbar','<Footer','<MobileNav','<MysteryAiAssistant','<AppLaunchLayer'])assert.ok(!shell.includes(chrome),chrome);
+  for(const kept of ['<AuthModal','<AccountControls','<ToastContainer','<TemplatePreviewModal'])assert.ok(shell.includes(kept),kept);
   const css=source('src/components/website/businessWorkspace.css');
-  assert.match(css,/html\[data-business-mode\] \.mh-bottom-nav\{display:none!important\}/,'the consumer bar steps aside in business mode');
   assert.equal((css.match(/position:\s*fixed;[^}]*bottom:\s*0/g)||[]).length,1,'exactly one bottom bar: the business dock');
   assert.match(css,/@media \(min-width:1024px\)\{\.bw-dock,\.bw-identity-edit\{display:none\}/,'desktops keep the sidebar');
-  assert.match(workspace,/setAttribute\('data-business-mode', ''\)/);
-  assert.match(workspace,/if \(!site\) return;/,'sign-in and empty states keep the consumer bar');
+  assert.doesNotMatch(workspace,/data-business-mode/,'no page-wide attribute is needed to hide consumer navigation');
 });
 
 test('editor: Back saves first, never publishes and returns to the same place',()=>{

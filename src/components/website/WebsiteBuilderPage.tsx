@@ -12,7 +12,7 @@ import { takeWebsiteStartIntent } from '../../utils/websiteStartIntent';
 import { WebsitePlansAndUltra } from './WebsitePlansAndUltra';
 import './websiteBuilder.css';
 import { WEBSITE_LIVE_LABELS, websiteLiveState } from '../../utils/websiteReadiness';
-import { websiteEditorPath } from '../../utils/routing';
+import { builderVisitOpensBusiness } from '../../utils/businessWorkspace';
 import {
   Globe,
   ArrowRight,
@@ -22,8 +22,7 @@ import {
   ChevronUp,
   RefreshCw,
   AlertCircle,
-  LayoutDashboard,
-  PenLine,
+  ArrowLeft,
 } from 'lucide-react';
 
 export const WebsiteBuilderPage: React.FC = () => {
@@ -36,6 +35,7 @@ export const WebsiteBuilderPage: React.FC = () => {
     isAuthModalOpen,
     openWebsiteEditor,
     setActivePage,
+    replacePath,
   } = useApp();
 
   const [selectedCategory, setSelectedCategory] = useState<TemplateCategory>('all');
@@ -53,20 +53,21 @@ export const WebsiteBuilderPage: React.FC = () => {
   const handleStarted = (site: WebsiteSiteRecord, alreadyExists: boolean, requested: string) => {
     setStartTemplate(''); setMySites([site]);
     if (alreadyExists && site.template_id !== requested) { setChangeTarget(requested); return; }
-    openWebsiteEditor(site);
+    openWebsiteEditor(site, { created: !alreadyExists });
     showToast(alreadyExists ? 'Opening your existing website.' : 'Your website is ready. Tap anything to change it.', alreadyExists ? 'info' : 'success');
   };
   // A design chosen before signing up or logging in is resumed once the account exists, even after a reload.
   const resuming = useRef(false);
+  const [resumingStart, setResumingStart] = useState(false);
   useEffect(() => {
     if (!user || !sessionToken || isAuthModalOpen || resuming.current) return;
     const intent = takeWebsiteStartIntent();
     if (!intent) return;
-    resuming.current = true;
+    resuming.current = true; setResumingStart(true);
     createWebsiteFromDetails(sessionToken, intent.templateId, intent)
       .then(res => handleStarted(res.site, res.alreadyExists, intent.templateId))
       .catch((e: any) => showToast(e?.message || 'We could not create your website. Please try again.', 'warning'))
-      .finally(() => { resuming.current = false; });
+      .finally(() => { resuming.current = false; setResumingStart(false); });
   }, [user?.id, sessionToken, isAuthModalOpen]);
   // After deletion the owner lands on the gallery to start again: new design, new name, new address.
   const handleWebsiteDeleted = (siteId: string) => {
@@ -109,6 +110,12 @@ export const WebsiteBuilderPage: React.FC = () => {
   }, [openTemplatePreview]);
 
   const activeSite = mySites.length > 0 ? mySites[0] : null;
+  // V7.2.1: Website is where an owner runs their business. The bare Website destination (/website-builder) opens My
+  // Business for someone who already has a website; the gallery stays one tap away at /website-builder/designs, and
+  // design links (?template=…) keep opening their preview. Replacing the entry keeps Back free of loops.
+  // Never while a design chosen before signing in is being resumed or a design switch is open.
+  const opensBusiness = Boolean(user && activeSite && !resumingStart && !changeTarget && !startTemplate && builderVisitOpensBusiness(window.location.pathname, window.location.search));
+  useEffect(() => { if (opensBusiness && !resuming.current) replacePath('/my-business'); }, [opensBusiness]);
 
   // Base template definition for the user's active site
   const activeBaseTemplate = activeSite
@@ -182,9 +189,11 @@ export const WebsiteBuilderPage: React.FC = () => {
   const displaySiteName =
     activeSite?.content_json?.businessName || activeSite?.name || 'My Business Website';
 
+  if (opensBusiness) return <p role="status" className="py-16 text-center text-sm text-slate-400">Opening My Business…</p>;
+
   return (
-    <div className="py-6 sm:py-10 text-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
+    <div className="py-5 sm:py-8 text-slate-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-7 sm:space-y-10">
 
         {startTemplate&&<WebsiteStartSheet templateId={startTemplate} onClose={()=>setStartTemplate('')} onCreated={(site,alreadyExists,requested)=>handleStarted(site,alreadyExists,requested)}/>}
         {activeSite&&sessionToken&&changeTarget&&<WebsiteSettingsControls site={activeSite} token={sessionToken} requestedTemplateId={changeTarget} selectionOnly onClosed={()=>setChangeTarget('')} onDeleted={handleWebsiteDeleted} onUpdated={updated=>{setMySites([updated]);setChangeTarget('');openWebsiteEditor(updated);}}/>}
@@ -214,16 +223,11 @@ export const WebsiteBuilderPage: React.FC = () => {
                (PRIORITIZED FOR LOGGED-IN USERS WITH AN ACTIVE WEBSITE)
             ========================================================= */}
         {user && activeSite ? (
-          <section id="website-owner-card" data-website-owner-card aria-labelledby="website-owner-name" className="website-owner-card website-owner-banner scroll-mt-24 text-left">
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ${liveState==='not-published'?'bg-amber-500/15 text-amber-200':'bg-emerald-500/15 text-emerald-300'}`}><span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${liveState==='not-published'?'bg-amber-300':'bg-emerald-400'}`}/>{WEBSITE_LIVE_LABELS[liveState].short}</span>
-              <span className="text-slate-400">{templateDesignLabel(activeBaseTemplate)} · Free plan</span>
-            </div>
-            <h1 id="website-owner-name" tabIndex={-1} className="mt-3 text-2xl sm:text-3xl font-bold break-words outline-none">{displaySiteName}</h1>
-            <p className="mt-1 text-sm text-slate-400 max-w-xl">{activeSite.template_id==='tmpl-data-reseller'?'Change your store’s look and wording in the editor. Orders, bundle prices and Store Earnings are in My Business.':'Change your website in the editor. Visitors, sharing and settings are in My Business.'} Other designs are below; switching always shows a preview first.</p>
-            <div className="website-owner-actions mt-4">
-              <a className="website-owner-primary inline-flex items-center justify-center gap-2" href={websiteEditorPath(activeSite.id)} onClick={event=>{if(event.metaKey||event.ctrlKey||event.shiftKey||event.button!==0)return;event.preventDefault();editSite(activeSite);}}><PenLine className="w-4 h-4" aria-hidden="true"/>Continue editing</a>
-              <a className="website-owner-secondary" href="/my-business" onClick={event=>{event.preventDefault();setActivePage('business');}}><LayoutDashboard className="w-4 h-4" aria-hidden="true"/>My Business</a>
+          <section id="website-owner-card" data-website-owner-card aria-labelledby="website-owner-name" className="website-owner-strip scroll-mt-24 text-left">
+            <a className="website-owner-back" href="/my-business" onClick={event=>{if(event.metaKey||event.ctrlKey||event.shiftKey||event.button!==0)return;event.preventDefault();setActivePage('business');}}><ArrowLeft className="w-4 h-4" aria-hidden="true"/>My Business</a>
+            <div className="min-w-0">
+              <h1 id="website-owner-name" tabIndex={-1} className="website-owner-strip-name outline-none">{displaySiteName}</h1>
+              <p className="website-owner-strip-meta"><span data-live={liveState}><span aria-hidden="true"/>{WEBSITE_LIVE_LABELS[liveState].short}</span>{templateDesignLabel(activeBaseTemplate)} · Free plan</p>
             </div>
           </section>
         ) : (

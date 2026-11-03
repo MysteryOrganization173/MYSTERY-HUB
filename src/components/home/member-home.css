@@ -7,7 +7,9 @@
 /* Brand light, not decoration: a soft green dawn behind the greeting that fades before the content. */
 .member-home::before { content: ''; position: absolute; inset: 0 0 auto; height: 340px; z-index: -1; pointer-events: none;
   background: radial-gradient(55% 90% at 88% 0%, #0f5a3466, transparent 70%), radial-gradient(40% 70% at 0% 0%, #0b3a2440, transparent 70%); }
-.member-home-inner { max-width: 1180px; margin-inline: auto; padding: 18px 16px 104px; display: grid; gap: 18px; }
+/* V7.2.1: no bottom padding of its own. The footer below already clears the phone tab bar, and main and the footer add
+   their own gaps; the old 104px stacked on top of them as an empty band before the footer. */
+.member-home-inner { max-width: 1180px; margin-inline: auto; padding: 18px 16px 8px; display: grid; gap: 18px; }
 .member-home h2 { font-family: var(--font-heading); font-size: 1.0625rem; font-weight: 650; letter-spacing: -.01em; color: var(--mh-text); }
 .member-text-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: var(--mh-accent); font-size: .875rem; font-weight: 600; cursor: pointer; text-decoration: none; }
 .member-text-link:hover { color: #d1f9e1; }
@@ -136,7 +138,7 @@
 .member-help-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 14px; }
 
 @media (min-width: 640px) {
-  .member-home-inner { padding: 28px 24px 56px; gap: 26px; }
+  .member-home-inner { padding: 28px 24px 16px; gap: 26px; }
   .member-service-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (min-width: 768px) {
@@ -144,7 +146,7 @@
   .member-lower { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 28px; }
 }
 @media (min-width: 1024px) {
-  .member-home-inner { padding: 36px 32px 64px; gap: 32px; }
+  .member-home-inner { padding: 36px 32px 16px; gap: 32px; }
   .member-home-primary { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: stretch; gap: 16px; }
   .member-home-primary.is-urgent .member-order { order: 0; }
   .member-buy { grid-template-columns: 1fr; }

@@ -43,5 +43,26 @@ export function initialWorkspaceTabs(reseller: boolean): string[] {
   return reseller ? ORDER.map(section => WORKSPACE_SECTIONS[section].tab) : ['Overview', 'Analytics', 'Settings'];
 }
 
+/**
+ * V7.2.1: the business dock (phones and tablets) shows at most four areas plus More. A Data store keeps its daily
+ * work there (Overview, Orders, Pricing, Earnings) with Analytics and Website & settings under More; other websites
+ * have few areas, so every one of them fits. More only ever lists what the dock does not.
+ */
+export function businessDock(available: WorkspaceSection[], reseller: boolean): WorkspaceSection[] {
+  return available.filter(section => !reseller || (section !== 'analytics' && section !== 'website')).slice(0, 4);
+}
+
+/** The Website Builder's design gallery, explicitly. A plain /website-builder visit by an owner opens My Business. */
+export const WEBSITE_DESIGNS_PATH = '/website-builder/designs';
+
+/** Should a visit to this Builder address take an existing owner to My Business? Only the bare Website destination:
+ * the explicit gallery, a design link (?template=…, /website-builder/template/…) and the editor always stay put. */
+export function builderVisitOpensBusiness(pathname: string, search = ''): boolean {
+  const path = String(pathname || '').split(/[?#]/)[0].replace(/\/+$/, '').toLowerCase() || '/';
+  const params = new URLSearchParams(search);
+  if (params.has('template') || params.has('t')) return false;
+  return path === '/website-builder' || path === '/website' || path === '/website-builder/index.html' || path === '/website/index.html';
+}
+
 const RANGE_LABEL: Record<string, string> = { '1': 'last 24 hours', '7': 'last 7 days', '30': 'last 30 days', '90': 'last 90 days', all: 'all time' };
 export const workspaceRangeLabel = (range: string) => RANGE_LABEL[range] || `last ${range} days`;

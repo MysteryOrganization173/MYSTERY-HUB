@@ -130,7 +130,8 @@ test('share kit: fixed messages with the owner name and link only, shown only wh
     assert.ok(m.text.includes(url));assert.doesNotMatch(m.text.replace(url,''),/\d|GH₵|%|instant|fast|cheap|guarantee|discount|free/i,m.text);
   }
   const page=source('src/components/website/BusinessWorkspacePage.tsx');
-  assert.match(page,/reseller && published && \(s\.sellable \?\? 0\) > 0 \? <StoreShareKit/);
+  // V7.2.1: and only until the store has paid orders in the period, so an established store isn't taught to share.
+  assert.match(page,/reseller && published && \(s\.sellable \?\? 0\) > 0 && s\.paidOrders === 0 \? <StoreShareKit/);
 });
 
 test('money boundaries unchanged: server products and prices, the same payment call, no checkout in previews',()=>{

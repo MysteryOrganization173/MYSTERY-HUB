@@ -103,7 +103,7 @@ export function pageIndexingHead(pathname: string, search = ''): SocialHead {
   const path = pathname.toLowerCase().replace(/\/+$/, '') || '/';
   const params = new URLSearchParams(search);
   const preview = ['owner_preview', 'isolated_template_preview', 'preview_template_id', 'editor_channel', 'editor_site'].some(key => params.has(key));
-  const aliases: Record<string, string> = { '/index.html': 'home', '/website': 'website', '/rewards': 'earn', '/referral': 'earn', '/afa-registration': 'afa', '/faq': 'help' };
+  const aliases: Record<string, string> = { '/index.html': 'home', '/website': 'website', '/website-builder/designs': 'website', '/rewards': 'earn', '/referral': 'earn', '/afa-registration': 'afa', '/faq': 'help' };
   const clean = path.replace(/\/index\.html$/, '');
   const page = Object.entries(PUBLIC_PAGE_METADATA).find(([, entry]) => entry.path === clean)?.[0] || aliases[clean] || aliases[path];
   if (page && !preview) return publicPageHead(page);

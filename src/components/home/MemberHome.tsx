@@ -8,6 +8,7 @@ import {HomeWalletSummary} from './HomeWalletSummary';
 import {MemberHomeView,type MemberWebsiteSummary} from './MemberHomeView';
 import {memberGreeting,memberTrackingOrder} from '../../utils/memberHomePresentation';
 import {withoutDeletedWebsites} from '../../utils/websiteDeletion';
+import {primeOwnerWebsites} from '../../hooks/useOwnerWebsites';
 
 function MemberDashboard(){
   const {user,sessionToken,openDataPage,setActivePage,openOrderStatus,openMysteryAi}=useApp();
@@ -26,7 +27,8 @@ function MemberDashboard(){
     let active=true;
     const timer=window.setTimeout(()=>getMyWebsitesOnServer(sessionToken!).then(result=>{
       if(!active||!result.success||!Array.isArray(result.sites))return;
-      const [site]=withoutDeletedWebsites(result.sites);
+      const sites=withoutDeletedWebsites(result.sites),[site]=sites;
+      primeOwnerWebsites(sessionToken,sites);
       setWebsite(!site?{state:'none'}:{state:site.status==='published'?'published':'draft',name:site.name,slug:site.slug});
     }).catch(()=>{}),600);
     return()=>{active=false;window.clearTimeout(timer);};

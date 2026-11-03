@@ -2,13 +2,14 @@ import React from 'react';
 import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { ActivePage } from '../../types';
 import { Home, Wifi, Globe, Gift, ReceiptText } from 'lucide-react';
+import { ownerHasWebsite } from '../../hooks/useOwnerWebsites';
 
 /**
  * Phone tab bar (<768px): five fixed destinations with labels. The selected tab carries aria-current and a quiet
  * green indicator behind its icon. Styling lives in index.css (.mh-bottom-nav-*), so it stays pure CSS.
  */
 export const MobileNav: React.FC = () => {
-  const { activePage, setActivePage, activeEditorSite, isMysteryAiOpen, isCheckoutOpen, isStatusModalOpen, isAuthModalOpen, selectedTemplatePreview, marketplaceInquiryProduct, waitlistInfo, isAccountOpen } = useApp();
+  const { activePage, setActivePage, sessionToken, activeEditorSite, isMysteryAiOpen, isCheckoutOpen, isStatusModalOpen, isAuthModalOpen, selectedTemplatePreview, marketplaceInquiryProduct, waitlistInfo, isAccountOpen } = useApp();
 
   const navItems: { id: ActivePage; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number; 'aria-hidden'?: boolean }> }[] = [
     { id: 'home', label: 'Home', icon: Home },
@@ -39,7 +40,8 @@ export const MobileNav: React.FC = () => {
               onClick={(e) => {
                 if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                 e.preventDefault();
-                setActivePage(item.id);
+                // V7.2.1: an owner's Website is My Business (the Builder redirects too; this skips that step).
+                setActivePage(item.id === 'website' && ownerHasWebsite(sessionToken) ? 'business' : item.id);
               }}
               className="mh-bottom-nav-item"
             >

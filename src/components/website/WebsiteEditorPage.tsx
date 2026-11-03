@@ -7,6 +7,7 @@ import { editorSiteIdFromPath, safeEditorReturnPath } from '../../utils/routing'
 import { isDeletedWebsite } from '../../utils/websiteDeletion';
 import { rememberOwnerWebsite } from '../../hooks/useOwnerWebsites';
 import { WebsiteEditor } from './editor/WebsiteEditor';
+import { builderVisitOpensBusiness } from '../../utils/businessWorkspace';
 
 type Load =
   | { kind: 'loading' }
@@ -36,6 +37,7 @@ export const WebsiteEditorPage: React.FC = () => {
   // Where leaving returns to: the page the editor was opened from (kept in this history entry, so it survives a
   // refresh), otherwise My Business, where an owner runs the website.
   const from = useRef(safeEditorReturnPath(window.history.state?.mhEditorFrom));
+  const created = useRef(Boolean(window.history.state?.mhEditorCreated));
   const seed = activeEditorSite && editorLaunch && activeEditorSite.id === siteId && editorLaunch.siteId === siteId && editorLaunch.token === sessionToken && sessionToken ? activeEditorSite : null;
   const [load, setLoad] = useState<{ key: string; state: Load }>(() => ({ key: `${sessionToken}:${siteId}`, state: seed ? { kind: 'ready', site: seed } : { kind: 'loading' } }));
   const loadKey = `${sessionToken}:${siteId}`;
@@ -78,7 +80,9 @@ export const WebsiteEditorPage: React.FC = () => {
     leaving.current = true;
     const guard = Boolean(window.history.state?.mhEditor);
     const origin = from.current;
-    if (origin && (!target || target === origin)) { window.history.go(guard ? -2 : -1); return; }
+    // V7.2.1: a website made just now leaves to My Business by replacing the editor's own entry. Stepping back would
+    // land on the gallery or design link it was started from (and a design link reopens its preview).
+    if (origin && (!target || target === origin) && !created.current) { window.history.go(guard ? -2 : -1); return; }
     const destination = target || origin || BUSINESS;
     if (!guard) { replacePath(destination); return; }
     let done = false;
@@ -118,7 +122,7 @@ export const WebsiteEditorPage: React.FC = () => {
     onClose={() => leave()} onOpenBusiness={() => leave(BUSINESS)}
     onSiteUpdated={updated => { rememberOwnerWebsite(sessionToken, updated); }}
     showToast={showToast}
-    backLabel={from.current?.startsWith('/website-builder') ? 'Back to Website Builder' : from.current && !from.current.startsWith(BUSINESS) ? 'Close the editor' : 'Back to My Business'} />;
+    backLabel={from.current?.startsWith('/website-builder') ? (builderVisitOpensBusiness(from.current) ? 'Back to My Business' : 'Back to Website Builder') : from.current && !from.current.startsWith(BUSINESS) ? 'Close the editor' : 'Back to My Business'} />;
 };
 
 function EditorGate({ kicker, title, detail, alert, children }: { kicker: string; title: string; detail: string; alert?: boolean; children: React.ReactNode }) {

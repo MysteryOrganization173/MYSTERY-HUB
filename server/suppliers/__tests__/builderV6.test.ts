@@ -103,10 +103,13 @@ test('opening and leaving the editor keep history predictable and never publish'
   assert.ok(!editor.includes('editorMounts'), 'no second history mechanism');
 });
 
-test('returning owners continue editing first; My Business and gallery stay one tap away', () => {
-  const banner = builder.slice(builder.indexOf('id="website-owner-card"'), builder.indexOf('id="website-owner-card"') + 2400);
-  assert.ok(banner.indexOf('Continue editing') < banner.indexOf('My Business</a>'));
-  assert.match(banner, /href=\{websiteEditorPath\(activeSite\.id\)\}/);
+// V7.2.1: an owner's Website is My Business (Overview first); editing is opened there on purpose. The gallery keeps a
+// slim strip back to My Business instead of a second "Continue editing" card.
+test('returning owners land in My Business; the gallery strip leads back there', () => {
+  const banner = builder.slice(builder.indexOf('id="website-owner-card"'), builder.indexOf('id="website-owner-card"') + 1600);
+  assert.match(banner, /href="\/my-business"/);
+  assert.ok(!banner.includes('Continue editing'), 'no competing editor entry on the gallery');
+  assert.match(builder, /builderVisitOpensBusiness\(window\.location\.pathname, window\.location\.search\)/);
   assert.match(workspace, /openWebsiteEditor\(target, \{ publish \}\)/);
   assert.match(source('src/components/website/editor/WebsiteEditorToolbar.tsx'), /Open My Business/);
   assert.match(source('src/components/website/editor/WebsitePublishSheet.tsx'), /managed \? 'Manage orders & earnings' : 'Open My Business'/);

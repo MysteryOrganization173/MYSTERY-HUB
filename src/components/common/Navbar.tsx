@@ -3,6 +3,8 @@ import { useOverlayLock } from '../../utils/overlayStack';
 import { ShareAppButton } from '../app/ShareAppButton';
 import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { BrandLogo } from './BrandLogo';
+import { ownerHasWebsite } from '../../hooks/useOwnerWebsites';
+import { WEBSITE_DESIGNS_PATH } from '../../utils/businessWorkspace';
 import { ActivePage } from '../../types';
 import { openMarketplaceAt } from '../../utils/marketplaceBrowse';
 import { openServicesAt } from '../../utils/serviceDirectory';
@@ -26,7 +28,7 @@ import {
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { activePage, setActivePage, openAuth, openMysteryAi, user, logoutUser, openAccount } = useApp();
+  const { activePage, setActivePage, openAuth, openMysteryAi, user, logoutUser, openAccount, sessionToken } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -85,7 +87,16 @@ export const Navbar: React.FC = () => {
   }, []);
 
   const handleNavClick = (pageId: ActivePage) => {
-    setActivePage(pageId);
+    // V7.2.1: an owner's Website is My Business (the Builder redirects too; this skips that step).
+    setActivePage(pageId === 'website' && ownerHasWebsite(sessionToken) ? 'business' : pageId);
+    setMobileMenuOpen(false);
+    setAccountDropdownOpen(false);
+  };
+
+  // Beside My Business, the account menu's Website Builder is the design gallery itself, for owners too.
+  const openDesigns = () => {
+    if (window.location.pathname !== WEBSITE_DESIGNS_PATH) window.history.pushState({ page: 'website' }, '', WEBSITE_DESIGNS_PATH);
+    setActivePage('website', false);
     setMobileMenuOpen(false);
     setAccountDropdownOpen(false);
   };
@@ -267,7 +278,7 @@ export const Navbar: React.FC = () => {
                     </button>
 
                     <button
-                      onClick={() => handleNavClick('website')}
+                      onClick={openDesigns}
                       className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
                     >
                       <Globe className="w-3.5 h-3.5 text-purple-400" />

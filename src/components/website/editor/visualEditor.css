@@ -26,6 +26,8 @@
 .visual-publish-button{background:var(--ve-green);color:#05140c;font-weight:800;font-size:14px;padding:0 18px;border-radius:999px}
 .visual-publish-button:hover{background:#02a857}
 .visual-publish-button:disabled{opacity:.6;cursor:wait}
+/* V7.2.1: nothing to publish. A quiet, readable state, not a greyed-out call to action. */
+.visual-publish-button[title]:disabled{opacity:1;cursor:default;background:transparent;color:var(--ve-muted,#9fb0a8);box-shadow:inset 0 0 0 1px #2a3a46}
 :where(.visual-workspace) button:focus-visible,:where(.visual-workspace) a:focus-visible,:where(.visual-workspace) input:focus-visible,:where(.visual-workspace) textarea:focus-visible,.visual-context-title h3:focus-visible{outline:2px solid var(--ve-green);outline-offset:2px}
 
 /* Phone dock: in the layout flow, so it never covers the website. */
