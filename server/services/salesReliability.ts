@@ -15,11 +15,19 @@ const stageFor=(endpoint:string):SalesStage|null=>endpoint==='/services'?'servic
 export function noteSupplierResponse(endpoint:string,source:'network'|'cache',body:unknown,status:number){
   const current=context.getStore(),stage=stageFor(endpoint);if(!current||!stage)return;
   if(status>=400){noteSalesFailure(stage,[401,403].includes(status)?'authorization':'http_error');return;}
+  // HTTP success is not eligibility evidence. The semantic parser records denial/unknown/success separately.
+  if(endpoint==='/beneficiary-check')return;
   const success=(body as {success?:unknown})?.success;
   if(success===false){noteSalesFailure(stage,'supplier_response');return;}
   if(source==='cache')current.cached.add(stage);
   // Missing legacy envelope fields remain unverified; this does not change supplier parsing.
   if(source==='network'&&success===true)current.fresh[stage]=Date.now();
+}
+export function noteBeneficiaryOutcome(outcome:'eligible'|'ineligible'|'unknown'){
+ const current=context.getStore();if(!current)return;
+ if(outcome==='unknown')noteSalesFailure('beneficiary','supplier_response');
+ else if(outcome==='eligible')current.fresh.beneficiary=Date.now();
+ // Ordinary recipient rejection is not an operational incident or outage recovery.
 }
 export function noteSupplierError(endpoint:string,error:unknown,phase:SalesObservation['phase']){
   const stage=stageFor(endpoint);if(!stage)return;

@@ -1,3 +1,4 @@
+import { readCheckoutFailure, checkoutFailurePresentation, type CheckoutFailureDetails } from '../../../shared/checkoutFailure';
 import { WEBSITE_TEMPLATES } from '../../data/templates';
 import { detectGhanaNetwork } from '../../data/bundles';
 import { websiteActionText, resolveStoreTheme } from '../../utils/websiteBrand';
@@ -20,6 +21,8 @@ export function ManagedDataStorefront({siteId,template,preview=false,previewProd
 }
 function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:string;template:WebsiteTemplate;preview:boolean;previewProducts?:WebsitePreviewProduct[]}) {
   const [products,setProducts]=useState<any[]>([]),[network,setNetwork]=useState(''),[selected,setSelected]=useState<DataBundle|null>(null),[phone,setPhone]=useState(''),[email,setEmail]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(true),[order,setOrder]=useState<any>(null),[reference,setReference]=useState(''),[busy,setBusy]=useState(false);
+  const [failure,setFailure]=useState<CheckoutFailureDetails|null>(null);
+  const failurePanel=useRef<HTMLDivElement>(null);
   const requestId=useRef<string|null>(null),guard=useRef(false),dialog=useRef<HTMLDialogElement>(null),payButton=useRef<HTMLButtonElement>(null),restoreFocus=useRef(false);
   const lifecycle=useRef(createStoreCheckoutAttempt()),mounted=useRef(false),trackingGeneration=useRef(0),paymentReference=useRef(''),started=useRef(false),trackingInput=useRef<HTMLInputElement>(null);
   const [locked,setLocked]=useState(false),[recoveryOnly,setRecoveryOnly]=useState(false),[trackingError,setTrackingError]=useState('');
@@ -56,7 +59,8 @@ function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:st
     if(preview||!selected||busy||!dialog.current||dialog.current.open)return;
     dialog.current.showModal();
     if(restoreFocus.current){restoreFocus.current=false;if(payButton.current&&!payButton.current.disabled)payButton.current.focus();else dialog.current.querySelector<HTMLButtonElement>("button:not([disabled])")?.focus();}
-  },[selected,busy]);
+    if(failure)failurePanel.current?.focus();
+  },[selected,busy,failure]);
   const refresh=async(ref=reference)=>{
     if(preview||!ref)return;const generation=++trackingGeneration.current;
     try{const result=await websiteBusinessRequest(`websites/${encodeURIComponent(siteId)}/store-orders/${encodeURIComponent(ref)}`);
@@ -70,7 +74,7 @@ function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:st
   };
   // Live status while an order is open; settled outcomes stop polling (Track this order still refreshes on demand).
   useEffect(()=>{if(!reference)return;void refresh();const timer=setInterval(()=>{if(!['delivered','refunded','cancelled','expired'].includes(lastStatus.current))void refresh();},10000);return()=>clearInterval(timer);},[reference]);
-  const choose=(bundle:DataBundle,recipient?:string)=>{if(preview){setError('Preview only. Customer checkout is available on the published store.');return;}if(guard.current)return;if(started.current){setError('Finish or track your existing order before choosing another bundle.');(orderHeading.current||trackingInput.current)?.focus();return;}restoreFocus.current=false;paymentReference.current="";setSelected(bundle);if(recipient)setPhone(recipient);requestId.current=crypto.randomUUID();setError('');setHint('');trackPublicWebsite(siteId,'product_view');trackPublicWebsite(siteId,'checkout_started');};
+  const choose=(bundle:DataBundle,recipient?:string)=>{if(preview){setError('Preview only. Customer checkout is available on the published store.');return;}if(guard.current)return;if(started.current){setError('Finish or track your existing order before choosing another bundle.');(orderHeading.current||trackingInput.current)?.focus();return;}restoreFocus.current=false;paymentReference.current="";setSelected(bundle);if(recipient)setPhone(recipient);requestId.current=crypto.randomUUID();setError('');setFailure(null);setHint('');trackPublicWebsite(siteId,'product_view');trackPublicWebsite(siteId,'checkout_started');};
   const digits=phone.replace(/\D/g,'');
   const validNumber=isValidGhanaPhoneNumber(phone);
   const confirmKey=selected?`${digits}:${selected.network}`:'';
@@ -83,7 +87,7 @@ function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:st
     if(!/^\S+@\S+\.\S+$/.test(email)){setHint('Enter a valid email address. Paystack needs it for this payment.');return;}
     setHint('');
     const currentAttempt=lifecycle.current.begin();if(currentAttempt===null)return;
-    guard.current=true;setBusy(true);setError('');
+    guard.current=true;setBusy(true);setError('');setFailure(null);
     started.current=true;setLocked(true);checkpoint(paymentReference.current||undefined);
     const finish=()=>{
       if(!lifecycle.current.settle(currentAttempt))return false;
@@ -94,7 +98,13 @@ function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:st
     // Keep the form and request ID mounted so cancellation can safely resume it.
     dialog.current?.close();
     const remember=(ref:string)=>{paymentReference.current=ref;checkpoint(ref);try{sessionStorage.setItem(lastOrderKey,ref);}catch{/* The reference stays on screen for this visit. */}if(mounted.current){setOwnReference(ref);setReference(ref);}};
-    await payment.initializeServerPayment({isActive:()=>lifecycle.current.current(currentAttempt),store:{siteId,requestId:requestId.current!,expectedMinor:Math.round(selected.priceGhc*100)},productId:selected.id,recipientPhone:phone,customerEmail:email,onOrderCreated:remember,onPaymentReceived:(ref)=>{if(!finish())return;remember(ref);setSelected(null);setRecoveryOnly(true);void refresh(ref);requestAnimationFrame(()=>{orderHeading.current?.scrollIntoView({block:'center'});orderHeading.current?.focus();});},onCancel:(ref)=>{if(!finish())return;if(ref){remember(ref);void refresh(ref);}},onError:e=>{if(!finish())return;if(e.existingOrderReference){remember(e.existingOrderReference);void refresh(e.existingOrderReference);}setRecoveryOnly(true);setError(`${e.message} Payment is not confirmed. Keep this page open and check the existing order or contact the business before trying again.`);}});
+    await payment.initializeServerPayment({isActive:()=>lifecycle.current.current(currentAttempt),store:{siteId,requestId:requestId.current!,expectedMinor:Math.round(selected.priceGhc*100)},productId:selected.id,recipientPhone:phone,customerEmail:email,onOrderCreated:remember,onPaymentReceived:(ref)=>{if(!finish())return;remember(ref);setSelected(null);setRecoveryOnly(true);void refresh(ref);requestAnimationFrame(()=>{orderHeading.current?.scrollIntoView({block:'center'});orderHeading.current?.focus();});},onCancel:(ref)=>{if(!finish())return;if(ref){remember(ref);void refresh(ref);}},onError:e=>{if(!finish())return;const details=readCheckoutFailure(e.checkout);if(details?.paymentState!=='not_started'&&e.existingOrderReference){remember(e.existingOrderReference);void refresh(e.existingOrderReference);}
+      if(details?.paymentState==='not_started'&&details.retryAllowed&&!paymentReference.current){
+        // Only an authoritative rejection of this attempt can unlock its unchanged form.
+        started.current=false;setLocked(false);setRecoveryOnly(false);setFailure(details);
+        try{const saved=readStoreCheckoutRecovery(sessionStorage,siteId);if(saved?.requestId===requestId.current)sessionStorage.removeItem(recoveryKey);}catch{}
+        setError('No payment was started for this attempt.');
+      }else{setRecoveryOnly(true);setError('Payment is not confirmed. Check the existing order or contact the business before paying again.');}}});
     // Once initialized, retain the request ID while the popup is open or cancelled.
   };
   const contact=template.siteContent?.whatsapp||template.siteContent?.phone||'';
@@ -164,19 +174,20 @@ function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:st
     {selected&&<dialog style={card} ref={dialog} aria-labelledby="store-checkout-title" onCancel={event=>{event.preventDefault();closeSheet();}} onClick={event=>{if(event.target===dialog.current)closeSheet();}} className="store-sheet">
       <div className="flex justify-between items-center gap-3"><h2 id="store-checkout-title" className="font-bold text-xl site-display">Buy {selected.dataAmount} {storeNetworkName(selectedNetwork)}</h2><button type="button" disabled={busy} className="store-secondary" style={{...card,minHeight:44}} onClick={closeSheet}>Close</button></div>
       <div className="store-summary" style={{borderColor:colors.border,'--store-network':storeNetworkColor(selectedNetwork)} as React.CSSProperties}><div className="pl-2 min-w-0"><p className="text-2xl font-bold site-display leading-none">{selected.dataAmount}</p><p className="text-sm mt-1" style={{color:colors.surfaceMutedText}}>{storeNetworkName(selectedNetwork)}{selected.validity?` · ${selected.validity}`:''} · {template.demoBusinessName}</p></div><p className="text-xl font-bold text-right" style={{color:colors.surfaceAccentText}}>{formatGhs(Math.round(selected.priceGhc*100))}<span className="block text-xs font-medium" style={{color:colors.surfaceMutedText}}>total</span></p></div>
-      <label className="block text-sm font-semibold mt-4">Number to receive the data<input ref={numberInput} type="tel" inputMode="tel" autoComplete="tel-national" enterKeyHint="next" maxLength={16} disabled={busy||locked} value={phone} placeholder="024 123 4567" onChange={event=>{if(started.current||guard.current)return;setPhone(event.target.value);requestId.current=crypto.randomUUID();setHint('');}} style={neutral} className="store-field store-number mt-1.5 placeholder:text-[var(--website-placeholder)]"/></label>
+      <label className="block text-sm font-semibold mt-4">Number to receive the data<input ref={numberInput} type="tel" inputMode="tel" autoComplete="tel-national" enterKeyHint="next" maxLength={16} disabled={busy||locked} value={phone} placeholder="024 123 4567" onChange={event=>{if(started.current||guard.current)return;setPhone(event.target.value);setFailure(null);setError('');requestId.current=crypto.randomUUID();setHint('');}} style={neutral} className="store-field store-number mt-1.5 placeholder:text-[var(--website-placeholder)]"/></label>
       {phone&&!validNumber&&<p className="store-note mt-1.5" style={{color:colors.surfaceMutedText}}>Enter a full Ghana number, like 024 123 4567.</p>}
       {validNumber&&<div className={`store-network-check${mismatch?' is-warning':''}`} style={{borderColor:mismatch?storeNetworkColor(selectedNetwork):colors.border}}>
         {mismatch&&<p className="store-note" role="note"><strong>{spaced} usually belongs to {storeNetworkName(detected!)}.</strong> This bundle only works on {storeNetworkName(selectedNetwork)}. Numbers can be moved (ported) between networks, so continue only if this number is on {storeNetworkName(selectedNetwork)} now.</p>}
         <label className="store-check"><input type="checkbox" data-network={selectedNetwork} checked={networkConfirmed} disabled={busy||locked} onChange={event=>{setConfirmedFor(event.target.checked?confirmKey:'');setHint('');}}/><span>{mismatch?`Yes, ${spaced} is on ${storeNetworkName(selectedNetwork)} now`:`${spaced} is an ${storeNetworkName(selectedNetwork)} number`}</span></label>
         {mismatch&&networks.includes(detected!)&&!locked&&<button type="button" className="store-link" style={{color:colors.surfaceText}} onClick={()=>{switchNetwork(detected!);setSelected(null);}}>Show {storeNetworkName(detected!)} bundles instead</button>}
       </div>}
-      <label className="block text-sm font-semibold mt-4">Email<input type="email" inputMode="email" autoComplete="email" enterKeyHint="done" maxLength={254} disabled={busy||locked} value={email} placeholder="you@example.com" onChange={event=>{if(started.current)return;setEmail(event.target.value);requestId.current=crypto.randomUUID();setHint('');}} style={neutral} className="store-field mt-1.5 font-normal placeholder:text-[var(--website-placeholder)]"/></label>
+      <label className="block text-sm font-semibold mt-4">Email<input type="email" inputMode="email" autoComplete="email" enterKeyHint="done" maxLength={254} disabled={busy||locked} value={email} placeholder="you@example.com" onChange={event=>{if(started.current)return;setEmail(event.target.value);setFailure(null);setError('');requestId.current=crypto.randomUUID();setHint('');}} style={neutral} className="store-field mt-1.5 font-normal placeholder:text-[var(--website-placeholder)]"/></label>
       <p className="store-note mt-1.5" style={{color:colors.surfaceMutedText}}>Paystack needs an email for this payment. Your order reference appears on this page after you pay.</p>
       {validNumber&&<p className="store-confirm-line" style={{borderColor:colors.border}}>Sending <strong>{selected.dataAmount} {storeNetworkName(selectedNetwork)}</strong> to <strong>{spaced}</strong> · you pay <strong>{formatGhs(Math.round(selected.priceGhc*100))}</strong></p>}
       <p className="text-xs my-3 leading-relaxed" style={{color:colors.surfaceMutedText}}>{sentence(dataDeliveryNote(selected.network))}</p>
       {locked&&<p className="text-sm my-3" style={{color:colors.surfaceMutedText}}>Keep these details for this payment attempt. Closing the payment window does not cancel an order that was already created.</p>}
-      {(hint||error)&&<p role="alert" style={{color:colors.surfaceText}} className="store-sheet-alert my-3 break-words">{hint||error}</p>}
+      {failure&&<div ref={failurePanel} tabIndex={-1} role="alert" className="store-sheet-alert my-3 break-words" style={{color:colors.surfaceText}}><h3 className="font-bold">{checkoutFailurePresentation(failure.code).title}</h3><p>{checkoutFailurePresentation(failure.code).message}</p><p>No payment was started for this attempt.</p>{checkoutFailurePresentation(failure.code).recipient&&<button type="button" className="store-secondary mt-2" style={quiet} onClick={()=>numberInput.current?.focus()}>Check recipient number</button>}</div>}
+      {(hint||error)&&!failure&&<p role="alert" style={{color:colors.surfaceText}} className="store-sheet-alert my-3 break-words">{hint||error}</p>}
       {paymentReference.current&&<div className="my-3 text-sm"><p className="break-all">Order reference: <code className="store-ref-code">{paymentReference.current}</code></p><button type="button" style={neutral} className="store-secondary mt-2" onClick={()=>{setSelected(null);void refresh(paymentReference.current);requestAnimationFrame(()=>orderHeading.current?.focus());}}>Check existing order</button></div>}
       <button style={primary} ref={payButton} className="store-primary w-full font-bold" disabled={busy||recoveryOnly} onClick={()=>void checkout()}>{busy?payment.loadingPhase==='opening'?'Opening secure payment…':'Connecting to secure payment…':`Pay ${formatGhs(Math.round(selected.priceGhc*100))}`}</button>
       <button type="button" style={quiet} className="store-secondary w-full mt-2" disabled={busy||locked} onClick={closeSheet}>Choose another bundle</button>

@@ -14,6 +14,8 @@ import { validateAndNormalizeGhanaPhone, canonicalGhanaPhone, getGhanaPhoneLooku
 import { toSafePublicOrder, maskOrderRecipient, type OrderRecord } from '../types/orders.js';
 import {websiteBusinessCapabilities} from '../../src/utils/websiteBusinessCapabilities.js';
 import {AdminAuditStore} from '../db/adminAuditStore.js';
+import {CheckoutFailure,rejectPreflight,requireCheckoutRecovery} from './checkoutFailure.js';
+import {isPreflightCode} from '../../shared/checkoutFailure.js';
 
 interface Wholesale { enabled:boolean; wholesaleMinor:number; version:string; updatedAt:string; actorId:string; supplierCostMinor:number }
 interface Price { enabled:boolean; retailMinor:number }
@@ -145,26 +147,41 @@ export class WebsiteBusinessService {
     return FinanceStore.transaction(adminId,async tx=>{await configLock(tx,true);const costs=await wholesale(tx);if((costs[product.id]?.version||'empty')!==input.expectedVersion)throw new FinanceError('Wholesale changed. Refresh.',409);
       const previous=costs[product.id]||null;const row:Wholesale={enabled:input.enabled as boolean,wholesaleMinor:amount,version:randomUUID(),updatedAt:new Date().toISOString(),actorId:adminId,supplierCostMinor:cost??0};costs[product.id]=row;await tx.saveConfig('store-wholesale',costs);await tx.audit(adminId,'store_wholesale_changed',product.id,{previous,next:row});return row;});
   }
+  private static async existingCheckout(ownerId:string,siteId:string,key:string,input:Record<string,unknown>,recipient:string,customerId?:string){
+    const row=await FinanceStore.read(ownerId,tx=>tx.find(key));if(!row)return null;
+    if(row.payload.siteId!==siteId||row.payload.productId!==input.productId||row.payload.recipient!==recipient||row.payload.email!==input.customerEmail||row.payload.customerId!==(customerId||null))throw requireCheckoutRecovery();
+    return this.checkoutResponse(row);
+  }
+  private static async checkoutResponse(row:{state:string;amount_minor:number;payload:Record<string,any>}){
+    const order=await OrdersStore.findOrder(row.payload.orderId);
+    if(!order||order.payment_status==='success'||order.paid_at||order.supplier_order_id||row.state!=='pending')throw requireCheckoutRecovery(row.payload.publicRef);
+    return {success:true,orderRef:row.payload.publicRef,reference:row.payload.reference,amountPesewas:row.amount_minor,currency:'GHS',accessCode:row.payload.accessCode,authorizationUrl:row.payload.authorizationUrl,isSimulated:row.payload.isSimulated};
+  }
   static async initialize(siteId:string,input:Record<string,unknown>,customerId?:string) {
     if(process.env.NODE_ENV==='production'&&!process.env.PAYSTACK_SECRET_KEY?.trim().startsWith('sk_live_'))throw new FinanceError('Live managed checkout is unavailable.',503);
     exact(input,['productId','recipientPhone','customerEmail','requestId']);
-    const product=getAuthoritativeProduct(String(input.productId));if(!product||product.id!==input.productId)throw new FinanceError('Bundle unavailable.');
     const phone=validateAndNormalizeGhanaPhone(input.recipientPhone as string);if(!phone.isValid||!phone.normalized!)throw new FinanceError('Enter a valid Ghana recipient number.');
     if(typeof input.customerEmail!=='string'||input.customerEmail.length>254||!/^\S+@\S+\.\S+$/.test(input.customerEmail))throw new FinanceError('Enter a valid receipt email.');
     const initialSite=await WebsiteStore.findPublishedSiteById(siteId);if(!initialSite||initialSite.status!=='published'||initialSite.template_id!=='tmpl-data-reseller')throw new FinanceError('Store not found.',404);
     const key=`store-checkout:${operationKey(input.requestId)}`;
+    const previous=await this.existingCheckout(initialSite.user_id,siteId,key,input,phone.normalized!,customerId);
+    const reject=async(code:import('../../shared/checkoutFailure.js').PreflightCode):Promise<never>=>{const concurrent=await this.existingCheckout(initialSite.user_id,siteId,key,input,phone.normalized!,customerId);if(concurrent||previous)throw requireCheckoutRecovery((concurrent||previous)!.orderRef);throw rejectPreflight(code);};
+    const product=getAuthoritativeProduct(String(input.productId));if(!product||product.id!==input.productId){return reject('PACKAGE_UNAVAILABLE');}
     const preflight=await FulfilmentService.preflightCheck(product.network,product.dataAmount,phone.normalized!);
-    if(!preflight.allowed||!Number.isSafeInteger(preflight.supplierCostMinor)||Number(preflight.supplierCostMinor)<=0)throw new FinanceError('Bundle is temporarily unavailable for managed checkout.',503);
+    if(!preflight.allowed||!Number.isSafeInteger(preflight.supplierCostMinor)||Number(preflight.supplierCostMinor)<=0){
+      return reject(!preflight.allowed&&isPreflightCode(preflight.code)?preflight.code:'PACKAGE_UNAVAILABLE');
+    }
+    if(previous){const current=await this.existingCheckout(initialSite.user_id,siteId,key,input,phone.normalized!,customerId);if(!current)throw requireCheckoutRecovery(previous.orderRef);return current;}
     const created=await FinanceStore.transaction(initialSite.user_id,async tx=>{
-      await configLock(tx);const old=await tx.find(key);if(old){if(old.payload.siteId!==siteId||old.payload.productId!==product.id||old.payload.recipient!==phone.normalized!||old.payload.email!==input.customerEmail||old.payload.customerId!==(customerId||null))throw new FinanceError('Checkout request changed.',409);return {row:old,fresh:false};}
+      await configLock(tx);const old=await tx.find(key);if(old){if(old.payload.siteId!==siteId||old.payload.productId!==product.id||old.payload.recipient!==phone.normalized!||old.payload.email!==input.customerEmail||old.payload.customerId!==(customerId||null))throw requireCheckoutRecovery();return {row:old,fresh:false};}
       if(tx.client)await tx.client.query('SELECT id FROM website_sites WHERE id=$1 FOR UPDATE',[siteId]);
-      const site=await WebsiteStore.findPublishedSiteById(siteId);if(!site||site.status!=='published'||site.template_id!=='tmpl-data-reseller')throw new FinanceError('Store is unavailable.',409);
+      const site=await WebsiteStore.findPublishedSiteById(siteId);if(!site||site.status!=='published'||site.template_id!=='tmpl-data-reseller')throw rejectPreflight('SERVICE_TEMPORARILY_UNAVAILABLE');
       const policy=await currentPolicy(tx),costs=await wholesale(tx),prices=await priceConfig(siteId,tx),cost=costs[product.id],price=prices.products[product.id];
-      if(!policy.enabled||!cost?.enabled||!price?.enabled||cost.wholesaleMinor<Number(preflight.supplierCostMinor)||price.retailMinor<minimumStorePrice(cost.wholesaleMinor,policy))throw new FinanceError('Bundle pricing needs an update before checkout.',409);
+      if(!policy.enabled||!cost?.enabled||!price?.enabled||cost.wholesaleMinor<Number(preflight.supplierCostMinor)||price.retailMinor<minimumStorePrice(cost.wholesaleMinor,policy))throw rejectPreflight('PACKAGE_UNAVAILABLE');
       const snapshot:StoreSnapshot={channel:'website_store',siteId,ownerId:site.user_id,productId:product.id,retailMinor:price.retailMinor,wholesaleMinor:cost.wholesaleMinor,reserveMinor:storeReserve(price.retailMinor,policy),earningMinor:price.retailMinor-cost.wholesaleMinor-storeReserve(price.retailMinor,policy),supplierCostMinor:preflight.supplierCostMinor!,currency:'GHS',policyVersion:policy.version,wholesaleVersion:cost.version,priceVersion:prices.version};
       if(product.network==='mtn') {
-        if(tx.client){await tx.client.query("SELECT pg_advisory_xact_lock(hashtext('mtn_' || $1))",[canonicalGhanaPhone(phone.normalized!)]);const active=await tx.client.query("SELECT id FROM orders WHERE network='mtn' AND recipient_phone=ANY($1::text[]) AND status IN ('paid','queued','submitted','processing','refund_pending') LIMIT 1",[getGhanaPhoneLookupVariants(phone.normalized!)]);if(active.rows.length)throw new FinanceError('An MTN order is already processing for this number.',409);}
-        else if(await OrdersStore.findActiveMtnOrder(phone.normalized!))throw new FinanceError('An MTN order is already processing for this number.',409);
+        if(tx.client){await tx.client.query("SELECT pg_advisory_xact_lock(hashtext('mtn_' || $1))",[canonicalGhanaPhone(phone.normalized!)]);const active=await tx.client.query("SELECT id FROM orders WHERE network='mtn' AND recipient_phone=ANY($1::text[]) AND status IN ('paid','queued','submitted','processing','refund_pending') LIMIT 1",[getGhanaPhoneLookupVariants(phone.normalized!)]);if(active.rows.length)throw rejectPreflight('ACTIVE_MTN_ORDER');}
+        else if(await OrdersStore.findActiveMtnOrder(phone.normalized!))throw rejectPreflight('ACTIVE_MTN_ORDER');
       }
       const id=`ord_${randomUUID()}`,reference=`MH_STORE_${randomUUID()}`,publicRef=`MH-${randomUUID()}`,now=new Date().toISOString();
       const order:OrderRecord={id,user_id:customerId||null,public_reference:publicRef,customer_name:null,customer_email:input.customerEmail as string,customer_phone:phone.normalized!,recipient_phone:phone.normalized!,network:product.network,service_type:'data',product_id:product.id,product_name_snapshot:`${product.networkName} ${product.dataAmount}`,bundle_size_snapshot:product.dataAmount,amount:snapshot.retailMinor,currency:'GHS',status:'pending_payment',payment_provider:'paystack',payment_reference:reference,payment_status:'pending',supplier_provider:'success_biz_hub',supplier_order_id:null,supplier_response:null,supplier_cost_minor:snapshot.supplierCostMinor,supplier_offer_ref:null,supplier_last_checked_at:null,failure_reason:null,created_at:now,updated_at:now,paid_at:null,submitted_at:null,delivered_at:null,referrer_user_id:null,referral_attribution_id:null,referral_code:null,store_context:snapshot};
@@ -172,12 +189,13 @@ export class WebsiteBusinessService {
       const row=await tx.create('store_checkout',key,order.amount,{siteId,productId:product.id,recipient:phone.normalized!,email:input.customerEmail,customerId:customerId||null,orderId:id,reference,publicRef},'initializing');return {row,fresh:true};
     });
     let row=created.row;
+    try{
     if(created.fresh) {
       const payment=await PaystackServerService.initializeTransaction({email:input.customerEmail as string,amountPesewas:row.amount_minor,reference:row.payload.reference,metadata:{purpose:'website_store_order',store_id:siteId,order_id:row.payload.orderId,product_id:product.id}});
       row=await FinanceStore.transaction(initialSite.user_id,async tx=>{const current=(await tx.find(key))!;return tx.update(current,payment.success?'pending':'initialization_uncertain',{...current.payload,...(payment.success?{accessCode:payment.accessCode,authorizationUrl:payment.authorizationUrl,isSimulated:payment.isSimulated===true}:{})});});
     }
-    if(row.state!=='pending'){const error=new FinanceError('Payment connection is uncertain. Track the existing order before trying again.',409);Object.assign(error,{existingOrderReference:row.payload.publicRef});throw error;}
-    return {success:true,orderRef:row.payload.publicRef,reference:row.payload.reference,amountPesewas:row.amount_minor,currency:'GHS',accessCode:row.payload.accessCode,authorizationUrl:row.payload.authorizationUrl,isSimulated:row.payload.isSimulated};
+    return await this.checkoutResponse(row);
+    }catch(error){if(error instanceof CheckoutFailure)throw error;throw requireCheckoutRecovery(row.payload.publicRef);}
   }
   /** Durable order is authority. Repeat calls recover missing effects without duplicate credits. */
   static async syncOrder(input:OrderRecord) {

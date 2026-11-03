@@ -18,6 +18,7 @@ import {observeSalesPreflight,noteSalesFailure} from './salesReliability.js';
 
 export type PreflightErrorCode =
   | 'BENEFICIARY_NOT_ELIGIBLE'
+  | 'BENEFICIARY_CHECK_UNAVAILABLE'
   | 'SUPPLIER_WALLET_LOW'
   | 'SERVICE_TEMPORARILY_UNAVAILABLE'
   | 'PACKAGE_UNAVAILABLE'
@@ -108,7 +109,7 @@ export class FulfilmentService {
 
       if (!servicesCheckResult.res.available) {
         noteSalesFailure('services','service_unavailable',true);
-        console.warn(`[Fulfilment Preflight] Services check failed: ${servicesCheckResult.res.reason}`);
+        console.warn('[Fulfilment Preflight] Service availability not confirmed.');
         return {
           allowed: false,
           code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
@@ -119,7 +120,7 @@ export class FulfilmentService {
       }
 
       if (!resolvedResult.res.resolved) {
-        console.warn(`[Fulfilment Preflight] Package resolution failed: ${resolvedResult.res.error}`);
+        console.warn('[Fulfilment Preflight] Package resolution not confirmed.');
         return {
           allowed: false,
           code: 'PACKAGE_UNAVAILABLE',
@@ -130,6 +131,10 @@ export class FulfilmentService {
       }
 
       const supplierPackage = resolvedResult.res.resolved;
+      if(!Number.isSafeInteger(supplierPackage.supplierCostMinor)||supplierPackage.supplierCostMinor<=0){
+        noteSalesFailure('catalog','supplier_response',true);
+        return {allowed:false,code:'PACKAGE_UNAVAILABLE',customerMessage:'This bundle is temporarily unavailable.',internalReason:'Invalid authoritative supplier cost.'};
+      }
 
       // Step B: Now that authoritative package is resolved, checkBeneficiaryEligibility and getBalance
       // are genuinely independent. Run them concurrently.
@@ -157,19 +162,19 @@ export class FulfilmentService {
       const walletMs = walletResult.ms;
 
       if (!beneficiaryResult.res.eligible) {
-        console.warn(`[Fulfilment Preflight] Beneficiary ineligible: ${beneficiaryResult.res.reason}`);
+        const confirmed=beneficiaryResult.res.outcome==='ineligible';
         return {
           allowed: false,
-          code: 'BENEFICIARY_NOT_ELIGIBLE',
-          customerMessage: "We've submitted this number for MTN verification. No payment has been taken. Verification may take some time.",
-          internalReason: beneficiaryResult.res.reason || 'Beneficiary ineligible',
+          code: confirmed?'BENEFICIARY_NOT_ELIGIBLE':'BENEFICIARY_CHECK_UNAVAILABLE',
+          customerMessage: confirmed?'The recipient is not eligible for this selected bundle.':'We could not confirm recipient eligibility. Please try again later.',
+          internalReason: confirmed?'Confirmed recipient denial.':'Eligibility evidence unavailable.',
           timings: { servicesMs, catalogMs, beneficiaryMs, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
         };
       }
 
       if (walletResult.error || !walletResult.res) {
         noteSalesFailure('wallet','supplier_response',true);
-        console.warn('[Fulfilment Preflight] Wallet check failed, failing closed:', walletResult.error);
+        console.warn('[Fulfilment Preflight] Wallet check unavailable; failing closed.');
         return {
           allowed: false,
           code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
@@ -182,7 +187,7 @@ export class FulfilmentService {
       if (walletResult.res.balancePesewas < supplierPackage.supplierCostMinor) {
         noteSalesFailure('wallet','wallet_low',true);
         console.error(
-          `[Fulfilment Preflight] Insufficient supplier wallet balance! Available: GH₵${walletResult.res.balanceGhc}, required: GH₵${(supplierPackage.supplierCostMinor / 100).toFixed(2)}`
+          '[Fulfilment Preflight] Supplier balance restriction.'
         );
         return {
           allowed: false,
@@ -200,7 +205,7 @@ export class FulfilmentService {
       };
     } catch (err) {
       noteSalesFailure('application','internal_error',true);
-      console.error('[Fulfilment Preflight] Unexpected preflight exception:', err);
+      console.error('[Fulfilment Preflight] Unexpected preflight exception; failing closed.');
       return {
         allowed: false,
         code: 'SERVICE_TEMPORARILY_UNAVAILABLE',

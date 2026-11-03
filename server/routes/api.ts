@@ -1,6 +1,9 @@
 import { commercialRouter } from './commercialApi.js';
 import {observeSalesRequest,salesCheckoutKind,noteSalesFailure,completeSalesPreflight} from '../services/salesReliability.js';
 import { CommercialService } from '../services/commercialService.js';
+import {recoverDirectCheckout} from '../services/directCheckoutRecovery.js';
+import {CheckoutFailure,checkoutFailureBody,rejectPreflight,requireCheckoutRecovery} from '../services/checkoutFailure.js';
+import {isPreflightCode} from '../../shared/checkoutFailure.js';
 import { WebsiteBusinessService } from '../services/websiteBusinessService.js';
 import { purchasableOptions } from '../../shared/marketplaceVariants.js';
 import { financeRouter } from './financeApi.js';
@@ -818,11 +821,21 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
     // ==========================================
     // B. DATA BUNDLE FLOW
     // ==========================================
+    const recoverData=()=>recoverDirectCheckout(req.user?.id,req.body,String(productId),phoneVal.normalized!,normalizeEmail(customerEmail||req.user?.email)||'');
+    const existingCheckout=await recoverData();
+    const sendDataCheckout=(result:OrderRecord&{checkout?:any})=>{
+      const checkout=result.checkout;if(!checkout)throw requireCheckoutRecovery(result.public_reference);
+      res.json({success:true,orderRef:result.public_reference,reference:result.payment_reference,accessCode:checkout.accessCode,authorizationUrl:checkout.authorizationUrl,amountGhc:result.amount/100,amountPesewas:result.amount,currency:'GHS',isSimulated:checkout.isSimulated||false});
+    };
+    const rejectData=async(code:import('../../shared/checkoutFailure.js').PreflightCode,ownedReference?:string)=>{
+      const concurrent=await recoverData();
+      if(concurrent||existingCheckout)throw requireCheckoutRecovery((concurrent||existingCheckout)!.public_reference);
+      throw rejectPreflight(code,ownedReference);
+    };
     // 3. Load authoritative product from server catalog
     const product = (await CommercialService.catalog()).products.find(p=>p.id===getAuthoritativeProduct(productId)?.id);
     if (!product) {
-      res.status(404).json({ error: 'Selected bundle product is currently unavailable or inactive.' });
-      return;
+      await rejectData('PACKAGE_UNAVAILABLE');return;
     }
 
     // 3a. MTN Duplicate Active Order Protection
@@ -836,13 +849,7 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
 
       if (activeMtnOrder) {
         console.info(`[Checkout Timing] total=${Math.round(performance.now() - reqStart)}ms`);
-        res.status(409).json({
-          code: ACTIVE_MTN_ORDER_CODE,
-          message: ACTIVE_MTN_ORDER_MESSAGE,
-          existingOrderReference: activeMtnOrder.public_reference,
-          existingOrderStatus: mapToSafeCustomerStatus(activeMtnOrder.status),
-        });
-        return;
+        await rejectData('ACTIVE_MTN_ORDER',req.user?.id&&activeMtnOrder.user_id===req.user.id?activeMtnOrder.public_reference:undefined);return;
       }
     }
 
@@ -863,17 +870,9 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
 
     if (!preflight.allowed) {
       console.info(`[Checkout Timing] total=${Math.round(performance.now() - reqStart)}ms`);
-      const safeCode = preflight.code || 'SERVICE_TEMPORARILY_UNAVAILABLE';
-      const safeMessage =
-        preflight.customerMessage ||
-        'This bundle is temporarily unavailable. Please try another package or try again shortly.';
-      res.status(safeCode === 'SERVICE_TEMPORARILY_UNAVAILABLE' || safeCode === 'SUPPLIER_WALLET_LOW' ? 503 : 400).json({
-        code: safeCode,
-        message: safeMessage,
-        error: safeMessage,
-      });
-      return;
+      await rejectData(isPreflightCode(preflight.code)?preflight.code:'SERVICE_TEMPORARILY_UNAVAILABLE');return;
     }
+    if(existingCheckout){const current=await recoverData();if(!current)throw requireCheckoutRecovery(existingCheckout.public_reference);sendDataCheckout(current);return;}
 
     // 5. Generate safe unique references
     const timestamp = Date.now();
@@ -924,10 +923,9 @@ apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.p
 
     const result = await CommercialService.initialize(newOrder,req.body);
     if(result.payment_provider==='wallet') {res.json({success:true,paymentMethod:'wallet',orderRef:result.public_reference,reference:result.payment_reference,status:result.status,amountPesewas:result.amount});return;}
-    const checkout=(result as any).checkout;
-    if(!checkout){res.status(409).json({error:'Existing payment initialization is uncertain. Reconcile the existing order before retrying.',orderRef:result.public_reference});return;}
-    res.json({success:true,orderRef:result.public_reference,reference:result.payment_reference,accessCode:checkout.accessCode,authorizationUrl:checkout.authorizationUrl,amountGhc:result.amount/100,amountPesewas:result.amount,currency:'GHS',isSimulated:checkout.isSimulated||false});
+    sendDataCheckout(result);
   } catch (err) {
+    if(err instanceof CheckoutFailure){res.status(err.status).json(checkoutFailureBody(err));return;}
     if(err instanceof FinanceError){res.status(err.status).json({error:err.message});return;}
     console.error('Payment Initialize Controller Exception:', err);
     res.status(500).json({ error: 'An unexpected server error occurred initializing payment.' });

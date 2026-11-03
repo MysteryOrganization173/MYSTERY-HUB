@@ -1,3 +1,4 @@
+import * as checkoutFailure from '../../../shared/checkoutFailure';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -18,7 +19,7 @@ function component(preview=false,siteId='site-a') {
     useEffect:(fn:any,deps:any[])=>{const i=cursor++,old=cells[i];if(!old||deps.some((d,j)=>!Object.is(d,old.deps[j]))){effects.push(()=>{old?.cleanup?.();cells[i]={deps,cleanup:fn()};});}}
   };
   const tile=()=>null,tabs=()=>null,row=()=>null,colors={accent:'#7c3aed',background:'#07101e',surface:'#0b1220',text:'#fff',mutedText:'#bbb',border:'#566',focus:'#fff'};
-  const modules:any={react,'../../utils/websitePreviewCatalog':{websitePreviewCatalog:(rows:any)=>rows||[]},'../../data/templates':{WEBSITE_TEMPLATES:[]},'../../data/bundles':{detectGhanaNetwork:()=>'mtn'},
+  const modules:any={'../../../shared/checkoutFailure':checkoutFailure,react,'../../utils/websitePreviewCatalog':{websitePreviewCatalog:(rows:any)=>rows||[]},'../../data/templates':{WEBSITE_TEMPLATES:[]},'../../data/bundles':{detectGhanaNetwork:()=>'mtn'},
     './storefront/ResellerCatalogue':{BundleTile:tile,NetworkTabs:tabs,BundleRow:row,SignalSteps:()=>null,bundleFilters:()=>[{id:'all',label:'All',count:1}],filterBundles:(b:any[])=>b,lowestPrice:(b:any[])=>b.length?Math.min(...b.map(x=>x.priceMinor)):null,sortBundles:(b:any[])=>b,storeNetworkColor:()=>'#ffcc00',storeNetworkName:(n:string)=>n.toUpperCase(),storeNetworksIn:(b:any[])=>[...new Set(b.map(x=>x.network))],networkSummaries:()=>[]},
     '../../utils/websiteBrand':{websiteActionText:()=> '#fff',resolveResellerTheme:()=>colors,resolveStoreTheme:()=>colors},
     '../../utils/templateRendererUtils':{renderTemplateLayout:(_template:any,slots:any)=>({type:'layout',props:slots})},
@@ -41,6 +42,24 @@ function component(preview=false,siteId='site-a') {
   return {calls,values,wrapper,render,find,buy,details,pay,cleanup,row};
 }
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
+
+for(const code of checkoutFailure.PREFLIGHT_CODES)test(`real managed component safely unlocks ${code} and ignores stale callbacks`,async()=>{
+ const h=component();h.render();await tick();h.buy();h.details();await h.pay();const first=h.calls.payments[0];
+ first.onError(Object.assign(new Error('PRIVATE provider detail'),{checkout:checkoutFailure.preflightFailure(code)}));h.render();
+ assert.equal(h.find(n=>n.type==='input'&&n.props.type==='tel').props.disabled,false);
+ assert.equal(h.find(n=>n.type==='button'&&n.props.className?.includes('w-full font-bold')).props.disabled,false);
+ assert.equal(h.values.has('mh_store_checkout:site-a'),false);
+ await h.pay();assert.equal(h.calls.payments.length,2);assert.equal(h.calls.payments[1].store.requestId,first.store.requestId);
+ first.onError(Object.assign(new Error('late denial'),{checkout:checkoutFailure.preflightFailure(code)}));h.render();
+ assert.equal(h.find(n=>n.type==='input'&&n.props.type==='tel').props.disabled,true,'old callback cannot unlock a newer in-flight attempt');h.cleanup();
+});
+for(const error of [new TypeError('Failed to fetch'),new Error('old server error'),Object.assign(new Error('malformed phase'),{checkout:{version:1,code:'BENEFICIARY_NOT_ELIGIBLE',paymentState:'not_started',retryAllowed:false}})])test(`real managed component keeps uncertainty locked: ${error.message}`,async()=>{
+ const h=component();h.render();await tick();h.buy();h.details();await h.pay();h.calls.payments[0].onError(error);h.render();
+ assert.equal(h.find(n=>n.type==='input'&&n.props.type==='tel').props.disabled,true);await h.pay();assert.equal(h.calls.payments.length,1);assert.equal(h.values.has('mh_store_checkout:site-a'),true);h.cleanup();
+});
+test('known managed payment reference wins over any later no-start denial',async()=>{
+ const h=component();h.render();await tick();h.buy();h.details();await h.pay();const first=h.calls.payments[0];first.onOrderCreated('MH-existing');first.onError(Object.assign(new Error('stale denial'),{checkout:checkoutFailure.preflightFailure('BENEFICIARY_NOT_ELIGIBLE')}));h.render();await h.pay();assert.equal(h.calls.payments.length,1);assert.equal(h.find(n=>n.type==='input'&&n.props.type==='tel').props.disabled,true);assert.equal(JSON.parse(h.values.get('mh_store_checkout:site-a')!).reference,'MH-existing');h.cleanup();
+});
 
 test('V1.2 preview cannot initialize, recover, track or emit checkout analytics',async()=>{
   const h=component(true);h.render();await tick();h.buy();h.render();

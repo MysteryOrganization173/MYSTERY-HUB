@@ -1,3 +1,5 @@
+import { checkoutFailurePresentation, readCheckoutFailure } from '../../../shared/checkoutFailure';
+import { directAttemptKey, readDirectAttempt, saveDirectAttempt, clearDirectAttempt } from '../../utils/directCheckoutAttempt';
 import {useDialogFocus} from '../../hooks/useDialogFocus';
 import {useVisualViewport} from '../../hooks/useVisualViewport';
 import {commercialRequest} from '../../services/commercialApi';
@@ -53,7 +55,7 @@ export const CheckoutModal: React.FC = () => {
     openDataPage,
     sessionToken,
   } = useApp();
-  const { initializeServerPayment, isInitializing, loadingPhase } = usePaystack();
+  const { initializeServerPayment, isInitializing, loadingPhase } = usePaystack(`${sessionToken||'guest'}:${isCheckoutOpen}:${checkoutBundle?.id||''}`);
 
   const [phone, setPhone] = useState('');
   const [receiptEmail,setReceiptEmail]=useState('');
@@ -61,7 +63,11 @@ export const CheckoutModal: React.FC = () => {
   const [commercial,setCommercial]=useState<any>(null);
   const [quoteError,setQuoteError]=useState('');
   const [quoteRefresh,setQuoteRefresh]=useState(0);
-  const directRequest=useRef(crypto.randomUUID());
+  const directRequest=useRef<string>(crypto.randomUUID());
+  const directScope=directAttemptKey(user?.id);
+  const attemptGeneration=useRef(0),knownReference=useRef<string|null>(null),recoveryLocked=useRef(false);
+  const [recoveryOnly,setRecoveryOnly]=useState(false);
+  useEffect(()=>{++attemptGeneration.current;return()=>{++attemptGeneration.current;};},[sessionToken,isCheckoutOpen,checkoutBundle?.id]);
   useEffect(()=>{if(!isCheckoutOpen||!checkoutBundle||checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data'||checkoutBundle.id.startsWith('instant-')||checkoutBundle.id.startsWith('airtime-')){setCommercial(null);return;}let active=true;setCommercial(null);setQuoteError('');commercialRequest('commercial/quote/'+encodeURIComponent(checkoutBundle.id),sessionToken).then(r=>{if(active)setCommercial(r);}).catch(e=>{if(active)setQuoteError(e.message);});return()=>{active=false;};},[isCheckoutOpen,checkoutBundle?.id,sessionToken,quoteRefresh,user?.phone]);
   // A typed Flexi amount has no catalogue price, so checkout asks the server before Pay is offered.
   const needsFlexiQuote = Boolean(isCheckoutOpen && checkoutBundle?.isFlexi && checkoutBundle.serviceFeeGhc === undefined
@@ -119,10 +125,15 @@ export const CheckoutModal: React.FC = () => {
   }, [isInitializing]);
 
   useEffect(() => {
+    let active=true;
     if (isCheckoutOpen && checkoutBundle) {
       setReceiptEmail(user?.email||'');
       setEditingReceipt(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user?.email || ''));
-      directRequest.current=crypto.randomUUID();
+      let saved=null;try{saved=readDirectAttempt(sessionStorage,directScope);}catch{}
+      const regular=!(checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data')&&!checkoutBundle.id.startsWith('instant-')&&!checkoutBundle.id.startsWith('airtime-');
+      if(!regular)saved=null;
+      directRequest.current=saved?.requestId||crypto.randomUUID();
+      recoveryLocked.current=!!saved;knownReference.current=saved?.reference||null;setRecoveryOnly(!!saved);
       setPaymentMethod('paystack');
       walletRequest.current=null;
       const initial = checkoutInitialPhone !== undefined ? checkoutInitialPhone : (user?.phone || '');
@@ -131,11 +142,20 @@ export const CheckoutModal: React.FC = () => {
       setServerError('');
       setActiveMtnConflict(null);
       setPreflightIssue(null);
-      setAttemptRef(null);
+      setAttemptRef(saved?.reference||null);
       setPaymentClosed(false);
       setRecovery({ checking: false, message: '' });
+      if(saved){
+        setServerError('An earlier checkout attempt may already exist. Check its reference or contact support before paying again.');
+        if(saved.reference)void lookupOrderOnServer(saved.reference).then(result=>{
+          if(!active||!result.success||!dataOrderPresentation(result.order?.status,result.order?.manual_review,result.order?.customer_resolution).paymentConfirmed)return;
+          clearDirectAttempt(sessionStorage,directScope,saved!.requestId);clearPendingCheckout(saved!.reference);
+          recoveryLocked.current=false;knownReference.current=null;setRecoveryOnly(false);setAttemptRef(null);setServerError('');directRequest.current=crypto.randomUUID();
+        }).catch(()=>{});
+      }
     }
-  }, [isCheckoutOpen,checkoutBundle, checkoutInitialPhone, user?.phone]);
+    return()=>{active=false;};
+  }, [isCheckoutOpen,checkoutBundle, checkoutInitialPhone, user?.phone,sessionToken,directScope]);
 
   useEffect(() => {
     const net = detectGhanaNetwork(phone);
@@ -156,6 +176,7 @@ export const CheckoutModal: React.FC = () => {
   useEffect(() => {
     if (preflightIssue && preflightRef.current) {
       smoothScrollToElement(preflightRef.current, { block: 'center' });
+      preflightRef.current.focus();
     }
   }, [preflightIssue]);
 
@@ -163,6 +184,7 @@ export const CheckoutModal: React.FC = () => {
   useEffect(() => {
     if (serverError && serverErrorRef.current) {
       smoothScrollToElement(serverErrorRef.current, { block: 'center' });
+      serverErrorRef.current.focus();
     }
   }, [serverError]);
 
@@ -213,7 +235,10 @@ export const CheckoutModal: React.FC = () => {
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     const clean = formatGhanaPhone(val.replace(/[^\d\s+]/g, ''));
+    if(recoveryLocked.current||knownReference.current)return;
+    ++attemptGeneration.current;
     setPhone(clean);
+    directRequest.current=crypto.randomUUID();
     if (activeMtnConflict) setActiveMtnConflict(null);
     if (preflightIssue) setPreflightIssue(null);
     if (phoneError) setPhoneError('');
@@ -286,7 +311,12 @@ export const CheckoutModal: React.FC = () => {
 
     if(isRegularData&&!commercial){setServerError('Refresh the current price before paying.');return;}
     if(flexiPending){setServerError('We are still confirming the price. Please wait a moment.');return;}
+    const generation=++attemptGeneration.current,key=directScope,requestId=directRequest.current;
+    const active=()=>generation===attemptGeneration.current;
+    const checkpoint=(reference?:string)=>{if(!isRegularData)return;try{if(!active()&&readDirectAttempt(sessionStorage,key)?.requestId!==requestId)return;}catch{return;}saveDirectAttempt(sessionStorage,key,{requestId,productId:checkoutBundle.id,...(reference?{reference}:{})});};
+    if(isRegularData){checkpoint(knownReference.current||undefined);recoveryLocked.current=true;setRecoveryOnly(true);}
     return initializeServerPayment({
+      isActive:active,
       commercial:isRegularData?{requestId:directRequest.current,expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:undefined,
       productId: checkoutBundle.id,
       recipientPhone: phone.trim(),
@@ -297,16 +327,23 @@ export const CheckoutModal: React.FC = () => {
       amount: requestedAmount,
       onOrderCreated: (orderRef) => {
         // Kept on this device so a customer who leaves for the MoMo prompt can check it later.
-        setAttemptRef(orderRef);
+        checkpoint(orderRef);
+        if(!active())return;
+        knownReference.current=orderRef;setAttemptRef(orderRef);
         savePendingCheckout({ orderRef, label: `${currentNetwork.name} ${productLabel}`, network: checkoutBundle.network, startedAt: new Date().toISOString() });
       },
       onPaymentReceived: (orderRef, reference) => {
-        clearPendingCheckout(orderRef);
+        if(!active())return;
+        // Popup success is not payment confirmation. Retain recovery until a server lookup confirms it.
+        if(!isRegularData)clearPendingCheckout(orderRef);
         const newOrder = createOrder(orderToCreate(), phone.trim(), 'paystack', reference, orderRef);
         closeCheckout();
         openOrderStatus(newOrder);
       },
       onCancel: (orderRef) => {
+        if(!active())return;
+        // A known reference can resume the same request; its recipient stays fixed.
+        if(orderRef){recoveryLocked.current=false;setRecoveryOnly(false);}
         // No toast: the sheet itself explains what happened and how to check.
         setPaymentClosed(true);
         if (orderRef) {
@@ -316,74 +353,22 @@ export const CheckoutModal: React.FC = () => {
         }
       },
       onError: (err) => {
-        if (err.code === 'ACTIVE_MTN_ORDER_EXISTS' || err.code === 'ACTIVE_MTN_ORDER') {
-          setActiveMtnConflict({
-            orderRef: err.existingOrderReference,
-            status: err.existingOrderStatus,
-          });
+        if(!active())return;
+        const details=readCheckoutFailure(err.checkout);
+        if(details?.code==='ACTIVE_MTN_ORDER'&&details.paymentState==='not_started'&&!knownReference.current){recoveryLocked.current=false;setRecoveryOnly(false);clearDirectAttempt(sessionStorage,key,requestId);setActiveMtnConflict({orderRef:err.existingOrderReference,status:err.existingOrderStatus});return;}
+        if(err.existingOrderReference){knownReference.current=err.existingOrderReference;setAttemptRef(err.existingOrderReference);checkpoint(err.existingOrderReference);}
+        if(!isRegularData){if(err.code==='ACTIVE_MTN_ORDER'||err.code==='ACTIVE_MTN_ORDER_EXISTS'){setActiveMtnConflict({orderRef:err.existingOrderReference,status:err.existingOrderStatus});return;}setServerError(err.message||'We could not confirm this payment. Check the existing order before trying again.');return;}
+        if(details?.paymentState==='not_started'&&details.retryAllowed&&!knownReference.current){
+          recoveryLocked.current=false;setRecoveryOnly(false);clearDirectAttempt(sessionStorage,key,requestId);
+          const view=checkoutFailurePresentation(details.code);
+          setPreflightIssue({code:details.code,title:view.title,message:view.message,supportingNote:'No payment was started for this attempt.',networkName:currentNetwork.name});
           return;
         }
-
-        const networkName = currentNetwork.name;
-        const isMtn = checkoutBundle.network === 'mtn' || detectedNet === 'mtn';
-
-        if (err.code === 'BENEFICIARY_NOT_ELIGIBLE') {
-          setPreflightIssue({
-            code: 'BENEFICIARY_NOT_ELIGIBLE',
-            title: isMtn ? "This MTN number isn't verified yet" : `This ${networkName} number isn't verified yet`,
-            message: isMtn
-              ? "We've submitted this number for MTN verification.\nNo payment has been taken.\n\nVerification may take some time. You can try again later, use another MTN number, or choose an Instant Bundle instead."
-              : `We've submitted this number for verification.\nNo payment has been taken.\n\nVerification may take some time. You can try again later, use another ${networkName} number, or choose an Instant Bundle instead.`,
-            conversionNote:
-              'Need data right now?\nInstant Bundles do not require this MTN verification step. Check each package’s delivery details and restrictions before paying.',
-            supportingNote:
-              'Mystery Hub checks eligibility before payment so you are not charged for an order that cannot be processed.',
-            networkName,
-            canViewInstant: !isInstantBundle,
-          });
-          return;
-        }
-
-        if (err.code === 'SUPPLIER_WALLET_LOW') {
-          setPreflightIssue({
-            code: 'SUPPLIER_WALLET_LOW',
-            title: 'Service temporarily unavailable',
-            message:
-              "We can't complete this purchase right now.\nNo payment has been taken.\n\nPlease try again shortly or report the issue so our team can check it.",
-            supportingNote:
-              'Mystery Hub pre-checks telecom channels before payment so you are never charged for an unfulfillable request.',
-            networkName,
-            canViewInstant: false,
-          });
-          return;
-        }
-
-        if (
-          err.code === 'SERVICE_TEMPORARILY_UNAVAILABLE' ||
-          err.code === 'PACKAGE_UNAVAILABLE'
-        ) {
-          setPreflightIssue({
-            code: err.code,
-            title:
-              err.code === 'PACKAGE_UNAVAILABLE'
-                ? 'Package temporarily unavailable'
-                : 'Service temporarily unavailable',
-            message:
-              "We can't confirm availability for this purchase right now.\nNo payment has been taken.\n\nPlease try again shortly. You don't need to change your number.",
-            supportingNote:
-              'Mystery Hub pre-checks telecom channels before payment so you are never charged for an unfulfillable request.',
-            networkName,
-            canViewInstant: false,
-          });
-          return;
-        }
-
-        if (isConnectivityError(err)) {
-          setServerError('We couldn’t reach Mystery Hub, so no payment window was opened and nothing was charged. Check your connection and try again.');
-          return;
-        }
-
-        setServerError(err.message || 'Payment initiation failed. Please try again.');
+        if(err.code==='ACTIVE_MTN_ORDER_EXISTS'||err.code==='ACTIVE_MTN_ORDER')setActiveMtnConflict({orderRef:err.existingOrderReference,status:err.existingOrderStatus});
+        // No answer (including a timeout) is not proof that the server stopped.
+        // Preserve the original request identity and never offer a fresh payment.
+        recoveryLocked.current=true;setRecoveryOnly(true);
+        setServerError('Payment is not confirmed. An order may already exist. Check its status or contact support before paying again.');
       },
     });
   };
@@ -391,11 +376,16 @@ export const CheckoutModal: React.FC = () => {
   // Customer-initiated check after the payment window closed. Server status decides; nothing is retried.
   const checkPaymentStatus = async () => {
     if (!attemptRef || recovery.checking) return;
+    const generation=attemptGeneration.current,reference=attemptRef,key=directScope,requestId=directRequest.current;
+    const active=()=>generation===attemptGeneration.current;
     setRecovery({ checking: true, message: '' });
     try {
-      const res = await lookupOrderOnServer(attemptRef);
+      const res = await lookupOrderOnServer(reference);
+      if(!active())return;
       const view = dataOrderPresentation(res.order?.status, res.order?.manual_review, res.order?.customer_resolution);
       if (res.success && res.order && view.paymentConfirmed) {
+        clearDirectAttempt(sessionStorage,key,requestId);
+        recoveryLocked.current=false;setRecoveryOnly(false);
         clearPendingCheckout(attemptRef);
         closeCheckout();
         openOrderStatus({ ...orderRecordFromLookup(res.order), recipientPhone: phone.trim(), buyerRecipientVisible: true, journey: 'direct_checkout' });
@@ -403,13 +393,14 @@ export const CheckoutModal: React.FC = () => {
       }
       setRecovery({ checking: false, message: 'No payment has been confirmed for this order yet. If you approved the prompt, it can take a minute to arrive. Check again before paying a second time.' });
     } catch {
+      if(!active())return;
       setRecovery({ checking: false, message: 'We couldn’t reach Mystery Hub to check. Your reference is saved on this device; check again when you are back online.' });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submissionPending.current || isInitializing || walletBusy) return;
+    if (submissionPending.current || isInitializing || walletBusy || recoveryLocked.current) return;
     if (!isCompleteGhanaPhone(phone)) {
       setPhoneError(ghanaPhoneDigits(phone).length ? 'Enter all 10 digits of the Ghana number, like 024 123 4567.' : 'Enter the recipient’s Ghana phone number before paying.');
       phoneInputRef.current?.focus(); return;
@@ -610,7 +601,7 @@ export const CheckoutModal: React.FC = () => {
                     An MTN bundle is already being processed for this number.
                   </h4>
                   <p className="text-xs text-amber-200/90 mt-1 leading-relaxed">
-                    Please wait for your current order to be completed before buying another MTN bundle for this number. No payment has been taken for this one.
+                    Please wait for your current order to be completed before buying another MTN bundle for this number. Check the existing order before paying again.
                   </p>
                 </div>
               </div>
@@ -641,6 +632,7 @@ export const CheckoutModal: React.FC = () => {
           {preflightIssue && (
             <div
               ref={preflightRef}
+              tabIndex={-1}
               role="alert"
               className="p-4 rounded-2xl bg-slate-900/95 border border-slate-700/80 text-left space-y-3"
             >
@@ -653,18 +645,6 @@ export const CheckoutModal: React.FC = () => {
                   <div className="text-xs text-slate-300 leading-relaxed whitespace-pre-line">
                     {preflightIssue.message}
                   </div>
-
-                  {preflightIssue.conversionNote && (
-                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs space-y-1 mt-1">
-                      <div className="flex items-center gap-1.5 font-bold text-amber-300">
-                        <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
-                        <span>Need data right now?</span>
-                      </div>
-                      <p className="text-[11px] text-amber-200/90 leading-relaxed">
-                        Instant Bundles do not require this MTN verification step. Check each package’s delivery details and restrictions before paying.
-                      </p>
-                    </div>
-                  )}
 
                   {preflightIssue.supportingNote && (
                     <p className="text-[11px] text-slate-400 pt-1 leading-relaxed">
@@ -701,6 +681,7 @@ export const CheckoutModal: React.FC = () => {
                   </button>
                 )}
 
+                {preflightIssue.code==='CHECKOUT_REVIEW_REQUIRED'&&<button type="button" onClick={()=>setQuoteRefresh(x=>x+1)} className="mh-button-secondary">Refresh price</button>}
                 {preflightIssue.code !== 'BENEFICIARY_NOT_ELIGIBLE' && (
                   <button
                     type="button"
@@ -745,14 +726,17 @@ export const CheckoutModal: React.FC = () => {
           {serverError && (
             <div
               ref={serverErrorRef}
+              tabIndex={-1}
               role="alert"
               className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-100 text-sm flex items-start gap-2.5"
             >
               <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0 space-y-1">
                 <p className="leading-relaxed">{serverError}</p>
-                {!/no payment window was opened/.test(serverError)&&<p className="text-xs text-rose-200/70">If payment was deducted, check Track Order before retrying. You can edit the recipient or contact support.</p>}
-                {commercial&&/price|pricing|quote|welcome offer|promotion/i.test(serverError)&&<button type="button" disabled={walletBusy||isInitializing} onClick={()=>setQuoteRefresh(x=>x+1)} className="rounded-lg border border-slate-600 px-3 min-h-11 text-emerald-400">Refresh price</button>}
+                {attemptRef&&<button type="button" onClick={checkPaymentStatus} disabled={recovery.checking} className="mh-button-secondary w-full text-sm">Check existing order</button>}
+                {recovery.message&&<p role="status">{recovery.message}</p>}
+                <a href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} className="text-emerald-300 underline">Contact support</a>
+                {commercial&&(/price|pricing|quote|welcome offer|promotion/i.test(serverError)||preflightIssue?.code==='CHECKOUT_REVIEW_REQUIRED')&&<button type="button" disabled={walletBusy||isInitializing||recoveryOnly||!!attemptRef} onClick={()=>setQuoteRefresh(x=>x+1)} className="rounded-lg border border-slate-600 px-3 min-h-11 text-emerald-400">Refresh price</button>}
               </div>
               <button
                 type="button"
@@ -780,7 +764,7 @@ export const CheckoutModal: React.FC = () => {
                 inputMode="tel"
                 autoComplete="tel-national"
                 enterKeyHint="go"
-                disabled={walletBusy||isInitializing}
+                disabled={walletBusy||isInitializing||recoveryOnly||!!attemptRef}
                 aria-invalid={Boolean(phoneError)}
                 aria-describedby="checkout-phone-help"
                 value={phone}
@@ -813,10 +797,10 @@ export const CheckoutModal: React.FC = () => {
             )}
           </div>
 
-          {!isInstantBundle&&<fieldset disabled={walletBusy||isInitializing}><WalletPaymentChoice amountMinor={Math.round(totalAmount*100)} value={paymentMethod} onChange={setPaymentMethod}/></fieldset>}
+          {!isInstantBundle&&<fieldset disabled={walletBusy||isInitializing||recoveryOnly||!!attemptRef}><WalletPaymentChoice amountMinor={Math.round(totalAmount*100)} value={paymentMethod} onChange={setPaymentMethod}/></fieldset>}
 
           {isRegularData&&<div className="text-xs text-slate-400">
-            {editingReceipt ? <label className="block text-sm font-semibold text-slate-100">Receipt email<span className="block text-xs font-normal text-slate-400 mt-0.5">Paystack sends your payment receipt here.</span><input type="email" inputMode="email" autoComplete="email" value={receiptEmail} onChange={e=>setReceiptEmail(e.target.value)} maxLength={128} placeholder="you@example.com" className="w-full mt-2 min-h-12 px-3.5 rounded-xl bg-[#0a0e12] border border-slate-700 text-base font-normal text-white placeholder:text-slate-600 focus:outline-none focus:border-[#00c365]" disabled={walletBusy||isInitializing} required/></label> : <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-800 px-3"><span className="min-w-0 break-all">Receipt to <span className="text-slate-200">{receiptEmail}</span></span><button type="button" disabled={walletBusy||isInitializing} onClick={()=>setEditingReceipt(true)} className="shrink-0 min-h-11 px-1 text-emerald-400 font-semibold">Change</button></div>}
+            {editingReceipt ? <label className="block text-sm font-semibold text-slate-100">Receipt email<span className="block text-xs font-normal text-slate-400 mt-0.5">Paystack sends your payment receipt here.</span><input type="email" inputMode="email" autoComplete="email" value={receiptEmail} onChange={e=>{if(recoveryLocked.current||knownReference.current)return;setReceiptEmail(e.target.value);directRequest.current=crypto.randomUUID();}} maxLength={128} placeholder="you@example.com" className="w-full mt-2 min-h-12 px-3.5 rounded-xl bg-[#0a0e12] border border-slate-700 text-base font-normal text-white placeholder:text-slate-600 focus:outline-none focus:border-[#00c365]" disabled={walletBusy||isInitializing||recoveryOnly||!!attemptRef} required/></label> : <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-800 px-3"><span className="min-w-0 break-all">Receipt to <span className="text-slate-200">{receiptEmail}</span></span><button type="button" disabled={walletBusy||isInitializing||recoveryOnly||!!attemptRef} onClick={()=>setEditingReceipt(true)} className="shrink-0 min-h-11 px-1 text-emerald-400 font-semibold">Change</button></div>}
             {commercial?.offer.state==='phone_required'&&<p className="mt-2">Add your phone in Account to check your Welcome Offer.</p>}
             {!commercial&&<div role="status" className="mt-2 flex flex-wrap items-center gap-2">{quoteError?<span className="text-amber-300">{quoteError}</span>:<span className="inline-flex items-center gap-1.5"><RefreshCw className="w-3.5 h-3.5 animate-spin" />Loading current price…</span>}{quoteError&&<button type="button" onClick={()=>setQuoteRefresh(x=>x+1)} className="rounded-lg border border-slate-600 px-3 min-h-11 text-emerald-400">Retry</button>}</div>}
           </div>}
@@ -866,7 +850,7 @@ export const CheckoutModal: React.FC = () => {
           <button
             type="submit"
             form="checkout-form"
-            disabled={walletBusy || isInitializing || isRegularData && !commercial || flexiPending}
+            disabled={recoveryOnly || walletBusy || isInitializing || isRegularData && !commercial || flexiPending}
             aria-busy={walletBusy||isInitializing}
             className="w-full min-h-12 px-4 rounded-2xl bg-[#00c365] hover:bg-[#16d577] text-[#03160c] font-bold text-base transition-colors active:translate-y-px flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           >

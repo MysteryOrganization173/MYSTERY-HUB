@@ -1,6 +1,8 @@
 import { getPool } from '../db/connection.js';
 import {AdminAuditStore} from '../db/adminAuditStore.js';
 import { randomUUID } from 'node:crypto';
+import {createGuestCheckoutOnce,recoverDirectCheckout} from './directCheckoutRecovery.js';
+import {CheckoutFailure,rejectPreflight,requireCheckoutRecovery} from './checkoutFailure.js';
 import { AUTHORITATIVE_PRODUCTS, getAuthoritativeProduct } from '../data/productCatalog.js';
 import { FinanceStore, FinanceError, type FinanceTx } from '../db/financeStore.js';
 import { AuthStore } from '../db/authStore.js';
@@ -86,27 +88,29 @@ export class CommercialService {
       const key=`direct:${operationKey(input.requestId??(process.env.NODE_ENV==='production'?undefined:randomUUID()))}`;
       const result=await FinanceStore.transaction(order.user_id,async tx=>{
         const old=await tx.find(key);
-        if(old){if(old.payload.productId!==order.product_id||old.payload.recipient!==order.recipient_phone)throw new FinanceError('Request details changed.',409);return {order:(await OrdersStore.findOrder(old.payload.orderId,tx.client))!,old};}
-        const prepared=await this.prepare(order,input,tx);await this.create(prepared,tx);
+        if(old){if(old.payload.productId!==order.product_id||old.payload.recipient!==order.recipient_phone)throw requireCheckoutRecovery();return {order:(await OrdersStore.findOrder(old.payload.orderId,tx.client))!,old};}
+        const prepared=await this.prepare(order,input,tx).catch(error=>{if(error instanceof FinanceError)throw rejectPreflight('CHECKOUT_REVIEW_REQUIRED');throw error;});await this.create(prepared,tx);
         const created=await tx.create('direct_checkout',key,prepared.amount,{orderId:prepared.id,productId:prepared.product_id,recipient:prepared.recipient_phone},'initializing');
         return {order:prepared,created};
       });
       saved=result.order;if(result.old)return {...saved,checkout:result.old.payload.checkout||null,initializationUncertain:!result.old.payload.checkout};operationId=result.created!.id;
-    } else {saved=await this.prepare(order,input);const result=await OrdersStore.createOrderWithMtnDuplicateCheck(saved);if(!result.success)throw new FinanceError('An MTN order is already active. Track the existing order.',409);}
+    } else {saved=await this.prepare(order,input).catch(async error=>{if(error instanceof FinanceError){await recoverDirectCheckout(undefined,input,order.product_id,order.recipient_phone,order.customer_email||'');throw rejectPreflight('CHECKOUT_REVIEW_REQUIRED');}throw error;});const created=await createGuestCheckoutOnce(saved,input);saved=created.order;if(!created.result.success)throw rejectPreflight('ACTIVE_MTN_ORDER');}
+    try {
     const payment=await PaystackServerService.initializeTransaction({email:saved.customer_email,amountPesewas:saved.amount,reference:saved.payment_reference,metadata:{public_reference:saved.public_reference,network:saved.network,service_type:'data',product_id:saved.product_id,product_name:saved.bundle_size_snapshot}});
     if(saved.user_id&&operationId)await FinanceStore.transaction(saved.user_id,async tx=>{const row=(await tx.operations()).find(o=>o.id===operationId)!;await tx.update(row,payment.success?'pending':'initialization_uncertain',{...row.payload,checkout:payment.success?payment:null});});
     if(!payment.success) {
       // A network error is not proof that Paystack rejected initialization.
       if(payment.definitiveFailure)await this.release(saved,'definitive_initialization_failure');
-      throw new FinanceError('Payment initialization failed or is uncertain. Check the existing order before retrying.',503);
+      const error=requireCheckoutRecovery(saved.public_reference);error.status=503;throw error;
     }
     return {...saved,checkout:payment};
+    }catch(error){if(error instanceof CheckoutFailure)throw error;const uncertain=requireCheckoutRecovery(saved.public_reference);uncertain.status=503;throw uncertain;}
   }
   static async create(order:OrderRecord,tx:FinanceTx) {
     if(tx.client&&order.network==='mtn') {
       await tx.client.query("SELECT pg_advisory_xact_lock(hashtext('mtn_' || $1))",[canonicalGhanaPhone(order.recipient_phone)]);
-      if((await tx.client.query("SELECT id FROM orders WHERE network='mtn' AND recipient_phone=$1 AND status IN ('paid','queued','submitted','processing','refund_pending')",[order.recipient_phone])).rows.length)throw new FinanceError('An MTN order is already active.',409);
-    } else if(order.network==='mtn'&&await OrdersStore.findActiveMtnOrder(order.recipient_phone))throw new FinanceError('An MTN order is already active.',409);
+      if((await tx.client.query("SELECT id FROM orders WHERE network='mtn' AND recipient_phone=$1 AND status IN ('paid','queued','submitted','processing','refund_pending')",[order.recipient_phone])).rows.length)throw rejectPreflight('ACTIVE_MTN_ORDER');
+    } else if(order.network==='mtn'&&await OrdersStore.findActiveMtnOrder(order.recipient_phone))throw rejectPreflight('ACTIVE_MTN_ORDER');
     await OrdersStore.createOrder(order,tx.client);
   }
   static async release(order:OrderRecord,reason:string) {

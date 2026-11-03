@@ -4,6 +4,7 @@
  * Supports independent deployment (Netlify frontend + Render/Cloud backend via VITE_API_BASE_URL).
  */
 
+import { readCheckoutFailure } from '../../shared/checkoutFailure';
 import type { WebsiteDeletionBlockerView, WebsiteDeletionCheckView } from '../utils/websiteDeletion';
 import { SafePublicOrderDetails, AuthenticatedCustomerOrderDetails, AdminOrderDetails } from '../../server/types/orders';
 import { SafeUserProfile, WaitlistChannel, AuthSessionResponse, WaitlistRecord, UserStatus } from '../../server/types/auth';
@@ -107,6 +108,7 @@ export interface VerifyPaymentResponse {
 }
 
 export interface ApiError extends Error {
+  checkout?: import('../../shared/checkoutFailure').CheckoutFailureDetails|null;
   status?: number;
   code?: string;
   existingOrderReference?: string;
@@ -202,14 +204,14 @@ export async function initializePaymentOnServer(
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    clearTimeout(timeoutHandle);
-
     const data = await res.json();
+    if(controller.signal.aborted)throw new DOMException('Checkout deadline exceeded.','AbortError');
     if (!res.ok) {
       const error: ApiError = new Error(data.message || data.error || 'Failed to initialize payment transaction.');
       error.code = data.code;
       error.existingOrderReference = data.existingOrderReference;
       error.existingOrderStatus = data.existingOrderStatus;
+      error.checkout = readCheckoutFailure(data.checkout);
       throw error;
     }
 
@@ -217,12 +219,12 @@ export async function initializePaymentOnServer(
   } catch (err: unknown) {
     clearTimeout(timeoutHandle);
     if (err instanceof Error && err.name === 'AbortError') {
-      const timeoutError: ApiError = new Error('Checkout is taking longer than expected. Please try again.');
+      const timeoutError: ApiError = new Error('The checkout result is not confirmed. An order may already exist. Check the existing attempt before paying again.');
       timeoutError.code = 'CHECKOUT_TIMEOUT';
       throw timeoutError;
     }
     throw err;
-  }
+  } finally {clearTimeout(timeoutHandle);}
 }
 
 export async function verifyPaymentOnServer(reference: string): Promise<VerifyPaymentResponse> {

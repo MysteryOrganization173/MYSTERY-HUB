@@ -74,6 +74,7 @@ export class SuccessBizHubClient {
       skipCache?: boolean;
       cacheTtlMs?: number;
       privateAfa?: boolean;
+      privateBeneficiary?: boolean;
     } = {}
   ): Promise<T> {
     const method = options.method || 'GET';
@@ -114,6 +115,7 @@ export class SuccessBizHubClient {
         method,
         headers,
         signal: controller.signal,
+        ...(options.privateBeneficiary?{redirect:'error' as const}:{}),
       };
 
       if (options.body && method === 'POST') {
@@ -121,11 +123,13 @@ export class SuccessBizHubClient {
       }
 
       const res = await fetch(url, fetchOptions);
+      if (options.privateBeneficiary && controller.signal.aborted) throw new DOMException('Supplier deadline exceeded.','AbortError');
       receivedHeaders = true;
 
       let responseJson: unknown = null;
       // fetch resolves at headers. Keep the deadline through body consumption too.
       const text = await res.text();
+      if (options.privateBeneficiary && controller.signal.aborted) throw new DOMException('Supplier deadline exceeded.','AbortError');
       clearTimeout(timeoutHandle);
       try {
         responseJson = JSON.parse(text);
@@ -142,6 +146,7 @@ export class SuccessBizHubClient {
         throw Object.assign(new Error('AFA supplier request failed.'), { statusCode: res.status, code });
       }
       if (!res.ok) {
+        if(options.privateBeneficiary)throw Object.assign(new Error('Recipient eligibility service unavailable.'),{statusCode:res.status});
         const errorMsg =
           (responseJson as { message?: string; error?: string })?.message ||
           (responseJson as { message?: string; error?: string })?.error ||
@@ -250,6 +255,7 @@ export class SuccessBizHubClient {
       method: 'POST',
       body,
       skipCache: true,
+      privateBeneficiary: true,
     });
   }
 

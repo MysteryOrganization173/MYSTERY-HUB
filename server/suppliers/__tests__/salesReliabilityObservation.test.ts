@@ -40,6 +40,12 @@ beforeEach(()=>{
 });
 afterEach(()=>{globalThis.fetch=realFetch;PaystackServerService.initializeTransaction=init;salesCollector.enqueue=enqueue;client.clearCache();for(const key of Object.keys(process.env))if(!(key in env))delete process.env[key];Object.assign(process.env,env);});
 const checkout=async(extra:Record<string,unknown>={})=>{const r=await realFetch(base+'/api/payments/initialize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productId:'mtn-2gb',recipientPhone:'0241234567',customerEmail:'synthetic-private@example.test',...extra})});return {status:r.status,body:await r.json()};};
+for(const body of [{success:true,data:{results:[]}},{success:false,data:{eligible:false}},{success:true,data:{eligible:'false'}}])test(`unknown eligibility is operational evidence, never a recipient denial: ${JSON.stringify(body)}`,async()=>{
+ override=path=>path==='/beneficiary-check'?json(body):undefined;const result=await checkout();assert.equal(result.body.code,'BENEFICIARY_CHECK_UNAVAILABLE');assert.equal(events[0].category,'supplier_response');assert.equal(events[0].stage,'beneficiary');assert.equal(events[0].fresh.beneficiary,undefined);assert.equal(payments,0);assert.equal(OrdersStore.adminDevOrders().length,0);
+});
+test('explicit denial cannot falsely recover a beneficiary outage',async()=>{
+ override=path=>path==='/beneficiary-check'?json({success:true,data:{eligible:false}}):undefined;const result=await checkout();assert.equal(result.body.code,'BENEFICIARY_NOT_ELIGIBLE');assert.equal(events[0].category,'validation');assert.equal(events[0].fresh.beneficiary,undefined);assert.equal(events[0].fresh.application,undefined);assert.equal(payments,0);
+});
 
 test('healthy checkout records one preflight without duplicate supplier calls; cached results stay distinct',async()=>{
   assert.equal((await checkout()).status,200);assert.equal(payments,1);assert.equal(events.length,1);assert.equal(events[0].category,'passed');assert.ok(events[0].fresh.services);
@@ -91,9 +97,9 @@ test('managed storefront HTTP and shared preflight produce one observation and n
     assert.equal(events.length,1);assert.equal(events[0].service,'data');assert.equal(calls.length,4);assert.equal(payments,0);
   }finally{WebsiteBusinessService.initialize=original;}
 });
-test('HTTP 500 after preflight does not falsely assign its root cause to the supplier or an internal defect',async()=>{
+test('Uncertain gateway initialization after preflight does not falsely assign its root cause to the supplier or an internal defect',async()=>{
   PaystackServerService.initializeTransaction=async()=>{throw Error('Synthetic internal failure');};
-  assert.equal((await checkout()).status,500);assert.equal(events[0].category,'application_error');assert.equal(events[0].stage,'application');assert.equal(events[0].blocked,false);
+  assert.equal((await checkout()).status,503);assert.equal(events[0].category,'application_error');assert.equal(events[0].stage,'application');assert.equal(events[0].blocked,false);
 });
 test('unexpected preflight exception has a separate internal error category',async()=>{
   const provider=FulfilmentService.getProvider(),original=provider.resolvePackage;
