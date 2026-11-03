@@ -70,7 +70,7 @@ test('My Business is its own shell: one navigation system, no consumer chrome',(
 test('the dock and More never list the same area',()=>{
   const all=workspaceSections(initialWorkspaceTabs(true));
   assert.deepEqual(businessDock(all,true),['overview','orders','products','earnings']);
-  assert.deepEqual(all.filter(s=>!businessDock(all,true).includes(s)),['analytics','website']);
+  assert.deepEqual(all.filter(s=>!businessDock(all,true).includes(s)),['promote','analytics','website'],'V7.3: Promote opens from More');
   const site=workspaceSections(initialWorkspaceTabs(false));
   assert.deepEqual(businessDock(site,false),['overview','analytics','website'],'other websites: only the areas they have');
   // A design change that kept Data history still has at most four dock areas; the rest stay reachable in More.

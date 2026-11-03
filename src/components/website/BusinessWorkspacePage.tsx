@@ -1,7 +1,7 @@
 import './websiteBuilder.css';
 import './businessWorkspace.css';
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ChartColumn, ChevronLeft, ChevronRight, Compass, Copy, Eye, Globe, House, LayoutDashboard, Menu, PenLine, PiggyBank, ReceiptText, RefreshCw, Share2, Tags, UserRound, X } from 'lucide-react';
+import { ArrowLeft, ChartColumn, ChevronLeft, ChevronRight, Compass, Copy, Eye, Globe, House, LayoutDashboard, Megaphone, Menu, PenLine, PiggyBank, ReceiptText, RefreshCw, Share2, Tags, UserRound, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { WebsiteSiteRecord } from '../../types';
 import { useOwnerWebsites } from '../../hooks/useOwnerWebsites';
@@ -12,6 +12,7 @@ import { websiteItemVocabulary } from '../../config/websiteStarters';
 import { unpublishWebsiteOnServer } from '../../services/apiClient';
 import { formatGhs } from '../../../shared/money';
 import { StoreShareKit } from './StoreShareKit';
+import { PromotionKit } from './PromotionKit';
 import { BrandMark } from '../common/BrandLogo';
 import { lazyPage } from '../../utils/lazyPage';
 import { getPageFromPath } from '../../utils/routing';
@@ -21,7 +22,7 @@ import { businessDock, initialWorkspaceTabs, sectionForTab, workspacePath, works
 // itself stays light on a phone. Builder V6: the editor is its own page and download (/website-builder/edit/:id).
 const WebsiteSettingsControls = lazyPage(() => import('./WebsiteSettingsControls'), 'WebsiteSettingsControls', { fallback: <p role="status" className="text-sm text-slate-400">Loading website settings…</p> });
 
-const ICONS: Record<WorkspaceSection, React.ComponentType<{ size?: number; 'aria-hidden'?: boolean }>> = { overview: LayoutDashboard, orders: ReceiptText, products: Tags, earnings: PiggyBank, analytics: ChartColumn, website: Globe };
+const ICONS: Record<WorkspaceSection, React.ComponentType<{ size?: number; 'aria-hidden'?: boolean }>> = { overview: LayoutDashboard, orders: ReceiptText, products: Tags, earnings: PiggyBank, promote: Megaphone, analytics: ChartColumn, website: Globe };
 
 /**
  * Business Workspace (/my-business): the place an owner runs an existing website from. V7.2.1: it is its own
@@ -149,7 +150,7 @@ export const BusinessWorkspacePage: React.FC = () => {
   // One rule for both navigations: the dock holds the daily areas, More holds the rest (never both).
   const dock = businessDock(available, reseller);
   const secondary = available.filter(target => !dock.includes(target));
-  const showRefresh = !['website', 'products'].includes(section);
+  const showRefresh = !['website', 'products', 'promote'].includes(section);
   const badge = (target: WorkspaceSection) => target === 'orders' && summary?.ordersNeedingCheck ? <span className="bw-badge" data-tone="warn" aria-label={`${summary.ordersNeedingCheck} need a check`}>{summary.ordersNeedingCheck}</span> : null;
   const detail = (target: WorkspaceSection): string => {
     const s = summary, range = s ? workspaceRangeLabel(s.range) : '';
@@ -203,7 +204,7 @@ export const BusinessWorkspacePage: React.FC = () => {
 
   // V7.1 share kit, now only while a store is open but has no paid orders in the period: an established store keeps
   // Share on its website card instead of a sharing lesson on every visit.
-  const nextSteps = (s: BusinessDashboardSummary) => reseller && published && (s.sellable ?? 0) > 0 && s.paidOrders === 0 ? <StoreShareKit name={name} url={publicUrl} /> : null;
+  const nextSteps = (s: BusinessDashboardSummary) => reseller && published && (s.sellable ?? 0) > 0 && s.paidOrders === 0 ? <StoreShareKit name={name} url={publicUrl} onPromote={() => go('promote')} /> : null;
 
   const identity = <div className="bw-identity">
     <WorkspaceAvatar logo={site.content_json?.logoUrl} name={name} />
@@ -233,7 +234,8 @@ export const BusinessWorkspacePage: React.FC = () => {
       {section === 'overview' && siteCard}
       <WebsiteBusinessDashboard site={site} token={sessionToken!} tab={info.tab} onTabChange={tab => go(sectionForTab(tab))} onEdit={() => editSite(site)} onPricingDirty={setPricingDirty}
         onPublish={() => editSite(site, true)} onShare={published ? () => void share() : undefined} onCopyLink={published ? copyLink : undefined}
-        onSummary={setSummary} refreshRef={refreshRef} overviewNext={nextSteps} settings={websiteArea} />
+        onSummary={setSummary} refreshRef={refreshRef} overviewNext={nextSteps} settings={websiteArea}
+        promote={reseller && <PromotionKit site={site} name={name} url={publicUrl} published={published} onPublish={() => editSite(site, true)} />} />
     </div>
 
     {/* Business dock (phones and tablets): the most-used areas, everything else under More. */}
