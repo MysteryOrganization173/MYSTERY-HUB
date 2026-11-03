@@ -1,12 +1,14 @@
 import { ExampleTag } from '../ExampleTag';
-import { SiteFooterContact } from '../SiteContactDetails';
+import { SiteFooterContact, websiteContactTarget } from '../SiteContactDetails';
 import {useVisualEditMarkers, useIsVisualEditing, useTemplateCopy} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
 import { HoursList } from '../storefront/BusinessInfo.js';
+import { ItemDetailSheet, ORDER_LIST_CSS, OrderBar, OrderListSheet, useOrderList } from '../storefront/OrderList';
+import { websiteActionText } from '../../../utils/websiteBrand';
 import React, { useState } from 'react';
-import { WebsiteTemplate } from '../../../types';
+import type { TemplateItem, WebsiteTemplate } from '../../../types';
 import {
   Utensils,
   Clock,
@@ -18,7 +20,18 @@ import {
   Star,
   Phone,
   Flame,
+  Plus,
 } from 'lucide-react';
+
+/** Table enquiries stay separate from food orders: these become the WhatsApp message, nothing is reserved. */
+const DINING_TOPICS = ['a table', 'a group or event', 'catering'];
+/** Classic Kitchen keeps its serif headings; the order sheets read in the page's sans for prices and buttons. */
+const CK_CSS = `
+.ck .ol-sheet{font-family:ui-sans-serif,system-ui,sans-serif}
+.ck .ol-sheet .site-display{font-family:Georgia,'Noto Serif',serif}
+.ck-add:active{transform:scale(.97)}
+.ck-dish-main:focus-visible,.ck-add:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:12px}
+`;
 
 interface TemplateViewProps {
   template: WebsiteTemplate;
@@ -30,6 +43,18 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
   const editing = useIsVisualEditing();
   const copy = useTemplateCopy(template);
   const [activeCategory, setActiveCategory] = useState<string>('All');
+  const content = template.siteContent;
+  const owner = !!content;
+  const order = useOrderList();
+  const [detail, setDetail] = useState<TemplateItem | null>(null);
+  const [listOpen, setListOpen] = useState(false);
+  // The gallery demo writes example messages only; a published site sends them to the owner's WhatsApp.
+  const link = owner && !editing && typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined;
+  const contact = { businessName: template.demoBusinessName, whatsapp: owner ? content?.whatsapp : '', link, demo: !owner, onContact: () => { if (onCtaClick) onCtaClick(); else window.location.assign(websiteContactTarget(content)); } };
+  // A tap opens the dish; the owner's editor keeps taps for editing.
+  const open = (item: TemplateItem) => { if (!editing) setDetail(item); };
+  const add = (item: TemplateItem) => { if (editing) return; if (item.options?.length) setDetail(item); else order.add(item); };
+  const primary = template.colorScheme?.primary || '#7a1c28';
 
   const categories = template.siteContent ? ['All', ...new Set((template.items || []).map(item=>item.category).filter((category):category is string=>Boolean(category) && category!=='All'))] : ['All', 'Main Grills', 'Soups & Swallows', 'Beverages'];
   const menuItems = template.items || [];
@@ -41,7 +66,8 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
 
   return (
-    <div className="bg-[var(--website-background,#fcf9f5)] text-[#1c1917] font-serif min-h-full">
+    <div className="ck bg-[var(--website-background,#fcf9f5)] text-[#1c1917] font-serif min-h-full" style={{ '--ol-bg': '#fcf9f5', '--ol-text': '#1c1917', '--ol-muted': '#6b625c', '--ol-line': '#eadfce', '--ol-accent': primary, '--ol-on-accent': websiteActionText(primary), '--ol-radius': '20px' } as React.CSSProperties}>
+      <style>{ORDER_LIST_CSS + CK_CSS}</style>
       {/* A slim location ribbon; published sites omit it until the owner adds a location. */}
       {(template.location || editing) && (
         <div className="bg-[var(--website-primary,#7a1c28)] text-[var(--website-background,#fcf9f5)] px-4 py-2 text-center text-xs tracking-wider uppercase font-sans flex items-center justify-center gap-2">
@@ -71,7 +97,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
             Our Menu
           </a>
           <a href="#reserve" className="hover:text-[var(--website-primary,#7a1c28)] transition-colors">
-            {template.siteContent ? 'Enquire' : 'Reservations'}
+            {template.siteContent ? 'Enquire' : 'Table enquiry'}
           </a>
           <a href="#location" className="hover:text-[var(--website-primary,#7a1c28)] transition-colors">
             Find Us
@@ -83,7 +109,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
           className="px-4 py-2 rounded-full bg-[var(--website-primary,#7a1c28)] hover:bg-[#5d151e] text-[var(--website-background,#fcf9f5)] text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer font-sans"
         >
           <Calendar className="w-3.5 h-3.5 text-[var(--website-accent,#c99a45)]" />
-          <span>{template.siteContent?.ctaLabel || (template.siteContent ? 'Contact us' : 'Reserve Table')}</span>
+          <span>{template.siteContent?.ctaLabel || (template.siteContent ? 'Contact us' : 'Ask for a table')}</span>
         </button>
       </nav>
 
@@ -142,59 +168,72 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
         </div>
 
         {/* Menu Category Filter Pills */}
-        <div className="flex items-center justify-center gap-2 flex-wrap">
+        {categories.length > 1 && <div className="flex items-center justify-center gap-2 flex-wrap" role="group" aria-label="Menu categories">
           {categories.map((cat) => (
             <button
               key={cat}
+              type="button"
+              aria-pressed={activeCategory === cat}
               onClick={() => setActiveCategory(cat)}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider transition-all cursor-pointer ${
+              className={`min-h-10 px-4 rounded-full text-xs font-semibold tracking-wider transition-all cursor-pointer ${
                 activeCategory === cat
                   ? 'bg-[var(--website-primary,#7a1c28)] text-white shadow-sm'
-                  : 'bg-white border border-[#f3ece2] text-[#78716c] hover:border-[var(--website-primary,#7a1c28)]'
+                  : 'bg-white border border-[#eadfce] text-[#6b625c] hover:border-[var(--website-primary,#7a1c28)]'
               }`}
             >
               {cat}
             </button>
           ))}
-        </div>
+        </div>}
 
-        {/* Menu Grid */}
+        {/* Menu: tap a dish for its photos, options and price; Add builds one WhatsApp order. */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {template.siteContent && !filteredItems.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
           {filteredItems.map((item) => (
             <div {...edit(`item:${item.id}`)}
-              key={item.id}
-              className="relative bg-white p-4 rounded-2xl border border-[#f3ece2] shadow-sm hover:shadow-md transition-shadow flex gap-4 items-start"
+              key={item.id || item.name}
+              className="ck-dish relative bg-white p-4 rounded-2xl border border-[#f3ece2] shadow-sm hover:shadow-md transition-shadow flex gap-4 items-start"
             >
               <ExampleTag item={item} corner="left"/>
               {item.image && (
-                <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-slate-100">
+                <button type="button" tabIndex={-1} aria-hidden="true" onClick={() => open(item)} className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-slate-100 p-0 border-0">
                   <SafeImage
                     src={item.image}
-                    alt={item.name}
+                    alt=""
                     className="w-full h-full object-cover"
                   />
-                </div>
+                </button>
               )}
-              <div className="flex-1 space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-bold text-sm text-[#1c1917] font-serif">{item.name}</h3>
-                  <span className="font-bold text-xs text-[var(--website-primary,#7a1c28)] shrink-0 font-sans">
-                    {item.price}
+              <div className="flex-1 min-w-0 space-y-1">
+                <button type="button" onClick={() => open(item)} aria-label={`${item.name}, ${item.price || "price on request"}, details`} className="ck-dish-main block w-full min-h-11 text-left bg-transparent border-0 p-0 text-inherit">
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="font-bold text-[15px] leading-snug text-[#1c1917] font-serif min-w-0 [overflow-wrap:anywhere]">{item.name}</span>
+                    <span className="font-bold text-sm text-[var(--website-primary,#7a1c28)] shrink-0 font-sans">
+                      {item.price || 'Ask'}
+                    </span>
                   </span>
+                  {item.desc && <span className="block text-xs text-[#6b625c] leading-relaxed line-clamp-2 mt-1">
+                    {item.desc}
+                  </span>}
+                </button>
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <span className="flex flex-wrap items-center gap-1.5 min-w-0">
+                    {(item.label || item.tag) && (
+                      <span className="inline-block text-[10px] font-bold text-[#8a5a12] bg-[var(--website-accent,#c99a45)]/15 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        {item.label || item.tag}
+                      </span>
+                    )}
+                    {!!item.options?.length && <span className="text-[11px] text-[#6b625c]">{item.options.length} choices</span>}
+                  </span>
+                  <button type="button" onClick={() => add(item)} aria-label={`Add ${item.name} to your order`} className="ck-add min-h-10 min-w-[76px] px-3 rounded-full border border-[var(--website-primary,#7a1c28)] text-[var(--website-primary,#7a1c28)] font-bold text-xs inline-flex items-center justify-center gap-1 shrink-0">
+                    <Plus className="w-3.5 h-3.5" aria-hidden="true" />Add
+                  </button>
                 </div>
-                <p className="text-xs text-[#78716c] leading-relaxed line-clamp-2">
-                  {item.desc}
-                </p>
-                {item.tag && (
-                  <span className="inline-block text-[10px] font-bold text-[var(--website-accent,#c99a45)] bg-[var(--website-accent,#c99a45)]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    {item.tag}
-                  </span>
-                )}
               </div>
             </div>
           ))}
         </div>
+        <p className="text-center text-xs text-[#6b625c] max-w-md mx-auto">{owner ? `Add dishes to your list and send them to ${template.demoBusinessName} on WhatsApp. They confirm availability, delivery and payment with you.` : 'Example menu. Customers add dishes to a list and send it to the restaurant on WhatsApp; nothing is paid here.'}</p>
       </div>
 
       {/* Interactive Table Reservation Card */}
@@ -206,7 +245,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
             <p className="text-xs text-[#78716c]" {...copy.edit('enquiryIntro')}>{copy.text('enquiryIntro')}</p>
           </div>
 
-          <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Ask about" dateLabel="Date of your visit"/>
+          <BusinessEnquiry onContact={onCtaClick} template={template} askLabel="Ask about" dateLabel="Date of your visit" guestsLabel="Number of guests" topics={DINING_TOPICS}/>
         </div>
       </div>
 
@@ -232,7 +271,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
           </div>}
           <div className="space-y-2">
             <h5 className="font-bold text-white uppercase tracking-wider text-[11px]">
-              {template.siteContent ? 'Contact' : 'Reservations'}
+              Contact
             </h5>
             <SiteFooterContact template={template} className="text-slate-400 text-xs" />
             <div className="pt-1">
@@ -247,6 +286,10 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
           © {new Date().getFullYear()} {template.demoBusinessName}.
         </div>
       </footer>
+
+      <OrderBar lines={order.lines} onOpen={() => setListOpen(true)} />
+      {detail && <ItemDetailSheet item={detail} contact={contact} onAdd={order.add} onClose={() => setDetail(null)} />}
+      {listOpen && <OrderListSheet lines={order.lines} contact={contact} onQuantity={order.setQuantity} onClear={() => { order.clear(); setListOpen(false); }} onClose={() => setListOpen(false)} noun="dishes" />}
     </div>
   );
 };
