@@ -14,8 +14,8 @@ const environment = { ...process.env };
 const realFetch = globalThis.fetch;
 const originalInit = PaystackServerService.initializeTransaction;
 const client = FulfilmentService.getProvider().client;
-const catalog = { status: 'success', data: [{ name: 'Fixture data', kind: 'data', network: 'MTN', slug: 'fixture-data', packages: [{ id: 'fixture-2gb', sizeLabel: '2GB', priceMinor: 100 }] }] };
-const services = { status: 'success', data: { services: [{ kind: 'data', available: true, enabled: true }] } };
+const catalog = { success: true, data: [{ name: 'Fixture data', kind: 'data', network: 'MTN', slug: 'fixture-data', packages: [{ id: 'fixture-2gb', sizeLabel: '2GB', priceMinor: 100 }] }] };
+const services = { success: true, data: { keyPermissions: { orders: true }, services: [{ id: 'orders', keyGranted: true, available: true, productCount: 1 }] } };
 let calls: string[];
 let payments: number;
 let server: Server;
@@ -34,8 +34,8 @@ function supplierFetch(override?: (path: string, options?: RequestInit) => Respo
     if (result) return result;
     if (path === '/services') return json(services);
     if (path === '/catalog') return json(catalog);
-    if (path === '/wallet') return json({ data: { currency: 'GHS', availableMinor: 100_000 } });
-    if (path === '/beneficiary-check') return json({ data: { eligible: true } });
+    if (path === '/wallet') return json({ success: true, data: { currency: 'GHS', availableMinor: 100_000 } });
+    if (path === '/beneficiary-check') return json({ success: true, data: { eligible: true } });
     throw new Error('Unexpected supplier operation');
   };
 }
@@ -152,7 +152,7 @@ test('unreachable, rejected and explicitly disabled services all fail before pay
       if (path !== '/services') return;
       if (mode === 'network') throw new TypeError('Synthetic connection failure');
       if (mode === 'forbidden') return json({ message: 'Synthetic permission denied' }, 403);
-      return json({ data: [{ kind: 'data', enabled: false, available: false }] });
+      return json({ success: true, data: { keyPermissions: { orders: true }, services: [{ id: 'orders', keyGranted: true, available: false, productCount: 1 }] } });
     });
     const failed = await initialize();
     assert.equal(failed.status, 503, mode);
@@ -162,11 +162,11 @@ test('unreachable, rejected and explicitly disabled services all fail before pay
 });
 
 test('beneficiary and wallet protections still block initialization', async () => {
-  supplierFetch(path => path === '/beneficiary-check' ? json({ data: { eligible: false } }) : undefined);
+  supplierFetch(path => path === '/beneficiary-check' ? json({ success: true, data: { eligible: false } }) : undefined);
   const beneficiary = await initialize();
   assert.equal(beneficiary.status, 400); assert.equal(beneficiary.body.code, 'BENEFICIARY_NOT_ELIGIBLE');
   client.clearCache();
-  supplierFetch(path => path === '/wallet' ? json({ data: { currency: 'GHS', availableMinor: 0 } }) : undefined);
+  supplierFetch(path => path === '/wallet' ? json({ success: true, data: { currency: 'GHS', availableMinor: 0 } }) : undefined);
   const wallet = await initialize();
   assert.equal(wallet.status, 503); assert.equal(wallet.body.code, 'SUPPLIER_WALLET_LOW');
   assert.equal(payments, 0); assert.equal(OrdersStore.adminDevOrders().length, 0);
@@ -217,4 +217,24 @@ test(`${serviceType}: a stalled submission body remains uncertain with exactly o
   await FulfilmentService.processPaidOrder(order.payment_reference, new Date().toISOString());
   assert.equal(calls.filter(path => path === endpoint).length, 1, 'uncertain submission must never be retried');
 });
+}
+
+// Central envelope rejection is new: a malformed successful POST may already
+// have been accepted. It must use the same one-submission reconciliation gate.
+for (const serviceType of ['data', 'airtime', 'instant_bundle'] as const) {
+  for (const response of ['not-json', JSON.stringify({ success: false, error: { code: 'SERVICE_UNAVAILABLE', message: 'synthetic private text' } })]) {
+    test(`${serviceType}: invalid successful submission envelope stays uncertain without a retry (${response === 'not-json' ? 'JSON' : 'envelope'})`, async () => {
+      assert.equal((await initialize()).status, 200);
+      const order = { ...OrdersStore.adminDevOrders()[0], service_type: serviceType, face_value_minor: 1000 };
+      OrdersStore.clearDevStore(); await OrdersStore.createOrder(order);
+      const endpoint = serviceType === 'data' ? '/orders' : serviceType === 'airtime' ? '/airtime' : '/instant-bundles';
+      supplierFetch(path => path === endpoint ? new Response(response) : undefined);
+      const result = await FulfilmentService.processPaidOrder(order.payment_reference, new Date().toISOString());
+      assert.equal(result.order?.status, 'queued');
+      assert.equal(result.order?.failure_reason, 'supplier_submission_uncertain');
+      await FulfilmentService.processPaidOrder(order.payment_reference, new Date().toISOString());
+      assert.equal(calls.filter(path => path === endpoint).length, 1);
+      assert.ok(!JSON.stringify(result.order?.supplier_response).includes('synthetic private text'));
+    });
+  }
 }

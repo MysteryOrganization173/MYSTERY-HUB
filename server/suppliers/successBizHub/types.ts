@@ -18,8 +18,10 @@ export interface SbhAfaData { publicId: string; status: string; phone: string; p
 export interface SbhAfaResponse { success: boolean; data?: SbhAfaData; error?: { code: string; message: string } }
 
 export interface SbhServicesResponse {
-  status: string;
-  data: SbhServiceItem[] | { services?: SbhServiceItem[] };
+  success?: boolean;
+  /** Legacy fixture compatibility; the HTTP client requires success:true. */
+  status?: string;
+  data: SbhServiceItem[] | { accountId?: string; keyPermissions?: Record<string, boolean>; services?: SbhServiceItem[] };
   message?: string;
 }
 
@@ -195,7 +197,7 @@ export interface SbhInstantBundlesResponse {
   status?: string;
   data:
     | SbhInstantBundlePackage[]
-    | { packages?: SbhInstantBundlePackage[]; products?: SbhInstantBundlePackage[]; items?: SbhInstantBundlePackage[] };
+    | { available?: boolean; packages?: SbhInstantBundlePackage[]; products?: SbhInstantBundlePackage[]; items?: SbhInstantBundlePackage[] };
   message?: string;
 }
 

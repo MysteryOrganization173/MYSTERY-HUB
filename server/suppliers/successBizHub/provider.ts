@@ -154,31 +154,7 @@ export class SuccessBizHubProvider implements SupplierProvider {
    * Check if data services are active and available in /services
    */
   async checkServicesAvailable(): Promise<{ available: boolean; reason?: string }> {
-    try {
-      const res = await this.client.getServices();
-      const list = Array.isArray(res.data)
-        ? res.data
-        : (res.data as { services?: unknown[] })?.services || [];
-
-      // If service list has entries, verify at least one data service is available
-      if (list.length > 0) {
-        const dataServices = (list as Array<{ kind?: string; enabled?: boolean; available?: boolean }>).filter(
-          (s) => (s.kind || '').toLowerCase() === 'data'
-        );
-        if (dataServices.length > 0) {
-          const anyActive = dataServices.some((s) => s.enabled !== false && s.available !== false);
-          if (!anyActive) {
-            return { available: false, reason: 'Supplier data service is temporarily marked unavailable.' };
-          }
-        }
-      }
-      return { available: true };
-    } catch (err) {
-      return {
-        available: false,
-        reason: err instanceof Error ? err.message : 'Unable to query supplier services.',
-      };
-    }
+    return this.client.checkServiceAvailability('orders');
   }
 
   /**
@@ -370,6 +346,7 @@ export class SuccessBizHubProvider implements SupplierProvider {
         errorMessage,
         rawResponse: {
           isTimeout,
+          isUncertainSubmission: (err as { isUncertainSubmission?: boolean }).isUncertainSubmission === true,
           error: errorMessage,
         },
       };
@@ -380,38 +357,7 @@ export class SuccessBizHubProvider implements SupplierProvider {
    * Check if Airtime service is available via GET /services
    */
   async checkAirtimeAvailable(): Promise<{ available: boolean; reason?: string }> {
-    try {
-      const res = await this.client.getServices();
-      let services: Array<{ kind?: string; slug?: string; name?: string; enabled?: boolean; available?: boolean }> = [];
-      if (Array.isArray(res.data)) {
-        services = res.data;
-      } else if (res.data && Array.isArray((res.data as { services?: any[] }).services)) {
-        services = (res.data as { services?: any[] }).services!;
-      }
-
-      if (services.length > 0) {
-        const airtimeService = services.find(
-          (s) =>
-            (s.slug && s.slug.toLowerCase().includes('airtime')) ||
-            (s.kind && s.kind.toLowerCase() === 'airtime') ||
-            (s.name && s.name.toLowerCase().includes('airtime'))
-        );
-
-        if (airtimeService) {
-          const isEnabled = airtimeService.enabled !== false && airtimeService.available !== false;
-          if (!isEnabled) {
-            return { available: false, reason: 'Airtime service is currently disabled on supplier.' };
-          }
-        }
-      }
-
-      return { available: true };
-    } catch (err) {
-      return {
-        available: false,
-        reason: err instanceof Error ? err.message : 'Unable to query supplier airtime availability.',
-      };
-    }
+    return this.client.checkServiceAvailability('airtime');
   }
 
   /**
@@ -487,6 +433,7 @@ export class SuccessBizHubProvider implements SupplierProvider {
         errorMessage,
         rawResponse: {
           isTimeout,
+          isUncertainSubmission: (err as { isUncertainSubmission?: boolean }).isUncertainSubmission === true,
           error: errorMessage,
         },
       };
@@ -578,6 +525,7 @@ export class SuccessBizHubProvider implements SupplierProvider {
         errorMessage,
         rawResponse: {
           isTimeout,
+          isUncertainSubmission: (err as { isUncertainSubmission?: boolean }).isUncertainSubmission === true,
           statusCode: errorObj.statusCode,
           responseBody: errorObj.responseBody,
           error: errorMessage,

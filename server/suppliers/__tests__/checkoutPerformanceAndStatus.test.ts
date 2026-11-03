@@ -115,7 +115,7 @@ async function runCheckoutPerformanceTests() {
     const mockClient = new SuccessBizHubClient();
     mockClient.isFulfillmentEnabled = () => true;
     mockClient.isConfigured = () => true;
-    mockClient.getServices = async () => ({ status: 'success', data: [{ kind: 'data', enabled: true, available: true }] });
+    mockClient.getServices = async () => ({ success: true, data: { keyPermissions: { orders: true, airtime: true }, services: ['orders', 'airtime'].map(id => ({ id, keyGranted: true, available: true, productCount: 1 })) } });
     mockClient.getCatalog = async () => ({
       status: 'success',
       data: [{
