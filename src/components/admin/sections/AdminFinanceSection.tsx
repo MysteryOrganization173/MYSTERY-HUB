@@ -1,11 +1,12 @@
 import React,{useState,useEffect,useRef} from 'react';
+import {AdminFinanceReconciliation} from './AdminFinanceReconciliation';
 import {financeRequest} from '../../../services/financeApi';
 import {DATA_MARGIN_POLICY} from '../../../../shared/dataReferralPolicy';
 import {formatGhs,parseGhs} from '../../../../shared/money';
 import {AdminButton,AdminEmpty,AdminError,AdminLoading,AdminNotice,AdminPageHeader,AdminPanel,AdminStat,AdminTabs,ConfirmAction,DefinitionList,Freshness,RefreshButton,StatusPill,adminField as field,adminLabel,type AdminTone,type ConfirmField} from '../ui/AdminUi';
 
-type FinanceView='summary'|'requests'|'customers'|'settings';
-const VIEWS:FinanceView[]=['summary','requests','customers','settings'];
+type FinanceView='summary'|'requests'|'customers'|'settings'|'reconciliation';
+const VIEWS:FinanceView[]=['summary','requests','customers','settings','reconciliation'];
 
 /** Human meaning of every server metric. Grouped so obligations are never read as income. */
 const METRIC_GROUPS:Array<{title:string;description:string;tone:AdminTone;items:Array<[string,string,string]>}>=[
@@ -50,7 +51,8 @@ export const AdminFinanceSection:React.FC<{sessionToken:string;initialView?:stri
  const customerRequest=useRef(0);
  const adjustmentRequest=useRef<{fingerprint:string;id:string}|null>(null);
  const load=async()=>{setLoadError('');try{const [c,q,o]=await Promise.all([financeRequest(sessionToken,'/control',undefined,true),financeRequest(sessionToken,`/withdrawals?offset=${queueOffset}`,undefined,true),financeRequest(sessionToken,`/operations?offset=${operationsOffset}`,undefined,true)]);setControl(c);setPolicy((current:any)=>({...current,...c.economics.find((x:any)=>x.service===current.service)}));setSettings(c.settings);setDefinitions(c.definitions);setQueue(q);setOperations(o);setLoadedAt(Date.now());}catch(e){setLoadError((e as Error).message);}};
- useEffect(()=>{void load();},[sessionToken,queueOffset,operationsOffset]);
+ const existingFinanceView=view!=='reconciliation';
+ useEffect(()=>{if(existingFinanceView)void load();},[sessionToken,queueOffset,operationsOffset,existingFinanceView]);
  const loadCustomer=async(id:string,offset:number)=>{const ticket=++customerRequest.current;try{const result=await financeRequest(sessionToken,`/customers/${encodeURIComponent(id)}?offset=${offset}`,undefined,true);if(ticket===customerRequest.current){setCustomer(result);setError('');}}catch(e){if(ticket===customerRequest.current)setError((e as Error).message);}};
  /** Every write goes through the existing finance endpoints, which re-check auth, state and confirmation. */
  const mutate=async(path:string,body:any)=>{if(busy)return false;setBusy(true);setError('');setConfirmError(null);try{await financeRequest(sessionToken,path,body,true);await load();if(customerId&&customer)await loadCustomer(customerId,customerOffset);onChanged?.();return true;}catch(e){const message=(e as Error).message;setError(message);setConfirmError(message);return false;}finally{setBusy(false);}};
@@ -71,14 +73,15 @@ export const AdminFinanceSection:React.FC<{sessionToken:string;initialView?:stri
  const fundingRows=operations.filter(row=>row.kind==='topup'||row.state==='manual_review');
  const fundingActionable=fundingRows.filter(row=>(row.kind==='review'&&row.state==='manual_review'&&row.payload.rewardId)||(row.kind==='topup'&&['pending','initializing','initialization_uncertain','failed','reversal_review'].includes(row.state))).length;
 
- if(!control&&loadError)return <section className="min-w-0 space-y-5 text-slate-100"><AdminPageHeader title="Financial Control Room"/><AdminError message={loadError} onRetry={()=>void load()}/></section>;
- if(!control)return <section className="min-w-0 space-y-5 text-slate-100"><AdminPageHeader title="Financial Control Room"/><AdminLoading label="Loading wallet and earnings records…"/></section>;
+ if(!control&&view!=='reconciliation'&&loadError)return <section className="min-w-0 space-y-5 text-slate-100"><AdminPageHeader title="Financial Control Room"/><AdminError message={loadError} onRetry={()=>void load()}/><AdminButton onClick={()=>setView('reconciliation')}>Open read-only reconciliation</AdminButton></section>;
+ if(!control&&view!=='reconciliation')return <section className="min-w-0 space-y-5 text-slate-100"><AdminPageHeader title="Financial Control Room"/><AdminLoading label="Loading wallet and earnings records…"/></section>;
 
  return <section className="min-w-0 space-y-5 text-slate-100">
-  <AdminPageHeader title="Financial Control Room" description="Customer wallets, Mystery Earn, manual withdrawals and reward settings. Nothing on this page sends money by itself." actions={<><Freshness at={loadedAt}/><RefreshButton busy={busy} onClick={()=>void load()}/></>}/>
-  <AdminTabs label="Finance views" value={view} onChange={setView} tabs={[{id:'summary',label:'Summary'},{id:'requests',label:'Requests',count:openRequests.length+fundingActionable||null,tone:openRequests.length?'warning':'neutral'},{id:'customers',label:'Customer history'},{id:'settings',label:'Settings'}]}/>
-  {loadError&&<AdminNotice tone="warning" title="Showing the last loaded figures">{loadError}</AdminNotice>}
+  <AdminPageHeader title="Financial Control Room" description="Customer wallets, Mystery Earn, manual withdrawals and reward settings. Nothing on this page sends money by itself." actions={view==='reconciliation'?undefined:<><Freshness at={loadedAt}/><RefreshButton busy={busy} onClick={()=>void load()}/></>}/>
+  <AdminTabs label="Finance views" value={view} onChange={setView} tabs={[{id:'summary',label:'Summary'},{id:'requests',label:'Requests',count:openRequests.length+fundingActionable||null,tone:openRequests.length?'warning':'neutral'},{id:'reconciliation',label:'Reconciliation'},{id:'customers',label:'Customer history'},{id:'settings',label:'Settings'}]}/>
+  {loadError&&view!=='reconciliation'&&<AdminNotice tone="warning" title="Showing the last loaded figures">{loadError}</AdminNotice>}
   {error&&!pending&&<p role="alert" className="break-words text-sm text-amber-300">{error}</p>}
+  {view==='reconciliation'&&<AdminFinanceReconciliation token={sessionToken} onOpenFinanceHistory={openCustomerHistory}/>}
 
   {view==='summary'&&<div className="space-y-5">
    {openRequests.length>0&&<AdminNotice tone="warning" title={`${openRequests.length} withdrawal request${openRequests.length===1?'':'s'} need action`} action={<AdminButton onClick={()=>setView('requests')}>Review requests</AdminButton>}>Approve or reject, then pay approved requests manually by MoMo and record the reference.</AdminNotice>}
