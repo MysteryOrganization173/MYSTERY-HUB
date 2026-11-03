@@ -1,5 +1,5 @@
 /**
- * V7.1 Data Store styles: Horizon, Market and Studio. Scoped to `.reseller-storefront[data-store-style]`, so the
+ * V7.1 Data Store styles: Horizon, Market and Studio (V7.2 adds Compact, Editorial and Signature). Scoped to `.reseller-storefront[data-store-style]`, so the
  * Classic look (no attribute) renders exactly as before. Same markup, same checkout and same tap targets in every
  * style; only composition, surfaces, type and image handling change. Inline like RESELLER_STORE_CSS so the public
  * page, the editor iframe and server rendering all carry it.
@@ -133,6 +133,118 @@ export const STORE_STYLE_CSS = `
 [data-store-style=studio] .store-steps-card,[data-store-style=studio] .store-help{background:transparent!important;border-left:0;border-right:0;border-radius:0;padding-left:0;padding-right:0}
 [data-store-style=studio] .store-step-number{background:transparent!important;color:var(--store-text)!important;border:1.5px solid var(--store-border);font-variant-numeric:tabular-nums}
 [data-store-style=studio] .store-footer{background:transparent!important}
+
+/* =========================== COMPACT (V7.2) =========================== */
+/* Commerce first: a short hero with no photo, then one framed price list. The network tabs stay under the header. */
+[data-store-style=compact] .cp{padding-top:14px;padding-bottom:0}
+[data-store-style=compact] .sx-badge{display:none}
+[data-store-style=compact] .sx-title{font-size:clamp(1.45rem,6.2vw,2.4rem);line-height:1.08;letter-spacing:-.025em}
+[data-store-style=compact] .sx-text{margin-top:6px;font-size:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+[data-store-style=compact] .sx-actions{margin-top:12px}
+[data-store-style=compact] .sx-primary{min-height:46px!important;padding:0 18px;border-radius:12px}
+[data-store-style=compact] .sx-facts{margin-top:12px;gap:6px}
+[data-store-style=compact] .sx-facts li{border:1px solid var(--store-border);border-radius:999px;padding:3px 10px;font-size:12.5px}
+@media (min-width:900px){[data-store-style=compact] .cp{padding-top:32px}
+  [data-store-style=compact] .cp .sx-copy{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:40px;align-items:end}
+  [data-store-style=compact] .cp .sx-copy>*{grid-column:1}
+  [data-store-style=compact] .cp .sx-actions{grid-column:2;grid-row:1/span 3;margin:0;align-self:center}
+  [data-store-style=compact] .cp .sx-facts{grid-column:1/-1}}
+[data-store-style=compact] .store-picker-wrap{display:none}
+[data-store-style=compact] #bundle-catalog.store-section{padding-top:16px}
+[data-store-style=compact] .store-section-head{margin-bottom:8px}
+[data-store-style=compact] .store-section-head h2{font-size:clamp(1.1rem,4vw,1.5rem)}
+[data-store-style=compact] .store-network-tabs{position:sticky;top:69px;z-index:6;border-radius:14px;box-shadow:0 10px 22px -18px rgb(0 0 0 / .7)}
+[data-store-style=compact] .store-network-tabs button{border-radius:10px}
+[data-store-style=compact] .store-rows{gap:0;border:1px solid var(--store-border);border-radius:16px;overflow:hidden;background:var(--store-surface)}
+[data-store-style=compact] .store-row{border:0!important;border-bottom:1px solid var(--store-border)!important;border-radius:0;min-height:58px;padding:8px 12px 8px 16px;background:transparent!important}
+[data-store-style=compact] .store-row::before{width:3px}
+[data-store-style=compact] .store-row:focus-visible{outline-offset:-3px}
+[data-store-style=compact] .store-row[aria-pressed=true]{box-shadow:inset 0 0 0 2px var(--website-accent)}
+[data-store-style=compact] .store-row-size{font-size:19px}
+[data-store-style=compact] .store-row-price{font-size:15.5px}
+[data-store-style=compact] .store-row-cta{padding:7px 12px;font-size:12.5px}
+@media (min-width:720px){[data-store-style=compact] .store-rows{column-gap:0}[data-store-style=compact] .store-row:nth-child(odd){border-right:1px solid var(--store-border)!important}}
+[data-store-style=compact] .store-section{padding-top:24px}
+[data-store-style=compact] .store-card{border-radius:16px;padding:16px}
+[data-store-style=compact] .store-steps{gap:10px}
+[data-store-style=compact] .store-steps small{font-size:13px}
+
+/* =========================== EDITORIAL (V7.2) =========================== */
+/* A magazine spread: serif display type (a system face, so nothing extra downloads), a framed photo with a caption,
+   numbered bundles on hairlines and calm spacing. */
+.reseller-storefront[data-store-style=editorial] :is(h1,h2,h3,.site-display){font-family:Georgia,'Noto Serif','Times New Roman',serif;letter-spacing:-.01em}
+[data-store-style=editorial] .store-header{border-bottom-width:3px!important;border-bottom-style:double!important}
+[data-store-style=editorial] .ed{padding-top:18px;padding-bottom:6px}
+[data-store-style=editorial] .ed-rule{display:flex;flex-wrap:wrap;gap:0 4px;margin:0 0 16px;padding:0 0 10px;border-bottom:1px solid;font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+[data-store-style=editorial] .ed-grid{display:grid;gap:22px}
+[data-store-style=editorial] .sx-badge{background:transparent;border:0;padding:0;font-style:italic;font-weight:600;letter-spacing:0}
+[data-store-style=editorial] .sx-title{font-size:clamp(2.1rem,9.5vw,4.6rem);line-height:1.03;font-weight:600}
+[data-store-style=editorial] .sx-text{font-size:16px;line-height:1.6}
+[data-store-style=editorial] .sx-primary{border-radius:999px}
+[data-store-style=editorial] .sx-facts{border-top:1px solid var(--store-border);padding-top:12px;width:100%}
+[data-store-style=editorial] .ed-figure{margin:0;border-top:1px solid;padding-top:10px}
+[data-store-style=editorial] .ed-photo{aspect-ratio:16/9;overflow:hidden;border-radius:4px}
+[data-store-style=editorial] .ed-photo>span{height:100%}
+[data-store-style=editorial] .ed-figure figcaption{margin-top:8px;font:italic 13px/1.4 Georgia,'Noto Serif',serif;overflow-wrap:anywhere}
+@media (min-width:900px){[data-store-style=editorial] .ed{padding-top:40px}
+  [data-store-style=editorial] .ed-grid{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:56px;align-items:center}
+  [data-store-style=editorial] .ed-photo{aspect-ratio:4/5}}
+[data-store-style=editorial] .store-picker-card{border-radius:4px}
+[data-store-style=editorial] .store-eyebrow{font:italic 600 14px/1.3 Georgia,'Noto Serif',serif;text-transform:none;letter-spacing:0}
+[data-store-style=editorial] .store-network-tabs{background:transparent!important;border:0;border-radius:0;padding:0;gap:20px;border-bottom:1px solid var(--store-border)}
+[data-store-style=editorial] .store-network-tabs button{background:transparent!important;color:var(--store-text)!important;border:0!important;border-bottom:2px solid transparent!important;border-radius:0;padding:0 2px;font-size:12.5px;letter-spacing:.1em;text-transform:uppercase}
+[data-store-style=editorial] .store-network-tabs button[aria-pressed=true]{border-bottom-color:var(--store-text)!important}
+[data-store-style=editorial] .store-network-tabs button[aria-pressed=true] .store-network-dot{background:var(--store-text)!important}
+[data-store-style=editorial] .store-rows{counter-reset:ed;gap:0}
+@media (min-width:720px){[data-store-style=editorial] .store-rows{column-gap:48px}}
+[data-store-style=editorial] .store-row,[data-store-style=editorial] .store-row.has-action{counter-increment:ed;background:transparent!important;border:0!important;border-top:1px solid var(--store-border)!important;border-radius:0;padding:14px 0 14px 36px;min-height:72px}
+[data-store-style=editorial] .store-row{grid-template-columns:76px minmax(0,1fr) auto}
+[data-store-style=editorial] .store-row.has-action{grid-template-columns:70px minmax(0,1fr) auto auto}
+[data-store-style=editorial] .store-row::before{content:counter(ed,decimal-leading-zero);top:50%;bottom:auto;left:0;width:auto;height:auto;transform:translateY(-50%);background:none;font:italic 600 13px/1 Georgia,'Noto Serif',serif;color:var(--store-muted)}
+[data-store-style=editorial] .store-row-size{font-size:26px;font-weight:600}
+[data-store-style=editorial] .store-row-size::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--store-network);margin-left:5px;vertical-align:4px}
+[data-store-style=editorial] .store-row-price{font-family:Georgia,'Noto Serif',serif;font-size:18px}
+[data-store-style=editorial] .store-row-cta{background:transparent!important;color:var(--store-text)!important;border:1px solid var(--store-border)}
+[data-store-style=editorial] .store-row:hover .store-row-cta{border-color:var(--store-text)}
+[data-store-style=editorial] .store-row[aria-pressed=true]{box-shadow:inset 0 -2px 0 var(--website-accent)}
+/* Phones: the counter, size and price keep one line; the network dot moves to the counter (the tabs name the network). */
+@media (max-width:479px){[data-store-style=editorial] .store-row,[data-store-style=editorial] .store-row.has-action{padding-left:28px;gap:8px}[data-store-style=editorial] .store-row.has-action{grid-template-columns:58px minmax(0,1fr) auto auto}[data-store-style=editorial] .store-row-size{font-size:21px;white-space:nowrap}[data-store-style=editorial] .store-row-size::after{display:none}[data-store-style=editorial] .store-row-price{font-size:16px}[data-store-style=editorial] .store-row-meta small{display:none}}
+@media (max-width:359px){[data-store-style=editorial] .store-row.has-action{grid-template-columns:50px minmax(0,1fr) auto auto}[data-store-style=editorial] .store-row-size{font-size:19px}}
+[data-store-style=editorial] .store-steps-card,[data-store-style=editorial] .store-help{background:transparent!important;border-left:0;border-right:0;border-radius:0;padding-left:0;padding-right:0}
+[data-store-style=editorial] .store-step-number{background:transparent!important;color:var(--store-text)!important;font:italic 700 18px/1 Georgia,'Noto Serif',serif}
+[data-store-style=editorial] .store-footer{border-top-width:3px!important;border-top-style:double!important}
+
+/* =========================== SIGNATURE (V7.2) =========================== */
+/* Brand first: a block in the owner's main colour carries the mark and the promise; the photo sits in an arch.
+   Text inside the block uses the accent's own readable ink (black or white), so any colour stays legible. */
+[data-store-style=signature] .sg{display:grid;padding-top:16px;padding-bottom:4px}
+[data-store-style=signature] .sg-arch{position:relative;z-index:1;justify-self:center;width:min(46%,190px);aspect-ratio:10/9;border-radius:999px 999px 0 0;overflow:hidden;margin-bottom:-1px}
+[data-store-style=signature] .sg-arch>span{height:100%}
+[data-store-style=signature] .sg-panel{position:relative;isolation:isolate;border-radius:28px;padding:24px 20px 22px;overflow:hidden}
+[data-store-style=signature] .sg-panel::after{content:"";position:absolute;z-index:-1;right:-64px;top:-64px;width:190px;height:190px;border-radius:50%;border:30px solid currentColor;opacity:.08;pointer-events:none}
+[data-store-style=signature] .sg-mark{width:64px;height:64px;border-radius:20px;display:grid;place-items:center;overflow:hidden;font-size:24px;font-weight:800;margin-bottom:16px}
+[data-store-style=signature] .sg-panel :is(.sx-title,.sx-text,.sx-facts,.sx-facts strong,.sx-secondary,.sx-badge){color:inherit!important}
+[data-store-style=signature] .sg-panel .sx-badge{background:transparent;border-color:currentColor}
+[data-store-style=signature] .sg-panel .sx-badge-dots i{box-shadow:0 0 0 2px var(--website-accent)}
+[data-store-style=signature] .sx-title{font-size:clamp(2rem,9vw,4.2rem);font-weight:800;letter-spacing:-.035em}
+[data-store-style=signature] .sg-panel .sx-primary{background:var(--website-on-accent)!important;color:var(--website-accent)!important}
+[data-store-style=signature] .sg-panel .sx-secondary{text-decoration-color:currentColor}
+[data-store-style=signature] .sg-panel .sx-facts{border-top:1px solid currentColor;padding-top:12px;width:100%}
+[data-store-style=signature] .sg-panel :focus-visible{outline-color:currentColor}
+@media (min-width:900px){[data-store-style=signature] .sg{grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr);gap:24px;align-items:stretch;padding-top:36px}
+  [data-store-style=signature] .sg-arch{order:2;width:100%;aspect-ratio:auto;min-height:420px;border-radius:999px 999px 36px 36px;margin:0}
+  [data-store-style=signature] .sg-panel{border-radius:36px;padding:48px 44px}
+  [data-store-style=signature] .sg-mark{width:84px;height:84px;font-size:30px;border-radius:26px}}
+/* Bundles as tickets: a coloured network stub, notches on both sides and a perforated price stub. */
+[data-store-style=signature] .store-row{border-radius:12px;padding-left:22px;min-height:70px;-webkit-mask:radial-gradient(circle 7px at 0 50%,#0000 97%,#000) left/51% 100% no-repeat,radial-gradient(circle 7px at 100% 50%,#0000 97%,#000) right/51% 100% no-repeat;mask:radial-gradient(circle 7px at 0 50%,#0000 97%,#000) left/51% 100% no-repeat,radial-gradient(circle 7px at 100% 50%,#0000 97%,#000) right/51% 100% no-repeat}
+[data-store-style=signature] .store-row::before{width:7px}
+[data-store-style=signature] .store-row:focus-visible{-webkit-mask:none;mask:none}
+[data-store-style=signature] .store-row-price{align-self:stretch;display:flex;align-items:center;justify-content:flex-end;border-left:1.5px dashed var(--store-border);padding-left:12px}
+[data-store-style=signature] .store-row-cta{border-radius:10px}
+[data-store-style=signature] .store-network-tabs{border-radius:16px}
+[data-store-style=signature] .store-network-tabs button{border-radius:12px}
+[data-store-style=signature] .store-help{border:1.5px solid var(--website-accent)!important}
+[data-store-style=signature] .store-step-number{background:var(--website-accent)!important;color:var(--website-on-accent)!important}
 
 @media (prefers-reduced-motion:reduce){[data-store-style] .mk-art{transform:none!important}}
 `;

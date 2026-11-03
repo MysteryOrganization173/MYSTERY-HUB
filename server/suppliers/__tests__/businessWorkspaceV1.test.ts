@@ -75,7 +75,13 @@ test('navigation: one bottom bar, entries from the account menu, home and the bu
   const head=pageIndexingHead('/my-business/orders');
   assert.equal(head.noindex,true);assert.equal(head.title,'My Business — Mystery Hub');assert.equal(head.url.endsWith('/my-business'),true,'never echoes the area or query');
   assert.match(workspace,/aria-label="Business areas/);
-  assert.doesNotMatch(source('src/components/website/businessWorkspace.css'),/position:\s*fixed;[^}]*bottom:\s*0/,'no competing bottom navigation');
+  // V7.2: one bottom bar at a time. The business dock replaces the consumer tab bar only while a website is managed.
+  const css=source('src/components/website/businessWorkspace.css');
+  assert.match(css,/html\[data-business-mode\] \.mh-bottom-nav\{display:none!important\}/,'the consumer bar steps aside in business mode');
+  assert.equal((css.match(/position:\s*fixed;[^}]*bottom:\s*0/g)||[]).length,1,'exactly one bottom bar: the business dock');
+  assert.match(css,/@media \(min-width:1024px\)\{\.bw-dock,\.bw-identity-edit\{display:none\}/,'desktops keep the sidebar');
+  assert.match(workspace,/setAttribute\('data-business-mode', ''\)/);
+  assert.match(workspace,/if \(!site\) return;/,'sign-in and empty states keep the consumer bar');
 });
 
 test('editor: Back saves first, never publishes and returns to the same place',()=>{

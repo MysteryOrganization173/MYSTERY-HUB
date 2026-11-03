@@ -6,13 +6,17 @@
  * website renders exactly as before until its owner picks a style on purpose. New websites are created with the
  * design's default. The registry is keyed by layout so other industries can add their own variants later.
  */
-export interface WebsiteStyleVariant { id: string; name: string; summary: string; detail: string; image: 'cover' | 'banner' | 'none' | 'card' }
+export interface WebsiteStyleVariant { id: string; name: string; summary: string; detail: string; image: 'cover' | 'banner' | 'none' | 'card' | 'arch' }
 
 export const WEBSITE_STYLE_VARIANTS: Readonly<Record<string, readonly WebsiteStyleVariant[]>> = Object.freeze({
   reseller: Object.freeze<WebsiteStyleVariant[]>([
     { id: 'horizon', name: 'Horizon', summary: 'Your banner fills the top, bundles start right below.', detail: 'Image-led and immersive. Works best with dark colours and a wide photo.', image: 'cover' },
     { id: 'market', name: 'Market', summary: 'Bright and shop-like, with bundles as price tags.', detail: 'Commerce first. Good with light colours; a short banner keeps bundles on the first screen.', image: 'banner' },
     { id: 'studio', name: 'Studio', summary: 'Big type and your logo, no banner photo.', detail: 'Clean and fast. Loads the least data, so it suits slow connections.', image: 'none' },
+    // V7.2: three more compositions. Same content, bundles, prices and checkout; only the arrangement changes.
+    { id: 'compact', name: 'Compact', summary: 'A short header, then a tidy price list.', detail: 'Bundles on the first screen. Network tabs stay at the top while customers scroll. No banner photo.', image: 'none' },
+    { id: 'editorial', name: 'Editorial', summary: 'Magazine-style headline beside a framed photo.', detail: 'Elegant serif type, numbered bundles and calm spacing. Lovely with light colours.', image: 'card' },
+    { id: 'signature', name: 'Signature', summary: 'Your colour and logo lead, with an arched photo.', detail: 'Brand-first: a bold block in your main colour, bundles shown as tickets.', image: 'arch' },
     { id: 'classic', name: 'Classic', summary: 'The original Data Store layout.', detail: 'Banner card beside your headline. Existing stores keep this until they choose another style.', image: 'card' },
   ]),
 });

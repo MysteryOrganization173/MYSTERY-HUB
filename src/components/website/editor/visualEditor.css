@@ -247,8 +247,9 @@
 .store-look-card:hover{border-color:var(--ve-line-strong)}
 .store-look-card[aria-checked="true"]{border-color:var(--ve-green);box-shadow:0 0 0 3px rgba(0,195,101,.16)}
 .store-look-art{display:block;aspect-ratio:100/72;border-bottom:1px solid var(--ve-line)}
-.store-look-art .s-bg{fill:#0b1218}.store-look-art .s-img{fill:#2b4a66}.store-look-art .s-fade{fill:#0b1218;opacity:.6}
-.store-look-art .s-ink{fill:#e6eef0}.store-look-art .s-muted{fill:#4b5b66}.store-look-art .s-tab{fill:#1c2a33}.store-look-art .s-row{fill:#16222b;stroke:#2a3a45;stroke-width:.6}.store-look-art .s-accent{fill:#00c365}
+/* V7.2: sketches take the store's own colours from --sk-* (set from the draft's palette); editor neutrals otherwise. */
+.store-look-art .s-bg{fill:var(--sk-bg,#0b1218)}.store-look-art .s-img{fill:var(--sk-img,#2b4a66)}.store-look-art .s-fade{fill:var(--sk-bg,#0b1218);opacity:.6}
+.store-look-art .s-ink{fill:var(--sk-ink,#e6eef0)}.store-look-art .s-muted{fill:var(--sk-muted,#4b5b66)}.store-look-art .s-tab{fill:var(--sk-surface,#1c2a33)}.store-look-art .s-row{fill:var(--sk-surface,#16222b);stroke:var(--sk-line,#2a3a45);stroke-width:.6}.store-look-art .s-accent{fill:var(--sk-accent,#00c365)}.store-look-art .s-on-accent{fill:var(--sk-on-accent,#05140c)}
 .store-look-text{display:grid;gap:2px;padding:8px 10px 10px}
 .store-look-text strong{display:inline-flex;align-items:center;gap:6px;font-size:13.5px}
 .store-look-text strong svg{color:var(--ve-green-text,#5be39b)}
@@ -260,3 +261,74 @@
 .copy-ideas li{flex:0 0 auto;max-width:82%}
 .copy-ideas button{min-height:40px;padding:8px 12px;border-radius:12px;border:1px solid var(--ve-line);background:var(--ve-field);color:var(--ve-text);font-size:13px;line-height:1.3;text-align:left;white-space:normal}
 .copy-ideas button[aria-pressed="true"]{border-color:var(--ve-green);background:var(--ve-green-soft,rgba(0,195,101,.12))}
+
+/* ---------------------------------------------------------------------------------------------
+   V7.2 Design mode. Desktop: a side panel like the contextual panel. Phones and tablets: the panel
+   takes the lower part of the editor *in the layout*, so the canvas above shrinks instead of being
+   covered and every tap shows its result in the live draft. Two working heights: peek and more room.
+   --------------------------------------------------------------------------------------------- */
+.design-panel{width:360px;min-width:0;flex-shrink:0;border-left:1px solid var(--ve-line);background:var(--ve-raised);color:var(--ve-text);display:flex;flex-direction:column;z-index:40;max-height:100%;overflow:hidden;font-family:var(--font-body)}
+.design-head{display:flex;align-items:center;gap:8px;padding:10px 12px 8px 16px;flex-shrink:0}
+.design-title{flex:1;min-width:0}
+.design-title h3{font-family:var(--font-heading);font-weight:700;font-size:17px;line-height:1.2;margin:0;border-radius:6px}
+.design-title h3:focus-visible{outline:2px solid var(--ve-green);outline-offset:2px}
+.design-title p{margin:2px 0 0;font-size:12px;color:var(--ve-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.design-size{display:none}
+.design-tabs{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;margin:0 12px 4px;padding:3px;border-radius:13px;background:var(--ve-field);border:1px solid var(--ve-line);flex-shrink:0}
+.design-tabs button{min-height:40px;border-radius:10px;font:600 14px/1 var(--font-body);color:var(--ve-muted);background:transparent;border:0;cursor:pointer}
+.design-tabs button[aria-selected="true"]{background:var(--ve-hover);color:var(--ve-text);box-shadow:inset 0 0 0 1px var(--ve-line-strong)}
+.design-tabs button:focus-visible{outline:2px solid var(--ve-green);outline-offset:-2px}
+.design-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:12px 16px max(16px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px}
+.design-fine{display:flex;flex-direction:column;gap:18px}
+
+/* Style cards: a grid when there is room, one swipeable row in the compact phone height. */
+.store-look-grid{grid-template-columns:repeat(auto-fill,minmax(128px,1fr))}
+.store-look-card:focus-visible{outline:2px solid var(--ve-green);outline-offset:2px}
+.store-look-text small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.store-look[data-variant="rail"] .store-look-grid{display:flex;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scroll-padding-inline:2px;padding:2px 2px 6px;margin:-2px -2px 0;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.store-look[data-variant="rail"] .store-look-grid::-webkit-scrollbar{display:none}
+.store-look[data-variant="rail"] .store-look-card{flex:0 0 136px;scroll-snap-align:start}
+.store-look[data-variant="rail"] .store-look-detail{display:none}
+
+/* Colour sets: mood chips, then small store previews in each palette. */
+.design-palettes{display:flex;flex-direction:column;gap:10px}
+.design-chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px 2px;-webkit-overflow-scrolling:touch}
+.design-chips::-webkit-scrollbar{display:none}
+.design-chips button{flex:0 0 auto;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--ve-line);background:var(--ve-field);color:var(--ve-muted);font:600 13.5px/1 var(--font-body);cursor:pointer;white-space:nowrap}
+.design-chips button[aria-pressed="true"]{border-color:rgba(0,195,101,.6);background:var(--ve-green-soft);color:var(--ve-green-text)}
+.design-chips button:focus-visible,.design-palette:focus-visible{outline:2px solid var(--ve-green);outline-offset:2px}
+.design-palette-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px}
+.design-palette-list[data-variant="rail"]{display:flex;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;padding:2px 2px 6px;margin:-2px -2px 0;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.design-palette-list[data-variant="rail"]::-webkit-scrollbar{display:none}
+.design-palette-list[data-variant="rail"]>li{flex:0 0 116px;scroll-snap-align:start}
+.design-palette{width:100%;display:flex;flex-direction:column;gap:6px;padding:6px;border-radius:14px;border:1.5px solid var(--ve-line);background:var(--ve-field);color:var(--ve-text);cursor:pointer;text-align:left;font:inherit}
+.design-palette:hover{border-color:var(--ve-line-strong)}
+.design-palette[aria-pressed="true"]{border-color:var(--ve-green);box-shadow:0 0 0 3px rgba(0,195,101,.16)}
+.design-swatch{display:block;position:relative;height:64px;border-radius:10px;border:1px solid;padding:9px 10px;overflow:hidden}
+.design-swatch i{display:block;height:6px;width:62%;border-radius:3px}
+.design-swatch i+i{height:4px;width:40%;margin-top:5px}
+.design-swatch b{position:absolute;left:8px;right:8px;bottom:7px;height:22px;border-radius:7px;border:1px solid}
+.design-swatch em{position:absolute;right:3px;top:3px;bottom:3px;display:grid;place-items:center;padding:0 7px;border-radius:5px;font:800 9.5px/1 var(--font-body);font-style:normal}
+.design-palette-name{display:flex;align-items:center;gap:5px;padding:0 2px 2px;font-size:12.5px;font-weight:600;line-height:1.25;min-height:20px}
+.design-palette-name svg{color:var(--ve-green-text);flex-shrink:0}
+
+/* Phones keep All Settings in More (the dock shows Bundles); wider screens have the toolbar button. */
+@media(min-width:640px){.visual-phone-only{display:none!important}}
+.visual-canvas-hint strong{color:var(--ve-green-text)}
+
+@media(max-width:1023px){
+ [data-design-open]{flex-direction:column}
+ [data-design-open]>.visual-canvas{min-height:0}
+ .design-panel{width:auto;flex:0 0 clamp(248px,44%,340px);border-left:0;border-top:1px solid var(--ve-line-strong);border-radius:22px 22px 0 0;box-shadow:0 -14px 36px rgba(0,0,0,.5);transition:flex-basis .22s cubic-bezier(.2,.8,.2,1)}
+ .design-panel[data-size="full"]{flex-basis:min(78%,640px)}
+ .design-head{padding:4px 10px 6px 4px}
+ .design-size{display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:0 10px;border-radius:12px;border:0;background:transparent;color:var(--ve-muted);font:600 13px/1 var(--font-body);cursor:pointer;flex-shrink:0}
+ .design-size:hover{background:var(--ve-hover);color:var(--ve-text)}
+ .design-size:focus-visible{outline:2px solid var(--ve-green);outline-offset:-2px}
+ .design-title{text-align:center}
+ .design-body{padding-top:10px}
+}
+.design-grabber{display:none}
+@media(min-width:1024px){.store-look[data-variant="rail"] .store-look-grid{display:grid;overflow:visible}.design-palette-list[data-variant="rail"]{display:grid;overflow:visible}.store-look[data-variant="rail"] .store-look-detail{display:block}}
+@media(max-width:359px){.design-title p{display:none}.design-size span:last-child{display:none}}
+@media(prefers-reduced-motion:reduce){.design-panel{transition:none}}

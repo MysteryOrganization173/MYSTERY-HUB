@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {ArrowLeft, Copy, ExternalLink, Eye, LayoutDashboard, Maximize2, Monitor, MoreHorizontal, Palette, PenLine, Save, SlidersHorizontal, Smartphone, Tablet, Undo2, X, EyeOff} from 'lucide-react';
+import {ArrowLeft, Copy, ExternalLink, Eye, LayoutDashboard, Layers, Maximize2, Monitor, MoreHorizontal, Palette, PenLine, Save, SlidersHorizontal, Smartphone, Tablet, Undo2, X, EyeOff} from 'lucide-react';
 
 type Device = 'desktop'|'tablet'|'mobile';
 const DEVICES = [['mobile',Smartphone,'Phone'],['tablet',Tablet,'Tablet'],['desktop',Monitor,'Desktop']] as const;
@@ -7,7 +7,8 @@ const DEVICES = [['mobile',Smartphone,'Phone'],['tablet',Tablet,'Tablet'],['desk
 /** Canvas First chrome: one slim top bar everywhere, plus a bottom dock on phones. */
 export function WebsiteEditorToolbar(p: {
   name:string; mode:'edit'|'preview'; device:Device; status:string; published:boolean; saving:boolean; publishing:boolean;
-  settingsOpen?:boolean; colorsOpen?:boolean; /** V7.1: Data Stores call this "Look" (style and colours). */ brandLabel?:string;
+  settingsOpen?:boolean; colorsOpen?:boolean; /** V7.2: "Design" everywhere: style (Data Stores), colour sets and fine-tuning. */ brandLabel?:string;
+  /** V7.2 Data Stores: bundles and prices take the dock's third place; All Settings moves into More. */ onBundles?:()=>void;
   onExit:()=>void; backLabel?:string; onMode:(v:'edit'|'preview')=>void; onDevice:(v:Device)=>void; onSave:()=>void; onPublish:()=>void; onUnpublish:()=>void; onSettings:()=>void; onBrand:()=>void; onCopy:()=>void; onFullPreview?:()=>void; liveUrl:string;
   undoLabel?:string; onUndo?:()=>void;
   /** The saved draft differs from what visitors see. */
@@ -47,24 +48,27 @@ export function WebsiteEditorToolbar(p: {
         <div className="visual-segment" role="group" aria-label="Preview size">{DEVICES.map(([device,Icon,label])=><button type="button" key={device} title={label} aria-label={`${label} size`} aria-pressed={p.device===device} onClick={()=>p.onDevice(device)}><Icon size={16}/></button>)}</div>
       </div>
       <div className="visual-editor-actions">
-        <button type="button" onClick={colors} aria-pressed={!!p.colorsOpen} className="visual-text-button visual-wide-only"><Palette size={16}/>{p.brandLabel||'Colors'}</button>
+        <button type="button" onClick={colors} aria-pressed={!!p.colorsOpen} className="visual-text-button visual-wide-only"><Palette size={16}/>{p.brandLabel||'Design'}</button>
         <button type="button" onClick={settings} aria-pressed={!!p.settingsOpen} className="visual-text-button visual-wide-only"><SlidersHorizontal size={16}/>All Settings</button>
         <button type="button" onClick={openMore} aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More options" className="visual-icon-button visual-wide-only"><MoreHorizontal size={19}/></button>
         <button type="button" onClick={p.onPublish} disabled={p.publishing} className="visual-publish-button">{p.publishing?'Publishing…':p.published?'Update Live':'Publish'}</button>
       </div>
     </header>
 
+    {/* V7.2: Design sits beside Edit, so changing the whole look is never hidden. Data Stores get Bundles here. */}
     <nav className="visual-editor-dock" aria-label="Editor tools">
       <button type="button" aria-pressed={active==='edit'} onClick={()=>p.onMode('edit')}><PenLine size={20}/>Edit</button>
-      <button type="button" aria-pressed={active==='colors'} onClick={colors}><Palette size={20}/>{p.brandLabel||'Colors'}</button>
+      <button type="button" aria-pressed={active==='colors'} onClick={colors} data-design-entry><Palette size={20}/>{p.brandLabel||'Design'}</button>
+      {p.onBundles ? <button type="button" onClick={p.onBundles}><Layers size={20}/>Bundles</button>
+        : <button type="button" aria-pressed={active==='settings'} onClick={settings}><SlidersHorizontal size={20}/>Settings</button>}
       <button type="button" aria-pressed={active==='preview'} onClick={()=>p.onMode('preview')}><Eye size={20}/>Preview</button>
-      <button type="button" aria-pressed={active==='settings'} onClick={settings}><SlidersHorizontal size={20}/>Settings</button>
       <button type="button" aria-expanded={moreOpen} aria-haspopup="menu" onClick={openMore}><MoreHorizontal size={20}/>More</button>
     </nav>
 
     {moreOpen && <div ref={moreRef} className="visual-more" role="menu" aria-label="More options" onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();closeMore();}}}>
       <div className="visual-more-head"><strong>More options</strong><button type="button" aria-label="Close more options" onClick={closeMore} className="visual-icon-button"><X size={18}/></button></div>
       <button type="button" role="menuitem" onClick={run(p.onSave)} disabled={p.saving || p.publishing}><Save size={18}/>Save draft now</button>
+      {p.onBundles && <button type="button" role="menuitem" onClick={run(settings)} className="visual-phone-only"><SlidersHorizontal size={18}/>All settings</button>}
       {p.onFullPreview && <button type="button" role="menuitem" onClick={run(p.onFullPreview)}><Maximize2 size={18}/>Full preview</button>}
       {p.published && <a role="menuitem" href={p.liveUrl} target="_blank" rel="noopener noreferrer" onClick={()=>setMoreOpen(false)}><ExternalLink size={18}/>View live site</a>}
       {p.published && <button type="button" role="menuitem" onClick={run(p.onCopy)}><Copy size={18}/>Copy link</button>}

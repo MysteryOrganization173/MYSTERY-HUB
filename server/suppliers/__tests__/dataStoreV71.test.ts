@@ -33,8 +33,8 @@ const legacy:SiteContent={businessName:'Quickbyte data',tagline:'Affordable data
 const managed=React.createElement('div',{id:'managed-fixture'});
 const render=(content:SiteContent|undefined,extra:Record<string,unknown>={})=>renderToStaticMarkup(renderTemplateLayout(content?mergeSiteWithTemplate(data,content,settings):data,{managedCheckout:managed,managedAvailability:'available',...extra} as any));
 
-test('style registry: four Data Store styles, Horizon for new stores, Classic for every existing store without a choice',()=>{
-  assert.deepEqual(WEBSITE_STYLE_VARIANTS.reseller.map(s=>s.id),['horizon','market','studio','classic']);
+test('style registry: Data Store styles (seven since V7.2), Horizon for new stores, Classic for every existing store without a choice',()=>{
+  assert.deepEqual(WEBSITE_STYLE_VARIANTS.reseller.map(s=>s.id),['horizon','market','studio','compact','editorial','signature','classic']);
   assert.equal(resolveWebsiteStyle('reseller',undefined,true),'classic','an existing owner keeps the original look');
   assert.equal(resolveWebsiteStyle('reseller',undefined,false),'horizon','the gallery shows the new default');
   assert.equal(resolveWebsiteStyle('reseller','neon',true),'classic','an unknown saved value never changes an owner store');
@@ -106,7 +106,7 @@ test('wording ideas: short, plain and truthful: no prices, numbers, speed, guara
 
 test('style picker and wording ideas render accessible choices; Classic is selected for a store without a style',()=>{
   const html=renderToStaticMarkup(React.createElement(WebsiteStoreLook,{layout:'reseller',value:undefined,onChange(){}}));
-  assert.equal((html.match(/role="radio"/g)||[]).length,4);assert.match(html,/aria-checked="true"[^>]*data-style="classic"/);
+  assert.equal((html.match(/role="radio"/g)||[]).length,WEBSITE_STYLE_VARIANTS.reseller.length);assert.match(html,/aria-checked="true"[^>]*data-style="classic"/);
   assert.match(html,/live store changes only when you publish/);
   assert.equal(renderToStaticMarkup(React.createElement(WebsiteStoreLook,{layout:'boutique',value:undefined,onChange(){}})),'');
   const ideas=renderToStaticMarkup(React.createElement(WebsiteCopyIdeas,{ideas:DATA_STORE_COPY_IDEAS.tagline,value:'Stay connected for less.',onPick(){}}));

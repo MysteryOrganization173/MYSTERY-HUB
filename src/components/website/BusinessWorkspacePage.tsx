@@ -1,7 +1,7 @@
 import './websiteBuilder.css';
 import './businessWorkspace.css';
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ChartColumn, ChevronDown, ChevronRight, Compass, Copy, Eye, Globe, LayoutDashboard, PenLine, PiggyBank, ReceiptText, RefreshCw, Share2, Tags, X } from 'lucide-react';
+import { ArrowLeft, ChartColumn, ChevronRight, Compass, Copy, Eye, Globe, House, LayoutDashboard, Menu, PenLine, PiggyBank, ReceiptText, RefreshCw, Share2, Tags, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { WebsiteSiteRecord } from '../../types';
 import { useOwnerWebsites } from '../../hooks/useOwnerWebsites';
@@ -30,6 +30,13 @@ export const BusinessWorkspacePage: React.FC = () => {
   const { sites, setSites, loading, error, reload } = useOwnerWebsites(sessionToken);
   const site = sites[0] || null;
   const reseller = site?.template_id === 'tmpl-data-reseller';
+  // V7.2 business mode: while an owner manages a website, the business dock replaces Mystery Hub's consumer tab bar
+  // on phones and tablets (CSS keys off this attribute). Sign-in and "no website yet" screens keep the normal bar.
+  useEffect(() => {
+    if (!site) return;
+    document.documentElement.setAttribute('data-business-mode', '');
+    return () => document.documentElement.removeAttribute('data-business-mode');
+  }, [!!site]);
 
   // Each area has its own address, so Back, refresh and bookmarks land where the owner was.
   const [section, setSection] = useState<WorkspaceSection>(() => workspaceSectionFromPath(window.location.pathname));
@@ -59,6 +66,7 @@ export const BusinessWorkspacePage: React.FC = () => {
 
   const [pricingDirty, setPricingDirty] = useState(false);
   const confirmPricingLeave = () => !pricingDirty || window.confirm('You have unsaved bundle prices. Leave without saving them?');
+  const leaveBusiness = () => { if (!confirmPricingLeave()) return; setPricingDirty(false); setMenuOpen(false); setActivePage('home'); };
   // Builder V6: Edit website opens the editor's own page; Back or its arrow returns here, to the same area, and
   // the website is re-read from the server when the workspace opens again.
   const editSite = (target: WebsiteSiteRecord, publish = false) => { if (!confirmPricingLeave()) return; setPricingDirty(false); setMenuOpen(false); openWebsiteEditor(target, { publish }); };
@@ -121,6 +129,8 @@ export const BusinessWorkspacePage: React.FC = () => {
   const exampleCount = (site.content_json?.items || []).filter(item => item.isExample).length;
   const itemWord = websiteItemVocabulary(site.template_id);
   const info = WORKSPACE_SECTIONS[section];
+  // The dock holds at most four areas: a Data store's daily work (orders, prices, earnings); other sites their few areas.
+  const dock = available.filter(target => target !== 'website' || !reseller).filter(target => target !== 'analytics' || !reseller).slice(0, 4);
   const showRefresh = !['website', 'products'].includes(section);
   const badge = (target: WorkspaceSection) => target === 'orders' && summary?.ordersNeedingCheck ? <span className="bw-badge" data-tone="warn" aria-label={`${summary.ordersNeedingCheck} need a check`}>{summary.ordersNeedingCheck}</span> : null;
   const detail = (target: WorkspaceSection): string => {
@@ -180,8 +190,8 @@ export const BusinessWorkspacePage: React.FC = () => {
   const identity = <div className="bw-identity">
     <WorkspaceAvatar logo={site.content_json?.logoUrl} name={name} />
     <div className="min-w-0 flex-1"><p className="bw-name" title={name}>{name}</p><p className="bw-state" data-live={live}><span aria-hidden="true" /><span className="bw-state-text">{reseller && summary?.storeLabel ? summary.storeLabel : WEBSITE_LIVE_LABELS[live].short}</span></p></div>
-    {/* Shows where the owner is, so it never reads as a second copy of the site menu above it. */}
-    <button type="button" className="bw-menu-button" aria-haspopup="dialog" aria-expanded={menuOpen} aria-label={`Business areas. Now showing ${info.label}`} onClick={() => setMenuOpen(true)}><span>{info.short}</span><ChevronDown size={17} aria-hidden="true" /></button>
+    {/* Phones and tablets: areas live in the business dock below, so the header keeps the owner's main action. */}
+    <button type="button" className="bw-identity-edit" onClick={() => editSite(site)}><PenLine size={16} aria-hidden="true" />Edit<span className="sr-only"> website</span></button>
   </div>;
 
   return <div className="bw" data-section={section}>
@@ -208,12 +218,27 @@ export const BusinessWorkspacePage: React.FC = () => {
         onSummary={setSummary} refreshRef={refreshRef} overviewHub={hub} settings={websiteArea} />
     </div>
 
+    {/* V7.2 business dock (phones and tablets): the most-used areas, everything else under More. */}
+    <nav className="bw-dock" aria-label="Business areas" style={{ '--bw-dock-count': dock.length + 1 } as React.CSSProperties}>
+      {dock.map(target => {
+        const Icon = ICONS[target];
+        return <a key={target} href={workspacePath(target)} aria-current={section === target ? 'page' : undefined} onClick={event => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return; event.preventDefault(); go(target); }}>
+          <span className="bw-dock-icon" aria-hidden="true"><Icon size={21} aria-hidden={true} />{target === 'orders' && summary?.ordersNeedingCheck ? <i className="bw-dock-dot" /> : null}</span>
+          <span className="bw-dock-label">{WORKSPACE_SECTIONS[target].short}{target === 'orders' && summary?.ordersNeedingCheck ? <span className="sr-only">, {summary.ordersNeedingCheck} need a check</span> : null}</span>
+        </a>;
+      })}
+      <button type="button" aria-haspopup="dialog" aria-expanded={menuOpen} data-active={!dock.includes(section) ? '' : undefined} aria-label={!dock.includes(section) ? `More business areas. Now showing ${info.label}` : 'More business areas'} onClick={() => setMenuOpen(true)}>
+        <span className="bw-dock-icon" aria-hidden="true"><Menu size={21} aria-hidden={true} /></span><span className="bw-dock-label">More</span>
+      </button>
+    </nav>
+
     {menuOpen && <WorkspaceMenu onClose={() => setMenuOpen(false)} name={name}>
       <nav aria-label="Business workspace"><ul className="bw-nav" data-drawer>{available.map(target => navLink(target, true))}</ul></nav>
       <div className="bw-drawer-actions">
         <button type="button" className="bw-button" data-primary onClick={() => editSite(site)}><PenLine size={16} aria-hidden="true" />Edit website</button>
         {published && <a className="bw-button" href={`/sites/${encodeURIComponent(site.slug)}`} target="_blank" rel="noopener noreferrer"><Eye size={16} aria-hidden="true" />View live site</a>}
         <a className="bw-quiet-link" href="/website-builder" onClick={event => { event.preventDefault(); setMenuOpen(false); setActivePage('website'); }}><Compass size={15} aria-hidden="true" />Explore designs in Website Builder</a>
+        <a className="bw-exit" href="/" onClick={event => { event.preventDefault(); leaveBusiness(); }}><House size={17} aria-hidden="true" /><span><strong>Back to Mystery Hub</strong><small>Buy data, airtime and more as a customer</small></span></a>
       </div>
     </WorkspaceMenu>}
   </div>;
