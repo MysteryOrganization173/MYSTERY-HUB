@@ -1,6 +1,6 @@
 import React, {useState} from 'react';
 import {ChevronDown} from 'lucide-react';
-import {activityDigest, customerActivityLabel, isOwnerActivity} from '../../utils/customerActivity';
+import {customerActivityLabel, isOwnerActivity} from '../../utils/customerActivity';
 import {formatGhs} from '../../../shared/money';
 
 /**
@@ -16,23 +16,29 @@ export function dailyViewSeries(trend: Trend): Trend {
   if (!trend.length) return [];
   const sorted = [...trend].sort((a, b) => a.day.localeCompare(b.day)), byDay = new Map(sorted.map(d => [d.day, d.views]));
   const start = Date.parse(`${sorted[0].day}T00:00:00Z`), end = Date.parse(`${sorted[sorted.length - 1].day}T00:00:00Z`);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return sorted;
+  // Long all-time histories keep every reported day rather than silently dropping the newest records.
+  // Avoid allocating years of empty dates: only short ranges have their gaps filled.
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || (end - start) / 86400000 >= 400) return sorted;
   const days: Trend = [];
-  for (let t = start; t <= end && days.length < 400; t += 86400000) { const day = new Date(t).toISOString().slice(0, 10); days.push({day, views: byDay.get(day) || 0}); }
+  for (let t = start; t <= end; t += 86400000) { const day = new Date(t).toISOString().slice(0, 10); days.push({day, views: byDay.get(day) || 0}); }
   return days;
 }
 
 const dayLabel = (day: string, opts: Intl.DateTimeFormatOptions = {day: 'numeric', month: 'short'}) => new Intl.DateTimeFormat(undefined, {...opts, timeZone: 'UTC'}).format(new Date(`${day}T00:00:00Z`));
 
-/** Groups activity by calendar day (newest first) after collapsing back-to-back repeats into one row with a count. */
+const activityDay = new Intl.DateTimeFormat('en-CA', {timeZone:'Africa/Accra',year:'numeric',month:'2-digit',day:'2-digit'});
+/** Ghana calendar days, with consecutive repeats collapsed only within the same day. */
 export function groupActivity(entries: Array<{label: string; at: string}>, now = new Date()) {
-  const today = now.toDateString(), yesterday = new Date(now.getTime() - 86400000).toDateString();
+  const today = activityDay.format(now), yesterday = activityDay.format(new Date(now.getTime() - 86400000));
   const groups: Array<{heading: string; rows: Array<{label: string; at: string; count: number}>}> = [];
-  for (const row of activityDigest(entries)) {
-    const date = new Date(row.at), key = date.toDateString();
-    const heading = key === today ? 'Today' : key === yesterday ? 'Yesterday' : new Intl.DateTimeFormat(undefined, {weekday: 'short', day: 'numeric', month: 'short'}).format(date);
-    const last = groups[groups.length - 1];
-    if (last?.heading === heading) last.rows.push(row); else groups.push({heading, rows: [row]});
+  let previousDay = '';
+  for (const entry of entries) {
+    const date = new Date(entry.at), key = activityDay.format(date);
+    const heading = key === today ? 'Today' : key === yesterday ? 'Yesterday' : new Intl.DateTimeFormat(undefined, {timeZone:'Africa/Accra',weekday:'short',day:'numeric',month:'short',year:'numeric'}).format(date);
+    if (key !== previousDay) groups.push({heading,rows:[]});
+    const rows = groups[groups.length - 1].rows, last = rows[rows.length - 1];
+    if (last?.label === entry.label) last.count++; else rows.push({...entry,count:1});
+    previousDay = key;
   }
   return groups;
 }
@@ -117,14 +123,14 @@ export function BusinessAnalytics({analytics: a, earnings: e, activity, reseller
     </section>
 
     <section className="ba-card" aria-labelledby="ba-activity-title">
-      <h3 id="ba-activity-title">Customer activity</h3>
+      <h3 id="ba-activity-title">Customer activity <small>Ghana time</small></h3>
       {rowCount ? <>
         <ol className="ba-days">{visible.map(g => <li key={g.heading}><h4>{g.heading}</h4><ul>{g.rows.map((row, i) => <li key={i}>
           <span className="ba-row-label">{row.label}{row.count > 1 && <span className="ba-count"> ×{row.count}</span>}</span>
-          <time dateTime={row.at}>{new Intl.DateTimeFormat(undefined, {hour: 'numeric', minute: '2-digit'}).format(new Date(row.at))}</time>
+          <time dateTime={row.at}>{new Intl.DateTimeFormat(undefined, {timeZone:'Africa/Accra',hour:'numeric',minute:'2-digit'}).format(new Date(row.at))}</time>
         </li>)}</ul></li>)}</ol>
         {rowCount > limit && <button type="button" className="ba-more" aria-expanded={showAll} onClick={() => setShowAll(v => !v)}>{showAll ? 'Show less' : `Show all ${rowCount}`}</button>}
-      </> : <p className="ba-empty">{published ? `No customer activity yet. Share your link on WhatsApp status or with your customers, and visits, messages${reseller ? ' and sales' : ''} will show here.` : 'Publish and share your website to start seeing customer activity.'}</p>}
+      </> : <p className="ba-empty">{published ? 'No customer activity recorded in this history. Site visits and contact actions are shown in the totals above.' : 'Publish and share your website to start seeing customer activity.'}</p>}
       {own.size > 0 && <details className="ba-own"><summary>Your own visits<span>{[...own.values()].reduce((n: number, v: any) => n + v.count, 0)}</span><ChevronDown size={15} aria-hidden="true"/></summary>
         <ul>{[...own.entries()].map(([label, v]: [string, any]) => <li key={label}><span>{label}</span><span>{v.count === 1 ? 'once' : `${v.count} times`} · latest {new Date(v.at).toLocaleString()}</span></li>)}</ul>
         <p>These are your own actions in the builder. They are not customer visits.</p>

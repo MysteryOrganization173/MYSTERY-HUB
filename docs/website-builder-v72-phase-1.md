@@ -40,7 +40,7 @@ Compatibility: a store with no saved style still renders Classic exactly (no sty
 
 `BusinessAnalytics` (Analytics area only; the Overview is unchanged) shows the same server figures in four groups: Reach (Views, Visitors), Customer actions, Sales (Checkout starts "Not a payment", Paid, Delivered, Sales) and Store Earnings (Available "Can be withdrawn", Pending "Not withdrawable yet"). The daily chart is a small SVG column chart (busiest day highlighted, accessible summary, collapsible daily table); days between the first and last recorded day with no record show as zero, nothing beyond is extrapolated. Customer activity is grouped by day with back-to-back repeats collapsed and shows eight rows until "Show all". The owner's own builder actions are summarised separately ("Your own visits · 7"), never mixed into customer activity.
 
-Noted for backend review (not changed): `views` counts `site_view` while `uniqueVisitors` counts `website_public_site_view` visitor ids, so the two come from different event names; `conversion` divides paid orders by recorded checkout starts and can exceed 100% when starts are missed (the page says so).
+Verified backend contract (not changed): the count helper prefixes `website_public_`, so Views and Visitors both use `website_public_site_view` (event count versus distinct visitor IDs). Public visit/contact events are excluded from the separate activity-history projection; its empty state now points owners to the totals rather than claiming no visits occurred. `conversion` divides paid orders by recorded checkout starts and can exceed 100% when starts are missed (the page says so).
 
 ## Verification
 
