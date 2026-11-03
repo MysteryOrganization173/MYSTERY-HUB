@@ -13,6 +13,8 @@
 .bw-state{display:flex;align-items:center;gap:6px;margin-top:2px;font-size:13px;color:#9fb0a8}
 .bw-state>span:first-child{width:7px;height:7px;border-radius:50%;background:#f2b24c;flex-shrink:0}
 .bw-state[data-live="live"]>span:first-child,.bw-state[data-live="live-changes"]>span:first-child{background:#00c365}
+/* A Data store shows its store status here; its dot follows that status, not only whether the site is published. */
+.bw-state[data-tone="setup"]>span:first-child,.bw-state[data-tone="blocked"]>span:first-child{background:#f2b24c}
 .bw-state-text{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bw-menu-button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid #2a3a46;background:#0f171e;color:#eef3f1;font-size:14px;font-weight:600;flex-shrink:0}
 .bw-menu-button:hover{background:#16212a}
@@ -71,15 +73,6 @@
 .bw-site .website-owner-address{max-width:none}
 .bw-site .website-owner-review{margin-top:0;max-width:none}
 
-/* Phone shortcuts into each area (desktops have the sidebar) */
-.bw-hub{border:1px solid #1e2a33;border-radius:16px;background:#0d171f;padding:6px}
-.bw-hub h2{font-size:13px;font-weight:700;color:#9fb0a8;padding:10px 10px 6px}
-.bw-hub ul{list-style:none;margin:0;padding:0}
-.bw-hub li+li{border-top:1px solid #16212a}
-.bw-hub a{display:flex;align-items:center;gap:12px;min-height:60px;padding:8px 10px;color:#eef3f1;text-decoration:none;border-radius:12px}
-.bw-hub a:hover{background:#111a21}
-.bw-hub a>svg:first-child{color:#3ee08f;flex-shrink:0}
-.bw-hub-chevron{color:#5b6b64;flex-shrink:0}
 
 /* Orders: every status filter stays visible (wraps) instead of hiding behind a sideways scroll. */
 .bw [data-order-filters]{display:flex;flex-wrap:wrap;overflow:visible}
@@ -131,9 +124,9 @@
 @media (min-width:640px){.bw{padding:16px 24px 40px}.bw-site{padding:20px}}
 @media (min-width:1024px){
   .bw{display:grid;grid-template-columns:248px minmax(0,1fr);gap:32px;padding:24px 32px 48px;align-items:start}
-  .bw-side{position:sticky;top:80px;max-height:calc(100dvh - 96px);overflow-y:auto;padding-right:4px}
+  .bw-side{position:sticky;top:76px;max-height:calc(100dvh - 92px);overflow-y:auto;padding-right:4px}
   .bw-identity{padding-top:4px}
-  .bw-menu-button,.bw-hub{display:none}
+  .bw-menu-button{display:none}
   .bw-side .bw-nav,.bw-side-foot{display:grid}
   .bw-back{display:none}
   .bw-head{padding-bottom:4px}
@@ -157,11 +150,10 @@
 .bw-share-tips strong{color:#eef3f1;font-weight:600}
 
 /* ---------------------------------------------------------------------------------------------
-   V7.2 business mode (phones and tablets). The business dock replaces Mystery Hub's consumer tab bar while an
-   owner manages a website: the areas they use most, with More for the rest and the way back to Mystery Hub.
-   Desktops keep the sidebar. Same height and safe-area handling as the consumer bar, so nothing else moves.
+   V7.2 business dock (phones and tablets). V7.2.1: My Business is its own shell (App.tsx), so the dock is the only
+   bottom bar: the areas used most, with More for the rest. Desktops keep the sidebar. Same height and safe-area
+   handling as the consumer bar.
    --------------------------------------------------------------------------------------------- */
-html[data-business-mode] .mh-bottom-nav{display:none!important}
 .bw-identity-edit{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid rgba(0,195,101,.45);background:rgba(0,195,101,.1);color:#bdf5d6;font-size:14px;font-weight:700;flex-shrink:0}
 .bw-identity-edit:hover{background:rgba(0,195,101,.18)}
 .bw-dock{position:fixed;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:repeat(var(--bw-dock-count,5),minmax(0,1fr));gap:2px;padding:4px 6px calc(4px + env(safe-area-inset-bottom,0px));background:linear-gradient(180deg,rgb(14 22 19 / .92),rgb(8 13 11 / .97));-webkit-backdrop-filter:blur(12px) saturate(140%);backdrop-filter:blur(12px) saturate(140%);border-top:1px solid rgba(0,195,101,.22);box-shadow:0 -12px 28px -14px rgb(0 0 0 / .75)}
@@ -182,8 +174,7 @@ html[data-business-mode] .mh-bottom-nav{display:none!important}
 .bw-exit strong{display:block;font-size:14.5px;font-weight:600}
 .bw-exit small{display:block;font-size:12.5px;color:#8fa29a}
 @media (max-width:1023px){
-  .bw{padding-bottom:calc(88px + env(safe-area-inset-bottom,0px))}
-  html[data-business-mode] .mh-app>footer{padding-bottom:calc(4.5rem + env(safe-area-inset-bottom,0px))}
+  .bw{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
   .bw-menu-button{display:none}
 }
 @media (max-width:359px){.bw-identity-edit{padding:0 10px}.bw-dock-icon{width:44px}.bw-dock-label{font-size:11px}}
@@ -247,3 +238,69 @@ html[data-business-mode] .mh-bottom-nav{display:none!important}
 
 /* The Overview already shows Edit website on its website card. */
 @media (max-width:1023px){.bw[data-section="overview"] .bw-identity-edit{display:none}}
+
+/* ---------------------------------------------------------------------------------------------
+   V7.2.1 business shell. The business bar says where the owner is (Mystery Hub / My Business) and is the way back;
+   the account sits on its right. Quiet on purpose: the business's name and areas are the page's real header.
+   --------------------------------------------------------------------------------------------- */
+.bw-bar{position:sticky;top:0;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:12px;height:56px;padding:0 16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:rgb(10 14 17 / .92);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid #18232b}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.bw-bar{background:#0a0e11}}
+.bw-crumbs{min-width:0}
+.bw-crumbs ol{display:flex;align-items:center;min-width:0;list-style:none;margin:0;padding:0;font-size:14px}
+.bw-crumbs li{display:flex;align-items:center;min-width:0}
+.bw-crumbs li+li::before{content:'/';margin:0 10px;color:#3d4d56}
+.bw-crumbs a{display:inline-flex;align-items:center;gap:6px;min-height:44px;margin-left:-6px;padding:0 6px;border-radius:10px;color:#a9b8b2;font-weight:600;text-decoration:none;white-space:nowrap}
+.bw-crumbs a:hover{color:#eef3f1;background:#111a21}
+.bw-crumbs-back{color:#6f8279;margin-right:-2px}
+.bw-crumbs [aria-current="page"]{color:#eef3f1;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bw-bar-account{display:grid;place-items:center;width:44px;height:44px;flex-shrink:0;border-radius:999px;color:#eef3f1}
+.bw-bar-account>span{display:grid;place-items:center;width:34px;height:34px;border-radius:999px;background:#10261c;border:1px solid #1f4a35;color:#3ee08f;font-weight:800;font-size:14px}
+.bw-bar-account:hover>span{background:#14301f}
+.bw-bar :is(a,button):focus-visible{outline:2px solid #00c365;outline-offset:2px}
+@media (max-width:359px){.bw-crumbs-mark{display:none}.bw-crumbs li+li::before{margin:0 7px}}
+@media (min-width:1024px){.bw-bar{height:60px;padding:0 32px}}
+
+/* Overview figures: one card, grouped by what the numbers cover; each figure opens the area that explains it. */
+.bw-glance{border:1px solid #1e2a33;border-radius:18px;background:#0d161d;padding:14px 14px 6px;display:grid;gap:4px;min-width:0}
+.bw-glance-head{display:grid;gap:8px;min-width:0}
+.bw-glance-head h2{font-size:15px;font-weight:700;color:#eef3f1;margin:0 2px}
+.bw-glance-head .website-period{margin:0}
+.bw-glance-group{padding-top:8px}
+.bw-glance-group+.bw-glance-group{border-top:1px solid #172129;margin-top:4px}
+.bw-glance-group h3{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7f948b;margin:2px 2px 4px}
+.bw-glance-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px}
+.bw-glance-list button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;min-height:64px;padding:8px;border-radius:12px;text-align:left;color:inherit}
+.bw-glance-list button:hover{background:#111c24}
+.bw-glance-list button:focus-visible{outline:2px solid #00c365;outline-offset:-2px}
+.bw-glance-label{font-size:12.5px;color:#a9b8b2;line-height:1.3}
+.bw-glance-list strong{font-size:21px;font-weight:800;letter-spacing:-.01em;line-height:1.15;color:#eef3f1;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.bw-glance-list small{font-size:11.5px;color:#7f948b;line-height:1.3}
+@media (min-width:640px){.bw-glance{padding:16px 16px 8px}.bw-glance-head{grid-template-columns:minmax(0,1fr) auto;align-items:center}.bw-glance-list{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:359px){.bw-glance-list strong{font-size:19px}}
+
+/* Customer activity on the Overview: a short digest, the full history lives in Analytics. */
+.bw-activity{display:grid;gap:4px;min-width:0}
+.bw-activity-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.bw-activity-head h2{font-size:15px;font-weight:700;color:#eef3f1;margin:0}
+.bw-activity-head button{min-height:44px;padding:0 4px;font-size:13.5px;font-weight:600;color:#44df95}
+.bw-activity-head button:hover{text-decoration:underline;text-underline-offset:3px}
+.bw-activity ul{list-style:none;margin:0;padding:0;border-top:1px solid #16212a}
+.bw-activity li{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #16212a;font-size:14px}
+.bw-activity-label{min-width:0;color:#e2e9e6}
+.bw-activity-label::first-letter{text-transform:uppercase}
+.bw-activity-count{color:#8fa29a;font-variant-numeric:tabular-nums}
+.bw-activity time{flex-shrink:0;font-size:12.5px;color:#8fa29a;font-variant-numeric:tabular-nums}
+
+/* More sheet: secondary areas first, then the website's link and designs, then account and the way out. */
+.bw-nav-chevron{color:#5b6b64;flex-shrink:0}
+.bw-menu-list{list-style:none;margin:0;padding:6px 0 0;border-top:1px solid #1a252d;display:grid;gap:2px}
+.bw-menu-list :is(a,button){display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:8px 12px;border-radius:12px;color:#eef3f1;text-decoration:none;font-size:14.5px;font-weight:600;text-align:left}
+.bw-menu-list :is(a,button):hover{background:#111a21}
+.bw-menu-list svg{color:#8fa29a;flex-shrink:0}
+.bw-menu-list span{display:flex;flex-direction:column;min-width:0}
+.bw-menu-list small{font-size:12.5px;font-weight:400;color:#8fa29a}
+.bw-drawer .website-sheet-body{gap:6px}
+
+/* Tablets: the dock keeps phone-sized targets centred instead of stretching across the width. */
+@media (min-width:640px) and (max-width:1023px){.bw-dock{grid-template-columns:repeat(var(--bw-dock-count,5),minmax(0,112px));justify-content:center}}
+.bw-drawer .website-sheet-body{padding-bottom:max(16px,env(safe-area-inset-bottom,0px))}

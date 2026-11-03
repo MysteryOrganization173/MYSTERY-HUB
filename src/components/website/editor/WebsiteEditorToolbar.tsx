@@ -19,6 +19,7 @@ export function WebsiteEditorToolbar(p: {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null), opener = useRef<HTMLElement | null>(null);
   // V5.1: say which thing is not live. "Not live yet" read as "my website is offline" to owners.
+  const upToDate = p.published && !p.liveBehind && p.status==='saved';
   const status = p.status==='saving' ? 'Saving…' : p.status==='saved' ? (p.published ? (p.liveBehind ? 'Changes saved · press Update Live to show them' : 'Saved · your live website is up to date') : 'Draft saved · website not published yet') : p.status==='offline' ? 'Offline · changes kept on this device' : p.status==='failed' ? 'Not saved · tap Save to retry' : 'Unsaved changes';
   const shortStatus = p.status==='saving' ? 'Saving…' : p.status==='saved' ? (p.published ? (p.liveBehind ? 'Saved · update to go live' : 'Saved · live') : 'Saved · not published') : p.status==='offline' ? 'Offline · kept here' : p.status==='failed' ? 'Not saved' : 'Unsaved';
   const active = p.settingsOpen ? 'settings' : p.colorsOpen ? 'colors' : p.mode;
@@ -51,7 +52,9 @@ export function WebsiteEditorToolbar(p: {
         <button type="button" onClick={colors} aria-pressed={!!p.colorsOpen} className="visual-text-button visual-wide-only"><Palette size={16}/>{p.brandLabel||'Design'}</button>
         <button type="button" onClick={settings} aria-pressed={!!p.settingsOpen} className="visual-text-button visual-wide-only"><SlidersHorizontal size={16}/>All Settings</button>
         <button type="button" onClick={openMore} aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More options" className="visual-icon-button visual-wide-only"><MoreHorizontal size={19}/></button>
-        <button type="button" onClick={p.onPublish} disabled={p.publishing} className="visual-publish-button">{p.publishing?'Publishing…':p.published?'Update Live':'Publish'}</button>
+        {/* V7.2.1: with every change saved and already live there is nothing to update; the button says so instead of
+            offering a publish that would change nothing. Any edit (unsaved or saved but not live) enables it again. */}
+        <button type="button" onClick={p.onPublish} disabled={p.publishing||upToDate} className="visual-publish-button" title={upToDate?'Your live website already shows every saved change':undefined}>{p.publishing?'Publishing…':upToDate?'Up to date':p.published?'Update Live':'Publish'}</button>
       </div>
     </header>
 

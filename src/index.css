@@ -111,8 +111,8 @@
   dialog::backdrop { background: rgb(0 0 0 / .72); }
   progress { accent-color: #00c365; }
   @media (max-width: 639px) {
-    .mh-app :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) { font-size: 16px; }
-    .mh-app button:not(.mh-compact-control) { min-height: 44px; }
+    :is(.mh-app, .mh-business-shell) :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) { font-size: 16px; }
+    :is(.mh-app, .mh-business-shell) button:not(.mh-compact-control) { min-height: 44px; }
     .mh-app > main { padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
   }
 }

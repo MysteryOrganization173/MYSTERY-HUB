@@ -96,7 +96,8 @@ test('launch steps: bundles, then publish, then share; gone once live with bundl
   assert.equal(resellerLaunchSteps({sellableBundles:1,published:true}),null);
   // The attention list still raises the same items the card replaces, so nothing is lost when the card hides.
   assert.deepEqual(ownerAttention({reseller:true,published:false,sellableBundles:0,content:{whatsapp:'0241234567'}}).map(i=>i.id),['bundles','publish']);
-  const dash=readFileSync('src/components/website/WebsiteBusinessDashboard.tsx','utf8');
+  // V7.2.1: the Overview keeps the headline figures; the full funnel (checkout starts, delivered) is in Analytics.
+  const dash=readFileSync('src/components/website/WebsiteBusinessDashboard.tsx','utf8')+readFileSync('src/components/website/BusinessAnalytics.tsx','utf8');
   for(const label of ['Visitors','Checkout starts','Paid orders','Delivered orders','Sales','Store Earnings available'])assert.ok(dash.includes(`'${label}'`)||dash.includes(`${label}:`),label);
 });
 

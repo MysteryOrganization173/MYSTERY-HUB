@@ -83,6 +83,26 @@ const AppContent: React.FC = () => {
     );
   }
 
+  // V7.2.1: My Business is the owner's own application. Its business bar (Mystery Hub / My Business, account) and
+  // business dock replace the consumer header, footer and tab bar, so one navigation system is on screen at a time.
+  // Like the editor, no assistant launcher floats over the dock; design previews, sign-in, account and toasts stay.
+  if (activePage === 'business') {
+    return (
+      <div className="mh-business-shell min-h-screen bg-[#0b0f12] text-slate-100 font-sans selection:bg-[#00c365] selection:text-black">
+        <SEOHead />
+        <GrowthTracker />
+        <a href="#main-content" className="fixed -top-20 left-4 focus:top-3 z-[120] mh-button">Skip to content</a>
+        <main id="main-content" tabIndex={-1} className="min-w-0 outline-none">
+          <BusinessWorkspacePage />
+        </main>
+        {templatePreviewNeeded && <TemplatePreviewModal />}
+        <AuthModal />
+        <AccountControls />
+        <ToastContainer />
+      </div>
+    );
+  }
+
   return (
     <div className="mh-app min-h-screen bg-[#0b0f12] text-slate-100 flex flex-col font-sans selection:bg-[#00c365] selection:text-black">
       <SEOHead />
@@ -96,7 +116,6 @@ const AppContent: React.FC = () => {
         {activePage === 'home' && <HomePage />}
         {activePage === 'data' && <DataPage />}
         {activePage === 'website' && <WebsiteBuilderPage />}
-        {activePage === 'business' && <BusinessWorkspacePage />}
         {activePage === 'marketplace' && <MarketplacePage />}
         {activePage === 'services' && <MoreServicesPage />}
         {activePage === 'afa' && <AfaRegistrationPage />}

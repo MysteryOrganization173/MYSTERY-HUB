@@ -44,7 +44,8 @@ interface ToastMessage {
 
 interface AppContextType {
   activePage: ActivePage;
-  setActivePage: (page: ActivePage) => void;
+  /** pushHistory false: the caller already set the address (e.g. /website-builder/designs). */
+  setActivePage: (page: ActivePage, pushHistory?: boolean) => void;
   dataProductMode: 'data' | 'instant' | 'airtime';
   setDataProductMode: (mode: 'data' | 'instant' | 'airtime') => void;
   dataNetwork: NetworkId | 'all';
@@ -97,7 +98,8 @@ interface AppContextType {
   /** How the editor was opened in this tab: which session loaded the website and whether to open the publish checklist. */
   editorLaunch: WebsiteEditorLaunch | null;
   /** Builder V6: go to the website's editor address (/website-builder/edit/:siteId). */
-  openWebsiteEditor: (site: WebsiteSiteRecord, options?: { publish?: boolean }) => void;
+  /** created: a website made just now; leaving its editor opens My Business (V7.2.1). */
+  openWebsiteEditor: (site: WebsiteSiteRecord, options?: { publish?: boolean; created?: boolean }) => void;
   /** Forget the editor's website (the editor page calls this when it closes). Never navigates. */
   closeWebsiteEditor: () => void;
   /** The editor page records the website it loaded from the server. */
@@ -395,7 +397,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Builder V6: the editor is a page with its own address, so refresh, Back and a reopened tab find it again.
   // The record passed here only paints the editor at once; the editor page reloads it from the server whenever
   // it was not loaded with the current session.
-  const openWebsiteEditor = (site: WebsiteSiteRecord, options: { publish?: boolean } = {}) => {
+  const openWebsiteEditor = (site: WebsiteSiteRecord, options: { publish?: boolean; created?: boolean } = {}) => {
     setActiveEditorSite(site);
     setEditorLaunch({ siteId: site.id, token: tokenRef.current, publish: Boolean(options.publish) });
     setSelectedTemplatePreview(null);
@@ -406,7 +408,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const current = safeEditorReturnPath(window.location.pathname + window.location.search);
       const onEditor = getPageFromPath(window.location.pathname) === 'editor';
       const from = fromPreview ? safeEditorReturnPath(window.history.state?.mhPreviewFrom) || '/website-builder' : onEditor ? safeEditorReturnPath(window.history.state?.mhEditorFrom) : current;
-      const state = { page: 'editor', mhEditorFrom: from };
+      // V7.2.1: a website made just now returns to My Business (Create → Editor → My Business), not to the design
+      // link or gallery it was started from.
+      const state = options.created ? { page: 'editor', mhEditorFrom: '/my-business', mhEditorCreated: true } : { page: 'editor', mhEditorFrom: from };
       if (fromPreview || window.location.pathname === path) window.history.replaceState(state, '', path);
       else window.history.pushState(state, '', path);
     }
