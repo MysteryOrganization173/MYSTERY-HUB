@@ -36,7 +36,7 @@ const render=(content:SiteContent|undefined,extra:Record<string,unknown>={})=>re
 test('style registry: Data Store styles (seven since V7.2), Horizon for new stores, Classic for every existing store without a choice',()=>{
   assert.deepEqual(WEBSITE_STYLE_VARIANTS.reseller.map(s=>s.id),['horizon','market','studio','compact','editorial','signature','classic']);
   assert.equal(resolveWebsiteStyle('reseller',undefined,true),'classic','an existing owner keeps the original look');
-  assert.equal(resolveWebsiteStyle('reseller',undefined,false),'horizon','the gallery shows the new default');
+  assert.equal(resolveWebsiteStyle('reseller',undefined,false),'market','the gallery shows the new default (V7.4: Market)');
   assert.equal(resolveWebsiteStyle('reseller','neon',true),'classic','an unknown saved value never changes an owner store');
   assert.equal(resolveWebsiteStyle('reseller','studio',true),'studio');
   assert.equal(resolveWebsiteStyle('boutique','horizon',true),'','layouts without variants are untouched');
@@ -88,9 +88,9 @@ test('Horizon and Market respect the owner focus point and description; Classic 
   assert.ok(!render(content).includes('80% 30%'),'Classic keeps its centred banner');
 });
 
-test('gallery demo shows Horizon with labelled example prices and the new starter wording',()=>{
+test('gallery demo shows Market (V7.4) with labelled example prices and the new starter wording',()=>{
   const html=renderToStaticMarkup(renderTemplateLayout(data));
-  assert.ok(html.includes('data-store-style="horizon"'));assert.ok(html.includes('Example store'));assert.ok(html.includes('Buy data in a few taps.'));
+  assert.ok(html.includes('data-store-style="market"'));assert.ok(html.includes('Example store'));assert.ok(html.includes('Buy data in a few taps.'));
 });
 
 test('wording ideas: short, plain and truthful: no prices, numbers, speed, guarantees, reviews or AI claims',()=>{
@@ -118,7 +118,7 @@ test('style picker and wording ideas render accessible choices; Classic is selec
 
 test('creating a store: new clients get Horizon; an older client that sends no style gets the original look',async()=>{
   const {site}=await WebsiteStore.createSite('usr_v71_new',{template_id:'tmpl-data-reseller',name:'Esi Data',businessName:'Esi Data',starterVersion:WEBSITE_STARTER_VERSION,content:{whatsapp:'0241234567'}});
-  assert.equal(site.content_json.styleVariant,'horizon');
+  assert.equal(site.content_json.styleVariant,'market');
   const old=await WebsiteStore.createSite('usr_v71_old',{template_id:'tmpl-data-reseller',name:'Old Client Store',content:{businessName:'Old Client Store'}} as any);
   assert.equal(old.site.content_json.styleVariant,undefined);
   await assert.rejects(()=>WebsiteStore.createSite('usr_v71_bad',{template_id:'tmpl-data-reseller',name:'Bad',businessName:'Bad',starterVersion:WEBSITE_STARTER_VERSION,content:{styleVariant:'neon'}} as any),/offered styles/);

@@ -21,7 +21,9 @@ export const WEBSITE_STYLE_VARIANTS: Readonly<Record<string, readonly WebsiteSty
   ]),
 });
 /** The style a brand-new website of this layout starts with. */
-export const WEBSITE_DEFAULT_STYLE: Readonly<Record<string, string>> = Object.freeze({ reseller: 'horizon' });
+// V7.4: Market leads. It is the clearest first impression (headline beside a framed photo, then readable bundle cards
+// with full-width Buy buttons) and what the gallery shows is what a new store starts with. Existing stores keep their saved style.
+export const WEBSITE_DEFAULT_STYLE: Readonly<Record<string, string>> = Object.freeze({ reseller: 'market' });
 /** The style an existing website without a saved choice has always rendered. */
 export const WEBSITE_ORIGINAL_STYLE: Readonly<Record<string, string>> = Object.freeze({ reseller: 'classic' });
 

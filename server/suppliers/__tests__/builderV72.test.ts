@@ -136,7 +136,7 @@ test('editor: Design is the second dock tool; style and colour changes stay ordi
   assert.match(dock,/p\.onBundles \?/,'Data Stores get Bundles in the dock');
   assert.match(editor,/onStyle=\{style=>changeContent\(\{styleVariant:style\}\)\}/);
   assert.match(editor,/onPalette=\{applyPalette\}/);
-  assert.match(editor,/const applyPalette = [^\n]*markDirty\(\);/);
+  assert.match(editor,/const applyPalette = [\s\S]*?setSettings\(next\);markDirty\(\);\};/);
   assert.doesNotMatch(editor,/onPalette=\{[^}]*publish/i,'choosing a look never publishes');
   assert.match(editor,/data-design-open=\{designOpen/,'phones shrink the canvas instead of covering it');
   assert.match(source('src/components/website/editor/visualEditor.css'),/\[data-design-open\]\{flex-direction:column\}/);

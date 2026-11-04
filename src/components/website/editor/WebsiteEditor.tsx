@@ -35,7 +35,7 @@ import { WebsiteStoreSetup } from './WebsiteStoreSetup';
 import { WebsiteStoreLook, WebsiteCopyIdeas } from './WebsiteStoreLook';
 import { WebsiteDesignPanel } from './WebsiteDesignPanel';
 import { DATA_STORE_COPY_IDEAS } from '../../../config/websiteStyleVariants';
-import { DATA_RESELLER_STARTER_HERO_IMAGE, resolveDataResellerHeroImage, showsLegacyDataResellerArtwork } from '../../../utils/dataResellerArtwork';
+import { heroAfterColourChange, isAutomaticDataStoreArtwork, matchedDataStoreArtwork, resolveDataResellerHeroImage, showsLegacyDataResellerArtwork } from '../../../utils/dataResellerArtwork';
 import {
   ArrowLeft,
   Save,
@@ -534,7 +534,11 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
     draftRef.current={...draft,...next};setContent(next.content);setSettings(next.settings);markDirty();
   };
   // Data Store helpers: V7.2 Design mode (style, colour sets, fine-tuning) and V7.1 wording ideas on text fields.
-  const applyPalette = (palette:{backgroundColor:string;primaryColor:string;accentColor:string}) => {const next={...draftRef.current.settings,backgroundColor:palette.backgroundColor,primaryColor:palette.primaryColor,accentColor:palette.accentColor};draftRef.current={...draftRef.current,settings:next};setSettings(next);markDirty();};
+  const applyPalette = (palette:{backgroundColor:string;primaryColor:string;accentColor:string}) => {const next={...draftRef.current.settings,backgroundColor:palette.backgroundColor,primaryColor:palette.primaryColor,accentColor:palette.accentColor};
+    // V7.4: automatic Data Store artwork follows the new colours; an owner's own photo never changes.
+    const hero=(isDataReseller?heroAfterColourChange(draftRef.current.content.heroImage,next):draftRef.current.content.heroImage) ?? draftRef.current.content.heroImage;
+    if(hero!==draftRef.current.content.heroImage){const nextContent={...draftRef.current.content,heroImage:hero};draftRef.current={...draftRef.current,content:nextContent};setContent(nextContent as typeof content);}
+    draftRef.current={...draftRef.current,settings:next};setSettings(next);markDirty();};
   const storeLook = isDataReseller && layoutMode==='template' ? <WebsiteStoreLook layout="reseller" value={content.styleVariant} onChange={style=>changeContent({styleVariant:style})} colors={{background:settings.backgroundColor,accent:settings.accentColor}}/> : null;
   const ideaField = isDataReseller && layoutMode==='template' && selected?.source.kind==='content' && ['tagline','aboutText','ctaLabel'].includes(selected.source.field as string) ? selected.source.field as 'tagline'|'aboutText'|'ctaLabel' : null;
   const designOpen = activeTab==='edit' && visualSelection==='branding';
@@ -764,7 +768,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
 
             {activeSection === 'media' && <section className="space-y-5">
               <div><h3 className="text-lg font-semibold">Images &amp; Media</h3><p className="text-sm text-slate-400 mt-2">Upload once, reuse across your website. Choose your cover image and logo here.</p></div>
-              <WebsiteImageField label="Cover image" value={content.heroImage} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,heroImage:isDataReseller&&!url?DATA_RESELLER_STARTER_HERO_IMAGE:url});markDirty();}} />
+              <WebsiteImageField label="Cover image" value={content.heroImage} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,heroImage:isDataReseller&&!url?matchedDataStoreArtwork(settings):url});markDirty();}} />
               {(!isDataReseller || (content.styleVariant && content.styleVariant!=='classic')) && content.heroImage && <details className="rounded-xl border border-slate-800 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-200 min-h-8">Cover photo focus and description</summary>
                 <div className="mt-3"><WebsiteImageDetails src={content.heroImage} focal={content.imageMeta?.heroImage} alt={content.imageMeta?.heroImage?.alt} onChange={patch=>changeContent({imageMeta:{...(content.imageMeta||{}),heroImage:{...(content.imageMeta?.heroImage||{}),...(patch.x!==undefined?{x:patch.x,y:patch.y}:{}),...(patch.alt!==undefined?{alt:patch.alt||undefined}:{})}}})}/></div>
               </details>}
@@ -786,7 +790,7 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 </div>
 
                 {storeLook}
-                <WebsitePaletteControl settings={settings} onApply={palette=>{const next={...draftRef.current.settings,backgroundColor:palette.backgroundColor,primaryColor:palette.primaryColor,accentColor:palette.accentColor};draftRef.current={...draftRef.current,settings:next};setSettings(next);markDirty();}}/>
+                <WebsitePaletteControl settings={settings} onApply={applyPalette}/>
 
                 {/* Brand Colors Grid */}
                 <div className="p-3.5 rounded-2xl bg-[#090f15] border border-slate-800/80 space-y-3">
@@ -850,16 +854,16 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                 <div className="p-3.5 rounded-2xl bg-[#090f15] border border-slate-800/80 space-y-3 text-left">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-white block">Hero / Cover Image</span>
-                    {content.heroImage && (
+                    {content.heroImage && !(isDataReseller && isAutomaticDataStoreArtwork(content.heroImage)) && (
                       <button
                         type="button"
                         onClick={() => {
-                          setContent({ ...content, heroImage: isDataReseller ? DATA_RESELLER_STARTER_HERO_IMAGE : '' });
+                          setContent({ ...content, heroImage: isDataReseller ? matchedDataStoreArtwork(settings) : '' });
                           markDirty();
                         }}
                         className="text-[11px] text-rose-400 hover:underline cursor-pointer"
                       >
-                        Reset to default
+                        {isDataReseller ? 'Remove photo' : 'Reset to default'}
                       </button>
                     )}
                   </div>
@@ -893,13 +897,20 @@ export const WebsiteEditor: React.FC<WebsiteEditorProps> = ({
                     )}
                   </div>
 
-                  {isDataReseller && showsLegacyDataResellerArtwork(content.heroImage) && (
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-300 space-y-2">
-                      <p>Your store shows the original Data store banner. It stays unless you change it. A plain starter image without any brand name is also available.</p>
-                      <button type="button" className="min-h-11 px-3 rounded-xl border border-emerald-500/40 text-emerald-300" onClick={() => { setContent({ ...content, heroImage: DATA_RESELLER_STARTER_HERO_IMAGE }); markDirty(); }}>Use the neutral starter image</button>
+                  {isDataReseller && isAutomaticDataStoreArtwork(content.heroImage) && (
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-300 space-y-2" data-artwork-state="automatic">
+                      {content.heroImage === matchedDataStoreArtwork(settings)
+                        ? <p>Matches your colours automatically. Upload your own photo to replace it; remove it later and the matching artwork comes back.</p>
+                        : <><p>This artwork was chosen for different colours.</p><button type="button" className="min-h-11 px-3 rounded-xl border border-emerald-500/40 text-emerald-300" onClick={() => { setContent({ ...content, heroImage: matchedDataStoreArtwork(settings) }); markDirty(); }}>Match the artwork to my colours</button></>}
                     </div>
                   )}
-                  <WebsiteImageField label="Hero / Cover Image" value={content.heroImage} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,heroImage:isDataReseller&&!url?DATA_RESELLER_STARTER_HERO_IMAGE:url});markDirty();}} />
+                  {isDataReseller && showsLegacyDataResellerArtwork(content.heroImage) && (
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-300 space-y-2">
+                      <p>Your store shows the original Data store banner. It stays unless you change it. Artwork that matches your colours, without any brand name, is also available.</p>
+                      <button type="button" className="min-h-11 px-3 rounded-xl border border-emerald-500/40 text-emerald-300" onClick={() => { setContent({ ...content, heroImage: matchedDataStoreArtwork(settings) }); markDirty(); }}>Use artwork matching my colours</button>
+                    </div>
+                  )}
+                  <WebsiteImageField label="Hero / Cover Image" value={content.heroImage} siteId={currentSite.id} token={sessionToken} onChange={url=>{setContent({...content,heroImage:isDataReseller&&!url?matchedDataStoreArtwork(settings):url});markDirty();}} />
                 </div>
 
                 {/* Brand Logo Asset Container */}

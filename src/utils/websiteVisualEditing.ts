@@ -1,4 +1,4 @@
-import { DATA_RESELLER_STARTER_HERO_IMAGE } from './dataResellerArtwork.js';
+import { matchedDataStoreArtwork } from './dataResellerArtwork.js';
 import type { SiteContent, SiteSettings, WebsiteTemplate } from '../types';
 import { SECTION_REGISTRY, type SectionData } from '../config/websiteBuilder';
 import { sanitizeUrl } from '../../server/types/website';
@@ -91,8 +91,8 @@ export function applyVisualValue(content: SiteContent, settings: SiteSettings, t
   if (!target || target.source.kind === 'item' || visualValueError(target, value)) return null;
   if (target.source.kind === 'settings') return {content, settings: {...settings, [target.source.field]: value}};
   if (target.source.kind === 'content') {
-    // Removing a Data store's photo selects the neutral starter rather than inheriting the legacy banner.
-    const next = target.source.field === 'heroImage' && template.layoutType === 'reseller' && !value.trim() ? DATA_RESELLER_STARTER_HERO_IMAGE : value;
+    // Removing a Data store's photo restores the artwork matching the current colours (V7.4), never an empty hero or the legacy banner.
+    const next = target.source.field === 'heroImage' && template.layoutType === 'reseller' && !value.trim() ? matchedDataStoreArtwork(settings) : value;
     return {content: {...content, [target.source.field]: next}, settings};
   }
   if (target.source.kind === 'copy') {
