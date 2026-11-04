@@ -89,7 +89,7 @@ export function WebsiteItemPanel({item, index, total, word, fields, layout = '',
       {fields.includes('price') && <ItemInput item={item} field="price" label="Price (optional)" placeholder="e.g. GH₵ 45" hint="Leave empty to hide the price." onChange={onChange}/>}
       {fields.includes('desc') && <ItemInput item={item} field="desc" label="Description" multiline onChange={onChange}/>}
       {fields.includes('image') && <div className="visual-field"><WebsiteImageField label="Photo" value={item.image || ''} siteId={siteId} token={token} onChange={image => onChange({image})}/></div>}
-      {['nightkitchen','boutique'].includes(layout) && <WebsiteItemExtras item={item} layout={layout} siteId={siteId} token={token} pinnedCount={pinnedCount} onChange={onChange}/>}
+      {['nightkitchen','boutique','restaurant','ecommerce'].includes(layout) && <WebsiteItemExtras item={item} layout={layout} siteId={siteId} token={token} pinnedCount={pinnedCount} onChange={onChange}/>}
       {fields.includes('category') && <ItemInput item={item} field="category" label="Group (optional)" hint={`Visitors can filter your ${word.many} by group.`} onChange={onChange}/>}
       {fields.includes('tag') && <ItemInput item={item} field="tag" label="Label (optional)" placeholder="e.g. New or Popular" hint="A short badge on the card. Only add one that is true." onChange={onChange}/>}
       {cardButton && <CardButtonInput {...cardButton} lower={word.many}/>}

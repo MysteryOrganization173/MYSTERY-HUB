@@ -129,7 +129,7 @@ export const BusinessWorkspacePage: React.FC = () => {
   const bar = <BusinessBar onHome={() => leaveBusiness('/')} account={user ? { name: user.name, open: openAccount } : null} />;
 
   // ---------- States before there is a website to manage ----------
-  if (!user && !isAuthChecking) return <>{bar}<WorkspaceGate title="Sign in to manage your business" detail="My Business shows your website, orders, prices and earnings in one place.">
+  if (!user && !isAuthChecking) return <>{bar}<WorkspaceGate title="Sign in to manage your business" detail="My Business is where you edit and publish your website, see visitors and customer activity, and, for a Data Store, manage orders, prices and Store Earnings.">
     <button type="button" className="bw-button" data-primary onClick={() => openAuth('login', 'Sign in to open My Business.')}>Sign in</button>
     <a className="bw-button" href="/website-builder" onClick={event => { event.preventDefault(); leaveTo('/website-builder'); }}>Explore website designs</a>
   </WorkspaceGate></>;

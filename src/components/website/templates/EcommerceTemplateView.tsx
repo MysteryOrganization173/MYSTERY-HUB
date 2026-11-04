@@ -1,22 +1,32 @@
 import { ExampleTag } from '../ExampleTag';
-import { SiteFooterContact } from '../SiteContactDetails';
-import {useVisualEditMarkers, useTemplateCopy} from '../editor/VisualEditMarkers';
+import { SiteFooterContact, websiteContactTarget } from '../SiteContactDetails';
+import {useVisualEditMarkers, useIsVisualEditing, useTemplateCopy} from '../editor/VisualEditMarkers';
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { SafeImage } from '../SafeImage.js';
+import { ItemDetailSheet, ORDER_LIST_CSS, OrderBar, OrderListSheet, useOrderList } from '../storefront/OrderList';
+import { orderCount } from '../../../utils/websiteOrderList';
+import { websiteActionText } from '../../../utils/websiteBrand';
+import { focalPosition } from '../../../config/websiteContentV5';
 import React, { useState } from 'react';
-import { WebsiteTemplate } from '../../../types';
+import type { TemplateItem, WebsiteTemplate } from '../../../types';
 import {
   ShoppingBag,
-  Search,
   Truck,
   ShieldCheck,
-  Star,
   Check,
   ArrowRight,
   Flame,
   Phone,
+  Plus,
   RotateCcw,
 } from 'lucide-react';
+
+/** Classic Shop's product cards: the whole card opens the product; one clear action adds it or asks for an option. */
+const CS_CSS = `
+.cs-add{min-height:44px;border-radius:12px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 14px}
+.cs-add:active{transform:scale(.98)}
+.cs-card :is(button):focus-visible{outline:2px solid var(--website-accent,#2563eb);outline-offset:2px}
+`;
 
 interface TemplateViewProps {
   template: WebsiteTemplate;
@@ -26,25 +36,32 @@ interface TemplateViewProps {
 export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, onCtaClick }) => {
   const edit = useVisualEditMarkers();
   const copy = useTemplateCopy(template);
-  const [cartCount, setCartCount] = useState<number>(1);
+  const editing = useIsVisualEditing();
   const [activeCategory, setActiveCategory] = useState<string>('All');
-  const [notification, setNotification] = useState<string | null>(null);
+  const content = template.siteContent;
+  const owner = !!content;
+  const order = useOrderList();
+  const [detail, setDetail] = useState<TemplateItem | null>(null);
+  const [listOpen, setListOpen] = useState(false);
 
   const products = template.items || [];
   const filteredProducts = products.filter((p) => {
     if (activeCategory === 'All') return true;
     return p.category === activeCategory;
   });
-
-  const handleAddToCart = (productName: string) => {
-    if (template.siteContent) { onCtaClick?.(); return; }
-    setCartCount((prev) => prev + 1);
-    setNotification(`Added "${productName}" to cart!`);
-    setTimeout(() => setNotification(null), 3000);
-  };
+  const categories = ['All', ...new Set(products.map(item => item.category).filter((category): category is string => Boolean(category) && category !== 'All'))];
+  const count = orderCount(order.lines);
+  const accent = template.colorScheme?.accent || '#2563eb';
+  // The gallery demo writes example messages only; a published shop sends them to the owner's WhatsApp.
+  const link = owner && !editing && typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined;
+  const contact = { businessName: template.demoBusinessName, whatsapp: owner ? content?.whatsapp : '', link, demo: !owner, onContact: () => { if (onCtaClick) onCtaClick(); else window.location.assign(websiteContactTarget(content)); } };
+  // A tap opens the product; the owner's editor keeps taps for editing. Products with options open first.
+  const open = (item: TemplateItem) => { if (!editing) setDetail(item); };
+  const add = (item: TemplateItem) => { if (editing) return; if (item.options?.length) setDetail(item); else order.add(item); };
 
   return (
-    <div className="bg-[#f8fafc] text-slate-900 font-sans min-h-full">
+    <div className="bg-[#f8fafc] text-slate-900 font-sans min-h-full" style={{ '--ol-bg': '#ffffff', '--ol-text': '#0f172a', '--ol-muted': '#475569', '--ol-line': '#e2e8f0', '--ol-accent': accent, '--ol-on-accent': websiteActionText(accent), '--ol-radius': '18px' } as React.CSSProperties}>
+      <style>{ORDER_LIST_CSS + CS_CSS}</style>
       {/* Top E-Commerce Announcement Bar */}
       <div className="bg-[var(--website-accent,#2563eb)] text-white text-xs px-4 py-2 text-center font-bold tracking-wide flex items-center justify-center gap-2">
         <Flame className="w-3.5 h-3.5 text-amber-300" />
@@ -69,33 +86,26 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
 
         <div className="flex items-center gap-3">
           <button
-            onClick={onCtaClick}
-            className="relative p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors cursor-pointer"
-            title={template.siteContent ? 'Contact this business' : 'Cart'}
+            type="button"
+            onClick={() => { if (!editing) setListOpen(true); }}
+            className="relative w-11 h-11 inline-flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors cursor-pointer"
+            aria-label={count ? `Your order list, ${count} item${count === 1 ? '' : 's'}` : 'Your order list'}
           >
-            <ShoppingBag className="w-4 h-4" />
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#ef4444] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-              {template.siteContent ? <Phone className="w-3 h-3" /> : cartCount}
-            </span>
+            <ShoppingBag className="w-4 h-4" aria-hidden="true" />
+            {count > 0 && <span aria-hidden="true" className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-[#ef4444] text-white text-[11px] font-bold rounded-full flex items-center justify-center">
+              {count}
+            </span>}
           </button>
 
           <button {...edit("content:ctaLabel")}
             onClick={onCtaClick}
-            className="px-3.5 py-2 rounded-xl bg-[var(--website-accent,#2563eb)] hover:bg-[#1d4ed8] text-white font-bold text-xs transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+            className="min-h-11 px-3.5 rounded-xl bg-[var(--website-accent,#2563eb)] hover:bg-[#1d4ed8] text-white font-bold text-xs transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
           >
-            <span>{template.siteContent?.ctaLabel || (template.siteContent ? 'Contact' : 'Checkout')}</span>
+            <span>{template.siteContent?.ctaLabel || 'Contact'}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </nav>
-
-      {/* Floating Notification Toast */}
-      {notification && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-2xl text-xs font-semibold flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
-          <Check className="w-4 h-4 text-emerald-400" />
-          <span>{notification}</span>
-        </div>
-      )}
 
       {/* Hero Showcase */}
       <div className="relative py-12 sm:py-16 px-6 sm:px-12 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 text-white overflow-hidden">
@@ -172,12 +182,14 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
             <p className="text-xs text-slate-500 mt-0.5" {...copy.edit('itemsIntro')}>{copy.text('itemsIntro')}</p>
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-            {(template.siteContent ? ['All', ...new Set(products.map(item=>item.category).filter((category):category is string=>Boolean(category) && category!=='All'))] : ['All', 'Laptops', 'Audio', 'Accessories']).map((cat) => (
+          {categories.length > 1 && <div className="flex items-center gap-1.5 overflow-x-auto pb-1" role="group" aria-label="Product categories">
+            {categories.map((cat) => (
               <button
                 key={cat}
+                type="button"
+                aria-pressed={activeCategory === cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                className={`shrink-0 min-h-10 px-3.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   activeCategory === cat
                     ? 'bg-[var(--website-accent,#2563eb)] text-white'
                     : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
@@ -186,65 +198,63 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
                 {cat}
               </button>
             ))}
-          </div>
+          </div>}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {template.siteContent && !filteredProducts.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
+        {/* Two products per row on phones, like a shop shelf; tap a product for photos, options and quantity. */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
+          {template.siteContent && !filteredProducts.length && <div className="col-span-full"><PublishedCatalogEmpty onContact={onCtaClick}/></div>}
           {filteredProducts.map((p) => (
             <div {...edit(`item:${p.id}`)}
-              key={p.id}
-              className="relative bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between group"
+              key={p.id || p.name}
+              className="cs-card relative bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col group min-w-0"
             >
               <ExampleTag item={p} corner="right" flow={!p.image}/>
-              <div>
+              <button type="button" onClick={() => open(p)} aria-label={`${p.name}${p.price ? `, ${p.price}` : ''}, details`} className="block w-full text-left bg-transparent border-0 p-0 text-inherit flex-1">
                 {p.image && (
-                  <div className="h-48 overflow-hidden relative bg-slate-50 p-4 flex items-center justify-center">
+                  <span className="block aspect-square overflow-hidden relative bg-slate-50 p-3">
                     <SafeImage
                       src={p.image}
-                      alt={p.name}
-                      className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform"
+                      alt=""
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                      style={{ objectPosition: focalPosition(p.focal) }}
                     />
-                    {p.tag && (
-                      <span className="absolute top-3 left-3 bg-[#ef4444] text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
-                        {p.tag}
+                    {(p.label || p.tag) && (
+                      <span className="absolute top-2 left-2 bg-[#b91c1c] text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase max-w-[80%] truncate">
+                        {p.label || p.tag}
                       </span>
                     )}
-                  </div>
+                  </span>
                 )}
-                <div className="p-4 space-y-2">
-                  {!template.siteContent?.starterVersion && <div className="flex items-center gap-1 text-amber-400 text-xs">
-                    <Star className="w-3.5 h-3.5 fill-current" />
-                    <Star className="w-3.5 h-3.5 fill-current" />
-                    <Star className="w-3.5 h-3.5 fill-current" />
-                    <Star className="w-3.5 h-3.5 fill-current" />
-                    <Star className="w-3.5 h-3.5 fill-current" />
-                    <span className="text-[11px] text-slate-500 font-semibold ml-1">(48)</span>
-                  </div>}
-                  <h3 className="font-bold text-sm text-slate-900 group-hover:text-[var(--website-accent,#2563eb)] transition-colors">
+                <span className="block p-3 sm:p-4 space-y-1">
+                  <span className="block font-bold text-[13.5px] sm:text-sm leading-snug text-slate-900 line-clamp-2 [overflow-wrap:anywhere] group-hover:text-[var(--website-accent,#2563eb)] transition-colors">
                     {p.name}
-                  </h3>
-                  <div className="font-extrabold text-base text-slate-900">
-                    {p.price}
-                  </div>
-                  <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">
+                  </span>
+                  <span className="block font-extrabold text-[15px] sm:text-base text-slate-900">
+                    {p.price || 'Ask for the price'}
+                  </span>
+                  {!!p.options?.length && <span className="block text-[11.5px] text-slate-500 truncate">{p.options.join(' · ')}</span>}
+                  {p.desc && <span className="hidden sm:block text-xs text-slate-500 leading-relaxed line-clamp-2">
                     {p.desc}
-                  </p>
-                </div>
-              </div>
+                  </span>}
+                </span>
+              </button>
 
-              <div className="p-4 pt-0 space-y-2">
+              <div className="px-3 pb-3 sm:px-4 sm:pb-4">
                 <button
-                  onClick={() => handleAddToCart(p.name)}
-                  className="w-full py-2.5 rounded-xl bg-[var(--website-accent,#2563eb)] hover:bg-[#1d4ed8] text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+                  type="button"
+                  onClick={() => add(p)}
+                  aria-label={p.options?.length ? `Choose an option for ${p.name}` : `Add ${p.name} to your order list`}
+                  className="cs-add w-full bg-[var(--website-accent,#2563eb)] hover:brightness-110 text-white transition-colors cursor-pointer shadow-sm"
                 >
-                  <ShoppingBag className="w-3.5 h-3.5" />
-                  <span>{template.siteContent ? 'Enquire' : 'Add to Bag'}</span>
+                  <Plus className="w-4 h-4" aria-hidden="true" />
+                  <span>{p.options?.length ? 'Choose' : 'Add'}</span>
                 </button>
               </div>
             </div>
           ))}
         </div>
+        <p className="text-xs text-slate-500 max-w-xl">{owner ? `Add products to your list and send it to ${template.demoBusinessName} on WhatsApp. They confirm stock, delivery and payment with you; nothing is paid on this website.` : 'Example products. Customers build an order list and send it to the shop on WhatsApp; nothing is paid here.'}</p>
       </div>
 
       {/* Footer */}
@@ -271,6 +281,10 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
           © {new Date().getFullYear()} {template.demoBusinessName}.
         </div>
       </footer>
+
+      <OrderBar lines={order.lines} onOpen={() => setListOpen(true)} />
+      {detail && <ItemDetailSheet item={detail} contact={contact} onAdd={order.add} onClose={() => setDetail(null)} />}
+      {listOpen && <OrderListSheet lines={order.lines} contact={contact} onQuantity={order.setQuantity} onClear={() => { order.clear(); setListOpen(false); }} onClose={() => setListOpen(false)} noun="products" />}
     </div>
   );
 };

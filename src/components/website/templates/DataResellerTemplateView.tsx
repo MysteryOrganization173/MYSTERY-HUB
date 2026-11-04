@@ -276,10 +276,10 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
         {managedCheckout || (owner ? null : (
           <>
             <NetworkTabs networks={networks} value={network} onChange={n => { setNetwork(n); setNotice(''); }} bundles={examples} theme={p} />
-            {/* The same compact rows a live Data Store shows; the gallery never takes payment. */}
+            {/* The same bundle layout and Buy buttons a live Data Store shows, at example prices; the gallery never takes payment. */}
             <div className="store-rows" style={{ marginTop: 14 }}>
               {sortBundles(examples.filter(b => b.network === network)).map(b => (
-                <BundleRow key={b.id} bundle={b} theme={p} onChoose={() => { if (onCtaClick) onCtaClick(); else setNotice('This is an example store. Bundles and prices appear here once a store owner sets them.'); }} />
+                <BundleRow key={b.id} bundle={b} theme={p} action="Buy" example onChoose={() => { if (onCtaClick) onCtaClick(); else setNotice('This is an example store. Bundles and prices appear here once a store owner sets them.'); }} />
               ))}
             </div>
             <p className="store-note mt-3" role={notice ? 'status' : undefined} style={{ color: p.mutedText }}>

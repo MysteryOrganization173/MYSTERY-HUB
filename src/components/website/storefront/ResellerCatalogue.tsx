@@ -122,10 +122,11 @@ export function filterBundles(bundles: StoreBundle[], filter: BundleFilter, pinn
 }
 
 /** A compact bundle row: size, validity and per-GB on the left, the total price on the right. */
-export function BundleRow({ bundle, theme, onChoose, selected = false, featured = false, action }: { bundle: StoreBundle; theme: StoreTheme; onChoose: (bundle: StoreBundle) => void; selected?: boolean; featured?: boolean; action?: string }) {
+export function BundleRow({ bundle, theme, onChoose, selected = false, featured = false, action, example = false }: { bundle: StoreBundle; theme: StoreTheme; onChoose: (bundle: StoreBundle) => void; selected?: boolean; featured?: boolean; action?: string; example?: boolean }) {
   const perGb = pricePerGb(bundle), price = formatGhs(bundle.priceMinor);
-  return <button type="button" className={`store-row${action ? ' has-action' : ''}`} aria-pressed={selected} onClick={() => onChoose(bundle)}
-    aria-label={`${action ? `${action} ` : ''}${storeNetworkName(bundle.network)} ${bundle.dataAmount}${bundle.validity ? `, ${bundle.validity}` : ''}, ${price}${featured ? ', featured by the store' : ''}`}
+  // The class only lets a style give the owner's featured bundles more room; it never changes what is on sale.
+  return <button type="button" className={`store-row${action ? ' has-action' : ''}${featured ? ' is-featured' : ''}`} aria-pressed={selected} onClick={() => onChoose(bundle)}
+    aria-label={`${example ? 'Example: ' : action ? `${action} ` : ''}${storeNetworkName(bundle.network)} ${bundle.dataAmount}${bundle.validity ? `, ${bundle.validity}` : ''}, ${price}${featured ? ', featured by the store' : ''}`}
     style={{ backgroundColor: theme.surface, borderColor: selected ? theme.accent : theme.hairline || theme.border, color: theme.surfaceText, '--store-network': storeNetworkColor(bundle.network) } as React.CSSProperties}>
     <span className="store-row-size site-display">{bundle.dataAmount}</span>
     <span className="store-row-meta" style={{ color: theme.surfaceMutedText }}>

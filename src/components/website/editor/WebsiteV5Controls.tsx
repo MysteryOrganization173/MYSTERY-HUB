@@ -214,11 +214,11 @@ export function WebsiteItemExtras({ item, layout, siteId, token, pinnedCount, on
       {extra.length > 0 && <div className="flex gap-2">{extra.map((src, i) => <div key={src + i} className="relative w-20"><SafeImage src={src} alt={`Extra photo ${i + 1}`} className="w-20 h-20 rounded-lg" />
         <button type="button" aria-label={`Remove extra photo ${i + 1}`} onClick={() => onChange({ images: extra.filter((_, n) => n !== i) })} className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-black text-white border border-slate-600 flex items-center justify-center"><X size={14} /></button></div>)}</div>}
       {extra.length < WEBSITE_V5_LIMITS.itemImages && <WebsiteImageField label="Add another photo" value="" siteId={siteId} token={token} onChange={url => { if (url) onChange({ images: [...extra, url] }); }} />}
-      <p className="visual-field-hint">Customers swipe through them when they open this {layout === 'nightkitchen' ? 'dish' : 'product'}.</p>
+      <p className="visual-field-hint">Customers swipe through them when they open this {['nightkitchen', 'restaurant'].includes(layout) ? 'dish' : 'product'}.</p>
     </div>}
     <div className="visual-field">
       <div className="visual-field-label"><label htmlFor="item-options">Options (optional)</label><span>{parseOptions(optionsText).length}/{WEBSITE_V5_LIMITS.options}</span></div>
-      <input id="item-options" className="visual-input" value={optionsText} placeholder={layout === 'nightkitchen' ? 'e.g. Regular, Large' : 'e.g. Small, Medium, Large'}
+      <input id="item-options" className="visual-input" value={optionsText} placeholder={['nightkitchen', 'restaurant'].includes(layout) ? 'e.g. Regular, Large' : 'e.g. Small, Medium, Large'}
         onChange={e => { setOptionsText(e.target.value); onChange({ options: parseOptions(e.target.value) }); }} />
       <p className="visual-field-hint">Separate with commas. The customer picks one and it goes into their WhatsApp message.</p>
     </div>

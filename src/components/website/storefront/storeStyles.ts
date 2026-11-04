@@ -1,5 +1,7 @@
 /**
- * V7.1 Data Store styles: Horizon, Market and Studio (V7.2 adds Compact, Editorial and Signature). Scoped to `.reseller-storefront[data-store-style]`, so the
+ * V7.1 Data Store styles: Horizon, Market and Studio (V7.2 adds Compact, Editorial and Signature).
+ * V7.3 gives the catalogue itself a personality per style: Horizon glow cards with a featured lead, Market price
+ * tags, Studio a numeral grid and Signature upright tickets; Compact, Editorial and Classic keep fast-to-scan rows. Scoped to `.reseller-storefront[data-store-style]`, so the
  * Classic look (no attribute) renders exactly as before. Same markup, same checkout and same tap targets in every
  * style; only composition, surfaces, type and image handling change. Inline like RESELLER_STORE_CSS so the public
  * page, the editor iframe and server rendering all carry it.
@@ -70,9 +72,25 @@ export const STORE_STYLE_CSS = `
 @media (min-width:640px){[data-store-style=horizon] .store-picker-wrap{margin-top:-68px}
   [data-store-style=horizon] .store-picker>.store-eyebrow{color:var(--store-text)!important}
   [data-store-style=horizon] .store-picker-card{background:rgb(var(--store-bg-rgb) / .72)!important;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-radius:18px;padding:14px 16px;box-shadow:0 18px 40px -28px rgb(0 0 0 / .8)}}
-[data-store-style=horizon] .store-row{background-image:linear-gradient(180deg,rgb(255 255 255 / .035),transparent 60%)}
-[data-store-style=horizon][data-store-tone=light] .store-row{background-image:none;box-shadow:0 1px 0 rgb(15 23 42 / .04),0 8px 20px -18px rgb(15 23 42 / .35)}
-[data-store-style=horizon] .store-row-cta{padding:9px 16px}
+/* Bundles as roomy cards that glow in their network's colour; the owner's first featured bundle leads across the row. */
+[data-store-style=horizon] .store-rows{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (min-width:720px){[data-store-style=horizon] .store-rows{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}}
+@media (min-width:1024px){[data-store-style=horizon] .store-rows{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:339px){[data-store-style=horizon] .store-rows{grid-template-columns:1fr}}
+[data-store-style=horizon] .store-row,[data-store-style=horizon] .store-row.has-action{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"meta meta" "size size" "price cta";align-items:end;gap:2px 8px;padding:14px 12px 12px;border-radius:22px;min-height:148px;background-image:radial-gradient(130% 90% at 100% 0%,color-mix(in srgb,var(--store-network) 30%,transparent),transparent 62%)}
+[data-store-style=horizon] .store-row::before{left:14px;right:auto;top:0;bottom:auto;width:34px;height:4px;border-radius:0 0 4px 4px}
+[data-store-style=horizon][data-store-tone=light] .store-row{box-shadow:0 1px 0 rgb(15 23 42 / .04),0 10px 24px -20px rgb(15 23 42 / .4)}
+[data-store-style=horizon] .store-row-meta{grid-area:meta;align-self:start;margin-top:4px}
+[data-store-style=horizon] .store-row-meta small{display:block}
+[data-store-style=horizon] .store-row-size{grid-area:size;font-size:clamp(30px,9vw,40px);margin:10px 0 8px}
+[data-store-style=horizon] .store-row-price{grid-area:price;text-align:left;font-size:17px;align-self:center}
+[data-store-style=horizon] .store-row-cta{grid-area:cta;padding:9px 14px}
+[data-store-style=horizon] .store-setup-price{grid-area:price;justify-self:start}
+[data-store-style=horizon] .store-row.is-featured:first-child{grid-column:1/-1;min-height:132px;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"meta cta" "size cta" "price cta"}
+[data-store-style=horizon] .store-row.is-featured:first-child .store-row-size{font-size:clamp(40px,12vw,56px);margin:6px 0 4px}
+[data-store-style=horizon] .store-row.is-featured:first-child .store-row-cta{align-self:end}
+[data-store-style=horizon] .store-skeleton{grid-template-columns:repeat(2,minmax(0,1fr))}
+[data-store-style=horizon] .store-skeleton-row{height:148px;border-radius:22px}
 [data-store-style=horizon] .store-network-tabs{box-shadow:inset 0 1px 0 rgb(255 255 255 / .04)}
 
 /* =========================== MARKET =========================== */
@@ -122,12 +140,22 @@ export const STORE_STYLE_CSS = `
 [data-store-style=studio] .store-network-tabs button{background:transparent!important;color:var(--store-text)!important;border:0!important;border-bottom:3px solid transparent!important;border-radius:0;padding:0 14px}
 [data-store-style=studio] .store-network-tabs button[aria-pressed=true]{border-bottom-color:var(--website-accent)!important}
 [data-store-style=studio] .store-network-tabs button[aria-pressed=true] .store-network-dot{background:var(--store-text)!important}
-[data-store-style=studio] .store-rows{gap:0}
-@media (min-width:720px){[data-store-style=studio] .store-rows{column-gap:40px}}
-[data-store-style=studio] .store-row{background:transparent!important;border:0!important;border-bottom:1px solid var(--store-border)!important;border-radius:0;padding-left:2px;min-height:72px}
-[data-store-style=studio] .store-row::before{display:none}
-[data-store-style=studio] .store-row-size{font-variant-numeric:tabular-nums;font-size:26px}
-[data-store-style=studio] .store-row[aria-pressed=true]{box-shadow:inset 3px 0 0 var(--website-accent)}
+/* A type specimen: big tabular numerals in a hairline grid, no boxes, a network dot in each corner. */
+[data-store-style=studio] .store-rows{grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border-top:1px solid var(--store-border);border-left:1px solid var(--store-border)}
+@media (min-width:720px){[data-store-style=studio] .store-rows{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:1024px){[data-store-style=studio] .store-rows{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:339px){[data-store-style=studio] .store-rows{grid-template-columns:1fr}}
+[data-store-style=studio] .store-row,[data-store-style=studio] .store-row.has-action{background:transparent!important;border:0!important;box-shadow:inset -1px -1px 0 var(--store-border);border-radius:0;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"size size" "meta meta" "price cta";align-items:end;gap:2px 8px;padding:20px 12px 14px 14px;min-height:150px}
+[data-store-style=studio] .store-row::before{left:auto;right:12px;top:14px;bottom:auto;width:8px;height:8px;border-radius:50%}
+[data-store-style=studio] .store-row-size{grid-area:size;font-variant-numeric:tabular-nums;font-size:clamp(32px,10vw,46px);letter-spacing:-.05em;margin-bottom:2px}
+[data-store-style=studio] .store-row-meta{grid-area:meta;margin-bottom:10px}
+[data-store-style=studio] .store-row-meta small{display:block}
+[data-store-style=studio] .store-row-price{grid-area:price;text-align:left;align-self:center}
+[data-store-style=studio] .store-row-cta{grid-area:cta}
+[data-store-style=studio] .store-setup-price{grid-area:price;justify-self:start}
+[data-store-style=studio] .store-row[aria-pressed=true]{box-shadow:inset 0 0 0 2px var(--website-accent),inset -1px -1px 0 var(--store-border)}
+[data-store-style=studio] .store-skeleton{grid-template-columns:repeat(2,minmax(0,1fr))}
+[data-store-style=studio] .store-skeleton-row{height:150px;border-radius:0}
 [data-store-style=studio] .store-row-cta{background:transparent!important;color:var(--store-text)!important;border:1.5px solid var(--store-text)}
 [data-store-style=studio] .store-row:hover .store-row-cta{background:var(--website-accent)!important;color:var(--website-on-accent)!important;border-color:var(--website-accent)}
 [data-store-style=studio] .store-steps-card,[data-store-style=studio] .store-help{background:transparent!important;border-left:0;border-right:0;border-radius:0;padding-left:0;padding-right:0}
@@ -236,11 +264,23 @@ export const STORE_STYLE_CSS = `
   [data-store-style=signature] .sg-panel{border-radius:36px;padding:48px 44px}
   [data-store-style=signature] .sg-mark{width:84px;height:84px;font-size:30px;border-radius:26px}}
 /* Bundles as tickets: a coloured network stub, notches on both sides and a perforated price stub. */
-[data-store-style=signature] .store-row{border-radius:12px;padding-left:22px;min-height:70px;-webkit-mask:radial-gradient(circle 7px at 0 50%,#0000 97%,#000) left/51% 100% no-repeat,radial-gradient(circle 7px at 100% 50%,#0000 97%,#000) right/51% 100% no-repeat;mask:radial-gradient(circle 7px at 0 50%,#0000 97%,#000) left/51% 100% no-repeat,radial-gradient(circle 7px at 100% 50%,#0000 97%,#000) right/51% 100% no-repeat}
-[data-store-style=signature] .store-row::before{width:7px}
+/* Bundles as upright tickets: a network band on top, notches at the perforation and a price stub below it. */
+[data-store-style=signature] .store-rows{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (min-width:720px){[data-store-style=signature] .store-rows{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}}
+@media (min-width:1024px){[data-store-style=signature] .store-rows{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:339px){[data-store-style=signature] .store-rows{grid-template-columns:1fr}}
+[data-store-style=signature] .store-row,[data-store-style=signature] .store-row.has-action{--sg-stub:56px;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto 1fr 50px;grid-template-areas:"meta meta" "size size" "price cta";align-items:center;gap:0 8px;padding:18px 12px 6px 14px;min-height:156px;border-radius:14px;-webkit-mask:radial-gradient(circle 8px at 0 calc(100% - var(--sg-stub)),#0000 97%,#000) left/51% 100% no-repeat,radial-gradient(circle 8px at 100% calc(100% - var(--sg-stub)),#0000 97%,#000) right/51% 100% no-repeat;mask:radial-gradient(circle 8px at 0 calc(100% - var(--sg-stub)),#0000 97%,#000) left/51% 100% no-repeat,radial-gradient(circle 8px at 100% calc(100% - var(--sg-stub)),#0000 97%,#000) right/51% 100% no-repeat}
+[data-store-style=signature] .store-row::before{left:0;right:0;top:0;bottom:auto;width:auto;height:6px}
+[data-store-style=signature] .store-row::after{content:"";position:absolute;left:12px;right:12px;bottom:var(--sg-stub);border-top:1.5px dashed var(--store-border);pointer-events:none}
 [data-store-style=signature] .store-row:focus-visible{-webkit-mask:none;mask:none}
-[data-store-style=signature] .store-row-price{align-self:stretch;display:flex;align-items:center;justify-content:flex-end;border-left:1.5px dashed var(--store-border);padding-left:12px}
-[data-store-style=signature] .store-row-cta{border-radius:10px}
+[data-store-style=signature] .store-row-meta{grid-area:meta;align-self:start}
+[data-store-style=signature] .store-row-meta small{display:block}
+[data-store-style=signature] .store-row-size{grid-area:size;font-size:clamp(30px,9vw,40px);align-self:center;padding-bottom:10px}
+[data-store-style=signature] .store-row-price{grid-area:price;text-align:left;font-size:17px}
+[data-store-style=signature] .store-row-cta{grid-area:cta;border-radius:10px}
+[data-store-style=signature] .store-setup-price{grid-area:price;justify-self:start}
+[data-store-style=signature] .store-skeleton{grid-template-columns:repeat(2,minmax(0,1fr))}
+[data-store-style=signature] .store-skeleton-row{height:156px}
 [data-store-style=signature] .store-network-tabs{border-radius:16px}
 [data-store-style=signature] .store-network-tabs button{border-radius:12px}
 [data-store-style=signature] .store-help{border:1.5px solid var(--website-accent)!important}
