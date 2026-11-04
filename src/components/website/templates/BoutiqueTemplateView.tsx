@@ -48,11 +48,15 @@ const CSS = `
 .bq-cat span{font-weight:400;opacity:.7;margin-left:4px}
 .bq-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 12px;margin-top:22px}
 @media(min-width:900px){.bq-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:36px 22px}}
-.bq-card{position:relative;text-align:left;background:none;border:0;padding:0;color:inherit;display:flex;flex-direction:column;justify-content:flex-start;width:100%;height:100%}
+.bq-item{position:relative;display:flex;flex-direction:column;min-width:0}
+.bq-card{position:relative;text-align:left;background:none;border:0;padding:0;color:inherit;display:flex;flex-direction:column;justify-content:flex-start;width:100%;flex:1}
 .bq-card-img{aspect-ratio:4/5;border-radius:2px}
 .bq-flag{position:absolute;top:8px;left:8px;z-index:2;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;padding:4px 7px}
 .bq-card h3{font-size:16px;line-height:1.3;font-weight:500;margin:10px 0 2px;overflow-wrap:anywhere}
-.bq-price{font-weight:700;font-size:14px}
+.bq-price{font-weight:700;font-size:15px}
+.bq-add{margin-top:10px;min-height:44px;width:100%;border:1px solid;border-radius:2px;background:transparent;font-weight:700;font-size:13px;letter-spacing:.02em}
+.bq-add:active{transform:scale(.98)}
+.bq-add:focus-visible,.bq-card:focus-visible{outline:2px solid currentColor;outline-offset:3px}
 .bq-note{font-size:12px;margin-top:2px}
 .bq-desc{font-size:13px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .bq-sec{padding-block:44px}
@@ -109,6 +113,7 @@ export const BoutiqueTemplateView: React.FC<Props> = ({ template, onCtaClick }) 
   const heroMeta = content?.imageMeta?.heroImage;
   const count = orderCount(order.lines);
   const open = (item: TemplateItem) => { if (!editing) setDetail(item); };
+  const add = (item: TemplateItem) => { if (editing) return; if (item.options?.length) setDetail(item); else order.add(item); };
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const blocks: Record<string, React.ReactNode> = {
@@ -119,16 +124,17 @@ export const BoutiqueTemplateView: React.FC<Props> = ({ template, onCtaClick }) 
         {categories.map(([c, n]) => <button key={c} type="button" role="tab" aria-selected={cat === c} className="bq-cat" onClick={() => setCat(c)} style={cat === c ? { borderBottomColor: ink } : { color: muted }}>{c === 'All' ? 'All' : c}<span>{n}</span></button>)}
       </div>}
       {owner && !shown.length && <div className="mt-6"><PublishedCatalogEmpty onContact={contact.onContact} /></div>}
-      <div className="bq-grid">{shown.map(item => <div key={item.id || item.name} className="relative" {...edit(`item:${item.id}`)}>
+      <div className="bq-grid">{shown.map(item => <div key={item.id || item.name} className="bq-item" {...edit(`item:${item.id}`)}>
         <ExampleTag item={item} corner="right" />
         <button type="button" className="bq-card" onClick={() => open(item)} aria-label={`${item.name}${item.price ? `, ${item.price}` : ''}, details`}>
           {(item.label || item.tag) && <span className="bq-flag" style={{ backgroundColor: paper, color: ink }}>{item.label || item.tag}</span>}
-          <SafeImage src={item.image} alt={item.alt || item.name} className="bq-card-img" style={{ objectPosition: focalPosition(item.focal), backgroundColor: mixWebsiteColor(paper, ink, 0.08) }} />
+          <SafeImage src={item.image} alt={item.alt || item.name} sizes="(min-width: 900px) 25vw, 50vw" className="bq-card-img" style={{ objectPosition: focalPosition(item.focal), backgroundColor: mixWebsiteColor(paper, ink, 0.08) }} />
           <h3 className="site-display">{item.name}</h3>
-          <span className="bq-price">{item.price || 'Ask for the price'}</span>
+          {item.price ? <span className="bq-price">{item.price}</span> : <span className="bq-note" style={{ color: muted, fontWeight: 600 }}>Price on request</span>}
           {item.desc && <p className="bq-note bq-desc" style={{ color: muted }}>{item.desc}</p>}
           {item.options?.length ? <p className="bq-note" style={{ color: muted }}>{item.options.length} option{item.options.length === 1 ? '' : 's'}</p> : null}
         </button>
+        <button type="button" className="bq-add" onClick={() => add(item)} aria-label={item.options?.length ? `Choose an option for ${item.name}` : `Add ${item.name} to your order list`} style={{ color: ink, borderColor: ink }}>{item.options?.length ? 'Choose options' : 'Add to list'}</button>
       </div>)}</div>
     </section>,
     gallery: gallery.length > 0 && <section key="gallery" className="bq-wrap bq-sec" aria-label="Photos">

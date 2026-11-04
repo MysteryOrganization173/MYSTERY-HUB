@@ -15,7 +15,7 @@ import {
   ShieldCheck,
   Check,
   ArrowRight,
-  Flame,
+  Info,
   Phone,
   Plus,
   RotateCcw,
@@ -63,8 +63,8 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
     <div className="bg-[#f8fafc] text-slate-900 font-sans min-h-full" style={{ '--ol-bg': '#ffffff', '--ol-text': '#0f172a', '--ol-muted': '#475569', '--ol-line': '#e2e8f0', '--ol-accent': accent, '--ol-on-accent': websiteActionText(accent), '--ol-radius': '18px' } as React.CSSProperties}>
       <style>{ORDER_LIST_CSS + CS_CSS}</style>
       {/* Top E-Commerce Announcement Bar */}
-      <div className="bg-[var(--website-accent,#2563eb)] text-white text-xs px-4 py-2 text-center font-bold tracking-wide flex items-center justify-center gap-2">
-        <Flame className="w-3.5 h-3.5 text-amber-300" />
+      <div className="bg-slate-900 text-slate-100 text-xs px-4 py-2 text-center font-semibold flex items-center justify-center gap-2">
+        <Info className="w-3.5 h-3.5 shrink-0 text-slate-300" aria-hidden="true" />
         <span>Contact the business to confirm stock, delivery and payment arrangements.</span>
       </div>
 
@@ -108,8 +108,9 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
       </nav>
 
       {/* Hero Showcase */}
-      <div className="relative py-12 sm:py-16 px-6 sm:px-12 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 text-white overflow-hidden">
-        <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-40  " src={template.heroImage || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
+      <div className="relative py-12 sm:py-16 px-6 sm:px-12 bg-slate-900 text-white overflow-hidden">
+        <SafeImage {...edit("content:heroImage")}  className="absolute inset-0" src={template.heroImage || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e'} alt={template.siteContent?.imageMeta?.heroImage?.alt || ''} loading="eager" fetchPriority="high" style={{ objectPosition: template.siteContent?.imageMeta?.heroImage ? focalPosition(template.siteContent.imageMeta.heroImage) : '75% 50%' }} />
+        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(90deg,rgba(15,23,42,.94)_0%,rgba(15,23,42,.78)_50%,rgba(15,23,42,.25)_100%)]" aria-hidden="true" />
         <div className="relative max-w-2xl space-y-4">
           <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30" {...copy.edit('eyebrow')}>{copy.text('eyebrow')}</span>
 
@@ -216,6 +217,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
                     <SafeImage
                       src={p.image}
                       alt=""
+                      sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
                       className="w-full h-full object-contain group-hover:scale-105 transition-transform"
                       style={{ objectPosition: focalPosition(p.focal) }}
                     />
@@ -231,7 +233,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
                     {p.name}
                   </span>
                   <span className="block font-extrabold text-[15px] sm:text-base text-slate-900">
-                    {p.price || 'Ask for the price'}
+                    {p.price || <span className="text-sm font-semibold text-slate-500">Price on request</span>}
                   </span>
                   {!!p.options?.length && <span className="block text-[11.5px] text-slate-500 truncate">{p.options.join(' · ')}</span>}
                   {p.desc && <span className="hidden sm:block text-xs text-slate-500 leading-relaxed line-clamp-2">

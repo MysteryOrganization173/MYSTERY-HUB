@@ -7,6 +7,7 @@ import { SafeImage } from '../SafeImage.js';
 import { HoursList } from '../storefront/BusinessInfo.js';
 import { ItemDetailSheet, ORDER_LIST_CSS, OrderBar, OrderListSheet, useOrderList } from '../storefront/OrderList';
 import { websiteActionText } from '../../../utils/websiteBrand';
+import { focalPosition } from '../../../config/websiteContentV5';
 import React, { useState } from 'react';
 import type { TemplateItem, WebsiteTemplate } from '../../../types';
 import {
@@ -30,7 +31,9 @@ const CK_CSS = `
 .ck .ol-sheet{font-family:ui-sans-serif,system-ui,sans-serif}
 .ck .ol-sheet .site-display{font-family:Georgia,'Noto Serif',serif}
 .ck-add:active{transform:scale(.97)}
-.ck-dish-main:focus-visible,.ck-add:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:12px}
+.ck-dish-main:focus-visible,.ck-add:focus-visible,.ck-cta:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:12px}
+.ck-hero-wash{background:linear-gradient(180deg,rgba(28,9,13,.12) 0%,rgba(28,9,13,.55) 42%,rgba(28,9,13,.93) 100%)}
+@media(min-width:640px){.ck-hero-wash{background:linear-gradient(90deg,rgba(28,9,13,.93) 0%,rgba(28,9,13,.74) 42%,rgba(28,9,13,.1) 100%)}}
 `;
 
 interface TemplateViewProps {
@@ -55,14 +58,20 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
   const open = (item: TemplateItem) => { if (!editing) setDetail(item); };
   const add = (item: TemplateItem) => { if (editing) return; if (item.options?.length) setDetail(item); else order.add(item); };
   const primary = template.colorScheme?.primary || '#7a1c28';
+  // The owner's chosen focus point, otherwise the food (right of centre in the starter photograph).
+  const heroFocus = template.siteContent?.imageMeta?.heroImage ? focalPosition(template.siteContent.imageMeta.heroImage) : '70% 50%';
 
-  const categories = template.siteContent ? ['All', ...new Set((template.items || []).map(item=>item.category).filter((category):category is string=>Boolean(category) && category!=='All'))] : ['All', 'Main Grills', 'Soups & Swallows', 'Beverages'];
+  const categories = ['All', ...new Set((template.items || []).map(item=>item.category).filter((category):category is string=>Boolean(category) && category!=='All'))];
   const menuItems = template.items || [];
 
   const filteredItems = menuItems.filter((item) => {
     if (activeCategory === 'All') return true;
     return item.category === activeCategory;
   });
+  // "All" reads like a printed menu card: a heading per category, in the owner's own order.
+  const groups = activeCategory === 'All' && categories.length > 2
+    ? categories.slice(1).map(name => ({ name, items: menuItems.filter(item => item.category === name) })).concat(menuItems.some(item => !item.category || item.category === 'All') ? [{ name: 'More', items: menuItems.filter(item => !item.category || item.category === 'All') }] : [])
+    : [{ name: '', items: filteredItems }];
 
 
   return (
@@ -78,15 +87,15 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
       {/* Restaurant Navigation */}
       <nav className="bg-[var(--website-background,#fcf9f5)]/95 backdrop-blur-md border-b border-[#f3ece2] px-4 sm:px-8 py-4 flex items-center justify-between sticky top-0 z-30 font-sans">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[var(--website-primary,#7a1c28)] text-[var(--website-accent,#c99a45)] flex items-center justify-center font-serif text-lg font-bold">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 shrink-0 rounded-full bg-[var(--website-primary,#7a1c28)] text-[var(--website-accent,#c99a45)] flex items-center justify-center font-serif text-lg font-bold">
             {template.siteContent?.logoUrl ? <SafeImage {...edit("content:logoUrl")} src={template.siteContent.logoUrl} alt={`${template.demoBusinessName} logo`} className="w-9 h-9 shrink-0 rounded-lg" style={{objectFit:'contain'}} /> : template.demoBusinessName.slice(0,1)}
           </div>
-          <div>
-            <span className="font-bold text-base sm:text-lg tracking-wide text-[var(--website-primary,#7a1c28)] font-serif block leading-none" {...edit("content:businessName")}>
+          <div className="min-w-0">
+            <span className="font-bold text-base sm:text-lg tracking-wide text-[var(--website-primary,#7a1c28)] font-serif block leading-tight truncate" {...edit("content:businessName")}>
               {template.demoBusinessName}
             </span>
-            <span className="text-[10px] text-[#78716c] uppercase tracking-widest block mt-0.5" {...edit("content:location")}>
+            <span className="text-[10px] text-[#78716c] uppercase tracking-widest block mt-0.5 truncate" {...edit("content:location")}>
               {template.location}
             </span>
           </div>
@@ -106,16 +115,18 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
         <button {...edit("content:ctaLabel")}
           onClick={onCtaClick}
-          className="px-4 py-2 rounded-full bg-[var(--website-primary,#7a1c28)] hover:bg-[#5d151e] text-[var(--website-background,#fcf9f5)] text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer font-sans"
+          aria-label={template.siteContent?.ctaLabel || (template.siteContent ? 'Contact us' : 'Ask for a table')}
+          className="ck-cta shrink-0 min-h-11 min-w-11 px-3 sm:px-4 rounded-full bg-[var(--website-primary,#7a1c28)] hover:bg-[#5d151e] text-[var(--website-background,#fcf9f5)] text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer font-sans whitespace-nowrap"
         >
-          <Calendar className="w-3.5 h-3.5 text-[var(--website-accent,#c99a45)]" />
-          <span>{template.siteContent?.ctaLabel || (template.siteContent ? 'Contact us' : 'Ask for a table')}</span>
+          <Calendar className="w-4 h-4 text-[var(--website-accent,#c99a45)]" aria-hidden="true" />
+          <span className="hidden sm:inline">{template.siteContent?.ctaLabel || (template.siteContent ? 'Contact us' : 'Ask for a table')}</span>
         </button>
       </nav>
 
       {/* Hero Section */}
-      <div className="relative py-14 sm:py-20 px-6 sm:px-12 bg-gradient-to-br from-[#2a0e14] via-[#3b151d] to-[#1c090d] text-white overflow-hidden">
-        <SafeImage {...edit("content:heroImage")}  className="absolute inset-0 opacity-45   " src={template.heroImage || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5'} alt={template.demoBusinessName} loading="eager" fetchPriority="high" />
+      <div className="ck-hero relative pt-36 pb-10 sm:py-24 px-6 sm:px-12 bg-[#2a0e14] text-white overflow-hidden">
+        <SafeImage {...edit("content:heroImage")}  className="absolute inset-0" src={template.heroImage || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5'} alt={template.siteContent?.imageMeta?.heroImage?.alt || ''} loading="eager" fetchPriority="high" style={{ objectPosition: heroFocus }} />
+        <div className="ck-hero-wash absolute inset-0 pointer-events-none" aria-hidden="true" />
         <div className="relative max-w-3xl space-y-5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--website-accent,#c99a45)]/20 border border-[var(--website-accent,#c99a45)]/40 text-[var(--website-accent,#c99a45)] text-xs font-sans font-semibold tracking-wider uppercase">
             <Utensils className="w-3.5 h-3.5" />
@@ -187,36 +198,39 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
         </div>}
 
         {/* Menu: tap a dish for its photos, options and price; Add builds one WhatsApp order. */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {template.siteContent && !filteredItems.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
-          {filteredItems.map((item) => (
+        {template.siteContent && !filteredItems.length && <PublishedCatalogEmpty onContact={onCtaClick}/>}
+        <div className={groups.length > 1 ? 'md:columns-2 md:gap-5' : undefined}>
+        {groups.map(group => <div key={group.name || 'all'} className={groups.length > 1 ? 'space-y-3 break-inside-avoid inline-block w-full mb-6' : 'space-y-3'}>
+        {group.name && <h3 className="ck-cat-h font-serif text-xl text-[var(--website-primary,#7a1c28)] flex items-baseline gap-2 pt-2 border-b border-[#eadfce] pb-2">{group.name}<span className="font-sans text-xs font-semibold text-[#6b625c]">{group.items.length}</span></h3>}
+        <div className={`grid grid-cols-1 gap-3 sm:gap-4${groups.length > 1 ? '' : ' md:grid-cols-2'}`}>
+          {group.items.map((item) => (
             <div {...edit(`item:${item.id}`)}
               key={item.id || item.name}
-              className="ck-dish relative bg-white p-4 rounded-2xl border border-[#f3ece2] shadow-sm hover:shadow-md transition-shadow flex gap-4 items-start"
+              className="ck-dish relative bg-white p-3 sm:p-4 rounded-2xl border border-[#efe4d3] shadow-[0_1px_2px_rgba(28,25,23,.05)] hover:shadow-md transition-shadow flex gap-4 items-stretch"
             >
               <ExampleTag item={item} corner="left"/>
               {item.image && (
-                <button type="button" tabIndex={-1} aria-hidden="true" onClick={() => open(item)} className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-slate-100 p-0 border-0">
+                <button type="button" tabIndex={-1} aria-hidden="true" onClick={() => open(item)} className="w-24 h-24 sm:w-28 sm:h-28 self-start rounded-xl overflow-hidden shrink-0 bg-[#f3ece2] p-0 border-0">
                   <SafeImage
                     src={item.image}
                     alt=""
+                    sizes="112px"
                     className="w-full h-full object-cover"
                   />
                 </button>
               )}
-              <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex-1 min-w-0 flex flex-col">
                 <button type="button" onClick={() => open(item)} aria-label={`${item.name}, ${item.price || "price on request"}, details`} className="ck-dish-main block w-full min-h-11 text-left bg-transparent border-0 p-0 text-inherit">
                   <span className="flex items-start justify-between gap-3">
-                    <span className="font-bold text-[15px] leading-snug text-[#1c1917] font-serif min-w-0 [overflow-wrap:anywhere]">{item.name}</span>
-                    <span className="font-bold text-sm text-[var(--website-primary,#7a1c28)] shrink-0 font-sans">
-                      {item.price || 'Ask'}
-                    </span>
+                    <span className="font-bold text-base leading-snug text-[#1c1917] font-serif min-w-0 [overflow-wrap:anywhere]">{item.name}</span>
+                    {item.price ? <span className="font-bold text-[15px] text-[var(--website-primary,#7a1c28)] shrink-0 font-sans">{item.price}</span>
+                      : <span className="text-xs font-semibold text-[#6b625c] shrink-0 font-sans">Price on request</span>}
                   </span>
                   {item.desc && <span className="block text-xs text-[#6b625c] leading-relaxed line-clamp-2 mt-1">
                     {item.desc}
                   </span>}
                 </button>
-                <div className="flex items-center justify-between gap-2 pt-1">
+                <div className="flex items-center justify-between gap-2 pt-2 mt-auto">
                   <span className="flex flex-wrap items-center gap-1.5 min-w-0">
                     {(item.label || item.tag) && (
                       <span className="inline-block text-[10px] font-bold text-[#8a5a12] bg-[var(--website-accent,#c99a45)]/15 px-2 py-0.5 rounded-full uppercase tracking-wider">
@@ -225,13 +239,15 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
                     )}
                     {!!item.options?.length && <span className="text-[11px] text-[#6b625c]">{item.options.length} choices</span>}
                   </span>
-                  <button type="button" onClick={() => add(item)} aria-label={`Add ${item.name} to your order`} className="ck-add min-h-10 min-w-[76px] px-3 rounded-full border border-[var(--website-primary,#7a1c28)] text-[var(--website-primary,#7a1c28)] font-bold text-xs inline-flex items-center justify-center gap-1 shrink-0">
-                    <Plus className="w-3.5 h-3.5" aria-hidden="true" />Add
+                  <button type="button" onClick={() => add(item)} aria-label={`Add ${item.name} to your order`} className="ck-add min-h-11 min-w-[84px] px-4 rounded-full bg-[var(--website-primary,#7a1c28)] text-[var(--website-background,#fcf9f5)] font-bold text-sm inline-flex items-center justify-center gap-1 shrink-0">
+                    <Plus className="w-4 h-4" aria-hidden="true" />{item.options?.length ? 'Choose' : 'Add'}
                   </button>
                 </div>
               </div>
             </div>
           ))}
+        </div>
+        </div>)}
         </div>
         <p className="text-center text-xs text-[#6b625c] max-w-md mx-auto">{owner ? `Add dishes to your list and send them to ${template.demoBusinessName} on WhatsApp. They confirm availability, delivery and payment with you.` : 'Example menu. Customers add dishes to a list and send it to the restaurant on WhatsApp; nothing is paid here.'}</p>
       </div>

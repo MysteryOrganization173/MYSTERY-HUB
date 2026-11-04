@@ -51,7 +51,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
       accent: '#c99a45',
       border: '#f3ece2',
     },
-    heroImage: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80',
+    heroImage: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782992/mysteryhub/website-starters/restaurant/classic-kitchen-hero.jpg',
     stats: [
       { label: 'Eat with us', value: 'Dine-in' },
       { label: 'Ready to collect', value: 'Takeaway' },
@@ -67,7 +67,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
         tag: 'Chef Choice',
         options: ['With banku', 'With fried yam'],
         rating: 5,
-        image: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=600&q=80',
+        image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782985/mysteryhub/website-starters/food/grilled-tilapia-banku.jpg',
       },
       {
         id: 'r2',
@@ -77,7 +77,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
         desc: 'Tender mutton cooked low and slow in aromatic tomato broth, accompanied by freshly pounded soft fufu.',
         tag: 'Popular',
         rating: 5,
-        image: 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=600&q=80',
+        image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782987/mysteryhub/website-starters/food/light-soup-fufu.jpg',
       },
       {
         id: 'r3',
@@ -88,7 +88,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
         tag: 'Party pack',
         options: ['Regular', 'Large'],
         rating: 5,
-        image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=600&q=80',
+        image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782984/mysteryhub/website-starters/food/jollof-grilled-chicken.jpg',
       },
       {
         id: 'r4',
@@ -98,7 +98,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
         desc: 'Freshly steeped roselle calyces infused with crushed ginger, cloves, organic honey, and sparkling mineral water.',
         tag: 'House Brew',
         rating: 5,
-        image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80',
+        image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782988/mysteryhub/website-starters/food/sobolo.jpg',
       },
     ],
     testimonials: [
@@ -140,13 +140,13 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
       accent: '#e8833a',
       border: '#3a2c26',
     },
-    heroImage: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1600&q=80',
+    heroImage: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782990/mysteryhub/website-starters/restaurant/night-kitchen-hero.jpg',
     stats: [],
     items: [
-      { id: 'nk1', name: 'Jollof with grilled chicken', price: 'GH₵ 65', category: 'Mains', desc: 'Smoky tomato jollof with a quarter grilled chicken and fresh salad.', label: 'Popular', pinned: true, image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=600&q=80', options: ['Regular', 'Large'] },
-      { id: 'nk2', name: 'Grilled tilapia with banku', price: 'GH₵ 90', category: 'Mains', desc: 'Whole grilled tilapia with banku, pepper sauce and sliced onions.', label: 'Spicy', pinned: true, image: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=600&q=80' },
-      { id: 'nk3', name: 'Light soup with fufu', price: 'GH₵ 70', category: 'Soups', desc: 'Goat or fish light soup served with soft fufu.', image: 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=600&q=80', options: ['Goat', 'Fish'] },
-      { id: 'nk4', name: 'Sobolo', price: 'GH₵ 20', category: 'Drinks', desc: 'Chilled hibiscus drink with ginger and cloves.', image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80' },
+      { id: 'nk1', name: 'Jollof with grilled chicken', price: 'GH₵ 65', category: 'Mains', desc: 'Smoky tomato jollof with a quarter grilled chicken and fresh salad.', label: 'Popular', pinned: true, image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782984/mysteryhub/website-starters/food/jollof-grilled-chicken.jpg', options: ['Regular', 'Large'] },
+      { id: 'nk2', name: 'Grilled tilapia with banku', price: 'GH₵ 90', category: 'Mains', desc: 'Whole grilled tilapia with banku, pepper sauce and sliced onions.', label: 'Spicy', pinned: true, image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782985/mysteryhub/website-starters/food/grilled-tilapia-banku.jpg' },
+      { id: 'nk3', name: 'Light soup with fufu', price: 'GH₵ 70', category: 'Soups', desc: 'Goat or fish light soup served with soft fufu.', image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782987/mysteryhub/website-starters/food/light-soup-fufu.jpg', options: ['Goat', 'Fish'] },
+      { id: 'nk4', name: 'Sobolo', price: 'GH₵ 20', category: 'Drinks', desc: 'Chilled hibiscus drink with ginger and cloves.', image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782988/mysteryhub/website-starters/food/sobolo.jpg' },
     ],
   },
 
@@ -180,13 +180,13 @@ export const WEBSITE_TEMPLATES: WebsiteTemplate[] = [
       accent: '#8a5a3b',
       border: '#ddd3c6',
     },
-    heroImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',
+    heroImage: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782997/mysteryhub/website-starters/boutique/boutique-hero.jpg',
     stats: [],
     items: [
-      { id: 'bq1', name: 'Kente occasion set', price: 'GH₵ 650', category: 'Occasion', desc: 'Made-to-measure kente for weddings and special days.', label: 'New', image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=600&q=80', options: ['S', 'M', 'L'] },
-      { id: 'bq2', name: 'Linen kaftan', price: 'GH₵ 380', category: 'Everyday', desc: 'A relaxed linen kaftan, tailored to your measurements.', image: 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?auto=format&fit=crop&w=600&q=80', options: ['Sand', 'Olive'] },
-      { id: 'bq3', name: 'Statement look', price: 'GH₵ 420', category: 'Occasion', desc: 'A bold outfit for evenings out. Ask about colours and fit.', image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80' },
-      { id: 'bq4', name: 'Ready-to-wear pieces', price: 'Ask', category: 'Everyday', desc: 'New pieces arrive every week. Ask what is in your size.', label: 'Gift idea', image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=600&q=80' },
+      { id: 'bq1', name: 'Kente occasion set', price: 'GH₵ 650', category: 'Occasion', desc: 'Made-to-measure kente for weddings and special days.', label: 'New', image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782993/mysteryhub/website-starters/boutique/kente-occasion-set.jpg', options: ['S', 'M', 'L'] },
+      { id: 'bq2', name: 'Linen kaftan', price: 'GH₵ 380', category: 'Everyday', desc: 'A relaxed linen kaftan, tailored to your measurements.', image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782994/mysteryhub/website-starters/boutique/linen-kaftan.jpg', options: ['Sand', 'Olive'] },
+      { id: 'bq3', name: 'Ankara statement dress', price: 'GH₵ 420', category: 'Occasion', desc: 'A bold wax-print dress with puff sleeves. Ask about colours and fit.', image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782996/mysteryhub/website-starters/boutique/ankara-statement-dress.jpg' },
+      { id: 'bq4', name: 'Ready-to-wear pieces', price: '', category: 'Everyday', desc: 'New pieces arrive every week. Ask what is in your size.', image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1793782997/mysteryhub/website-starters/boutique/boutique-hero.jpg' },
     ],
   },
 
