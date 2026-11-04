@@ -43,6 +43,7 @@ export const MysteryAiAssistant: React.FC = () => {
     activePage,
     user,
     setActivePage,
+    openDataPage,
     activeEditorSite,
     editorAiContext,
     isMysteryAiOpen,
@@ -64,7 +65,13 @@ export const MysteryAiAssistant: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [slowReply, setSlowReply] = useState(false);
-  const [failure, setFailure] = useState<{query: string; messageId: string; error: string; kind: ChatFailureKind; retryable?:boolean} | null>(null);
+  const [failure, setFailure] = useState<{query: string; messageId: string; error: string; kind: ChatFailureKind; retryable?:boolean; retryAt?:number} | null>(null);
+  const [retrySeconds,setRetrySeconds]=useState(0);
+  useEffect(()=>{
+    const tick=()=>setRetrySeconds(Math.max(0,Math.ceil(((failure?.retryAt||0)-Date.now())/1000)));
+    tick();if(!failure?.retryAt)return;
+    const timer=setInterval(tick,1000);return ()=>clearInterval(timer);
+  },[failure?.retryAt]);
   const [showJump, setShowJump] = useState(false);
   const requestGate = useRef(new AiRequestGate());
   const pendingQuestion = useRef<{query: string; messageId: string} | null>(null);
@@ -121,7 +128,7 @@ export const MysteryAiAssistant: React.FC = () => {
       case 'website':
         return "Hi 👋 I'm Mystery AI. I see you're exploring the Website Builder! Ready to create a no-code website for your Ghanaian business, church, salon, or shop?";
       case 'services':
-        return "Hi 👋 I'm Mystery AI. Looking through our upcoming digital utilities? Let me know which services (like ECG power tokens or WAEC checker) you'd like to hear about.";
+        return "Hi 👋 I'm Mystery AI. Looking through All Services? I can explain what's available, what's limited and which utilities are still planned.";
       case 'orders':
         return "Hi 👋 I'm Mystery AI. Tracking an order or have questions about delivery? I can guide you on lookups and WhatsApp support.";
       case 'about':
@@ -244,6 +251,7 @@ export const MysteryAiAssistant: React.FC = () => {
 
   const handleSendMessage = async (textToSend?: string, retry = false) => {
     const query = (textToSend || inputValue).trim();
+    if (retry && failure?.retryAt && Date.now() < failure.retryAt) return;
     if (!query || query.length > CHAT_MAX_CHARS || !chatAvailable.current || requestGate.current.busy) return;
     const request = requestGate.current.begin();
     const userMsg: ChatMessage = {
@@ -259,7 +267,7 @@ export const MysteryAiAssistant: React.FC = () => {
     if (!textToSend || textToSend === inputValue) setInputValue('');
     setIsTyping(true);
     try {
-      const response = await sendMysteryAiMessage(query, activePage, priorHistory, undefined, request.signal);
+      const response = await sendMysteryAiMessage(query, activePage, priorHistory, editorAiContext, request.signal);
       if (!requestGate.current.accepts(request)) return;
       setMessages(prev => [...prev, {
         id: `ai-${Date.now()}`, role: 'assistant', content: response.reply,
@@ -272,7 +280,8 @@ export const MysteryAiAssistant: React.FC = () => {
       setFailure({query, messageId: userMsg.id,
         error: error instanceof Error ? error.message : "Couldn't reach Mystery AI just now. Try again.",
         kind: error instanceof MysteryAiError ? error.kind : 'unavailable',
-        retryable: error instanceof MysteryAiError ? error.retryable : true});
+        retryable: error instanceof MysteryAiError ? error.retryable : true,
+        retryAt: error instanceof MysteryAiError && error.retryAfterSeconds ? Date.now()+error.retryAfterSeconds*1000 : undefined});
     } finally {
       if (requestGate.current.accepts(request)) { setIsTyping(false); pendingQuestion.current = null; }
       requestGate.current.finish(request);
@@ -304,8 +313,9 @@ export const MysteryAiAssistant: React.FC = () => {
     inputRef.current?.focus();
   };
 
-  const handleQuickActionClick = (targetPage: ActivePage) => {
-    setActivePage(targetPage);
+  const handleQuickActionClick = (action: NonNullable<ChatMessage['quickAction']>) => {
+    if (action.targetPage === 'data' && action.dataMode) openDataPage(action.dataMode);
+    else setActivePage(action.targetPage);
     // Smooth auto-scroll to top and toast feedback
     window.scrollTo({ top: 0, behavior: 'smooth' });
     if (window.innerWidth < 640) {
@@ -447,7 +457,7 @@ export const MysteryAiAssistant: React.FC = () => {
                         <div className="mt-3 pt-2.5 border-t border-slate-700/60 flex flex-col gap-1.5">
                           <button
                             type="button"
-                            onClick={() => handleQuickActionClick(msg.quickAction!.targetPage)}
+                            onClick={() => handleQuickActionClick(msg.quickAction!)}
                             className="w-full min-h-11 py-2 px-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(0,195,101,0.25)] flex items-center justify-between group cursor-pointer"
                           >
                             <span className="flex items-center gap-1.5">
@@ -512,8 +522,8 @@ export const MysteryAiAssistant: React.FC = () => {
                   <p className="mt-1 text-[13px] leading-relaxed text-slate-300">{failure.error}</p>
                   <div className="mt-2.5 flex flex-wrap gap-2">
                     {canRetry(failure.kind) && failure.retryable !== false && (
-                      <button type="button" onClick={() => handleSendMessage(failure.query, true)} disabled={isTyping}
-                        className="min-h-11 inline-flex items-center gap-1.5 rounded-xl bg-[#00c365] px-4 text-sm font-bold text-black disabled:opacity-50 cursor-pointer"><RotateCcw className="h-4 w-4" aria-hidden="true" />Retry</button>
+                      <button type="button" onClick={() => handleSendMessage(failure.query, true)} disabled={isTyping || retrySeconds > 0}
+                        className="min-h-11 inline-flex items-center gap-1.5 rounded-xl bg-[#00c365] px-4 text-sm font-bold text-black disabled:opacity-50 cursor-pointer"><RotateCcw className="h-4 w-4" aria-hidden="true" />{retrySeconds > 0 ? `Retry in ${retrySeconds}s` : 'Retry'}</button>
                     )}
                     <button type="button" onClick={handleEditFailed}
                       className="min-h-11 inline-flex items-center gap-1.5 rounded-xl border border-slate-700 px-4 text-sm font-semibold text-slate-200 hover:text-white cursor-pointer"><Pencil className="h-4 w-4" aria-hidden="true" />Edit question</button>

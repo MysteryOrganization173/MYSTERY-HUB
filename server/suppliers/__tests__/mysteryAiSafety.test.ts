@@ -74,7 +74,7 @@ test('network limit rejects thirteenth request even with spoofed identity header
 test('four provider calls cap concurrent usage and return friendly 429',async()=>{
   const releases:Array<()=>void>=[];
   await withApi(()=>({models:{generateContent:()=>new Promise(resolve=>releases.push(()=>resolve({text:'answer'})))}}),async post=>{
-    const pending=Array.from({length:4},()=>post({message:'hello'}));
+    const pending=Array.from({length:4},()=>post({message:'Explain a general concept'}));
     try {
       for(let i=0;i<100&&releases.length<4;i++)await new Promise(resolve=>setTimeout(resolve,5));
       assert.equal(releases.length,4);
@@ -97,17 +97,17 @@ test('provider failure returns friendly 503 and never exposes or logs raw error/
 
 test('Wallet, Airtime, media and reseller instructions match repository capability boundaries',()=>{
   const prompt=buildMysteryAiSystemInstruction();
-  assert.match(prompt,/MYSTERY WALLET \(LIVE\)/);
-  assert.ok(prompt.includes(`authoritative service fee: ${AIRTIME_SERVICE_FEE_PERCENT}%`));
-  assert.match(prompt,/Upload Image \/ Media Library/);
-  assert.match(prompt,/Configured and enabled managed reseller stores/);
-  assert.match(prompt,/no account\/order tools, autonomous website editing, publishing actions, persistent memory or support-ticket creation/);
-  assert.match(prompt,/cannot initiate payments or directly deduct funds/);
-  assert.match(getGroundedLocalResponse('Wallet funding','home')!.reply,/Wallet is live/);
+  assert.match(prompt,/Wallet supports Add Money/);
+  assert.ok(prompt.includes(`Airtime service fee is ${AIRTIME_SERVICE_FEE_PERCENT}%`));
+  assert.match(prompt,/Upload Image, Replace image and Choose from Media/);
+  assert.match(prompt,/Managed Data Store checkout requires configuration and enablement/);
+  assert.match(prompt,/no such tools, autonomous actions, support-ticket creation or persistent personal memory/);
+  assert.match(prompt,/cannot browse the live web, read private accounts\/orders, verify a payment, buy data, initiate payments/);
+  assert.match(getGroundedLocalResponse('Wallet funding','home')!.reply,/Add Money/);
   assert.ok(getGroundedLocalResponse('Airtime fee','data')!.reply.includes(`${AIRTIME_SERVICE_FEE_PERCENT}%`));
-  assert.match(resolveInstantBuilderHelp('upload image')!.reply,/Upload Image \/ Media Library/);
-  assert.match(getGroundedLocalResponse('managed reseller website','home')!.reply,/configured and enabled/);
-  assert.match(getGroundedLocalResponse('my order status','home')!.reply,/Orders page/);
+  assert.match(resolveInstantBuilderHelp('How do I upload an image?',{experienceMode:'website_editor'} as any)!.reply,/Upload Image.*Choose from Media/);
+  assert.match(getGroundedLocalResponse('managed reseller website','home')!.reply,/Managed checkout.*enablement/);
+  assert.match(getGroundedLocalResponse('my order status','home')!.reply,/Open Orders/);
   assert.equal(getGroundedLocalResponse('Explain quantum physics','home'),null);
 });
 
@@ -149,7 +149,7 @@ test('UI wires prior-only history, identity guard, reset/close cancellation and 
   assert.match(ui,/if \(!requestGate.current.accepts\(request\)\) return/);
   assert.match(ui,/const handleClearHistory = \(\) => \{\s*cancelPending\(\)/);
   assert.match(ui,/cancelPending\(\);\s*closeMysteryAi\(\)/);
-  assert.match(ui,/role="alert"/);assert.match(ui,/>Retry<\/button>/);
+  assert.match(ui,/role="alert"/);assert.match(ui,/Retry in/);assert.match(ui,/disabled=\{isTyping \|\| retrySeconds > 0\}/);
   assert.doesNotMatch(ui,/\bOnline\b/);assert.match(ui,/Help guide/);
 });
 
@@ -164,7 +164,7 @@ test('provider cancellation is passed to the SDK before a timed-out request can 
       if(invocation===2)return Promise.resolve({text:'fallback model answer'});
       return new Promise((resolve,reject)=>{releases.push(()=>resolve({text:'eventual answer'}));input.config.abortSignal.addEventListener('abort',()=>reject(input.config.abortSignal.reason),{once:true});});
     }}}),async post=>{
-      const first=await post({message:'hello'});assert.equal(first.status,200);
+      const first=await post({message:'Explain a general concept'});assert.equal(first.status,200);
       // The timed-out transport was cancelled; four new requests fill the four bounded request slots.
       const pending=Array.from({length:4},()=>post({message:'hello again'}));
       try {
