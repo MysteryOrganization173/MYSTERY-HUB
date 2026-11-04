@@ -1,3 +1,4 @@
+import {campaignLanding} from '../../utils/campaignTracking';
 import { WebsiteSiteRenderer } from './WebsiteSiteRenderer';
 import { trackPublicWebsite, publicWebsiteClickKind } from '../../services/websiteBusinessApi';
 import React, { useState, useEffect } from 'react';
@@ -31,6 +32,7 @@ export const PublicPublishedSite: React.FC<PublicPublishedSiteProps> = ({ slug }
         if (!isMounted) return;
         if (res.success && res.site) {
           setSite(res.site);
+          campaignLanding(res.site.id);
           trackPublicWebsite(res.site.id,'site_view');
           applyPublicSiteHead(publicSiteHead(res.site, window.location.origin));
         } else {

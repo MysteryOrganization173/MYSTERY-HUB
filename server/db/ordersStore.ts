@@ -1,3 +1,4 @@
+import {campaignForNewOrder} from '../services/campaignContext.js';
 import {isUnpaidFailedAttempt,unpaidFailedAttemptSql} from '../services/orderManagementPolicy.js';
 import { CommercialService } from '../services/commercialService.js';
 import { WebsiteBusinessService } from '../services/websiteBusinessService.js';
@@ -116,6 +117,8 @@ export class OrdersStore {
   static async createOrderWithMtnDuplicateCheck(
     order: OrderRecord
   ): Promise<{ success: true; order: OrderRecord } | { success: false; existingOrder: OrderRecord }> {
+    const campaign=campaignForNewOrder(order);
+    order={...order};if(campaign)order.campaign_context=campaign;else delete order.campaign_context;
     if (order.network.toLowerCase() !== 'mtn') {
       const created = await this.createOrder(order);
       return { success: true, order: created };
@@ -159,11 +162,11 @@ export class OrdersStore {
             payment_reference, payment_status, supplier_provider, supplier_order_id,
             supplier_response, supplier_cost_minor, supplier_offer_ref,
             supplier_last_checked_at, failure_reason, created_at, updated_at,
-            paid_at, submitted_at, delivered_at, referrer_user_id, referral_attribution_id, referral_code
+            paid_at, submitted_at, delivered_at, referrer_user_id, referral_attribution_id, referral_code, campaign_context
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
             $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
-            $27, $28, $29, $30, $31, $32, $33, $34, $35
+            $27, $28, $29, $30, $31, $32, $33, $34, $35, $36
           ) RETURNING *;
         `;
         const values = [
@@ -202,6 +205,7 @@ export class OrdersStore {
           order.referrer_user_id ?? null,
           order.referral_attribution_id ?? null,
           order.referral_code ?? null,
+          order.campaign_context?JSON.stringify(order.campaign_context):null,
         ];
         await client.query(insertQuery, values);
         await client.query('COMMIT');
@@ -338,6 +342,8 @@ export class OrdersStore {
    * Create a new pending order atomically
    */
   static async createOrder(order: OrderRecord, client?: PoolClient): Promise<OrderRecord> {
+    const campaign=devMemoryStore.has(order.id)?devMemoryStore.get(order.id)!.campaign_context:campaignForNewOrder(order);
+    order={...order};if(campaign)order.campaign_context=campaign;else delete order.campaign_context;
     const pool = client || getPool();
     if (pool) {
       const query = `
@@ -351,12 +357,12 @@ export class OrdersStore {
           supplier_last_checked_at, failure_reason, created_at, updated_at,
           paid_at, submitted_at, delivered_at, referrer_user_id, referral_attribution_id, referral_code,
           product_slug, variant_id, variant_snapshot, fulfilment_method, pickup_location_id,
-          pickup_location_snapshot, delivery_city, delivery_area, delivery_landmark, delivery_note, marketplace_status, marketplace_context, store_context, commercial_context
+          pickup_location_snapshot, delivery_city, delivery_area, delivery_landmark, delivery_note, marketplace_status, marketplace_context, store_context, commercial_context, campaign_context
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
           $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
           $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38,
-          $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49
+          $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50
         ) RETURNING *;
       `;
       const values = [
@@ -409,6 +415,7 @@ export class OrdersStore {
         order.marketplace_context ? JSON.stringify(order.marketplace_context) : null,
         order.store_context ? JSON.stringify(order.store_context) : null,
         order.commercial_context ? JSON.stringify(order.commercial_context) : null,
+        order.campaign_context ? JSON.stringify(order.campaign_context) : null,
       ];
       await pool.query(query, values);
       return order;

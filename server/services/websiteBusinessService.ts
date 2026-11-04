@@ -159,7 +159,7 @@ export class WebsiteBusinessService {
   }
   static async initialize(siteId:string,input:Record<string,unknown>,customerId?:string) {
     if(process.env.NODE_ENV==='production'&&!process.env.PAYSTACK_SECRET_KEY?.trim().startsWith('sk_live_'))throw new FinanceError('Live managed checkout is unavailable.',503);
-    exact(input,['productId','recipientPhone','customerEmail','requestId']);
+    exact(input,['productId','recipientPhone','customerEmail','requestId','campaignToken','campaignVisitorId','campaignAttemptId']);
     const phone=validateAndNormalizeGhanaPhone(input.recipientPhone as string);if(!phone.isValid||!phone.normalized!)throw new FinanceError('Enter a valid Ghana recipient number.');
     if(typeof input.customerEmail!=='string'||input.customerEmail.length>254||!/^\S+@\S+\.\S+$/.test(input.customerEmail))throw new FinanceError('Enter a valid receipt email.');
     const initialSite=await WebsiteStore.findPublishedSiteById(siteId);if(!initialSite||initialSite.status!=='published'||initialSite.template_id!=='tmpl-data-reseller')throw new FinanceError('Store not found.',404);

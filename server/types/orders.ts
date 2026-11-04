@@ -20,6 +20,7 @@ export interface OrderRecord {
   archived_at?: string | null;
   resolution_json?: import('./orderResolution.js').OrderResolution | null;
   commercial_context?: import('../../shared/directPricing.js').CommercialSnapshot | null;
+  campaign_context?: import('../../shared/campaigns.js').CampaignSnapshot|null;
   store_context?: import('../../shared/storeEconomics.js').StoreSnapshot | null;
   marketplace_context?: Record<string, unknown> | null;
   id: string;

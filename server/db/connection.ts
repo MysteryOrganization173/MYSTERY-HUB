@@ -1,3 +1,4 @@
+import {CAMPAIGN_SCHEMA} from './campaignSchema.js';
 import { ORDER_MANAGEMENT_SCHEMA } from './orderManagementSchema.js';
 import {NOTIFICATION_SCHEMA} from './notificationSchema.js';
 import { ORDER_RESOLUTION_SCHEMA } from './orderResolutionSchema.js';
@@ -610,6 +611,7 @@ export async function initDatabase(): Promise<void> {
     await client.query(ADMIN_ASSISTED_SCHEMA);
     await client.query(ORDER_MANAGEMENT_SCHEMA);
     await client.query(NOTIFICATION_SCHEMA);
+    await client.query(CAMPAIGN_SCHEMA);
     await client.query(BACKEND_RLS_SCHEMA);
     // Observability may degrade independently; it must not take purchasing offline.
     try { await client.query(SALES_RELIABILITY_SCHEMA); }
