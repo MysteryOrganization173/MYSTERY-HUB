@@ -106,7 +106,7 @@ test('locally personalized welcome text is never sent as model conversation hist
 });
 test('backend guide navigation follows its service contract, not incidental words in the reply',async()=>{
  const old=globalThis.fetch;globalThis.fetch=async()=>new Response(JSON.stringify({reply:knownServiceHelp('Hi'),source:'guide',fallback:true}),{status:200});
- try{assert.equal((await sendMysteryAiMessage('Hi','home',[])).quickAction?.targetPage,'services');assert.equal((await sendMysteryAiMessage('Wallet','home',[])).quickAction?.targetPage,'wallet');}finally{globalThis.fetch=old;}
+ try{assert.equal((await sendMysteryAiMessage('Hi','home',[])).quickAction,undefined);assert.equal((await sendMysteryAiMessage('Wallet','home',[])).quickAction,undefined);assert.equal((await sendMysteryAiMessage('Open Wallet','home',[])).quickAction?.targetPage,'wallet');}finally{globalThis.fetch=old;}
 });
 const brief={businessName:'Synthetic Studio',businessType:'Design',contactName:'Synthetic Owner',phone:'0241234567',email:'synthetic@example.test',existingDomain:'no',estimatedPages:3,featuresRequirements:'A portfolio',preferredStyle:'Simple',projectNotes:'Keep this progress',referenceWebsite:''};
 for(const value of ['', '  \t ',undefined])test(`optional Ultra reference ${JSON.stringify(value)} accepts a valid email and preserves the input`,()=>{

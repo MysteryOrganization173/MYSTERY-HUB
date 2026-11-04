@@ -13,16 +13,16 @@ async function runMysteryAiTests() {
   console.log('--- STARTING MYSTERY AI PRODUCTION TEST SUITE ---');
   let passed = 0;
 
-  // 1. Dynamic context builder contains current live product data and correct prices
+  // 1. Injected catalogue evidence is used; missing evidence is never replaced by seed prices.
   {
-    const instruction = buildMysteryAiSystemInstruction();
-    assert.ok(instruction.includes('GH₵5.49'), 'Must include MTN 1GB rate (GH₵5.49)');
-    assert.ok(instruction.includes('GH₵23.99'), 'Must include MTN 5GB rate (GH₵23.99)');
-    assert.ok(instruction.includes('GH₵44.99'), 'Must include MTN 10GB rate (GH₵44.99)');
-    assert.ok(instruction.includes('GH₵4.99'), 'Must include AT 1GB rate (GH₵4.99)');
-    assert.ok(instruction.includes('GH₵44.99'), 'Must include Telecel 10GB rate (GH₵44.99)');
-
-    console.log('✓ 1. Dynamic context builder derives current live prices from catalog');
+    const instruction=buildMysteryAiSystemInstruction(undefined,[{network:'mtn',isActive:true,dataAmount:'synthetic 1GB',priceGhc:7.13}] as any);
+    assert.ok(instruction.includes('synthetic 1GB (GH₵7.13)'));
+    assert.ok(instruction.includes('not a quote or supplier availability check'));
+    const missing=buildMysteryAiSystemInstruction();
+    assert.ok(!/GH₵[0-9]/.test(missing));
+    assert.ok(missing.includes('No price snapshot supplied'));
+    assert.ok(missing.includes('evidence unavailable, not proof a service is down'));
+    console.log('✓ 1. Catalogue evidence and missing-data boundaries verified');
     passed++;
   }
 
@@ -89,7 +89,7 @@ async function runMysteryAiTests() {
       'Must NOT promise guaranteed instant delivery'
     );
     assert.ok(instruction.includes('Do not promise instant delivery'), 'Must avoid unverified instant delivery claims');
-    assert.ok(instruction.includes('MTN Orders: Fast under normal conditions, but NOT instant'), 'Must state MTN is NOT instant');
+    assert.ok(instruction.includes('Never promise guaranteed, immediate or instant airtime/bundle delivery'), 'Must not invent delivery speed');
     assert.ok(instruction.includes('Do not invent a delivery estimate'), 'Must rely on authoritative status instead of a fabricated estimate');
     assert.ok(!instruction.includes('48 hours'), 'Must not promise an unsupported maximum delay');
     assert.ok(
@@ -98,7 +98,7 @@ async function runMysteryAiTests() {
     );
     assert.ok(instruction.includes('trackable'), 'Must state orders remain trackable');
     assert.ok(
-      instruction.indexOf('AirtelTigo') < instruction.indexOf('Telecel'),
+      instruction.includes('Supported data networks are MTN, AirtelTigo and Telecel'),
       'Customer-facing network order must be MTN -> AirtelTigo -> Telecel'
     );
     console.log('✓ 4. Realistic delivery expectations, AT instant delivery, and MTN protection grounded in AI prompt');
