@@ -10,6 +10,7 @@ import { mixWebsiteColor, readableWebsiteColor, resolveStoreTheme, websiteAction
 import { focalPosition, resolveWebsiteSections, websiteDirectionsUrl, type WebsitePolicies } from '../../../config/websiteContentV5';
 import { hasPolicies, PolicyList } from '../storefront/BusinessInfo';
 import { ItemDetailSheet, ORDER_LIST_CSS, OrderListSheet, useOrderList } from '../storefront/OrderList';
+import { withDisplayPrices } from '../../../utils/websiteOrderList';
 import { orderCount } from '../../../utils/websiteOrderList';
 
 /** Gallery preview only, labelled as examples. Owners write their own or the section stays hidden. */
@@ -94,7 +95,7 @@ export const BoutiqueTemplateView: React.FC<Props> = ({ template, onCtaClick }) 
   const footBg = dark ? mixWebsiteColor(paper, '#000000', 0.35) : '#1f1a17';
 
   const name = template.demoBusinessName;
-  const items = template.items || [];
+  const items = useMemo(() => withDisplayPrices(template.items || []), [template.items]);
   const whatsapp = owner ? content?.whatsapp : '';
   const policies = owner ? content?.policies : EXAMPLE_POLICIES;
   const directions = websiteDirectionsUrl(owner ? content?.location : undefined);
@@ -196,6 +197,6 @@ export const BoutiqueTemplateView: React.FC<Props> = ({ template, onCtaClick }) 
 
     {count > 0 && <div className="bq-float"><button type="button" onClick={() => setListOpen(true)} style={{ backgroundColor: ink, color: paper }} data-order-bar><span>{count} item{count === 1 ? '' : 's'} on your list</span><span>Review →</span></button></div>}
     {detail && <ItemDetailSheet item={detail} contact={contact} onAdd={order.add} onClose={() => setDetail(null)} />}
-    {listOpen && <OrderListSheet lines={order.lines} contact={contact} onQuantity={order.setQuantity} onClear={() => { order.clear(); setListOpen(false); }} onClose={() => setListOpen(false)} noun="products" />}
+    {listOpen && <OrderListSheet lines={order.lines} contact={contact} onQuantity={order.setQuantity} note={order.note} onNote={order.setNote} onClear={() => { order.clear(); setListOpen(false); }} onClose={() => setListOpen(false)} noun="products" />}
   </div>;
 };

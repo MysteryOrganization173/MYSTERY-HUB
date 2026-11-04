@@ -3,13 +3,14 @@ import {Check, ChevronLeft, ChevronRight, Plus, Trash2} from 'lucide-react';
 import type {TemplateItem} from '../../../types';
 import {WebsiteImageField} from './WebsiteImageField';
 import {WebsiteItemExtras} from './WebsiteV5Controls';
+import {priceHint} from '../../../utils/websiteOrderList';
 import './visualEditor.css';
 
 type ItemField = 'name' | 'price' | 'category' | 'desc' | 'tag';
 const LIMITS: Record<ItemField, number> = {name: 100, price: 40, category: 50, desc: 300, tag: 40};
 const touchFirst = () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
 
-function ItemInput({item, field, label, hint, placeholder, multiline, onChange}: {item: TemplateItem; field: ItemField; label: string; hint?: string; placeholder?: string; multiline?: boolean; onChange: (patch: Partial<TemplateItem>) => void}) {
+function ItemInput({item, field, label, hint, placeholder, multiline, suggestions, onChange}: {item: TemplateItem; field: ItemField; label: string; hint?: string; placeholder?: string; multiline?: boolean; suggestions?: string[]; onChange: (patch: Partial<TemplateItem>) => void}) {
   const [value, setValue] = useState(item[field] || ''), [error, setError] = useState('');
   useEffect(() => {setValue(item[field] || ''); setError('');}, [item.id, item[field]]);
   const id = `item-${field}`, describedBy = [error ? `${id}-error` : '', hint ? `${id}-hint` : ''].filter(Boolean).join(' ') || undefined;
@@ -24,7 +25,8 @@ function ItemInput({item, field, label, hint, placeholder, multiline, onChange}:
     <div className="visual-field-label"><label htmlFor={id}>{label}</label>{multiline && <span>{value.length}/{LIMITS[field]}</span>}</div>
     {multiline
       ? <textarea id={id} rows={3} maxLength={LIMITS[field]} value={value} placeholder={placeholder} onChange={e => change(e.target.value)} className="visual-input" aria-invalid={!!error} aria-describedby={describedBy}/>
-      : <input id={id} type="text" enterKeyHint="done" autoComplete="off" maxLength={LIMITS[field]} value={value} placeholder={placeholder} onChange={e => change(e.target.value)} onKeyDown={finish} className="visual-input" aria-invalid={!!error} aria-describedby={describedBy}/>}
+      : <input id={id} type="text" enterKeyHint="done" autoComplete="off" maxLength={LIMITS[field]} value={value} placeholder={placeholder} onChange={e => change(e.target.value)} onKeyDown={finish} className="visual-input" aria-invalid={!!error} aria-describedby={describedBy} list={suggestions?.length ? `${id}-suggestions` : undefined}/>}
+    {!!suggestions?.length && <datalist id={`${id}-suggestions`}>{suggestions.map(s => <option key={s} value={s}/>)}</datalist>}
     {error && <p id={`${id}-error`} role="alert" className="visual-field-error">{error} Your draft keeps the last name.</p>}
     {hint && !error && <p id={`${id}-hint`} className="visual-field-hint">{hint}</p>}
   </div>;
@@ -45,8 +47,8 @@ function CardButtonInput({value, max, onChange, lower}: {value: string; max: num
  * Edits one menu dish, service, room or product in place on the canvas. Example items carry the
  * explicit keep/remove decision the publish gate asks for, right where the owner is looking.
  */
-export function WebsiteItemPanel({item, index, total, word, fields, layout = '', pinnedCount = 0, siteId, token, busy, cardButton, onChange, onKeep, onRemove, onAdd, onPrevious, onNext, onDone}: {
-  item: TemplateItem; index: number; total: number; word: {singular: string; plural: string; many: string}; fields: string[]; layout?: string; pinnedCount?: number; siteId: string; token: string; busy: boolean;
+export function WebsiteItemPanel({item, index, total, word, fields, layout = '', pinnedCount = 0, groups = [], siteId, token, busy, cardButton, onChange, onKeep, onRemove, onAdd, onPrevious, onNext, onDone}: {
+  item: TemplateItem; index: number; total: number; word: {singular: string; plural: string; many: string}; fields: string[]; layout?: string; pinnedCount?: number; groups?: string[]; siteId: string; token: string; busy: boolean;
   cardButton?: {value: string; max: number; onChange: (value: string) => void};
   onChange: (patch: Partial<TemplateItem>) => void; onKeep: () => void; onRemove: () => void; onAdd: () => void; onPrevious: () => void; onNext: () => void; onDone: () => void;
 }) {
@@ -79,18 +81,18 @@ export function WebsiteItemPanel({item, index, total, word, fields, layout = '',
     <div className="visual-context-fields" inert={busy}>
       {item.isExample && <div className="visual-example-note" role="group" aria-labelledby="visual-example-title">
         <strong id="visual-example-title">Example {lower}</strong>
-        <p>We added this so your page doesn’t start empty. Change it to something you really offer, then keep it, or remove it. Examples must be kept or removed before you publish.</p>
+        <p>We added this so your page doesn’t start empty. Change the name, price and photo to something you really offer, then keep it, or remove it. Examples must be kept or removed before you publish.</p>
         <div className="visual-example-actions">
           <button type="button" onClick={onKeep} className="visual-primary-button"><Check size={17}/>Keep this {lower}</button>
           <button type="button" onClick={onRemove} className="visual-secondary-button">Remove</button>
         </div>
       </div>}
       <ItemInput item={item} field="name" label="Name" onChange={onChange}/>
-      {fields.includes('price') && <ItemInput item={item} field="price" label="Price (optional)" placeholder="e.g. GH₵ 45" hint="Leave empty to hide the price." onChange={onChange}/>}
+      {fields.includes('price') && <ItemInput item={item} field="price" label="Price (optional)" placeholder="e.g. 45 or GH₵ 45" hint={priceHint(item.price)} onChange={onChange}/>}
       {fields.includes('desc') && <ItemInput item={item} field="desc" label="Description" multiline onChange={onChange}/>}
       {fields.includes('image') && <div className="visual-field"><WebsiteImageField label="Photo" value={item.image || ''} siteId={siteId} token={token} onChange={image => onChange({image})}/></div>}
       {['nightkitchen','boutique','restaurant','ecommerce'].includes(layout) && <WebsiteItemExtras item={item} layout={layout} siteId={siteId} token={token} pinnedCount={pinnedCount} onChange={onChange}/>}
-      {fields.includes('category') && <ItemInput item={item} field="category" label="Group (optional)" hint={`Visitors can filter your ${word.many} by group.`} onChange={onChange}/>}
+      {fields.includes('category') && <ItemInput item={item} field="category" label="Group (optional)" hint={groups.length ? `Pick a group you already use, or type a new one. Visitors filter your ${word.many} by group.` : `For example Mains or Drinks. Visitors filter your ${word.many} by group.`} suggestions={groups.filter(g => g !== item.category)} onChange={onChange}/>}
       {fields.includes('tag') && <ItemInput item={item} field="tag" label="Label (optional)" placeholder="e.g. New or Popular" hint="A short badge on the card. Only add one that is true." onChange={onChange}/>}
       {cardButton && <CardButtonInput {...cardButton} lower={word.many}/>}
       <div className="visual-item-footer">

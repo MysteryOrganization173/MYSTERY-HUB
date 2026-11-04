@@ -55,10 +55,10 @@ test('a Ghanaian multi-item order: options, quantities, an honest total only whe
   const message=orderMessage('Auntie Esi Chop Bar',lines,'https://mysterybundlehub.com/s/auntie-esi');
   assert.equal(message,[
     'Hello Auntie Esi Chop Bar, I\'d like to order:',
-    '• 3 × Asaana-glazed grilled tilapia with banku, fresh pepper and green shito from the Volta (With fried yam) · GH₵ 120',
-    '• 2 × Waakye special · GH₵ 45',
-    'Total at your listed prices: GH₵450.00',
-    'Please confirm availability, delivery and payment.',
+    '• 3 × Asaana-glazed grilled tilapia with banku, fresh pepper and green shito from the Volta (With fried yam) · GH₵ 120 each (GH₵ 360.00)',
+    '• 2 × Waakye special · GH₵ 45 each (GH₵ 90.00)',
+    'Total at your listed prices: GH₵ 450.00',
+    'Please confirm availability, the final price, delivery and payment.',
     'https://mysterybundlehub.com/s/auntie-esi',
   ].join('\n'));
   // An item priced "Ask" removes the total instead of inventing one.

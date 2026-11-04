@@ -6,6 +6,7 @@ import { BusinessEnquiry } from '../BusinessEnquiry.js';
 import { SafeImage } from '../SafeImage.js';
 import { HoursList } from '../storefront/BusinessInfo.js';
 import { ItemDetailSheet, ORDER_LIST_CSS, OrderBar, OrderListSheet, useOrderList } from '../storefront/OrderList';
+import { withDisplayPrices } from '../../../utils/websiteOrderList';
 import { websiteActionText } from '../../../utils/websiteBrand';
 import { focalPosition } from '../../../config/websiteContentV5';
 import React, { useState } from 'react';
@@ -61,8 +62,8 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
   // The owner's chosen focus point, otherwise the food (right of centre in the starter photograph).
   const heroFocus = template.siteContent?.imageMeta?.heroImage ? focalPosition(template.siteContent.imageMeta.heroImage) : '70% 50%';
 
-  const categories = ['All', ...new Set((template.items || []).map(item=>item.category).filter((category):category is string=>Boolean(category) && category!=='All'))];
-  const menuItems = template.items || [];
+  const menuItems = withDisplayPrices(template.items || []);
+  const categories = ['All', ...new Set(menuItems.map(item=>item.category).filter((category):category is string=>Boolean(category) && category!=='All'))];
 
   const filteredItems = menuItems.filter((item) => {
     if (activeCategory === 'All') return true;
@@ -305,7 +306,7 @@ export const RestaurantTemplateView: React.FC<TemplateViewProps> = ({ template, 
 
       <OrderBar lines={order.lines} onOpen={() => setListOpen(true)} />
       {detail && <ItemDetailSheet item={detail} contact={contact} onAdd={order.add} onClose={() => setDetail(null)} />}
-      {listOpen && <OrderListSheet lines={order.lines} contact={contact} onQuantity={order.setQuantity} onClear={() => { order.clear(); setListOpen(false); }} onClose={() => setListOpen(false)} noun="dishes" />}
+      {listOpen && <OrderListSheet lines={order.lines} contact={contact} onQuantity={order.setQuantity} note={order.note} onNote={order.setNote} onClear={() => { order.clear(); setListOpen(false); }} onClose={() => setListOpen(false)} noun="dishes" />}
     </div>
   );
 };

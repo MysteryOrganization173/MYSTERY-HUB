@@ -4,6 +4,7 @@ import {useVisualEditMarkers, useIsVisualEditing, useTemplateCopy} from '../edit
 import { PublishedCatalogEmpty } from '../PublishedCatalogEmpty.js';
 import { SafeImage } from '../SafeImage.js';
 import { ItemDetailSheet, ORDER_LIST_CSS, OrderBar, OrderListSheet, useOrderList } from '../storefront/OrderList';
+import { withDisplayPrices } from '../../../utils/websiteOrderList';
 import { orderCount } from '../../../utils/websiteOrderList';
 import { websiteActionText } from '../../../utils/websiteBrand';
 import { focalPosition } from '../../../config/websiteContentV5';
@@ -44,7 +45,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
   const [detail, setDetail] = useState<TemplateItem | null>(null);
   const [listOpen, setListOpen] = useState(false);
 
-  const products = template.items || [];
+  const products = withDisplayPrices(template.items || []);
   const filteredProducts = products.filter((p) => {
     if (activeCategory === 'All') return true;
     return p.category === activeCategory;
@@ -286,7 +287,7 @@ export const EcommerceTemplateView: React.FC<TemplateViewProps> = ({ template, o
 
       <OrderBar lines={order.lines} onOpen={() => setListOpen(true)} />
       {detail && <ItemDetailSheet item={detail} contact={contact} onAdd={order.add} onClose={() => setDetail(null)} />}
-      {listOpen && <OrderListSheet lines={order.lines} contact={contact} onQuantity={order.setQuantity} onClear={() => { order.clear(); setListOpen(false); }} onClose={() => setListOpen(false)} noun="products" />}
+      {listOpen && <OrderListSheet lines={order.lines} contact={contact} onQuantity={order.setQuantity} note={order.note} onNote={order.setNote} onClear={() => { order.clear(); setListOpen(false); }} onClose={() => setListOpen(false)} noun="products" />}
     </div>
   );
 };
