@@ -1,3 +1,4 @@
+import {campaignOrderContext} from '../services/campaignContext.js';
 import { commercialRouter } from './commercialApi.js';
 import {observeSalesRequest,salesCheckoutKind,noteSalesFailure,completeSalesPreflight} from '../services/salesReliability.js';
 import { CommercialService } from '../services/commercialService.js';
@@ -206,7 +207,7 @@ apiRouter.get('/instant-bundles', async (_req: Request, res: Response) => {
  * If fulfillment is enabled, performs supplier preflight checks before taking customer payment.
  */
 const walletCheckoutLimiter=createRateLimiter({windowMs:60_000,max:10});
-apiRouter.post('/payments/initialize', optionalAuth, (req,res,next)=>req.body?.paymentMethod==='wallet'?walletCheckoutLimiter(req,res,next):next(), observeSalesRequest(salesCheckoutKind), async (req: Request, res: Response) => {
+apiRouter.post('/payments/initialize', optionalAuth,campaignOrderContext, (req,res,next)=>req.body?.paymentMethod==='wallet'?walletCheckoutLimiter(req,res,next):next(), observeSalesRequest(salesCheckoutKind), async (req: Request, res: Response) => {
   if (req.body?.serviceType === 'afa' || req.body?.productId === 'afa-registration') { res.status(400).json({ error: 'Use the authenticated AFA registration checkout.' }); return; }
   const reqStart = performance.now();
   try {

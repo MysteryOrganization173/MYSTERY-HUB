@@ -1,3 +1,4 @@
+import {campaignCheckoutFields} from '../utils/campaignTracking';
 /**
  * Frontend API Client Service
  * Connects React frontend with the Express backend endpoints.
@@ -190,6 +191,7 @@ export async function initializePaymentOnServer(
 
   const payload = {
     ...req,
+    ...campaignCheckoutFields(req.requestId),
     visitorKey: visitorKey || undefined,
     referralCode: referralCode || undefined,
   };

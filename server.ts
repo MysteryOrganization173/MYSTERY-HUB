@@ -1,3 +1,4 @@
+import {campaignPublicRouter,campaignAdminRouter,campaignShortRouter} from './server/routes/campaignApi.js';
 import { corsMiddleware } from './server/middleware/cors.js';
 import express from 'express';
 import {notificationRouter,adminNotificationRouter} from './server/routes/notificationApi.js';
@@ -25,6 +26,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(corsMiddleware);
+app.use(campaignShortRouter);
 
 // Root-level health check endpoint for monitoring & Render checks
 app.get('/health', (_req, res) => {
@@ -71,6 +73,8 @@ app.post(
 );
 
 app.use(express.json({ limit: '1mb' }));
+app.use('/api/campaigns',campaignPublicRouter);
+app.use('/api/admin/campaigns',campaignAdminRouter);
 app.use('/api/analytics',growthAnalyticsRouter);
 app.use('/api/admin/analytics',adminGrowthAnalyticsRouter);
 

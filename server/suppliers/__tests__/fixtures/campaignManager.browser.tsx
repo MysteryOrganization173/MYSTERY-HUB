@@ -1,0 +1,14 @@
+/** Compiled local-only browser harness. All records are synthetic; no live service calls. */
+import React,{useState} from 'react';
+import {createRoot} from 'react-dom/client';
+import {AdminCampaignSection} from '../../../../src/components/admin/sections/AdminCampaignSection';
+import type {CampaignReport,Campaign,CampaignLink} from '../../../../shared/campaigns';
+declare const __SYNTHETIC_REPORT__:CampaignReport;
+const report=structuredClone(__SYNTHETIC_REPORT__),at=new Date().toISOString();
+const campaign:Campaign={id:report.campaigns[0].id,name:'Synthetic Data Store launch',description:'Local browser verification only',channel:'whatsapp',destination:'/data',site_id:null,status:'active',budget_minor:20000,starts_on:at.slice(0,10),ends_on:null,revision:crypto.randomUUID(),created_at:at,updated_at:at};
+const links:CampaignLink[]=report.links.map(l=>({id:l.id,campaign_id:campaign.id,code:l.code,label:l.label,channel:l.channel as any,destination:l.destination,site_id:null,created_at:at}));
+const fixture:any={calls:[],failNext:new URLSearchParams(location.search).get('case')==='unavailable',delayNext:false};(window as any).__campaignFixture=fixture;
+const wait=async()=>{if(fixture.delayNext){fixture.delayNext=false;await new Promise(r=>setTimeout(r,1000));}if(fixture.failNext){fixture.failNext=false;throw Error('Synthetic service unavailable. No records changed.');}};
+const api:any={list:async()=>{await wait();return {campaigns:[campaign],total:1,offset:0,limit:100};},report:async(_t:string,f:any)=>{await wait();fixture.calls.push({method:'report',filters:f});return structuredClone(report);},detail:async()=>{await wait();return {campaign,links,spend:fixture.spend?[fixture.spend]:[]};},create:async(_t:string,body:any)=>{fixture.calls.push({method:'create',body});Object.assign(campaign,{name:body.name,description:body.description});return campaign;},update:async(_t:string,_id:string,body:any)=>{fixture.calls.push({method:'update',body});Object.assign(campaign,body,{revision:crypto.randomUUID()});return campaign;},link:async(_t:string,_id:string,body:any)=>{fixture.calls.push({method:'link',body});links.push({...links[0],id:'cl_'+crypto.randomUUID(),code:'Syn789',...body});},spend:async(_t:string,_id:string,body:any)=>{fixture.calls.push({method:'spend',body});fixture.spend={id:'cs_'+crypto.randomUUID(),campaign_id:campaign.id,amount_minor:body.amountMinor,spent_on:body.spentOn,notes:body.notes,revision:crypto.randomUUID(),created_at:at,updated_at:at};}};
+function App(){const [token,setToken]=useState('synthetic-admin');fixture.setToken=setToken;return <><header className="border-b border-slate-800 p-4 text-sm text-slate-400">Hub Admin · SYNTHETIC CAMPAIGN QA · no production activity</header><main className="mx-auto w-full min-w-0 max-w-6xl p-3 sm:p-5"><AdminCampaignSection sessionToken={token} api={api}/></main></>;}
+createRoot(document.getElementById('root')!).render(<App/>);

@@ -1,3 +1,4 @@
+import {campaignOrderContext} from '../services/campaignContext.js';
 import { Router } from 'express';
 import { FinanceService } from '../services/financeService.js';
 import { FinanceStore, FinanceError } from '../db/financeStore.js';
@@ -21,7 +22,7 @@ afaRouter.get('/config', async (_req, res) => {
   try { res.json(await AfaService.publicConfig()); }
   catch { res.status(503).json({ available:false, enabled:false, retailPriceMinor:null, retailPriceGhc:null, status:'supplier_error', message:'AFA registration is temporarily unavailable.' }); }
 });
-afaRouter.post('/payments/initialize', requireAuth, createRateLimiter({windowMs:600_000,max:10}), async (req, res) => {
+afaRouter.post('/payments/initialize', requireAuth,campaignOrderContext, createRateLimiter({windowMs:600_000,max:10}), async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   let orderId: string | undefined;
   try {

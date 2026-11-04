@@ -1,3 +1,4 @@
+import {captureCampaignToken} from './utils/campaignTracking';
 import {createRoot} from 'react-dom/client';
 import type {ReactElement} from 'react';
 import './index.css';
@@ -14,7 +15,9 @@ const siteSlug = window.location.pathname.match(/^\/sites\/([^/?#]+)/)?.[1];
 // Before any surface downloads: Chromium may offer installation before the app code has arrived.
 captureInstallPrompt();
 
-const surface: Promise<ReactElement> = isolatedTemplateId
+captureCampaignToken();
+const shortCode=!isolatedTemplateId && window.location.pathname.match(/^\/c\/([^/]+)\/?$/)?.[1];
+const surface: Promise<ReactElement> = shortCode ? import('./components/common/CampaignRedirect').then(({CampaignRedirect})=><CampaignRedirect code={shortCode}/>) : isolatedTemplateId
   ? import('./components/website/IsolatedTemplatePreview').then(({IsolatedTemplatePreview}) => <IsolatedTemplatePreview templateId={isolatedTemplateId} />)
   : siteSlug
     ? import('./components/website/PublicPublishedSite').then(({PublicPublishedSite}) => <PublicPublishedSite slug={siteSlug} />)

@@ -1,3 +1,4 @@
+import {campaignCheckoutFields} from '../utils/campaignTracking';
 import { API_BASE_URL } from './apiClient';
 import {readCheckoutFailure} from '../../shared/checkoutFailure';
 export async function websiteBusinessRequest<T=any>(path:string,token?:string,body?:unknown,method=body?'POST':'GET'):Promise<T> {
@@ -5,7 +6,7 @@ export async function websiteBusinessRequest<T=any>(path:string,token?:string,bo
   if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('Website services returned an unexpected response. Please retry.');
   const result=await response.json();if(!response.ok)throw Object.assign(new Error(result.error||'Website action failed.'),{status:response.status,code:result.code,checkout:readCheckoutFailure(result.checkout),existingOrderReference:/^MH-[a-zA-Z0-9-]{1,60}$/.test(result.existingOrderReference||'')?result.existingOrderReference:undefined});return result.data;
 }
-export function initializeStorePayment(siteId:string,requestId:string,productId:string,recipientPhone:string,customerEmail:string,token?:string){return websiteBusinessRequest(`websites/${encodeURIComponent(siteId)}/store-checkout`,token,{requestId,productId,recipientPhone,customerEmail});}
+export function initializeStorePayment(siteId:string,requestId:string,productId:string,recipientPhone:string,customerEmail:string,token?:string){return websiteBusinessRequest(`websites/${encodeURIComponent(siteId)}/store-checkout`,token,{requestId,productId,recipientPhone,customerEmail,...campaignCheckoutFields(requestId,siteId)});}
 export function trackPublicWebsite(siteId:string,event:string){
   try{
     const identity=(storage:Storage,key:string)=>{let value=storage.getItem(key);if(!value||!/^[-0-9a-f]{36}$/i.test(value)){value=crypto.randomUUID();storage.setItem(key,value);}return value;};
