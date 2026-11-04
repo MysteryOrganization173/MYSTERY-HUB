@@ -11,6 +11,7 @@ import { readableWebsiteColor, resolveStoreTheme, websiteActionText } from '../.
 import { focalPosition, resolveWebsiteSections, websiteDirectionsUrl, type WebsiteHours } from '../../../config/websiteContentV5';
 import { HoursList, OpenBadge } from '../storefront/BusinessInfo';
 import { ItemDetailSheet, ORDER_LIST_CSS, OrderBar, OrderListSheet, useOrderList } from '../storefront/OrderList';
+import { whatsappDigits, withDisplayPrices } from '../../../utils/websiteOrderList';
 
 /** Gallery preview only: clearly example hours, so the open-now badge and hours table can be seen. */
 const EXAMPLE_HOURS: WebsiteHours = { days: [0, 1, 2, 3, 4, 5, 6].map(i => i === 6 ? { closed: false, open: '12:00', close: '20:00' } : { closed: false, open: '11:00', close: '21:00' }) };
@@ -61,6 +62,7 @@ const CSS = `
 @media(min-width:900px){.nk-rows{grid-template-columns:1fr 1fr;gap:16px}}
 .nk-row{display:flex;gap:14px;padding:12px;border-radius:20px;border:1px solid var(--nk-line);background:var(--nk-card);align-items:stretch;position:relative}
 .nk-row-body{flex:1;min-width:0;display:flex;flex-direction:column}
+.nk-row-tagged .nk-row-body{padding-top:20px}
 .nk-cat{margin-top:26px}
 @media(min-width:900px){.nk-groups{columns:2;column-gap:24px}.nk-groups .nk-cat{break-inside:avoid;display:inline-block;width:100%}.nk-groups .nk-rows{grid-template-columns:1fr}}
 .nk-cat:first-child{margin-top:18px}
@@ -113,7 +115,7 @@ export const NightKitchenTemplateView: React.FC<Props> = ({ template, onCtaClick
   const line = theme.hairline;
 
   const name = template.demoBusinessName;
-  const items = template.items || [];
+  const items = useMemo(() => withDisplayPrices(template.items || []), [template.items]);
   const hours = owner ? content?.hours : EXAMPLE_HOURS;
   const whatsapp = owner ? content?.whatsapp : '';
   const phone = owner ? content?.phone : '';
@@ -133,7 +135,7 @@ export const NightKitchenTemplateView: React.FC<Props> = ({ template, onCtaClick
   const add = (item: TemplateItem) => { if (editing) return; if (item.options?.length) setDetail(item); else order.add(item); };
 
   const heroMeta = content?.imageMeta?.heroImage;
-  const primary = whatsapp ? `https://wa.me/${whatsapp.replace(/\D/g, '').replace(/^0/, '233')}` : '#menu';
+  const primary = whatsappDigits(whatsapp) ? `https://wa.me/${whatsappDigits(whatsapp)}` : '#menu';
 
   const blocks: Record<string, React.ReactNode> = {
     picks: picks.length > 0 && <section key="picks" className="nk-sec" aria-labelledby="nk-picks"><div className="nk-wrap">
@@ -157,8 +159,9 @@ export const NightKitchenTemplateView: React.FC<Props> = ({ template, onCtaClick
         <div className={groups.length > 1 ? 'nk-groups' : undefined}>
         {groups.map(group => <div key={group.name || 'all'} className={group.name ? 'nk-cat' : undefined}>
         {group.name && <h3 className="nk-cat-h site-display">{group.name}<span style={{ color: muted }}>{group.items.length}</span></h3>}
-        <div className="nk-rows">{group.items.map(item => <div key={item.id || item.name} className="nk-row" {...edit(`item:${item.id}`)}>
-          <ExampleTag item={item} corner="right" />
+        <div className="nk-rows">{group.items.map(item => <div key={item.id || item.name} className={`nk-row${item.isExample && !item.image ? " nk-row-tagged" : ""}`} {...edit(`item:${item.id}`)}>
+          {/* V7.5: the badge sits on the photo corner, never over the dish name. */}
+          <ExampleTag item={item} corner={item.image ? "left" : "right"} />
           {item.image && <SafeImage src={item.image} alt="" sizes="(min-width: 900px) 120px, 104px" className="nk-thumb" style={{ objectPosition: focalPosition(item.focal), backgroundColor: theme.background }} />}
           <div className="nk-row-body">
             <button type="button" className="nk-row-main" onClick={() => open(item)} aria-label={`${item.name}, ${item.price || 'price on request'}, details`}>
@@ -190,7 +193,7 @@ export const NightKitchenTemplateView: React.FC<Props> = ({ template, onCtaClick
     </div></section>,
     enquiry: <section key="enquiry" id="enquiry" className="nk-wrap nk-sec" aria-labelledby="nk-enquiry"><div className="nk-card" style={{ backgroundColor: theme.surface }}>
       <h2 id="nk-enquiry" className="nk-h2 site-display" {...copy.edit('enquiryHeading')}>{copy.text('enquiryHeading')}</h2>
-      <div style={{ marginTop: 14, color: theme.surfaceText }}>{owner ? <BusinessEnquiry onContact={contact.onContact} template={template} askLabel="Ask about" dateLabel="Date of your visit" /> : <p className="nk-desc" style={{ color: muted, WebkitLineClamp: 'unset' }}>Customers can ask about a table or a group order. The message goes to the business on WhatsApp; nothing is booked here.</p>}</div>
+      <div style={{ marginTop: 14, color: theme.surfaceText }}>{owner ? <BusinessEnquiry onContact={contact.onContact} template={template} askLabel="Ask about" dateLabel="Date of your visit" guestsLabel="Number of guests" topics={["a table", "a group or event", "catering"]} /> : <p className="nk-desc" style={{ color: muted, WebkitLineClamp: 'unset' }}>Customers can ask about a table or a group order. The message goes to the business on WhatsApp; nothing is booked here.</p>}</div>
     </div></section>,
   };
   const sections = resolveWebsiteSections('nightkitchen', content?.sections);
@@ -236,6 +239,6 @@ export const NightKitchenTemplateView: React.FC<Props> = ({ template, onCtaClick
 
     <OrderBar lines={order.lines} onOpen={() => setListOpen(true)} />
     {detail && <ItemDetailSheet item={detail} contact={contact} onAdd={order.add} onClose={() => setDetail(null)} />}
-    {listOpen && <OrderListSheet lines={order.lines} contact={contact} onQuantity={order.setQuantity} onClear={() => { order.clear(); setListOpen(false); }} onClose={() => setListOpen(false)} noun="dishes" />}
+    {listOpen && <OrderListSheet lines={order.lines} contact={contact} onQuantity={order.setQuantity} note={order.note} onNote={order.setNote} onClear={() => { order.clear(); setListOpen(false); }} onClose={() => setListOpen(false)} noun="dishes" />}
   </div>;
 };

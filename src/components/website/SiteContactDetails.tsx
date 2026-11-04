@@ -2,8 +2,9 @@ import {useVisualEditMarkers} from './editor/VisualEditMarkers';
 import React from 'react';
 import type { SiteContent, WebsiteTemplate } from '../../types';
 import { resolveSectionCtaTarget } from './SectionSiteRenderer';
+import { whatsappDigits } from '../../utils/websiteOrderList.js';
 export function websiteContactTarget(content?: Partial<SiteContent>): string {
-  const whatsapp=(content?.whatsapp || '').replace(/\D/g,'').replace(/^0/,'233');
+  const whatsapp=whatsappDigits(content?.whatsapp);
   const phone=(content?.phone || '').replace(/[^\d+]/g,'');
   // Always a real destination: the owner's WhatsApp, phone or email, else the footer contact
   // block, which SiteFooterContact renders for every saved site (even one with no details yet).
@@ -22,7 +23,7 @@ export function websiteSocialUrl(network: 'instagram'|'facebook'|'tiktok', value
   return `https://www.${domains[network]}/${network==='tiktok'?'@':''}${raw.replace(/^@/,'')}`;
 }
 type FooterContactPart='phone'|'whatsapp'|'email'|'social';
-const whatsappHref=(value:string)=>`https://wa.me/${value.replace(/\D/g,'').replace(/^0/,'233')}`;
+const whatsappHref=(value:string)=>`https://wa.me/${whatsappDigits(value) || value.replace(/\D/g,'')}`;
 /**
  * The saved contact details, rendered inside each legacy template's own footer so the footer
  * stays the last thing on the page and keeps the template's colours. It inherits text colour

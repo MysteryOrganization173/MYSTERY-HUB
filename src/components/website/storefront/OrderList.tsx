@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Minus, Plus, X } from 'lucide-react';
+import { Copy, Minus, Plus, Trash2, X } from 'lucide-react';
 import type { TemplateItem } from '../../../types';
 import { SafeImage } from '../SafeImage.js';
 import { focalPosition } from '../../../config/websiteContentV5';
-import { formatGhs } from '../../../../shared/money';
-import { addOrderLine, orderCount, orderMessage, orderTotalMinor, setOrderQuantity, whatsappOrderUrl, type OrderLine } from '../../../utils/websiteOrderList';
+import { addOrderLine, formatOrderGhs, ORDER_LIST_LIMITS, orderCount, orderMessage, orderPriceMinor, orderTotals, PRICE_ON_REQUEST, setOrderQuantity, whatsappOrderUrl, type OrderLine } from '../../../utils/websiteOrderList';
 
 /**
  * Shared by Boutique and Night Kitchen. Each design sets the look through CSS variables on an ancestor:
@@ -23,7 +22,7 @@ export const ORDER_LIST_CSS = `
 .ol-sheet-foot{padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--ol-line,#e5e5e5);display:grid;gap:8px}
 .ol-photos{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -16px;padding:0 16px;scrollbar-width:none}
 .ol-photos>*{flex:0 0 86%;scroll-snap-align:center;aspect-ratio:4/5;border-radius:calc(var(--ol-radius,18px) * .6)}
-.ol-photos.single>*{flex-basis:100%;aspect-ratio:4/3}
+.ol-photos.single>*{flex-basis:100%;aspect-ratio:1/1;max-height:min(50svh,420px)}
 .ol-price{font-weight:700;font-size:17px}
 .ol-muted{color:var(--ol-muted,#666);font-size:14px;line-height:1.55}
 .ol-label{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border:1px solid currentColor;border-radius:999px;color:var(--ol-accent,#111)}
@@ -38,21 +37,29 @@ export const ORDER_LIST_CSS = `
 .ol-line{display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--ol-line,#eee)}
 .ol-line-name{flex:1;min-width:0;font-weight:600;font-size:15px;overflow-wrap:anywhere}
 .ol-qty{display:inline-flex;align-items:center;gap:4px}
-.ol-qty button{width:40px;height:40px;border-radius:999px;border:1px solid var(--ol-line,#ddd);background:transparent;color:inherit;display:inline-flex;align-items:center;justify-content:center}
+.ol-qty button{width:44px;height:44px;border-radius:999px;border:1px solid var(--ol-line,#ddd);background:transparent;color:inherit;display:inline-flex;align-items:center;justify-content:center}
 .ol-qty span{min-width:24px;text-align:center;font-weight:700}
 .ol-bar{position:sticky;bottom:0;z-index:40;padding:10px 12px calc(10px + env(safe-area-inset-bottom));pointer-events:none}
 .ol-bar button{pointer-events:auto;width:100%;max-width:640px;margin:0 auto;min-height:54px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 18px;border:0;border-radius:calc(var(--ol-radius,18px) * .8);background:var(--ol-accent,#111);color:var(--ol-on-accent,#fff);font-weight:700;font-size:15px;box-shadow:0 12px 30px rgba(0,0,0,.35)}
 .ol-note{font-size:12px;line-height:1.5;color:var(--ol-muted,#666)}
+.ol-field{display:grid;gap:6px}
+.ol-field label{font-size:13px;font-weight:600}
+.ol-field textarea{width:100%;min-height:72px;padding:10px 12px;border-radius:calc(var(--ol-radius,18px) * .5);border:1px solid var(--ol-line,#ddd);background:transparent;color:inherit;font:inherit;font-size:16px;resize:vertical}
+.ol-field textarea:focus-visible,.ol-qty button:focus-visible,.ol-option:focus-visible,.ol-primary:focus-visible,.ol-secondary:focus-visible,.ol-close:focus-visible{outline:2px solid var(--ol-accent,#111);outline-offset:2px}
+.ol-line-sub{font-weight:700}
+.ol-totals{display:grid;gap:4px}
 `;
 
 /** The buyer's list for this visit only. Nothing is stored or sent until they choose WhatsApp. */
 export function useOrderList() {
   const [lines, setLines] = useState<OrderLine[]>([]);
+  const [note, setNote] = useState('');
   return {
-    lines,
+    lines, note,
+    setNote: (text: string) => setNote(text.replace(/[<>]/g, '').slice(0, ORDER_LIST_LIMITS.note)),
     add: (item: TemplateItem, option?: string) => setLines(current => addOrderLine(current, item, option)),
     setQuantity: (key: string, quantity: number) => setLines(current => setOrderQuantity(current, key, quantity)),
-    clear: () => setLines([]),
+    clear: () => { setLines([]); setNote(''); },
   };
 }
 
@@ -76,7 +83,20 @@ function SendButton({ contact, message, label }: { contact: Contact; message: st
   const url = whatsappOrderUrl(contact.whatsapp, message);
   if (contact.demo) return <><button type="button" className="ol-primary" onClick={() => setNotice('Example design: on a real website this opens WhatsApp with the message above, addressed to the business.')}>{label}</button>{notice && <p role="status" className="ol-note">{notice}</p>}</>;
   if (url) return <a className="ol-primary" href={url} target="_blank" rel="noopener noreferrer" data-website-event="whatsapp_click">{label}</a>;
-  return <><button type="button" className="ol-secondary" onClick={contact.onContact}>Contact the business</button><p className="ol-note">This business has not added a WhatsApp number yet. Copy your order and contact them directly.</p></>;
+  return <NoWhatsApp contact={contact} message={message} />;
+}
+function NoWhatsApp({ contact, message }: { contact: Contact; message: string }) {
+  const [copied, setCopied] = useState(''), [showText, setShowText] = useState(false), area = useRef<HTMLTextAreaElement>(null);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(message); setCopied('Copied. Paste it into your message to the business.'); }
+    catch { setShowText(true); setCopied('Select the text below and copy it.'); setTimeout(() => area.current?.select(), 0); }
+  };
+  return <>
+    <button type="button" className="ol-primary" onClick={() => void copy()}><Copy size={18} aria-hidden="true" />Copy my order</button>
+    {contact.onContact && <button type="button" className="ol-secondary" onClick={contact.onContact}>Contact the business</button>}
+    <p className="ol-note" role="status">{copied || 'This business has not added a WhatsApp number, so the order can’t open in WhatsApp. Copy it and send it to them.'}</p>
+    {showText && <div className="ol-field"><textarea ref={area} readOnly value={message} aria-label="Your order text" /></div>}
+  </>;
 }
 
 export function ItemDetailSheet({ item, contact, onAdd, onClose, addLabel = 'Add to order list' }: { item: TemplateItem; contact: Contact; onAdd: (item: TemplateItem, option?: string) => void; onClose: () => void; addLabel?: string }) {
@@ -93,35 +113,39 @@ export function ItemDetailSheet({ item, contact, onAdd, onClose, addLabel = 'Add
       {photos.map((src, i) => <SafeImage key={src + i} src={src} alt={i === 0 ? item.alt || item.name : `${item.name}, photo ${i + 1}`} style={i === 0 ? { objectPosition: focalPosition(item.focal) } : undefined} />)}
     </div>}
     <div className="flex flex-wrap items-center gap-2">
-      {item.price ? <span className="ol-price">{item.price}</span> : <span className="ol-price">Ask for the price</span>}
+      {item.price ? <span className="ol-price">{item.price}</span> : <span className="ol-price">{PRICE_ON_REQUEST}</span>}
       {(item.label || item.tag) && <span className="ol-label">{item.label || item.tag}</span>}
     </div>
     {item.desc && <p className="ol-muted">{item.desc}</p>}
     {options.length > 0 && <div role="group" aria-label="Choose an option" className="ol-options">
       {options.map(o => <button key={o} type="button" className="ol-option" aria-pressed={option === o} onClick={() => setOption(o)}>{o}</button>)}
     </div>}
+    {options.length > 0 && <p className="ol-note">{orderPriceMinor(item.price) !== null ? `${item.price} for any choice.` : 'The business confirms the price for your choice.'}</p>}
     <div><p className="ol-note" style={{ marginBottom: 6 }}>Your WhatsApp message</p><p className="ol-preview">{message}</p></div>
     <p className="ol-note">Nothing is paid or reserved here. {contact.demo ? 'The business' : contact.businessName} confirms the price, availability and delivery with you.</p>
   </Sheet>;
 }
 
-export function OrderListSheet({ lines, contact, onQuantity, onClear, onClose, noun = 'items' }: { lines: OrderLine[]; contact: Contact; onQuantity: (key: string, quantity: number) => void; onClear: () => void; onClose: () => void; noun?: string }) {
-  const message = orderMessage(contact.businessName, lines, contact.link);
-  const total = orderTotalMinor(lines);
+export function OrderListSheet({ lines, contact, onQuantity, onClear, onClose, noun = 'items', note = '', onNote }: { lines: OrderLine[]; contact: Contact; onQuantity: (key: string, quantity: number) => void; onClear: () => void; onClose: () => void; noun?: string; note?: string; onNote?: (text: string) => void }) {
+  const message = orderMessage(contact.businessName, lines, contact.link, note);
+  const totals = orderTotals(lines);
   return <Sheet label="Your order list" title="Your order list" onClose={onClose} foot={lines.length ? <>
     <SendButton contact={contact} message={message} label="Send order on WhatsApp" />
     <button type="button" className="ol-secondary" onClick={onClear}>Clear the list</button>
   </> : undefined}>
     {!lines.length ? <p className="ol-muted">Your list is empty. Add {noun} to send them in one WhatsApp message.</p> : <>
       <ul className="ol-lines">{lines.map(l => <li key={l.key} className="ol-line">
-        <div className="ol-line-name">{l.name}{l.option && <span className="ol-muted"> · {l.option}</span>}<div className="ol-muted">{l.price || 'Ask for the price'}</div></div>
+        <div className="ol-line-name">{l.name}{l.option && <span className="ol-muted"> · {l.option}</span>}<div className="ol-muted">{l.price ? (l.quantity > 1 && orderPriceMinor(l.price) !== null ? <>{l.price} each · <span className="ol-line-sub">{formatOrderGhs(orderPriceMinor(l.price)! * l.quantity)}</span></> : l.price) : PRICE_ON_REQUEST}</div></div>
         <div className="ol-qty">
-          <button type="button" aria-label={`One less ${l.name}`} onClick={() => onQuantity(l.key, l.quantity - 1)}><Minus size={16} aria-hidden="true" /></button>
+          <button type="button" aria-label={l.quantity > 1 ? `One less ${l.name}` : `Remove ${l.name}`} onClick={() => onQuantity(l.key, l.quantity - 1)}>{l.quantity > 1 ? <Minus size={16} aria-hidden="true" /> : <Trash2 size={16} aria-hidden="true" />}</button>
           <span aria-live="polite">{l.quantity}</span>
           <button type="button" aria-label={`One more ${l.name}`} onClick={() => onQuantity(l.key, l.quantity + 1)}><Plus size={16} aria-hidden="true" /></button>
         </div>
       </li>)}</ul>
-      {total !== null ? <p className="ol-price">At the listed prices: {formatGhs(total)}</p> : <p className="ol-muted">Some prices are to be confirmed by the business.</p>}
+      <div className="ol-totals">{totals.complete ? <p className="ol-price">At the listed prices: {formatOrderGhs(totals.knownMinor)}</p>
+        : totals.knownMinor > 0 ? <><p className="ol-price">Listed prices so far: {formatOrderGhs(totals.knownMinor)}</p><p className="ol-muted">Plus {totals.unpriced} item{totals.unpriced === 1 ? '' : 's'} priced by the business. They confirm the final total.</p></>
+        : <p className="ol-muted">The business tells you the price before you pay.</p>}</div>
+      {onNote && <div className="ol-field"><label htmlFor="ol-note">Add a note (optional)</label><textarea id="ol-note" maxLength={ORDER_LIST_LIMITS.note} value={note} onChange={e => onNote(e.target.value)} placeholder="e.g. less pepper, delivery to Osu, pickup at 6pm" /></div>}
       <div><p className="ol-note" style={{ marginBottom: 6 }}>Your WhatsApp message</p><p className="ol-preview">{message}</p></div>
       <p className="ol-note">This is a message, not a payment. Delivery, pickup and payment are agreed with the business.</p>
     </>}
@@ -131,9 +155,9 @@ export function OrderListSheet({ lines, contact, onQuantity, onClear, onClose, n
 /** Pinned to the bottom once something is on the list. */
 export function OrderBar({ lines, onOpen }: { lines: OrderLine[]; onOpen: () => void }) {
   if (!lines.length) return null;
-  const count = orderCount(lines), total = orderTotalMinor(lines);
+  const count = orderCount(lines), totals = orderTotals(lines);
   return <div className="ol-bar"><button type="button" onClick={onOpen} data-order-bar>
-    <span>{count} item{count === 1 ? '' : 's'}{total !== null ? ` · ${formatGhs(total)}` : ''}</span>
+    <span>{count} item{count === 1 ? '' : 's'}{totals.complete ? ` · ${formatOrderGhs(totals.knownMinor)}` : totals.knownMinor > 0 ? ' · price to confirm' : ''}</span>
     <span>Review order →</span>
   </button></div>;
 }

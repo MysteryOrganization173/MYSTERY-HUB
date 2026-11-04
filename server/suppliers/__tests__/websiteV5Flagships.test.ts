@@ -100,7 +100,7 @@ test('the WhatsApp message is plain, in the buyer’s voice, and promises nothin
   const lines=addOrderLine(addOrderLine([],dish as any,'Large'),product as any);
   const text=orderMessage('Fixture Chop House',lines,'https://example.test/sites/fixture');
   assert.match(text,/^Hello Fixture Chop House, I'd like to order:/);assert.ok(text.includes('• Fixture jollof (Large) · GH₵ 65'));
-  assert.ok(text.includes('Total at your listed prices: GH₵345.00'));assert.ok(text.includes('Please confirm availability, delivery and payment.'));
+  assert.ok(text.includes('Total at your listed prices: GH₵ 345.00'));assert.ok(text.includes('Please confirm availability, the final price, delivery and payment.'));
   assert.doesNotMatch(text,/paid|confirmed order|reserved/i);
   assert.equal(whatsappOrderUrl('024 123 4567','hi'),'https://wa.me/233241234567?text=hi');assert.equal(whatsappOrderUrl('',''),null);assert.equal(whatsappOrderUrl('12',''),null);
   const source=readFileSync('src/components/website/storefront/OrderList.tsx','utf8');

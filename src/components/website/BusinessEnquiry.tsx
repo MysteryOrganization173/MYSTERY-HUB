@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import type {WebsiteTemplate} from '../../types';
+import {whatsappDigits} from '../../utils/websiteOrderList.js';
 
 const field = 'w-full min-h-11 rounded-xl border bg-transparent px-3 py-2.5 text-sm [border-color:color-mix(in_srgb,currentColor_25%,transparent)]';
 
@@ -9,7 +10,7 @@ const field = 'w-full min-h-11 rounded-xl border bg-transparent px-3 py-2.5 text
  * WhatsApp chat with the business. Nothing is booked or sent by the website itself.
  */
 export function BusinessEnquiry({onContact, template, askLabel = 'What would you like to ask about?', dateLabel = 'Preferred date', topics, guestsLabel}: {onContact?: () => void; template?: WebsiteTemplate; askLabel?: string; dateLabel?: string; topics?: string[]; guestsLabel?: string}) {
-  const content = template?.siteContent, number = (content?.whatsapp || '').replace(/\D/g, '').replace(/^0/, '233');
+  const content = template?.siteContent, number = whatsappDigits(content?.whatsapp);
   // A design can offer its own topics (a restaurant asks about a table, not a dish); otherwise the owner's items.
   const options = topics || (template?.items || []).map(item => item.name).filter(Boolean);
   const [topic, setTopic] = useState(options[0] || ''), [date, setDate] = useState(''), [name, setName] = useState(''), [guests, setGuests] = useState('');

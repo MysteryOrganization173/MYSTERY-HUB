@@ -220,7 +220,7 @@ export function WebsiteItemExtras({ item, layout, siteId, token, pinnedCount, on
       <div className="visual-field-label"><label htmlFor="item-options">Options (optional)</label><span>{parseOptions(optionsText).length}/{WEBSITE_V5_LIMITS.options}</span></div>
       <input id="item-options" className="visual-input" value={optionsText} placeholder={['nightkitchen', 'restaurant'].includes(layout) ? 'e.g. Regular, Large' : 'e.g. Small, Medium, Large'}
         onChange={e => { setOptionsText(e.target.value); onChange({ options: parseOptions(e.target.value) }); }} />
-      <p className="visual-field-hint">Separate with commas. The customer picks one and it goes into their WhatsApp message.</p>
+      <p className="visual-field-hint">Separate with commas. The customer picks one and it goes into their WhatsApp message. Every choice has this {['nightkitchen', 'restaurant'].includes(layout) ? 'dish' : 'product'}’s price, so add a choice that costs more as its own {['nightkitchen', 'restaurant'].includes(layout) ? 'dish' : 'product'}.</p>
     </div>
     {layout === 'nightkitchen' && <label className="flex items-start gap-3 rounded-xl border border-slate-800 p-3 min-h-12">
       <input type="checkbox" className="w-5 h-5 mt-0.5 accent-emerald-500" checked={!!item.pinned} disabled={!canPin} onChange={e => onChange({ pinned: e.target.checked || undefined })} />
