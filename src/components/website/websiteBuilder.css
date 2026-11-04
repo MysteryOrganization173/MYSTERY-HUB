@@ -339,3 +339,13 @@
 .website-owner-strip-meta>span{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:#fcd9a0}
 .website-owner-strip-meta>span>span{width:6px;height:6px;border-radius:50%;background:currentColor}
 .website-owner-strip-meta>span:is([data-live="live"],[data-live="live-changes"]){color:#6ee7b7}
+
+/* V7.4 phone preview: one slim bar, the website edge to edge, the name bar compact. Touch targets stay 44px. */
+.tpv-icon{min-height:44px;min-width:44px}
+@media(max-width:639px){
+  .tpv-bar{padding-top:max(6px,env(safe-area-inset-top))}
+  .tpv-note-toggle{display:block;min-height:22px}
+  .website-preview-namebar{padding:8px 10px max(8px,env(safe-area-inset-bottom));gap:6px}
+  .website-preview-namebar input,.website-preview-namebar button{min-height:44px;border-radius:12px}
+  .website-preview-namebar input{padding:0 12px}
+}

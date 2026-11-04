@@ -55,6 +55,7 @@ export const TemplatePreviewModal: React.FC = () => {
   const [changeTarget,setChangeTarget]=useState('');
   const [previewName,setPreviewName]=useState('');
   const [starting,setStarting]=useState(false);
+  const [noteOpen,setNoteOpen]=useState(false);
   // Gallery previews show the real starter a new owner receives, not the demonstration business.
   // Managed Data stores keep their existing catalogue preview (real bundles, no starter items).
   const starterTemplate = useMemo(() => {
@@ -294,26 +295,28 @@ export const TemplatePreviewModal: React.FC = () => {
     }
   };
 
-  // Target isolated viewport dimensions
-  const targetWidth = deviceView === 'mobile' ? 375 : deviceView === 'tablet' ? 768 : 1280;
-
-  // Compute available canvas width and height
+  // V7.4: on a phone the preview IS the phone. The website renders at the screen's real width (no
+  // scaled 375px mock-up, no simulated browser), so what the owner sees is what their customers get.
+  const phone = isMobileScreen;
   const availableWidth = canvasDimensions.width || (typeof window !== 'undefined' ? window.innerWidth : 1200);
   const availableHeight = canvasDimensions.height || 600;
+  const targetWidth = phone ? Math.max(280, Math.round(availableWidth)) : deviceView === 'mobile' ? 375 : deviceView === 'tablet' ? 768 : 1280;
 
-  // Margin buffer for comfortable framing
-  const marginX = isMobileScreen ? 8 : deviceView === 'desktop' ? 32 : 24;
+  // Margin buffer for comfortable framing (desktop and tablet keep a framed device).
+  const marginX = phone ? 0 : deviceView === 'desktop' ? 32 : 24;
   const usableWidth = Math.max(280, availableWidth - marginX);
 
   // Scaling factor: 1.0 on large screens, scaled down cleanly on smaller physical screens
-  const scale = Math.min(1, usableWidth / targetWidth);
+  const scale = phone ? 1 : Math.min(1, usableWidth / targetWidth);
   const frameRenderedWidth = targetWidth * scale;
+  const previewNote = t.siteContent ? 'Your website preview · Saved content. Preview actions do not place orders or bookings.' : dataDemo ? 'This is how your store starts. Bundles and prices here are examples: after creating it, you choose your bundles and set your own prices.' : starterTemplate ? `This is exactly how your website starts.${starterTemplate.items?.length ? ' Items marked Example are there for you to edit, keep or remove.' : ''}` : 'Design preview · Sample content and interactions. Reservations and purchases are not submitted.';
+  const shortNote = t.siteContent ? 'Your saved website' : dataDemo ? 'Example bundles and prices' : starterTemplate ? 'Example content' : 'Sample content';
 
   return (
-    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Website template preview" className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-3 md:p-5 bg-[#05080c] animate-in fade-in duration-200 overflow-hidden overscroll-contain" data-template-preview>
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Website template preview" className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-3 md:p-5 bg-[#05080c] animate-in fade-in duration-200 overflow-hidden overscroll-contain" data-template-preview data-preview-phone={phone ? '' : undefined}>
       {/* Dynamic Ambient Background Glow customized to template colors */}
       <div
-        className="absolute inset-0 pointer-events-none opacity-20 blur-[140px] transition-colors duration-500"
+        className="absolute inset-0 pointer-events-none opacity-20 blur-[140px] transition-colors duration-500 hidden sm:block"
         style={{
           background: `radial-gradient(circle at 50% 25%, ${palette.primary}, ${palette.secondary}, transparent 75%)`,
         }}
@@ -322,31 +325,34 @@ export const TemplatePreviewModal: React.FC = () => {
       {/* Main Modal Container: Full Screen on Mobile, Windowed on Desktop */}
       {/* Fills the fixed overlay exactly (not 100dvh, which can differ from it while Android's address bar moves). */}
       <div className="relative w-full h-full sm:h-[95vh] sm:max-w-7xl bg-[#0a0f14] border-0 sm:border border-slate-800 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 z-10">
-        
+
         {startSheet}
-        <p className="px-4 py-2 text-xs text-slate-300 bg-slate-900">{t.siteContent ? 'Your website preview · Saved content. Preview actions do not place orders or bookings.' : dataDemo ? 'This is how your store starts. Bundles and prices here are examples: after creating it, you choose your bundles and set your own prices.' : starterTemplate ? `This is exactly how your website starts.${starterTemplate.items?.length ? ' Items marked Example are there for you to edit, keep or remove.' : ''}` : 'Design preview · Sample content and interactions. Reservations and purchases are not submitted.'}</p>
+        <p className="hidden sm:block px-4 py-1.5 text-xs text-slate-300 bg-slate-900">{previewNote}</p>
         {/* =========================================================
-            TOP CONTROL BAR: Clean, Aggressively Simplified
-            - Mobile: [ Back ]  Template Name  [ Share ] [ Use ]
+            TOP CONTROL BAR
+            - Phone: one slim row [ Back ] Name · what you are seeing (tap for more) [ Share ]
+              The full explanation opens on demand, so the website keeps the screen.
             - Desktop: LEFT (Identity) | CENTER (Viewport) | RIGHT (Share, Use, Close)
             ========================================================= */}
-        <div className="px-3 sm:px-5 py-2 sm:py-2.5 bg-[#080d12] border-b border-slate-800/90 flex items-center justify-between gap-2 shrink-0 z-20">
-          
+        <div className="tpv-bar px-2 sm:px-5 py-1.5 sm:py-2.5 bg-[#080d12] border-b border-slate-800/90 flex items-center justify-between gap-2 shrink-0 z-20">
+
           {/* MOBILE TOOLBAR (< sm) */}
-          <div className="flex sm:hidden items-center justify-between w-full gap-2">
+          <div className="flex sm:hidden items-center justify-between w-full gap-1.5">
             <button
               type="button"
               onClick={handleClose}
-              className="flex items-center gap-1 text-slate-300 hover:text-white px-2 py-1.5 rounded-lg bg-slate-800/60 active:scale-95 text-xs font-semibold shrink-0 cursor-pointer"
-              aria-label="Back to Website Builder"
+              className="tpv-icon flex items-center gap-0.5 text-slate-200 pl-1.5 pr-2.5 rounded-xl bg-slate-800/70 active:scale-95 text-sm font-semibold shrink-0 cursor-pointer"
+              aria-label="Back to designs"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-5 h-5" aria-hidden="true" />
               <span>Back</span>
             </button>
 
-            <div className="min-w-0 flex-1 text-center px-1">
-              <h3 className="font-bold text-xs text-white truncate">{t.title}</h3>
-              <p className="text-[10px] text-slate-400 truncate">{t.categoryLabel}</p>
+            <div className="min-w-0 flex-1 px-1 leading-tight">
+              <h2 data-autofocus tabIndex={-1} className="font-bold text-[13px] text-white truncate outline-none">{t.title}</h2>
+              <button type="button" onClick={() => setNoteOpen(open => !open)} aria-expanded={noteOpen} aria-controls="tpv-note" className="tpv-note-toggle text-[11px] text-slate-400 truncate max-w-full text-left">
+                {shortNote} · <span className="underline underline-offset-2">{noteOpen ? 'Hide' : 'About'}</span>
+              </button>
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
@@ -354,20 +360,21 @@ export const TemplatePreviewModal: React.FC = () => {
                 type="button"
                 disabled={!!t.siteContent}
                 onClick={handleShare}
-                className="p-2 text-slate-300 hover:text-white rounded-lg bg-slate-800/80 active:scale-95 border border-slate-700/60 cursor-pointer"
-                title="Share Template"
-                aria-label="Share Template"
+                className="tpv-icon grid place-items-center text-slate-300 hover:text-white rounded-xl bg-slate-800/80 active:scale-95 border border-slate-700/60 cursor-pointer disabled:opacity-40"
+                title="Share this design"
+                aria-label="Share this design"
               >
                 {copiedLink ? <Check className="w-4 h-4 text-[#00c365]" /> : <Share2 className="w-4 h-4" />}
               </button>
 
-              <button
+              {/* With the name bar below, its button is the one way to use the design; otherwise it lives here. */}
+              {!namedPreview && <button
                 type="button"
                 onClick={handleStartBuilding}
-                className="px-3 py-1.5 rounded-lg bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs uppercase tracking-wider active:scale-95 flex items-center gap-1 cursor-pointer shadow-sm"
+                className="tpv-icon px-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-sm active:scale-95 flex items-center gap-1 cursor-pointer shadow-sm"
               >
                 <span>{t.siteContent ? 'Done' : 'Use'}</span>
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -380,7 +387,7 @@ export const TemplatePreviewModal: React.FC = () => {
                 style={{ backgroundColor: palette.secondary }}
               />
               <div className="leading-tight min-w-0 text-left">
-                <h3 className="font-extrabold text-xs sm:text-sm text-white truncate max-w-xs">
+                <h3 data-autofocus tabIndex={-1} className="font-extrabold text-xs sm:text-sm text-white truncate max-w-xs outline-none">
                   {t.title}
                 </h3>
                 <p className="text-[11px] text-slate-400 truncate">
@@ -468,27 +475,28 @@ export const TemplatePreviewModal: React.FC = () => {
             </div>
           </div>
         </div>
+        {noteOpen && <p id="tpv-note" className="sm:hidden px-3 py-2 text-xs leading-relaxed text-slate-200 bg-slate-900 border-b border-slate-800">{previewNote}</p>}
 
         {/* =========================================================
             DYNAMIC CANVAS CONTAINER: Isolated Scaled iframe Viewport
             ========================================================= */}
         <div
           ref={canvasRef}
-          className="flex-1 bg-[#05080c] p-1 sm:p-4 overflow-hidden flex flex-col items-center justify-center relative"
+          className="flex-1 min-h-0 bg-[#05080c] p-0 sm:p-4 overflow-hidden flex flex-col items-center justify-center relative"
         >
-          {/* Framed Device Mockup Container */}
+          {/* Framed Device Mockup Container (a phone shows the website edge to edge, without a frame) */}
           <div
-            className="flex flex-col rounded-xl sm:rounded-2xl border border-slate-800 shadow-2xl overflow-hidden bg-[#0d1319] transition-all duration-300 relative"
+            className={`flex flex-col overflow-hidden bg-[#0d1319] transition-all duration-300 relative ${phone ? '' : 'rounded-2xl border border-slate-800 shadow-2xl'}`}
             style={{
-              width: `${frameRenderedWidth}px`,
+              width: phone ? '100%' : `${frameRenderedWidth}px`,
               maxWidth: '100%',
-              height: deviceView === 'mobile' && scale >= 0.99 && availableHeight > 740 ? '700px' : '100%',
+              height: !phone && deviceView === 'mobile' && scale >= 0.99 && availableHeight > 740 ? '700px' : '100%',
               maxHeight: '100%',
             }}
           >
-            {/* Clean Realistic Browser Chrome */}
-            <div
-              className="border-b px-3 sm:px-4 py-1.5 sm:py-2 flex items-center justify-between text-xs shrink-0 select-none z-10"
+            {/* Clean Realistic Browser Chrome (desktop and tablet views only) */}
+            {!phone && <div
+              className="border-b px-3 sm:px-4 py-1.5 flex items-center justify-between text-xs shrink-0 select-none z-10"
               style={{
                 backgroundColor: isDarkBackground ? '#0d1319' : '#f8fafc',
                 borderColor: isDarkBackground ? '#1e293b' : '#e2e8f0',
@@ -536,7 +544,7 @@ export const TemplatePreviewModal: React.FC = () => {
                   {getIndustryIcon()}
                 </span>
               </div>
-            </div>
+            </div>}
 
             {/* ISOLATED IFRAME VIEWPORT WRAPPER */}
             <div className="flex-1 w-full relative overflow-hidden bg-white">
@@ -574,7 +582,7 @@ export const TemplatePreviewModal: React.FC = () => {
           <input id="website-preview-name" value={previewName} maxLength={100} onChange={event=>setPreviewName(event.target.value.replace(/[<>]/g,''))} placeholder="Type your business name to see it" autoComplete="organization" enterKeyHint="go"/>
           <button type="submit">Use this design<ArrowRight className="w-4 h-4" aria-hidden="true"/></button>
         </form> :
-        <div className="px-3 sm:px-5 py-2 bg-[#06090d] border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-1.5 text-xs text-slate-400 shrink-0 select-none">
+        <div className="hidden sm:flex px-3 sm:px-5 py-2 bg-[#06090d] border-t border-slate-800/80 flex-col sm:flex-row items-center justify-between gap-1.5 text-xs text-slate-400 shrink-0 select-none">
           <div className="flex items-center gap-2 text-[11px] sm:text-xs">
             <span className="text-slate-300 font-medium">Ready to launch your website in Ghana?</span>
             <span className="hidden md:inline text-slate-600">·</span>
