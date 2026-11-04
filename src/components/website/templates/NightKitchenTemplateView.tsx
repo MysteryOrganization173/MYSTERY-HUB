@@ -28,15 +28,15 @@ const CSS = `
 .nk-nav a{color:inherit;text-decoration:none;opacity:.9}
 @media(min-width:900px){.nk-nav{display:flex}}
 .nk-pill{min-height:44px;padding:0 16px;border-radius:999px;display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:14px;text-decoration:none;border:1px solid rgba(255,255,255,.35);color:#fff;background:rgba(0,0,0,.28);backdrop-filter:blur(8px)}
-.nk-hero{position:relative;min-height:min(86svh,720px);display:flex;align-items:flex-end;overflow:hidden;color:#fff}
-@media(min-width:900px){.nk-hero{min-height:min(84vh,760px)}}
+.nk-hero{position:relative;min-height:min(68svh,560px);display:flex;align-items:flex-end;overflow:hidden;color:#fff}
+@media(min-width:900px){.nk-hero{min-height:min(76vh,680px)}}
 .nk-hero-img{position:absolute;inset:0}
 .nk-hero-fade{position:absolute;inset:auto 0 0;height:78%;pointer-events:none}
 .nk-hero-top{position:absolute;inset:0 0 auto;height:120px;background:linear-gradient(rgba(0,0,0,.5),transparent);pointer-events:none}
-.nk-hero-copy{position:relative;padding-bottom:28px;padding-top:120px;max-width:680px}
+.nk-hero-copy{position:relative;padding-bottom:24px;padding-top:96px;max-width:680px}
 .nk-open{display:inline-flex;align-items:center;font-size:13px;font-weight:700;padding:7px 12px;border-radius:999px;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);margin:0 0 14px}
 .nk-eyebrow{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin:0 0 8px}
-.nk-h1{font-size:clamp(38px,10.5vw,68px);line-height:1.02;font-weight:500;margin:0;letter-spacing:-.02em}
+.nk-h1{font-size:clamp(34px,9.6vw,64px);line-height:1.02;font-weight:500;margin:0;letter-spacing:-.02em}
 .nk-lede{font-size:16px;line-height:1.55;margin:14px 0 0;max-width:520px;opacity:.88}
 .nk-actions{display:grid;grid-template-columns:1.25fr 1fr;gap:10px;margin-top:22px;max-width:480px}
 .nk-btn{min-height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:15px;white-space:nowrap;text-decoration:none;border:0;padding:0 12px;text-align:center}
@@ -46,7 +46,7 @@ const CSS = `
 .nk-tabs{position:sticky;top:0;z-index:15;border-bottom:1px solid var(--nk-line)}
 .nk-tabs-in{display:flex;gap:8px;overflow-x:auto;padding:10px 0;scrollbar-width:none}
 .nk-tab{flex:none;min-height:40px;padding:0 16px;border-radius:999px;font-weight:600;font-size:14px;border:1px solid transparent;background:transparent;color:inherit}
-.nk-sec{padding-block:40px}
+.nk-sec{padding-block:36px}
 .nk-label{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin:0 0 6px}
 .nk-h2{font-size:clamp(28px,7vw,40px);line-height:1.1;font-weight:500;margin:0}
 .nk-picks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}
@@ -54,17 +54,27 @@ const CSS = `
 .nk-pick{text-align:left;background:none;border:0;padding:0;color:inherit;display:flex;flex-direction:column;justify-content:flex-start;height:100%}
 .nk-pick-img{aspect-ratio:4/5;border-radius:18px;overflow:hidden}
 .nk-pick h3{font-size:17px;line-height:1.25;font-weight:500;margin:10px 0 2px}
-.nk-rows{display:grid;gap:0;margin-top:14px}
-@media(min-width:900px){.nk-rows{grid-template-columns:1fr 1fr;column-gap:40px}}
-.nk-row{display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--nk-line);align-items:flex-start;position:relative}
+.nk-rows{display:grid;gap:12px;margin-top:14px}
+@media(min-width:900px){.nk-rows{grid-template-columns:1fr 1fr;gap:16px}}
+.nk-row{display:flex;gap:14px;padding:12px;border-radius:20px;border:1px solid var(--nk-line);background:var(--nk-card);align-items:stretch;position:relative}
+.nk-row-body{flex:1;min-width:0;display:flex;flex-direction:column}
+.nk-cat{margin-top:26px}
+@media(min-width:900px){.nk-groups{columns:2;column-gap:24px}.nk-groups .nk-cat{break-inside:avoid;display:inline-block;width:100%}.nk-groups .nk-rows{grid-template-columns:1fr}}
+.nk-cat:first-child{margin-top:18px}
+.nk-cat-h{display:flex;align-items:baseline;gap:10px;font-size:22px;line-height:1.2;font-weight:500;margin:0}
+.nk-cat-h span{font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:13px;font-weight:600;opacity:.7}
 .nk-row-main{display:block;width:100%;text-align:left;background:none;border:0;padding:0;color:inherit}
-.nk-row h3{font-size:18px;line-height:1.25;font-weight:500;margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.nk-row h3{font-size:18px;line-height:1.25;font-weight:600;margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .nk-chip{font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:.02em}
 .nk-desc{font-size:14px;line-height:1.5;margin:4px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.nk-row-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
-.nk-price{font-weight:700;font-size:15px}
-.nk-add{min-height:40px;min-width:72px;padding:0 12px;border-radius:999px;font-weight:700;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:4px;background:transparent}
-.nk-thumb{width:92px;height:92px;flex:none;border-radius:16px;overflow:hidden}
+.nk-row-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;padding-top:10px}
+.nk-price{font-weight:700;font-size:16px}
+.nk-price-na{font-weight:600;font-size:13px}
+.nk-add{min-height:44px;min-width:84px;padding:0 16px;border-radius:999px;font-weight:700;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:4px;border:0}
+.nk-add:active{transform:scale(.97)}
+.nk-add:focus-visible,.nk-row-main:focus-visible,.nk-pick:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:12px}
+.nk-thumb{width:104px;height:104px;flex:none;border-radius:14px;overflow:hidden;align-self:flex-start}
+@media(min-width:900px){.nk-thumb{width:120px;height:120px}}
 .nk-gallery{display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;gap:10px;margin-top:18px;aspect-ratio:4/3}
 @media(min-width:900px){.nk-gallery{aspect-ratio:21/9}}
 .nk-gallery>*{border-radius:18px}
@@ -110,6 +120,8 @@ export const NightKitchenTemplateView: React.FC<Props> = ({ template, onCtaClick
 
   const categories = useMemo(() => ['All', ...new Set(items.map(i => i.category).filter((c): c is string => !!c && c !== 'All'))], [items]);
   const shown = tab === 'All' ? items : items.filter(i => i.category === tab);
+  // "All" reads like a printed menu: one heading per category, in the owner's own order.
+  const groups = tab === 'All' && categories.length > 2 ? categories.slice(1).map(c => ({ name: c, items: items.filter(i => i.category === c) })).concat(items.some(i => !i.category || i.category === 'All') ? [{ name: 'More', items: items.filter(i => !i.category || i.category === 'All') }] : []) : [{ name: '', items: shown }];
   const picks = items.filter(i => i.pinned).slice(0, 4);
   const gallery = (owner ? content?.gallery || [] : items.map(i => i.image).filter((s): s is string => !!s)).slice(0, 3);
 
@@ -125,9 +137,9 @@ export const NightKitchenTemplateView: React.FC<Props> = ({ template, onCtaClick
       <p className="nk-label" style={{ color: accentText }} {...copy.edit('picksEyebrow')}>{copy.text('picksEyebrow')}</p>
       <h2 id="nk-picks" className="nk-h2 site-display" {...copy.edit('picksHeading')}>{copy.text('picksHeading')}</h2>
       <div className="nk-picks">{picks.map(item => <button key={item.id || item.name} type="button" className="nk-pick" onClick={() => open(item)} {...edit(`item:${item.id}`)}>
-        <SafeImage src={item.image} alt={item.alt || item.name} className="nk-pick-img" style={{ objectPosition: focalPosition(item.focal), backgroundColor: theme.surface }} />
+        <SafeImage src={item.image} alt={item.alt || item.name} sizes="(min-width: 900px) 25vw, 50vw" className="nk-pick-img" style={{ objectPosition: focalPosition(item.focal), backgroundColor: theme.surface }} />
         <h3 className="site-display">{item.name}</h3>
-        <span className="nk-price" style={{ color: accentText }}>{item.price || 'Ask'}</span>
+        <span className="nk-price" style={{ color: accentText }}>{item.price || 'Price on request'}</span>
       </button>)}</div>
     </div></section>,
     menu: <section key="menu" id="menu" className="scroll-mt-4" aria-labelledby="nk-menu">
@@ -139,20 +151,25 @@ export const NightKitchenTemplateView: React.FC<Props> = ({ template, onCtaClick
         <h2 id="nk-menu" className="nk-h2 site-display" {...copy.edit('menuHeading')}>{copy.text('menuHeading')}</h2>
         <p className="nk-desc" style={{ color: muted, WebkitLineClamp: 'unset', display: 'block' }} {...copy.edit('menuIntro')}>{copy.text('menuIntro')}</p>
         {owner && !shown.length && <div className="mt-4"><PublishedCatalogEmpty onContact={contact.onContact} /></div>}
-        <div className="nk-rows">{shown.map(item => <div key={item.id || item.name} className="nk-row" {...edit(`item:${item.id}`)}>
+        <div className={groups.length > 1 ? 'nk-groups' : undefined}>
+        {groups.map(group => <div key={group.name || 'all'} className={group.name ? 'nk-cat' : undefined}>
+        {group.name && <h3 className="nk-cat-h site-display">{group.name}<span style={{ color: muted }}>{group.items.length}</span></h3>}
+        <div className="nk-rows">{group.items.map(item => <div key={item.id || item.name} className="nk-row" {...edit(`item:${item.id}`)}>
           <ExampleTag item={item} corner="right" />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <button type="button" className="nk-row-main" onClick={() => open(item)} aria-label={`${item.name}, details`}>
+          {item.image && <SafeImage src={item.image} alt="" sizes="(min-width: 900px) 120px, 104px" className="nk-thumb" style={{ objectPosition: focalPosition(item.focal), backgroundColor: theme.background }} />}
+          <div className="nk-row-body">
+            <button type="button" className="nk-row-main" onClick={() => open(item)} aria-label={`${item.name}, ${item.price || 'price on request'}, details`}>
               <h3 className="site-display">{item.name}{(item.label || item.tag) && <span className="nk-chip" style={{ backgroundColor: `${accent}26`, color: accentText }}>{item.label || item.tag}</span>}</h3>
               {item.desc && <p className="nk-desc" style={{ color: muted }}>{item.desc}</p>}
             </button>
             <div className="nk-row-foot">
-              <span className="nk-price">{item.price || 'Ask'}</span>
-              <button type="button" className="nk-add" onClick={() => add(item)} style={{ color: accentText, border: `1px solid ${line}` }} aria-label={`Add ${item.name} to your order`}><Plus size={16} aria-hidden="true" />Add</button>
+              {item.price ? <span className="nk-price">{item.price}</span> : <span className="nk-price-na" style={{ color: muted }}>Price on request</span>}
+              <button type="button" className="nk-add" onClick={() => add(item)} style={{ backgroundColor: accent, color: onAccent }} aria-label={`Add ${item.name} to your order`}><Plus size={16} aria-hidden="true" />{item.options?.length ? 'Choose' : 'Add'}</button>
             </div>
           </div>
-          {item.image && <SafeImage src={item.image} alt="" className="nk-thumb" style={{ objectPosition: focalPosition(item.focal), backgroundColor: theme.surface }} />}
         </div>)}</div>
+        </div>)}
+        </div>
       </div>
     </section>,
     gallery: gallery.length > 0 && <section key="gallery" className="nk-sec" aria-label="Photos"><div className="nk-wrap">
@@ -177,7 +194,7 @@ export const NightKitchenTemplateView: React.FC<Props> = ({ template, onCtaClick
   const nav = sections.filter(s => s.visible && s.nav && blocks[s.id]);
   const anchor: Record<string, string> = { menu: '#menu', hours: '#hours', findus: '#find-us' };
 
-  return <div className="nk" style={{ backgroundColor: theme.background, color: theme.text, '--nk-line': line, '--ol-bg': theme.background, '--ol-text': theme.text, '--ol-muted': muted, '--ol-line': line, '--ol-accent': accent, '--ol-on-accent': onAccent, '--ol-radius': '22px' } as React.CSSProperties}>
+  return <div className="nk" style={{ backgroundColor: theme.background, color: theme.text, '--nk-line': line, '--nk-card': theme.surface, '--ol-bg': theme.background, '--ol-text': theme.text, '--ol-muted': muted, '--ol-line': line, '--ol-accent': accent, '--ol-on-accent': onAccent, '--ol-radius': '22px' } as React.CSSProperties}>
     <style>{CSS + ORDER_LIST_CSS}</style>
     <header className="nk-head"><div className="nk-wrap nk-head-in" style={{ color: '#fff' }}>
       <div className="nk-brand">

@@ -44,5 +44,5 @@ test('template migration keeps business identity and safe links without changing
 
 test('inherited themes retain legacy design but repair text on its actual solid surface',()=>{
  const source=text('src/components/website/WebsiteContrastBoundary.tsx');assert.match(source,/readableWebsiteColor\(original,\[hex\(background\)\]\)/);assert.match(source,/backgroundImage!=='none'/);assert.match(source,/MutationObserver/);
- const restaurant=mergeSiteWithTemplate(WEBSITE_TEMPLATES.find(t=>t.layoutType==='restaurant')!,content,{backgroundColor:'#07111e',primaryColor:'#123456'});const html=renderToStaticMarkup(renderTemplateLayout(restaurant));assert.ok(html.includes('website-presentation'));assert.ok(html.includes('to-[#1c090d] text-white'));assert.ok(websiteContrast(readableWebsiteColor('#123456',['#07111e']),'#07111e')>=4.5);
+ const restaurant=mergeSiteWithTemplate(WEBSITE_TEMPLATES.find(t=>t.layoutType==='restaurant')!,content,{backgroundColor:'#07111e',primaryColor:'#123456'});const html=renderToStaticMarkup(renderTemplateLayout(restaurant));assert.ok(html.includes('website-presentation'));assert.ok(html.includes('bg-[#2a0e14] text-white'));assert.ok(websiteContrast(readableWebsiteColor('#123456',['#07111e']),'#07111e')>=4.5);
 });
