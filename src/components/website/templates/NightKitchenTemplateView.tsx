@@ -20,20 +20,23 @@ const CSS = `
 .nk-wrap{width:100%;max-width:1120px;margin:0 auto;padding:0 16px}
 @media(min-width:768px){.nk-wrap{padding:0 32px}}
 .nk-head{position:absolute;inset:0 0 auto;z-index:20}
-.nk-head-in{display:flex;align-items:center;gap:12px;min-height:64px}
+.nk-head-in{display:flex;flex-wrap:wrap;align-items:center;gap:0 12px;min-height:64px}
 .nk-brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
 .nk-logo{width:40px;height:40px;border-radius:12px;flex:none;overflow:hidden;display:flex;align-items:center;justify-content:center;font-weight:700}
 .nk-name{font-size:19px;line-height:1.15;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 12px rgba(0,0,0,.45)}
-.nk-nav{display:none;gap:22px;font-size:14px;font-weight:600}
-.nk-nav a{color:inherit;text-decoration:none;opacity:.9}
-@media(min-width:900px){.nk-nav{display:flex}}
+.nk-nav{display:flex;order:3;width:100%;gap:20px;font-size:14px;font-weight:600;overflow-x:auto;scrollbar-width:none;margin-top:-6px}
+.nk-nav::-webkit-scrollbar{display:none}
+.nk-nav a{color:inherit;text-decoration:none;opacity:.92;min-height:44px;display:inline-flex;align-items:center;white-space:nowrap;text-shadow:0 1px 10px rgba(0,0,0,.55)}
+.nk-nav a:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:6px}
+@media(min-width:900px){.nk-nav{order:0;width:auto;gap:22px;margin-top:0}}
 .nk-pill{min-height:44px;padding:0 16px;border-radius:999px;display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:14px;text-decoration:none;border:1px solid rgba(255,255,255,.35);color:#fff;background:rgba(0,0,0,.28);backdrop-filter:blur(8px)}
 .nk-hero{position:relative;min-height:min(68svh,560px);display:flex;align-items:flex-end;overflow:hidden;color:#fff}
 @media(min-width:900px){.nk-hero{min-height:min(76vh,680px)}}
 .nk-hero-img{position:absolute;inset:0}
 .nk-hero-fade{position:absolute;inset:auto 0 0;height:78%;pointer-events:none}
-.nk-hero-top{position:absolute;inset:0 0 auto;height:120px;background:linear-gradient(rgba(0,0,0,.5),transparent);pointer-events:none}
-.nk-hero-copy{position:relative;padding-bottom:24px;padding-top:96px;max-width:680px}
+.nk-hero-top{position:absolute;inset:0 0 auto;height:150px;background:linear-gradient(rgba(0,0,0,.5),transparent);pointer-events:none}
+.nk-hero-copy{position:relative;padding-bottom:24px;padding-top:124px;max-width:680px}
+@media(min-width:900px){.nk-hero-copy{padding-top:96px}}
 .nk-open{display:inline-flex;align-items:center;font-size:13px;font-weight:700;padding:7px 12px;border-radius:999px;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);margin:0 0 14px}
 .nk-eyebrow{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin:0 0 8px}
 .nk-h1{font-size:clamp(34px,9.6vw,64px);line-height:1.02;font-weight:500;margin:0;letter-spacing:-.02em}
@@ -185,14 +188,14 @@ export const NightKitchenTemplateView: React.FC<Props> = ({ template, onCtaClick
       <p className="nk-desc" style={{ color: muted, display: 'flex', gap: 8, WebkitLineClamp: 'unset', fontSize: 16 }} {...edit('content:location')}><MapPin size={18} aria-hidden="true" style={{ flex: 'none', marginTop: 2 }} />{template.location}</p>
       {directions && <a href={directions} target="_blank" rel="noopener noreferrer" className="nk-btn" style={{ marginTop: 16, backgroundColor: theme.text, color: theme.background, maxWidth: 260 }}>Get directions</a>}
     </div></section>,
-    enquiry: <section key="enquiry" className="nk-wrap nk-sec" aria-labelledby="nk-enquiry"><div className="nk-card" style={{ backgroundColor: theme.surface }}>
+    enquiry: <section key="enquiry" id="enquiry" className="nk-wrap nk-sec" aria-labelledby="nk-enquiry"><div className="nk-card" style={{ backgroundColor: theme.surface }}>
       <h2 id="nk-enquiry" className="nk-h2 site-display" {...copy.edit('enquiryHeading')}>{copy.text('enquiryHeading')}</h2>
       <div style={{ marginTop: 14, color: theme.surfaceText }}>{owner ? <BusinessEnquiry onContact={contact.onContact} template={template} askLabel="Ask about" dateLabel="Date of your visit" /> : <p className="nk-desc" style={{ color: muted, WebkitLineClamp: 'unset' }}>Customers can ask about a table or a group order. The message goes to the business on WhatsApp; nothing is booked here.</p>}</div>
     </div></section>,
   };
   const sections = resolveWebsiteSections('nightkitchen', content?.sections);
   const nav = sections.filter(s => s.visible && s.nav && blocks[s.id]);
-  const anchor: Record<string, string> = { menu: '#menu', hours: '#hours', findus: '#find-us' };
+  const anchor: Record<string, string> = { menu: '#menu', hours: '#hours', findus: '#find-us', enquiry: '#enquiry' };
 
   return <div className="nk" style={{ backgroundColor: theme.background, color: theme.text, '--nk-line': line, '--nk-card': theme.surface, '--ol-bg': theme.background, '--ol-text': theme.text, '--ol-muted': muted, '--ol-line': line, '--ol-accent': accent, '--ol-on-accent': onAccent, '--ol-radius': '22px' } as React.CSSProperties}>
     <style>{CSS + ORDER_LIST_CSS}</style>
