@@ -3,7 +3,7 @@
  * Which areas a website has comes from the dashboard's existing tab rule (Data store, or Data history kept after a
  * design change), never from template names scattered through the UI. Each area maps to one dashboard tab.
  */
-export type WorkspaceSection = 'overview' | 'orders' | 'products' | 'earnings' | 'analytics' | 'website';
+export type WorkspaceSection = 'overview' | 'orders' | 'products' | 'earnings' | 'promote' | 'analytics' | 'website';
 
 export const WORKSPACE_BASE_PATH = '/my-business';
 
@@ -12,11 +12,12 @@ export const WORKSPACE_SECTIONS: Record<WorkspaceSection, { label: string; short
   orders: { label: 'Orders', short: 'Orders', slug: 'orders', tab: 'Orders', hint: 'Payment and delivery for each sale' },
   products: { label: 'Products & pricing', short: 'Pricing', slug: 'products', tab: 'Bundles & Pricing', hint: 'Bundles on sale and your prices' },
   earnings: { label: 'Store Earnings', short: 'Earnings', slug: 'earnings', tab: 'Store Earnings', hint: 'Pending, available and withdrawals' },
+  promote: { label: 'Promote your business', short: 'Promote', slug: 'promote', tab: 'Promote', hint: 'Ready-made adverts and captions' },
   analytics: { label: 'Analytics', short: 'Analytics', slug: 'analytics', tab: 'Analytics', hint: 'Visits and customer activity' },
   website: { label: 'Website & settings', short: 'Website', slug: 'website', tab: 'Settings', hint: 'Publish, share, design and delete' },
 };
 
-const ORDER: WorkspaceSection[] = ['overview', 'orders', 'products', 'earnings', 'analytics', 'website'];
+const ORDER: WorkspaceSection[] = ['overview', 'orders', 'products', 'earnings', 'promote', 'analytics', 'website'];
 
 export function workspacePath(section: WorkspaceSection): string {
   const slug = WORKSPACE_SECTIONS[section].slug;
@@ -46,10 +47,11 @@ export function initialWorkspaceTabs(reseller: boolean): string[] {
 /**
  * V7.2.1: the business dock (phones and tablets) shows at most four areas plus More. A Data store keeps its daily
  * work there (Overview, Orders, Pricing, Earnings) with Analytics and Website & settings under More; other websites
- * have few areas, so every one of them fits. More only ever lists what the dock does not.
+ * have few areas, so every one of them fits. More only ever lists what the dock does not. V7.3: Promote (Data Stores)
+ * opens from More and from the Overview share kit.
  */
 export function businessDock(available: WorkspaceSection[], reseller: boolean): WorkspaceSection[] {
-  return available.filter(section => !reseller || (section !== 'analytics' && section !== 'website')).slice(0, 4);
+  return available.filter(section => !reseller || (section !== 'promote' && section !== 'analytics' && section !== 'website')).slice(0, 4);
 }
 
 /** The Website Builder's design gallery, explicitly. A plain /website-builder visit by an owner opens My Business. */

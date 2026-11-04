@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {Check, Copy, MessageCircle, Share2} from 'lucide-react';
+import {Check, Copy, Image as ImageIcon, MessageCircle, Share2} from 'lucide-react';
 
 /**
  * V7.1 "Get your first customers": ready-to-send messages for an open Data Store, plus three practical tips.
@@ -15,7 +15,7 @@ export function storeShareMessages(name: string, url: string) {
   ];
 }
 
-export function StoreShareKit({name, url}: {name: string; url: string}) {
+export function StoreShareKit({name, url, onPromote}: {name: string; url: string; onPromote?: () => void}) {
   const messages = storeShareMessages(name, url);
   const [pick, setPick] = useState(messages[0].id), [copied, setCopied] = useState('');
   const message = messages.find(m => m.id === pick) || messages[0];
@@ -36,6 +36,7 @@ export function StoreShareKit({name, url}: {name: string; url: string}) {
       <a className="bw-button" data-primary href={`https://wa.me/?text=${encodeURIComponent(message.text)}`} target="_blank" rel="noopener noreferrer"><MessageCircle size={16} aria-hidden="true"/>Send on WhatsApp</a>
       <button type="button" className="bw-button" onClick={() => void copy()}>{copied === 'yes' ? <Check size={16} aria-hidden="true"/> : <Copy size={16} aria-hidden="true"/>}{copied === 'yes' ? 'Copied' : 'Copy message'}</button>
       {typeof navigator !== 'undefined' && 'share' in navigator && <button type="button" className="bw-button" onClick={() => void share()}><Share2 size={16} aria-hidden="true"/>More apps</button>}
+      {onPromote && <button type="button" className="bw-button" onClick={onPromote}><ImageIcon size={16} aria-hidden="true"/>Make a picture advert</button>}
     </div>
     {copied === 'blocked' && <p role="status" className="bw-share-note">Copying is blocked in this browser. Press and hold the message above to copy it.</p>}
     <ul className="bw-share-tips" aria-label="Selling tips">

@@ -26,7 +26,7 @@ test('My Business has its own address and every area deep-links back to it',()=>
 
 test('areas come from the dashboard tab rule, so a non-reseller design never shows reseller areas',()=>{
   for(const [section,meta] of Object.entries(WORKSPACE_SECTIONS))assert.equal(sectionForTab(meta.tab),section);
-  assert.deepEqual(workspaceSections(initialWorkspaceTabs(true)),['overview','orders','products','earnings','analytics','website']);
+  assert.deepEqual(workspaceSections(initialWorkspaceTabs(true)),['overview','orders','products','earnings','promote','analytics','website'],'V7.3 adds Promote for Data Stores');
   assert.deepEqual(workspaceSections(initialWorkspaceTabs(false)),['overview','analytics','website']);
   assert.deepEqual(workspaceSections(['Overview','Orders','Store Earnings','Analytics','Settings']),['overview','orders','earnings','analytics','website'],'Data history kept after a design change');
   assert.match(workspace,/workspaceSections\(summary\.tabs\)|workspaceSections\(/);

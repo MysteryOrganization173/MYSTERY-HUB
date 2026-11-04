@@ -304,3 +304,48 @@
 /* Tablets: the dock keeps phone-sized targets centred instead of stretching across the width. */
 @media (min-width:640px) and (max-width:1023px){.bw-dock{grid-template-columns:repeat(var(--bw-dock-count,5),minmax(0,112px));justify-content:center}}
 .bw-drawer .website-sheet-body{padding-bottom:max(16px,env(safe-area-inset-bottom,0px))}
+
+/* ---------- V7.3 Promotion Kit (Promote area, Data Stores) ---------- */
+.pk{display:grid;gap:16px}
+.pk-intro h2,.pk-gate h2{font-size:17px;font-weight:700;margin:0}
+.pk-intro p,.pk-gate p{font-size:13.5px;color:#9fb0a8;margin:4px 0 0;line-height:1.5}
+.pk-gate{border:1px solid #1f2d36;border-radius:16px;background:#0d151b;padding:18px;justify-items:start}
+.pk-note{font-size:12.5px;color:#9fb0a8;line-height:1.5;margin:6px 0 0}
+.pk-layout{display:grid;gap:18px}
+/* Phones: designs, then the advert and its actions, then the fine-tuning. Desktop: choices left, the advert sticky on the right. */
+@media (min-width:1024px){.pk-layout{grid-template-columns:minmax(0,1fr) minmax(320px,400px);grid-template-areas:"pick result" "tune result";align-items:start}.pk-pick{grid-area:pick}.pk-controls{grid-area:tune}.pk-result{grid-area:result;position:sticky;top:84px}}
+.pk-controls,.pk-pick{display:grid;gap:14px;min-width:0}
+.pk-group{border:0;margin:0;padding:0;min-width:0;display:grid;gap:8px}
+.pk-group legend,.pk-field>span{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9fb0a8;margin-bottom:8px;padding:0}
+.pk-designs{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(124px,40%);gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 2px 6px;scrollbar-width:thin}
+@media (min-width:640px){.pk-designs{grid-auto-flow:row;grid-template-columns:repeat(3,minmax(0,1fr));overflow:visible}}
+.pk-design{scroll-snap-align:start;display:grid;gap:6px;align-content:start;text-align:left;padding:8px;border-radius:14px;border:1.5px solid #243039;background:#0f171d;color:#eef3f1;min-width:0}
+.pk-design canvas{width:100%;height:auto;border-radius:8px;background:#0b1015;display:block}
+.pk-design strong{font-size:13.5px;line-height:1.2}
+.pk-design small{font-size:11.5px;color:#9fb0a8;line-height:1.35}
+.pk-design[aria-checked=true]{border-color:#00c365;box-shadow:0 0 0 2px rgb(0 195 101 / .25)}
+.pk-design:disabled{opacity:.5;cursor:not-allowed}
+.pk-segment{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.pk-segment button,.pk-messages button{min-height:48px;padding:8px 12px;border-radius:12px;border:1.5px solid #243039;background:#0f171d;color:#eef3f1;text-align:left;display:flex;flex-direction:column;justify-content:center;gap:2px;font-size:13.5px}
+.pk-segment button small{font-size:11.5px;color:#9fb0a8}
+.pk-segment button[aria-checked=true],.pk-messages button[aria-checked=true]{border-color:#00c365;background:#0f2119}
+.pk-swatch{display:flex;gap:3px;margin-bottom:4px}.pk-swatch i{width:16px;height:16px;border-radius:5px;border:1px solid rgb(255 255 255 / .25)}
+.pk-segment button:has(.pk-swatch){flex-direction:column;align-items:flex-start}
+.pk-messages{display:flex;flex-wrap:wrap;gap:8px}
+.pk-messages button{min-height:44px;flex:0 1 auto;font-weight:600}
+.pk-field{display:grid;gap:6px}
+.pk-field select,.pk-field input{min-height:48px;border-radius:12px;border:1.5px solid #2c3a44;background:#0b1217;color:#eef3f1;padding:0 12px;font-size:15px;width:100%}
+.pk-field small{font-size:12px;color:#9fb0a8}
+.pk-result{display:grid;gap:12px;min-width:0}
+.pk-frame{position:relative;border-radius:18px;overflow:hidden;border:1px solid #243039;justify-self:center;width:min(100%,360px)}
+.pk-frame[data-format=square]{width:min(100%,400px)}
+.pk-frame canvas{display:block;width:100%;height:auto}
+.pk-loading{position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgb(255 255 255 / .06) 50%,transparent 70%) #0b1015;background-size:200% 100%;animation:pk-shimmer 1.2s linear infinite}
+@keyframes pk-shimmer{to{background-position:-200% 0}}
+.pk-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pk-actions .bw-button[data-primary]{grid-column:1/-1}
+.pk-status{min-height:20px;margin:0;font-size:13px;color:#b9e8cf;display:flex;gap:6px;align-items:center}
+.pk-caption{border:1px solid #1f2d36;border-radius:14px;background:#0d151b;padding:12px}
+.pk-caption span{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9fb0a8}
+.pk-caption p{margin:6px 0 0;font-size:13.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;color:#e6eeea}
+@media (prefers-reduced-motion:reduce){.pk-loading{animation:none}}
