@@ -258,7 +258,7 @@ export interface DigitalService {
   status: ServiceStatus;
   iconName: string;
   accentColor: string;
-  targetPage?: 'wallet' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'afa' | 'earn';
+  targetPage?: 'creative' | 'wallet' | 'data' | 'website' | 'marketplace' | 'services' | 'about' | 'afa' | 'earn';
   /** Data page mode to open with (Airtime shares the Data page). */
   dataMode?: 'data' | 'airtime';
   /** Short line for the compact phone tile of a featured service. */
@@ -268,7 +268,7 @@ export interface DigitalService {
   artworkUrl?: string;
 }
 
-export type ActivePage = 'wallet' | 'home' | 'data' | 'website' | 'business' | 'marketplace' | 'services' | 'about' | 'help' | 'orders' | 'admin' | 'earn' | 'afa' | 'app' | 'editor';
+export type ActivePage = 'creative' | 'wallet' | 'home' | 'data' | 'website' | 'business' | 'marketplace' | 'services' | 'about' | 'help' | 'orders' | 'admin' | 'earn' | 'afa' | 'app' | 'editor';
 
 export type MarketplaceAvailability = 'available' | 'check_availability' | 'limited' | 'coming_soon';
 

@@ -55,6 +55,7 @@ import {
 } from '../services/duplicateOrderProtection.js';
 
 import { afaRouter } from './afaApi.js';
+import { creativeStudioRouter } from './creativeStudioApi.js';
 import { accountRouter } from './accountApi.js';
 import { AccountError, identifierConflict, loginAccount } from '../services/accountSecurity.js';
 
@@ -68,6 +69,7 @@ apiRouter.use('/auth', accountRouter);
 apiRouter.use('/finance', financeRouter);
 apiRouter.use('/commercial',commercialRouter);
 apiRouter.use('/afa', afaRouter);
+apiRouter.use('/creative-studio', creativeStudioRouter);
 
 // Mount Website Builder endpoints
 apiRouter.use('/websites', websiteRouter);

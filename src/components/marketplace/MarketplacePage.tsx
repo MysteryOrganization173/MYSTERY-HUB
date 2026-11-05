@@ -13,6 +13,7 @@ import { ProductPhoto } from './MarketplaceMedia';
 import { MarketplaceProductCard } from './MarketplaceProductCard';
 import { MarketplaceRefineSheet, refineAvailability } from './MarketplaceRefineSheet';
 import { useMarketplaceDialog } from './useMarketplaceDialog';
+import { CreativeStudioEntry } from '../creative/CreativeStudioEntry';
 import { marketplaceProductKey } from '../../utils/marketplaceDeepLink';
 import {
   DEFAULT_BROWSE_STATE, KIND_LABELS, PRICE_BANDS, SORT_OPTIONS, MarketplaceBrowseState, MarketplaceSort,
@@ -471,6 +472,9 @@ export const MarketplacePage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Design services on quote live in Creative Studio, a part of the Marketplace with its own page. */}
+        <CreativeStudioEntry variant="marketplace" />
 
         {/* =========================================================
             2. VISUAL CATEGORY DISCOVERY (admin categories, live counts, real product photos)

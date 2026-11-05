@@ -640,6 +640,24 @@ export async function updateAdminOrderStatusOnServer(
   return data;
 }
 
+/** A Creative Studio brief. Resolves only when the server has stored it (201 new, or 200 for a retried copy). */
+export class CreativeBriefRequestError extends Error {
+  constructor(message: string, public field?: string, public retryable = true) { super(message); }
+}
+export async function submitCreativeBrief(payload: import('../../shared/creativeStudio').CreativeBriefInput): Promise<{ reference: string; receivedAt: string; service: string }> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/api/creative-studio/enquiries`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  } catch {
+    throw new CreativeBriefRequestError('We could not reach Mystery Hub. Check your connection and try again.');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success || typeof data.reference !== 'string') {
+    throw new CreativeBriefRequestError(data.error || 'We could not save your brief just now. Please try again.', data.field, res.status !== 400);
+  }
+  return { reference: data.reference, receivedAt: data.receivedAt, service: data.service };
+}
+
 export async function submitMarketplaceInquiry(payload: {
   productId: string;
   productName: string;

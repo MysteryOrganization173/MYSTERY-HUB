@@ -56,6 +56,17 @@ export const DIGITAL_SERVICES: DigitalService[] = [
     keywords: ['shop', 'buy', 'laptop', 'phone', 'tech', 'accessories', 'enquiry'],
   },
   {
+    id: 'srv-creative',
+    title: 'Creative Studio',
+    category: 'Business',
+    description: 'Flyers, posters, logos, social media graphics and banners designed for you. Share a short brief, get a quote, and work starts only when you agree.',
+    status: 'active',
+    iconName: 'Palette',
+    accentColor: '#FF8A4C',
+    targetPage: 'creative',
+    keywords: ['design', 'graphic design', 'flyer', 'poster', 'logo', 'branding', 'social media', 'banner', 'church', 'funeral poster'],
+  },
+  {
     id: 'srv-afa',
     title: 'AFA Registration',
     category: 'Phone & Internet',

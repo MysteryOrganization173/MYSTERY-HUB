@@ -41,6 +41,7 @@ export function serviceActionLabel(service: DigitalService, availability: Servic
     'srv-airtime': 'Top up airtime',
     'srv-website': 'Build a website',
     'srv-marketplace': 'Browse marketplace',
+    'srv-creative': 'Request a design',
     'srv-afa': availability === 'available' ? 'Register' : 'Check status',
     'srv-rewards': 'Open Mystery Earn',
     'srv-wallet': 'Open Wallet',
@@ -50,7 +51,7 @@ export function serviceActionLabel(service: DigitalService, availability: Servic
 
 /** Canonical address of each available service (used as the link href; clicks go through the app router). */
 export function serviceHref(service: DigitalService) {
-  const paths: Record<string, string> = { data: '/data', website: '/website-builder', marketplace: '/marketplace', afa: '/afa', earn: '/earn', wallet: '/wallet' };
+  const paths: Record<string, string> = { data: '/data', website: '/website-builder', marketplace: '/marketplace', creative: '/creative-studio', afa: '/afa', earn: '/earn', wallet: '/wallet' };
   return service.status === 'coming_soon' || !service.targetPage ? servicesHref({ service: serviceSlug(service) }) : paths[service.targetPage] || '/services';
 }
 
