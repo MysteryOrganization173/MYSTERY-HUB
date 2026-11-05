@@ -1,3 +1,4 @@
+import { AdminShield } from './sections/AdminShield';
 import {decodeAdminHash} from '../../utils/adminNavigation';
 import {AdminCommercialSection} from './sections/AdminCommercialSection';
 import {AdminFinanceSection} from './sections/AdminFinanceSection';
@@ -268,7 +269,10 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
             />
           )}
           {activeTab === 'orders' && (
+            <>
+            <AdminShield key={token} token={token} />
             <AdminOrdersSection key={param} sessionToken={token} initialStatusFilter={param.startsWith('ref/')?'':param.replace(/\/today$/,'')} initialReference={param.startsWith('ref/')?param.slice(4):undefined} initialCreatedToday={!param.startsWith('ref/')&&param.endsWith('/today')} initialView={orderViews.current.get(param)} onViewChange={rememberOrders} onChanged={onSignalsChanged} />
+            </>
           )}
           {activeTab === 'marketplace' && (
             <AdminMarketplaceSection key={param} sessionToken={token} initialView={param} onChanged={onSignalsChanged} />

@@ -1,4 +1,5 @@
 import {campaignPublicRouter,campaignAdminRouter,campaignShortRouter} from './server/routes/campaignApi.js';
+import { createShieldRouter, shieldAdminRouter } from './server/routes/shieldApi.js';
 import { corsMiddleware } from './server/middleware/cors.js';
 import express from 'express';
 import {notificationRouter,adminNotificationRouter} from './server/routes/notificationApi.js';
@@ -81,6 +82,8 @@ app.use('/api/admin/analytics',adminGrowthAnalyticsRouter);
 // Mount Core Payments & Orders API Router
 app.use('/api/notifications',notificationRouter);
 app.use('/api/admin/notifications',adminNotificationRouter);
+app.use('/api/shield', createShieldRouter());
+app.use('/api/admin/shield', shieldAdminRouter);
 app.use('/api', apiRouter);
 
 // Mount Protected Admin V1 API Router

@@ -1,3 +1,4 @@
+import { OrderShield } from './OrderShield';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { dataOrderPresentation, dataRecipientDisplay } from '../../utils/dataPurchasePresentation';
 import { afaStatusLabel } from '../../../shared/afa';
@@ -23,6 +24,7 @@ export const OrderStatusModal: React.FC = () => {
     updateOrderStatus,
     showToast,
     user,
+    sessionToken,
     openAuth,
   } = useApp();
 
@@ -478,6 +480,9 @@ export const OrderStatusModal: React.FC = () => {
           </div>
 
           {/* Optional referral discovery: only after a confirmed first-party delivery, below tracking actions. */}
+          {sessionToken && user?.role === 'customer' && activeOrder.network === 'mtn' && isDataOrder && lookupReference && (
+            <OrderShield key={sessionToken + lookupReference} token={sessionToken} reference={lookupReference} />
+          )}
           <PostPurchaseInvite order={activeOrder} onExplore={() => { closeOrderStatus(); setActivePage('earn'); }} />
 
           {/* WhatsApp Support Assistance */}
