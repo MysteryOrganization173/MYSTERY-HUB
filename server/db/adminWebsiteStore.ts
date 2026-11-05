@@ -9,17 +9,18 @@ import type {AdminWebsiteRow,AdminWebsiteInspection,WebsiteAdminSummary} from '.
 const text=(value:unknown):string|null=>typeof value==='string'&&value.trim()?value.trim():null;
 const iso=(value:Date|string)=>new Date(value).toISOString();
 function project(row:any):AdminWebsiteRow {
-  return {id:row.id,name:row.name,businessName:text(row.businessName)??'',slug:row.slug,user_id:row.user_id,ownerName:text(row.ownerName)??'Not provided',template_id:row.template_id,status:row.status,created_at:iso(row.created_at),updated_at:iso(row.updated_at),published_at:row.published_at?iso(row.published_at):null,assetCount:Number(row.assetCount)||0,publicUrl:row.status==='published'?`/sites/${encodeURIComponent(row.slug)}`:null};
+  return {id:row.id,name:row.name,businessName:text(row.businessName)??'',slug:row.slug,user_id:row.user_id,ownerName:text(row.ownerName)??'Not provided',template_id:row.template_id,status:row.status,created_at:iso(row.created_at),updated_at:iso(row.updated_at),published_at:row.published_at?iso(row.published_at):null,assetCount:Number(row.assetCount)||0,publicUrl:row.status==='published'?`/sites/${encodeURIComponent(row.slug)}`:null,...(row.ownerStage?{ownerStage:row.ownerStage}:{})};
 }
 export function validateAdminWebsiteId(id:string){if(!/^site_[a-zA-Z0-9_-]{1,59}$/.test(id))throw new WebsiteOperationError('Invalid website ID.');}
 export function adminWebsiteFilters(query:Record<string,unknown>){
-  if(Object.keys(query).some(k=>!['range','status','template','search','limit','offset'].includes(k))||['range','status','template','search'].some(k=>query[k]!==undefined&&typeof query[k]!=='string')||['limit','offset'].some(k=>query[k]!==undefined&&!['string','number'].includes(typeof query[k])))throw new WebsiteOperationError('Invalid website filters.');
+  if(Object.keys(query).some(k=>!['range','status','template','search','limit','offset','activation'].includes(k))||['range','status','template','search','activation'].some(k=>query[k]!==undefined&&typeof query[k]!=='string')||['limit','offset'].some(k=>query[k]!==undefined&&!['string','number'].includes(typeof query[k])))throw new WebsiteOperationError('Invalid website filters.');
   const range=String(query.range||'30'),status=String(query.status||''),template=String(query.template||''),search=String(query.search||'').trim();
+  const activation=String(query.activation||'');
   const limit=Number(query.limit??25),offset=Number(query.offset??0);
-  if(!['7','30','90','all'].includes(range)||!['','draft','published'].includes(status)||(template&&!isValidTemplateId(template))||search.length>100||!Number.isInteger(limit)||limit<1||limit>100||!Number.isInteger(offset)||offset<0||offset>100000)throw new WebsiteOperationError('Invalid website filters.');
-  return {range,status,template,search,limit,offset,since:range==='all'?null:new Date(Date.now()-Number(range)*86400_000).toISOString()};
+  if(!['','eligible','draft_only','published_owner'].includes(activation)||!['7','30','90','all'].includes(range)||!['','draft','published'].includes(status)||(template&&!isValidTemplateId(template))||search.length>100||!Number.isInteger(limit)||limit<1||limit>100||!Number.isInteger(offset)||offset<0||offset>100000)throw new WebsiteOperationError('Invalid website filters.');
+  return {range,status,template,search,activation,limit,offset,since:range==='all'?null:new Date(Date.now()-Number(range)*86400_000).toISOString()};
 }
-type ProjectReport=Pick<WebsiteAdminSummary,'sites'|'total'|'limit'|'offset'|'metrics'|'recentCreated'|'recentPublished'> & {
+type ProjectReport=Pick<WebsiteAdminSummary,'sites'|'total'|'limit'|'offset'|'metrics'|'recentCreated'|'recentPublished'|'activation'> & {
   templateProjects:Array<{templateId:string;projects:number;published:number}>;
   assetMetrics:{tracked:number;ready:number;cleanupPending:number};
 };
@@ -49,29 +50,36 @@ export class AdminWebsiteStore {
     if(db){
       const pattern=f.search?`%${f.search.replace(/[\\%_]/g,'\\$&')}%`:'';
       const raw=(await db.query(`WITH assets AS (SELECT website_id,status,expires_at FROM website_assets),
-        projects AS (SELECT ${columns},COALESCE(a.ready,0)::int AS "assetCount" FROM website_sites s LEFT JOIN users u ON u.id=s.user_id
+        owner_state AS (SELECT user_id,bool_or(status='published') AS has_published FROM website_sites WHERE status<>'archived' GROUP BY user_id),
+        projects AS (SELECT ${columns},COALESCE(a.ready,0)::int AS "assetCount",
+          CASE WHEN u.role='customer' AND u.status='active' THEN CASE WHEN o.has_published THEN 'published_owner' ELSE 'draft_only' END ELSE 'excluded' END AS "ownerStage" FROM website_sites s LEFT JOIN users u ON u.id=s.user_id
+          LEFT JOIN owner_state o ON o.user_id=s.user_id
           LEFT JOIN (SELECT website_id,count(*) FILTER(WHERE status='ready') AS ready FROM assets GROUP BY website_id) a ON a.website_id=s.id WHERE s.status<>'archived'),
         period AS (SELECT * FROM projects WHERE ($1::timestamptz IS NULL OR created_at >= $1)),
-        filtered AS (SELECT * FROM period WHERE ($2='' OR status=$2) AND ($3='' OR template_id=$3) AND
+        filtered AS (SELECT * FROM period WHERE ($8='' OR ($8='eligible' AND "ownerStage"<>'excluded') OR "ownerStage"=$8) AND ($2='' OR status=$2) AND ($3='' OR template_id=$3) AND
           ($4='' OR name ILIKE $4 OR "businessName" ILIKE $4 OR COALESCE("ownerName",'') ILIKE $4 OR id ILIKE $4 OR slug ILIKE $4))
         SELECT jsonb_build_object(
           'sites',(SELECT COALESCE(jsonb_agg(to_jsonb(p)),'[]') FROM (SELECT * FROM filtered ORDER BY created_at DESC,id LIMIT $5 OFFSET $6) p),
           'total',(SELECT count(*) FROM filtered),'limit',$5::int,'offset',$6::int,
+          'activation',(SELECT jsonb_build_object('customerOwners',count(DISTINCT user_id) FILTER(WHERE "ownerStage"<>'excluded'),'publishedOwners',count(DISTINCT user_id) FILTER(WHERE "ownerStage"='published_owner'),'draftOnlyOwners',count(DISTINCT user_id) FILTER(WHERE "ownerStage"='draft_only'),'excludedProjects',count(*) FILTER(WHERE "ownerStage"='excluded')) FROM projects),
           'metrics',(SELECT jsonb_build_object('total',count(*),'draft',count(*) FILTER(WHERE status='draft'),'published',count(*) FILTER(WHERE status='published'),'free',count(*)) FROM period),
           'recentCreated',(SELECT COALESCE(jsonb_agg(to_jsonb(p)),'[]') FROM (SELECT * FROM period ORDER BY created_at DESC,id LIMIT 5) p),
           'recentPublished',(SELECT COALESCE(jsonb_agg(to_jsonb(p)),'[]') FROM (SELECT * FROM projects WHERE status='published' AND published_at IS NOT NULL AND ($1::timestamptz IS NULL OR published_at >= $1) ORDER BY published_at DESC,id LIMIT 5) p),
           'templateProjects',(SELECT COALESCE(jsonb_agg(to_jsonb(t)),'[]') FROM (SELECT template_id AS "templateId",count(*) FILTER(WHERE $1::timestamptz IS NULL OR created_at >= $1) AS projects,count(*) FILTER(WHERE status='published' AND ($1::timestamptz IS NULL OR created_at >= $1)) AS published FROM projects GROUP BY template_id) t),
           'assetMetrics',(SELECT jsonb_build_object('tracked',count(*),'ready',count(*) FILTER(WHERE status='ready'),'cleanupPending',count(*) FILTER(WHERE status IN ('deleting','failed') OR status='pending' AND expires_at<$7)) FROM assets)
-        ) AS report`,[f.since,f.status,f.template,pattern,f.limit,f.offset,now])).rows[0].report;
+        ) AS report`,[f.since,f.status,f.template,pattern,f.limit,f.offset,now,f.activation])).rows[0].report;
       return {...raw,sites:raw.sites.map(project),recentCreated:raw.recentCreated.map(project),recentPublished:raw.recentPublished.map(project)};
     }
     const [sites,assets]=await Promise.all([WebsiteStore.allSites(),WebsiteAssetStore.all()]);
-    const owners=new Map(AuthStore.adminDevUsers().map(u=>[u.id,u.name]));
-    const rows=sites.map(s=>project({...s,businessName:s.content_json.businessName,ownerName:owners.get(s.user_id),assetCount:assets.filter(a=>a.website_id===s.id&&a.status==='ready').length}));
+    const owners=new Map(AuthStore.adminDevUsers().map(u=>[u.id,u]));
+    const publishedOwners=new Set(sites.filter(s=>s.status==='published').map(s=>s.user_id));
+    const ownerStage=(id:string)=>owners.get(id)?.role==='customer'&&owners.get(id)?.status==='active'?(publishedOwners.has(id)?'published_owner':'draft_only'):'excluded';
+    const rows=sites.map(s=>project({...s,businessName:s.content_json.businessName,ownerName:owners.get(s.user_id)?.name,ownerStage:ownerStage(s.user_id),assetCount:assets.filter(a=>a.website_id===s.id&&a.status==='ready').length}));
     const period=rows.filter(r=>!f.since||r.created_at>=f.since);
     const sorted=(a:AdminWebsiteRow,b:AdminWebsiteRow)=>b.created_at.localeCompare(a.created_at)||a.id.localeCompare(b.id);
-    const filtered=period.filter(r=>(!f.status||r.status===f.status)&&(!f.template||r.template_id===f.template)&&(!f.search||[r.name,r.businessName,r.ownerName,r.id,r.slug].some(v=>v.toLowerCase().includes(f.search.toLowerCase())))).sort(sorted);
-    return {sites:filtered.slice(f.offset,f.offset+f.limit),total:filtered.length,limit:f.limit,offset:f.offset,
+    const filtered=period.filter(r=>(!f.activation||(f.activation==='eligible'?r.ownerStage!=='excluded':r.ownerStage===f.activation))&&(!f.status||r.status===f.status)&&(!f.template||r.template_id===f.template)&&(!f.search||[r.name,r.businessName,r.ownerName,r.id,r.slug].some(v=>v.toLowerCase().includes(f.search.toLowerCase())))).sort(sorted);
+    const customerRows=rows.filter(s=>s.ownerStage!=='excluded');
+    return {activation:{customerOwners:new Set(customerRows.map(s=>s.user_id)).size,publishedOwners:new Set(customerRows.filter(s=>s.ownerStage==='published_owner').map(s=>s.user_id)).size,draftOnlyOwners:new Set(customerRows.filter(s=>s.ownerStage==='draft_only').map(s=>s.user_id)).size,excludedProjects:rows.length-customerRows.length},sites:filtered.slice(f.offset,f.offset+f.limit),total:filtered.length,limit:f.limit,offset:f.offset,
       metrics:{total:period.length,draft:period.filter(s=>s.status==='draft').length,published:period.filter(s=>s.status==='published').length,free:period.length},
       recentCreated:[...period].sort(sorted).slice(0,5),recentPublished:rows.filter(r=>r.status==='published'&&r.published_at&&(!f.since||r.published_at>=f.since)).sort((a,b)=>b.published_at!.localeCompare(a.published_at!)||a.id.localeCompare(b.id)).slice(0,5),
       templateProjects:[...new Set(rows.map(r=>r.template_id))].map(templateId=>({templateId,projects:period.filter(r=>r.template_id===templateId).length,published:period.filter(r=>r.template_id===templateId&&r.status==='published').length})),

@@ -52,6 +52,31 @@ test('native Admin website query accuracy, contact privacy, pagination and uncha
         const missing=await AdminWebsiteStore.inspect(sites[1].id);assert.equal(missing.owner.phone,null);assert.equal(missing.businessContact.whatsapp,null);assert.equal(missing.publicUrl,null);
       }finally{pool.query=original;}
     });
+    await t.test('owner activation deduplicates accounts before date filters and excludes staff/disabled/archived records',async()=>{
+      const copy=sites[30];
+      await observer.query(`INSERT INTO website_sites(id,user_id,template_id,name,slug,status,content_json,settings_json,created_at,updated_at,published_at,published_snapshot_json)
+        SELECT 'site_pilot_second',user_id,template_id,name,'pilot-second','draft',content_json,settings_json,NOW(),NOW(),NULL,NULL FROM website_sites WHERE id=$1`,[copy.id]);
+      await observer.query(`INSERT INTO website_sites(id,user_id,template_id,name,slug,status,content_json,settings_json,created_at,updated_at)
+        SELECT 'site_pilot_archived',user_id,template_id,name,'pilot-archived','archived',content_json,settings_json,NOW(),NOW() FROM website_sites WHERE id=$1`,[copy.id]);
+      for(const [id,role,status] of [['fixture-pilot-staff','admin','active'],['fixture-pilot-disabled','customer','disabled']] as const){
+        await AuthStore.createUser({id,name:id,email:null,phone:null,passwordHash:'SYNTHETIC',role,status});
+        await WebsiteStore.createSite(id,{name:'Excluded pilot record',template_id:'tmpl-legon-consult'});
+      }
+      const all=await AdminWebsiteStore.projects({range:'all'});
+      assert.deepEqual(all.activation,{customerOwners:31,publishedOwners:16,draftOnlyOwners:15,excludedProjects:2});
+      const draft=await AdminWebsiteStore.projects({range:'7',activation:'draft_only',search:'Owner 30'});assert.equal(draft.total,0);assert.deepEqual(draft.activation,all.activation);
+      const mixed=await AdminWebsiteStore.projects({range:'7',activation:'published_owner',status:'draft',search:'Owner 30'});assert.equal(mixed.total,1);assert.equal(mixed.sites[0].id,'site_pilot_second');assert.equal(mixed.sites[0].ownerStage,'published_owner');
+      const eligible=await AdminWebsiteStore.projects({range:'all',activation:'eligible',limit:100});assert.equal(eligible.total,32);assert.ok(eligible.sites.every(s=>s.ownerStage!=='excluded'));
+    });
+    await t.test('engagement is a bounded read-only aggregate over existing public observations, never previews or raw identities',async()=>{
+      const site=sites[0],visitorId=randomUUID(),sessionId=randomUUID();
+      await Promise.all(Array.from({length:4},()=>WebsiteAnalyticsStore.ingestPublic(site.id,{event:'site_view',visitorId,sessionId})));
+      await WebsiteAnalyticsStore.ingestPublic(site.id,{event:'whatsapp_click',visitorId,sessionId});await WebsiteAnalyticsStore.ingestPublic(site.id,{event:'call_click',visitorId,sessionId});
+      for(const at of ["NOW()-interval '31 days'","NOW()+interval '1 day'"])await observer.query(`INSERT INTO analytics_events(id,event_name,visitor_id,session_id,entity_type,entity_id,created_at) VALUES($1,'website_public_site_view',$2,$3,'website',$4,${at})`,['evt_'+randomUUID(),randomUUID(),randomUUID(),site.id]);
+      const evidence=await WebsiteAnalyticsStore.publicEngagement(site.id);assert.equal(evidence.views,1);assert.equal(evidence.approximateBrowsers,1);assert.equal(evidence.whatsappClicks,1);assert.equal(evidence.callClicks,1);assert.equal(evidence.emailClicks,0);assert.ok(evidence.lastObservedAt);assert.ok(!JSON.stringify(evidence).includes(visitorId));
+      const empty=await WebsiteAnalyticsStore.publicEngagement(sites[1].id);assert.equal(empty.views,0);assert.equal(empty.lastObservedAt,null);
+      await assert.rejects(WebsiteAnalyticsStore.publicEngagement('site_missing'),/not found/);
+    });
     await t.test('new inspection and list reads cannot mutate customer/financial state or alter RLS',async()=>{
       for(const name of ['orders','finance_accounts','finance_operations','finance_ledger'])assert.equal((await observer.query(`SELECT count(*) FROM ${name}`)).rows[0].count,'0');
       assert.equal((await observer.query("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND NOT c.relrowsecurity")).rows[0].count,'0');
@@ -62,6 +87,7 @@ test('native Admin website query accuracy, contact privacy, pagination and uncha
       await assert.rejects(WebsiteStore.forceUnpublish(sites[0].id,'fixture-admin','wrong'),/slug/);
       const before=(await WebsiteStore.findSiteById(sites[0].id))!;await WebsiteStore.forceUnpublish(before.id,'fixture-admin',before.slug);
       const after=(await WebsiteStore.findSiteById(before.id))!;assert.equal(after.status,'draft');assert.deepEqual(after.content_json,before.content_json);assert.equal((await AdminWebsiteStore.inspect(before.id)).publicUrl,null);
+      assert.equal((await AdminWebsiteStore.projects({range:'all'})).activation?.draftOnlyOwners,16);
       assert.ok((await AdminAuditStore.findRecent()).some(a=>a.entity_id===before.id&&a.action==='website_admin_unpublished'));
     });
   }finally{await getPool()?.end();await observer.end();delete process.env.DATABASE_URL;delete process.env.DATABASE_SSL;delete process.env.MYSTERY_TEST_DATABASE_OPT_IN;}
