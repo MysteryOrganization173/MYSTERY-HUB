@@ -1278,7 +1278,15 @@ export function uploadWebsiteImage(intent: WebsiteUploadIntent, file: File, onPr
 }
 export function changeWebsiteTemplate(token: string, id: string, targetTemplateId: string, expectedUpdatedAt: string) { return websiteFreeRequest<{success:true;site:WebsiteSiteRecord}>(`websites/${encodeURIComponent(id)}/change-template`,token,'POST',{targetTemplateId,confirmed:true,expectedUpdatedAt}); }
 export function recordWebsiteAnalytics(input: WebsiteAnalyticsInput, token?: string) { return websiteFreeRequest<{success:true}>('websites/analytics',token,'POST',input); }
-export function getAdminWebsiteSummary(token: string, filters: {range:string;search?:string;status?:string;template?:string;offset?:number}, signal?:AbortSignal) { return websiteFreeRequest<WebsiteAdminSummary>(`admin/website-builder?${new URLSearchParams(Object.entries(filters).map(([key,value])=>[key,String(value)]))}`,token,'GET',undefined,signal); }
+export function getAdminWebsiteSummary(token: string, filters: {range:string;search?:string;status?:string;template?:string;offset?:number;activation?:string}, signal?:AbortSignal) { return websiteFreeRequest<WebsiteAdminSummary>(`admin/website-builder?${new URLSearchParams(Object.entries(filters).filter(([key,value])=>key!=='activation'||Boolean(value)).map(([key,value])=>[key,String(value)]))}`,token,'GET',undefined,signal); }
+export async function getAdminWebsiteEngagement(token:string,id:string,signal?:AbortSignal){
+  const result=await websiteFreeRequest<{success:boolean;engagement:import('../config/websiteAnalytics').AdminWebsiteEngagement}>(`admin/website-builder/${encodeURIComponent(id)}/engagement`,token,'GET',undefined,signal);
+  const data=result.engagement,validDate=(value:unknown)=>typeof value==='string'&&Number.isFinite(Date.parse(value));
+  if(!data||!validDate(data.since)||!validDate(data.through)||Date.parse(data.since)>Date.parse(data.through)||
+    !['views','approximateBrowsers','whatsappClicks','callClicks','emailClicks'].every(key=>Number.isSafeInteger((data as any)[key])&&(data as any)[key]>=0)||
+    !(data.lastObservedAt===null||validDate(data.lastObservedAt)))throw Error('Public engagement response could not be verified. Please retry.');
+  return data;
+}
 export async function getAdminWebsiteInspection(token:string,id:string,signal?:AbortSignal){
   const result=await websiteFreeRequest<{success:true;site:AdminWebsiteInspection}>(`admin/website-builder/${encodeURIComponent(id)}`,token,'GET',undefined,signal);
   if(result.site?.id!==id)throw Error('Website inspection could not be verified. Please retry.');

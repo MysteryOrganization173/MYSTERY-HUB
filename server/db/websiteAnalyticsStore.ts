@@ -3,7 +3,7 @@ import { getPool } from './connection.js';
 import { WebsiteStore } from './websiteStore.js';
 import { WebsiteAssetStore } from './websiteAssetStore.js';
 import { AdminWebsiteStore, adminWebsiteFilters } from './adminWebsiteStore.js';
-import { WEBSITE_CLIENT_EVENTS, type WebsiteAnalyticsInput, type WebsiteAdminSummary } from '../../src/config/websiteAnalytics.js';
+import { WEBSITE_CLIENT_EVENTS, type WebsiteAnalyticsInput, type WebsiteAdminSummary, type AdminWebsiteEngagement } from '../../src/config/websiteAnalytics.js';
 import { isValidTemplateId } from '../types/website.js';
 import { cloudinaryConfigured, websiteMediaLimits, WebsiteOperationError } from '../services/websiteCloudinary.js';
 interface EventRecord { id: string; event_name: string; user_id: string | null; visitor_id: string | null; session_id: string | null; entity_type: string | null; entity_id: string | null; metadata_json: Record<string,string>; created_at: string; }
@@ -35,6 +35,34 @@ export class WebsiteAnalyticsStore {
       if(!duplicate.rows.length)await client.query('INSERT INTO analytics_events(id,event_name,visitor_id,session_id,entity_type,entity_id,metadata_json,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[row.id,event,row.visitor_id,row.session_id,'website',siteId,'{}',row.created_at]);
       await client.query('COMMIT');
     }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+  }
+  /** Admin-only aggregate; existing public observations, never customers/messages/sales. */
+  static async publicEngagement(siteId:string):Promise<AdminWebsiteEngagement> {
+    const through=new Date().toISOString(),since=new Date(Date.parse(through)-30*86400000).toISOString();
+    const db=getPool();
+    if(db){
+      const client=await db.connect();
+      try{
+        await client.query('BEGIN READ ONLY');await client.query("SET LOCAL statement_timeout='2000ms'");await client.query("SET LOCAL lock_timeout='500ms'");
+        const result=await client.query(`SELECT (SELECT jsonb_build_object(
+          'views',count(*) FILTER(WHERE event_name='website_public_site_view'),
+          'approximateBrowsers',count(DISTINCT visitor_id) FILTER(WHERE event_name='website_public_site_view'),
+          'whatsappClicks',count(*) FILTER(WHERE event_name='website_public_whatsapp_click'),
+          'callClicks',count(*) FILTER(WHERE event_name='website_public_call_click'),
+          'emailClicks',count(*) FILTER(WHERE event_name='website_public_email_click'),
+          'lastObservedAt',max(created_at))
+          FROM analytics_events WHERE entity_type='website' AND entity_id=s.id AND created_at >= $2 AND created_at <= $3
+          AND event_name IN ('website_public_site_view','website_public_whatsapp_click','website_public_call_click','website_public_email_click')) AS evidence
+          FROM website_sites s WHERE s.id=$1`,[siteId,since,through]);
+        if(!result.rows.length)throw new WebsiteOperationError('Website not found.',404);
+        await client.query('COMMIT');return {since,through,...result.rows[0].evidence};
+      }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+    }
+    if(!await WebsiteStore.findSiteRecordById(siteId))throw new WebsiteOperationError('Website not found.',404);
+    const names=['website_public_site_view','website_public_whatsapp_click','website_public_call_click','website_public_email_click'];
+    const rows=memory.filter(e=>e.entity_type==='website'&&e.entity_id===siteId&&e.created_at>=since&&e.created_at<=through&&names.includes(e.event_name));
+    const count=(name:string)=>rows.filter(e=>e.event_name===`website_public_${name}`).length;
+    return {since,through,views:count('site_view'),approximateBrowsers:new Set(rows.filter(e=>e.event_name==='website_public_site_view'&&e.visitor_id).map(e=>e.visitor_id)).size,whatsappClicks:count('whatsapp_click'),callClicks:count('call_click'),emailClicks:count('email_click'),lastObservedAt:rows.length?rows.reduce((latest,e)=>e.created_at>latest?e.created_at:latest,''):null};
   }
   static async ownerAnalytics(siteId:string,userId:string,range='30',staffVerified=false) {
     if(!staffVerified)await WebsiteAssetStore.ownedSite(siteId,userId);

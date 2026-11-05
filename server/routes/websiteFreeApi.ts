@@ -57,6 +57,10 @@ export const adminWebsiteRouter=Router();
 adminWebsiteRouter.use((_req,res,next)=>{res.set('Cache-Control','no-store');next();},requireAdmin);
 adminWebsiteRouter.use(adminWebsiteBusinessRouter);
 adminWebsiteRouter.get('/',websiteFreeHandler(async(req,res)=>{res.json({success:true,...await WebsiteAnalyticsStore.summary(req.query)});}));
+adminWebsiteRouter.get('/:id/engagement',websiteFreeHandler(async(req,res)=>{
+  validateAdminWebsiteId(req.params.id);
+  res.json({success:true,engagement:await WebsiteAnalyticsStore.publicEngagement(req.params.id)});
+}));
 adminWebsiteRouter.get('/:id',websiteFreeHandler(async(req,res)=>{
   // Includes deleted (archived) websites so staff can still trace their history.
   // Safe operational projection; no account/security/provider credentials or arbitrary content.
