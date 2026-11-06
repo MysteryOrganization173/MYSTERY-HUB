@@ -52,13 +52,14 @@ interface AdminMarketplaceSectionProps {
   sessionToken: string;
   /** Deep link from the admin hash route: products | inquiries | categories. */
   initialView?: string;
+  onShowAllEnquiries?: () => void;
   /** Lets the shell refresh navigation badges after inquiry or product changes. */
   onChanged?: () => void;
 }
 type MarketplaceView = 'products' | 'inquiries' | 'categories';
 const MARKETPLACE_VIEWS: MarketplaceView[] = ['products', 'inquiries', 'categories'];
 
-export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = ({ sessionToken, initialView, onChanged }) => {
+export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = ({ sessionToken, initialView, onChanged, onShowAllEnquiries }) => {
   const { showToast } = useApp();
   const [view, setView] = useState<MarketplaceView>(MARKETPLACE_VIEWS.includes(initialView?.split('/')[0] as MarketplaceView) ? initialView!.split('/')[0] as MarketplaceView : 'products');
   const changeView = (next: MarketplaceView) => {
@@ -420,7 +421,7 @@ export const AdminMarketplaceSection: React.FC<AdminMarketplaceSectionProps> = (
       )}
       </>}
 
-      {view!=='products'&&<MarketplaceControlPanels initialFilter={initialView?.split('/').slice(1).join('/')||'new'} token={sessionToken} view={view} categories={categories} onCategoriesChanged={loadCategories} products={products} onChanged={()=>{void fetchProducts();onChanged?.();}} onEditProduct={openEditModal} />}
+      {view!=='products'&&<MarketplaceControlPanels initialFilter={initialView?.split('/').slice(1).join('/')||'new'} token={sessionToken} view={view} categories={categories} onCategoriesChanged={loadCategories} products={products} onChanged={()=>{void fetchProducts();onChanged?.();}} onEditProduct={openEditModal} onShowAllEnquiries={onShowAllEnquiries} />}
       {preview&&<MarketplaceProductDetailModal product={preview} onClose={()=>setPreview(null)} onBuyNow={()=>showToast('Internal draft preview: purchasing is disabled.','info')} onInquire={()=>showToast('Internal draft preview.','info')} onShare={()=>showToast('Drafts cannot be shared publicly.','info')} formatGhcReward={n=>'GH₵'+(n ?? 0).toFixed(2)} />}
       {publishWarnings && (
         <ConfirmAction

@@ -18,7 +18,9 @@ import { AdminNotificationsSection } from './sections/AdminNotificationsSection'
 import {AdminAnalyticsSection} from './sections/AdminAnalyticsSection';
 import {useLeadAlerts} from './leadAlerts';
 import {AdminLeadSummary} from './sections/AdminLeadSummary';
-import {leadDestination} from '../../../shared/leadOperations';
+import {leadAlertLabel, leadDestination} from '../../../shared/leadOperations';
+import { AdminOperationsAlerts } from './sections/AdminOperationsAlerts';
+import { AdminSheet } from './ui/AdminUi';
 import { BrandLogo } from '../common/BrandLogo';
 import { useAdminSignals } from './adminSignals';
 import {
@@ -79,6 +81,7 @@ export const AdminPage: React.FC = () => {
   const [location, setLocation] = useState(readHash);
   const [menuOpen, setMenuOpen] = useState(false);
   const [signalRefresh, setSignalRefresh] = useState(0);
+  const onSignalsChanged = useCallback(() => setSignalRefresh(n => n + 1), []);
   const activeTab = location.tab;
 
   useEffect(() => {
@@ -147,7 +150,7 @@ export const AdminPage: React.FC = () => {
     menuOpen={menuOpen}
     setMenuOpen={setMenuOpen}
     signalRefresh={signalRefresh}
-    onSignalsChanged={() => setSignalRefresh(n => n + 1)}
+    onSignalsChanged={onSignalsChanged}
     onStorefront={() => setActivePage('home')}
     onSignOut={logoutUser}
   />;
@@ -165,13 +168,30 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
     orderViews.current.set(param, view);
   }, [param]);
   const signals = useAdminSignals(token, signalRefresh);
-  const leads=useLeadAlerts(token);
+  const leads = useLeadAlerts(token);
+  const refreshOrderSignals = useCallback(() => {
+    leads.refresh();
+    onSignalsChanged();
+  }, [leads.refresh, onSignalsChanged]);
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const alertTrigger = useRef<HTMLButtonElement>(null);
+  const restoreAlertFocus = useRef(false);
+  useEffect(() => {
+    if (!alertsOpen && restoreAlertFocus.current) {
+      restoreAlertFocus.current = false;
+      alertTrigger.current?.focus();
+    }
+  }, [alertsOpen]);
+  const paidCount = !leads.orderError ? leads.orders?.total : undefined;
+  const hasEnquiryAlerts = !leads.error && leads.data &&
+    [leads.data.ultra, leads.data.marketplace].some(source => source.new > 0 || source.overdue > 0);
+  const hasAlerts = !leads.denied && Boolean(paidCount || hasEnquiryAlerts || (signals.supplierAlert && !signals.supplierUnavailable));
   const badges: Partial<Record<AdminTab, { count: number | null; tone: 'warning' | 'danger' | 'info'; label: string }>> = {
-    orders: signals.ordersAttention ? { count: signals.ordersAttention, tone: 'warning', label: `${signals.ordersAttention} orders need attention` } : undefined,
-    marketplace: leads.data?.marketplace.new ? { count: leads.data.marketplace.new, tone: 'info', label: `${leads.data.marketplace.new} new Marketplace enquiries` } : undefined,
-    websites:leads.data?.ultra.new?{count:leads.data.ultra.new,tone:'info',label:`${leads.data.ultra.new} new Ultra enquiries`}:undefined,
-    finance: signals.pendingWithdrawals ? { count: signals.pendingWithdrawals, tone: 'warning', label: `${signals.pendingWithdrawals} withdrawal requests waiting` } : undefined,
-    system: signals.supplierAlert ? { count: null, tone: 'danger', label: 'Supplier needs attention' } : undefined,
+    orders: paidCount ? { count: paidCount, tone: 'warning', label: `${paidCount} paid orders need attention` } : undefined,
+    marketplace: !leads.error && leads.data?.marketplace.new ? { count: leads.data.marketplace.new, tone: 'info', label: `${leads.data.marketplace.new} new Marketplace and Creative Studio enquiries` } : undefined,
+    websites: !leads.error && leads.data?.ultra.new ? { count: leads.data.ultra.new, tone: 'info', label: `${leads.data.ultra.new} new Ultra enquiries` } : undefined,
+    finance: !leads.denied && signals.pendingWithdrawals ? { count: signals.pendingWithdrawals, tone: 'warning', label: `${signals.pendingWithdrawals} waiting withdrawal requests in the latest 50` } : undefined,
+    system: !leads.denied && !signals.supplierUnavailable && signals.supplierAlert ? { count: null, tone: 'danger', label: 'Supplier needs attention at the last overview check' } : undefined,
   };
   // Areas reached through "More" on phones still surface their alerts on that button.
   const moreBadges = (Object.keys(badges) as AdminTab[]).filter(tab => !QUICK.includes(tab) && badges[tab]).map(tab => badges[tab]!);
@@ -208,9 +228,9 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
   return (
     <div className="admin-v2 min-h-screen bg-[#070b0e] text-slate-100 flex flex-col font-sans">
       {/* Top bar */}
-      <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#0a1015]/95 px-4 py-2.5 backdrop-blur-md sm:px-6">
-        <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
+      <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#0a1015]/95 px-3 py-2.5 backdrop-blur-md sm:px-6">
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button type="button" onClick={() => setMenuOpen(true)} aria-label="Open admin menu" aria-expanded={menuOpen} className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-800 text-slate-200 lg:hidden">
               <Menu className="h-5 w-5" />
             </button>
@@ -220,8 +240,15 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
               <Shield className="h-3 w-3" />Admin
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <span className="hidden max-w-[16rem] truncate text-xs text-slate-400 md:inline" title={adminLabel}>{adminLabel}</span>
+            <button ref={alertTrigger} type="button" onClick={() => {
+              restoreAlertFocus.current = true;
+              setAlertsOpen(true);
+            }} aria-label={hasAlerts ? 'Operations alerts · attention needed' : 'Operations alerts'} aria-haspopup="dialog" className="relative inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border border-slate-800 px-2 text-sm text-slate-200 hover:bg-slate-800/60">
+              <Bell className="h-4 w-4" aria-hidden /><span className="hidden lg:inline">Alerts</span>
+              {hasAlerts && <span aria-hidden className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-300" />}
+            </button>
             <button type="button" onClick={onStorefront} title="Return to customer store" aria-label="Return to customer store" className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-slate-800 px-3 text-sm text-slate-300 hover:text-white">
               <ArrowLeft className="h-4 w-4 text-[#00c365]" /><span className="hidden sm:inline">Storefront</span>
             </button>
@@ -256,8 +283,14 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
         )}
 
         <main className="min-w-0 flex-1">
-          {leads.fresh.length>0&&<div role="status" className="mb-4 rounded-xl border border-sky-700 bg-sky-950/30 p-3 text-sm"><p>New enquiries received while Admin was open.</p>{leads.fresh.map(row=><button key={row.source+row.id} className="mr-3 min-h-11 text-sky-200" onClick={()=>{const d=leadDestination(row.source,row.reference);navigate(d.tab as AdminTab,d.param);}}>{row.source==='ultra'?'Ultra':'Marketplace'} · open enquiry</button>)}<button className="min-h-11 text-slate-400" onClick={leads.dismiss}>Dismiss alert</button></div>}
-          {activeTab==='overview'&&<div className="mb-5"><AdminLeadSummary state={leads} navigate={navigate}/></div>}
+          {leads.fresh.length > 0 && <div className="mb-4 rounded-xl border border-sky-700 bg-sky-950/30 p-3 text-sm">
+            <p role="status">{leads.fresh.length} new {leads.fresh.length === 1 ? 'enquiry' : 'enquiries'} since your last check</p>
+            {leads.fresh.map(row => <button type="button" key={row.source + row.id} className="mr-3 min-h-11 text-left text-sky-200" onClick={() => {
+              const {tab, param} = leadDestination(row.source, row.reference);
+              navigate(tab, param);
+            }}>{leadAlertLabel(row.source, row)} · {row.reference}</button>)}
+            <button type="button" className="min-h-11 text-slate-300" onClick={leads.dismiss}>Dismiss banner for this session</button>
+          </div>}
           {activeTab==='commercial'&&<AdminCommercialSection token={token}/>}
           {activeTab==='finance'&&<AdminFinanceSection sessionToken={token} initialView={param} onOpenCustomer={id=>navigate('customers',id)} onChanged={onSignalsChanged}/>}
           {activeTab === 'earn' && <AdminMysteryEarnSection sessionToken={token} initialReferrerId={param||null} onOpenCustomer={id => navigate('customers', id)} />}
@@ -265,17 +298,25 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
             <AdminOverviewSection
               sessionToken={token}
               onNavigateTab={(tab,filter) => navigate(tab, filter||'')}
-              onRefreshed={onSignalsChanged}
+              onRefreshed={refreshOrderSignals}
+              alerts={<AdminOperationsAlerts alerts={leads} navigate={navigate} />}
+              leadSummary={<AdminLeadSummary state={leads} navigate={navigate} />}
             />
           )}
+          {alertsOpen && <AdminSheet title="Operations alerts" subtitle="Staff-only checks. Phone push is off." onClose={() => setAlertsOpen(false)}>
+            <AdminOperationsAlerts alerts={leads} supplier={signals} navigate={(tab, filter) => {
+              setAlertsOpen(false);
+              navigate(tab, filter);
+            }} />
+          </AdminSheet>}
           {activeTab === 'orders' && (
             <>
             <AdminShield key={token} token={token} />
-            <AdminOrdersSection key={param} sessionToken={token} initialStatusFilter={param.startsWith('ref/')?'':param.replace(/\/today$/,'')} initialReference={param.startsWith('ref/')?param.slice(4):undefined} initialCreatedToday={!param.startsWith('ref/')&&param.endsWith('/today')} initialView={orderViews.current.get(param)} onViewChange={rememberOrders} onChanged={onSignalsChanged} />
+            <AdminOrdersSection key={param} sessionToken={token} initialStatusFilter={param.startsWith('ref/')?'':param.replace(/\/today$/,'')} initialReference={param.startsWith('ref/')?param.slice(4):undefined} initialCreatedToday={!param.startsWith('ref/')&&param.endsWith('/today')} initialView={orderViews.current.get(param)} onViewChange={rememberOrders} onChanged={refreshOrderSignals} />
             </>
           )}
           {activeTab === 'marketplace' && (
-            <AdminMarketplaceSection key={param} sessionToken={token} initialView={param} onChanged={onSignalsChanged} />
+            <AdminMarketplaceSection key={param} sessionToken={token} initialView={param} onChanged={onSignalsChanged} onShowAllEnquiries={() => navigate('marketplace', 'inquiries/all')} />
           )}
           {activeTab === 'notifications' && <AdminNotificationsSection key={token} sessionToken={token} initialView={param} onNavigate={view => navigate('notifications', view)} />}
           {activeTab === 'waitlist' && (
