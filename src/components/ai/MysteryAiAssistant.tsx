@@ -5,6 +5,8 @@ import { MysteryAiIcon } from './MysteryAiIcon';
 import {AssistantText} from './AssistantText';
 import {useDialogFocus} from '../../hooks/useDialogFocus';
 import { AiRequestGate } from '../../utils/aiRequestGate';
+import {aiDataChoices,confirmAiDataChoice,maskAiRecipient,parseAiDataRequest,type AiDataChoice,type DataRequest} from '../../services/mysteryAiOrders';
+import {readPendingCheckout} from '../../utils/checkoutRecovery';
 import {validateAiNavigation,type AiNavigation} from '../../../shared/mysteryAiIntent';
 import {
   ChatMessage,
@@ -47,6 +49,7 @@ export const MysteryAiAssistant: React.FC = () => {
     sessionToken,
     setActivePage,
     openDataPage,
+    openCheckout,
     activeEditorSite,
     editorAiContext,
     isMysteryAiOpen,
@@ -77,9 +80,20 @@ export const MysteryAiAssistant: React.FC = () => {
   },[failure?.retryAt]);
   const [showJump, setShowJump] = useState(false);
   const requestGate = useRef(new AiRequestGate());
+  const dataDraft = useRef<DataRequest | undefined>(undefined);
+  const choiceOwner = useRef<string | undefined>(undefined);
+  const [activeChoiceId,setActiveChoiceId] = useState<string>();
+  const updateChoiceOwner = (id?:string) => {
+    choiceOwner.current = id;
+    setActiveChoiceId(id);
+  };
+  const [choiceNotice, setChoiceNotice] = useState('');
   const pendingQuestion = useRef<{query: string; messageId: string} | null>(null);
   const cancelPending = () => {
     requestGate.current.cancel();
+    dataDraft.current = undefined;
+    updateChoiceOwner();
+    setChoiceNotice('');
     pendingQuestion.current = null;
     setIsTyping(false);
     setFailure(null);
@@ -164,6 +178,15 @@ export const MysteryAiAssistant: React.FC = () => {
     setInputValue('');
     setMessages([]);
   }, [accountId,sessionToken]);
+
+  const previousPage = useRef({activePage,dataProductMode,isInsideEditor});
+  useLayoutEffect(() => {
+    const before = previousPage.current;
+    previousPage.current = {activePage,dataProductMode,isInsideEditor};
+    if (before.activePage !== activePage || before.dataProductMode !== dataProductMode || before.isInsideEditor !== isInsideEditor) {
+      cancelPending();
+    }
+  }, [activePage,dataProductMode,isInsideEditor]);
 
   // Inactivity expansion trigger: gently expand prompt once
   useEffect(() => {
@@ -251,9 +274,16 @@ export const MysteryAiAssistant: React.FC = () => {
   };
 
   const handleSendMessage = async (textToSend?: string, retry = false) => {
-    const query = (textToSend || inputValue).trim();
+    const rawQuery = (textToSend || inputValue).trim();
+    const query = maskAiRecipient(rawQuery);
     if (retry && failure?.retryAt && Date.now() < failure.retryAt) return;
-    if (!query || query.length > CHAT_MAX_CHARS || !chatAvailable.current || requestGate.current.busy) return;
+    if (!rawQuery || rawQuery.length > CHAT_MAX_CHARS || !chatAvailable.current || requestGate.current.busy) return;
+    const orderDraft = !isInsideEditor && !(activePage === 'data' && dataProductMode !== 'data')
+      ? retry ? dataDraft.current : parseAiDataRequest(rawQuery, dataDraft.current)
+      : null;
+    dataDraft.current = orderDraft ?? undefined;
+    updateChoiceOwner();
+    setChoiceNotice('');
     const request = requestGate.current.begin();
     const userMsg: ChatMessage = {
       id: retry && failure ? failure.messageId : `user-${Date.now()}`,
@@ -268,6 +298,14 @@ export const MysteryAiAssistant: React.FC = () => {
     if (!textToSend || textToSend === inputValue) setInputValue('');
     setIsTyping(true);
     try {
+      if (orderDraft) {
+        const result = await aiDataChoices(orderDraft, request.signal);
+        if (!requestGate.current.accepts(request) || !chatAvailable.current) return;
+        const id = `ai-${Date.now()}`;
+        updateChoiceOwner(result.choices.length ? id : undefined);
+        setMessages(prev => [...prev, {id, role:'assistant', content:result.reply, timestamp:timeLabel(), productChoices:result.choices}]);
+        return;
+      }
       const response = await sendMysteryAiMessage(query, activePage, priorHistory, editorAiContext, request.signal);
       if (!requestGate.current.accepts(request)) return;
       setMessages(prev => [...prev, {
@@ -279,7 +317,7 @@ export const MysteryAiAssistant: React.FC = () => {
       if (!requestGate.current.accepts(request)) return;
       // The service exposes only safe product-facing errors, never provider details.
       setFailure({query, messageId: userMsg.id,
-        error: error instanceof Error ? error.message : "Couldn't reach Mystery AI just now. Try again.",
+        error: orderDraft ? 'Current Data bundles could not be loaded. Try again or open the Data page.' : error instanceof Error ? error.message : "Couldn't reach Mystery AI just now. Try again.",
         kind: error instanceof MysteryAiError ? error.kind : 'unavailable',
         retryable: error instanceof MysteryAiError ? error.retryable : true,
         retryAt: error instanceof MysteryAiError && error.retryAfterSeconds ? Date.now()+error.retryAfterSeconds*1000 : undefined});
@@ -312,6 +350,41 @@ export const MysteryAiAssistant: React.FC = () => {
     setInputValue('');
     setMessages([welcomeMessage()]);
     inputRef.current?.focus();
+  };
+
+  const handleBundleChoice = async (messageId:string, choice:AiDataChoice) => {
+    if (!chatAvailable.current || choiceOwner.current !== messageId || requestGate.current.busy) return;
+    const pendingNotice = 'An earlier payment is still pending. Open Orders to check it before starting another checkout.';
+    if (readPendingCheckout()) {
+      setChoiceNotice(pendingNotice);
+      return;
+    }
+    const request = requestGate.current.begin();
+    const recipient = dataDraft.current?.recipient;
+    setIsTyping(true);
+    setChoiceNotice('');
+    try {
+      const bundle = await confirmAiDataChoice(choice, request.signal);
+      if (!requestGate.current.accepts(request) || !chatAvailable.current || choiceOwner.current !== messageId) return;
+      if (!bundle) {
+        updateChoiceOwner();
+        setChoiceNotice('This bundle’s price or availability has changed. Ask for current bundles again or open the Data page.');
+        return;
+      }
+      if (readPendingCheckout()) {
+        setChoiceNotice(pendingNotice);
+        return;
+      }
+      cancelPending();
+      closeMysteryAi();
+      setIsOpen(false);
+      openCheckout(bundle, recipient ? {recipientPhone:recipient} : undefined);
+    } catch {
+      if (requestGate.current.accepts(request)) setChoiceNotice('Could not verify this bundle. Try again or open the Data page.');
+    } finally {
+      if (requestGate.current.accepts(request)) setIsTyping(false);
+      requestGate.current.finish(request);
+    }
   };
 
   const handleQuickActionClick = (candidate: AiNavigation) => {
@@ -462,6 +535,18 @@ export const MysteryAiAssistant: React.FC = () => {
                       {isAssistant ? <span className="sr-only">Mystery AI: </span> : <span className="sr-only">You: </span>}
                       {isAssistant?<AssistantText text={msg.content}/>:msg.content}
 
+                      {!!msg.productChoices?.length && activeChoiceId === msg.id && (
+                        <div className="mt-3 flex flex-col gap-2">
+                          {msg.productChoices.map(choice => (
+                            <button key={choice.id} type="button" disabled={isTyping}
+                              onClick={() => handleBundleChoice(msg.id, choice)}
+                              className="min-h-11 rounded-xl bg-[#00c365] px-3 py-2 text-left text-xs font-bold text-black disabled:opacity-50">
+                              Review checkout · {choice.network === 'airteltigo' ? 'AirtelTigo' : choice.network === 'telecel' ? 'Telecel' : 'MTN'} {choice.dataAmount} · GH₵{choice.priceGhc.toFixed(2)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Actionable Redirection Button */}
                       {isAssistant && !!msg.actions?.length && (
                         <div className="mt-3 pt-2.5 border-t border-slate-700/60 flex flex-col gap-1.5">
@@ -488,6 +573,7 @@ export const MysteryAiAssistant: React.FC = () => {
                 );
               })}
 
+              {choiceNotice && <p role="status" className="text-sm text-amber-200">{choiceNotice}</p>}
               {/* First visit: suggested questions sit under the greeting as full-width, easy-to-tap choices */}
               {!conversationStarted && !isTyping && suggestedQuestions.length > 0 && (
                 <div className="space-y-2 pt-1">
