@@ -10,6 +10,8 @@ import {readPendingCheckout} from '../../utils/checkoutRecovery';
 import {redactAiSavedText} from '../../../shared/mysteryAiPrivacy';
 import {useMysteryAiHistory} from './useMysteryAiHistory';
 import {MysteryAiHistoryPanel} from './MysteryAiHistoryPanel';
+import {MysteryAiVoice} from './MysteryAiVoice';
+import {MysteryAiFeedbackForm} from './MysteryAiFeedbackForm';
 import {validateAiNavigation,type AiNavigation} from '../../../shared/mysteryAiIntent';
 import {
   ChatMessage,
@@ -72,6 +74,9 @@ export const MysteryAiAssistant: React.FC = () => {
   const [isExpandedPrompt, setIsExpandedPrompt] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [voiceActive,setVoiceActive] = useState(false);
+  const [feedbackFor,setFeedbackFor] = useState<ChatMessage|null>(null);
+  const feedbackButtons = useRef(new Map<string,HTMLButtonElement>());
   const [isTyping, setIsTyping] = useState(false);
   const [slowReply, setSlowReply] = useState(false);
   const [failure, setFailure] = useState<{query: string; messageId: string; error: string; kind: ChatFailureKind; retryable?:boolean; retryAt?:number} | null>(null);
@@ -97,6 +102,7 @@ export const MysteryAiAssistant: React.FC = () => {
     dataDraft.current = undefined;
     updateChoiceOwner();
     setChoiceNotice('');
+    setFeedbackFor(null);
     pendingQuestion.current = null;
     setIsTyping(false);
     setFailure(null);
@@ -180,7 +186,7 @@ export const MysteryAiAssistant: React.FC = () => {
       const timestamp = new Date(turn.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
       return [
         {id:`saved-question-${turn.id}`,role:'user' as const,content:turn.question,timestamp},
-        {id:`saved-answer-${turn.id}`,role:'assistant' as const,content:turn.reply,timestamp},
+        {id:`saved-answer-${turn.id}`,role:'assistant' as const,content:turn.reply,timestamp,reportReference:turn.id},
       ];
     }) : [welcomeMessage()]);
   });
@@ -294,7 +300,7 @@ export const MysteryAiAssistant: React.FC = () => {
     const rawQuery = (textToSend || inputValue).trim();
     const query = maskAiRecipient(rawQuery);
     if (retry && failure?.retryAt && Date.now() < failure.retryAt) return;
-    if (!rawQuery || rawQuery.length > CHAT_MAX_CHARS || !chatAvailable.current || requestGate.current.busy || (history.current && history.busy) || history.unsaved || history.visible) return;
+    if (!rawQuery || rawQuery.length > CHAT_MAX_CHARS || !chatAvailable.current || requestGate.current.busy || (history.current && history.busy) || history.unsaved || history.visible || voiceActive || feedbackFor) return;
     const orderDraft = !isInsideEditor && !(activePage === 'data' && dataProductMode !== 'data')
       ? retry ? dataDraft.current : parseAiDataRequest(rawQuery, dataDraft.current)
       : null;
@@ -302,9 +308,10 @@ export const MysteryAiAssistant: React.FC = () => {
     updateChoiceOwner();
     setChoiceNotice('');
     const request = requestGate.current.begin();
+    const turnId = crypto.randomUUID();
     const saveResponse = (reply:string) => {
       if (!history.current) return;
-      void history.saveTurn({requestId:crypto.randomUUID(),question:redactAiSavedText(query).slice(0,2000),reply:redactAiSavedText(reply).slice(0,4000)});
+      void history.saveTurn({requestId:turnId,question:redactAiSavedText(query).slice(0,2000),reply:redactAiSavedText(reply).slice(0,4000)});
     };
     const userMsg: ChatMessage = {
       id: retry && failure ? failure.messageId : `user-${Date.now()}`,
@@ -324,7 +331,7 @@ export const MysteryAiAssistant: React.FC = () => {
         if (!requestGate.current.accepts(request) || !chatAvailable.current) return;
         const id = `ai-${Date.now()}`;
         updateChoiceOwner(result.choices.length ? id : undefined);
-        setMessages(prev => [...prev, {id, role:'assistant', content:result.reply, timestamp:timeLabel(), productChoices:result.choices}]);
+        setMessages(prev => [...prev, {id, role:'assistant', content:result.reply, timestamp:timeLabel(), productChoices:result.choices, reportReference:turnId}]);
         saveResponse(result.reply);
         return;
       }
@@ -333,7 +340,7 @@ export const MysteryAiAssistant: React.FC = () => {
       setMessages(prev => [...prev, {
         id: `ai-${Date.now()}`, role: 'assistant', content: response.reply,
         timestamp: timeLabel(),
-        actions: response.actions, source: response.source,
+        actions: response.actions, source: response.source, reportReference:turnId,
       }]);
       saveResponse(response.reply);
     } catch (error) {
@@ -465,7 +472,7 @@ export const MysteryAiAssistant: React.FC = () => {
   }
 
   const countLabel = composerCountLabel(inputValue.length);
-  const canSend = Boolean(inputValue.trim()) && inputValue.length <= CHAT_MAX_CHARS && !isTyping && !(history.current && history.busy) && !history.unsaved && !history.visible;
+  const canSend = Boolean(inputValue.trim()) && inputValue.length <= CHAT_MAX_CHARS && !isTyping && !(history.current && history.busy) && !history.unsaved && !history.visible && !voiceActive && !feedbackFor;
   // Phones get a near full-height sheet whose own header closes it; larger screens keep the floating panel above its button.
   const panelHeight = isPhone ? Math.max(240, viewport.height - 16) : undefined;
 
@@ -608,11 +615,24 @@ export const MysteryAiAssistant: React.FC = () => {
                     <span className="text-[11px] text-slate-500 mt-1 px-1">
                       {msg.source === 'scripted' ? 'Help guide · ' : msg.source === 'gemini' ? 'AI answer · ' : ''}{failedHere ? 'Not answered · ' : ''}{msg.timestamp}
                     </span>
+                    {isAssistant && msg.reportReference && user?.role==='customer' && sessionToken && (
+                      <button type="button" ref={element=>{if(element)feedbackButtons.current.set(msg.id,element);else feedbackButtons.current.delete(msg.id);}}
+                        disabled={isTyping||voiceActive||Boolean(feedbackFor)}
+                        className="min-h-11 rounded px-2 text-xs text-slate-400 underline underline-offset-2 disabled:opacity-50"
+                        onClick={()=>setFeedbackFor(msg)}>Report answer</button>
+                    )}
                   </div>
                 );
               })}
 
               {choiceNotice && <p role="status" className="text-sm text-amber-200">{choiceNotice}</p>}
+              {feedbackFor?.reportReference && sessionToken && user?.role==='customer' &&
+                <MysteryAiFeedbackForm key={feedbackFor.id} token={sessionToken} reference={feedbackFor.reportReference} answer={feedbackFor.content} onClose={()=>{
+                  const id=feedbackFor.id;
+                  setFeedbackFor(null);
+                  requestAnimationFrame(()=>feedbackButtons.current.get(id)?.focus());
+                }}/>
+              }
               {/* First visit: suggested questions sit under the greeting as full-width, easy-to-tap choices */}
               {!conversationStarted && !isTyping && suggestedQuestions.length > 0 && (
                 <div className="space-y-2 pt-1">
@@ -682,7 +702,7 @@ export const MysteryAiAssistant: React.FC = () => {
           </div>
 
           {/* Input Footer */}
-          {!history.visible && <form
+          {!history.visible && !feedbackFor && <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSendMessage();
@@ -730,6 +750,14 @@ export const MysteryAiAssistant: React.FC = () => {
                 </button>
               )}
             </div>
+            <MysteryAiVoice available={isOpen&&isMysteryAiOpen&&!isAnyModalActive&&!isTyping&&!history.unsaved}
+              scope={`${accountId??'guest'}:${sessionToken??''}:${activePage}:${dataProductMode}:${isInsideEditor}`}
+              remaining={Math.max(0,CHAT_MAX_CHARS-inputValue.length-(inputValue.trim()?1:0))}
+              onActivity={setVoiceActive}
+              onTranscript={text=>{
+                setInputValue(before=>[before.trimEnd(),text].filter(Boolean).join(' ').slice(0,CHAT_MAX_CHARS));
+                inputRef.current?.focus();
+              }}/>
             {countLabel && <p id="mystery-ai-count" className="mt-1.5 px-1 text-right text-[11px] text-amber-200" aria-live="polite">{countLabel}</p>}
           </form>}
         </div>
