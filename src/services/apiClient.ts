@@ -647,7 +647,9 @@ export class CreativeBriefRequestError extends Error {
 export async function submitCreativeBrief(payload: import('../../shared/creativeStudio').CreativeBriefInput): Promise<{ reference: string; receivedAt: string; service: string }> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}/api/creative-studio/enquiries`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    // A stalled phone connection must not leave the button on "Sending…": stop after 20 seconds. Retrying is safe
+    // because the same brief keeps its request id.
+    res = await fetch(`${API_BASE_URL}/api/creative-studio/enquiries`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(20_000) });
   } catch {
     throw new CreativeBriefRequestError('We could not reach Mystery Hub. Check your connection and try again.');
   }

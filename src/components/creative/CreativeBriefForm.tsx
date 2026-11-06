@@ -57,7 +57,8 @@ export const CreativeBriefForm: React.FC<{ service: CreativeServiceId | ''; onSe
   const own = (selected && values[selected.id]) || {};
   const setField = (id: string, value: string) => { if (!selected) return; setValues(v => ({ ...v, [selected.id]: { ...(v[selected.id] || {}), [id]: value } })); clearError(`fields.${id}`); };
   const clearError = (key: string) => setErrors(e => { if (!e[key]) return e; const next = { ...e }; delete next[key]; return next; });
-  const markStarted = () => { if (!started.current) { started.current = true; trackGrowth('creative_brief', { page: 'creative' }); } };
+  const markStarted = () => { if (!started.current) { started.current = true; trackGrowth('creative_brief_started', { page: 'creative' }); } };
+  const focusField = (field: string) => requestAnimationFrame(() => (formRef.current?.querySelector<HTMLElement>(`[data-field="${field}"]`) || formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]'))?.focus());
 
   const payload = useMemo((): CreativeBriefInput => {
     const fields = selected ? Object.fromEntries(selected.fields.map(f => [f.id, (own[f.id] || '').trim()]).filter(([, v]) => v)) : {};
@@ -79,8 +80,8 @@ export const CreativeBriefForm: React.FC<{ service: CreativeServiceId | ''; onSe
     const problems = creativeBriefProblems(body, today);
     if (problems.length) {
       setErrors(Object.fromEntries(problems.map(p => [p.field || 'form', p.message])));
-      const first = problems[0].field;
-      requestAnimationFrame(() => (formRef.current?.querySelector<HTMLElement>(`[data-field="${first}"]`) || formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]'))?.focus());
+      setFailure(null); setStatus('editing');
+      focusField(problems[0].field);
       return;
     }
     setErrors({}); setFailure(null); setStatus('sending');
@@ -90,7 +91,7 @@ export const CreativeBriefForm: React.FC<{ service: CreativeServiceId | ''; onSe
       setStatus('sent');
     } catch (error) {
       const err = error instanceof CreativeBriefRequestError ? error : new CreativeBriefRequestError('We could not save your brief just now. Please try again.');
-      if (err.field) setErrors({ [err.field]: err.message });
+      if (err.field) { setErrors({ [err.field]: err.message }); focusField(err.field); }
       setFailure({ message: err.message, retryable: err.retryable });
       setStatus('failed');
     }
@@ -131,10 +132,10 @@ export const CreativeBriefForm: React.FC<{ service: CreativeServiceId | ''; onSe
     if (field.kind === 'choice') return (
       <fieldset key={field.id}>
         <legend>{label}</legend>
-        <div className="cs-pills" role="radiogroup" aria-label={field.label}>
+        <div className="cs-pills">
           {field.choices!.map((choice, i) => (
             <label className="cs-pill" key={choice}>
-              <input type="radio" name={id} value={choice} checked={value === choice} data-field={i === 0 ? key : undefined} {...(i === 0 ? invalid(key) : {})} onChange={() => setField(field.id, choice)} onClick={() => { if (value === choice && !field.required) setField(field.id, ''); }} />
+              <input type="radio" name={id} value={choice} checked={value === choice} data-field={i === 0 ? key : undefined} {...invalid(key)} onChange={() => setField(field.id, choice)} onClick={() => { if (value === choice && !field.required) setField(field.id, ''); }} />
               <span>{choice}</span>
             </label>
           ))}
@@ -163,7 +164,7 @@ export const CreativeBriefForm: React.FC<{ service: CreativeServiceId | ''; onSe
         <div className="cs-choice-grid">
           {CREATIVE_SERVICES.map((s, i) => (
             <label className="cs-choice" key={s.id}>
-              <input type="radio" name="cs-service" value={s.id} checked={service === s.id} data-field={i === 0 ? 'service' : undefined} {...(i === 0 ? invalid('service') : {})}
+              <input type="radio" name="cs-service" value={s.id} checked={service === s.id} data-field={i === 0 ? 'service' : undefined} {...invalid('service')}
                 onChange={() => { onService(s.id); clearError('service'); }} />
               <span>{s.name}</span>
             </label>
@@ -211,7 +212,7 @@ export const CreativeBriefForm: React.FC<{ service: CreativeServiceId | ''; onSe
                   <div className="cs-link-row">
                     <input className="cs-input" type="url" inputMode="url" autoComplete="url" data-field={`links.${i}`} maxLength={CREATIVE_LIMITS.link} aria-label={`Example link ${i + 1}`}
                       placeholder="https://instagram.com/p/…" value={link} onChange={e => { const next = [...links]; next[i] = e.target.value; setLinks(next); clearError(`links.${i}`); }} {...invalid(`links.${i}`)} />
-                    {links.length > 1 && <button type="button" className="cs-remove" aria-label={`Remove example link ${i + 1}`} onClick={() => { setLinks(links.filter((_, j) => j !== i)); setErrors({}); }}><X size={18} aria-hidden /></button>}
+                    {links.length > 1 && <button type="button" className="cs-remove" aria-label={`Remove example link ${i + 1}`} onClick={() => { setLinks(links.filter((_, j) => j !== i)); setErrors(e => Object.fromEntries(Object.entries(e).filter(([k]) => !k.startsWith('links.')))); }}><X size={18} aria-hidden /></button>}
                   </div>
                   {err(`links.${i}`)}
                 </div>

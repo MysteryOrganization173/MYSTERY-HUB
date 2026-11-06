@@ -56,6 +56,7 @@ import {
 
 import { afaRouter } from './afaApi.js';
 import { creativeStudioRouter } from './creativeStudioApi.js';
+import { CREATIVE_INQUIRY_TYPE } from '../../shared/creativeStudio.js';
 import { accountRouter } from './accountApi.js';
 import { AccountError, identifierConflict, loginAccount } from '../services/accountSecurity.js';
 
@@ -1634,6 +1635,11 @@ apiRouter.post('/marketplace/inquiries', async (req: Request, res: Response) => 
   try {
     const { productId, productName, customerName, customerPhone, customerEmail, inquiryType, message, budget } = req.body || {};
 
+    // Creative Studio briefs only come through /api/creative-studio/enquiries, with its own checks and rate limit.
+    if (typeof inquiryType === 'string' && inquiryType.trim().toLowerCase() === CREATIVE_INQUIRY_TYPE) {
+      res.status(400).json({ error: 'Send design requests through the Creative Studio form.' });
+      return;
+    }
     if (!productName || typeof productName !== 'string' || !productName.trim()) {
       res.status(400).json({ error: 'Product name is required for inquiries.' });
       return;

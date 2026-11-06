@@ -134,6 +134,8 @@ export class CreativeBriefError extends Error {
 
 const REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const UNSAFE = /[<>\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/;
+/** Invisible characters that can disguise text in Admin (zero-width and direction overrides). Removed, never stored. */
+const INVISIBLE = /[​-‏‪-‮⁠-⁩﻿]/g;
 const KEYS = ['requestId', 'service', 'name', 'phone', 'email', 'details', 'neededBy', 'budget', 'links', 'fields', 'website'];
 
 /** Plain text only: no markup characters or control characters (new lines are allowed only where `multiline`). */
@@ -143,7 +145,7 @@ function text(value: unknown, field: string, label: string, max: number, require
     return '';
   }
   if (typeof value !== 'string') throw new CreativeBriefError(`${label} must be text.`, field);
-  const clean = value.replace(/\r\n?/g, '\n').trim();
+  const clean = value.replace(INVISIBLE, '').replace(/\r\n?/g, '\n').trim();
   if (required && !clean) throw new CreativeBriefError(`${label} is required.`, field);
   if (clean.length > max) throw new CreativeBriefError(`${label} can be up to ${max} characters.`, field);
   if (UNSAFE.test(clean) || (!multiline && /[\n\t]/.test(clean))) throw new CreativeBriefError(`${label} can't include < or > or special characters.`, field);
@@ -152,7 +154,7 @@ function text(value: unknown, field: string, label: string, max: number, require
 
 /** A Ghana number (0XX XXX XXXX or +233 XX XXX XXXX), kept as 0XXXXXXXXX; other countries keep their + form. */
 export function creativePhone(value: string): string | null {
-  const raw = value.replace(/[\s().-]/g, '');
+  const raw = value.replace(/[\s().-]/g, '').replace(/^00(?=[1-9])/, '+');
   if (!/^\+?\d+$/.test(raw)) return null;
   const digits = raw.replace(/^\+/, '').replace(/^00/, '');
   if (/^233\d{9}$/.test(digits)) return /^0[235]\d{8}$/.test('0' + digits.slice(3)) ? '0' + digits.slice(3) : null;
@@ -171,7 +173,7 @@ export function creativeLink(value: string): string | null {
   if (!clean || clean.length > CREATIVE_LIMITS.link || UNSAFE.test(clean) || /\s/.test(clean)) return null;
   try {
     const url = new URL(/^https?:\/\//i.test(clean) ? clean : `https://${clean}`);
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(url.hostname)) return null;
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || !/^[a-z0-9.-]+\.(?:[a-z]{2,}|xn--[a-z0-9-]+)$/i.test(url.hostname)) return null;
     return url.href.length > CREATIVE_LIMITS.link ? null : url.href;
   } catch { return null; }
 }
@@ -179,7 +181,7 @@ export function creativeLink(value: string): string | null {
 /** A calendar date from today (Accra time is UTC) up to two years ahead. */
 function futureDate(value: unknown, field: string, label: string, today: string): string {
   if (value === undefined || value === null || value === '') return '';
-  if (typeof value !== 'string' || !/^20\d\d-\d\d-\d\d$/.test(value) || new Date(value + 'T00:00:00Z').toISOString().slice(0, 10) !== value) throw new CreativeBriefError(`Choose a valid ${label.toLowerCase()}.`, field);
+  if (typeof value !== 'string' || !/^20\d\d-\d\d-\d\d$/.test(value) || !Number.isFinite(Date.parse(value + 'T00:00:00Z')) || new Date(value + 'T00:00:00Z').toISOString().slice(0, 10) !== value) throw new CreativeBriefError(`Choose a valid ${label.toLowerCase()}.`, field);
   const latest = new Date(Date.parse(today + 'T00:00:00Z') + 731 * 86_400_000).toISOString().slice(0, 10);
   if (value < today) throw new CreativeBriefError(`${label} can't be in the past.`, field);
   if (value > latest) throw new CreativeBriefError(`${label} must be within two years.`, field);
@@ -268,19 +270,29 @@ function check(input: unknown, today: string): { brief?: CreativeBrief; problems
 
 /** The plain-text summary Admin reads in the enquiry card (its message box keeps line breaks). Up to 2,000 characters. */
 export function creativeLeadMessage(brief: CreativeBrief): string {
-  const lines = [
-    `Creative Studio brief ${brief.reference}`,
-    `Service: ${brief.service.name}`,
-    ...brief.fields.map(({ field, value }) => `${field.label.replace(/, if there is one$|\?$/g, '')}: ${value}`),
-    brief.neededBy ? `Needed by: ${brief.neededBy}` : '',
-    '',
-    'What they need:',
-    brief.details,
-    ...(brief.links.length ? ['', 'Reference links (not checked, open with care):', ...brief.links.map(link => `- ${link}`)] : []),
-    '',
-    'Quote required: no price or delivery date has been promised.',
-  ];
-  return lines.filter((line, i) => line !== '' || (i > 0 && lines[i - 1] !== '')).join('\n').slice(0, 2000);
+  const build = (links: string[], details: string) => {
+    const omitted = brief.links.length - links.length;
+    const lines = [
+      `Creative Studio brief ${brief.reference}`,
+      `Service: ${brief.service.name}`,
+      ...brief.fields.map(({ field, value }) => `${field.label.replace(/, if there is one$|\?$/g, '')}: ${value}`),
+      brief.neededBy ? `Needed by: ${brief.neededBy}` : '',
+      '',
+      'What they need:',
+      details,
+      ...(brief.links.length ? ['', 'Reference links (not checked, open with care):', ...links.map(link => `- ${link}`),
+        ...(omitted ? [`(${omitted} more ${omitted === 1 ? 'link' : 'links'} not shown: ask the customer)`] : [])] : []),
+      '',
+      'Quote required: no price or delivery date has been promised.',
+    ];
+    return lines.filter((line, i) => line !== '' || (i > 0 && lines[i - 1] !== '')).join('\n');
+  };
+  // Whole links are left out before anything is shortened, so an address is never cut into a different one,
+  // and the opening lines and the quote line always stay.
+  let links = [...brief.links], message = build(links, brief.details);
+  while (message.length > 2000 && links.length) { links = links.slice(0, -1); message = build(links, brief.details); }
+  if (message.length > 2000) message = build(links, brief.details.slice(0, Math.max(0, brief.details.length - (message.length - 2000) - 1)).trimEnd() + '…');
+  return message;
 }
 
 /** The line Admin sees next to "About": the service, clearly marked as Creative Studio. */

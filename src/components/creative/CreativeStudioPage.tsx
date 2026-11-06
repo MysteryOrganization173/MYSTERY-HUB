@@ -184,7 +184,7 @@ export const CreativeStudioPage: React.FC = () => {
             <div><p className="cs-eyebrow">Work</p><h2 className="cs-h2" id="cs-work-title">Made for <span className="cs-serif">Mystery Hub</span></h2></div>
             <p className="cs-lead">Logos, campaign graphics and banners we use for our own brand and launches.</p>
           </div>
-          <p className="cs-work-note"><Info size={18} aria-hidden /><span>These pieces were made for Mystery Hub itself. They are not client projects, and no client work is shown yet. Client work will appear here only when the client agrees to share it.</span></p>
+          <p className="cs-work-note"><Info size={18} aria-hidden /><span>These pieces were made for Mystery Hub itself, and most were created with AI image tools. They are not client projects, and no client work is shown yet. Client work will appear here only when the client agrees to share it.</span></p>
           <ul className="cs-work">
             {CREATIVE_WORK.map((work, i) => (
               <li key={work.id}>

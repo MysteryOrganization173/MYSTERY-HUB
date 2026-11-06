@@ -13,6 +13,7 @@ import {
   CREATIVE_SERVICES, CreativeBriefError, creativeBriefProblems, creativeLeadMessage, creativeLink, creativePhone, creativeReference, validateCreativeBrief,
 } from '../../../shared/creativeStudio.js';
 import { CREATIVE_WORK } from '../../../src/data/creativeStudioWork.js';
+import { creativeVisitorKey } from '../../routes/creativeStudioApi.js';
 import { DIGITAL_SERVICES } from '../../../src/data/services.js';
 import { serviceHref } from '../../../src/utils/serviceDirectory.js';
 import { getPageFromPath, ROUTE_PATH_MAP } from '../../../src/utils/routing.js';
@@ -86,6 +87,34 @@ test('briefs are validated by one shared rule: contact, details, service questio
   // The logo brief asks different questions from the flyer brief.
   const logo = validateCreativeBrief(valid({ service: 'logo', fields: { businessName: 'Ama Catering', businessType: 'Event catering in Kumasi', style: 'Elegant' } }), TODAY);
   assert.equal(logo.service.name, 'Logo & brand identity');
+  // Review fixes: impossible dates are field errors, invisible characters are removed, 00 means +, punycode domains work.
+  assert.equal(fieldOf(() => validateCreativeBrief(valid({ neededBy: '2026-13-01' }), TODAY)), 'neededBy');
+  assert.equal(fieldOf(() => validateCreativeBrief(valid({ neededBy: '2026-00-10' }), TODAY)), 'neededBy');
+  assert.equal(validateCreativeBrief(valid({ name: 'Ama‮ Mensah​' }), TODAY).name, 'Ama Mensah');
+  assert.equal(creativePhone('0044 7700 900123'), '+447700900123');
+  assert.equal(creativeLink('https://пример.рф/p'), 'https://xn--e1afmkfd.xn--p1ai/p');
+});
+
+test('the Admin message never cuts a link or loses the quote line, even for the largest logo brief', () => {
+  const brief = validateCreativeBrief(valid({ service: 'logo', details: 'd'.repeat(800), neededBy: '2026-12-01',
+    fields: { businessName: 'b'.repeat(120), businessType: 't'.repeat(160), logoStatus: 'Refresh my current logo', style: 'Traditional', colours: 'c'.repeat(80) },
+    links: [1, 2, 3].map(n => `https://site${n}.example/` + 'p'.repeat(170)) }), TODAY);
+  const message = creativeLeadMessage(brief);
+  assert.ok(message.length <= 2000, String(message.length));
+  assert.match(message, /Quote required: no price or delivery date has been promised\.$/);
+  const shown = message.split('\n').filter(line => line.startsWith('- https://'));
+  for (const line of shown) assert.ok(brief.links.includes(line.slice(2)), 'every shown link is complete');
+  assert.ok(shown.length < 3 && /more links? not shown: ask the customer/.test(message));
+  assert.match(message, /d{800}/, 'the details are kept whole when dropping a link is enough');
+});
+
+test('rate limits separate visitors behind the proxy and the old enquiry route cannot forge Creative Studio leads', async () => {
+  assert.equal(creativeVisitorKey({ headers: { 'x-forwarded-for': '41.66.1.2, 10.0.0.1' }, ip: '10.0.0.1' }), '41.66.1.2');
+  assert.equal(creativeVisitorKey({ headers: { 'x-forwarded-for': '<script>' }, ip: '10.0.0.1' }), '10.0.0.1');
+  assert.equal(creativeVisitorKey({ headers: {}, ip: '10.0.0.9' }), '10.0.0.9');
+  const forged = await fetch(`${base}/api/marketplace/inquiries`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productName: 'Creative Studio · Flyers & posters', inquiryType: 'Creative_Studio ', customerPhone: '0241234567' }) });
+  assert.equal(forged.status, 400);
+  assert.equal((await (await adminInquiries('admin-token')).json()).total, 0);
 });
 
 test('the lead Admin reads is plain text with the reference and an explicit quote-required line, within the column limit', () => {
@@ -167,7 +196,7 @@ test('Creative Studio has one address, page metadata, a directory entry, analyti
   assert.equal(entry.status, 'active');
   assert.equal(serviceHref(entry), '/creative-studio');
   const event = (name: string) => validateGrowthEvent({ event: name, visitorId: ID, sessionId: ID, metadata: { page: 'creative' } });
-  for (const name of ['page_view', 'creative_service', 'creative_brief']) assert.doesNotThrow(() => event(name), name);
+  for (const name of ['page_view', 'creative_service', 'creative_brief_started']) assert.doesNotThrow(() => event(name), name);
   // Every sample is Mystery Hub's own, a versioned Cloudinary original, with real alt text. No client work is claimed.
   assert.ok(CREATIVE_WORK.length >= 6);
   for (const work of CREATIVE_WORK) {

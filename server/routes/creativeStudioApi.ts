@@ -12,9 +12,20 @@ import { CREATIVE_INQUIRY_TYPE, CreativeBriefError, creativeLeadMessage, creativ
  */
 export const creativeStudioRouter = Router();
 creativeStudioRouter.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
-const limiter = createRateLimiter({ windowMs: 600_000, max: 8, message: 'Too many briefs from this connection. Please wait a few minutes or message us on WhatsApp.', key: req => req.ip || req.socket.remoteAddress || 'unknown' });
+/**
+ * The visitor a brief comes from. The API runs behind Render's proxy without `trust proxy`, so `req.ip` is the proxy
+ * for everyone; the first X-Forwarded-For address separates visitors instead. That header can be forged, which only
+ * lets a sender spread their own briefs over several buckets, so a site-wide ceiling below still bounds the total.
+ */
+export function creativeVisitorKey(req: { headers: Record<string, string | string[] | undefined>; ip?: string; socket?: { remoteAddress?: string } }): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded || '').split(',')[0].trim();
+  return (/^[0-9a-f:.]{3,45}$/i.test(first) ? first : '') || req.ip || req.socket?.remoteAddress || 'unknown';
+}
+const perVisitor = createRateLimiter({ windowMs: 600_000, max: 8, message: 'Too many briefs from this connection. Please wait a few minutes or message us on WhatsApp.', key: creativeVisitorKey });
+const siteWide = createRateLimiter({ windowMs: 600_000, max: 120, message: 'We are receiving a lot of briefs right now. Please try again in a few minutes or message us on WhatsApp.', key: () => 'creative-studio' });
 
-creativeStudioRouter.post('/enquiries', limiter, async (req, res) => {
+creativeStudioRouter.post('/enquiries', perVisitor, siteWide, async (req, res) => {
   let brief;
   try { brief = validateCreativeBrief(req.body); }
   catch (error) {
@@ -35,8 +46,10 @@ creativeStudioRouter.post('/enquiries', limiter, async (req, res) => {
       budget: brief.budget || undefined,
     });
     res.status(saved.duplicate ? 200 : 201).json({ success: true, reference: brief.reference, receivedAt: saved.createdAt, service: brief.service.name });
-  } catch {
-    console.error('[Creative Studio] Brief could not be saved');
+  } catch (error) {
+    // Only the database error code and constraint, never the brief or the customer's details.
+    const { code, constraint } = (error || {}) as { code?: string; constraint?: string };
+    console.error('[Creative Studio] Brief could not be saved', { code: code || 'unknown', constraint: constraint || undefined });
     res.status(503).json({ error: 'We could not save your brief just now. Please try again, or message us on WhatsApp.' });
   }
 });

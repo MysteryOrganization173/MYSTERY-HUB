@@ -30,7 +30,8 @@ A customer-facing page for professional design work, sold on quote: `/creative-s
 
 - `POST /api/creative-studio/enquiries` (`server/routes/creativeStudioApi.ts`):
   - guests are allowed;
-  - rate-limited to 8 per 10 minutes per IP;
+  - rate-limited to 8 per 10 minutes per visitor (first X-Forwarded-For address, because the API runs behind a proxy without `trust proxy`), plus a site-wide ceiling of 120 per 10 minutes;
+  - the ordinary Marketplace enquiry route refuses the `creative_studio` type, so leads of that type only come from this form;
   - responses are `no-store`.
 - `shared/creativeStudio.ts` validates the brief on both the page and the server:
   - plain text only;
@@ -60,7 +61,7 @@ A customer-facing page for professional design work, sold on quote: `/creative-s
 
 - `page_view` with page `creative` counts visits.
 - `creative_service` counts a service chosen.
-- `creative_brief` counts a brief started.
+- `creative_brief_started` counts a brief started.
 - These events appear in Admin → Analytics under "Observed service engagement". A visit or a started brief is not a lead: saved briefs are counted in Admin → Marketplace → Enquiries.
 
 ## Not in V1

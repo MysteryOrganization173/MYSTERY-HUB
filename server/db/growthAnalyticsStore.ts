@@ -14,7 +14,7 @@ export const GROWTH_SQL={
  (SELECT min(created_at) FROM analytics_events WHERE event_name='growth_page_view') "firstObserved",
  (SELECT coalesce(jsonb_agg(x ORDER BY x."day"),'[]') FROM (SELECT ${day} AS "day",count(*)::int views,count(DISTINCT (visitor_id,session_id))::int sessions FROM e GROUP BY 1) x) trend,
  (SELECT coalesce(jsonb_agg(x ORDER BY x.views DESC),'[]') FROM (SELECT metadata_json->>'page' page,count(*)::int views,count(DISTINCT visitor_id)::int visitors FROM e GROUP BY 1) x) pages,
- (SELECT coalesce(jsonb_agg(x ORDER BY x.count DESC),'[]') FROM (SELECT event_name event,metadata_json->>'page' page,count(*)::int count FROM analytics_events WHERE event_name IN ('growth_checkout_opened','growth_marketplace_product','growth_marketplace_inquiry','growth_creative_service','growth_creative_brief') AND created_at >= $1 AND created_at < $2 GROUP BY 1,2) x) engagement`,
+ (SELECT coalesce(jsonb_agg(x ORDER BY x.count DESC),'[]') FROM (SELECT event_name event,metadata_json->>'page' page,count(*)::int count FROM analytics_events WHERE event_name IN ('growth_checkout_opened','growth_marketplace_product','growth_marketplace_inquiry','growth_creative_service','growth_creative_brief_started') AND created_at >= $1 AND created_at < $2 GROUP BY 1,2) x) engagement`,
  adoption:`WITH e AS (SELECT * FROM analytics_events WHERE event_name LIKE 'growth_%' AND created_at >= $1 AND created_at < $2)
  SELECT count(*) FILTER(WHERE event_name='growth_page_view' AND metadata_json->>'page'='app')::int "appVisits",
  count(*) FILTER(WHERE event_name='growth_install_action')::int actions,count(*) FILTER(WHERE event_name='growth_install_prompt')::int prompts,
