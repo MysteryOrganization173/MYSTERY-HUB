@@ -1,6 +1,28 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import {readFileSync} from 'node:fs';
 import {aiDataChoices,confirmAiDataChoice,maskAiRecipient,parseAiDataRequest} from '../../../src/services/mysteryAiOrders';
+
+test('general Data questions and other services keep their normal reply instead of the ordering flow',()=>{
+ for(const query of ['How do I buy data?','Where can I buy data bundles?','Buy data','I want to buy data','Show me data bundles',
+   'I want to build a website that sells MTN bundles','I want to resell MTN data','I want to sell data on my website','I want a logo for my MTN data shop',
+   'Show me how Mystery Earn works with data','Show me Creative Studio examples of data bundle flyers','Do you have data for my business website?','Never buy MTN 5GB']){
+   assert.equal(parseAiDataRequest(query),null,query);
+ }
+});
+
+test('specific bundle requests and open requests still reach the ordering flow',()=>{
+ for(const query of ['MTN 5GB','AirtelTigo 3GB','I want 5GB MTN data','Show me the cheapest MTN option','Do you have Telecel bundles?','I need data','Buy MTN 5GB for my business']){
+   assert.notEqual(parseAiDataRequest(query),null,query);
+ }
+});
+
+test('checkout from chat never falls back to the account phone',()=>{
+ const assistant=readFileSync('src/components/ai/MysteryAiAssistant.tsx','utf8');
+ assert.match(assistant,/openCheckout\(bundle,\s*\{recipientPhone:recipient \?\? ''\}\)/);
+ assert.doesNotMatch(assistant,/openCheckout\(bundle,[^)]*undefined\)/);
+ assert.match(readFileSync('src/components/checkout/CheckoutModal.tsx','utf8'),/checkoutInitialPhone !== undefined \? checkoutInitialPhone :/);
+});
 
 test('exact direct Data request and clarification retain only the active recipient',()=>{
  const initial=parseAiDataRequest('I need data for +233 (24) 123-4567')!;

@@ -378,7 +378,8 @@ export const MysteryAiAssistant: React.FC = () => {
       cancelPending();
       closeMysteryAi();
       setIsOpen(false);
-      openCheckout(bundle, recipient ? {recipientPhone:recipient} : undefined);
+      // An empty value stops checkout falling back to the account phone: the customer chooses the recipient.
+      openCheckout(bundle, {recipientPhone:recipient ?? ''});
     } catch {
       if (requestGate.current.accepts(request)) setChoiceNotice('Could not verify this bundle. Try again or open the Data page.');
     } finally {
