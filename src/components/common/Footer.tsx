@@ -20,6 +20,7 @@ export const Footer: React.FC = () => {
       { label: 'AFA Registration', page: 'afa' },
       { label: 'Website Builder', page: 'website', note: 'Beta' },
       { label: 'Marketplace', page: 'marketplace' },
+      { label: 'Creative Studio', page: 'creative' },
     ] },
     { title: 'Your account', links: [
       { label: 'Mystery Earn', page: 'earn', note: 'Rewards' },

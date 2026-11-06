@@ -149,7 +149,7 @@ export const Navbar: React.FC = () => {
         {/* Zone 2: Navigation Links (Desktop) */}
         <nav className="hidden xl:flex items-center gap-3 text-xs font-medium text-slate-300">
           {navLinks.map((link) => {
-            const isActive = activePage === link.id || (link.id === 'website' && activePage === 'business');
+            const isActive = activePage === link.id || (link.id === 'website' && activePage === 'business') || (link.id === 'marketplace' && activePage === 'creative');
             return (
               <a
                 key={link.id}
@@ -395,7 +395,7 @@ export const Navbar: React.FC = () => {
                   handleNavClick(link.id);
                 }}
                 className={`block w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  activePage === link.id || (link.id === 'website' && activePage === 'business')
+                  activePage === link.id || (link.id === 'website' && activePage === 'business') || (link.id === 'marketplace' && activePage === 'creative')
                     ? 'bg-[#00c365]/10 text-[#00c365] font-semibold'
                     : 'text-slate-300 hover:bg-slate-900 hover:text-white'
                 }`}

@@ -1,7 +1,7 @@
 /** Public, bounded analytics vocabulary. Financial outcomes cannot be submitted here. */
-export const GROWTH_EVENTS=['page_view','identity','checkout_opened','marketplace_product','marketplace_inquiry','install_action','install_prompt','install_accepted','install_dismissed','installed','standalone_launch'] as const;
+export const GROWTH_EVENTS=['page_view','identity','checkout_opened','marketplace_product','marketplace_inquiry','creative_service','creative_brief_started','install_action','install_prompt','install_accepted','install_dismissed','installed','standalone_launch'] as const;
 export type GrowthEvent=typeof GROWTH_EVENTS[number];
-export const GROWTH_PAGES=['home','data','airtime','instant','afa','website','marketplace','earn','wallet','orders','services','app','about','help'] as const;
+export const GROWTH_PAGES=['home','data','airtime','instant','afa','website','marketplace','creative','earn','wallet','orders','services','app','about','help'] as const;
 export type GrowthPage=typeof GROWTH_PAGES[number];
 export const GROWTH_SOURCES=['direct','whatsapp','facebook','instagram','google','bing','tiktok','youtube','x','email','referral','other'] as const;
 export const GROWTH_MEDIA=['none','message','social','organic','cpc','email','referral','qr','other'] as const;

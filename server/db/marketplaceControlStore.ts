@@ -61,15 +61,24 @@ export class MarketplaceControlStore {
     await AdminAuditStore.record({ adminUserId: adminId, action: existing ? 'marketplace_category_updated' : 'marketplace_category_created', entityType: 'marketplace_category', entityId: slug, metadata: { active: record.active, sortOrder: record.sort_order } });
     return record;
   }
-  static async createInquiry(input: { productId?: string; productName: string; customerName?: string; customerPhone?: string; customerEmail?: string; inquiryType?: string; message?: string; budget?: string }) {
+  /** `id` is only passed by callers that make retries safe (Creative Studio): the same id never makes a second lead. */
+  static async createInquiry(input: { id?: string; productId?: string; productName: string; customerName?: string; customerPhone?: string; customerEmail?: string; inquiryType?: string; message?: string; budget?: string }): Promise<{ id: string; createdAt: string; duplicate?: boolean }> {
     const now = new Date().toISOString();
-    const record: MarketplaceInquiryRecord = { id: `inq_${randomUUID()}`, product_id: input.productId || null,
+    if (input.id !== undefined && !/^inq_[a-z0-9_-]{8,56}$/.test(input.id)) throw new MarketplaceInputError('Invalid enquiry id.');
+    const record: MarketplaceInquiryRecord = { id: input.id || `inq_${randomUUID()}`, product_id: input.productId || null,
       product_name: plainText(input.productName, 'Product name',MARKETPLACE_LIMITS.inquiryProductName,true), customer_name: plainText(input.customerName,'Customer name',128),
       customer_phone: plainText(input.customerPhone,'Phone',32), customer_email: plainText(input.customerEmail,'Email',128),
       inquiry_type: plainText(input.inquiryType || 'general','Inquiry type',64,true), message: plainText(input.message,'Message',2000),
       budget: plainText(input.budget,'Budget',128), status:'new',admin_note:null,created_at:now,updated_at:now,contacted_at:null };
     const pool = getPool();
+    if (pool && input.id) {
+      const inserted = await pool.query('INSERT INTO marketplace_inquiries (id,product_id,product_name,customer_name,customer_phone,customer_email,inquiry_type,message,budget,status,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT (id) DO NOTHING RETURNING created_at',[record.id,record.product_id,record.product_name,record.customer_name,record.customer_phone,record.customer_email,record.inquiry_type,record.message,record.budget,record.status,now,now]);
+      if (inserted.rowCount) return {id:record.id,createdAt:now};
+      const existing = (await pool.query('SELECT created_at FROM marketplace_inquiries WHERE id=$1',[record.id])).rows[0];
+      return {id:record.id,createdAt:new Date(existing.created_at).toISOString(),duplicate:true};
+    }
     if (pool) await pool.query('INSERT INTO marketplace_inquiries (id,product_id,product_name,customer_name,customer_phone,customer_email,inquiry_type,message,budget,status,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[record.id,record.product_id,record.product_name,record.customer_name,record.customer_phone,record.customer_email,record.inquiry_type,record.message,record.budget,record.status,now,now]);
+    else if (inquiries.has(record.id)) return {id:record.id,createdAt:inquiries.get(record.id)!.created_at,duplicate:true};
     else inquiries.set(record.id,record);
     return {id:record.id,createdAt:now};
   }

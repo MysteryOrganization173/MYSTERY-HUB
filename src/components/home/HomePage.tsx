@@ -11,6 +11,7 @@ import { HomeFaqPreview } from './HomeFaqPreview';
 import { HomeComingSoonSection } from './HomeComingSoonSection';
 import { MemberHome } from './MemberHome';
 import { InstallAppPromo } from '../pwa/InstallAppPromo';
+import { CreativeStudioEntry } from '../creative/CreativeStudioEntry';
 
 export const HomePage: React.FC = () => {
   const { user, isAuthChecking } = useApp();
@@ -45,6 +46,7 @@ export const HomePage: React.FC = () => {
       <div className="home-container home-install-band empty:hidden"><InstallAppPromo /></div>
       <HomeWebsiteSection />
       <HomeMarketplaceSection />
+      <div className="home-container home-creative-entry mt-2 mb-10 sm:mb-14"><CreativeStudioEntry variant="home" /></div>
       <HomeComingSoonSection />
       <div className="home-container home-help">
         <WhyMysteryHub />

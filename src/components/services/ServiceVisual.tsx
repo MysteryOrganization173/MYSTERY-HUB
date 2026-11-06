@@ -1,13 +1,13 @@
 import React from 'react';
 import {
-  Wifi, Smartphone, Globe, Zap, Droplet, Tv, GraduationCap, FileCheck2, Sparkles, Cpu, Wallet, Gift, Store, ShieldCheck,
+  Wifi, Smartphone, Globe, Zap, Droplet, Tv, GraduationCap, FileCheck2, Sparkles, Cpu, Wallet, Gift, Store, ShieldCheck, Palette,
 } from 'lucide-react';
 import type { DigitalService } from '../../types';
 import { SAMPLE_SERVICE_ARTWORK } from '../../data/services';
 import { getCloudinarySrcSet, getCloudinaryUrl } from '../../utils/cloudinary';
 
 export const SERVICE_ICONS: Record<string, React.ComponentType<{ className?: string; size?: number; 'aria-hidden'?: boolean }>> = {
-  Wifi, Smartphone, Layout: Globe, Zap, Droplet, Tv, GraduationCap, FileCheck2, Sparkles, Cpu, Wallet, Gift, Store, ShieldCheck,
+  Wifi, Smartphone, Layout: Globe, Zap, Droplet, Tv, GraduationCap, FileCheck2, Sparkles, Cpu, Wallet, Gift, Store, ShieldCheck, Palette,
 };
 
 export const ServiceIcon: React.FC<{ service: DigitalService; size?: number }> = ({ service, size = 22 }) => {
