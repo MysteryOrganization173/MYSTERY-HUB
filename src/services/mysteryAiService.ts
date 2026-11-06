@@ -4,6 +4,8 @@ import {mysteryHubGuide,mysteryBuilderHelp,mysteryInstantHelp} from '../../share
 import {aiActions,type AiGuideContext,type AiNavigation} from '../../shared/mysteryAiIntent';
 import {MYSTERY_AI_BUDGET,aiCanRetry,aiFailureMessage,boundAiHistory} from '../../shared/mysteryAiPolicy';
 
+import type {AiDataChoice} from './mysteryAiOrders';
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -12,6 +14,7 @@ export interface ChatMessage {
   source?: 'scripted' | 'gemini';
   actions?: AiNavigation[];
   quickAction?: AiNavigation;
+  productChoices?: AiDataChoice[];
 }
 
 export interface SuggestedQuestion {
