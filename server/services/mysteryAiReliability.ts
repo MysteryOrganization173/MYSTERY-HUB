@@ -1,14 +1,16 @@
-import {mysteryHubGuide,mysteryInstantHelp} from '../../shared/mysteryAiKnowledge.js';
+import {mysteryHubGuide,mysteryInstantHelp,mysteryVerifiedHelp} from '../../shared/mysteryAiKnowledge.js';
 import {getGeminiClient} from './geminiClient.js';
 import {CommercialService} from './commercialService.js';
-import {buildMysteryAiSystemInstruction} from './mysteryAiContext.js';
+import {afaAvailabilityHelp,buildMysteryAiSystemInstruction,dataPriceHelp,referralPolicyHelp} from './mysteryAiContext.js';
+import {getPublicReferralRules} from './publicReferralPolicy.js';
+import {AfaService} from './afaService.js';
 import {Router} from 'express';
 import {ThinkingLevel} from '@google/genai';
 import {requireAdmin} from '../middleware/authMiddleware.js';
 import {createRateLimiter} from '../middleware/rateLimiter.js';
 
-import {MYSTERY_AI_BUDGET,aiCanRetry,aiFailureMessage,type AiFailureCode} from '../../shared/mysteryAiPolicy.js';
-import type {AiGuideContext} from '../../shared/mysteryAiIntent.js';
+import {MYSTERY_AI_BUDGET,aiCanRetry,aiFailureMessage,boundAiHistory,type AiFailureCode} from '../../shared/mysteryAiPolicy.js';
+import {aiPriorQuestion,aiText,aiTopic,isWritingRequest,type AiGuideContext,type AiTurn} from '../../shared/mysteryAiIntent.js';
 export type {AiFailureCode} from '../../shared/mysteryAiPolicy.js';
 export const AI_FAILURE=aiFailureMessage('PROVIDER_UNAVAILABLE');
 /** Extract fixed codes only. Never expose the upstream message, metadata, URL or key. */
@@ -47,7 +49,15 @@ export function hasUnsupportedDeliveryClaim(reply:string):boolean {
  * Narrow first-person completion claims only; this is not a general hallucination filter.
  */
 export function hasUnsupportedActionClaim(reply:string):boolean {
- return /^\s*(?:i (?:have |just |already )?|i['’]ve (?:just |already )?)(?:refunded|charged|deducted|submitted|published|unpublished|purchased|transferred|verified your payment|checked your (?:order|account|balance)|accessed your|contacted (?:support|the supplier))\b/i.test(reply);
+ return /(?:^|[.!?]\s+|\n)\s*[*_]*(?:i (?:have |just |already )?|i['’]ve (?:just |already )?)(?:refunded|charged|deducted|submitted|published|unpublished|purchased|transferred|verified your payment|checked your (?:order|account|balance)|accessed your|contacted (?:support|the supplier))\b/i.test(reply);
+}
+export function hasUnsupportedBusinessClaim(reply:string):boolean {
+ const q=aiText(reply);
+ if(/\bsuccess[\s-]*biz[\s-]*hub\b/.test(q))return true;
+ if(/(?:^|[.!?]\s+|\n)\s*[*_]*(?:yes,\s*)?(?:(?:your|that) (?:order|payment|refund|reward|voucher)|order MH-[A-Z0-9-]+) (?:(?:is|was|has been) (?:delivered|confirmed|complete[d]?|processed|credited|issued|successful|(?:still )?processing)|went through)\b/i.test(reply))return true;
+ if(/(?:^|[.!?]\s+|\n)\s*[*_]*your (?:wallet |available )?balance is (?:GH₵\s*|GHS\s*)?\d/i.test(reply))return true;
+ return /\bmystery hub\b/.test(q)&&/\b(?:giveaways?|customer of the week)\b/.test(q)&&
+   /\b(?:every friday|never (?:offers?|runs?|had)|does not (?:offer|run)|doesn't (?:offer|run)|winner is|guaranteed|(?:win|prize of) \d)\b/.test(q);
 }
 export async function bounded<T>(work:(signal:AbortSignal)=>Promise<T>,ms:number,parent?:AbortSignal):Promise<T> {
  const controller=new AbortController();const cancel=()=>controller.abort(parent?.reason||new DOMException('Cancelled','AbortError'));
@@ -58,8 +68,8 @@ export async function bounded<T>(work:(signal:AbortSignal)=>Promise<T>,ms:number
  if(controller.signal.aborted)onAbort();else timer=setTimeout(()=>controller.abort(new DOMException('Provider deadline','TimeoutError')),ms);
  })]);}finally{if(timer)clearTimeout(timer);parent?.removeEventListener('abort',cancel);controller.signal.removeEventListener('abort',onAbort);}
 }
-type Input={message:string;history:any[];activePage?:string};
-export function createReliableMysteryAiRouter(validate:(body:any)=>Input,deps:{getClient?:typeof getGeminiClient;catalog?:typeof CommercialService.catalog;attemptTimeoutMs?:number;catalogTimeoutMs?:number;totalTimeoutMs?:number}={}) {
+type Input={message:string;history:AiTurn[];activePage?:string};
+export function createReliableMysteryAiRouter(validate:(body:any)=>Input,deps:{getClient?:typeof getGeminiClient;catalog?:typeof CommercialService.catalog;referralRules?:typeof getPublicReferralRules;afaConfig?:typeof AfaService.publicConfig;attemptTimeoutMs?:number;catalogTimeoutMs?:number;totalTimeoutMs?:number}={}) {
  const router=Router();let active=0,cooldownUntil=0,cooldownCode:AiFailureCode='QUOTA',successfulGenerations=0;
  let lastSuccessAt:string|null=null,lastFailure:({code:AiFailureCode;at:string}&ReturnType<typeof aiProviderDiagnostic>)|null=null;
  const counts:Partial<Record<AiFailureCode,number>>={};
@@ -72,7 +82,9 @@ export function createReliableMysteryAiRouter(validate:(body:any)=>Input,deps:{g
  let input:Input;try{input=validate(req.body);}catch(e){res.status(400).json({error:(e as Error).message,code:'INVALID_REQUEST',retryable:false});return;}
  if(active>=4){res.set('Retry-After','2').status(429).json({error:'Mystery AI is busy. Please try again shortly.',code:'BUSY',retryable:true,retryAfterSeconds:2});return;}
  const started=Date.now(),request=new AbortController();
- const context:AiGuideContext={activePage:input.activePage,history:input.history};const disconnect=()=>{if(!res.writableEnded)request.abort(new DOMException('Disconnected','AbortError'));};res.once('close',disconnect);
+ const history=boundAiHistory(input.history);
+ const page=input.activePage&&/^(?:home|data|website|editor|creative|business|marketplace|services|help|about|orders|wallet|earn|afa|app)$/.test(input.activePage)?input.activePage:'home';
+ const context:AiGuideContext={activePage:page,history};const disconnect=()=>{if(!res.writableEnded)request.abort(new DOMException('Disconnected','AbortError'));};res.once('close',disconnect);
  const finish=(code:AiFailureCode)=>{
    if(request.signal.aborted||res.destroyed)return;
    const reply=knownServiceHelp(input.message,context);
@@ -84,13 +96,46 @@ export function createReliableMysteryAiRouter(validate:(body:any)=>Input,deps:{g
    const e=req.body.editorContext;
    const editor=e?.experienceMode==='website_editor'?{experienceMode:'website_editor',templateId:typeof e.templateId==='string'?e.templateId.slice(0,50):'',templateName:typeof e.templateName==='string'?e.templateName.slice(0,100):'',siteStatus:e.siteStatus==='published'?'published':'draft',activeEditorSection:typeof e.activeEditorSection==='string'?e.activeEditorSection.slice(0,50):'General',previewDevice:['desktop','tablet','mobile'].includes(e.previewDevice)?e.previewDevice:'mobile',hasUnsavedChanges:Boolean(e.hasUnsavedChanges)}:null;
    context.editorContext=editor;
-   const instant=mysteryInstantHelp(input.message,context);if(instant){outcomes.instantGuide++;res.json({reply:instant.reply,source:'guide',fallback:false,latencyMs:Date.now()-started});return;}
+   const guide=(reply:string)=>{
+     if(request.signal.aborted||res.destroyed)return;
+     outcomes.instantGuide++;
+     res.json({reply,source:'guide',fallback:false,latencyMs:Date.now()-started});
+   };
+   const instant=mysteryInstantHelp(input.message,context)||mysteryVerifiedHelp(input.message,context);
+   if(instant){guide(instant.reply);return;}
+   const topic=aiTopic(input.message,context),q=aiText(input.message);
+   const readPublic=async<T>(read:()=>Promise<T>)=>{
+     try{return await bounded(read,deps.catalogTimeoutMs??MYSTERY_AI_BUDGET.catalogMs,request.signal);}
+     catch{return undefined;}
+   };
+   if(topic==='earn'&&!isWritingRequest(input.message)){
+     const showRates=/\b(?:how much|rates?|percent(?:age)?|first purchase|repeat purchase)\b/.test(q);
+     const policy=showRates?(await readPublic(()=> (deps.referralRules||getPublicReferralRules)()))?.dataPolicy:undefined;
+     guide(referralPolicyHelp(policy,showRates));return;
+   }
+   if(topic==='afa'&&!isWritingRequest(input.message)){
+     if(/\b(?:available|availability|register|sign up|buy|open|how much|price|cost|fees?)\b/.test(q)){
+       const config=await readPublic(()=>deps.afaConfig?deps.afaConfig():AfaService.publicConfig());
+       guide(afaAvailabilityHelp(config));return;
+     }
+     guide(knownServiceHelp('AFA registration')!);return;
+   }
+   const asksPrice=(text:string)=>/\b(?:how much|prices?|cost|rates?)\b/.test(text);
+   const prior=aiPriorQuestion(context);
+   const networkFollowUp=/^what about (telecel|mtn|airteltigo|at)$/.exec(q);
+   const priceFollowUp=networkFollowUp&&asksPrice(aiText(prior));
+   const question=priceFollowUp?prior.replace(/\b(?:mtn|telecel|airteltigo|at)\b/gi,networkFollowUp[1]==='at'?'AirtelTigo':networkFollowUp[1]):q==='how much'?prior:input.message;
+   if(topic==='data'&&(asksPrice(q)||priceFollowUp)&&!isWritingRequest(input.message)){
+     if(/\binstant bundles?\b/.test(aiText(question))){
+       guide('I can’t verify an Instant Bundles price here. Open Instant Bundles to see current offers and their checkout prices.');return;
+     }
+     const catalog=await readPublic(()=> (deps.catalog||CommercialService.catalog)());
+     guide(dataPriceHelp(question,catalog?.products));return;
+   }
    const client=(deps.getClient||getGeminiClient)();if(!client){finish('CONFIGURATION');return;}
    if(Date.now()<cooldownUntil){finish(cooldownCode);return;}
-   let products:Awaited<ReturnType<typeof CommercialService.catalog>>['products']=[];
-   try{products=(await bounded(()=> (deps.catalog||CommercialService.catalog)(),deps.catalogTimeoutMs??MYSTERY_AI_BUDGET.catalogMs,request.signal)).products;}catch{if(request.signal.aborted)return;}
-   const instruction=buildMysteryAiSystemInstruction(editor,products);
-   const contents=[...input.history.map(m=>({role:m.role==='user'?'user':'model',parts:[{text:m.content}]})),{role:'user',parts:[{text:`[Page: ${input.activePage||'home'}]\nCustomer Question: ${input.message}`}]}];
+   const instruction=buildMysteryAiSystemInstruction(editor);
+   const contents=[...history.map(m=>({role:m.role==='user'?'user':'model',parts:[{text:m.content}]})),{role:'user',parts:[{text:`[Page: ${page}]\nCustomer Question: ${input.message}`}]}];
    const complex=input.message.trim().split(/\s+/).length>25||/rewrite|compose|draft a|compare|troubleshoot|explain why|critique|analy[sz]e|audit|marketing strategy|copywriting|professional tone/i.test(input.message);
    const models=complex?['gemini-3.8-flash','gemini-3.1-flash-lite']:['gemini-3.1-flash-lite','gemini-3.8-flash'];let failure:AiFailureCode='PROVIDER_UNAVAILABLE';
    for(const model of models){
@@ -102,7 +147,7 @@ export function createReliableMysteryAiRouter(validate:(body:any)=>Input,deps:{g
        // Keep the same hard deadline via bounded() + transport abortSignal, without that server hint.
        const result=await bounded(signal=>client.models.generateContent({model,contents,config:{systemInstruction:instruction,temperature:.7,topP:.9,maxOutputTokens:512,thinkingConfig:{thinkingLevel:model==='gemini-3.1-flash-lite'?ThinkingLevel.MINIMAL:ThinkingLevel.LOW},abortSignal:signal,httpOptions:{retryOptions:{attempts:1}}}}),ms,request.signal);
        if(request.signal.aborted)return;
-       if(result.promptFeedback?.blockReason||result.candidates?.some(c=>['SAFETY','BLOCKLIST','PROHIBITED_CONTENT','SPII'].includes(c.finishReason||''))||typeof result.text==='string'&&(hasUnsupportedDeliveryClaim(result.text)||hasUnsupportedActionClaim(result.text))){failure='SAFETY';}else
+       if(result.promptFeedback?.blockReason||result.candidates?.some(c=>['SAFETY','BLOCKLIST','PROHIBITED_CONTENT','SPII'].includes(c.finishReason||''))||typeof result.text==='string'&&(result.text.length>4000||hasUnsupportedDeliveryClaim(result.text)||hasUnsupportedActionClaim(result.text)||hasUnsupportedBusinessClaim(result.text))){failure='SAFETY';}else
        if(typeof result.text==='string'&&result.text.trim()){outcomes.generated++;successfulGenerations++;lastSuccessAt=new Date().toISOString();res.json({reply:result.text,source:'gemini',fallback:false,model,routingClass:complex?'complex':'simple',latencyMs:Date.now()-started});return;}if(failure!=='SAFETY')failure='EMPTY_RESPONSE';
      }catch(error){failure=classifyAiError(error);if(request.signal.aborted)return;diagnostic=aiProviderDiagnostic(error);}
      lastFailure={code:failure,at:new Date().toISOString(),...diagnostic};

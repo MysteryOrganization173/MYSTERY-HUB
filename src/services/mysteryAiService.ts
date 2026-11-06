@@ -2,7 +2,7 @@ import { ActivePage, SafeEditorAiContext } from '../types';
 import { API_BASE_URL } from './apiClient';
 import {mysteryHubGuide,mysteryBuilderHelp,mysteryInstantHelp} from '../../shared/mysteryAiKnowledge';
 import {aiNavigation,type AiGuideContext} from '../../shared/mysteryAiIntent';
-import {MYSTERY_AI_BUDGET,aiCanRetry,aiFailureMessage} from '../../shared/mysteryAiPolicy';
+import {MYSTERY_AI_BUDGET,aiCanRetry,aiFailureMessage,boundAiHistory} from '../../shared/mysteryAiPolicy';
 
 export interface ChatMessage {
   id: string;
@@ -103,7 +103,7 @@ export async function sendMysteryAiMessage(
  signal?:AbortSignal,timeoutMs:number=MYSTERY_AI_BUDGET.clientMs
 ):Promise<{reply:string;quickAction?:ChatMessage['quickAction'];source:'scripted'|'gemini'}>{
  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
- const turns=history.filter(m=>!m.id.startsWith('welcome-')).slice(-8).map(({role,content})=>({role,content}));
+ const turns=boundAiHistory(history.filter(m=>!m.id.startsWith('welcome-')));
  const context:AiGuideContext={activePage,history:turns,editorContext};
  const result=(reply:string,source:'scripted'|'gemini')=>({reply,source,quickAction:aiNavigation(userMessage,context)});
  const instant=mysteryInstantHelp(userMessage,context);if(instant)return result(instant.reply,'scripted');

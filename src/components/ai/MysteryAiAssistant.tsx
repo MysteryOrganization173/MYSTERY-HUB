@@ -42,6 +42,7 @@ export const MysteryAiAssistant: React.FC = () => {
   const {
     activePage,
     user,
+    sessionToken,
     setActivePage,
     openDataPage,
     activeEditorSite,
@@ -124,15 +125,13 @@ export const MysteryAiAssistant: React.FC = () => {
     }
     switch (page) {
       case 'data':
-        return "Hi 👋 I'm Mystery AI. I see you're browsing our Data & Airtime offers! What would you like to know about our MTN, Telecel, and AirtelTigo bundles or MoMo checkout?";
+        return "Hi, I’m Mystery AI. What would you like to know about Data or Airtime?";
       case 'website':
-        return "Hi 👋 I'm Mystery AI. I see you're exploring the Website Builder! Ready to create a no-code website for your Ghanaian business, church, salon, or shop?";
+        return "Hi, I can help you find your way around Website Builder.";
       case 'services':
-        return "Hi 👋 I'm Mystery AI. Looking through All Services? I can explain what's available, what's limited and which utilities are still planned.";
+        return "Hi, which service would you like to know about?";
       case 'orders':
-        return "Hi 👋 I'm Mystery AI. Tracking an order or have questions about delivery? I can guide you on lookups and WhatsApp support.";
-      case 'about':
-        return "Hi 👋 I'm Mystery AI. Want to learn more about Mystery Hub's mission and who we serve in Ghana?";
+        return "Hi, I can help you find tracking and support for your order.";
       case 'home':
       default:
         return user
@@ -155,14 +154,14 @@ export const MysteryAiAssistant: React.FC = () => {
   // The conversation lives only in this component. A different account (or signing out) must never see it,
   // so a change of account cancels any pending reply and starts a fresh chat.
   const accountId = user?.id ?? null;
-  const previousAccount = useRef(accountId);
-  useEffect(() => {
-    if (previousAccount.current === accountId) return;
-    previousAccount.current = accountId;
+  const previousAccount = useRef({accountId,sessionToken});
+  useLayoutEffect(() => {
+    if (previousAccount.current.accountId === accountId && previousAccount.current.sessionToken === sessionToken) return;
+    previousAccount.current = {accountId,sessionToken};
     cancelPending();
     setInputValue('');
     setMessages([]);
-  }, [accountId]);
+  }, [accountId,sessionToken]);
 
   // Inactivity expansion trigger: gently expand prompt once
   useEffect(() => {

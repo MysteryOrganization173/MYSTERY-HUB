@@ -13,15 +13,12 @@ async function runMysteryAiTests() {
   console.log('--- STARTING MYSTERY AI PRODUCTION TEST SUITE ---');
   let passed = 0;
 
-  // 1. Injected catalogue evidence is used; missing evidence is never replaced by seed prices.
+  // 1. Published prices are served by deterministic guides, outside the model prompt.
   {
-    const instruction=buildMysteryAiSystemInstruction(undefined,[{network:'mtn',isActive:true,dataAmount:'synthetic 1GB',priceGhc:7.13}] as any);
-    assert.ok(instruction.includes('synthetic 1GB (GH₵7.13)'));
-    assert.ok(instruction.includes('not a quote or supplier availability check'));
-    const missing=buildMysteryAiSystemInstruction();
-    assert.ok(!/GH₵[0-9]/.test(missing));
-    assert.ok(missing.includes('No price snapshot supplied'));
-    assert.ok(missing.includes('evidence unavailable, not proof a service is down'));
+    const prompt=buildMysteryAiSystemInstruction();
+    assert.ok(!/GH₵[0-9]/.test(prompt));
+    assert.ok(prompt.includes('Do not fill in missing prices'));
+    assert.ok(prompt.includes('Missing evidence means unconfirmed'));
     console.log('✓ 1. Catalogue evidence and missing-data boundaries verified');
     passed++;
   }
