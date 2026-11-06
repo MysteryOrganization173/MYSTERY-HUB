@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {SalesReliabilityPanel} from './SalesReliabilityPanel';
+import {AiFeedbackPanel} from './AiFeedbackPanel';
 import type {SalesReliabilityView} from '../../../../shared/salesReliability';
 import { createAdminRequestScope } from '../../../utils/adminRequestScope';
 import {
@@ -163,6 +164,7 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
       <AdminPageHeader title="System Health" description="Checkout evidence, service checks and the admin audit trail." actions={<><Freshness at={checkedAt} prefix="Checked" /><RefreshButton busy={isRefreshing} onClick={() => {void fetchSystemAndAudit(true);void fetchSales();}} label="Check again" /></>} />
 
       {salesPanel}
+      <AiFeedbackPanel sessionToken={sessionToken}/>
 
       {problems.length
         ? <AdminNotice tone={problems.some(row => row.tone === 'danger') ? 'danger' : 'warning'} title={`${problems.length} item${problems.length === 1 ? '' : 's'} to look at`}>{problems.map(row => `${row.name}: ${row.verdict}`).join(' · ')}</AdminNotice>

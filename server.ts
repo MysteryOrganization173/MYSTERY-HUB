@@ -11,6 +11,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createMysteryAiRouter } from './server/routes/mysteryAiApi.js';
 import {mysteryAiHistoryRouter} from './server/routes/mysteryAiHistoryApi.js';
+import {mysteryAiFeedbackRouter} from './server/routes/mysteryAiFeedbackApi.js';
 import { apiRouter, handlePaystackWebhook, handleSuccessBizHubWebhook } from './server/routes/api.js';
 import { adminRouter } from './server/routes/adminApi.js';
 import { initDatabase } from './server/db/connection.js';
@@ -93,6 +94,7 @@ app.use('/api/admin', adminRouter);
 // Bounded informational AI endpoint (no account or transaction tools).
 app.use('/api/mystery-ai', createMysteryAiRouter());
 app.use('/api/mystery-ai/history', mysteryAiHistoryRouter);
+app.use('/api/mystery-ai/feedback', mysteryAiFeedbackRouter);
 
 // Setup Vite in development or static serving in production
 async function startServer() {

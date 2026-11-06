@@ -16,6 +16,7 @@ export interface ChatMessage {
   actions?: AiNavigation[];
   quickAction?: AiNavigation;
   productChoices?: AiDataChoice[];
+  reportReference?: string;
 }
 
 export interface SuggestedQuestion {
