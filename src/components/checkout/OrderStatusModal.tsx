@@ -471,11 +471,12 @@ export const OrderStatusModal: React.FC = () => {
             <button
               onClick={() => {
                 closeOrderStatus();
+                if (activeOrder.serviceType === 'results_checker') { window.location.assign(`/results-checkers?order=${encodeURIComponent(activeOrder.publicReference || activeOrder.id)}`); return; }
                 setActivePage(isAfa ? 'home' : 'data');
               }}
               className="mh-button"
             >
-              <span>{isAfa ? 'Back to Home' : tone === 'success' ? 'Buy again' : 'Done'}</span>
+              <span>{activeOrder.serviceType === 'results_checker' ? 'Open your receipt' : isAfa ? 'Back to Home' : tone === 'success' ? 'Buy again' : 'Done'}</span>
             </button>
           </div>
 

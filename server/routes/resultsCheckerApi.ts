@@ -48,7 +48,7 @@ resultsCheckerRouter.post('/payments/initialize', requireAuth, campaignOrderCont
     const id = `ord_${randomUUID()}`, publicRef = `MH-RC-${randomUUID()}`, reference = `MH_rc_${randomUUID()}`, now = new Date().toISOString();
     const amount = product.retailMinor * qty;
     const order: OrderRecord = { id, user_id: req.user!.id, public_reference: publicRef, customer_name: req.user!.name, customer_email: email, customer_phone: phone.normalized, recipient_phone: phone.normalized,
-      network: CHECKER_ORDER_NETWORK, service_type: 'results_checker', product_id: checkerProductId(product.key), product_name_snapshot: checkerOrderName(product, qty), bundle_size_snapshot: product.name,
+      network: CHECKER_ORDER_NETWORK as OrderRecord['network'], service_type: 'results_checker', product_id: checkerProductId(product.key), product_name_snapshot: checkerOrderName(product, qty), bundle_size_snapshot: product.name,
       amount, currency: 'GHS', status: 'pending_payment', payment_provider: 'paystack', payment_reference: reference, payment_status: 'pending', supplier_provider: 'success_biz_hub',
       supplier_order_id: null, supplier_response: null, supplier_cost_minor: null, supplier_offer_ref: null, supplier_last_checked_at: null, failure_reason: null, created_at: now, updated_at: now, paid_at: null, submitted_at: null, delivered_at: null };
     const referral = await ReferralService.resolveReferralContextForOrder({ userId: req.user!.id, visitorKey: req.body.visitorKey, explicitCode: req.body.referralCode });

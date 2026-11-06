@@ -31,6 +31,7 @@ const WebsiteEditorPage = lazyPage(() => import('./components/website/WebsiteEdi
 const MoreServicesPage = lazyPage(() => import('./components/services/MoreServicesPage'), 'MoreServicesPage');
 const AfaRegistrationPage = lazyPage(() => import('./components/services/AfaRegistrationPage'), 'AfaRegistrationPage');
 const MarketplacePage = lazyPage(() => import('./components/marketplace/MarketplacePage'), 'MarketplacePage');
+const ResultsCheckersPage = lazyPage(() => import('./components/checkers/ResultsCheckersPage'), 'ResultsCheckersPage');
 const CreativeStudioPage = lazyPage(() => import('./components/creative/CreativeStudioPage'), 'CreativeStudioPage');
 const HelpPage = lazyPage(() => import('./components/help/HelpPage'), 'HelpPage');
 const AboutPage = lazyPage(() => import('./components/about/AboutPage'), 'AboutPage');
@@ -119,6 +120,7 @@ const AppContent: React.FC = () => {
         {activePage === 'website' && <WebsiteBuilderPage />}
         {activePage === 'marketplace' && <MarketplacePage />}
         {activePage === 'creative' && <CreativeStudioPage />}
+        {activePage === 'checkers' && <ResultsCheckersPage />}
         {activePage === 'services' && <MoreServicesPage />}
         {activePage === 'afa' && <AfaRegistrationPage />}
         {activePage === 'about' && <AboutPage />}

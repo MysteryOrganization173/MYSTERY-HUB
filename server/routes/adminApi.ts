@@ -8,6 +8,7 @@ import { adminCommercialRouter } from './commercialApi.js';
 import { AfaStore } from '../db/afaStore.js';
 import { adminFinanceRouter } from './financeApi.js';
 import { AfaService } from '../services/afaService.js';
+import { ResultsCheckerStore } from '../db/resultsCheckerStore.js';
 import { adminMarketplaceRouter } from './adminMarketplaceApi.js';
 import { WebsiteUltraStore } from '../db/websiteUltraStore.js';
 import {LeadOperationsStore} from '../db/leadOperationsStore.js';
@@ -269,7 +270,7 @@ adminRouter.get('/orders/:reference', async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      order: { ...toAdminOrderDetails(order), ...(order.service_type === 'afa' ? { afa_registration: await AfaStore.operationalDetails(order.id) } : {}) },
+      order: { ...toAdminOrderDetails(order), ...(order.service_type === 'afa' ? { afa_registration: await AfaStore.operationalDetails(order.id) } : {}), ...(order.service_type === 'results_checker' ? { results_checker: await ResultsCheckerStore.operationalDetails(order.id) } : {}) },
     });
   } catch (err) {
     console.error('[Admin API] Get order error:', err);
@@ -305,7 +306,7 @@ adminRouter.post('/orders/:reference/refresh', async (req: Request, res: Respons
 
     res.json({
       success: true,
-      order: { ...toAdminOrderDetails(refreshed), ...(refreshed.service_type === 'afa' ? { afa_registration: await AfaStore.operationalDetails(refreshed.id) } : {}) },
+      order: { ...toAdminOrderDetails(refreshed), ...(refreshed.service_type === 'afa' ? { afa_registration: await AfaStore.operationalDetails(refreshed.id) } : {}), ...(refreshed.service_type === 'results_checker' ? { results_checker: await ResultsCheckerStore.operationalDetails(refreshed.id) } : {}) },
       message: 'Supplier status checked. This does not confirm a customer refund.',
     });
   } catch (err) {
@@ -380,6 +381,7 @@ adminRouter.patch('/orders/:reference/status', async (req: Request, res: Respons
 
     const targetStatus = marketplaceStatus || status;
     if(targetStatus==='refunded'&&order.payment_status==='success'){res.status(409).json({error:'Use the order-linked customer refund workflow. A status change is not proof of a refund.'});return;}
+    if(order.service_type==='results_checker'){res.status(400).json({error:'A results checker can only complete when its PINs are stored. Use supplier refresh or the audited customer resolution.'});return;}
     if(order.service_type==='afa'){res.status(400).json({error:'AFA completion requires a confirmed supplier registered status. Use supplier refresh or the audited customer-resolution workflow.'});return;}
     if(order.service_type!=='marketplace'){res.status(409).json({error:'Supplier-backed orders require supplier reconciliation or the audited customer-resolution workflow. A manual status is not delivery evidence.'});return;}
     if (!targetStatus) {

@@ -278,6 +278,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
 
   const caseLabel = (order: AdminOrderDetails) => {
     const kase = describeOrderCase(order);
+    if (order.service_type === 'results_checker' && !kase.key.startsWith('resolved_')) return <StatusPill tone={kase.tone}>{`Checker · ${kase.label}`}</StatusPill>;
     if (order.service_type === 'afa' && !kase.key.startsWith('resolved_')) return <StatusPill tone={kase.tone}>{`AFA · ${afaStatusLabel(order.status, order.manual_review)}`}</StatusPill>;
     return <StatusPill tone={kase.tone}>{kase.label}</StatusPill>;
   };
@@ -557,6 +558,20 @@ function OrderDetailSheet({ order, token, onClose, detailError, loadingDetail, a
           ]} />
           {customerWhatsapp && <a href={customerWhatsapp} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 px-4 text-sm font-semibold text-slate-100 hover:border-[#00c365]"><MessageCircle className="h-4 w-4 text-[#00c365]" />Message customer on WhatsApp</a>}
         </AdminPanel>
+
+        {order.service_type === 'results_checker' && (
+          <AdminPanel title="Results checker" tone="warning">
+            {order.results_checker ? <DefinitionList items={[
+              ['Product', `${order.results_checker.product.toUpperCase()} × ${order.results_checker.qty}`],
+              ['Supplier purchase', order.results_checker.supplierPurchaseId || 'None recorded'],
+              ['Quoted unit cost', ghs(order.results_checker.quotedCostMinor)],
+              ['Purchase attempted', order.results_checker.submissionAttemptedAt ? new Date(order.results_checker.submissionAttemptedAt).toLocaleString() : 'Not attempted'],
+              ['PINs stored', `${order.results_checker.pinsStored} of ${order.results_checker.pinsExpected}`],
+              ['Customer opened receipt', order.results_checker.customerViewedAt ? new Date(order.results_checker.customerViewedAt).toLocaleString() : 'Not yet'],
+            ]} /> : <p className="text-slate-400">Purchase details are unavailable.</p>}
+            <p className="mt-2 text-xs text-slate-400">PINs are encrypted and shown only to the customer. An attempted purchase with no PINs may still have been charged: check the supplier statement before any refund or new purchase. The system never buys twice on its own.</p>
+          </AdminPanel>
+        )}
 
         {order.service_type === 'afa' && (
           <AdminPanel title="AFA registration" tone="warning">

@@ -11,6 +11,7 @@ export const ROUTE_PATH_MAP: Record<ActivePage, string> = {
   business: '/my-business',
   marketplace: '/marketplace',
   creative: '/creative-studio',
+  checkers: '/results-checkers',
   services: '/services',
   about: '/about',
   help: '/help',
@@ -152,6 +153,7 @@ export function getPageFromPath(rawPath: string | null | undefined): ActivePage 
 
   // Mystery Creative Studio: design services on quote, part of the Marketplace family.
   if (normalized === '/creative-studio' || normalized === '/creative-studio/index.html') return 'creative';
+  if (normalized === '/results-checkers' || normalized === '/results-checkers/index.html') return 'checkers';
 
   if (normalized === '/services' || normalized === '/services/index.html') {
     return 'services';

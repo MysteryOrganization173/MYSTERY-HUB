@@ -234,7 +234,7 @@ export class ReferralService {
     if(input.store_context)return null;
     // AFA requires a separately enabled economic policy. A wildcard cannot silently enable it.
     const economy = await economicsPolicy(input.service_type || 'data');
-    if (input.service_type === 'afa' && !economy?.enabled) return null;
+    if ((input.service_type === 'afa' || input.service_type === 'results_checker') && !economy?.enabled) return null;
     // Successful payment is authoritative; a historical paid_at alone is insufficient.
     if (input.status !== 'delivered' || input.payment_status !== 'success' || input.currency !== 'GHS'
       || (input.service_type === 'marketplace' && input.marketplace_status !== 'completed')) return null;
@@ -278,7 +278,7 @@ export class ReferralService {
       if (!amount) {
         rule = await ReferralStore.findMatchingRule(service, order.network, order.product_id, purchaseStage, client, at);
         if (!rule) return null;
-        if (service === 'afa' && rule.service_type !== 'afa') return null;
+        if ((service === 'afa' || service === 'results_checker') && rule.service_type !== service) return null;
         if (rule.reward_type === 'fixed_minor' && rule.reward_minor != null) amount = rule.reward_minor;
         else if (rule.reward_type === 'percent_bps' && rule.reward_percent_bps != null) amount = percentMinor(order.amount,rule.reward_percent_bps);
       }

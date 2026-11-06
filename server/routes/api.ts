@@ -56,6 +56,7 @@ import {
 
 import { afaRouter } from './afaApi.js';
 import { creativeStudioRouter } from './creativeStudioApi.js';
+import { resultsCheckerRouter } from './resultsCheckerApi.js';
 import { CREATIVE_INQUIRY_TYPE } from '../../shared/creativeStudio.js';
 import { accountRouter } from './accountApi.js';
 import { AccountError, identifierConflict, loginAccount } from '../services/accountSecurity.js';
@@ -71,6 +72,7 @@ apiRouter.use('/finance', financeRouter);
 apiRouter.use('/commercial',commercialRouter);
 apiRouter.use('/afa', afaRouter);
 apiRouter.use('/creative-studio', creativeStudioRouter);
+apiRouter.use('/results-checkers', resultsCheckerRouter);
 
 // Mount Website Builder endpoints
 apiRouter.use('/websites', websiteRouter);
@@ -212,6 +214,7 @@ apiRouter.get('/instant-bundles', async (_req: Request, res: Response) => {
 const walletCheckoutLimiter=createRateLimiter({windowMs:60_000,max:10});
 apiRouter.post('/payments/initialize', optionalAuth,campaignOrderContext, (req,res,next)=>req.body?.paymentMethod==='wallet'?walletCheckoutLimiter(req,res,next):next(), observeSalesRequest(salesCheckoutKind), async (req: Request, res: Response) => {
   if (req.body?.serviceType === 'afa' || req.body?.productId === 'afa-registration') { res.status(400).json({ error: 'Use the authenticated AFA registration checkout.' }); return; }
+  if (req.body?.serviceType === 'results_checker' || (typeof req.body?.productId === 'string' && req.body.productId.startsWith('results-checker-'))) { res.status(400).json({ error: 'Use the results checker page to buy a checker.' }); return; }
   const reqStart = performance.now();
   try {
     const { productId, recipientPhone, phone: bodyPhone, customerPhone, customerEmail: suppliedCustomerEmail, customerName, serviceType, network: reqNetwork, amount: reqAmount } = req.body || {};

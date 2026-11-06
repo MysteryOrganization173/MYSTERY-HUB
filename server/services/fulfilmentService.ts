@@ -10,6 +10,7 @@ import { WebsiteBusinessService } from './websiteBusinessService.js';
 import { AfaStore } from '../db/afaStore.js';
 import { FinanceService } from './financeService.js';
 import { AfaService } from './afaService.js';
+import { ResultsCheckerService } from './resultsCheckerService.js';
 import { OrdersStore } from '../db/ordersStore.js';
 import { OrderRecord, OrderStatus } from '../types/orders.js';
 import { SuccessBizHubProvider } from '../suppliers/successBizHub/provider.js';
@@ -371,6 +372,7 @@ export class FulfilmentService {
     }
 
     if (claimedOrder.service_type === 'afa') return { order: await AfaService.submit(claimedOrder), alreadyHandled: false };
+    if (claimedOrder.service_type === 'results_checker') return { order: await ResultsCheckerService.fulfil(claimedOrder), alreadyHandled: false };
 
     // Step 3: Safety check: Is live fulfilment enabled?
     const isFulfillmentEnabled = this.provider.client.isFulfillmentEnabled();
@@ -736,6 +738,7 @@ export class FulfilmentService {
    */
   static async refreshOrderStatusIfDue(order: OrderRecord, force = false): Promise<OrderRecord> {
     if (order.service_type === 'afa') return AfaService.refresh(order);
+    if (order.service_type === 'results_checker') return ResultsCheckerService.refresh(order);
     const uncertainWithId = order.failure_reason === 'supplier_submission_uncertain' && (order.status === 'queued' || order.store_context && order.manual_review && ['submitted','processing','delivered'].includes(order.status));
     const failedPaidRefresh=force&&order.payment_status==='success'&&['paid','queued','submitted','processing','failed','refund_pending','refunded'].includes(order.status)&&order.resolution_json?.stage!=='resolved';
     if (!order.supplier_order_id || (order.status !== 'submitted' && order.status !== 'processing' && !uncertainWithId && !failedPaidRefresh)) {
