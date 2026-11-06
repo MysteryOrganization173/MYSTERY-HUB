@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle2, ChevronRight, Clock, RotateCcw, ShoppingBag, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronRight, Clock, RotateCcw, ShoppingBag, XCircle, GraduationCap } from 'lucide-react';
 import { OrderRecord } from '../../types';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import {
@@ -50,9 +50,9 @@ export const CustomerOrderCard: React.FC<{ order: OrderRecord; status: CustomerO
       className="group w-full text-left flex items-start gap-3 rounded-2xl border border-slate-800 bg-[#0f151b] hover:border-[#00c365]/40 hover:bg-[#111a21] px-3.5 py-3 sm:px-4 sm:py-3.5 transition-colors cursor-pointer"
     >
       <span className="w-[3.25rem] shrink-0 flex justify-center pt-0.5" aria-hidden="true">
-        {marketplace ? (
+        {marketplace || order.serviceType === 'results_checker' ? (
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#00c365]/15 border border-[#00c365]/30 text-[#00c365]">
-            <ShoppingBag className="w-4 h-4" />
+            {order.serviceType === 'results_checker' ? <GraduationCap className="w-4 h-4" /> : <ShoppingBag className="w-4 h-4" />}
           </span>
         ) : (
           <NetworkBrandBadge network={order.network} size="xs" />

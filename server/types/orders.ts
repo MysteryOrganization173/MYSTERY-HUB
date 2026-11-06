@@ -31,7 +31,7 @@ export interface OrderRecord {
   customer_phone: string;
   recipient_phone: string;
   network: 'mtn' | 'telecel' | 'airteltigo';
-  service_type?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'afa';
+  service_type?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'afa' | 'results_checker';
   product_id: string;
   product_name_snapshot: string;
   bundle_size_snapshot: string;
@@ -94,7 +94,7 @@ export type SafePublicOrderDetails = Pick<
   customer_resolution?: import('./orderResolution.js').CustomerResolution;
   amount_ghc: number;
   manual_review?: boolean;
-  service_type?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'afa';
+  service_type?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'afa' | 'results_checker';
   face_value_ghc?: number;
   service_fee_ghc?: number;
   fulfilment_method?: 'pickup' | 'delivery' | 'digital_delivery' | 'manual_activation' | null;
@@ -114,6 +114,8 @@ export interface AuthenticatedCustomerOrderDetails extends SafePublicOrderDetail
 
 export interface AdminOrderDetails extends AuthenticatedCustomerOrderDetails {
   resolution?: import('./orderResolution.js').OrderResolution | null;
+  /** Facts about a voucher purchase. PINs are never part of any Admin response. */
+  results_checker?: {product:string; qty:number; supplierPurchaseId:string|null; quotedCostMinor:number; submissionAttemptedAt:string|null; pinsExpected:number; pinsStored:number; pinsStoredAt:string|null; customerViewedAt:string|null} | null;
   afa_registration?: {name:string; region:string; location:string; occupation?:string; maskedIdNumber:string; supplierStatus:string|null; supplierPublicId:string|null; submittedAt:string|null; registeredAt:string|null; createdAt:string; sensitivePayloadPurgedAt:string|null} | null;
   marketplace_context?: Record<string,unknown> | null;
   id: string;

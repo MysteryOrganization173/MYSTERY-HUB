@@ -12,7 +12,7 @@ const LIMIT = 8;
 const productLabel = (order: AdminOrderDetails) =>
   order.service_type === 'airtime' ? `${order.network.toUpperCase()} Airtime` : order.product_name_snapshot;
 const serviceLabel = (order: AdminOrderDetails) =>
-  order.service_type === 'marketplace' ? 'Marketplace'
+  order.service_type === 'marketplace' ? 'Marketplace' : order.service_type === 'results_checker' ? 'Results checker'
     : `${order.network.toUpperCase()}${order.service_type === 'instant_bundle' ? ' · Instant' : order.service_type === 'afa' ? ' · AFA' : ''}`;
 
 /** "4 min ago" for today, otherwise a short Ghana-time date. */

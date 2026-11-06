@@ -7,6 +7,7 @@ import { httpOrderRecordClient, type OrderRecordClient } from '../../../services
 import { afaStatusLabel } from '../../../../shared/afa';
 import { FULFILMENT_LABELS, FulfilmentMode } from '../../../../shared/marketplacePolicy';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { API_BASE_URL } from '../../../services/apiClient';
 import {
   AdminOrdersResponse,
   getAdminOrdersOnServer,
@@ -278,6 +279,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
 
   const caseLabel = (order: AdminOrderDetails) => {
     const kase = describeOrderCase(order);
+    if (order.service_type === 'results_checker' && !kase.key.startsWith('resolved_')) return <StatusPill tone={kase.tone}>{`Checker · ${kase.label}`}</StatusPill>;
     if (order.service_type === 'afa' && !kase.key.startsWith('resolved_')) return <StatusPill tone={kase.tone}>{`AFA · ${afaStatusLabel(order.status, order.manual_review)}`}</StatusPill>;
     return <StatusPill tone={kase.tone}>{kase.label}</StatusPill>;
   };
@@ -318,7 +320,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
           <div id="order-filters" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <label className={adminLabel}><span>Service</span>
               <select className={adminField} value={serviceTypeFilter} onChange={e => { setServiceTypeFilter(e.target.value); setCurrentPage(1); }}>
-                <option value="">All services</option><option value="data">Data bundles</option><option value="instant_bundle">Instant bundles</option><option value="airtime">Airtime</option><option value="afa">AFA Registration</option><option value="marketplace">Marketplace</option>
+                <option value="">All services</option><option value="results_checker">Results checkers</option><option value="data">Data bundles</option><option value="instant_bundle">Instant bundles</option><option value="airtime">Airtime</option><option value="afa">AFA Registration</option><option value="marketplace">Marketplace</option>
               </select></label>
             <label className={adminLabel}><span>Network</span>
               <select className={adminField} value={networkFilter} onChange={e => { setNetworkFilter(e.target.value); setCurrentPage(1); }}>
@@ -469,6 +471,30 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
   );
 };
 
+/** The exit for a paid checker that can't complete. It starts the audited refund workflow and never buys anything. */
+function CheckerRefundReview({ order, token, onDone }: { order: AdminOrderDetails; token: string; onDone: () => void }) {
+  const [note, setNote] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const send = async () => {
+    setBusy(true); setError('');
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/orders/${encodeURIComponent(order.public_reference)}/results-checker/refund-review`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ note }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not move this order.');
+      onDone();
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not move this order.'); } finally { setBusy(false); }
+  };
+  const held = order.results_checker?.pinsStored || 0;
+  return (
+    <div className="mt-3 space-y-2 rounded-xl border border-slate-700 p-3">
+      <label className="block text-sm font-semibold text-slate-200" htmlFor="rc-refund-note">Move to refund review</label>
+      <textarea id="rc-refund-note" className="w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm text-slate-100" rows={2} maxLength={500} placeholder="What the supplier statement shows" value={note} onChange={e => setNote(e.target.value)} />
+      {held > 0 && <p className="text-xs text-amber-300">This customer can still see {held} PIN{held === 1 ? '' : 's'} on their receipt.</p>}
+      {error && <p role="alert" className="text-xs text-red-300">{error}</p>}
+      <button type="button" className="min-h-11 rounded-lg border border-slate-600 px-3 text-sm text-slate-100 disabled:opacity-50" disabled={busy || note.trim().length < 10} onClick={send}>{busy ? 'Moving…' : 'Move to refund review'}</button>
+    </div>
+  );
+}
+
 function OrderDetailSheet({ order, token, onClose, detailError, loadingDetail, acting, onReload, message, actionError, copiedKey, onCopy, note, setNote, savingNote, onSaveNote, onToggleFlag, refreshingSupplier, onRefreshSupplier, updatingStatus, onMarketplaceStep, onResolutionUpdated, recordKeeping, testClosure }: {
   order: AdminOrderDetails; token: string; onClose: () => void; detailError: string | null; message: string | null; actionError: string | null;
   loadingDetail: boolean; acting: boolean; onReload: () => void;
@@ -557,6 +583,21 @@ function OrderDetailSheet({ order, token, onClose, detailError, loadingDetail, a
           ]} />
           {customerWhatsapp && <a href={customerWhatsapp} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 px-4 text-sm font-semibold text-slate-100 hover:border-[#00c365]"><MessageCircle className="h-4 w-4 text-[#00c365]" />Message customer on WhatsApp</a>}
         </AdminPanel>
+
+        {order.service_type === 'results_checker' && (
+          <AdminPanel title="Results checker" tone="warning">
+            {order.results_checker ? <DefinitionList items={[
+              ['Product', `${order.results_checker.product.toUpperCase()} × ${order.results_checker.qty}`],
+              ['Supplier purchase', order.results_checker.supplierPurchaseId || 'None recorded'],
+              ['Quoted unit cost', ghs(order.results_checker.quotedCostMinor)],
+              ['Purchase attempted', order.results_checker.submissionAttemptedAt ? new Date(order.results_checker.submissionAttemptedAt).toLocaleString() : 'Not attempted'],
+              ['PINs stored', `${order.results_checker.pinsStored} of ${order.results_checker.pinsExpected}`],
+              ['Customer opened receipt', order.results_checker.customerViewedAt ? new Date(order.results_checker.customerViewedAt).toLocaleString() : 'Not yet'],
+            ]} /> : <p className="text-slate-400">Purchase details are unavailable.</p>}
+            <p className="mt-2 text-xs text-slate-400">PINs are encrypted and shown only to the customer. An attempted purchase with no PINs may still have been charged: check the supplier statement before any refund or new purchase. The system never buys twice on its own.</p>
+            {order.results_checker && order.payment_status === 'success' && ['paid', 'queued', 'submitted', 'processing'].includes(order.status) && order.results_checker.pinsStored < order.results_checker.pinsExpected && <CheckerRefundReview order={order} token={token} onDone={onReload} />}
+          </AdminPanel>
+        )}
 
         {order.service_type === 'afa' && (
           <AdminPanel title="AFA registration" tone="warning">

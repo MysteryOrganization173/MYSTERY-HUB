@@ -3,6 +3,7 @@ import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { applySocialHead, marketplaceProductHead, pageIndexingHead, PUBLIC_ORIGIN, PUBLIC_PAGE_METADATA, publicPageHead } from '../../utils/socialMetadata';
 
 const OTHER_PAGES: Record<string, {title:string;description:string}> = {
+  checkers: { title: 'WASSCE & BECE Results Checkers — Mystery Hub', description: 'Buy WASSCE and BECE results checker vouchers from Mystery Hub. Mystery Hub sells vouchers and is not affiliated with WAEC.' },
   help: { title: 'Help & FAQs — Mystery Hub Ghana',description:'Find answers about Data, Airtime, payments, order tracking, Mystery Earn, Website Builder, Wallet and support.'},
   wallet: {title:'Mystery Wallet — Mystery Hub',description:'Top up your Wallet and use your available balance for supported Mystery Hub purchases.'},
   about: {title:'About Mystery Hub — Reliable Digital Solutions for Ghana',description:'Learn about Mystery Hub’s mission to provide honest, reliable data bundles, website building tools, and everyday digital utilities across Ghana.'},

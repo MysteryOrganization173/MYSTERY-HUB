@@ -8,6 +8,7 @@ import { adminCommercialRouter } from './commercialApi.js';
 import { AfaStore } from '../db/afaStore.js';
 import { adminFinanceRouter } from './financeApi.js';
 import { AfaService } from '../services/afaService.js';
+import { ResultsCheckerStore } from '../db/resultsCheckerStore.js';
 import { adminMarketplaceRouter } from './adminMarketplaceApi.js';
 import { WebsiteUltraStore } from '../db/websiteUltraStore.js';
 import {LeadOperationsStore} from '../db/leadOperationsStore.js';
@@ -269,7 +270,7 @@ adminRouter.get('/orders/:reference', async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      order: { ...toAdminOrderDetails(order), ...(order.service_type === 'afa' ? { afa_registration: await AfaStore.operationalDetails(order.id) } : {}) },
+      order: { ...toAdminOrderDetails(order), ...(order.service_type === 'afa' ? { afa_registration: await AfaStore.operationalDetails(order.id) } : {}), ...(order.service_type === 'results_checker' ? { results_checker: await ResultsCheckerStore.operationalDetails(order.id) } : {}) },
     });
   } catch (err) {
     console.error('[Admin API] Get order error:', err);
@@ -305,7 +306,7 @@ adminRouter.post('/orders/:reference/refresh', async (req: Request, res: Respons
 
     res.json({
       success: true,
-      order: { ...toAdminOrderDetails(refreshed), ...(refreshed.service_type === 'afa' ? { afa_registration: await AfaStore.operationalDetails(refreshed.id) } : {}) },
+      order: { ...toAdminOrderDetails(refreshed), ...(refreshed.service_type === 'afa' ? { afa_registration: await AfaStore.operationalDetails(refreshed.id) } : {}), ...(refreshed.service_type === 'results_checker' ? { results_checker: await ResultsCheckerStore.operationalDetails(refreshed.id) } : {}) },
       message: 'Supplier status checked. This does not confirm a customer refund.',
     });
   } catch (err) {
@@ -380,6 +381,7 @@ adminRouter.patch('/orders/:reference/status', async (req: Request, res: Respons
 
     const targetStatus = marketplaceStatus || status;
     if(targetStatus==='refunded'&&order.payment_status==='success'){res.status(409).json({error:'Use the order-linked customer refund workflow. A status change is not proof of a refund.'});return;}
+    if(order.service_type==='results_checker'){res.status(400).json({error:'A results checker can only complete when its PINs are stored. Use supplier refresh or the audited customer resolution.'});return;}
     if(order.service_type==='afa'){res.status(400).json({error:'AFA completion requires a confirmed supplier registered status. Use supplier refresh or the audited customer-resolution workflow.'});return;}
     if(order.service_type!=='marketplace'){res.status(409).json({error:'Supplier-backed orders require supplier reconciliation or the audited customer-resolution workflow. A manual status is not delivery evidence.'});return;}
     if (!targetStatus) {
@@ -430,6 +432,26 @@ adminRouter.patch('/orders/:reference/status', async (req: Request, res: Respons
  * - Preserves all payment references, financial amounts, and customer history for audit integrity.
  * - Writes an audit record to admin_audit_log.
  */
+/**
+ * Moves a paid results checker that can't complete into the audited refund workflow. It never buys anything and can't
+ * mark an order delivered. A written note is required, because a supplier debit has to be checked first.
+ */
+adminRouter.post('/orders/:reference/results-checker/refund-review', async (req: Request, res: Response) => {
+  try {
+    const order = await OrdersStore.findOrder(req.params.reference);
+    if (!order || order.service_type !== 'results_checker') { res.status(404).json({ error: 'Results checker order not found.' }); return; }
+    const note = typeof req.body?.note === 'string' ? req.body.note.trim() : '';
+    if (note.length < 10 || note.length > 500 || /[<>\x00-\x08\x0b\x0c\x0e-\x1f]/.test(note)) { res.status(400).json({ error: 'Write what you checked with the supplier, in 10 to 500 characters of plain text.' }); return; }
+    if (order.payment_status !== 'success' || !['paid', 'queued', 'submitted', 'processing'].includes(order.status)) { res.status(409).json({ error: 'Only a paid order that has not finished can be moved to refund review.' }); return; }
+    const record = await ResultsCheckerStore.find(order.id);
+    if (!record || record.pin_count >= record.qty) { res.status(409).json({ error: 'All PINs for this order are stored. Complete it instead of refunding it.' }); return; }
+    await OrdersStore.updateOrderReview(order.id, true, note);
+    const updated = await OrdersStore.updateOrderStatus(order.id, 'refund_pending', 'Results checker moved to refund review by staff.');
+    await AdminAuditStore.record({ adminUserId: req.user!.id, action: 'results_checker_refund_review', entityType: 'order', entityId: order.public_reference, metadata: { fromStatus: order.status, pinsStored: record.pin_count, pinsExpected: record.qty, purchaseAttempted: Boolean(record.submission_attempted_at) } });
+    res.json({ success: true, order: toAdminOrderDetails(updated || order), message: 'Moved to refund review.' });
+  } catch { res.status(500).json({ error: 'Could not move this order to refund review.' }); }
+});
+
 adminRouter.post('/orders/:reference/close-test-order', async (req: Request, res: Response) => {
   try {
     const ref = req.params.reference;
@@ -440,6 +462,9 @@ adminRouter.post('/orders/:reference/close-test-order', async (req: Request, res
       res.status(404).json({ error: 'Order reference not found.' });
       return;
     }
+
+    // A results checker is real value, and may hold PINs. It has its own audited path.
+    if (order.service_type === 'results_checker') { res.status(400).json({ error: 'Results checker orders cannot be closed as test orders. Use Move to refund review.' }); return; }
 
     // Safety Rule 1: Never close delivered orders
     if (order.status === 'delivered' || order.delivered_at) {

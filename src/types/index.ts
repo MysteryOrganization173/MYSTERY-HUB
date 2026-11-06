@@ -47,7 +47,7 @@ export interface OrderRecord {
   id: string; // Local client ID e.g. MH1234567
   publicReference?: string; // Real authoritative backend reference e.g. MH-20260930-592025
   serverReference?: string; // Alias for backward compatibility
-  serviceType?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'afa';
+  serviceType?: 'data' | 'airtime' | 'instant_bundle' | 'marketplace' | 'afa' | 'results_checker';
   bundle: DataBundle;
   recipientPhone: string;
   buyerRecipientVisible?: boolean; // Presentation only: direct checkout or authenticated account Orders.
@@ -268,7 +268,7 @@ export interface DigitalService {
   artworkUrl?: string;
 }
 
-export type ActivePage = 'creative' | 'wallet' | 'home' | 'data' | 'website' | 'business' | 'marketplace' | 'services' | 'about' | 'help' | 'orders' | 'admin' | 'earn' | 'afa' | 'app' | 'editor';
+export type ActivePage = 'checkers' | 'creative' | 'wallet' | 'home' | 'data' | 'website' | 'business' | 'marketplace' | 'services' | 'about' | 'help' | 'orders' | 'admin' | 'earn' | 'afa' | 'app' | 'editor';
 
 export type MarketplaceAvailability = 'available' | 'check_availability' | 'limited' | 'coming_soon';
 

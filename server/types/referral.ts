@@ -11,6 +11,7 @@ export type RewardServiceType =
   | 'instant_bundle'
   | 'marketplace'
   | 'afa'
+  | 'results_checker'
   | 'website_builder'
   | 'manual_adjustment';
 

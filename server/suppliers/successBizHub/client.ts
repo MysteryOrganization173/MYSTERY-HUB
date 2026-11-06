@@ -209,6 +209,22 @@ export class SuccessBizHubClient {
     return this.request(`/afa/${encodeURIComponent(identifier)}`, { privateAfa: true });
   }
 
+  /** Voucher catalogue. Cached briefly for the page; purchases always pass skipCache to see current cost and stock. */
+  async getVouchers(skipCache = false): Promise<unknown> {
+    return this.request('/vouchers', { cacheTtlMs: 60_000, skipCache, privateAfa: true });
+  }
+  /**
+   * Buys vouchers and returns PINs. Never retried here: the supplier documents no idempotency key for this route. The
+   * private mode keeps raw supplier text out of errors. Customer contacts are not sent, and the supplier's documentation
+   * says the pack then also goes to the supplier account's own contacts by SMS, email and WhatsApp.
+   */
+  async purchaseVoucher(req: { typeId: string; qty: number }): Promise<unknown> {
+    return this.request('/vouchers/purchase', { method: 'POST', privateAfa: true, body: { typeId: req.typeId, qty: req.qty } });
+  }
+  async getVoucherPurchase(identifier: string): Promise<unknown> {
+    return this.request(`/vouchers/purchases/${encodeURIComponent(identifier)}`, { privateAfa: true });
+  }
+
   /**
    * 2. GET /wallet
    * Retrieve balance, available and held

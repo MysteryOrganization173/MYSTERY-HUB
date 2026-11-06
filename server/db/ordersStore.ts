@@ -617,7 +617,7 @@ export class OrdersStore {
       const query = `
         UPDATE orders
         SET status = $1, payment_status = $2, failure_reason = $3, payment_closed_at = $4, updated_at = $5
-        WHERE id = $6 ${existing.service_type === 'afa' ? "AND status = 'pending_payment' AND payment_status = 'pending' RETURNING *" : ''};
+        WHERE id = $6 ${existing.service_type === 'afa' || existing.service_type === 'results_checker' ? "AND status = 'pending_payment' AND payment_status = 'pending' RETURNING *" : ''};
       `;
       const result = await pool.query(query, [
         updated.status,
@@ -627,10 +627,10 @@ export class OrdersStore {
         updated.updated_at,
         existing.id,
       ]);
-      if (existing.service_type === 'afa' && !result.rows[0]) { const current=await this.findOrder(ref); return {order:current,cancelled:false,alreadyPaid:current?.payment_status==='success'}; }
+      if ((existing.service_type === 'afa' || existing.service_type === 'results_checker') && !result.rows[0]) { const current=await this.findOrder(ref); return {order:current,cancelled:false,alreadyPaid:current?.payment_status==='success'}; }
     } else {
       const current = devMemoryStore.get(existing.id);
-      if (existing.service_type === 'afa' && current?.payment_status === 'success') return {order:current,cancelled:false,alreadyPaid:true};
+      if ((existing.service_type === 'afa' || existing.service_type === 'results_checker') && current?.payment_status === 'success') return {order:current,cancelled:false,alreadyPaid:true};
       devMemoryStore.set(existing.id, updated);
       devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
       devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
@@ -674,7 +674,7 @@ export class OrdersStore {
       const query = `
         UPDATE orders
         SET status = $1, payment_status = $2, failure_reason = $3, payment_closed_at = $4, updated_at = $5
-        WHERE id = $6 ${existing.service_type === 'afa' ? "AND status = 'pending_payment' AND payment_status = 'pending' RETURNING *" : ''};
+        WHERE id = $6 ${existing.service_type === 'afa' || existing.service_type === 'results_checker' ? "AND status = 'pending_payment' AND payment_status = 'pending' RETURNING *" : ''};
       `;
       const result = await pool.query(query, [
         updated.status,
@@ -684,10 +684,10 @@ export class OrdersStore {
         updated.updated_at,
         existing.id,
       ]);
-      if (existing.service_type === 'afa' && !result.rows[0]) { const current=await this.findOrder(ref); return {order:current,expired:false,alreadyPaid:current?.payment_status==='success'}; }
+      if ((existing.service_type === 'afa' || existing.service_type === 'results_checker') && !result.rows[0]) { const current=await this.findOrder(ref); return {order:current,expired:false,alreadyPaid:current?.payment_status==='success'}; }
     } else {
       const current = devMemoryStore.get(existing.id);
-      if (existing.service_type === 'afa' && current?.payment_status === 'success') return {order:current,expired:false,alreadyPaid:true};
+      if ((existing.service_type === 'afa' || existing.service_type === 'results_checker') && current?.payment_status === 'success') return {order:current,expired:false,alreadyPaid:true};
       devMemoryStore.set(existing.id, updated);
       devMemoryStore.set(`payref:${existing.payment_reference}`, updated);
       devMemoryStore.set(`pubref:${existing.public_reference}`, updated);
@@ -811,9 +811,9 @@ export class OrdersStore {
     if (pool) {
       const query = `
         SELECT * FROM orders
-        WHERE (status IN ('submitted', 'processing') OR (status = 'queued' AND (failure_reason = 'supplier_submission_uncertain' OR service_type = 'afa')))
-          AND (supplier_order_id IS NOT NULL OR service_type = 'afa')
-          AND service_type IN ('data', 'airtime', 'instant_bundle', 'afa')
+        WHERE (status IN ('submitted', 'processing') OR (status = 'queued' AND (failure_reason = 'supplier_submission_uncertain' OR service_type IN ('afa', 'results_checker'))))
+          AND (supplier_order_id IS NOT NULL OR service_type IN ('afa', 'results_checker'))
+          AND service_type IN ('data', 'airtime', 'instant_bundle', 'afa', 'results_checker')
         ORDER BY created_at DESC
         LIMIT $1;
       `;
@@ -827,9 +827,9 @@ export class OrdersStore {
         .filter(
           (o) =>
             (o.status === 'submitted' || o.status === 'processing' ||
-              (o.status === 'queued' && (o.failure_reason === 'supplier_submission_uncertain' || o.service_type === 'afa'))) &&
-            (Boolean(o.supplier_order_id) || o.service_type === 'afa') &&
-            ['data', 'airtime', 'instant_bundle', 'afa'].includes(o.service_type || '')
+              (o.status === 'queued' && (o.failure_reason === 'supplier_submission_uncertain' || o.service_type === 'afa' || o.service_type === 'results_checker'))) &&
+            (Boolean(o.supplier_order_id) || o.service_type === 'afa' || o.service_type === 'results_checker') &&
+            ['data', 'airtime', 'instant_bundle', 'afa', 'results_checker'].includes(o.service_type || '')
         )
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, limit);
@@ -1136,7 +1136,7 @@ export class OrdersStore {
       supplier_cost_minor: supplierCostMinor,
       supplier_offer_ref: supplierOfferRef,
       supplier_response: rawSupplierResponse ? JSON.stringify(rawSupplierResponse) : existing.supplier_response,
-      submitted_at: existing.service_type === 'afa' ? existing.submitted_at || nowIso : nowIso,
+      submitted_at: existing.service_type === 'afa' || existing.service_type === 'results_checker' ? existing.submitted_at || nowIso : nowIso,
       updated_at: nowIso,
       supplier_last_checked_at: nowIso,
       failure_reason: null,
@@ -1318,7 +1318,8 @@ export class OrdersStore {
         // The webhook may precede persistence of the supplier ID. Let the provider retry.
         if (!order) throw new Error('Supplier webhook order is not yet available.');
         // The documented data webhook cannot authoritatively update AFA registrations.
-        if (order.service_type === 'afa') { containsAfa = true; continue; }
+        // Nor voucher purchases: their state only ever comes from the voucher routes.
+        if (order.service_type === 'afa' || order.service_type === 'results_checker') { containsAfa = true; continue; }
         let rawStatus='';try{rawStatus=String(JSON.parse(update.response)?.status||'').toLowerCase();}catch{}
         const updated = await this.updateOrderStatus(order.id, update.status, update.failureReason,
           update.supplierOrderId, update.response, { client, afterCommit, expectedSupplierId:update.supplierOrderId, authoritativeSupplierRecovery:['processed','completed','success','delivered','processing','in_progress','pending','queued','accepted'].includes(rawStatus) });

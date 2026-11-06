@@ -60,7 +60,7 @@ test('Financial Control Room loading endpoints return JSON before the storefront
     const responses=await Promise.all(paths.map(path=>fetchOriginal(origin+'/api/admin/finance'+path,{headers:{Authorization:'Bearer admin-token'}})));
     for(const response of responses){assert.equal(response.status,200);assert.match(response.headers.get('content-type')||'',/^application\/json/);assert.equal(response.headers.get('cache-control'),'no-store');}
     const [control,queue,operations,customer]=await Promise.all(responses.map(response=>response.json()));
-    assert.equal(control.settings.withdrawalMinimumMinor,500);assert.equal(control.settings.withdrawalFeeBps,300);assert.deepEqual(control.economics.map((policy:any)=>policy.service),['data','airtime','afa']);assert.ok(Array.isArray(control.definitions));
+    assert.equal(control.settings.withdrawalMinimumMinor,500);assert.equal(control.settings.withdrawalFeeBps,300);assert.deepEqual(control.economics.map((policy:any)=>policy.service),['data','airtime','afa','results_checker']);assert.ok(Array.isArray(control.definitions));
     assert.deepEqual(queue,[]);assert.ok(operations.length>0);assert.equal(customer.walletMinor,10000);assert.ok(Array.isArray(customer.earnLedger));
   } finally {await new Promise<void>(resolve=>listener.close(()=>resolve()));}
 });

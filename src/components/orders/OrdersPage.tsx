@@ -212,7 +212,7 @@ const OrdersHistory: React.FC = () => {
             <ul className="space-y-2.5">
               {visibleOrders.map(({ order, status }) => (
                 <li key={order.id}>
-                  <CustomerOrderCard order={order} status={status} now={now} onOpen={() => openOrderStatus(order)} />
+                  <CustomerOrderCard order={order} status={status} now={now} onOpen={() => { if (order.serviceType === 'results_checker') window.location.assign(`/results-checkers?order=${encodeURIComponent(order.publicReference || order.id)}`); else openOrderStatus(order); }} />
                 </li>
               ))}
             </ul>

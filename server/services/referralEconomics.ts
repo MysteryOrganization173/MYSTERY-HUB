@@ -11,7 +11,7 @@ export async function economicsPolicy(service:string):Promise<EconomicsPolicy|un
   return {...policy,...(direct?.reserveConfigured?{directReserve:{bps:direct.reserveBps,fixed:direct.reserveFixedMinor}}:{})};
 }
 export async function saveEconomicsPolicy(adminId:string,input:Record<string,unknown>) {
-  if(input.confirmed!==true||!['data','airtime','afa'].includes(input.service as string)||typeof input.enabled!=='boolean'||!['fixed','margin_percent','stage_margin_percent'].includes(input.mode as string))throw new FinanceError('Invalid reward economics configuration.');
+  if(input.confirmed!==true||!['data','airtime','afa','results_checker'].includes(input.service as string)||typeof input.enabled!=='boolean'||!['fixed','margin_percent','stage_margin_percent'].includes(input.mode as string))throw new FinanceError('Invalid reward economics configuration.');
   const policy:EconomicsPolicy={service:input.service as string,enabled:input.enabled,version:randomUUID(),reserveMinor:moneyMinor(input.reserveMinor,true),reserveBps:Number(input.reserveBps),supplierCostMinor:input.supplierCostMinor==null?null:moneyMinor(input.supplierCostMinor,true),mode:input.mode as EconomicsPolicy['mode'],marginBps:Number(input.marginBps)};
   percentMinor(100,policy.reserveBps);percentMinor(100,policy.marginBps);
   if(policy.mode==='stage_margin_percent') {
@@ -55,7 +55,7 @@ export function computeEconomicReward(order:OrderRecord,rule:ReferralRewardRuleR
   // The 50/10 fixed rules remain compatible, capped to known commercial margin.
   // Missing cost fails closed for new Data/Airtime/AFA rewards. Historical facts
   // are returned before this calculation and never revalued.
-  const eligible=['data','airtime','afa'].includes(order.service_type||'data');
+  const eligible=['data','airtime','afa','results_checker'].includes(order.service_type||'data');
   const amount=!eligible?requested:margin==null?0:acquisitionSubsidy?requested:Math.min(margin,policy?.enabled&&policy.mode==='margin_percent'?percentMinor(margin,policy.marginBps):requested);
   const contribution=cost===null||!(quotedReserve!=null||policy?.enabled)?null:order.amount-cost-reserve-amount;
   return {amount,snapshot:{retail_price_minor:order.amount,supplier_cost_minor:cost,supplier_cost_source:cost===null?'unknown':order.supplier_cost_minor==null?'admin_afa_cost':'supplier_order',operations_reserve_minor:reserve,rewardable_margin_minor:margin,economic_version:policy?.enabled?policy.version:'legacy-rule',rule_version:rule?.updated_at||null,rule_id:rule?.id||null,final_reward_minor:amount,calculation_mode:acquisitionSubsidy?'welcome_acquisition_subsidy':policy?.enabled?policy.mode:'fixed_margin_cap',acquisition_subsidy:acquisitionSubsidy,contribution_after_reward_minor:contribution}};
