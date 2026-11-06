@@ -5,6 +5,7 @@ import { MysteryAiIcon } from './MysteryAiIcon';
 import {AssistantText} from './AssistantText';
 import {useDialogFocus} from '../../hooks/useDialogFocus';
 import { AiRequestGate } from '../../utils/aiRequestGate';
+import {validateAiNavigation,type AiNavigation} from '../../../shared/mysteryAiIntent';
 import {
   ChatMessage,
   MysteryAiError,
@@ -41,6 +42,7 @@ const phoneQuery = '(max-width: 639px)';
 export const MysteryAiAssistant: React.FC = () => {
   const {
     activePage,
+    dataProductMode,
     user,
     sessionToken,
     setActivePage,
@@ -271,7 +273,7 @@ export const MysteryAiAssistant: React.FC = () => {
       setMessages(prev => [...prev, {
         id: `ai-${Date.now()}`, role: 'assistant', content: response.reply,
         timestamp: timeLabel(),
-        quickAction: response.quickAction, source: response.source,
+        actions: response.actions, source: response.source,
       }]);
     } catch (error) {
       if (!requestGate.current.accepts(request)) return;
@@ -312,16 +314,25 @@ export const MysteryAiAssistant: React.FC = () => {
     inputRef.current?.focus();
   };
 
-  const handleQuickActionClick = (action: NonNullable<ChatMessage['quickAction']>) => {
+  const handleQuickActionClick = (candidate: AiNavigation) => {
+    const action=validateAiNavigation(candidate,activePage,dataProductMode);
+    if(!action)return;
+    cancelPending();
+    closeMysteryAi();
+    setIsOpen(false);
+    if(action.focus==='track-order'){
+      requestAnimationFrame(()=>{
+        const target=document.getElementById('mh-track-order');
+        const toggle=target?.querySelector<HTMLButtonElement>('button[aria-expanded]');
+        if(toggle?.getAttribute('aria-expanded')==='false')toggle.click();
+        toggle?.focus({preventScroll:true});
+        target?.scrollIntoView({block:'nearest',behavior:reducedMotion()?'auto':'smooth'});
+      });
+      return;
+    }
     if (action.targetPage === 'data' && action.dataMode) openDataPage(action.dataMode);
     else setActivePage(action.targetPage);
-    // Smooth auto-scroll to top and toast feedback
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    if (window.innerWidth < 640) {
-      cancelPending();
-      closeMysteryAi();
-      setIsOpen(false);
-    }
+    window.scrollTo({ top: 0, behavior: reducedMotion()?'auto':'smooth' });
   };
 
   // Programmatically compute suggested questions dynamically for current active page
@@ -452,19 +463,21 @@ export const MysteryAiAssistant: React.FC = () => {
                       {isAssistant?<AssistantText text={msg.content}/>:msg.content}
 
                       {/* Actionable Redirection Button */}
-                      {msg.quickAction && (
+                      {isAssistant && !!msg.actions?.length && (
                         <div className="mt-3 pt-2.5 border-t border-slate-700/60 flex flex-col gap-1.5">
-                          <button
+                          {msg.actions.map(action=><button
+                            key={action.label}
                             type="button"
-                            onClick={() => handleQuickActionClick(msg.quickAction!)}
-                            className="w-full min-h-11 py-2 px-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(0,195,101,0.25)] flex items-center justify-between group cursor-pointer"
+                            disabled={!validateAiNavigation(action,activePage,dataProductMode)}
+                            onClick={() => handleQuickActionClick(action)}
+                            className="w-full min-h-11 py-2 px-3 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black text-xs font-bold transition-all flex items-center justify-between group cursor-pointer disabled:opacity-50"
                           >
                             <span className="flex items-center gap-1.5">
                               <ExternalLink className="w-3.5 h-3.5" />
-                              <span>{msg.quickAction.label}</span>
+                              <span>{action.label}</span>
                             </span>
                             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                          </button>
+                          </button>)}
                         </div>
                       )}
                     </div>

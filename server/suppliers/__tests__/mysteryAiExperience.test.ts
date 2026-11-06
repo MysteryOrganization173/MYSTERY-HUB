@@ -26,7 +26,10 @@ test('new replies follow the reader only near the bottom; the list scrolls itsel
   assert.equal(isNearBottom({scrollTop: 900, scrollHeight: 1400, clientHeight: 420}), true);
   assert.equal(isNearBottom({scrollTop: 200, scrollHeight: 1400, clientHeight: 420}), false);
   assert.match(ui, /box\.scrollTo\(\{ top: box\.scrollHeight/);
-  assert.doesNotMatch(ui, /scrollIntoView/, 'scrollIntoView can scroll the page behind the dialog');
+  const navigationStart = ui.indexOf('const handleQuickActionClick');
+  const navigationEnd = ui.indexOf('// Programmatically compute suggested questions', navigationStart);
+  const chatWithoutNavigation = ui.slice(0, navigationStart) + ui.slice(navigationEnd);
+  assert.doesNotMatch(chatWithoutNavigation, /scrollIntoView/, 'the open dialog must not scroll the page behind it');
   assert.match(ui, />New reply/);
   assert.match(ui, /prefers-reduced-motion/);
 });
