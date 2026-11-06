@@ -91,9 +91,9 @@ test('one account never sees another account\'s conversation', () => {
   assert.doesNotMatch(ui, /localStorage|sessionStorage/, 'the conversation is never written to device storage');
 });
 
-test('no claims of memory or voice; the privacy note says exactly what the chat is', () => {
-  assert.doesNotMatch(ui, /remembers|voice|microphone/i);
-  assert.match(ui, /can’t see your account, orders or Wallet, and this chat isn’t saved/);
+test('the privacy note distinguishes temporary chat from opt-in account storage', () => {
+  assert.match(ui, /Temporary chat isn’t saved/);
+  assert.match(ui, /choose Saved chats and start a saved chat/);
 });
 
 test('signed-in Home suggests member questions, each with a grounded answer during an outage', () => {

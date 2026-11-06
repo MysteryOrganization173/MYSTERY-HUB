@@ -134,7 +134,8 @@ export function createReliableMysteryAiRouter(validate:(body:any)=>Input,deps:{g
    }
    const client=(deps.getClient||getGeminiClient)();if(!client){finish('CONFIGURATION');return;}
    if(Date.now()<cooldownUntil){finish(cooldownCode);return;}
-   const instruction=buildMysteryAiSystemInstruction(editor);
+   const style=req.body.replyStyle;
+   const instruction=buildMysteryAiSystemInstruction(editor)+(style==='brief'?'\nPresentation preference: keep the answer brief.':style==='step_by_step'?'\nPresentation preference: use short numbered steps when helpful.':'');
    const contents=[...history.map(m=>({role:m.role==='user'?'user':'model',parts:[{text:m.content}]})),{role:'user',parts:[{text:`[Page: ${page}]\nCustomer Question: ${input.message}`}]}];
    const complex=input.message.trim().split(/\s+/).length>25||/rewrite|compose|draft a|compare|troubleshoot|explain why|critique|analy[sz]e|audit|marketing strategy|copywriting|professional tone/i.test(input.message);
    const models=complex?['gemini-3.8-flash','gemini-3.1-flash-lite']:['gemini-3.1-flash-lite','gemini-3.8-flash'];let failure:AiFailureCode='PROVIDER_UNAVAILABLE';
