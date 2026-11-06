@@ -147,7 +147,7 @@ test('UI wires prior-only history, identity guard, reset/close cancellation and 
   assert.match(ui,/sendMysteryAiMessage\(query, activePage, priorHistory/);
   assert.doesNotMatch(ui,/sendMysteryAiMessage\(query, activePage, \[\.\.\.messages, userMsg\]/);
   assert.match(ui,/if \(!requestGate.current.accepts\(request\)\) return/);
-  assert.match(ui,/const handleClearHistory = \(\) => \{\s*cancelPending\(\)/);
+  assert.match(ui,/const handleClearHistory = \(\) => \{\s*if \(!history\.temporary\(\)\) return;\s*cancelPending\(\)/);
   assert.match(ui,/cancelPending\(\);\s*closeMysteryAi\(\)/);
   assert.match(ui,/role="alert"/);assert.match(ui,/Retry in/);assert.match(ui,/disabled=\{isTyping \|\| retrySeconds > 0\}/);
   assert.doesNotMatch(ui,/\bOnline\b/);assert.match(ui,/Help guide/);

@@ -7,6 +7,9 @@ import {useDialogFocus} from '../../hooks/useDialogFocus';
 import { AiRequestGate } from '../../utils/aiRequestGate';
 import {aiDataChoices,confirmAiDataChoice,maskAiRecipient,parseAiDataRequest,type AiDataChoice,type DataRequest} from '../../services/mysteryAiOrders';
 import {readPendingCheckout} from '../../utils/checkoutRecovery';
+import {redactAiSavedText} from '../../../shared/mysteryAiPrivacy';
+import {useMysteryAiHistory} from './useMysteryAiHistory';
+import {MysteryAiHistoryPanel} from './MysteryAiHistoryPanel';
 import {validateAiNavigation,type AiNavigation} from '../../../shared/mysteryAiIntent';
 import {
   ChatMessage,
@@ -170,6 +173,20 @@ export const MysteryAiAssistant: React.FC = () => {
   // The conversation lives only in this component. A different account (or signing out) must never see it,
   // so a change of account cancels any pending reply and starts a fresh chat.
   const accountId = user?.id ?? null;
+  const history = useMysteryAiHistory(user?.role === 'customer' ? sessionToken : null, accountId, turns => {
+    cancelPending();
+    setInputValue('');
+    setMessages(turns.length ? turns.flatMap(turn => {
+      const timestamp = new Date(turn.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      return [
+        {id:`saved-question-${turn.id}`,role:'user' as const,content:turn.question,timestamp},
+        {id:`saved-answer-${turn.id}`,role:'assistant' as const,content:turn.reply,timestamp},
+      ];
+    }) : [welcomeMessage()]);
+  });
+  useEffect(() => {
+    if (isMysteryAiOpen && user?.role === 'customer' && sessionToken) void history.reload();
+  }, [isMysteryAiOpen, accountId, sessionToken, user?.role]);
   const previousAccount = useRef({accountId,sessionToken});
   useLayoutEffect(() => {
     if (previousAccount.current.accountId === accountId && previousAccount.current.sessionToken === sessionToken) return;
@@ -277,7 +294,7 @@ export const MysteryAiAssistant: React.FC = () => {
     const rawQuery = (textToSend || inputValue).trim();
     const query = maskAiRecipient(rawQuery);
     if (retry && failure?.retryAt && Date.now() < failure.retryAt) return;
-    if (!rawQuery || rawQuery.length > CHAT_MAX_CHARS || !chatAvailable.current || requestGate.current.busy) return;
+    if (!rawQuery || rawQuery.length > CHAT_MAX_CHARS || !chatAvailable.current || requestGate.current.busy || (history.current && history.busy) || history.unsaved || history.visible) return;
     const orderDraft = !isInsideEditor && !(activePage === 'data' && dataProductMode !== 'data')
       ? retry ? dataDraft.current : parseAiDataRequest(rawQuery, dataDraft.current)
       : null;
@@ -285,6 +302,10 @@ export const MysteryAiAssistant: React.FC = () => {
     updateChoiceOwner();
     setChoiceNotice('');
     const request = requestGate.current.begin();
+    const saveResponse = (reply:string) => {
+      if (!history.current) return;
+      void history.saveTurn({requestId:crypto.randomUUID(),question:redactAiSavedText(query).slice(0,2000),reply:redactAiSavedText(reply).slice(0,4000)});
+    };
     const userMsg: ChatMessage = {
       id: retry && failure ? failure.messageId : `user-${Date.now()}`,
       role: 'user', content: query,
@@ -304,15 +325,17 @@ export const MysteryAiAssistant: React.FC = () => {
         const id = `ai-${Date.now()}`;
         updateChoiceOwner(result.choices.length ? id : undefined);
         setMessages(prev => [...prev, {id, role:'assistant', content:result.reply, timestamp:timeLabel(), productChoices:result.choices}]);
+        saveResponse(result.reply);
         return;
       }
-      const response = await sendMysteryAiMessage(query, activePage, priorHistory, editorAiContext, request.signal);
+      const response = await sendMysteryAiMessage(query, activePage, priorHistory, editorAiContext, request.signal, undefined, history.style);
       if (!requestGate.current.accepts(request)) return;
       setMessages(prev => [...prev, {
         id: `ai-${Date.now()}`, role: 'assistant', content: response.reply,
         timestamp: timeLabel(),
         actions: response.actions, source: response.source,
       }]);
+      saveResponse(response.reply);
     } catch (error) {
       if (!requestGate.current.accepts(request)) return;
       // The service exposes only safe product-facing errors, never provider details.
@@ -346,6 +369,7 @@ export const MysteryAiAssistant: React.FC = () => {
   };
 
   const handleClearHistory = () => {
+    if (!history.temporary()) return;
     cancelPending();
     setInputValue('');
     setMessages([welcomeMessage()]);
@@ -441,7 +465,7 @@ export const MysteryAiAssistant: React.FC = () => {
   }
 
   const countLabel = composerCountLabel(inputValue.length);
-  const canSend = Boolean(inputValue.trim()) && inputValue.length <= CHAT_MAX_CHARS && !isTyping;
+  const canSend = Boolean(inputValue.trim()) && inputValue.length <= CHAT_MAX_CHARS && !isTyping && !(history.current && history.busy) && !history.unsaved && !history.visible;
   // Phones get a near full-height sheet whose own header closes it; larger screens keep the floating panel above its button.
   const panelHeight = isPhone ? Math.max(240, viewport.height - 16) : undefined;
 
@@ -478,9 +502,15 @@ export const MysteryAiAssistant: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1">
-              {conversationStarted && (
+              {user?.role==='customer' && sessionToken && (
+                <button type="button" disabled={isTyping||history.busy} className="min-h-11 rounded-lg px-2 text-xs font-semibold text-slate-200 disabled:opacity-50" onClick={history.visible?history.hide:history.show}>
+                  {history.visible?'Back':'Saved chats'}
+                </button>
+              )}
+              {conversationStarted && !history.visible && (
                 <button
                   type="button"
+                  disabled={history.busy}
                   onClick={handleClearHistory}
                   className="min-h-11 inline-flex items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
                   title="Start a new chat"
@@ -517,6 +547,15 @@ export const MysteryAiAssistant: React.FC = () => {
               aria-busy={isTyping}
               className="h-full overflow-y-auto overscroll-contain p-3 sm:p-4 space-y-4 text-[15px] sm:text-sm"
             >
+              {history.visible && <MysteryAiHistoryPanel key={accountId} history={history}/>}
+              {!history.visible && history.current && <p className="break-words rounded-lg bg-slate-900 p-2 text-xs text-slate-300">Saving to: {history.current.title}</p>}
+              {!history.visible && history.unsaved && (
+                <div className="space-y-1 text-xs text-amber-200" role="status">
+                  <p>Reply not saved. {history.error}</p>
+                  <button type="button" disabled={history.busy} className="min-h-11 rounded-lg border border-slate-700 px-2" onClick={()=>history.unsaved && history.saveTurn(history.unsaved)}>Retry save</button>
+                </div>
+              )}
+              {!history.visible && <>
               {messages.map((msg) => {
                 const isAssistant = msg.role === 'assistant';
                 const failedHere = failure?.messageId === msg.id;
@@ -594,7 +633,7 @@ export const MysteryAiAssistant: React.FC = () => {
                   </ul>
                   <p className="flex items-start gap-2 px-0.5 pt-2 text-xs leading-relaxed text-slate-500">
                     <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden="true" />
-                    <span>Mystery AI explains how Mystery Hub works. It can’t see your account, orders or Wallet, and this chat isn’t saved: it clears when you start a new chat or reload. Never share PINs or passwords.</span>
+                    <span>Mystery AI explains how Mystery Hub works. It can’t see your orders or Wallet. Temporary chat isn’t saved. {sessionToken && user?.role==='customer'?'To keep a conversation, choose Saved chats and start a saved chat. ':''}Never share PINs or passwords.</span>
                   </p>
                 </div>
               )}
@@ -628,9 +667,10 @@ export const MysteryAiAssistant: React.FC = () => {
                   </div>
                 </div>
               )}
+              </>}
             </div>
 
-            {showJump && (
+            {showJump && !history.visible && (
               <button
                 type="button"
                 onClick={() => scrollToLatest()}
@@ -642,7 +682,7 @@ export const MysteryAiAssistant: React.FC = () => {
           </div>
 
           {/* Input Footer */}
-          <form
+          {!history.visible && <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSendMessage();
@@ -691,7 +731,7 @@ export const MysteryAiAssistant: React.FC = () => {
               )}
             </div>
             {countLabel && <p id="mystery-ai-count" className="mt-1.5 px-1 text-right text-[11px] text-amber-200" aria-live="polite">{countLabel}</p>}
-          </form>
+          </form>}
         </div>
       )}
 

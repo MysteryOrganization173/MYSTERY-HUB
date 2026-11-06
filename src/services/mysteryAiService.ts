@@ -5,6 +5,7 @@ import {aiActions,type AiGuideContext,type AiNavigation} from '../../shared/myst
 import {MYSTERY_AI_BUDGET,aiCanRetry,aiFailureMessage,boundAiHistory} from '../../shared/mysteryAiPolicy';
 
 import type {AiDataChoice} from './mysteryAiOrders';
+import type {AiReplyStyle} from '../../shared/mysteryAiPrivacy';
 
 export interface ChatMessage {
   id: string;
@@ -99,7 +100,7 @@ const isOffline=()=>typeof navigator!=='undefined'&&navigator.onLine===false;
 /** One request, one body deadline, no automatic client retries or model calls. */
 export async function sendMysteryAiMessage(
  userMessage:string,activePage:ActivePage,history:ChatMessage[],editorContext?:SafeEditorAiContext|null,
- signal?:AbortSignal,timeoutMs:number=MYSTERY_AI_BUDGET.clientMs
+ signal?:AbortSignal,timeoutMs:number=MYSTERY_AI_BUDGET.clientMs,replyStyle?:AiReplyStyle|null
 ):Promise<{reply:string;actions?:AiNavigation[];quickAction?:AiNavigation;source:'scripted'|'gemini'}>{
  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
  const turns=boundAiHistory(history.filter(m=>!m.id.startsWith('welcome-')));
@@ -117,7 +118,7 @@ export async function sendMysteryAiMessage(
    // Race the complete fetch/body operation even if a transport ignores cancellation.
    const work=async()=>{
      const res=await fetch(`${API_BASE_URL}/api/mystery-ai/chat`,{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,
-       body:JSON.stringify({message:userMessage,activePage,history:turns,editorContext:editorContext||undefined})});
+       body:JSON.stringify({message:userMessage,activePage,history:turns,editorContext:editorContext||undefined,replyStyle:replyStyle||undefined})});
      const data=await res.json().catch(()=>({}));
      if(res.status===429){
        const seconds=Math.ceil(Math.min(300,Math.max(1,Number(res.headers.get('Retry-After')||data.retryAfterSeconds)||60)));
