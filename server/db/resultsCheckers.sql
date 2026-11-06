@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS public.results_checker_purchases (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS results_checker_supplier_purchase ON public.results_checker_purchases (supplier_purchase_id) WHERE supplier_purchase_id IS NOT NULL;
+-- Not unique: the supplier's reply format is undocumented, and a repeated id must never block saving paid-for PINs.
+CREATE INDEX IF NOT EXISTS results_checker_supplier_purchase ON public.results_checker_purchases (supplier_purchase_id) WHERE supplier_purchase_id IS NOT NULL;
 ALTER TABLE public.results_checker_purchases ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.results_checker_purchases FROM PUBLIC;
 DO $$

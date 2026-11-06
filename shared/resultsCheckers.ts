@@ -98,8 +98,10 @@ export function parseVoucherPurchase(response: unknown): VoucherPurchaseResult {
   for (const raw of rawPins) {
     if (raw && typeof raw === 'object') {
       const row = raw as Record<string, unknown>;
-      const pin = pinText(row.pin ?? row.code ?? row.value), serial = pinText(row.serial ?? row.serialNumber ?? row.serial_number);
+      const rawSerial = row.serial ?? row.serialNumber ?? row.serial_number;
+      const pin = pinText(row.pin ?? row.code ?? row.value), serial = pinText(rawSerial);
       if (pin) pins.push({ pin, ...(serial ? { serial } : {}) }); else malformedPins++;
+      if (pin && rawSerial !== undefined && rawSerial !== null && !serial) malformedPins++;
     } else { const pin = pinText(raw); if (pin) pins.push({ pin }); else malformedPins++; }
   }
   return { purchaseId, pins, costMinor: parseMinor(data.chargeMinor ?? data.priceMinor ?? data.totalMinor), malformedPins };
@@ -117,6 +119,6 @@ export interface CheckerReceipt {
 export function checkerReceiptState(input: { paid: boolean; status: string; manualReview: boolean; pinCount: number; qty: number }): CheckerReceipt['state'] {
   if (input.pinCount >= input.qty && input.status === 'delivered') return 'ready';
   if (input.pinCount > 0) return 'partial';
-  if (input.manualReview || ['refund_pending', 'failed', 'refunded'].includes(input.status) || !input.paid) return 'review';
+  if (input.manualReview || ['refund_pending', 'failed', 'refunded', 'cancelled', 'expired'].includes(input.status)) return 'review';
   return 'processing';
 }

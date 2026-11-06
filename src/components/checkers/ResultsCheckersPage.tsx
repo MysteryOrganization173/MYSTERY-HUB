@@ -17,7 +17,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
     try { await navigator.clipboard.writeText(value); setState('copied'); } catch { setState('failed'); }
     window.setTimeout(() => setState('idle'), 2200);
   };
-  return <button type="button" className="rc-copy" onClick={copy} aria-label={`Copy ${label}`}>{state === 'copied' ? <><Check size={16} aria-hidden />Copied</> : state === 'failed' ? 'Select and copy' : <><Copy size={16} aria-hidden />Copy</>}</button>;
+  return <button type="button" className="rc-copy" onClick={copy} aria-label={state === 'copied' ? `${label} copied` : state === 'failed' ? `Could not copy ${label}` : `Copy ${label}`}>{state === 'copied' ? <><Check size={16} aria-hidden />Copied</> : state === 'failed' ? 'Select and copy' : <><Copy size={16} aria-hidden />Copy</>}</button>;
 }
 
 /** The customer's receipt. Everything comes from the server: PINs appear only after they are safely stored. */
@@ -37,11 +37,11 @@ function Receipt({ receipt, onRefresh, refreshing }: { receipt: CheckerReceipt; 
       </>}
       {receipt.state === 'processing' && <>
         <div className="rc-state"><Clock3 size={24} aria-hidden /><h2 id="rc-receipt-title" ref={heading} tabIndex={-1}>{receipt.paid ? 'Payment confirmed. Getting your checker.' : 'Confirming your payment'}</h2></div>
-        <p className="rc-receipt-note">This page will show your PIN as soon as we have it. Please don't pay again.</p>
+        <p className="rc-receipt-note">{receipt.paid ? "This page will show your PIN as soon as we have it. Please don't pay again." : "If you approved a Mobile Money payment, it can take a moment to reach us. Please don't pay again. We'll keep checking."}</p>
       </>}
       {receipt.state === 'review' && <>
         <div className="rc-state rc-state-warn"><AlertCircle size={24} aria-hidden /><h2 id="rc-receipt-title" ref={heading} tabIndex={-1}>{receipt.paid ? 'Our team is checking your order' : 'Payment not confirmed'}</h2></div>
-        <p className="rc-receipt-note">{receipt.paid ? "Your payment is recorded, but your checker needs a manual check. Please don't pay again. We'll sort this out with you." : 'We have no confirmed payment for this order, so nothing has been charged to this order.'}</p>
+        <p className="rc-receipt-note">{receipt.paid ? "Your payment is recorded, but your checker needs a manual check. Please don't pay again. We'll sort this out with you." : "We have no confirmed payment for this order. If money left your account, please don't pay again. Contact us with the order number below."}</p>
       </>}
 
       {receipt.pins.length > 0 && (
@@ -169,7 +169,7 @@ export const ResultsCheckersPage: React.FC = () => {
         {!receipt && (<>
           {configFailed && <div className="rc-alert" role="status"><AlertCircle size={18} aria-hidden /><span>We can't show availability just now. Please try again shortly.</span></div>}
           {!config && !configFailed && <p className="rc-loading" role="status"><Loader2 size={18} className="rc-spin" aria-hidden />Checking availability…</p>}
-          {config && !open && <div className="rc-closed" role="status"><Clock3 size={20} aria-hidden /><div><strong>{config.message}</strong><span>Nothing can be bought here yet. We'll open sales when supply is confirmed.</span></div></div>}
+          {config && !open && <div className="rc-closed" role="status"><Clock3 size={20} aria-hidden /><div><strong>{config.message}</strong><span>{/not on sale/.test(config.message) ? "Nothing can be bought here yet. We'll open sales when supply is confirmed." : 'Please try again shortly.'}</span></div></div>}
 
           {config && (
             <form onSubmit={buy} noValidate>

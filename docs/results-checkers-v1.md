@@ -27,6 +27,9 @@ The supplier documents no idempotency key for `POST /vouchers/purchase`, and a t
 | Timeout, 5xx, unreadable reply | Marked uncertain, review. Never repeated |
 | 400, 401, 403, 404, 429 | Refund pending and review. Staff check the supplier statement first, because a refusal isn't proof of no debit |
 | Stock or cost changed before buying | No purchase, review |
+| PINs returned but the save fails | Retried, then saved without the reference. If it still fails: uncertain, review, recover from the supplier's own delivery |
+
+Staff can end a stuck paid order with **Move to refund review** on the order page. It needs a written note, is audited, starts the existing refund workflow and never buys anything. "Close test order" is refused for these orders.
 
 The shape of `data.pins` entries and of the purchase lookup isn't documented. The parser accepts plain strings and `{ pin, serial }` style objects, and counts anything else as malformed. Check this against the first real response.
 
@@ -36,6 +39,7 @@ The shape of `data.pins` entries and of the purchase lookup isn't documented. Th
 - PINs are in `results_checker_purchases`, never in `orders`, `supplier_response`, logs or analytics.
 - Only `GET /api/results-checkers/orders/:reference/receipt` returns them, only to the order's own signed-in customer, with `no-store`. Any other order or user gets the same 404.
 - Admin sees purchase facts and PIN counts, not PINs. If a customer loses account access, there is no staff PIN view yet.
+- The supplier's documentation says that when no phone or email is sent, the voucher pack also goes to the supplier account's own contacts by SMS, email and WhatsApp. Mystery Hub sends none, so expect customer PINs to reach those contacts. Check this on the first purchase. It is also the recovery route if a save ever fails.
 
 Keep the key safe. Losing it makes stored PINs unreadable, and changing it needs a planned migration.
 
@@ -53,7 +57,7 @@ Nothing here has been done. All of it is needed.
 5. Make one real purchase yourself and check the receipt, Orders, Admin and the supplier statement. Read the real reply format. If it differs, stop and fix the parser.
 6. Then make it discoverable: set `srv-results` in `src/data/services.ts` to active with `targetPage: 'checkers'`, add a footer link, and add `/results-checkers` to the public page metadata.
 
-To stop sales at any time, remove `RESULTS_CHECKER_ENABLED`. Receipts keep working.
+To stop sales at any time, remove `RESULTS_CHECKER_ENABLED`. Receipts keep working. Checkouts already paid when it is switched off go to review without buying anything.
 
 ## GH₵2 referral reward
 

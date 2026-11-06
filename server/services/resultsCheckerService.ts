@@ -2,7 +2,7 @@ import { SuccessBizHubClient } from '../suppliers/successBizHub/client.js';
 import { ResultsCheckerStore } from '../db/resultsCheckerStore.js';
 import { OrdersStore } from '../db/ordersStore.js';
 import { isCheckerEncryptionConfigured } from './resultsCheckerEncryption.js';
-import { CHECKER_MAX_QTY, CHECKER_PRODUCTS, checkerProduct, matchCheckerOffer, parseVoucherCatalogue, parseVoucherPurchase, type CheckerConfig, type CheckerProduct, type OfferState, type VoucherOffer } from '../../shared/resultsCheckers.js';
+import { CHECKER_MAX_QTY, CHECKER_PRODUCTS, checkerProduct, matchCheckerOffer, parseVoucherCatalogue, parseVoucherPurchase, type CheckerConfig, type CheckerProduct, type OfferState, type VoucherOffer, type VoucherPurchaseResult } from '../../shared/resultsCheckers.js';
 import type { OrderRecord } from '../types/orders.js';
 
 const OFFER_REF = 'results_checker';
@@ -16,6 +16,9 @@ const OFFER_REF = 'results_checker';
  */
 export class ResultsCheckerService {
   static client = new SuccessBizHubClient();
+  static saveRetryDelayMs = 400;
+  /** Status pages can be opened by anyone holding a reference, and all sales share the supplier's rate limit. */
+  private static lastLookup = new Map<string, number>();
 
   static enabled() { return /^(true|1)$/i.test(process.env.RESULTS_CHECKER_ENABLED || ''); }
   static typeId(product: CheckerProduct) { return (process.env[product.typeIdEnv] || '').trim() || undefined; }
@@ -23,7 +26,8 @@ export class ResultsCheckerService {
   /** Live supplier money needs a live payment. Test payments only ever reach a supplier stand-in on this machine. */
   static supplierSpendAllowed(): boolean {
     if (!this.client.isFulfillmentEnabled()) return false;
-    if ((process.env.PAYSTACK_SECRET_KEY || '').trim().startsWith('sk_live_')) return process.env.NODE_ENV !== 'test';
+    // Webhook signatures are only enforced in production, so live spending must never run anywhere else.
+    if ((process.env.PAYSTACK_SECRET_KEY || '').trim().startsWith('sk_live_')) return process.env.NODE_ENV === 'production';
     if (process.env.NODE_ENV === 'production') return false;
     return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(process.env.SUCCESS_BIZ_HUB_BASE_URL || '');
   }
@@ -61,7 +65,7 @@ export class ResultsCheckerService {
     if (!record) return this.review(order, 'Results checker purchase record is missing; do not buy a voucher without investigation.');
     if (record.pin_count > 0) return this.settle(order);
     if (record.submission_attempted_at) return (await OrdersStore.saveSupplierUncertainSubmission(order.id, 'Results checker purchase was already attempted; reconcile with the supplier before any further action.')) || order;
-    if (!this.supplierSpendAllowed() || !isCheckerEncryptionConfigured()) return this.review(order, 'Results checker dispatch held by payment, supplier or encryption configuration. No voucher was bought.');
+    if (!this.enabled() || !this.supplierSpendAllowed() || !isCheckerEncryptionConfigured()) return this.review(order, 'Results checker dispatch held by payment, supplier or encryption configuration. No voucher was bought.');
 
     const product = checkerProduct(record.product_key);
     if (!product) return this.review(order, 'Results checker product is unknown. No voucher was bought.');
@@ -69,7 +73,7 @@ export class ResultsCheckerService {
     let check: { state: OfferState; offer: VoucherOffer | null };
     try { check = await this.offerFor(product, record.qty, true); }
     catch { return this.review(order, 'Supplier catalogue could not be checked after payment. No voucher was bought.'); }
-    if (check.state !== 'ok' || check.offer?.id !== record.supplier_type_id) return this.review(order, `Results checker unavailable after payment (${check.state}). No voucher was bought. Refund or retry from Admin.`);
+    if (check.state !== 'ok' || check.offer?.id !== record.supplier_type_id) return this.review(order, `Results checker unavailable after payment (${check.state}). No voucher was bought. Move it to refund review from this order.`);
 
     if (!await ResultsCheckerStore.claimSubmission(order.id)) return (await OrdersStore.findOrder(order.id)) || order;
     let response: unknown;
@@ -91,32 +95,45 @@ export class ResultsCheckerService {
   static async applyPurchase(order: OrderRecord, response: unknown, expected: number, quotedCostMinor: number): Promise<OrderRecord> {
     const result = parseVoucherPurchase(response);
     if ((response as { success?: unknown })?.success !== true) return (await OrdersStore.saveSupplierUncertainSubmission(order.id, 'Supplier voucher reply was not a success; outcome unknown. Do not buy again until checked.')) || order;
-    if (result.pins.length > 0) await ResultsCheckerStore.savePins(order.id, result.purchaseId, result.pins);
-    else if (result.purchaseId) await ResultsCheckerStore.savePurchaseId(order.id, result.purchaseId);
+    // A voucher has been paid for by now, so losing this save would lose real value. Try hard, and never leave it silent.
+    if (result.pins.length > 0 && !await this.savePinsDurably(order.id, result.purchaseId, result.pins)) {
+      return (await OrdersStore.saveSupplierUncertainSubmission(order.id, `Supplier returned ${result.pins.length} PIN(s) but they could not be saved${result.purchaseId ? ` (reference ${result.purchaseId})` : ''}. The supplier sends the pack to the account contacts: recover it there. Do not buy again.`)) || order;
+    }
+    if (!result.pins.length && result.purchaseId) await ResultsCheckerStore.savePurchaseId(order.id, result.purchaseId);
 
     const supplierRef = result.purchaseId || (result.pins.length ? `pins-${order.id.slice(-24)}` : null);
     if (!supplierRef) return (await OrdersStore.saveSupplierUncertainSubmission(order.id, 'Supplier voucher reply had no PINs and no reference. Do not buy again until checked.')) || order;
 
     // Only safe facts about the purchase enter the order record. PINs never do.
     const safe = { purchaseId: result.purchaseId, pinCount: result.pins.length, malformedPins: result.malformedPins, costMinor: result.costMinor };
-    const cost = result.costMinor ?? quotedCostMinor * expected;
+    // The undocumented reply may give a unit price or a total, so the cost used for margin is the cautious reading.
+    const quotedTotal = quotedCostMinor * expected, reported = result.costMinor;
+    const cost = reported === null ? quotedTotal : reported > quotedCostMinor && reported < quotedTotal ? reported * expected : Math.max(reported, quotedTotal);
+    const chargeConfirmed = reported === quotedTotal || (expected > 1 && reported === quotedCostMinor);
     const complete = result.pins.length === expected && result.malformedPins === 0;
     await OrdersStore.saveSupplierSubmission(order.id, supplierRef, cost, OFFER_REF, 'processing', safe);
     if (!complete) {
       await OrdersStore.updateOrderReview(order.id, true, `Supplier returned ${result.pins.length} of ${expected} PINs (${result.malformedPins} unreadable). Use the purchase lookup or supplier support to complete this order.`);
       return (await OrdersStore.findOrder(order.id)) || order;
     }
-    const delivered = (await OrdersStore.updateOrderStatus(order.id, 'delivered')) || order;
-    if (result.costMinor === null || result.costMinor > quotedCostMinor * expected) {
-      await OrdersStore.updateOrderReview(order.id, true, result.costMinor === null ? 'Voucher delivered, but the supplier reply had no charge. Confirm cost from the statement.' : 'Voucher delivered, but the supplier charged more than quoted. Check the margin.');
-    }
-    return (await OrdersStore.findOrder(order.id)) || delivered;
+    // Flagged before delivery, so no referral reward is paid on a cost nobody has confirmed.
+    if (!chargeConfirmed) await OrdersStore.updateOrderReview(order.id, true, reported === null ? 'Voucher delivered, but the supplier reply had no charge. Confirm cost from the statement. No referral reward was paid.' : 'Voucher delivered, but the supplier charge does not match the quote. Check the margin. No referral reward was paid.');
+    return (await OrdersStore.updateOrderStatus(order.id, 'delivered')) || (await OrdersStore.findOrder(order.id)) || order;
   }
 
-  /** Crash recovery: PINs held but the order isn't delivered yet. */
+  /** Retries a brief database failure. If the reference itself is the problem, the PINs are saved without it. */
+  private static async savePinsDurably(orderId: string, purchaseId: string | null, pins: VoucherPurchaseResult['pins']): Promise<boolean> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try { await ResultsCheckerStore.savePins(orderId, attempt < 2 ? purchaseId : null, pins); return true; }
+      catch { if (attempt < 2) await new Promise(resolve => setTimeout(resolve, this.saveRetryDelayMs * (attempt + 1))); }
+    }
+    return false;
+  }
+
+  /** Crash recovery only: exactly the PINs expected, and nothing has flagged this order for a person to check. */
   private static async settle(order: OrderRecord): Promise<OrderRecord> {
     const record = await ResultsCheckerStore.find(order.id);
-    if (!record || record.pin_count < record.qty || order.status === 'delivered') return order;
+    if (!record || record.pin_count !== record.qty || order.manual_review || order.status === 'delivered') return order;
     const ref = record.supplier_purchase_id || `pins-${order.id.slice(-24)}`;
     if (!order.supplier_order_id) await OrdersStore.saveSupplierSubmission(order.id, ref, record.quoted_cost_minor * record.qty, OFFER_REF, 'processing', { purchaseId: record.supplier_purchase_id, pinCount: record.pin_count, recovered: true });
     return (await OrdersStore.updateOrderStatus(order.id, 'delivered')) || order;
@@ -145,6 +162,10 @@ export class ResultsCheckerService {
 
   private static async lookup(order: OrderRecord, purchaseId: string, expected: number, quotedCostMinor: number): Promise<OrderRecord> {
     if (!this.client.isConfigured() || !isCheckerEncryptionConfigured()) return order;
+    const now = Date.now();
+    if (now - (this.lastLookup.get(order.id) || 0) < 30_000) return order;
+    if (this.lastLookup.size > 2000) this.lastLookup.clear();
+    this.lastLookup.set(order.id, now);
     let response: unknown;
     try { response = await this.client.getVoucherPurchase(purchaseId); }
     catch { return order; }

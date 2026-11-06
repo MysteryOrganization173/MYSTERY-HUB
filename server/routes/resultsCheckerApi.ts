@@ -80,10 +80,10 @@ resultsCheckerRouter.get('/orders/:reference/receipt', requireAuth, receiptLimit
     const record = await ResultsCheckerStore.find(refreshed.id);
     if (!record) { res.status(404).json({ error: 'We could not find that order on your account.' }); return; }
     const paid = refreshed.payment_status === 'success';
-    const pins = paid ? ResultsCheckerStore.pins(record) : [];
+    const pins = paid ? ResultsCheckerStore.pins(record).slice(0, record.qty) : [];
     if (pins.length) await ResultsCheckerStore.markViewed(refreshed.id);
     const receipt: CheckerReceipt = { orderRef: refreshed.public_reference, productName: refreshed.product_name_snapshot, qty: record.qty, status: refreshed.status, paid, manualReview: Boolean(refreshed.manual_review), pins, pinsExpected: record.qty,
       state: checkerReceiptState({ paid, status: refreshed.status, manualReview: Boolean(refreshed.manual_review), pinCount: pins.length, qty: record.qty }) };
     res.json(receipt);
-  } catch { res.status(503).json({ error: 'We could not open this receipt just now. Your PINs are safe. Please try again.' }); }
+  } catch { res.status(503).json({ error: 'We could not open this receipt just now. Please try again.' }); }
 });

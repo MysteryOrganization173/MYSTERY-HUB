@@ -215,7 +215,8 @@ export class SuccessBizHubClient {
   }
   /**
    * Buys vouchers and returns PINs. Never retried here: the supplier documents no idempotency key for this route. The
-   * private mode keeps raw supplier text out of errors, and contacts are left out so PINs go only through Mystery Hub.
+   * private mode keeps raw supplier text out of errors. Customer contacts are not sent, and the supplier's documentation
+   * says the pack then also goes to the supplier account's own contacts by SMS, email and WhatsApp.
    */
   async purchaseVoucher(req: { typeId: string; qty: number }): Promise<unknown> {
     return this.request('/vouchers/purchase', { method: 'POST', privateAfa: true, body: { typeId: req.typeId, qty: req.qty } });

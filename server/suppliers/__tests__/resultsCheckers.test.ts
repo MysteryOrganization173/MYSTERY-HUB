@@ -142,7 +142,12 @@ test('live spending needs a live payment key: test payments cannot reach the rea
     assert.equal(ResultsCheckerService.supplierSpendAllowed(), true, 'a stand-in on this machine only');
     process.env.NODE_ENV = 'production';
     assert.equal(ResultsCheckerService.supplierSpendAllowed(), false);
-    process.env.SUCCESS_BIZ_HUB_FULFILLMENT_ENABLED = 'false'; process.env.PAYSTACK_SECRET_KEY = 'sk_live_synthetic';
+    // A live key only spends in an explicit production process, because webhook signatures are only enforced there.
+    process.env.PAYSTACK_SECRET_KEY = 'sk_live_synthetic'; delete process.env.SUCCESS_BIZ_HUB_BASE_URL;
+    for (const env of ['test', 'development', '']) { process.env.NODE_ENV = env; assert.equal(ResultsCheckerService.supplierSpendAllowed(), false, env || 'unset'); }
+    delete process.env.NODE_ENV; assert.equal(ResultsCheckerService.supplierSpendAllowed(), false, 'NODE_ENV missing');
+    process.env.NODE_ENV = 'production'; assert.equal(ResultsCheckerService.supplierSpendAllowed(), true);
+    process.env.SUCCESS_BIZ_HUB_FULFILLMENT_ENABLED = 'false';
     assert.equal(ResultsCheckerService.supplierSpendAllowed(), false);
   } finally { process.env.NODE_ENV = was.env; if (was.key === undefined) delete process.env.PAYSTACK_SECRET_KEY; else process.env.PAYSTACK_SECRET_KEY = was.key; if (was.url === undefined) delete process.env.SUCCESS_BIZ_HUB_BASE_URL; else process.env.SUCCESS_BIZ_HUB_BASE_URL = was.url; }
 });
@@ -177,7 +182,10 @@ test('an unpaid order never reaches the supplier', async () => {
   await ResultsCheckerService.fulfil(paidNotQueued);
   assert.equal(purchase.mock.callCount(), 0);
   const body = await (await receipt(order)).json();
-  assert.deepEqual(body.pins, []); assert.equal(body.paid, false); assert.equal(body.state, 'review');
+  assert.deepEqual(body.pins, []); assert.equal(body.paid, false);
+  assert.equal(body.state, 'processing', 'a Mobile Money payment may still be on its way: never tell them nothing was charged');
+  const page = readFileSync('src/components/checkers/ResultsCheckersPage.tsx', 'utf8');
+  assert.doesNotMatch(page, /nothing has been charged/);
 });
 
 test('a verified payment buys once, stores PINs encrypted, then delivers; the customer can reopen the receipt', async () => {
@@ -429,4 +437,127 @@ test('security properties in the source: no PIN logging, no raw reply stored, no
   const page = readFileSync('src/components/checkers/ResultsCheckersPage.tsx', 'utf8');
   assert.match(page, /aren't affiliated with or endorsed by WAEC/);
   assert.doesNotMatch(page, /instant|guaranteed|official partner/i);
+});
+
+test('review: PINs survive a failing save, and if they truly cannot be saved the order says exactly that', async () => {
+  ResultsCheckerService.saveRetryDelayMs = 1;
+  const real = ResultsCheckerStore.savePins.bind(ResultsCheckerStore);
+  // A brief database failure: the retry saves them.
+  let calls = 0;
+  const flaky = mock.method(ResultsCheckerStore, 'savePins', async (...a: Parameters<typeof real>) => { if (++calls === 1) throw new Error('brief outage'); return real(...a); });
+  const order = await pendingOrder();
+  await pay(order);
+  assert.equal((await fresh(order)).status, 'delivered');
+  assert.equal((await ResultsCheckerStore.find(order.id))!.pin_count, 1);
+  flaky.mock.restore();
+  // The reference is what fails: the last attempt saves the PINs without it.
+  const noRef = mock.method(ResultsCheckerStore, 'savePins', async (id: string, ref: string | null, pins: Parameters<typeof real>[2]) => { if (ref) throw new Error('duplicate key'); return real(id, ref, pins); });
+  const second = await pendingOrder();
+  await pay(second);
+  assert.equal((await ResultsCheckerStore.find(second.id))!.pin_count, 1);
+  noRef.mock.restore();
+  // Every attempt fails: never delivered, flagged, not bought again.
+  purchase.mock.resetCalls();
+  const broken = mock.method(ResultsCheckerStore, 'savePins', async () => { throw new Error('down'); });
+  const third = await pendingOrder();
+  await pay(third);
+  const after = await fresh(third);
+  assert.equal(broken.mock.callCount(), 3);
+  assert.notEqual(after.status, 'delivered');
+  assert.equal(after.failure_reason, 'supplier_submission_uncertain');
+  assert.equal(after.manual_review, true);
+  await pay(third); await ResultsCheckerService.refresh(after);
+  assert.equal(purchase.mock.callCount(), 1);
+  broken.mock.restore();
+  assert.doesNotMatch(readFileSync('server/db/resultsCheckers.sql', 'utf8'), /UNIQUE INDEX/);
+});
+
+test('review: switching the service off stops purchases for checkouts already paid', async () => {
+  const order = await pendingOrder();
+  delete process.env.RESULTS_CHECKER_ENABLED;
+  await pay(order);
+  const after = await fresh(order);
+  assert.equal(purchase.mock.callCount(), 0);
+  assert.equal(after.manual_review, true); assert.notEqual(after.status, 'delivered');
+  assert.match(after.admin_note || '', /No voucher was bought/);
+});
+
+test('review: an unconfirmed or odd charge is flagged first, uses the cautious cost and pays no reward', async () => {
+  await saveEconomicsPolicy('admin', { confirmed: true, service: 'results_checker', enabled: true, mode: 'fixed', reserveMinor: 0, reserveBps: 195, marginBps: 0 });
+  await ReferralStore.createOrUpdateRule({ service_type: 'results_checker', reward_type: 'fixed_minor', reward_minor: 200, enabled: true, product_key: null, network: null, reward_percent_bps: null, starts_at: null, ends_at: null });
+  const run = async (reply: unknown, qty = 1) => { purchase.mock.mockImplementation(async () => reply); const order = await pendingOrder('bece', qty, { referrer_user_id: 'referrer' }); await pay(order); return { order: await fresh(order), ledger: (await ReferralStore.findLedgerByOrderId(order.id)).length }; };
+  const pinsFor = (n: number) => Array.from({ length: n }, (_, i) => ({ pin: 'SYNTHPIN' + (5000 + i) }));
+  let r = await run({ success: true, data: { id: 'V1', pins: pinsFor(1) } });
+  assert.equal(r.order.status, 'delivered'); assert.equal(r.order.manual_review, true); assert.equal(r.ledger, 0); assert.equal(r.order.supplier_cost_minor, 1800);
+  r = await run({ success: true, data: { id: 'V2', priceMinor: '2000', pins: pinsFor(1) } });
+  assert.equal(r.order.manual_review, true); assert.equal(r.ledger, 0); assert.equal(r.order.supplier_cost_minor, 2000);
+  // Two vouchers where the reply's price is a higher unit price: margin must not be overstated.
+  r = await run({ success: true, data: { id: 'V3', priceMinor: '2000', pins: pinsFor(2) } }, 2);
+  assert.equal(r.order.supplier_cost_minor, 4000); assert.equal(r.order.manual_review, true); assert.equal(r.ledger, 0);
+  // A confirmed charge, as a total or as a unit price, is clean and rewarded.
+  r = await run({ success: true, data: { id: 'V4', priceMinor: '3600', pins: pinsFor(2) } }, 2);
+  assert.equal(r.order.supplier_cost_minor, 3600); assert.ok(!r.order.manual_review); assert.equal(r.ledger, 1);
+  r = await run({ success: true, data: { id: 'V5', priceMinor: '1800', pins: pinsFor(2) } }, 2);
+  assert.equal(r.order.supplier_cost_minor, 3600); assert.ok(!r.order.manual_review);
+});
+
+test('review: surplus PINs and unreadable entries cannot slip past review on a later refresh', async () => {
+  // Too many PINs: review, and the customer sees only what they paid for.
+  purchase.mock.mockImplementation(async () => pinsReply(3));
+  const surplus = await pendingOrder('bece', 1);
+  await pay(surplus);
+  let after = await fresh(surplus);
+  assert.notEqual(after.status, 'delivered'); assert.equal(after.manual_review, true);
+  await ResultsCheckerService.refresh(after);
+  assert.notEqual((await fresh(surplus)).status, 'delivered');
+  assert.equal((await (await receipt(surplus)).json()).pins.length, 1);
+  // A full set plus an unreadable entry.
+  purchase.mock.mockImplementation(async () => ({ success: true, data: { id: 'VM', priceMinor: '1800', pins: [{ pin: 'SYNTHPIN7777' }, '<bad>'] } }));
+  const mixed = await pendingOrder();
+  await pay(mixed);
+  after = await fresh(mixed);
+  await ResultsCheckerService.refresh(after);
+  assert.notEqual((await fresh(mixed)).status, 'delivered');
+  // An unreadable serial means the voucher may be unusable, so it isn't passed off as complete.
+  purchase.mock.mockImplementation(async () => ({ success: true, data: { id: 'VS', priceMinor: '1800', pins: [{ pin: 'SYNTHPIN8888', serial: '<bad>' }] } }));
+  const serial = await pendingOrder();
+  await pay(serial);
+  assert.notEqual((await fresh(serial)).status, 'delivered');
+  assert.equal((await fresh(serial)).manual_review, true);
+});
+
+test('review: supplier lookups from status pages are throttled per order', async () => {
+  purchase.mock.mockImplementation(async () => ({ success: true, data: { id: 'VCH_T', priceMinor: '1800' } }));
+  const order = await pendingOrder();
+  await pay(order);
+  lookup.mock.mockImplementation(async () => ({ success: true, data: { id: 'VCH_T' } }));
+  for (let i = 0; i < 5; i++) await ResultsCheckerService.refresh(await fresh(order));
+  assert.equal(lookup.mock.callCount(), 1);
+});
+
+test('review: staff have one audited exit for stuck orders, and it never buys or completes anything', async () => {
+  const route = (order: OrderRecord, body: unknown, token = 'admin-token') => post(`/admin/orders/${order.public_reference}/results-checker/refund-review`, body, token);
+  purchase.mock.mockImplementation(async () => { throw new Error('timeout'); });
+  const stuck = await pendingOrder();
+  await pay(stuck);
+  purchase.mock.resetCalls();
+  assert.equal((await route(stuck, { note: 'Checked the supplier statement: no debit.' }, 'buyer-token')).status, 403);
+  assert.equal((await route(stuck, { note: 'short' })).status, 400);
+  assert.equal((await route(stuck, { note: '<script>alert(1)</script> nope nope' })).status, 400);
+  const moved = await route(stuck, { note: 'Checked the supplier statement: no debit.' });
+  assert.equal(moved.status, 200);
+  const after = await fresh(stuck);
+  assert.equal(after.status, 'refund_pending'); assert.equal(after.payment_status, 'success');
+  assert.equal(purchase.mock.callCount(), 0);
+  // Not for unpaid orders, or orders holding every PIN.
+  assert.equal((await route(await pendingOrder(), { note: 'Checked the supplier statement.' })).status, 409);
+  purchase.mock.mockImplementation(async () => pinsReply());
+  const done = await pendingOrder(); await pay(done);
+  assert.equal((await route(done, { note: 'Checked the supplier statement.' })).status, 409);
+  // The test-order closer refuses these orders outright, including one holding PINs.
+  assert.equal((await post(`/admin/orders/${done.public_reference}/close-test-order`, { confirmPaidTestOrder: true }, 'admin-token')).status, 400);
+  assert.equal((await post(`/admin/orders/${stuck.public_reference}/close-test-order`, { confirmPaidTestOrder: true }, 'admin-token')).status, 400);
+  // Staff cannot simply mark one delivered.
+  const status = await fetch(`${base}/api/admin/orders/${stuck.public_reference}/status`, { method: 'PATCH', headers: auth('admin-token'), body: JSON.stringify({ status: 'delivered' }) });
+  assert.ok(status.status >= 400 && status.status < 500, String(status.status));
 });

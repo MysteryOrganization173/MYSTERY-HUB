@@ -33,7 +33,7 @@ export const adminFinanceRouter=Router();
 adminFinanceRouter.use('/reconciliation',(_req,res,next)=>{res.setHeader('Cache-Control','no-store');next();});
 adminFinanceRouter.use(requireAdmin);
 adminFinanceRouter.use('/reconciliation',financeReconciliationRouter);
-adminFinanceRouter.get('/control',handler(async req=>({metrics:await FinanceStore.metrics(),...(await FinanceStore.read(req.user.id,async tx=>({settings:await FinanceService.config(tx),definitions:await FinanceService.achievementDefinitions(tx)}))),economics:await Promise.all(['data','airtime','afa'].map(async service=>({service,...await economicsPolicy(service)})))})));
+adminFinanceRouter.get('/control',handler(async req=>({metrics:await FinanceStore.metrics(),...(await FinanceStore.read(req.user.id,async tx=>({settings:await FinanceService.config(tx),definitions:await FinanceService.achievementDefinitions(tx)}))),economics:await Promise.all(['data','airtime','afa','results_checker'].map(async service=>({service,...await economicsPolicy(service)})))})));
 adminFinanceRouter.get('/operations',handler(req=>FinanceStore.adminOperations(typeof req.query.kind==='string'?req.query.kind:undefined,50,Math.max(0,Math.min(100000,Number(req.query.offset)||0)))));
 adminFinanceRouter.get('/customers/:id',handler(async req=>({...await FinanceService.summary(req.params.id,Math.max(0,Math.min(100000,Number(req.query.offset)||0))),earnLedger:await ReferralStore.getLedgerForUser(req.params.id)})));
 adminFinanceRouter.post('/orders/:id/refund',sensitive,handler(async req=>{

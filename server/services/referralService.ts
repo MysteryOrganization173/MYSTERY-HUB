@@ -235,6 +235,8 @@ export class ReferralService {
     // AFA requires a separately enabled economic policy. A wildcard cannot silently enable it.
     const economy = await economicsPolicy(input.service_type || 'data');
     if ((input.service_type === 'afa' || input.service_type === 'results_checker') && !economy?.enabled) return null;
+    // A voucher flagged for review has an unconfirmed cost, so the margin behind a reward isn't known.
+    if (input.service_type === 'results_checker' && input.manual_review) return null;
     // Successful payment is authoritative; a historical paid_at alone is insufficient.
     if (input.status !== 'delivered' || input.payment_status !== 'success' || input.currency !== 'GHS'
       || (input.service_type === 'marketplace' && input.marketplace_status !== 'completed')) return null;
