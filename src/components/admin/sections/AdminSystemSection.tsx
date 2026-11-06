@@ -72,10 +72,9 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
     try {
       const sysRes = await getAdminSystemOnServer(sessionToken);
       if (!current()) return;
-      if (sysRes.success && sysRes.system) {
-        setSystemData(sysRes.system);
-        setCheckedAt(Date.now());
-      }
+      if (!sysRes.success || !sysRes.system) throw new Error('System diagnostics were not returned.');
+      setSystemData(sysRes.system);
+      setCheckedAt(Date.now());
 
       try {
         const auditRes = await fetch(`${API_BASE_URL}/api/admin/audit-logs`, {
@@ -115,7 +114,7 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
   const rows: HealthRow[] = [
     {
       key: 'api', icon: <Server className="h-4 w-4" />, name: 'API server', tone: 'success', verdict: 'Responding',
-      checked: 'This page loaded its status from the API just now.',
+      checked: 'The API responded at the last successful check.',
       detail: <span className="font-mono">{environment} · Node {nodeVersion} · up {hours}h {minutes}m</span>,
     },
     {
@@ -127,14 +126,14 @@ export const AdminSystemSection: React.FC<AdminSystemSectionProps> = ({ sessionT
     {
       key: 'paystack', icon: <CreditCard className="h-4 w-4" />, name: 'Paystack', tone: components.paystack.status !== 'configured' ? 'danger' : liveMode ? 'success' : 'warning',
       verdict: components.paystack.status !== 'configured' ? 'Secret key missing' : liveMode ? 'Live key configured' : 'Test key configured',
-      checked: `A ${components.paystack.mode} secret key is present (${components.paystack.currency}).`,
+      checked: components.paystack.status === 'configured' ? `The server reports ${components.paystack.mode} configuration (${components.paystack.currency}).` : 'The server reports no Paystack secret key.',
       limits: 'It does not prove Paystack is accepting payments right now. Payment success is confirmed per order by Paystack verification.',
     },
     {
       key: 'supplier', icon: <Radio className="h-4 w-4" />, name: 'Data supplier (Success Biz Hub)',
       tone: supplier.status === 'error' ? 'danger' : supplier.status !== 'connected' ? 'neutral' : supplier.isLowBalance ? 'warning' : 'success',
       verdict: supplier.status === 'error' ? 'Supplier API error' : supplier.status !== 'connected' ? 'Not configured' : supplier.isLowBalance ? 'Connected · wallet low' : 'Connected',
-      checked: supplier.status === 'connected' ? 'The supplier balance endpoint answered this check.' : 'The supplier balance endpoint did not answer successfully.',
+      checked: supplier.status === 'connected' ? 'The supplier balance endpoint answered the last successful check.' : supplier.status === 'error' ? 'No usable wallet balance was returned.' : 'Supplier credentials are missing, so a balance check was skipped.',
       limits: 'A balance response does not prove service discovery or checkout is working. Sales reliability is shown separately; delivery is confirmed per order.',
       detail: <>Wallet {supplier.walletBalanceGhc !== null ? <strong className="text-white">GH₵{supplier.walletBalanceGhc.toFixed(2)}</strong> : 'not available'} · warning below GH₵{supplier.lowBalanceThresholdGhc}</>,
     },

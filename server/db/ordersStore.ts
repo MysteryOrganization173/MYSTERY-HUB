@@ -23,6 +23,24 @@ import { ReferralService } from '../services/referralService.js';
 import type { PoolClient } from 'pg';
 import { validateOrderPayment } from '../services/paymentValidation.js';
 import { canAdvanceOrderStatus } from '../services/orderTransitions.js';
+import type { PaidOrderAlert } from '../../shared/adminAlerts.js';
+
+const refundExceptionStates = ['refund_pending', 'refunded'];
+const failedFulfilmentStates = ['failed', 'cancelled', 'expired'];
+const uncertainSubmissionStates = ['paid', 'queued', 'submitted', 'processing'];
+
+export function paidOrderAlertReason(order: OrderRecord): PaidOrderAlert['reason'] {
+  if (refundExceptionStates.includes(order.status) || order.resolution_json?.stage === 'refund_pending') return 'refund_exception';
+  if (failedFulfilmentStates.includes(order.status)) return 'fulfilment_failed';
+  if (order.failure_reason === 'supplier_submission_uncertain' && uncertainSubmissionStates.includes(order.status)) return 'supplier_uncertain';
+  return 'flagged';
+}
+
+// Fixed enum literals. Sort verified incidents ahead of routine flags before applying the sample limit.
+const alertStatusesSql = [...refundExceptionStates, ...failedFulfilmentStates].map(status => `'${status}'`).join(',');
+const uncertainStatusesSql = uncertainSubmissionStates.map(status => `'${status}'`).join(',');
+const alertPrioritySql = `CASE WHEN status IN (${alertStatusesSql}) OR resolution_json->>'stage' = 'refund_pending'
+  OR (failure_reason = 'supplier_submission_uncertain' AND status IN (${uncertainStatusesSql})) THEN 0 ELSE 1 END`;
 
 // In-memory fallback repository for development when DATABASE_URL is omitted
 const devMemoryStore = new Map<string, OrderRecord>();
@@ -1536,6 +1554,7 @@ export class OrdersStore {
    * Admin: Search, filter, and paginate orders
    */
   static async searchOrdersAdmin(params: {
+    prioritizePaidAttention?: boolean;
     archived?: 'exclude'|'include'|'only';
     q?: string;
     serviceType?: string;
@@ -1634,7 +1653,7 @@ export class OrdersStore {
       const query = `
         SELECT * FROM orders 
         ${whereClause} 
-        ORDER BY created_at DESC 
+        ORDER BY ${params.prioritizePaidAttention ? `${alertPrioritySql}, ` : ''}created_at DESC${params.prioritizePaidAttention ? ', id' : ''}
         LIMIT $${valIdx} OFFSET $${valIdx + 1};
       `;
       values.push(limit, offset);
@@ -1715,7 +1734,11 @@ export class OrdersStore {
       all = all.filter((o) => new Date(o.created_at) <= new Date(params.dateTo!));
     }
 
-    all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    all.sort((a, b) => {
+      const priority = params.prioritizePaidAttention ? Number(paidOrderAlertReason(a) === 'flagged') - Number(paidOrderAlertReason(b) === 'flagged') : 0;
+      const date = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return priority || date || (params.prioritizePaidAttention ? a.id.localeCompare(b.id) : 0);
+    });
 
     const total = all.length;
     const totalPages = Math.ceil(total / limit) || 1;

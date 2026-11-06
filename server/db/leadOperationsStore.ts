@@ -1,6 +1,7 @@
 import {getPool} from './connection.js';
 import {LeadError} from '../services/leadWorkflow.js';
 import {LEAD_FILTERS,type LeadSource,type LeadSummary} from '../../shared/leadOperations.js';
+import {CREATIVE_INQUIRY_TYPE} from '../../shared/creativeStudio.js';
 export function leadFilter(source:LeadSource,value:unknown){
  if(typeof value!=='string'||!(LEAD_FILTERS as readonly string[]).includes(value)||source==='ultra'&&value==='resolved'||source==='marketplace'&&value==='quoted')throw new LeadError('Invalid lead filter.');
  const status=source==='ultra'?'lead_status':'status',updated=source==='ultra'?'lead_updated_at':'updated_at';
@@ -15,7 +16,8 @@ export class LeadOperationsStore{
   const c=await db.connect();try{await c.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');await c.query("SET LOCAL statement_timeout='3000ms'");
    const clock=(await c.query("SELECT NOW() now,(NOW() AT TIME ZONE 'Africa/Accra')::date::text today")).rows[0],data:any={checkedAt:new Date(clock.now).toISOString(),today:clock.today};
    for(const source of ['ultra','marketplace'] as const){const table=source==='ultra'?'website_ultra_enquiries':'marketplace_inquiries',status=source==='ultra'?'lead_status':'status',updated=source==='ultra'?'coalesce(lead_updated_at,created_at)':'updated_at',reference=source==='ultra'?'reference':'id';
-    const link=`id,${reference} reference,${status} status,created_at AS "createdAt",${updated} AS "updatedAt"`;
+    const kind=source==='ultra'?"'ultra'":`CASE WHEN inquiry_type='${CREATIVE_INQUIRY_TYPE}' THEN 'creative' ELSE 'marketplace' END`;
+    const link=`id,${reference} reference,${status} status,created_at AS "createdAt",${updated} AS "updatedAt",${kind} kind`;
     data[source]=(await c.query(`SELECT count(*) FILTER(WHERE ${status}='new')::int new,count(*) FILTER(WHERE ${leadFilter(source,'due')})::int due,count(*) FILTER(WHERE ${leadFilter(source,'overdue')})::int overdue,
       (SELECT coalesce(json_agg(r),'[]') FROM (SELECT ${link} FROM ${table} WHERE ${status}='new' ORDER BY created_at DESC,id LIMIT 5) r) "latestNew",
       (SELECT coalesce(json_agg(r),'[]') FROM (SELECT ${link} FROM ${table} WHERE ${leadFilter(source,'recent')} ORDER BY ${updated} DESC,id LIMIT 5) r) recent FROM ${table}`)).rows[0];

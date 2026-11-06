@@ -1,10 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { AdminAttentionOrders } from './AdminAttentionOrders';
 import { createAdminRequestScope } from '../../../utils/adminRequestScope';
 import { AdminBusinessSummary, ReportOrdersSheet } from './AdminBusinessSummary';
 import { AdminRecentOrders } from './AdminRecentOrders';
 import { AdminEarnPulse } from './AdminEarnPulse';
-import { AdminOverviewMetrics, getAdminSystemOnServer } from '../../../services/apiClient';
+import { AdminOverviewMetrics, type AdminSystemStatus, getAdminSystemOnServer } from '../../../services/apiClient';
 import { loadAdminOverview } from '../adminSignals';
 import { marketplaceControlRequest } from '../../../services/marketplaceControls';
 import { financeRequest } from '../../../services/financeApi';
@@ -21,9 +20,10 @@ interface AdminOverviewSectionProps {
   sessionToken: string;
   onNavigateTab: (tab: OverviewTab, param?: string) => void;
   onRefreshed?: () => void;
+  alerts: React.ReactNode;
+  leadSummary: React.ReactNode;
 }
 
-interface SystemSnapshot { paystack?: { status: string; mode: string }; database?: { status: string }; successBizHub?: { lowBalanceThresholdGhc?: number }; fulfilmentPipeline?: { status: string; autoDispatch: boolean; uncertainSubmissionCount: number } }
 interface AttentionItem { id: string; tone: AdminTone; icon: React.ReactNode; title: string; detail: string; action: string; open: () => void }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -47,14 +47,14 @@ function TodayFigure({ label, value, detail, tone = 'neutral', action, onOpen, c
  * action now, the latest orders, service health, then business performance for any period.
  * Every figure is server-derived; the frontend only formats and labels it.
  */
-export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sessionToken, onNavigateTab, onRefreshed }) => {
+export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sessionToken, onNavigateTab, onRefreshed, alerts, leadSummary }) => {
   const [metrics, setMetrics] = useState<AdminOverviewMetrics | null>(null);
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [system, setSystem] = useState<SystemSnapshot | null>(null);
+  const [system, setSystem] = useState<AdminSystemStatus['components'] | null>(null);
   const [todayReport, setTodayReport] = useState<AdminFinancialReport | null>(null);
   const [marketplace, setMarketplace] = useState<{ newInquiries?: number; needsReview?: number; drafts?: number } | null>(null);
   const [withdrawals, setWithdrawals] = useState<{ waiting: number; reviewNeeded: number } | null>(null);
@@ -80,10 +80,16 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
     const [overview, health, report, market, payout] = results;
     if (overview.status === 'fulfilled') { setMetrics(overview.value.metrics); setLoadedAt(overview.value.at); }
     else setError(overview.reason instanceof Error ? overview.reason.message : 'Overview could not refresh.');
-    if (health.status === 'fulfilled') setSystem((health.value.system?.components as unknown as SystemSnapshot) || null); else errors.push('System health');
-    if (report.status === 'fulfilled') setTodayReport(report.value.report); else errors.push("Today's deliveries");
-    if (market.status === 'fulfilled') setMarketplace(market.value.metrics || null); else errors.push('Marketplace');
-    if (payout.status === 'fulfilled') { const rows = payout.value; setWithdrawals({ waiting: rows.filter(r => ['pending_review', 'approved'].includes(r.state)).length, reviewNeeded: rows.filter(r => ['pending_review', 'approved'].includes(r.state) && (r.restricted || r.earn?.reconciliationRequired)).length }); } else errors.push('Withdrawals');
+    if (health.status === 'fulfilled' && health.value.success && health.value.system?.components) setSystem(health.value.system.components);
+    else { setSystem(null); errors.push('System health'); }
+    if (report.status === 'fulfilled' && report.value.report) setTodayReport(report.value.report);
+    else { setTodayReport(null); errors.push("Today's financial report"); }
+    if (market.status === 'fulfilled' && market.value.metrics) setMarketplace(market.value.metrics);
+    else { setMarketplace(null); errors.push('Marketplace'); }
+    if (payout.status === 'fulfilled' && Array.isArray(payout.value)) {
+      const waiting = payout.value.filter(row => ['pending_review', 'approved'].includes(row.state));
+      setWithdrawals({ waiting: waiting.length, reviewNeeded: waiting.filter(row => row.restricted || row.earn?.reconciliationRequired).length });
+    } else { setWithdrawals(null); errors.push('Withdrawals'); }
     setSideErrors(errors);
     setIsLoading(false);
     setIsRefreshing(false);
@@ -94,19 +100,20 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
 
   const todayLabel = new Date().toLocaleDateString('en-GH', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Africa/Accra' });
   if (isLoading) return <AdminLoading label="Loading today's operations…" />;
-  if (!metrics) return <div className="space-y-4"><AdminPageHeader eyebrow={todayLabel} title="Overview" /><AdminError title="Overview could not load" message={error || 'Unknown server response'} onRetry={() => void fetchOverview(true)} /></div>;
+  if (!metrics) return <div className="space-y-4"><AdminPageHeader eyebrow={todayLabel} title="Overview" /><AdminError title="Overview could not load" message={error || 'Unknown server response'} onRetry={() => void fetchOverview(true)} /><AdminPanel title="Operations alerts">{alerts}</AdminPanel>{leadSummary}</div>;
 
   const { today, allTime, supplier } = metrics;
   const threshold = system?.successBizHub?.lowBalanceThresholdGhc;
-  const uncertain = system?.fulfilmentPipeline?.uncertainSubmissionCount || 0;
+  const uncertain = system?.fulfilmentPipeline?.uncertainSubmissionCount ?? 0;
+  const dispatch = system?.fulfilmentPipeline;
   const attention: AttentionItem[] = [];
   if (supplier.isLowBalance && supplier.balanceGhc !== null) attention.push({ id: 'supplier-low', tone: 'danger', icon: <Wallet className="h-[18px] w-[18px]" />, title: `Supplier wallet is low: ${ghsMajor(supplier.balanceGhc)}`, detail: `Below the ${threshold != null ? ghsMajor(threshold) : 'configured'} threshold. Top up Success Biz Hub so data and airtime keep delivering. Checked when this page loaded; there is no push alert yet.`, action: 'System Health', open: () => onNavigateTab('system') });
   if (supplier.status === 'error') attention.push({ id: 'supplier-error', tone: 'danger', icon: <Truck className="h-[18px] w-[18px]" />, title: 'Supplier balance check failed', detail: 'Mystery Hub could not reach Success Biz Hub just now. Deliveries may be affected.', action: 'System Health', open: () => onNavigateTab('system') });
-  if (supplier.status === 'connected' && !supplier.fulfilmentEnabled) attention.push({ id: 'dispatch-off', tone: 'warning', icon: <Truck className="h-[18px] w-[18px]" />, title: 'Automatic supplier dispatch is off', detail: 'Paid data and airtime orders wait in the queue until dispatch is enabled.', action: 'System Health', open: () => onNavigateTab('system') });
+  if (dispatch && !dispatch.autoDispatch) attention.push({ id: 'dispatch-off', tone: 'warning', icon: <Truck className="h-[18px] w-[18px]" />, title: 'Automatic supplier dispatch is held', detail: 'Check System Health for the server dispatch setting and payment mode.', action: 'System Health', open: () => onNavigateTab('system') });
   if (uncertain > 0) attention.push({ id: 'uncertain', tone: 'danger', icon: <AlertTriangle className="h-[18px] w-[18px]" />, title: `${plural(uncertain, 'supplier submission')} uncertain`, detail: 'The supplier may or may not have accepted these. Never resubmit; reconcile them first.', action: 'Review orders', open: () => onNavigateTab('orders', 'needs_attention') });
   if (allTime.manualReviewPendingCount > 0) attention.push({ id: 'orders', tone: 'warning', icon: <PackageSearch className="h-[18px] w-[18px]" />, title: `${plural(allTime.manualReviewPendingCount, 'order')} need${allTime.manualReviewPendingCount === 1 ? 's' : ''} attention`, detail: `All dates: flagged orders, failed paid orders and open refunds.${allTime.unresolvedPaidCount ? ` ${plural(allTime.unresolvedPaidCount, 'paid customer')} without a recorded remedy.` : ''}`, action: 'Needs Attention', open: () => onNavigateTab('orders', 'needs_attention') });
   if (withdrawals?.waiting) attention.push({ id: 'withdrawals', tone: 'warning', icon: <CreditCard className="h-[18px] w-[18px]" />, title: `${plural(withdrawals.waiting, 'withdrawal request')} waiting`, detail: `From the first 50 requests. Approving records your decision; you still send the MoMo payout and mark it paid.${withdrawals.reviewNeeded ? ` ${withdrawals.reviewNeeded} need reconciliation first.` : ''}`, action: 'Requests', open: () => onNavigateTab('finance', 'requests') });
-  if (marketplace?.newInquiries) attention.push({ id: 'inquiries', tone: 'info', icon: <MessageSquare className="h-[18px] w-[18px]" />, title: `${marketplace.newInquiries} new marketplace inquir${marketplace.newInquiries === 1 ? 'y' : 'ies'}`, detail: 'Customers are waiting for a reply about a product.', action: 'Inquiries', open: () => onNavigateTab('marketplace', 'inquiries') });
+  if (marketplace?.newInquiries) attention.push({ id: 'inquiries', tone: 'info', icon: <MessageSquare className="h-[18px] w-[18px]" />, title: `${marketplace.newInquiries} new Marketplace and Creative Studio enquir${marketplace.newInquiries === 1 ? 'y' : 'ies'}`, detail: 'Customers are waiting for a reply about a product or service.', action: 'Enquiries', open: () => onNavigateTab('marketplace', 'inquiries/new') });
   if (allTime.pendingWaitlist > 0) attention.push({ id: 'waitlist', tone: 'neutral', icon: <ClipboardList className="h-[18px] w-[18px]" />, title: `${plural(allTime.pendingWaitlist, 'launch request')} pending`, detail: 'People asked to be told when a service launches.', action: 'Launch requests', open: () => onNavigateTab('waitlist') });
   const urgent = attention.filter(item => item.tone === 'danger').length;
 
@@ -141,9 +148,9 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
             {sideErrors.length ? 'No issues in the checks that completed. Some checks are unavailable.' : 'Nothing needs action in the loaded records. Each area keeps its full queue.'}
           </p>
         )}
-        {sideErrors.length > 0 && <p className="mt-3 text-xs text-amber-300">Could not check: {sideErrors.join(', ')}. Any previous values for those checks may be out of date; they may still need attention.</p>}
+        {sideErrors.length > 0 && <p role="status" className="mt-3 text-xs text-amber-300">Unavailable this refresh · {sideErrors.join(', ')}.</p>}
       </div>
-      <AdminAttentionOrders token={sessionToken} revision={revision} onOpen={reference => onNavigateTab('orders', `ref/${reference}`)} onOpenAll={() => onNavigateTab('orders', 'needs_attention')} />
+      <div className="mt-4 border-t border-slate-800 pt-4">{alerts}</div>
     </AdminPanel>
   );
 
@@ -156,7 +163,7 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
         </div>
         <div className="flex items-center justify-between gap-3 py-2.5">
           <dt className="text-slate-400">Automatic dispatch</dt>
-          <dd><StatusPill tone={supplier.fulfilmentEnabled ? system?.fulfilmentPipeline && !system.fulfilmentPipeline.autoDispatch ? 'warning' : 'success' : 'warning'}>{supplier.fulfilmentEnabled ? system?.fulfilmentPipeline && !system.fulfilmentPipeline.autoDispatch ? 'Held: test mode' : 'On' : 'Off'}</StatusPill></dd>
+          <dd><StatusPill tone={!dispatch ? 'neutral' : dispatch.autoDispatch ? 'success' : 'warning'}>{!dispatch ? 'Unavailable' : dispatch.autoDispatch ? 'On' : supplier.fulfilmentEnabled ? 'Held by server' : 'Off'}</StatusPill></dd>
         </div>
         <div className="flex items-center justify-between gap-3 py-2.5">
           <dt className="min-w-0 text-slate-400">Supplier wallet{threshold != null && <span className="block text-xs text-slate-500">Alert below {ghsMajor(threshold)}</span>}</dt>
@@ -207,6 +214,8 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
           <div className="order-3">{healthPanel}</div>
         </div>
       </div>
+
+      {leadSummary}
 
       {/* 3. Business performance: compact, any period, full V3 breakdown on demand. */}
       <AdminBusinessSummary token={sessionToken} revision={revision} onOpenOrder={reference => onNavigateTab('orders', `ref/${reference}`)} onOpenFinance={() => onNavigateTab('finance')} />
