@@ -1,7 +1,7 @@
 import { ActivePage, SafeEditorAiContext } from '../types';
 import { API_BASE_URL } from './apiClient';
 import {mysteryHubGuide,mysteryBuilderHelp,mysteryInstantHelp} from '../../shared/mysteryAiKnowledge';
-import {aiNavigation,type AiGuideContext} from '../../shared/mysteryAiIntent';
+import {aiActions,type AiGuideContext,type AiNavigation} from '../../shared/mysteryAiIntent';
 import {MYSTERY_AI_BUDGET,aiCanRetry,aiFailureMessage,boundAiHistory} from '../../shared/mysteryAiPolicy';
 
 export interface ChatMessage {
@@ -10,12 +10,8 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   source?: 'scripted' | 'gemini';
-  quickAction?: {
-    type: 'navigate';
-    targetPage: ActivePage;
-    label: string;
-    dataMode?: 'data' | 'instant' | 'airtime';
-  };
+  actions?: AiNavigation[];
+  quickAction?: AiNavigation;
 }
 
 export interface SuggestedQuestion {
@@ -101,11 +97,13 @@ const isOffline=()=>typeof navigator!=='undefined'&&navigator.onLine===false;
 export async function sendMysteryAiMessage(
  userMessage:string,activePage:ActivePage,history:ChatMessage[],editorContext?:SafeEditorAiContext|null,
  signal?:AbortSignal,timeoutMs:number=MYSTERY_AI_BUDGET.clientMs
-):Promise<{reply:string;quickAction?:ChatMessage['quickAction'];source:'scripted'|'gemini'}>{
+):Promise<{reply:string;actions?:AiNavigation[];quickAction?:AiNavigation;source:'scripted'|'gemini'}>{
  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
  const turns=boundAiHistory(history.filter(m=>!m.id.startsWith('welcome-')));
  const context:AiGuideContext={activePage,history:turns,editorContext};
- const result=(reply:string,source:'scripted'|'gemini')=>({reply,source,quickAction:aiNavigation(userMessage,context)});
+ const actions=aiActions(userMessage,context);
+ const result=(reply:string,source:'scripted'|'gemini')=>({reply,source,actions,quickAction:actions[0]});
+ if(actions.length===2)return result('Choose Data Bundles or Airtime to see the current options and checkout details.','scripted');
  const instant=mysteryInstantHelp(userMessage,context);if(instant)return result(instant.reply,'scripted');
  const controller=new AbortController();let timedOut=false;
  const cancel=()=>controller.abort(new DOMException('Cancelled','AbortError'));
@@ -148,6 +146,7 @@ export async function sendMysteryAiMessage(
 /** A guide never invents an action from the text it returns. */
 export function getGroundedLocalResponse(query:string,activePage:ActivePage,editorContext?:SafeEditorAiContext|null,history:AiGuideContext['history']=[]) {
  const context:AiGuideContext={activePage,editorContext,history};
+ const actions=aiActions(query,context);
  const help=mysteryHubGuide(query,context);
- return help?{reply:help.reply,quickAction:aiNavigation(query,context)}:null;
+ return help||actions.length?{reply:help?.reply||'Use the button below to continue.',actions,quickAction:actions[0]}:null;
 }

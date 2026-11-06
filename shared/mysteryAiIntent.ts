@@ -2,7 +2,33 @@
 export type AiTopic='data'|'airtime'|'website'|'business'|'wallet'|'earn'|'orders'|'marketplace'|'afa'|'future'|'support'|'ultra'|'promotion'|'results'|'creative'|'services';
 export interface AiTurn {role:'user'|'assistant';content:string}
 export interface AiGuideContext {history?:readonly AiTurn[];activePage?:string;editorContext?:{experienceMode?:string;templateId?:string;siteStatus?:string;activeEditorSection?:string;hasUnsavedChanges?:boolean}|null}
-export interface AiNavigation {type:'navigate';targetPage:'data'|'website'|'business'|'wallet'|'earn'|'orders'|'marketplace'|'afa'|'services'|'help'|'creative';label:string;dataMode?:'data'|'instant'|'airtime'}
+export interface AiNavigation {type:'navigate';targetPage:'data'|'website'|'business'|'wallet'|'earn'|'orders'|'marketplace'|'afa'|'services'|'help'|'creative';label:string;dataMode?:'data'|'instant'|'airtime';focus?:'track-order'}
+const actionRegistry = {
+ data:{type:'navigate',targetPage:'data',dataMode:'data',label:'Open Data Bundles'},
+ airtime:{type:'navigate',targetPage:'data',dataMode:'airtime',label:'Open Airtime'},
+ instant:{type:'navigate',targetPage:'data',dataMode:'instant',label:'Open Instant Bundles'},
+ website:{type:'navigate',targetPage:'website',label:'Open Website Builder'},
+ ultra:{type:'navigate',targetPage:'website',label:'View Ultra Enquiries'},
+ business:{type:'navigate',targetPage:'business',label:'Open My Business'},
+ wallet:{type:'navigate',targetPage:'wallet',label:'Open Wallet'},
+ earn:{type:'navigate',targetPage:'earn',label:'Open Mystery Earn'},
+ orders:{type:'navigate',targetPage:'orders',label:'Open Order Tracking'},
+ track:{type:'navigate',targetPage:'orders',focus:'track-order',label:'Go to Track Order'},
+ marketplace:{type:'navigate',targetPage:'marketplace',label:'Open Marketplace'},
+ afa:{type:'navigate',targetPage:'afa',label:'Open AFA Registration'},
+ future:{type:'navigate',targetPage:'services',label:'View Service Availability'},
+ services:{type:'navigate',targetPage:'services',label:'View Service Availability'},
+ support:{type:'navigate',targetPage:'orders',label:'Open Orders & Support'},
+ help:{type:'navigate',targetPage:'help',label:'Open Help & FAQs'},
+ creative:{type:'navigate',targetPage:'creative',label:'Open Creative Studio'},
+} as const satisfies Record<string,AiNavigation>;
+
+export function validateAiNavigation(action:AiNavigation,activePage:string,dataMode?:AiNavigation['dataMode']):AiNavigation|undefined {
+ return Object.values(actionRegistry).find(candidate=>candidate.type===action.type&&candidate.targetPage===action.targetPage&&
+   ('dataMode' in candidate?candidate.dataMode:undefined)===action.dataMode&&
+   ('focus' in candidate?candidate.focus:undefined)===action.focus&&candidate.label===action.label&&
+   (action.focus?activePage==='orders':activePage!==action.targetPage||action.targetPage==='data'&&candidate.type==='navigate'&&action.dataMode!==dataMode));
+}
 export const aiText=(s:string)=>s.toLowerCase().replace(/[’‘]/g,"'").replace(/[^a-z0-9'\s-]/g,' ').replace(/\s+/g,' ').trim();
 export const isAcknowledgment=(s:string)=>/^(?:thanks(?: a lot| so much)?|thank you(?: very much)?|okay|ok|alright|got it|understood|great|nice|cool|cheers)$/.test(aiText(s));
 export const isGreeting=(s:string)=>/^(?:hi|hello|hey|good (?:morning|afternoon|evening))(?: there)?$/.test(aiText(s));
@@ -24,7 +50,7 @@ function directTopics(text:string,ctx:AiGuideContext):AiTopic[]{
  if(/^(?:giveaways?|promotions?)$/.test(q)||/\b(?:customer of the week|customer champions|customer recognition|friday (?:giveaways?|prizes?|rewards?|draw)|mystery hub (?:promotions?|promotional rewards?))\b/.test(q)||
    /\b(?:giveaways?|promotions?|give away|promotional rewards?|discounts?)\b/.test(q)&&/\b(?:mystery hub|you|current|next|today|this week|friday|winner|active|running|status)\b/.test(q))topics.add('promotion');
  if(/\b(?:results? checkers?|checker (?:pins?|vouchers?)|(?:waec|wassce|bece) (?:pins?|vouchers?|checkers?|results?)|(?:waec|wassce|bece).{0,24}\b(?:buy|price|cost)|(?:buy|price|cost).{0,24}\b(?:waec|wassce|bece))\b/.test(q))topics.add('results');
- if(/\b(?:creative studio|design services?)\b/.test(q)||/\b(?:design|create|quote)\b.*\b(?:flyer|poster|logo|banner)\b/.test(q)&&/\b(?:you|mystery hub)\b/.test(q))topics.add('creative');
+ if(/\b(?:creative studio|design services?)\b/.test(q)||/\b(?:design|create|quote)\b.*\b(?:flyer|poster|logo|banner)\b/.test(q)&&/\b(?:you|mystery hub)\b/.test(q)||/^(?:can i|how (?:can|do) i|i want to) (?:request|get) (?:a |an )?(?:logo|flyer|poster|banner) design\b/.test(q))topics.add('creative');
  if(/^(?:what services (?:are (?:currently )?available|do you (?:offer|have|provide))|which services (?:are (?:currently )?available|can i use))(?: on mystery hub)?$/.test(q))topics.add('services');
  const websiteOrder=/\b(?:whatsapp orders?|whatsapp ordering|customer orders?|menu|catalogue|catalog)\b/.test(q)&&(builder||/\b(?:my (?:website|site|shop)|restaurant|business website)\b/.test(q));
  if(websiteOrder)topics.add('website');
@@ -57,23 +83,26 @@ export function hasMixedProtectedTopics(message:string,context:AiGuideContext){
  const topics=directTopics(message,context);
  return topics.length>1&&topics.some(topic=>topic==='promotion'||topic==='results');
 }
-export function aiNavigation(message:string,ctx:AiGuideContext={}):AiNavigation|undefined {
+export function aiActions(message:string,ctx:AiGuideContext={}):AiNavigation[] {
  const q=aiText(message);
- if(requestsPrivateFacts(message)||isWritingRequest(message))return;
- if(isGreeting(q)||isAcknowledgment(q)||/^(?:why|how|explain|tell me more|can i use (?:it|this|that) (?:for free|free)|what about)/.test(q)&&isFollowUp(q))return;
- if(/\b(?:don't|do not|not to|no need to|without)\b.*\b(?:open|navigate|take|go|buy|purchase|recharge|top up|create|build|track)\b|\b(?:admin|dashboard credentials|browse the (?:live )?web)\b/.test(q))return;
- const topic=aiTopic(message,ctx);if(!topic)return;
- if(topic==='promotion'||topic==='results')return;
+ const blocked=(input:string)=>requestsPrivateFacts(input)||isWritingRequest(input)||
+   /\b(?:don't|do not|not to|no need to|without|never)\b.*\b(?:open|navigate|take|go|show|buy|purchase|recharge|top up|create|build|track|check|request)\b|\b(?:admin|dashboard credentials|browse the (?:live )?web)\b/.test(aiText(input));
+ if(blocked(message)||isGreeting(q)||isAcknowledgment(q))return [];
+ if(/^(?:how (?:do|can) i |where can i |can i |i want to )?(?:buy|browse|find) (?:mobile )?data(?: bundles?)? or airtime(?: please)?$/.test(q))return [actionRegistry.data,actionRegistry.airtime];
+ const topic=aiTopic(message,ctx);if(!topic||topic==='promotion'||topic==='results')return [];
+ const followUp=/^(?:take me there|(?:open|show me) (?:it|that|this)|where do i start)$/.test(q);
+ if(followUp&&(!aiPriorQuestion(ctx)||blocked(aiPriorQuestion(ctx))))return [];
  const request=/^(?:please )?(?:open|take me|go to|show me|buy|purchase|recharge|top up|add money)\b/.test(q)
-  ||/\b(?:i want to|i would like to|i'd like to|help me) (?:buy|purchase|recharge|top up|add|create|build|track|find|access|view|use|open|fund)\b/.test(q)
-  ||/\b(?:how|where) (?:do|can) i (?:buy|purchase|recharge|track|pay|create|build|start|fund|withdraw|find|access|use|view|see|add|top up)\b/.test(q)
+  ||/\b(?:i want to|i would like to|i'd like to|help me) (?:buy|purchase|recharge|top up|add|create|build|track|check|find|access|view|use|open|fund|request)\b/.test(q)
+  ||/\b(?:how|where) (?:do|can) i (?:buy|purchase|recharge|track|check|pay|create|build|start|fund|withdraw|find|access|use|view|see|add|top up|request)\b/.test(q)
   ||/^(?:where (?:is|can i find)|where do i start|can i (?:create|build)|can you (?:open|show me|take me))\b/.test(q)
   ||topic==='orders'&&/\b(?:my order|my bundle)\b.*\b(?:delayed|delivered|track|not received)\b/.test(q)
-  ||topic==='creative'&&/^(?:what can creative studio|can (?:you|mystery hub) design|how do i (?:request|get) a quote)\b/.test(q);
- if(!request)return;
- const pages:Record<Exclude<AiTopic,'promotion'|'results'>,AiNavigation['targetPage']>={data:'data',airtime:'data',website:'website',business:'business',wallet:'wallet',earn:'earn',orders:'orders',marketplace:'marketplace',afa:'afa',future:'services',services:'services',support:'orders',ultra:'website',creative:'creative'};
+  ||topic==='orders'&&/^(?:can i|can you help me|could you help me) (?:check|track|look up) (?:my|an?) order\b/.test(q)
+  ||topic==='creative'&&/^(?:what can creative studio|can (?:you|mystery hub) design|can i request|how do i (?:request|get) a quote)\b/.test(q);
+ if(!request&&!followUp)return [];
  const helpDestination=topic==='support'&&/\b(?:help|faqs)\b/.test(q)&&!/\borders?\b/.test(q);
- const targetPage=helpDestination?'help':pages[topic];if(ctx.activePage===targetPage&&targetPage!=='data')return;
- const labels:Record<Exclude<AiTopic,'promotion'|'results'>,string>={data:'Open Data Bundles',airtime:'Open Airtime',website:'Open Website Builder',business:'Open My Business',wallet:'Open Wallet',earn:'Open Mystery Earn',orders:'Open Order Tracking',marketplace:'Open Marketplace',afa:'Open AFA Registration',future:'View Service Availability',services:'View Service Availability',support:'Open Orders & Support',ultra:'View Ultra Enquiries',creative:'Open Creative Studio'};
- return {type:'navigate',targetPage,label:helpDestination?'Open Help & FAQs':labels[topic],...(topic==='airtime'?{dataMode:'airtime' as const}:topic==='data'?{dataMode:/\binstant bundles?\b/.test(q)?'instant' as const:'data' as const}:{})};
+ const action=actionRegistry[helpDestination?'help':topic==='orders'&&ctx.activePage==='orders'?'track':
+   topic==='data'&&/\binstant bundles?\b/.test(followUp?aiText(aiPriorQuestion(ctx)):q)?'instant':topic];
+ return validateAiNavigation(action,ctx.activePage||'')?[action]:[];
 }
+export const aiNavigation = (message:string,context:AiGuideContext={}) => aiActions(message,context)[0];
