@@ -20,7 +20,7 @@ export function parseAiDataRequest(message:string, previous?:DataRequest):DataRe
  const networks=[...safe.matchAll(networkPattern)].map(match=>match[1].toLowerCase().replace(/\s/g,'') as NetworkId);
  const sizes=[...safe.matchAll(sizePattern)].map(match=>`${Number(match[1])}${match[2].toUpperCase()}`);
  // Questions about selling, other services or how buying works are not a request for a specific bundle.
- if(/\b(?:never|sell|sells|selling|resell|resells|reselling|website|site|logo|flyer|poster|banner|design|creative|earn|marketplace|afa|guide|usage)\b|\b(?:how|where)\s+(?:do|can|does)\b/i.test(safe)
+ if(/\b(?:never\s+(?:buy|purchase|get|order|send)|sell|sells|selling|resell|resells|reselling|website|site|logo|flyer|poster|banner|design|creative|earn|marketplace|afa|guide|usage)\b|\b(?:how|where)\s+(?:do|can|does|to|should|would|could)\b/i.test(safe)
    ||!sizes.length&&/\b(?:shop|store|business)\b/i.test(safe))return null;
  // A general Data request with no network, size or number keeps its normal page button.
  if(!networks.length&&!sizes.length&&!safe.includes('[number hidden]')&&aiActions(safe,{activePage:'home'}).length)return null;

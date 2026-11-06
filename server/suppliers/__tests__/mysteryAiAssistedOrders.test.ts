@@ -6,13 +6,13 @@ import {aiDataChoices,confirmAiDataChoice,maskAiRecipient,parseAiDataRequest} fr
 test('general Data questions and other services keep their normal reply instead of the ordering flow',()=>{
  for(const query of ['How do I buy data?','Where can I buy data bundles?','Buy data','I want to buy data','Show me data bundles',
    'I want to build a website that sells MTN bundles','I want to resell MTN data','I want to sell data on my website','I want a logo for my MTN data shop',
-   'Show me how Mystery Earn works with data','Show me Creative Studio examples of data bundle flyers','Do you have data for my business website?','Never buy MTN 5GB']){
+   'Show me how Mystery Earn works with data','Show me Creative Studio examples of data bundle flyers','Do you have data for my business website?','Never buy MTN 5GB','How to buy MTN 5GB?','How would I buy MTN 5GB','Where should I buy MTN data?','How to buy data?']){
    assert.equal(parseAiDataRequest(query),null,query);
  }
 });
 
 test('specific bundle requests and open requests still reach the ordering flow',()=>{
- for(const query of ['MTN 5GB','AirtelTigo 3GB','I want 5GB MTN data','Show me the cheapest MTN option','Do you have Telecel bundles?','I need data','Buy MTN 5GB for my business']){
+ for(const query of ['MTN 5GB','AirtelTigo 3GB','I want 5GB MTN data','Show me the cheapest MTN option','Do you have Telecel bundles?','I need data','Buy MTN 5GB for my business','Never mind, I want Telecel 5GB','I want MTN 5GB that never expires']){
    assert.notEqual(parseAiDataRequest(query),null,query);
  }
 });
