@@ -4,6 +4,7 @@ import { marketplaceControlRequest,ManagedCategory,MarketplaceInquiry } from '..
 import { whatsappLink } from '../../../../shared/marketplacePolicy';
 import {LeadWorkflowEditor} from './LeadWorkflowEditor';
 import {readLeadWorkflow} from '../../../../shared/leadOperations';
+import {CREATIVE_INQUIRY_TYPE} from '../../../../shared/creativeStudio';
 import { MarketplaceProduct } from '../../../types';
 import { categoryMismatches } from '../../../utils/marketplaceCategoryCheck';
 import { AdminButton,AdminEmpty,AdminLoading,AdminNotice,AdminPanel,ConfirmAction,StatusPill,adminField as field,adminLabel,type AdminTone } from '../ui/AdminUi';
@@ -12,7 +13,7 @@ const INQUIRY_STATUS:Record<string,{label:string;tone:AdminTone}>={new:{label:'N
 const STATUS_FILTERS=[{id:'new',label:'New'},{id:'contacted',label:'Contacted'},{id:'resolved',label:'Resolved'},{id:'closed',label:'Closed'},{id:'',label:'All'}];
 
 /** Inquiries inbox and category manager. `view` is controlled by the Marketplace tabs. */
-export function MarketplaceControlPanels({token,view,categories,onCategoriesChanged,products,onChanged,onEditProduct,initialFilter=''}:{initialFilter?:string;token:string;view:'categories'|'inquiries';categories:ManagedCategory[];onCategoriesChanged:()=>void;products:MarketplaceProduct[];onChanged:()=>void;onEditProduct?:(product:MarketplaceProduct)=>void}) {
+export function MarketplaceControlPanels({token,view,categories,onCategoriesChanged,products,onChanged,onEditProduct,onShowAllEnquiries,initialFilter=''}:{initialFilter?:string;token:string;view:'categories'|'inquiries';categories:ManagedCategory[];onCategoriesChanged:()=>void;products:MarketplaceProduct[];onChanged:()=>void;onEditProduct?:(product:MarketplaceProduct)=>void;onShowAllEnquiries?:()=>void}) {
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false);
  const [slug,setSlug]=useState(''),[label,setLabel]=useState('');
  const [rows,setRows]=useState<MarketplaceInquiry[]>([]),[status,setStatus]=useState(['','new','contacted','resolved','closed'].includes(initialFilter)?initialFilter:''),[search,setSearch]=useState(''),[searchDraft,setSearchDraft]=useState(''),[product,setProduct]=useState(''),[page,setPage]=useState(1),[total,setTotal]=useState(0);
@@ -39,7 +40,8 @@ export function MarketplaceControlPanels({token,view,categories,onCategoriesChan
   <div className="mt-4 space-y-2">{categories.map(c=><CategoryRow key={`${c.slug}-${c.label}-${c.sort_order}-${c.active}`} category={c} live={inquiryProducts.filter(p=>p.category===c.slug&&p.published&&!p.archived).length} busy={busy} save={body=>run(()=>categorySave(c,body))} />)}</div>
  </AdminPanel>;
 
- return <AdminPanel title="Customer inquiries" description="Questions and quote requests from product pages. Contact the customer, then mark where the conversation stands." actions={<AdminButton disabled={busy} onClick={()=>run(load)}>Refresh inquiries</AdminButton>}>
+ return <AdminPanel title="Customer enquiries" description="Marketplace questions and Creative Studio briefs. Review the saved request and use the existing follow-up controls." actions={<AdminButton disabled={busy} onClick={()=>run(load)}>Refresh inquiries</AdminButton>}>
+  {inquiryId&&<div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400"><span className="break-all">Enquiry {inquiryId}</span>{onShowAllEnquiries&&<AdminButton variant="ghost" onClick={onShowAllEnquiries}>Show all enquiries</AdminButton>}</div>}
   <div role="group" aria-label="Filter inquiries by status" className="mb-3 flex flex-wrap gap-1.5">{STATUS_FILTERS.map(f=><button key={f.id||'all'} type="button" aria-pressed={status===f.id} onClick={()=>{setStatus(f.id);setFollowUp('');setInquiryId('');setPage(1);}} className={`min-h-9 rounded-full border px-3 text-xs font-semibold ${status===f.id?'border-[#00c365]/60 bg-[#00c365]/10 text-[#7dffbf]':'border-slate-700 text-slate-300 hover:border-slate-500'}`}>{f.label}</button>)}</div>
   {notice&&<p role="status" className="my-2 text-sm text-emerald-300">{notice}</p>}
   <label className={adminLabel}>Follow-up view<select aria-label="Marketplace follow-up filter" className={field} value={followUp} onChange={e=>{setFollowUp(e.target.value);setStatus('');setInquiryId('');setPage(1);}}><option value="">All dates</option><option value="due">Due today</option><option value="overdue">Overdue</option><option value="recent">Updated in last 7 days</option></select></label>
@@ -49,7 +51,7 @@ export function MarketplaceControlPanels({token,view,categories,onCategoriesChan
   </div>
   {error&&<p role="alert" className="mt-3 text-sm text-rose-300">{error}</p>}
   <div className="mt-4 space-y-3">
-   {loading&&!rows.length?<AdminLoading label="Loading inquiries…"/>:!rows.length?<AdminEmpty title={status==='new'?'No new inquiries':'No inquiries match these filters'}>{status==='new'?'You are up to date. New questions from product pages land here.':'Try another status or clear the search.'}</AdminEmpty>:
+   {loading&&!rows.length?<AdminLoading label="Loading inquiries…"/>:!rows.length?error?null:<AdminEmpty title={status==='new'?'No new inquiries':'No inquiries match these filters'}>{status==='new'?'New Marketplace questions and Creative Studio briefs appear here.':'Try another status or clear the search.'}</AdminEmpty>:
    rows.map(row=><InquiryRow key={`${token}-${row.id}-${row.workflow_version||0}`} row={row} token={token} onReload={()=>run(load)} onSaved={()=>{setNotice('Follow-up saved.');void run(load);onChanged();}} />)}
   </div>
   <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-400"><AdminButton disabled={page===1||busy} onClick={()=>setPage(page-1)}>Previous</AdminButton><span>Page {page} · {total} inquir{total===1?'y':'ies'}</span><AdminButton disabled={page*10>=total||busy} onClick={()=>setPage(page+1)}>Next</AdminButton></div>
@@ -84,7 +86,7 @@ function InquiryRow({row,token,onSaved,onReload}:{row:MarketplaceInquiry;token:s
  const [note,setNote]=useState(row.admin_note||'');const link=whatsappLink(row.customer_phone);const state=INQUIRY_STATUS[row.status]||{label:row.status,tone:'neutral' as AdminTone};
  const transitions=row.status==='new'?['contacted','resolved','closed']:row.status==='contacted'?['resolved','closed']:['new'];
  return <article className={`min-w-0 space-y-3 break-words rounded-2xl border p-4 text-sm ${row.status==='new'?'border-amber-500/30 bg-amber-500/[0.04]':'border-slate-800 bg-[#0b1116]'}`}>
-  <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="font-semibold text-white">{row.customer_name||'Name not supplied'}</p><p className="text-xs text-slate-400">About <span className="text-slate-200">{row.product_name}</span> · {row.inquiry_type.replace(/_/g,' ')}{row.budget?` · Budget ${row.budget}`:''}</p></div><StatusPill tone={state.tone}>{state.label}</StatusPill></div>
+  <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="font-semibold text-white">{row.customer_name||'Name not supplied'}</p><p className="text-xs text-slate-400">About <span className="text-slate-200">{row.product_name}</span> · {row.inquiry_type===CREATIVE_INQUIRY_TYPE?'Creative Studio brief':row.inquiry_type.replace(/_/g,' ')}{row.budget?` · Budget ${row.budget}`:''}</p><p className="break-all font-mono text-xs text-slate-400">{row.id}</p></div><StatusPill tone={state.tone}>{state.label}</StatusPill></div>
   {row.message?<p className="whitespace-pre-wrap rounded-xl bg-slate-900/60 p-3 text-slate-200">{row.message}</p>:<p className="text-xs text-slate-500">No message</p>}
   <div className="flex flex-wrap gap-2">
    {link&&<a className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#00c365] px-4 text-sm font-semibold text-black hover:bg-[#00e575]" href={link} target="_blank" rel="noopener noreferrer"><MessageCircle className="h-4 w-4"/>Open WhatsApp</a>}

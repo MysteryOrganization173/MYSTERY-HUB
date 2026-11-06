@@ -28,7 +28,7 @@ import { describeAdminRule, saveAdminRewardRule } from '../services/adminEarnCon
 import { EarnInputError } from '../services/adminEarnQuery.js';
 import { ReferralRuleValidationError } from '../services/referralRulePolicy.js';
 import { requireAdmin } from '../middleware/authMiddleware.js';
-import { OrdersStore } from '../db/ordersStore.js';
+import { OrdersStore, paidOrderAlertReason } from '../db/ordersStore.js';
 import { AuthStore } from '../db/authStore.js';
 import { WaitlistStore } from '../db/waitlistStore.js';
 import { AdminAuditStore } from '../db/adminAuditStore.js';
@@ -39,6 +39,8 @@ import { FulfilmentService } from '../services/fulfilmentService.js';
 import { SuccessBizHubProvider } from '../suppliers/successBizHub/provider.js';
 import { isDbConnected } from '../db/connection.js';
 import { parseSupplierAdvertWithAi } from '../services/marketplaceAiImporter.js';
+import { createRateLimiter } from '../middleware/rateLimiter.js';
+import type { PaidOrderAlerts } from '../../shared/adminAlerts.js';
 
 // Simple sliding window rate limit map for Admin AI Importer
 const adminAiRateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -50,6 +52,24 @@ adminRouter.use((_req,res,next)=>{res.setHeader('Cache-Control','no-store');next
 
 // Apply strict admin authentication and authorization to all admin routes
 adminRouter.use(requireAdmin);
+adminRouter.get('/alerts/paid-orders', createRateLimiter({
+  windowMs: 60_000, max: 12, key: req => req.user!.id,
+}), async (_req, res) => {
+  try {
+    const checkedAt = new Date().toISOString();
+    const { orders, total } = await OrdersStore.searchOrdersAdmin({
+      status: 'needs_attention', paymentStatus: 'success', prioritizePaidAttention: true, page: 1, limit: 5,
+    });
+    const alerts: PaidOrderAlerts = {
+      checkedAt,
+      total,
+      orders: orders.map(order => ({ reference: order.public_reference, reason: paidOrderAlertReason(order), updatedAt: order.updated_at })),
+    };
+    res.json({ data: alerts });
+  } catch {
+    res.status(503).json({ error: 'Paid-order alerts are unavailable. Try again shortly.' });
+  }
+});
 adminRouter.get('/leads',async(_req,res)=>{try{res.json({success:true,data:await LeadOperationsStore.summary()});}catch{res.status(503).json({error:'Lead counts unavailable. Retry shortly.'});}});
 adminRouter.patch('/leads/marketplace/:id',async(req,res)=>{if(!/^inq_[a-zA-Z0-9_-]{1,64}$/.test(req.params.id)){res.status(400).json({error:'Invalid enquiry.'});return;}try{res.json({success:true,inquiry:await MarketplaceControlStore.updateInquiry(req.params.id,req.body,req.user!.id)});}catch(e){res.status(e instanceof LeadError?e.status:503).json({error:e instanceof LeadError?e.message:'Could not save follow-up. Reload before retrying.'});}});
 adminRouter.get('/leads/:source/:id/history',async(req,res)=>{if(!['ultra','marketplace'].includes(req.params.source)||!/^[a-zA-Z0-9_-]{1,80}$/.test(req.params.id)){res.status(400).json({error:'Invalid lead.'});return;}try{res.json({success:true,history:await LeadOperationsStore.history(req.params.source as 'ultra'|'marketplace',req.params.id)});}catch{res.status(503).json({error:'History unavailable.'});}});
