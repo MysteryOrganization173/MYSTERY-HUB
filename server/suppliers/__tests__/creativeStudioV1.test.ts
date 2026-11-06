@@ -12,7 +12,7 @@ import { validateGrowth as validateGrowthEvent } from '../../services/growthVali
 import {
   CREATIVE_SERVICES, CreativeBriefError, creativeBriefProblems, creativeLeadMessage, creativeLink, creativePhone, creativeReference, validateCreativeBrief,
 } from '../../../shared/creativeStudio.js';
-import { CREATIVE_WORK } from '../../../src/data/creativeStudioWork.js';
+import { CREATIVE_PROJECTS, CREATIVE_WORK } from '../../../src/data/creativeStudioWork.js';
 import { creativeVisitorKey } from '../../routes/creativeStudioApi.js';
 import { DIGITAL_SERVICES } from '../../../src/data/services.js';
 import { serviceHref } from '../../../src/utils/serviceDirectory.js';
@@ -197,13 +197,36 @@ test('Creative Studio has one address, page metadata, a directory entry, analyti
   assert.equal(serviceHref(entry), '/creative-studio');
   const event = (name: string) => validateGrowthEvent({ event: name, visitorId: ID, sessionId: ID, metadata: { page: 'creative' } });
   for (const name of ['page_view', 'creative_service', 'creative_brief_started']) assert.doesNotThrow(() => event(name), name);
-  // Every sample is Mystery Hub's own, a versioned Cloudinary original, with real alt text. No client work is claimed.
+  // Every piece belongs to a labelled Studio Concept, is a versioned Cloudinary original and has real alt text.
   assert.ok(CREATIVE_WORK.length >= 6);
   for (const work of CREATIVE_WORK) {
-    assert.equal(work.owner, 'mystery-hub');
-    assert.match(work.src, /^https:\/\/res\.cloudinary\.com\/da6oeat7m\/image\/upload\/v\d+\/[\w/-]+\.(png|jpg)$/);
+    assert.ok(CREATIVE_PROJECTS.find(p => p.pieces.includes(work))!.owner === 'concept');
+    assert.match(work.src, /^https:\/\/res\.cloudinary\.com\/da6oeat7m\/image\/upload\/v\d+\/mysteryhub\/creative-studio\/concepts\/[\w-]+\.jpg$/);
     assert.ok(work.alt.length > 30 && work.width > 0 && work.height > 0, work.id);
   }
   const entryPoints = ['src/components/marketplace/MarketplacePage.tsx', 'src/components/home/HomePage.tsx', 'src/components/common/Footer.tsx'].map(f => readFileSync(f, 'utf8'));
   assert.ok(entryPoints.every(source => /CreativeStudioEntry|page: 'creative'/.test(source)));
+});
+
+test('V1.1 portfolio: three different concept brands, honestly labelled, each leading to a real brief', () => {
+  assert.deepEqual(CREATIVE_PROJECTS.map(p => p.sector), ['Restaurant', 'Skin care', 'Technology']);
+  assert.equal(new Set(CREATIVE_WORK.map(w => w.src)).size, CREATIVE_WORK.length, 'no piece repeats');
+  for (const project of CREATIVE_PROJECTS) {
+    assert.equal(project.owner, 'concept');
+    assert.ok(project.pieces.length >= 5, project.id);
+    assert.ok(project.palette.length >= 4, project.id);
+    assert.ok(CREATIVE_SERVICES.some(s => s.id === project.service), project.id);
+    assert.ok(project.pieces.every(w => w.note.length > 5 && w.width >= 1000), project.id);
+  }
+  // Three different lead colours, so the portfolio cannot read as one company.
+  assert.equal(new Set(CREATIVE_PROJECTS.map(p => p.palette[0])).size, 3);
+  const page = readFileSync('src/components/creative/CreativeStudioPage.tsx', 'utf8');
+  assert.match(page, /Selected <span className="cs-serif">Studio Concepts/);
+  assert.match(page, /Harmattan Table, Indigo Hour and Lonzero are fictional brands/);
+  assert.match(page, /CREATIVE_OWNER_LABEL\[project\.owner\]/);
+  // The page sells outcomes: no software statements, and no claim of traditional or human-only production either.
+  assert.doesNotMatch(page, /\bAI\b|AI-assisted|hand-?made|hand-?drawn|no AI/i);
+  // The enquiry form still does the selling: every project and viewer leads to a quote, not a checkout.
+  assert.match(page, /chooseService\(project\.service, true\)/);
+  assert.doesNotMatch(page, /Buy now|checkout/i);
 });
