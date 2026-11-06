@@ -155,7 +155,7 @@ test('AI health remains Admin-only and separates guide outcomes from verified ge
   await apiV2({models:{generateContent:async()=>{if(fail)throw {status:503,message:'synthetic-private-key-and-message'};return {text:'Useful answer'};}}},async base=>{
    assert.equal((await fetch(base+'/health')).status,401);
    assert.equal((await fetch(base+'/health',{headers:{Authorization:'Bearer synthetic-customer'}})).status,403);
-   await postV2(base,'Hello');await postV2(base,'How do I track my order?');
+   await postV2(base,'Hello');await postV2(base,'Wallet funding');
    const health=async()=>{const r=await fetch(base+'/health',{headers:{Authorization:'Bearer synthetic-admin'}});assert.equal(r.status,200);assert.equal(r.headers.get('Cache-Control'),'no-store');return r.json();};
    const first=await health();assert.equal(first.providerAccessVerified,false);assert.equal(first.requestOutcomes.instantGuide,1);assert.equal(first.requestOutcomes.fallbackGuide,1);assert.equal(first.failureCounts.PROVIDER_UNAVAILABLE,2);assert.equal(first.latency.completedRequests,2);
    assert.doesNotMatch(JSON.stringify(first),/synthetic-private|How do I track|order history/);
