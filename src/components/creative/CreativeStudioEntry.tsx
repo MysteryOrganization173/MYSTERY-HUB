@@ -2,10 +2,10 @@ import React from 'react';
 import { ArrowRight, Palette } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { getCloudinaryUrl } from '../../utils/cloudinary';
-import { CREATIVE_WORK } from '../../data/creativeStudioWork';
+import { creativeWorkById } from '../../data/creativeStudioWork';
 
 const isPlainClick = (e: React.MouseEvent) => !(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0);
-const THUMBS = ['earn-portrait', 'ai-mark', 'earn-launch'].map(id => CREATIVE_WORK.find(w => w.id === id)!);
+const THUMBS = ['ht-flyer', 'lz-social', 'ih-social-a'].map(creativeWorkById);
 
 /**
  * The way into Mystery Creative Studio from the Marketplace and the homepage. Small and self-contained: it does not

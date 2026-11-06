@@ -7,7 +7,7 @@ import { getCloudinarySrcSet, getCloudinaryUrl } from '../../utils/cloudinary';
 import { trackGrowth } from '../../utils/growthAnalytics';
 import { workspacePath } from '../../utils/businessWorkspace';
 import { CREATIVE_SERVICES, creativeService, type CreativeServiceId } from '../../../shared/creativeStudio';
-import { CREATIVE_WORK, CREATIVE_WORK_OWNER_LABEL, type CreativeWork } from '../../data/creativeStudioWork';
+import { CREATIVE_KIND_SERVICE, CREATIVE_OWNER_LABEL, CREATIVE_PROJECTS, CREATIVE_WORK, CREATIVE_WORK_KINDS, creativeProjectOf, creativeWorkById, type CreativeWork, type CreativeWorkKind } from '../../data/creativeStudioWork';
 import { CreativeBriefForm } from './CreativeBriefForm';
 
 const isPlainClick = (e: React.MouseEvent) => !(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0);
@@ -24,7 +24,7 @@ function useSerifFont() {
     const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = SERIF_HREF; document.head.appendChild(link);
   }, []);
 }
-const HERO = { banner: CREATIVE_WORK.find(w => w.id === 'earn-launch')!, portrait: CREATIVE_WORK.find(w => w.id === 'earn-portrait')!, mark: CREATIVE_WORK.find(w => w.id === 'ai-mark')! };
+const HERO = { banner: creativeWorkById('ht-cover'), portrait: creativeWorkById('ih-social-a'), mark: creativeWorkById('lz-social') };
 
 function WorkImage({ work, sizes, widths, eager, crop }: { work: CreativeWork; sizes: string; widths: number[]; eager?: boolean; crop?: boolean }) {
   return (
@@ -33,33 +33,40 @@ function WorkImage({ work, sizes, widths, eager, crop }: { work: CreativeWork; s
   );
 }
 
-/** Full-screen viewer for one work sample, with previous/next. Native <dialog>: Escape closes, focus stays inside. */
-function WorkViewer({ index, onClose, onMove }: { index: number | null; onClose: () => void; onMove: (step: number) => void }) {
+/** What the viewer is showing: a list of pieces (one project, or one type of work) and the position in it. */
+interface Viewing { list: readonly CreativeWork[]; index: number }
+
+/** Full-screen viewer with previous/next and the way to a brief. Native <dialog>: Escape closes, focus stays inside. */
+function WorkViewer({ viewing, onClose, onMove, onRequest }: { viewing: Viewing | null; onClose: () => void; onMove: (step: number) => void; onRequest: (work: CreativeWork) => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current; if (!dialog) return;
-    if (index !== null && !dialog.open) dialog.showModal();
-    if (index === null && dialog.open) dialog.close();
-  }, [index]);
-  const work = index === null ? null : CREATIVE_WORK[index];
+    if (viewing && !dialog.open) dialog.showModal();
+    if (!viewing && dialog.open) dialog.close();
+  }, [viewing]);
+  const work = viewing ? viewing.list[viewing.index] : null;
+  const project = work ? creativeProjectOf(work) : null;
   return (
-    <dialog ref={ref} className="cs-lightbox" aria-label={work ? `${work.title}, enlarged` : 'Work sample'} onClose={onClose}
+    <dialog ref={ref} className="cs-lightbox" aria-label={work ? `${project!.name}: ${work.title}, enlarged` : 'Work sample'} onClose={onClose}
       onKeyDown={e => { if (e.key === 'ArrowRight') onMove(1); if (e.key === 'ArrowLeft') onMove(-1); }}
       onClick={e => { if (e.target === ref.current) onClose(); }}>
-      {work && (
+      {work && project && (
         <div className="cs-lightbox-inner">
           <div className="cs-lightbox-bar">
-            <p>{index! + 1} of {CREATIVE_WORK.length} · {CREATIVE_WORK_OWNER_LABEL[work.owner]}</p>
+            <p aria-live="polite">{viewing!.index + 1} of {viewing!.list.length} · {CREATIVE_OWNER_LABEL[project.owner]}</p>
             <button type="button" className="cs-icon-btn" onClick={onClose} aria-label="Close"><X size={20} aria-hidden /></button>
           </div>
           <figure>
-            <img src={getCloudinaryUrl(work.src, { width: 1600, crop: 'limit' })} width={work.width} height={work.height} alt={work.alt} decoding="async" />
+            <img key={work.id} src={getCloudinaryUrl(work.src, { width: 1600, crop: 'limit' })} srcSet={getCloudinarySrcSet(work.src, [640, 1000, 1600], { crop: 'limit' })} sizes="(min-width: 1100px) 1100px, 100vw" width={work.width} height={work.height} alt={work.alt} decoding="async" />
           </figure>
           <figcaption>
-            <span><strong>{work.title}</strong><br /><span>{work.kind} · {work.note}</span></span>
-            <span className="cs-lightbox-nav">
-              <button type="button" className="cs-icon-btn" onClick={() => onMove(-1)} aria-label="Previous sample"><ChevronLeft size={20} aria-hidden /></button>
-              <button type="button" className="cs-icon-btn" onClick={() => onMove(1)} aria-label="Next sample"><ChevronRight size={20} aria-hidden /></button>
+            <span className="cs-lightbox-text"><strong>{project.name}: {work.title}</strong><span>{work.note}</span></span>
+            <span className="cs-lightbox-actions">
+              <button type="button" className="cs-btn cs-btn-primary" onClick={() => onRequest(work)}>Request something similar</button>
+              {viewing!.list.length > 1 && <span className="cs-lightbox-nav">
+                <button type="button" className="cs-icon-btn" onClick={() => onMove(-1)} aria-label="Previous piece"><ChevronLeft size={20} aria-hidden /></button>
+                <button type="button" className="cs-icon-btn" onClick={() => onMove(1)} aria-label="Next piece"><ChevronRight size={20} aria-hidden /></button>
+              </span>}
             </span>
           </figcaption>
         </div>
@@ -76,7 +83,8 @@ export const CreativeStudioPage: React.FC = () => {
   const { setActivePage } = useApp();
   useSerifFont();
   const [service, setService] = useState<CreativeServiceId | ''>(serviceFromUrl);
-  const [viewing, setViewing] = useState<number | null>(null);
+  const [viewing, setViewing] = useState<Viewing | null>(null);
+  const [workFilter, setWorkFilter] = useState<CreativeWorkKind | 'all'>('all');
   const tracked = useRef(new Set<string>());
 
   const chooseService = useCallback((id: CreativeServiceId, scroll = false) => {
@@ -109,7 +117,9 @@ export const CreativeStudioPage: React.FC = () => {
     window.history.pushState({ page: 'business' }, '', workspacePath('promote'));
     setActivePage('business', false);
   };
-  const move = (step: number) => setViewing(i => i === null ? i : (i + step + CREATIVE_WORK.length) % CREATIVE_WORK.length);
+  const move = (step: number) => setViewing(v => v && { ...v, index: (v.index + step + v.list.length) % v.list.length });
+  const requestSimilar = (work: CreativeWork) => { setViewing(null); chooseService(CREATIVE_KIND_SERVICE[work.kind], true); };
+  const filtered = workFilter === 'all' ? [] : CREATIVE_WORK.filter(work => work.kind === workFilter);
   const { contact } = BUSINESS_CONFIG;
 
   return (
@@ -139,10 +149,10 @@ export const CreativeStudioPage: React.FC = () => {
               </ul>
             </div>
             <div className="cs-stack">
-              <figure className="cs-stack-a"><WorkImage work={HERO.banner} widths={[480, 720]} sizes="(min-width: 960px) 320px, 62vw" eager /></figure>
+              <figure className="cs-stack-a"><WorkImage work={HERO.banner} widths={[480, 800]} sizes="(min-width: 960px) 320px, 62vw" eager /></figure>
               <figure className="cs-stack-b"><WorkImage work={HERO.portrait} widths={[320, 480]} sizes="(min-width: 960px) 240px, 46vw" eager /></figure>
               <figure className="cs-stack-c"><WorkImage work={HERO.mark} widths={[320, 480]} sizes="(min-width: 960px) 230px, 44vw" /></figure>
-              <p className="cs-stack-note">Mystery Hub’s own artwork</p>
+              <p className="cs-stack-note">Studio Concepts</p>
             </div>
           </div>
         </div>
@@ -181,23 +191,59 @@ export const CreativeStudioPage: React.FC = () => {
       <section className="cs-section" id="work" aria-labelledby="cs-work-title">
         <div className="cs-wrap">
           <div className="cs-section-head">
-            <div><p className="cs-eyebrow">Work</p><h2 className="cs-h2" id="cs-work-title">Made for <span className="cs-serif">Mystery Hub</span></h2></div>
-            <p className="cs-lead">Logos, campaign graphics and banners we use for our own brand and launches.</p>
+            <div><p className="cs-eyebrow">Work</p><h2 className="cs-h2" id="cs-work-title">Selected <span className="cs-serif">Studio Concepts</span></h2></div>
+            <p className="cs-lead">Brand identities, campaign visuals and design explorations.</p>
           </div>
-          <p className="cs-work-note"><Info size={18} aria-hidden /><span>These pieces were made for Mystery Hub itself, and most were created with AI image tools. They are not client projects, and no client work is shown yet. Client work will appear here only when the client agrees to share it.</span></p>
-          <ul className="cs-work">
-            {CREATIVE_WORK.map((work, i) => (
-              <li key={work.id}>
-                <button type="button" onClick={() => setViewing(i)} aria-label={`Enlarge ${work.title}`}>
-                  <WorkImage work={work} widths={[400, 640, 900]} sizes="(min-width: 1000px) 370px, (min-width: 520px) 46vw, 92vw" />
-                  <span className="cs-badge">{CREATIVE_WORK_OWNER_LABEL[work.owner]}</span>
-                  <span className="cs-work-meta"><strong>{work.title}</strong><span>{work.kind}</span></span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <p className="cs-work-note"><Info size={18} aria-hidden /><span>Harmattan Table, Indigo Hour and Lonzero are fictional brands we created to show our range. They are not client projects.</span></p>
+          <div className="cs-filter" role="group" aria-label="Show work by type">
+            <button type="button" aria-pressed={workFilter === 'all'} onClick={() => setWorkFilter('all')}>By project</button>
+            {CREATIVE_WORK_KINDS.map(kind => <button key={kind} type="button" aria-pressed={workFilter === kind} onClick={() => setWorkFilter(kind)}>{kind}</button>)}
+          </div>
+          {workFilter === 'all' ? (
+            <div className="cs-projects">
+              {CREATIVE_PROJECTS.map((project, p) => (
+                <article key={project.id} className="cs-project" data-flip={p % 2 === 1} aria-labelledby={`cs-project-${project.id}`}>
+                  <button type="button" className="cs-project-cover" onClick={() => setViewing({ list: project.pieces, index: 0 })} aria-label={`Enlarge ${project.name}, ${project.pieces[0].title}`}>
+                    <WorkImage work={project.pieces[0]} widths={[480, 800, 1200]} sizes="(min-width: 1000px) 690px, 92vw" />
+                  </button>
+                  <div className="cs-project-text">
+                    <p className="cs-project-label">{CREATIVE_OWNER_LABEL[project.owner]} · {project.sector}</p>
+                    <h3 id={`cs-project-${project.id}`}>{project.name}</h3>
+                    <p>{project.summary}</p>
+                    <ul className="cs-swatches" aria-hidden="true">{project.palette.map(colour => <li key={colour} style={{ background: colour }} />)}</ul>
+                    <ul className="cs-uses" aria-label={`${project.name} includes`}>{project.includes.map(item => <li key={item}>{item}</li>)}</ul>
+                    <button type="button" className="cs-btn cs-btn-ghost" onClick={() => chooseService(project.service, true)} aria-label={`Request something similar to ${project.name}`}>Request something similar<ArrowRight size={16} aria-hidden /></button>
+                  </div>
+                  <ul className="cs-strip" aria-label={`More from ${project.name}`}>
+                    {project.pieces.slice(1).map((work, i) => (
+                      <li key={work.id} style={{ aspectRatio: `${work.width} / ${work.height}` }}>
+                        <button type="button" onClick={() => setViewing({ list: project.pieces, index: i + 1 })} aria-label={`Enlarge ${project.name}, ${work.title}`}>
+                          <WorkImage work={work} widths={[320, 640, 960]} sizes="(min-width: 760px) 480px, 300px" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <ul className="cs-work">
+              {filtered.map((work, i) => (
+                <li key={work.id}>
+                  <button type="button" onClick={() => setViewing({ list: filtered, index: i })} aria-label={`Enlarge ${creativeProjectOf(work).name}, ${work.title}`}>
+                    <WorkImage work={work} widths={[400, 640, 900]} sizes="(min-width: 1000px) 370px, (min-width: 520px) 46vw, 92vw" />
+                    <span className="cs-work-meta"><strong>{work.title}</strong><span>{creativeProjectOf(work).name} · {CREATIVE_OWNER_LABEL[creativeProjectOf(work).owner]}</span></span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="cs-work-cta">
+            <p>Want work like this for your own business?</p>
+            <a className="cs-btn cs-btn-primary" href="#brief" onClick={jump('brief')}>Request a design<ArrowRight size={18} aria-hidden /></a>
+          </div>
         </div>
-        <WorkViewer index={viewing} onClose={() => setViewing(null)} onMove={move} />
+        <WorkViewer viewing={viewing} onClose={() => setViewing(null)} onMove={move} onRequest={requestSimilar} />
       </section>
 
       <section className="cs-section" id="process" aria-labelledby="cs-process-title">
@@ -215,7 +261,7 @@ export const CreativeStudioPage: React.FC = () => {
           <div className="cs-know">
             <div><h3>Prices</h3><p>Every project is quoted, because a single flyer and a full brand set are very different jobs. Your quote shows the full price before you decide.</p></div>
             <div><h3>Timing and changes</h3><p>How long it takes and how many rounds of changes you get are agreed in your quote, before work starts.</p></div>
-            <div><h3>Who designs it</h3><p>The Mystery Hub team prepares your design and may use digital and AI-assisted tools. A person on the team checks every design before you see it.</p></div>
+            <div><h3>Who designs it</h3><p>The Mystery Hub team prepares your design and checks it before you see it. You approve the work against what you agreed.</p></div>
           </div>
         </div>
       </section>

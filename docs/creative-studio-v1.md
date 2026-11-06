@@ -17,7 +17,7 @@ A customer-facing page for professional design work, sold on quote: `/creative-s
    - Banners & web graphics
 
    Each card shows what it is good for, a "What you can ask for" disclosure, and "Price: quoted for your project".
-3. See work samples. These are Mystery Hub's own brand and campaign artwork, labelled "Made for Mystery Hub", with a note that no client work is shown yet. Each sample opens in a full-screen viewer.
+3. See three Studio Concepts: Harmattan Table (restaurant), Indigo Hour (skin care) and Lonzero (technology). They are fictional brands, labelled as concepts, with a note that they are not client projects. Each opens in a full-screen viewer, and work can also be browsed by type.
 4. Send a brief without an account. The form asks:
    - service-specific questions;
    - "what you need";
@@ -74,8 +74,12 @@ A customer-facing page for professional design work, sold on quote: `/creative-s
 - Online payment
 - Any automated or AI design tool
 
-The page states that the team may use AI-assisted tools and that a person checks every design. The founder should confirm this policy.
+The page describes outcomes and does not discuss production tools. It says the team prepares and checks each design. The founder should keep that true in practice.
+
+## Portfolio assets
+
+All pieces are listed in `src/data/creativeStudioWork.ts` and stored in Cloudinary under `mysteryhub/creative-studio/concepts`. To replace one, upload the new image and change its entry.
 
 ## Adding real client work later
 
-Add an entry to `src/data/creativeStudioWork.ts` with `owner: 'client'` only after the client has agreed in writing. Use a versioned Cloudinary URL and real alt text. The page labels each piece from `owner`.
+Add a project with `owner: 'client'` only after the client has agreed in writing. Use a versioned Cloudinary URL and real alt text. The page labels each project from `owner`.
