@@ -87,13 +87,13 @@ for(const q of ['Hi, what can you help me with?','What is Mystery Hub?','How do 
 test('Wallet guide rejects withdrawals; Earn guide never invents economics or reads accounts',()=>{
  assert.match(knownServiceHelp('Can I withdraw money from my Wallet?')!,/cannot be withdrawn/);
  assert.match(knownServiceHelp('How does Mystery Earn work?')!,/effective reward policy/);
- assert.match(buildMysteryAiSystemInstruction(undefined,[]),/current availability/);
+ assert.match(buildMysteryAiSystemInstruction(),/runtime availability/);
 });
 
 test('Ultra comparison is grounded in the existing custom-build enquiry, never denied or sold as a subscription',()=>{
  const q='Compare Website Builder and Ultra',guide=knownServiceHelp(q)!;
  assert.match(guide,/custom website-build enquiry/);assert.match(guide,/free self-service Website Builder/);assert.match(guide,/confirm scope, quote and acceptance/);assert.match(guide,/not an instant AI website generator or a subscription/);
- assert.equal(getGroundedLocalResponse(q,'home')?.reply,guide);assert.ok(buildMysteryAiSystemInstruction(undefined,[]).includes(guide));assert.doesNotMatch(guide,/GH₵|accepted your project|does not exist/);
+ assert.equal(getGroundedLocalResponse(q,'home')?.reply,guide);assert.ok(buildMysteryAiSystemInstruction().includes(guide));assert.doesNotMatch(guide,/GH₵|accepted your project|does not exist/);
  assert.match(knownServiceHelp('My Ultra order refund')!,/Refunds remain unconfirmed until verified/);
 });
 test('a response with missing provenance is never labelled genuine AI',async()=>{

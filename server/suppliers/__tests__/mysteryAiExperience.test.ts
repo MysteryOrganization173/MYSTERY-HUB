@@ -84,7 +84,7 @@ test('accessible chat: labelled dialog, polite log, busy state and status text',
 test('one account never sees another account\'s conversation', () => {
   const effect = ui.slice(ui.indexOf('const accountId = user?.id ?? null;'), ui.indexOf('// Inactivity expansion trigger'));
   assert.match(effect, /cancelPending\(\);\s*setInputValue\(''\);\s*setMessages\(\[\]\);/);
-  assert.match(effect, /\[accountId\]/);
+  assert.match(effect, /\[accountId,sessionToken\]/);
   assert.doesNotMatch(ui, /localStorage|sessionStorage/, 'the conversation is never written to device storage');
 });
 

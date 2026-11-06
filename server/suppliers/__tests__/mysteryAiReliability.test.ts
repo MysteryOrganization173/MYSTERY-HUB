@@ -28,11 +28,15 @@ test('hung provider is aborted and capacity recovers; no orphaned promise reject
  for(let i=0;i<5;i++){const response=await post(base);assert.equal(response.status,503);assert.equal((await response.json()).code,'TIMEOUT');}assert.equal(aborted,10);
  });
 });
-test('catalog hanging has a bounded timeout and provider still receives a safe empty catalogue',async()=>{
- await api({models:{generateContent:async()=>({text:'Safe response'})}},async base=>assert.equal((await post(base)).status,200),{catalog:()=>new Promise(()=>{}),catalogTimeoutMs:10});
+test('catalog hanging has a bounded timeout and the guide reports missing price evidence without a model call',async()=>{
+ let calls=0;
+ await api({models:{generateContent:async()=>{calls++;return {text:'Unused'};}}},async base=>{
+   const response=await post(base,'How much is MTN 1GB?');
+   assert.equal(response.status,200);assert.match((await response.json()).reply,/couldn’t verify/);assert.equal(calls,0);
+ },{catalog:()=>new Promise(()=>{}),catalogTimeoutMs:10});
 });
 test('known questions work without configured Gemini and identify non-AI source',async()=>{
- await api(null,async base=>{const response=await post(base,'How do I track my order?');assert.equal(response.status,200);const body=await response.json();assert.equal(body.source,'guide');assert.equal(body.fallback,true);assert.match(body.reply,/Open Orders/);});
+ await api(null,async base=>{const response=await post(base,'Wallet funding');assert.equal(response.status,200);const body=await response.json();assert.equal(body.source,'guide');assert.equal(body.fallback,true);assert.match(body.reply,/Open Wallet/);});
 });
 test('request disconnect cancels provider transport and health is admin protected',async()=>{
  let started=false,cancelled=false;await api({models:{generateContent:(input:any)=>new Promise((_,reject)=>{started=true;input.config.abortSignal.addEventListener('abort',()=>{cancelled=true;reject(input.config.abortSignal.reason);},{once:true});})}},async base=>{
