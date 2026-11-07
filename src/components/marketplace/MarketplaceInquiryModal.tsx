@@ -121,7 +121,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
     ].filter((line) => line !== null) as string[];
 
     const fullMessage = messageLines.join('\n');
-    const whatsappUrl = `https://wa.me/233592066298?text=${encodeURIComponent(fullMessage)}`;
+    const whatsappUrl = BUSINESS_CONFIG.getGeneralWhatsAppUrl(fullMessage);
 
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     setIsSubmitted(true);
@@ -339,7 +339,7 @@ export const MarketplaceInquiryModal: React.FC = () => {
                     className="py-2.5 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors flex items-center justify-center gap-1.5"
                   >
                     <Phone className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Call: 0592066298</span>
+                    <span>Call: {BUSINESS_CONFIG.contact.supportPhone}</span>
                   </a>
                   <a
                     href={`mailto:${BUSINESS_CONFIG.contact.supportEmail}?subject=${encodeURIComponent(

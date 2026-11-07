@@ -709,7 +709,7 @@ export const MarketplacePage: React.FC = () => {
                   className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs border border-slate-700 transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Phone className="w-4 h-4 text-amber-400" />
-                  <span>Call: 0592066298</span>
+                  <span>Call: {BUSINESS_CONFIG.contact.supportPhone}</span>
                 </a>
               </div>
             </div>

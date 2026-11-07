@@ -1,4 +1,5 @@
 import { DataNetworkSelector, DATA_NETWORK_CHOICES } from './DataNetworkSelector';
+import { BUSINESS_CONFIG } from '../../config/business';
 import { Money } from '../purchase/Money';
 import { useTapFeedback } from '../../hooks/useTapFeedback';
 import { formatGhanaPhone, isCompleteGhanaPhone } from '../../utils/checkoutRecovery';
@@ -679,7 +680,7 @@ export const DataPage: React.FC = () => {
             </div>
 
             <a
-              href="https://wa.me/233592066298?text=Hello%20Mystery%20Hub,%20I%20have%20a%20question%20about%20a%20data%20bundle"
+              href={BUSINESS_CONFIG.getGeneralWhatsAppUrl('Hello Mystery Hub, I have a question about a data bundle')}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#00c365] text-black font-bold text-xs hover:bg-[#00b05b] transition-colors cursor-pointer shrink-0"
