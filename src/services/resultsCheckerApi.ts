@@ -17,8 +17,8 @@ export async function initializeCheckerPayment(input: { product: CheckerProductK
   return data;
 }
 
-export async function getCheckerReceipt(reference: string, token: string): Promise<CheckerReceipt> {
-  const res = await fetch(`${API_BASE_URL}/api/results-checkers/orders/${encodeURIComponent(reference)}/receipt`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+export async function getCheckerReceipt(reference: string, token: string, signal?: AbortSignal): Promise<CheckerReceipt> {
+  const res = await fetch(`${API_BASE_URL}/api/results-checkers/orders/${encodeURIComponent(reference)}/receipt`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'We could not open this receipt just now. Please try again.');
   return data;

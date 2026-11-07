@@ -45,7 +45,7 @@ Keep the key safe. Losing it makes stored PINs unreadable, and changing it needs
 
 ## Activation
 
-Nothing here has been done. All of it is needed.
+These are operational prerequisites, not evidence of completed production setup. Verify each against the actual backend before activation. This release does not apply the schema, set secrets or enable sales.
 
 1. Confirm that the supplier key has the `vouchers` permission, using read-only `GET /services` and `GET /vouchers`.
 2. Note the real `id`, `name`, `priceMinor` and `available` for BECE and WASSCE. Compare the cost with GH₵18.00. A higher cost keeps that product unavailable (`maxCostMinor` in `shared/resultsCheckers.ts`).
@@ -54,7 +54,7 @@ Nothing here has been done. All of it is needed.
    - `RESULTS_CHECKER_PIN_KEY`: 64 hex characters, generated fresh
    - `RESULTS_CHECKER_TYPE_ID_BECE`, `RESULTS_CHECKER_TYPE_ID_WASSCE`: the supplier ids
    - `RESULTS_CHECKER_ENABLED=true`, last
-5. Make one real purchase yourself and check the receipt, Orders, Admin and the supplier statement. Read the real reply format. If it differs, stop and fix the parser.
+5. Obtain supplier-confirmed purchase/lookup response shapes and verify the parser against sanitized fixtures. A controlled real acceptance purchase requires separate explicit authorization; it is not part of engineering tests or this release. If authorized later, check the private receipt, Orders, Admin and supplier statement.
 6. Then make it discoverable: set `srv-results` in `src/data/services.ts` to active with `targetPage: 'checkers'`, add a footer link, and add `/results-checkers` to the public page metadata.
 
 To stop sales at any time, remove `RESULTS_CHECKER_ENABLED`. Receipts keep working. Checkouts already paid when it is switched off go to review without buying anything.
@@ -73,3 +73,22 @@ Rough margin at GH₵18.00 cost, assuming Paystack's 1.95% fee: BECE GH₵23.99 
 ## Not in V1
 
 Guest purchases, Wallet payment, a second supplier or failover, Admin price management, automatic refunds, and sending PINs by SMS or email.
+
+
+## V3.1 completion and remaining activation gates (7 November 2026)
+
+The dormant implementation now preserves saved vouchers across repeated/concurrent responses, deduplicates identical PIN/serial pairs, rechecks the current paid/queued/non-review order at its atomic supplier claim, and binds private receipts to the authenticated session. Crash recovery can deliver only from readable PINs plus durable clean response/charge facts. PIN count and quoted cost alone are not delivery evidence. A missing key, malformed reply or incomplete persistence goes to review; no second purchase is submitted.
+
+Regression reproductions on original main: four backend safety cases failed (overwrite, duplicate quantity, missing-validation crash, stale dispatch); the browser logout case retained the previous PIN. Repairs are covered by synthetic APIs and a disposable PostgreSQL database; no customer PIN or paid supplier response was inspected.
+
+### Production evidence still needed
+
+- Fresh authenticated `/services`: account identity, `vouchers` scope and service permission/availability. Conflicting or missing flags require supplier clarification; PR #69 remains held.
+- Authenticated `/vouchers`: exact BECE/WASSCE identifiers and variants, `priceMinor`, numeric stock. Dashboard screenshots are not API evidence. Costs above the existing approved GH₵18.00 ceiling remain blocked; retail stays BECE GH₵23.99 / WASSCE GH₵24.99.
+- Approved installation of the existing optional RLS schema by the established workflow; verify backend role access and denied client grants. No production DDL is included in this release.
+- Dedicated encryption key configured and preserved securely, mapped product IDs and live payment/fulfilment prerequisites. Never send secrets to chat.
+- Supplier-confirmed `data.pins` entry shape, purchase identifier, charge semantics and GET lookup contract. The October 31 document does not fully specify these; synthetic fixtures prove code behavior, not the live supplier contract.
+
+The existing sanitized Render Shell procedure is attached to [PR #69](https://github.com/MysteryOrganization173/MYSTERY-HUB/pull/69#issuecomment-6711476631). Run it once in the existing backend service Shell, using only its existing environment; it sends allowlisted GETs, prints no key/customer information and never submits or reconciles orders. Return only the sanitized JSON. Do not rotate keys or redeploy for this check. The Admin commercial-readiness workspace can provide fresh permission/catalogue evidence once deployed, but cannot establish an undocumented purchase contract or authorize activation.
+
+Use `npm test -- server/suppliers/__tests__/resultsCheckers.test.ts`, the opt-in `resultsCheckersPostgres.test.ts` against an empty loopback `_test` database, and `npm run build && python scripts/reviewResultsCheckers.py`. Browser fixtures contain synthetic PINs only. `CHECKER_REVIEW_BASE_SHA` reproduces the original logout defect. Rollback is a normal code revert while the commercial flag remains off; no data migration is required or authorized.
