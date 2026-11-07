@@ -59,7 +59,7 @@ export const DIGITAL_SERVICES: DigitalService[] = [
     id: 'srv-creative',
     title: 'Creative Studio',
     category: 'Business',
-    description: 'Flyers, posters, logos, social media graphics and banners designed for you. Share a short brief, get a quote, and work starts only when you agree.',
+    description: 'Flyers, posters, logos, social media posts and banners designed for you, as fixed packages with clear prices, timing and revisions. Send an order request, or a brief for a custom project.',
     status: 'active',
     iconName: 'Palette',
     accentColor: '#FF8A4C',

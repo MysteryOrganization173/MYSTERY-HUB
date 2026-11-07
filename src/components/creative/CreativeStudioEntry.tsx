@@ -27,9 +27,9 @@ export const CreativeStudioEntry: React.FC<{ variant: 'marketplace' | 'home' }> 
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[#ff8a4c]"><Palette className="h-3.5 w-3.5" aria-hidden />Mystery Creative Studio</span>
         <strong className={`mt-1 block font-['Outfit'] font-bold leading-tight text-white ${home ? 'text-lg sm:text-2xl' : 'text-[15px] sm:text-lg'}`}>Need a flyer, logo or social media design?</strong>
-        <span className={`mt-1 block text-slate-300 ${home ? 'text-sm sm:text-base' : 'text-[13px] sm:text-sm'}`}>{home ? 'Send a short brief and the Mystery Hub team quotes for your design. Nothing is charged until you agree.' : 'Our team designs it for you. Send a brief and get a quote.'}</span>
+        <span className={`mt-1 block text-slate-300 ${home ? 'text-sm sm:text-base' : 'text-[13px] sm:text-sm'}`}>{home ? 'Fixed design packages with clear prices, timing and revisions, made by the Mystery Hub studio team.' : 'Fixed design packages, made for you by our studio team.'}</span>
       </span>
-      <span className={`flex-none items-center gap-1.5 font-semibold text-[#00c365] ${home ? 'hidden sm:inline-flex' : 'hidden md:inline-flex'} text-sm`}>Request a design<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden /></span>
+      <span className={`flex-none items-center gap-1.5 font-semibold text-[#00c365] ${home ? 'hidden sm:inline-flex' : 'hidden md:inline-flex'} text-sm`}>See packages<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden /></span>
       <ArrowRight className={`h-5 w-5 flex-none text-[#00c365] ${home ? 'sm:hidden' : 'md:hidden'}`} aria-hidden />
     </a>
   );
