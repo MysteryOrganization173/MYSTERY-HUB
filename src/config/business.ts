@@ -22,17 +22,19 @@ export const BUSINESS_CONFIG = {
   // Official Public Contact Information
   contact: {
     supportEmail: 'aryeeteyemmanuel852@gmail.com',
-    supportPhone: '0592066298',
-    supportPhoneIntl: '+233592066298',
-    phoneLink: 'tel:+233592066298',
+    supportPhone: '0594521108',
+    supportPhoneIntl: '+233594521108',
+    phoneLink: 'tel:+233594521108',
     emailLink: 'mailto:aryeeteyemmanuel852@gmail.com',
-    supportWhatsAppUrl: 'https://wa.me/233592066298',
+    supportWhatsAppUrl: 'https://wa.me/233594521108',
+    telegramChannelUrl: 'https://t.me/mysteryhubapp',
     whatsappChannelUrl: 'https://whatsapp.com/channel/0029VbBt1MGC6ZvlDJ8Biz3l',
     supportLocation: 'Accra, Ghana 🇬🇭',
     supportHours: 'Mon – Sat: 8:00 AM – 8:00 PM GMT',
   },
 
   socials: {
+    telegramChannel: 'https://t.me/mysteryhubapp',
     whatsappChannel: 'https://whatsapp.com/channel/0029VbBt1MGC6ZvlDJ8Biz3l',
     twitter: 'https://x.com/mysteryhubgh',
     instagram: 'https://instagram.com/mysteryhubgh',
@@ -90,20 +92,20 @@ export const BUSINESS_CONFIG = {
     const text = encodeURIComponent(
       `Hello Mystery Hub Support, I am inquiring about Order #${orderId} for recipient ${phone}.`
     );
-    return `https://wa.me/233592066298?text=${text}`;
+    return `https://wa.me/233594521108?text=${text}`;
   },
 
   getGeneralWhatsAppUrl: (message?: string) => {
     const defaultMsg = 'Hello Mystery Hub team, I would like to inquire about your digital services in Ghana.';
     const text = encodeURIComponent(message || defaultMsg);
-    return `https://wa.me/233592066298?text=${text}`;
+    return `https://wa.me/233594521108?text=${text}`;
   },
 
   getCheckoutSupportWhatsAppUrl: (dataAmount: string, networkName: string) => {
     const text = encodeURIComponent(
       `Hello Mystery Hub, I am currently purchasing a ${dataAmount} bundle for ${networkName} and have a quick question.`
     );
-    return `https://wa.me/233592066298?text=${text}`;
+    return `https://wa.me/233594521108?text=${text}`;
   },
 
   getMarketplaceInquiryWhatsAppUrl: (productName: string, notes?: string) => {
@@ -112,7 +114,7 @@ export const BUSINESS_CONFIG = {
         notes ? ` Notes: ${notes}` : ''
       }`
     );
-    return `https://wa.me/233592066298?text=${text}`;
+    return `https://wa.me/233594521108?text=${text}`;
   },
 
   getWhatsAppChannelUrl: () => {

@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { ROUTE_PATH_MAP } from '../../utils/routing';
 import type { ActivePage } from '../../types';
-import { ArrowUpRight, Mail, MessageCircle, Phone, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight, Mail, MessageCircle, Phone, Send, ShieldCheck } from 'lucide-react';
 
 type FooterLink = { label: string; page: ActivePage; note?: string; open?: () => void };
 
@@ -52,10 +52,15 @@ export const Footer: React.FC = () => {
 
             <section aria-labelledby="footer-channel" className="max-w-md border-l-2 border-[#00c365]/60 pl-4">
               <h2 id="footer-channel" className="font-['Outfit'] text-base font-semibold text-white">Stay connected with Mystery Hub</h2>
-              <p className="mt-1 text-sm leading-relaxed text-slate-400">Service updates, new launches and special offers on our WhatsApp Channel.</p>
-              <a href={contact.whatsappChannelUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#00c365] px-4 text-sm font-semibold text-[#02190d] hover:bg-[#19d679] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7cedb3]">
-                <MessageCircle className="h-4 w-4" aria-hidden="true" />Join our WhatsApp Channel<ArrowUpRight className="h-4 w-4" aria-hidden="true" /><span className="sr-only">(opens WhatsApp)</span>
-              </a>
+              <p className="mt-1 text-sm leading-relaxed text-slate-400">Service updates, new launches and special offers. For personal help, use WhatsApp support below.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                <a href={contact.whatsappChannelUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center justify-between gap-2 rounded-xl border border-[#00c365]/40 bg-[#00c365]/10 px-3 py-3 text-sm font-semibold text-[#7cedb3] hover:bg-[#00c365]/20 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7cedb3]">
+                  <MessageCircle className="h-5 w-5 shrink-0" aria-hidden="true" /><span>Join WhatsApp Channel</span><ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="sr-only">(opens in a new tab)</span>
+                </a>
+                <a href={contact.telegramChannelUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center justify-between gap-2 rounded-xl border border-sky-500/40 bg-sky-500/10 px-3 py-3 text-sm font-semibold text-sky-200 hover:bg-sky-500/20 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300">
+                  <Send className="h-5 w-5 shrink-0" aria-hidden="true" /><span>Join Telegram Channel</span><ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="sr-only">(opens in a new tab)</span>
+                </a>
+              </div>
             </section>
           </div>
 

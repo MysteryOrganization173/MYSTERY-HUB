@@ -205,7 +205,7 @@ test('Footer V2.1 keeps coming-soon services as text, not dead links, and uses t
   const footer = source('src/components/common/Footer.tsx');
   const coming = footer.slice(footer.indexOf('>Coming soon<'), footer.indexOf('</nav>'));
   assert.match(coming, /ECG Prepaid Bills/); assert.ok(!/<a |href=/.test(coming), 'coming-soon services are not links');
-  assert.match(footer, /Join our WhatsApp Channel/); assert.match(footer, /<BrandLogo size="md" \/>/);
+  assert.match(footer, /Join WhatsApp Channel/); assert.match(footer, /<BrandLogo size="md" \/>/);
   assert.ok(!/privacy|terms of/i.test(footer), 'no links to legal pages that do not exist');
   assert.ok(!/giveaway|friday|members/i.test(footer));
   assert.match(footer, /safe-area-inset-bottom/);
