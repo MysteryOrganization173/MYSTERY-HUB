@@ -75,11 +75,12 @@ export class SuccessBizHubClient {
       cacheTtlMs?: number;
       privateAfa?: boolean;
       privateBeneficiary?: boolean;
+      diagnostic?: boolean;
     } = {}
   ): Promise<T> {
     const method = options.method || 'GET';
-    const observed = method === 'GET' && ['/services','/catalog','/wallet','/instant-bundles'].includes(endpoint)
-      || method === 'POST' && endpoint === '/beneficiary-check';
+    const observed = !options.diagnostic && (method === 'GET' && ['/services','/catalog','/wallet','/instant-bundles'].includes(endpoint)
+      || method === 'POST' && endpoint === '/beneficiary-check');
     const identity = options.privateAfa ? `${this.getBaseUrl()}:${createHash('sha256').update(this.getApiKey()).digest('hex')}:` : '';
     const cacheKey = `${identity}${method}:${endpoint}:${options.cacheTtlMs || 0}`;
 
@@ -99,7 +100,7 @@ export class SuccessBizHubClient {
     }
 
     const url = `${this.getBaseUrl()}${endpoint}`;
-    const timeoutMs = this.getTimeoutMs();
+    const timeoutMs = options.diagnostic ? Math.min(this.getTimeoutMs(), 8000) : this.getTimeoutMs();
     const controller = new AbortController();
     const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -115,7 +116,7 @@ export class SuccessBizHubClient {
         method,
         headers,
         signal: controller.signal,
-        ...(options.privateBeneficiary?{redirect:'error' as const}:{}),
+        ...((options.privateBeneficiary || options.diagnostic)?{redirect:'error' as const}:{}),
       };
 
       if (options.body && method === 'POST') {
@@ -123,13 +124,13 @@ export class SuccessBizHubClient {
       }
 
       const res = await fetch(url, fetchOptions);
-      if (options.privateBeneficiary && controller.signal.aborted) throw new DOMException('Supplier deadline exceeded.','AbortError');
+      if ((options.privateBeneficiary || options.diagnostic) && controller.signal.aborted) throw new DOMException('Supplier deadline exceeded.','AbortError');
       receivedHeaders = true;
 
       let responseJson: unknown = null;
       // fetch resolves at headers. Keep the deadline through body consumption too.
       const text = await res.text();
-      if (options.privateBeneficiary && controller.signal.aborted) throw new DOMException('Supplier deadline exceeded.','AbortError');
+      if ((options.privateBeneficiary || options.diagnostic) && controller.signal.aborted) throw new DOMException('Supplier deadline exceeded.','AbortError');
       clearTimeout(timeoutHandle);
       try {
         responseJson = JSON.parse(text);
@@ -184,6 +185,17 @@ export class SuccessBizHubClient {
    * Determine product permissions and current availability
    * Cached for 5 minutes (300,000 ms)
    */
+  /** Admin diagnostics only: no order methods, cache reuse, redirects, retries or checkout observations. */
+  public readinessIdentity(): string {
+    return createHash('sha256').update(`${this.getBaseUrl()}:${this.getApiKey()}`).digest('hex');
+  }
+  async getReadinessResource(endpoint: '/services' | '/catalog' | '/instant-bundles' | '/vouchers'): Promise<unknown> {
+    if (!['/services', '/catalog', '/instant-bundles', '/vouchers'].includes(endpoint)) throw new Error('Unsupported readiness resource.');
+    const base = this.getBaseUrl();
+    if (base !== 'https://api.successbizhub.com/v2' && !(process.env.NODE_ENV === 'test' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/v2$/.test(base))) throw Object.assign(new Error('Supplier readiness configuration requires verification.'), { code: 'CONFIGURATION' });
+    return this.request(endpoint, { privateAfa: true, diagnostic: true, skipCache: true });
+  }
+
   async getServices(skipCache = false): Promise<SbhServicesResponse> {
     return this.request<SbhServicesResponse>('/services', {
       method: 'GET',

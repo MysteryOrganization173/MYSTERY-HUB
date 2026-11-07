@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { optionalAuth,requireAdmin } from '../middleware/authMiddleware.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
+import { CommercialReadinessService } from '../services/commercialReadinessService.js';
 import { CommercialService } from '../services/commercialService.js';
 import { FinanceError } from '../db/financeStore.js';
 import { MoneyValidationError } from '../../shared/money.js';
@@ -15,5 +16,6 @@ commercialRouter.get('/quote/:productId',optionalAuth,handle(async req=>{
 }));
 export const adminCommercialRouter=Router();
 adminCommercialRouter.use(requireAdmin);
+adminCommercialRouter.get('/readiness',createRateLimiter({windowMs:60_000,max:6}),handle(()=>CommercialReadinessService.snapshot()));
 adminCommercialRouter.get('/',handle(()=>CommercialService.admin()));
 adminCommercialRouter.post('/',createRateLimiter({windowMs:60_000,max:10}),handle(req=>CommercialService.save(req.user.id,req.body)));
