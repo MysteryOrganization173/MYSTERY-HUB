@@ -87,6 +87,21 @@ test('Creative Studio briefs in PostgreSQL: one lead per request, every field fi
       assert.equal((await fetch(`${base}/api/admin/marketplace/inquiries`)).status, 401);
     });
 
+    await t.test('a V2 package order request stores the server price snapshot once and creates no order', async () => {
+      const requestId = randomUUID();
+      const body = { ...flyer(requestId), packageId: 'standard-flyer', extras: ['express', 'print-pdf'] };
+      const first = await send(body);
+      assert.equal(first.status, 201);
+      assert.equal((await first.json()).order.totalMinor, 17900);
+      assert.equal((await send(body)).status, 200);
+      const stored = await rows(idOf(requestId));
+      assert.equal(stored.length, 1);
+      assert.equal(stored[0].product_name, 'Creative Studio · Standard flyer order');
+      assert.match(stored[0].message, /Total shown: GH₵179 \(draft price, catalogue /);
+      assert.match(stored[0].message, /Order request: no payment taken\./);
+      assert.equal(Number((await observer.query('SELECT count(*) FROM orders')).rows[0].count), 0);
+    });
+
     await t.test('a refused brief stores nothing, and no order or wallet record is created', async () => {
       const requestId = randomUUID();
       assert.equal((await send({ ...flyer(requestId), details: '<script>alert(1)</script> synthetic' })).status, 400);

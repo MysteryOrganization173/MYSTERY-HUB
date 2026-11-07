@@ -41,7 +41,7 @@ export function serviceActionLabel(service: DigitalService, availability: Servic
     'srv-airtime': 'Top up airtime',
     'srv-website': 'Build a website',
     'srv-marketplace': 'Browse marketplace',
-    'srv-creative': 'Request a design',
+    'srv-creative': 'See design packages',
     'srv-afa': availability === 'available' ? 'Register' : 'Check status',
     'srv-rewards': 'Open Mystery Earn',
     'srv-wallet': 'Open Wallet',

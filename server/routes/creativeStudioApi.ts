@@ -5,7 +5,8 @@ import { MarketplaceControlStore } from '../db/marketplaceControlStore.js';
 import { CREATIVE_INQUIRY_TYPE, CreativeBriefError, creativeLeadMessage, creativeLeadSubject, validateCreativeBrief } from '../../shared/creativeStudio.js';
 
 /**
- * Mystery Creative Studio briefs. Guests are welcome (no account is needed to ask for a quote). A brief is stored as a
+ * Mystery Creative Studio briefs and package order requests. Guests are welcome. A package request names a package and
+ * extras; the server prices it from shared/creativeCatalogue.ts and stores the snapshot. No payment is taken. Each is stored as a
  * Marketplace enquiry of type "creative_studio", so it appears in Admin → Marketplace → Enquiries with the existing
  * follow-up workflow. The client's requestId becomes the enquiry id, so a retried submission never makes a second lead.
  * Brief contents are never logged.
@@ -45,7 +46,10 @@ creativeStudioRouter.post('/enquiries', perVisitor, siteWide, async (req, res) =
       message: creativeLeadMessage(brief),
       budget: brief.budget || undefined,
     });
-    res.status(saved.duplicate ? 200 : 201).json({ success: true, reference: brief.reference, receivedAt: saved.createdAt, service: brief.service.name });
+    res.status(saved.duplicate ? 200 : 201).json({
+      success: true, reference: brief.reference, receivedAt: saved.createdAt, service: brief.price ? brief.price.package.name : brief.service.name,
+      ...(brief.price ? { order: { package: brief.price.package.id, extras: brief.price.extras.map(extra => extra.id), totalMinor: brief.price.totalMinor, pricing: brief.price.pricing, catalogueVersion: brief.price.catalogueVersion, paymentTaken: false } } : {}),
+    });
   } catch (error) {
     // Only the database error code and constraint, never the brief or the customer's details.
     const { code, constraint } = (error || {}) as { code?: string; constraint?: string };

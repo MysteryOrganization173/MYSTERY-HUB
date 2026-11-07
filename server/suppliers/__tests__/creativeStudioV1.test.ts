@@ -50,8 +50,9 @@ test('the V1 catalogue is four quoted services with service-aware questions and 
     assert.doesNotMatch(words, /GH₵|GHS|\bfree\b|unlimited|guarantee|24 ?hours|same day/i, `${s.id} makes no price or delivery promise`);
   }
   const page = readFileSync('src/components/creative/CreativeStudioPage.tsx', 'utf8') + readFileSync('src/components/creative/CreativeBriefForm.tsx', 'utf8');
+  // V2: prices come only from the shared catalogue, never typed into the page, and custom projects are still quoted.
   assert.doesNotMatch(page, /Buy now|GH₵ ?\d|unlimited revisions|within \d+ (hours|days)|testimonial|★/i);
-  assert.match(page, /quoted for your project/);
+  assert.match(page, /sends a quote before any work starts/);
   assert.match(page, /not client projects/);
 });
 
@@ -221,12 +222,13 @@ test('V1.1 portfolio: three different concept brands, honestly labelled, each le
   // Three different lead colours, so the portfolio cannot read as one company.
   assert.equal(new Set(CREATIVE_PROJECTS.map(p => p.palette[0])).size, 3);
   const page = readFileSync('src/components/creative/CreativeStudioPage.tsx', 'utf8');
-  assert.match(page, /Selected <span className="cs-serif">Studio Concepts/);
+  assert.match(page, /Studio Concepts/);
   assert.match(page, /Harmattan Table, Indigo Hour and Lonzero are fictional brands/);
   assert.match(page, /CREATIVE_OWNER_LABEL\[project\.owner\]/);
   // The page sells outcomes: no software statements, and no claim of traditional or human-only production either.
   assert.doesNotMatch(page, /\bAI\b|AI-assisted|hand-?made|hand-?drawn|no AI/i);
-  // The enquiry form still does the selling: every project and viewer leads to a quote, not a checkout.
-  assert.match(page, /chooseService\(project\.service, true\)/);
-  assert.doesNotMatch(page, /Buy now|checkout/i);
+  // V2: every project and viewer leads to a real package (an order request), and nothing on the page takes payment.
+  assert.match(page, /onOrder\(offer\.id\)/);
+  assert.match(page, /openPackage\(packageForWork\(work\)\)/);
+  assert.doesNotMatch(page, /Buy now|Pay now|paystack/i);
 });

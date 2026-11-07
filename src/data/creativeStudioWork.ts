@@ -1,7 +1,7 @@
 import type { CreativeServiceId } from '../../shared/creativeStudio';
 
 /**
- * Creative Studio portfolio. V1.1 shows three Studio Concepts: fictional brands designed by Mystery Hub to show range.
+ * Creative Studio portfolio. V2 shows three Studio Concepts: fictional brands designed by Mystery Hub to show range.
  * All images live in Cloudinary under mysteryhub/creative-studio/concepts, so a piece can be replaced by changing its
  * entry here.
  *
@@ -33,8 +33,12 @@ export interface CreativeProject {
   includes: readonly string[];
   /** Main brand colours, as swatches. */
   palette: readonly string[];
-  /** The brief this project leads to when a customer wants something similar. */
+  /** The service this project belongs to. */
   service: CreativeServiceId;
+  /** The package a customer is offered when they want something similar (shared/creativeCatalogue.ts). */
+  package: string;
+  /** A one-line story for the project switcher. */
+  hook: string;
   /** First piece is the project cover. */
   pieces: readonly CreativeWork[];
 }
@@ -44,7 +48,7 @@ const art = (version: string, id: string) => `${LIB}v${version}/mysteryhub/creat
 
 export const CREATIVE_PROJECTS: readonly CreativeProject[] = [
   {
-    id: 'harmattan-table', name: 'Harmattan Table', sector: 'Restaurant', owner: 'concept', service: 'flyers',
+    id: 'harmattan-table', name: 'Harmattan Table', sector: 'Restaurant', owner: 'concept', service: 'flyers', package: 'starter-identity', hook: 'A restaurant identity from chilli, clay and harmattan light.',
     summary: 'A warm identity for a slow-cooking Ghanaian restaurant in Osu. The mark is a low harmattan sun fading into bands of dust, and the colours come from chilli, clay pots and dry-season light.',
     includes: ['Logo', 'Colour system', 'Menu', 'Promotional flyer', 'Social ad'],
     palette: ['#B5341C', '#E3A32B', '#D9785A', '#4B5B2E', '#2A1710'],
@@ -58,7 +62,7 @@ export const CREATIVE_PROJECTS: readonly CreativeProject[] = [
     ],
   },
   {
-    id: 'indigo-hour', name: 'Indigo Hour', sector: 'Skin care', owner: 'concept', service: 'social',
+    id: 'indigo-hour', name: 'Indigo Hour', sector: 'Skin care', owner: 'concept', service: 'social', package: 'product-label', hook: 'Skin care packaging and a calm social campaign.',
     summary: 'Calm skin care made with clay, shea and hibiscus. A circle dipped once in an indigo vat became the logo, and the same dye line runs across every label and carton.',
     includes: ['Logo', 'Packaging', 'Product labels', 'Social campaign'],
     palette: ['#1F2A5A', '#C9805C', '#EFE3D2', '#7A1F3D'],
@@ -72,7 +76,7 @@ export const CREATIVE_PROJECTS: readonly CreativeProject[] = [
     ],
   },
   {
-    id: 'lonzero', name: 'Lonzero', sector: 'Technology', owner: 'concept', service: 'logo',
+    id: 'lonzero', name: 'Lonzero', sector: 'Technology', owner: 'concept', service: 'logo', package: 'logo-design', hook: 'A bold technology brand built on the prime meridian.',
     summary: 'Delivery route planning for Ghanaian businesses. The logo is a zero crossed by the prime meridian, which runs through Tema, and it became the idea behind the whole brand: every drop on one line.',
     includes: ['Logo', 'Stationery', 'Launch banner', 'Social ad', 'Website design'],
     palette: ['#2438E8', '#FFB000', '#0D1130', '#FFFFFF'],
@@ -87,7 +91,7 @@ export const CREATIVE_PROJECTS: readonly CreativeProject[] = [
   },
 ];
 
-/** The brief a kind of work leads to, so "Request something similar" on a banner opens the banner brief. */
+/** The service a kind of work belongs to (used to pick a package when a piece is not a package sample). */
 export const CREATIVE_KIND_SERVICE: Record<CreativeWorkKind, CreativeServiceId> = {
   Identity: 'logo', 'Menu & print': 'flyers', 'Social media': 'social', Packaging: 'logo', 'Banner & web': 'banners',
 };

@@ -1,10 +1,12 @@
 /**
- * Mystery Creative Studio V1: the service catalogue and the brief rules, shared by the page and the server.
+ * Mystery Creative Studio: the four services and the brief rules, shared by the page and the server.
  *
- * Creative Studio sells human-delivered design work on quote. Nothing here is a price, a turnaround or a guarantee:
- * every project is scoped and priced by the team after they read the brief. A brief becomes an ordinary Marketplace
- * enquiry (inquiry_type "creative_studio"), so Admin follows it up with the existing Lead Operations workflow.
+ * V2 sells fixed-price packages (shared/creativeCatalogue.ts). A brief is either a package order request (it names a
+ * package and extras, and the server prices it) or a custom project that the team quotes. Both become an ordinary
+ * Marketplace enquiry (inquiry_type "creative_studio"), so Admin follows them up with the existing Lead Operations
+ * workflow. No payment is taken by either path in this release.
  */
+import { CreativePriceError, creativePriceLines, priceCreativeOrder, type CreativePrice } from './creativeCatalogue.js';
 
 export type CreativeServiceId = 'flyers' | 'social' | 'logo' | 'banners';
 
@@ -110,6 +112,9 @@ export interface CreativeBriefInput {
   budget?: string;
   links?: string[];
   fields?: Record<string, string>;
+  /** A package order request: the package id and chosen extra ids. The server sets the price. Absent for a custom project. */
+  packageId?: string;
+  extras?: string[];
   /** Left empty by people. Anything here is a form-filling bot. */
   website?: string;
 }
@@ -126,6 +131,8 @@ export interface CreativeBrief {
   budget: string;
   links: string[];
   fields: { field: CreativeField; value: string }[];
+  /** Set for a package order request: the server's price snapshot. */
+  price?: CreativePrice;
 }
 
 export class CreativeBriefError extends Error {
@@ -136,7 +143,7 @@ const REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9
 const UNSAFE = /[<>\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/;
 /** Invisible characters that can disguise text in Admin (zero-width and direction overrides). Removed, never stored. */
 const INVISIBLE = /[​-‏‪-‮⁠-⁩﻿]/g;
-const KEYS = ['requestId', 'service', 'name', 'phone', 'email', 'details', 'neededBy', 'budget', 'links', 'fields', 'website'];
+const KEYS = ['requestId', 'service', 'name', 'phone', 'email', 'details', 'neededBy', 'budget', 'links', 'fields', 'packageId', 'extras', 'website'];
 
 /** Plain text only: no markup characters or control characters (new lines are allowed only where `multiline`). */
 function text(value: unknown, field: string, label: string, max: number, required = false, multiline = false): string {
@@ -221,7 +228,15 @@ function check(input: unknown, today: string): { brief?: CreativeBrief; problems
 
   const service = creativeService(v.service);
   if (!service) problems.push(new CreativeBriefError('Choose a service.', 'service'));
-  else if (Object.keys(raw).some(key => !service.fields.some(field => field.id === key))) throw new CreativeBriefError('This brief has fields we do not accept.');
+  // A package order request is priced here, from the catalogue, never from anything the page sends as an amount.
+  let price: CreativePrice | undefined;
+  if (v.packageId !== undefined || v.extras !== undefined) {
+    try { price = priceCreativeOrder(v.packageId, v.extras ?? []); }
+    catch (error) { if (error instanceof CreativePriceError) throw new CreativeBriefError(error.message, error.field); throw error; }
+    if (service && price.package.category !== service.id) throw new CreativeBriefError('This package belongs to a different service. Refresh the page and choose again.', 'package');
+    if (v.budget) throw new CreativeBriefError('A package has a set price, so a budget is not needed.', 'budget');
+  }
+  if (service && Object.keys(raw).some(key => !service.fields.some(field => field.id === key))) throw new CreativeBriefError('This brief has fields we do not accept.');
   const fields = (service?.fields || []).flatMap(field => {
     const id = `fields.${field.id}`;
     const value = attempt(() => {
@@ -265,7 +280,7 @@ function check(input: unknown, today: string): { brief?: CreativeBrief; problems
     return value;
   }, '');
   if (problems.length || !service) return { problems };
-  return { problems, brief: { requestId: v.requestId.toLowerCase(), reference: creativeReference(v.requestId), service, name, phone, email, details, neededBy, budget, links, fields } };
+  return { problems, brief: { requestId: v.requestId.toLowerCase(), reference: creativeReference(v.requestId), service, name, phone, email, details, neededBy, budget, links, fields, price } };
 }
 
 /** The plain-text summary Admin reads in the enquiry card (its message box keeps line breaks). Up to 2,000 characters. */
@@ -273,8 +288,9 @@ export function creativeLeadMessage(brief: CreativeBrief): string {
   const build = (links: string[], details: string) => {
     const omitted = brief.links.length - links.length;
     const lines = [
-      `Creative Studio brief ${brief.reference}`,
+      `Creative Studio ${brief.price ? 'order request' : 'brief'} ${brief.reference}`,
       `Service: ${brief.service.name}`,
+      ...(brief.price ? creativePriceLines(brief.price) : []),
       ...brief.fields.map(({ field, value }) => `${field.label.replace(/, if there is one$|\?$/g, '')}: ${value}`),
       brief.neededBy ? `Needed by: ${brief.neededBy}` : '',
       '',
@@ -283,19 +299,21 @@ export function creativeLeadMessage(brief: CreativeBrief): string {
       ...(brief.links.length ? ['', 'Reference links (not checked, open with care):', ...links.map(link => `- ${link}`),
         ...(omitted ? [`(${omitted} more ${omitted === 1 ? 'link' : 'links'} not shown: ask the customer)`] : [])] : []),
       '',
-      'Quote required: no price or delivery date has been promised.',
+      brief.price
+        ? 'Order request: no payment taken. Confirm the package, price and start date with the customer before any work or payment.'
+        : 'Quote required: no price or delivery date has been promised.',
     ];
     return lines.filter((line, i) => line !== '' || (i > 0 && lines[i - 1] !== '')).join('\n');
   };
   // Whole links are left out before anything is shortened, so an address is never cut into a different one,
-  // and the opening lines and the quote line always stay.
+  // and the opening lines and the closing quote or order line always stay.
   let links = [...brief.links], message = build(links, brief.details);
   while (message.length > 2000 && links.length) { links = links.slice(0, -1); message = build(links, brief.details); }
   if (message.length > 2000) message = build(links, brief.details.slice(0, Math.max(0, brief.details.length - (message.length - 2000) - 1)).trimEnd() + '…');
   return message;
 }
 
-/** The line Admin sees next to "About": the service, clearly marked as Creative Studio. */
+/** The line Admin sees next to "About": the package or service, clearly marked as Creative Studio. */
 export function creativeLeadSubject(brief: CreativeBrief): string {
-  return `Creative Studio · ${brief.service.name}`;
+  return brief.price ? `Creative Studio · ${brief.price.package.name} order` : `Creative Studio · ${brief.service.name}`;
 }
