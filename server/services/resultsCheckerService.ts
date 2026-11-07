@@ -105,12 +105,13 @@ export class ResultsCheckerService {
     if (!supplierRef) return (await OrdersStore.saveSupplierUncertainSubmission(order.id, 'Supplier voucher reply had no PINs and no reference. Do not buy again until checked.')) || order;
 
     // Only safe facts about the purchase enter the order record. PINs never do.
-    const safe = { purchaseId: result.purchaseId, pinCount: result.pins.length, malformedPins: result.malformedPins, costMinor: result.costMinor };
     // The undocumented reply may give a unit price or a total, so the cost used for margin is the cautious reading.
     const quotedTotal = quotedCostMinor * expected, reported = result.costMinor;
     const cost = reported === null ? quotedTotal : reported > quotedCostMinor && reported < quotedTotal ? reported * expected : Math.max(reported, quotedTotal);
     const chargeConfirmed = reported === quotedTotal || (expected > 1 && reported === quotedCostMinor);
-    const complete = result.pins.length === expected && result.malformedPins === 0;
+    const stored = await ResultsCheckerStore.find(order.id);
+    const complete = result.pins.length === expected && stored?.pin_count === expected && result.malformedPins === 0;
+    const safe = { purchaseId: result.purchaseId, pinCount: result.pins.length, malformedPins: result.malformedPins, costMinor: result.costMinor, validationVersion: 1, complete, chargeConfirmed };
     await OrdersStore.saveSupplierSubmission(order.id, supplierRef, cost, OFFER_REF, 'processing', safe);
     if (!complete) {
       await OrdersStore.updateOrderReview(order.id, true, `Supplier returned ${result.pins.length} of ${expected} PINs (${result.malformedPins} unreadable). Use the purchase lookup or supplier support to complete this order.`);
@@ -134,8 +135,16 @@ export class ResultsCheckerService {
   private static async settle(order: OrderRecord): Promise<OrderRecord> {
     const record = await ResultsCheckerStore.find(order.id);
     if (!record || record.pin_count !== record.qty || order.manual_review || order.status === 'delivered') return order;
-    const ref = record.supplier_purchase_id || `pins-${order.id.slice(-24)}`;
-    if (!order.supplier_order_id) await OrdersStore.saveSupplierSubmission(order.id, ref, record.quoted_cost_minor * record.qty, OFFER_REF, 'processing', { purchaseId: record.supplier_purchase_id, pinCount: record.pin_count, recovered: true });
+    try {
+      const pins = ResultsCheckerStore.pins(record);
+      if (pins.length !== record.qty || new Set(pins.map(pin => JSON.stringify([pin.pin, pin.serial || '']))).size !== record.qty) return this.review(order, 'Stored checker PINs require review before delivery. Do not buy again.');
+    } catch { return this.review(order, 'Stored checker PINs cannot be opened with the current encryption configuration. Do not buy again.'); }
+    // Count alone cannot establish a clean supplier reply or its charge after a crash.
+    let facts: Record<string, unknown> | null = null;
+    try { facts = typeof order.supplier_response === 'string' ? JSON.parse(order.supplier_response) : order.supplier_response as Record<string, unknown> | null; } catch { /* Missing evidence stays in review. */ }
+    if (facts?.validationVersion !== 1 || facts.complete !== true || facts.chargeConfirmed !== true || facts.pinCount !== record.qty || facts.malformedPins !== 0 || !order.supplier_order_id || order.supplier_cost_minor === null) {
+      return this.review(order, 'Stored checker PINs require validation of the supplier reply and charge before delivery. Do not buy again.');
+    }
     return (await OrdersStore.updateOrderStatus(order.id, 'delivered')) || order;
   }
 

@@ -49,27 +49,45 @@ export class ResultsCheckerStore {
 
   /** Exactly one caller wins, across every worker, and it can only ever be won once for an order. */
   static async claimSubmission(orderId: string): Promise<boolean> {
+    const eligible = (order: OrderRecord | null) => Boolean(order && order.service_type === 'results_checker' && order.payment_status === 'success' && order.status === 'queued' && !order.manual_review && !order.resolution_json);
     const pool = getPool();
     if (!pool) {
-      const row = memory.get(orderId);
-      if (!row || row.submission_attempted_at) return false;
+      const order = await OrdersStore.findOrder(orderId), row = memory.get(orderId);
+      if (!eligible(order) || !row || row.submission_attempted_at) return false;
       row.submission_attempted_at = new Date().toISOString(); return true;
     }
-    return ((await pool.query('UPDATE results_checker_purchases SET submission_attempted_at=NOW(),updated_at=NOW() WHERE order_id=$1 AND submission_attempted_at IS NULL', [orderId])).rowCount || 0) === 1;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // The same order row lock used by Admin/status changes makes eligibility current at the claim.
+      const order = (await client.query<OrderRecord>('SELECT * FROM orders WHERE id=$1 FOR UPDATE', [orderId])).rows[0] || null;
+      const won = eligible(order) && ((await client.query('UPDATE results_checker_purchases SET submission_attempted_at=NOW(),updated_at=NOW() WHERE order_id=$1 AND submission_attempted_at IS NULL', [orderId])).rowCount || 0) === 1;
+      await client.query('COMMIT'); return won;
+    } catch (err) { await client.query('ROLLBACK'); throw err; } finally { client.release(); }
   }
 
-  /** Stored before the order may become delivered. A repeat can add PINs but never lose or replace ones already held. */
+  /** Merge encrypted value under a row lock: later or concurrent replies cannot replace earlier PINs. */
   static async savePins(orderId: string, purchaseId: string | null, pins: readonly CheckerPin[]): Promise<void> {
-    const envelope = encryptPins(orderId, pins);
+    const merge = (row: CheckerPurchaseRecord | null): CheckerPin[] => {
+      if (!row) throw new Error('Results checker purchase not found.');
+      const merged = this.pins(row);
+      for (const pin of pins) if (!merged.some(saved => saved.pin === pin.pin && saved.serial === pin.serial)) merged.push(pin);
+      return merged;
+    };
     const pool = getPool();
     if (!pool) {
-      const row = memory.get(orderId);
-      if (!row) throw new Error('Results checker purchase not found.');
-      if (row.pin_count > pins.length) return;
-      Object.assign(row, { supplier_purchase_id: row.supplier_purchase_id || purchaseId, encrypted_pins: envelope, pin_count: pins.length, pins_stored_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+      const row = memory.get(orderId) || null, merged = merge(row);
+      Object.assign(row!, { supplier_purchase_id: row!.supplier_purchase_id || purchaseId, encrypted_pins: encryptPins(orderId, merged), pin_count: merged.length, pins_stored_at: new Date().toISOString(), updated_at: new Date().toISOString() });
       return;
     }
-    await pool.query(`UPDATE results_checker_purchases SET supplier_purchase_id=COALESCE(supplier_purchase_id,$2),encrypted_pins=$3,pin_count=$4,pins_stored_at=NOW(),updated_at=NOW() WHERE order_id=$1 AND pin_count<=$4`, [orderId, purchaseId, envelope, pins.length]);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const row = (await client.query<CheckerPurchaseRecord>('SELECT * FROM results_checker_purchases WHERE order_id=$1 FOR UPDATE', [orderId])).rows[0] || null;
+      const merged = merge(row);
+      await client.query('UPDATE results_checker_purchases SET supplier_purchase_id=COALESCE(supplier_purchase_id,$2),encrypted_pins=$3,pin_count=$4,pins_stored_at=NOW(),updated_at=NOW() WHERE order_id=$1', [orderId, purchaseId, encryptPins(orderId, merged), merged.length]);
+      await client.query('COMMIT');
+    } catch (err) { await client.query('ROLLBACK'); throw err; } finally { client.release(); }
   }
 
   static async savePurchaseId(orderId: string, purchaseId: string): Promise<void> {

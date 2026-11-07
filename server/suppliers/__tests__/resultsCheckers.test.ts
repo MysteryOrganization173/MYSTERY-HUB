@@ -346,14 +346,16 @@ test('a known purchase can be completed from the lookup route, without a new pur
   assert.equal((await fresh(other)).manual_review, true);
 });
 
-test('a crash after saving PINs recovers on refresh, and an interrupted purchase is flagged, not repeated', async () => {
+test('a crash with no durable validation goes to review, and an interrupted purchase is flagged, not repeated', async () => {
   const order = await pendingOrder();
   await OrdersStore.markOrderPaid(order.payment_reference, new Date().toISOString());
   await OrdersStore.claimOrderForSupplierDispatch(order.id);
   await ResultsCheckerStore.claimSubmission(order.id);
   await ResultsCheckerStore.savePins(order.id, 'VCH_CRASH', [{ pin: 'RECOVERED1234' }]);
   await ResultsCheckerService.refresh(await fresh(order));
-  assert.equal((await fresh(order)).status, 'delivered');
+  assert.notEqual((await fresh(order)).status, 'delivered');
+  assert.equal((await fresh(order)).manual_review, true);
+  assert.equal((await fresh(order)).supplier_cost_minor, null, 'a quote is not a confirmed charge');
   assert.equal(purchase.mock.callCount(), 0);
 
   const interrupted = await pendingOrder();
@@ -560,4 +562,98 @@ test('review: staff have one audited exit for stuck orders, and it never buys or
   // Staff cannot simply mark one delivered.
   const status = await fetch(`${base}/api/admin/orders/${stuck.public_reference}/status`, { method: 'PATCH', headers: auth('admin-token'), body: JSON.stringify({ status: 'delivered' }) });
   assert.ok(status.status >= 400 && status.status < 500, String(status.status));
+});
+
+test('readiness regression: previously saved PINs survive equal-size and longer disjoint replies', async () => {
+  const order = await pendingOrder('bece', 3);
+  await ResultsCheckerStore.savePins(order.id, 'PIN_KEEP', [{ pin: 'FIRSTPIN1234' }]);
+  await ResultsCheckerStore.savePins(order.id, 'PIN_KEEP', [{ pin: 'SECONDPIN1234' }]);
+  await ResultsCheckerStore.savePins(order.id, 'PIN_KEEP', [{ pin: 'SECONDPIN1234' }, { pin: 'THIRDPIN1234' }]);
+  const row = (await ResultsCheckerStore.find(order.id))!;
+  assert.deepEqual(ResultsCheckerStore.pins(row).map(p => p.pin).sort(), ['FIRSTPIN1234', 'SECONDPIN1234', 'THIRDPIN1234'].sort());
+  assert.equal(row.pin_count, 3);
+  await assert.rejects(ResultsCheckerStore.savePins('missing-order', null, [{ pin: 'SAFE1234' }]));
+});
+
+test('readiness regression: repeated identical vouchers cannot satisfy a multi-voucher quantity', async () => {
+  purchase.mock.mockImplementation(async () => pinsReply(2, { pins: ['DUPLICATE1234', 'DUPLICATE1234'] }));
+  const order = await pendingOrder('bece', 2); await pay(order);
+  assert.notEqual((await fresh(order)).status, 'delivered');
+  assert.equal((await fresh(order)).manual_review, true);
+  assert.equal((await ResultsCheckerStore.find(order.id))!.pin_count, 1);
+});
+
+test('readiness regression: crash before validation facts are stored never invents delivery or confirmed cost', async () => {
+  const order = await pendingOrder();
+  await OrdersStore.markOrderPaid(order.payment_reference, new Date().toISOString());
+  await OrdersStore.claimOrderForSupplierDispatch(order.id);
+  const save = mock.method(OrdersStore, 'saveSupplierSubmission', async () => { throw Error('synthetic persistence failure'); });
+  await assert.rejects(ResultsCheckerService.applyPurchase(await fresh(order), pinsReply(1, { pins: [{ pin: 'PRESERVED1234', serial: '<bad>' }] }), 1, 1800));
+  save.mock.restore();
+  await ResultsCheckerService.refresh(await fresh(order));
+  assert.notEqual((await fresh(order)).status, 'delivered');
+  assert.equal((await fresh(order)).manual_review, true);
+  assert.equal((await fresh(order)).supplier_cost_minor, null);
+  assert.equal((await ResultsCheckerStore.find(order.id))!.pin_count, 1);
+  assert.equal(purchase.mock.callCount(), 0);
+});
+
+test('readiness regression: refund review during catalogue check prevents stale dispatch', async () => {
+  const order = await pendingOrder();
+  await OrdersStore.markOrderPaid(order.payment_reference, new Date().toISOString());
+  await OrdersStore.claimOrderForSupplierDispatch(order.id);
+  const snapshot = await fresh(order);
+  vouchers.mock.mockImplementation(async () => {
+    await OrdersStore.updateOrderReview(order.id, true, 'Synthetic staff review');
+    await OrdersStore.updateOrderStatus(order.id, 'refund_pending');
+    return catalogue();
+  });
+  await ResultsCheckerService.fulfil(snapshot);
+  assert.equal(purchase.mock.callCount(), 0);
+  assert.equal((await fresh(order)).status, 'refund_pending');
+});
+
+
+test('readiness regression: a crash after durable clean validation can recover without rebuying', async () => {
+  const order = await pendingOrder();
+  await OrdersStore.markOrderPaid(order.payment_reference, new Date().toISOString());
+  await OrdersStore.claimOrderForSupplierDispatch(order.id);
+  const status = mock.method(OrdersStore, 'updateOrderStatus', async () => { throw Error('synthetic crash after evidence'); });
+  await assert.rejects(ResultsCheckerService.applyPurchase(await fresh(order), pinsReply(), 1, 1800));
+  status.mock.restore();
+  await ResultsCheckerService.refresh(await fresh(order));
+  assert.equal((await fresh(order)).status, 'delivered');
+  assert.equal((await fresh(order)).supplier_cost_minor, 1800);
+  assert.equal(purchase.mock.callCount(), 0);
+});
+
+test('readiness regression: missing or changed encryption key never overwrites held value', async () => {
+  const order = await pendingOrder();
+  await ResultsCheckerStore.savePins(order.id, 'SAFE_KEY', [{ pin: 'RETAINED1234' }]);
+  const before = (await ResultsCheckerStore.find(order.id))!;
+  for (const key of ['', 'b'.repeat(64)]) {
+    process.env.RESULTS_CHECKER_PIN_KEY = key;
+    await assert.rejects(ResultsCheckerStore.savePins(order.id, 'SAFE_KEY', [{ pin: 'NEWPIN1234' }]));
+    assert.equal((await ResultsCheckerStore.find(order.id))!.encrypted_pins, before.encrypted_pins);
+  }
+  process.env.RESULTS_CHECKER_PIN_KEY = 'a'.repeat(64);
+  assert.deepEqual(ResultsCheckerStore.pins((await ResultsCheckerStore.find(order.id))!), [{ pin: 'RETAINED1234' }]);
+});
+
+
+test('readiness regression: crash recovery requires the encrypted PINs to remain readable', async () => {
+  for (const key of ['', 'b'.repeat(64)]) {
+    process.env.RESULTS_CHECKER_PIN_KEY = 'a'.repeat(64);
+    const order = await pendingOrder();
+    await OrdersStore.markOrderPaid(order.payment_reference, new Date().toISOString());
+    await OrdersStore.claimOrderForSupplierDispatch(order.id);
+    const status = mock.method(OrdersStore, 'updateOrderStatus', async () => { throw Error('synthetic crash'); });
+    await assert.rejects(ResultsCheckerService.applyPurchase(await fresh(order), pinsReply(), 1, 1800));
+    status.mock.restore(); process.env.RESULTS_CHECKER_PIN_KEY = key;
+    await ResultsCheckerService.refresh(await fresh(order));
+    assert.notEqual((await fresh(order)).status, 'delivered');
+    assert.equal((await fresh(order)).manual_review, true);
+  }
+  process.env.RESULTS_CHECKER_PIN_KEY = 'a'.repeat(64);
+  assert.equal(purchase.mock.callCount(), 0);
 });

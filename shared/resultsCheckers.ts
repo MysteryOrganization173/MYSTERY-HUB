@@ -104,7 +104,13 @@ export function parseVoucherPurchase(response: unknown): VoucherPurchaseResult {
       if (pin && rawSerial !== undefined && rawSerial !== null && !serial) malformedPins++;
     } else { const pin = pinText(raw); if (pin) pins.push({ pin }); else malformedPins++; }
   }
-  return { purchaseId, pins, costMinor: parseMinor(data.chargeMinor ?? data.priceMinor ?? data.totalMinor), malformedPins };
+  // Repeated identical vouchers are one item of value, never proof of multiple deliveries.
+  const unique = pins.filter((pin, index) => {
+    const first = pins.findIndex(other => other.pin === pin.pin && other.serial === pin.serial);
+    if (first !== index) malformedPins++;
+    return first === index;
+  });
+  return { purchaseId, pins: unique, costMinor: parseMinor(data.chargeMinor ?? data.priceMinor ?? data.totalMinor), malformedPins };
 }
 
 export interface CheckerConfigProduct { key: CheckerProductKey; name: string; short: string; priceMinor: number; available: boolean; stock: 'in_stock' | 'low' | null }

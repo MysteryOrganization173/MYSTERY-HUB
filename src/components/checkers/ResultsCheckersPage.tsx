@@ -75,6 +75,12 @@ const ICON: Record<CheckerProductKey, string> = { bece: 'BECE', wassce: 'WASSCE'
  * Whether anything can be bought is the server's decision alone: until it says so, the page explains and sells nothing.
  */
 export const ResultsCheckersPage: React.FC = () => {
+  const { user, sessionToken } = useApp();
+  // A new authenticated session owns a new component: private receipt/form state never crosses accounts.
+  return <CheckerSession key={user && sessionToken ? `${user.id}:${sessionToken}` : 'guest'} />;
+};
+
+const CheckerSession: React.FC = () => {
   const { user, sessionToken, openAuth } = useApp();
   const [config, setConfig] = useState<CheckerConfig | null>(null);
   const [configFailed, setConfigFailed] = useState(false);
@@ -88,17 +94,22 @@ export const ResultsCheckersPage: React.FC = () => {
   const [receiptRef, setReceiptRef] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [receiptError, setReceiptError] = useState('');
-  const polls = useRef(0);
+  const polls = useRef(0), alive = useRef(true), receiptRequest = useRef(0), receiptAbort = useRef<AbortController | null>(null), submitting = useRef(false);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; receiptAbort.current?.abort(); }; }, []);
 
   useEffect(() => { let on = true; getCheckerConfig().then(c => { if (on) setConfig(c); }).catch(() => { if (on) setConfigFailed(true); }); return () => { on = false; }; }, []);
   useEffect(() => { if (user) { setEmail(e => e || user.email || ''); setPhone(p => p || user.phone || ''); } }, [user]);
 
   const loadReceipt = useCallback(async (reference: string) => {
     if (!sessionToken) return;
+    receiptAbort.current?.abort();
+    const controller = new AbortController(), request = ++receiptRequest.current;
+    receiptAbort.current = controller;
+    const current = () => alive.current && request === receiptRequest.current && !controller.signal.aborted;
     setChecking(true); setReceiptError('');
-    try { setReceipt(await getCheckerReceipt(reference, sessionToken)); }
-    catch (err) { setReceiptError(err instanceof Error ? err.message : 'We could not open this receipt just now. Please try again.'); }
-    finally { setChecking(false); }
+    try { const value = await getCheckerReceipt(reference, sessionToken, controller.signal); if (current()) setReceipt(value); }
+    catch (err) { if (current()) setReceiptError(err instanceof Error ? err.message : 'We could not open this receipt just now. Please try again.'); }
+    finally { if (current()) setChecking(false); }
   }, [sessionToken]);
 
   // Coming back from Paystack (?reference=) or from Orders (?order=). The server verifies the payment itself.
@@ -132,19 +143,22 @@ export const ResultsCheckersPage: React.FC = () => {
 
   const buy = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!product || starting) return;
+    if (!product || starting || submitting.current) return;
     if (!user || !sessionToken) { openAuth('login', 'Sign in to buy a results checker. Your PIN is kept on your account.'); return; }
     const problems: Record<string, string> = {};
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) problems.customerEmail = 'Enter a valid email for your payment receipt.';
     if (!phone.trim()) problems.phone = 'Enter your phone number, so we can help if anything goes wrong.';
     setErrors(problems);
     if (Object.keys(problems).length) return;
-    setStarting(true);
+    submitting.current = true; setStarting(true);
     try {
       const payment = await initializeCheckerPayment({ product: product.key, qty, customerEmail: email.trim(), phone: phone.trim() }, sessionToken);
+      if (!alive.current) return;
       if (!/^https:\/\/checkout\.paystack\.com\//.test(payment.authorizationUrl) && !payment.isSimulated) throw new Error('Payment could not be opened. Please try again.');
       window.location.assign(payment.authorizationUrl);
     } catch (err) {
+      if (!alive.current) return;
+      submitting.current = false;
       const e = err as Error & { field?: string };
       setErrors(e.field ? { [e.field]: e.message } : { form: e.message || 'Unable to start your purchase. Please try again.' });
       setStarting(false);
