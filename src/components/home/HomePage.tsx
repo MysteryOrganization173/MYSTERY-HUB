@@ -12,10 +12,14 @@ import { HomeComingSoonSection } from './HomeComingSoonSection';
 import { MemberHome } from './MemberHome';
 import { InstallAppPromo } from '../pwa/InstallAppPromo';
 import { CreativeStudioEntry } from '../creative/CreativeStudioEntry';
-import { Seasonal } from '../../seasonal/Seasonal';
+import { useSeason } from '../../seasonal/SeasonProvider';
+import { SeasonalHome } from '../../seasonal/Seasonal';
 
 export const HomePage: React.FC = () => {
   const { user, isAuthChecking } = useApp();
+  // Seasonal Experience: while a season is on for a signed-out visitor, the homepage is the season's own
+  // composition (lazy-loaded; the ordinary homepage is its fallback). Off, nothing here changes.
+  const season = useSeason();
 
   if (isAuthChecking) {
     return (
@@ -38,12 +42,17 @@ export const HomePage: React.FC = () => {
     );
   }
 
+  if (season.active) return <SeasonalHome fallback={<NormalGuestHome />} />;
+  return <NormalGuestHome />;
+};
+
+/** The ordinary signed-out homepage. It is also the fallback if the seasonal homepage cannot load. */
+export function NormalGuestHome() {
   return (
     <div className="home-page space-y-0">
       <Hero />
       <QuickServicesBar />
       <HomeFeaturedData />
-      <Seasonal slot="home-share" />
       {/* P0-C: install card (renders nothing where installing cannot work). Layout around it belongs to Homepage V3. */}
       <div className="home-container home-install-band empty:hidden"><InstallAppPromo /></div>
       <HomeWebsiteSection />
@@ -56,4 +65,4 @@ export const HomePage: React.FC = () => {
       </div>
     </div>
   );
-};
+}
