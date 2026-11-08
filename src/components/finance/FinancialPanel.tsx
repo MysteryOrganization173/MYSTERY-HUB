@@ -6,6 +6,7 @@ import { parseGhs,percentMinor,formatGhs } from '../../../shared/money';
 import { EarnBalanceSummary } from '../earn/EarnBalanceSummary';
 import { EarnMilestones } from '../earn/EarnMilestones';
 import type { EarnAchievement } from '../../utils/earnMilestones';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 const inputClass='w-full min-w-0 rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm text-white';
 const buttonClass='rounded-xl bg-[#00c365] px-4 py-3 text-sm font-semibold text-black disabled:opacity-50';
@@ -33,7 +34,7 @@ export const FinancialPanel:React.FC<{mode:'wallet'|'earn';earnLayout?:(parts:Ea
     return()=>{active=false;};
   },[mode,sessionToken]);
   useEffect(()=>{if(mode==='wallet'&&sessionToken&&new URLSearchParams(window.location.search).get('topup')==='1')setAction('topup');},[mode,sessionToken]);
-  if(!user||!sessionToken)return <section className="rounded-2xl border border-slate-800 bg-[#0b1116] p-5"><h1 className="text-xl font-bold text-white">Mystery {mode==='wallet'?'Wallet':'Earn'}</h1><p className="my-3 text-slate-400">Sign in to view your balances and history.</p><button className={buttonClass} onClick={()=>openAuth('login')}>Sign in</button></section>;
+  if(!user||!sessionToken)return <section className="rounded-2xl border border-slate-800 bg-[#0b1116] p-5"><Seasonal slot="page" page="wallet" /><h1 className="text-xl font-bold text-white">Mystery {mode==='wallet'?'Wallet':'Earn'}</h1><p className="my-3 text-slate-400">Sign in to view your balances and history.</p><button className={buttonClass} onClick={()=>openAuth('login')}>Sign in</button></section>;
   let minor=0;try{minor=parseGhs(amount);}catch{}
   const fee=minor&&data?percentMinor(minor,data.settings.withdrawalFeeBps):0;
   const perform=async(e:React.FormEvent)=>{

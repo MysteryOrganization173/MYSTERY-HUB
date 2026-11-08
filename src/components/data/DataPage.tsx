@@ -30,6 +30,7 @@ import {
   Check,
   AlertTriangle,
 } from 'lucide-react';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 /** Brings a section into view only when it is not already; the sticky header covers the top 5rem on phones. */
 const revealSection = (element: HTMLElement | null) => {
@@ -327,6 +328,7 @@ export const DataPage: React.FC = () => {
 
         <header className="space-y-4">
           <div>
+            <Seasonal slot="page" page="data" />
             <p className="text-xs font-semibold text-[#44df95] mb-1">Data & Airtime</p>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Stay connected.</h1>
             <p className="text-sm text-slate-400 mt-1 max-w-xl">Data, Instant Bundles and airtime for MTN, AirtelTigo and Telecel. Pay with Mobile Money and see the total before you pay.</p>

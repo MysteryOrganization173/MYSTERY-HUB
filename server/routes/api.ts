@@ -56,6 +56,7 @@ import {
 
 import { afaRouter } from './afaApi.js';
 import { creativeStudioRouter } from './creativeStudioApi.js';
+import { seasonalRouter } from './seasonalApi.js';
 import { resultsCheckerRouter } from './resultsCheckerApi.js';
 import { CREATIVE_INQUIRY_TYPE } from '../../shared/creativeStudio.js';
 import { accountRouter } from './accountApi.js';
@@ -72,6 +73,7 @@ apiRouter.use('/finance', financeRouter);
 apiRouter.use('/commercial',commercialRouter);
 apiRouter.use('/afa', afaRouter);
 apiRouter.use('/creative-studio', creativeStudioRouter);
+apiRouter.use('/seasonal', seasonalRouter);
 apiRouter.use('/results-checkers', resultsCheckerRouter);
 
 // Mount Website Builder endpoints

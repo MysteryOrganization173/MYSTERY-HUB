@@ -14,6 +14,7 @@ import { customerOrderStatus, orderDateLabel } from '../../utils/customerOrderPr
 import { OrderRecord } from '../../types';
 import { PostPurchaseInvite } from './PostPurchaseInvite';
 import { CheckCircle2, Clock, AlertTriangle, ArrowRight, MessageSquare, Copy, Check, RefreshCw, X, ShieldAlert, Phone as PhoneIcon } from 'lucide-react';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 export const OrderStatusModal: React.FC = () => {
   const {
@@ -274,6 +275,9 @@ export const OrderStatusModal: React.FC = () => {
         </div>
 
         <div className="overflow-y-auto px-4 sm:px-5 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-4 overscroll-contain">
+          {/* Seasonal celebration only when the server itself reports the order delivered; never for a payment that is
+              pending, paid, queued or processing, and never for a locally assumed state. */}
+          {activeOrder.serverStatus === 'delivered' && <Seasonal slot="celebrate" />}
           {/* Status hero */}
           <div className="flex items-start gap-3.5 pt-1">
             {activeOrder.status === 'delivered' || isDataOrder && dataView.paymentConfirmed && !activeOrder.manualReview && ['paid','queued'].includes(activeOrder.serverStatus || '') ? (

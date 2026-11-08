@@ -24,6 +24,7 @@ import {
   AlertCircle,
   ArrowLeft,
 } from 'lucide-react';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 export const WebsiteBuilderPage: React.FC = () => {
   const {
@@ -274,6 +275,7 @@ export const WebsiteBuilderPage: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center relative z-10">
               <div className="lg:col-span-7 space-y-5 text-left">
+                <Seasonal slot="page" page="website" />
                 <p className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#112019] border border-[#00c365]/30 text-xs font-semibold text-[#4ade80]">
                   <Globe className="w-3.5 h-3.5" aria-hidden="true" />
                   Website Builder · Free plan

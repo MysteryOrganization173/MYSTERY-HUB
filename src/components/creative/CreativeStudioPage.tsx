@@ -12,6 +12,7 @@ import {
 } from '../../../shared/creativeCatalogue';
 import { CREATIVE_KIND_SERVICE, CREATIVE_OWNER_LABEL, CREATIVE_PROJECTS, creativeProjectOf, creativeWorkById, type CreativeProject, type CreativeWork } from '../../data/creativeStudioWork';
 import { ArtImage, CATEGORY_MAT, CreativeSheet, type SheetState } from './CreativeSheet';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 const isPlainClick = (e: React.MouseEvent) => !(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0);
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -254,6 +255,7 @@ export const CreativeStudioPage: React.FC = () => {
           </div>
 
           <div className="cs-stage" aria-label="Studio Concept artwork">
+            <Seasonal slot="creative-stage" />
             <figure className="cs-stage-wide"><ArtImage work={HERO.wide} widths={[480, 800]} sizes="(min-width: 960px) 360px, 64vw" eager /></figure>
             <figure className="cs-stage-tall"><ArtImage work={HERO.tall} widths={[320, 560]} sizes="(min-width: 960px) 240px, 42vw" eager /></figure>
             <figure className="cs-stage-square"><ArtImage work={HERO.square} widths={[320, 480]} sizes="(min-width: 960px) 210px, 38vw" /></figure>

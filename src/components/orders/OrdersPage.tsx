@@ -16,6 +16,7 @@ import {
   orderMatchesQuery,
 } from '../../utils/customerOrderPresentation';
 import { RefreshCw, Search, X } from 'lucide-react';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 /** The account orders API returns at most this many recent orders and has no paging yet. */
 const ACCOUNT_ORDER_LIMIT = 50;
@@ -124,7 +125,8 @@ const OrdersHistory: React.FC = () => {
     <div className="py-6 sm:py-10 text-slate-100">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 space-y-4 sm:space-y-5">
         <header className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
+            <Seasonal slot="page" page="orders" />
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">My Orders</h1>
             <p className="text-sm text-slate-400 mt-1">Find a purchase or check its delivery.</p>
           </div>

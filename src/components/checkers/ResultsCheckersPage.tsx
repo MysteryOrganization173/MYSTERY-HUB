@@ -7,6 +7,7 @@ import { getCheckerConfig, getCheckerReceipt, initializeCheckerPayment } from '.
 import { verifyPaymentOnServer } from '../../services/apiClient';
 import { formatGhs } from '../../../shared/money';
 import type { CheckerConfig, CheckerConfigProduct, CheckerProductKey, CheckerReceipt } from '../../../shared/resultsCheckers';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 const SUPPORT = BUSINESS_CONFIG.contact.supportWhatsAppUrl;
 const money = (minor: number) => formatGhs(minor);
@@ -170,6 +171,7 @@ const CheckerSession: React.FC = () => {
   return (
     <div className="rc-page">
       <div className="rc-wrap">
+        <Seasonal slot="page" page="checkers" />
         <header className="rc-hero">
           <span className="rc-mark" aria-hidden="true"><GraduationCap size={26} /></span>
           <h1>WASSCE and BECE results checkers</h1>
