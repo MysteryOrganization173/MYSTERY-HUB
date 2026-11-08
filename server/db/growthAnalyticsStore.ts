@@ -7,6 +7,7 @@ const day="to_char(created_at AT TIME ZONE 'Africa/Accra','YYYY-MM-DD')";
 const paid="payment_status='success' AND paid_at IS NOT NULL AND currency='GHS' AND payment_provider IN ('paystack','wallet') AND NOT EXISTS(SELECT 1 FROM order_test_fixtures f WHERE f.order_id=o.id)";
 const refundEvidence="resolution_json->>'stage'='resolved' AND resolution_json->>'outcome' IN ('paystack_refund','wallet_refund') AND resolution_json->>'amountMinor'=amount::text AND resolution_json->>'paymentReference'=payment_reference AND pg_input_is_valid(resolution_json->>'verifiedAt','timestamptz')";
 export const GROWTH_SQL={
+ experiences:`SELECT event_name,count(*)::int observations,count(DISTINCT visitor_id)::int estimated_browsers FROM analytics_events WHERE entity_type='experience' AND created_at >= $1 AND created_at < $2 GROUP BY event_name ORDER BY event_name`,
  traffic:`WITH e AS (SELECT * FROM analytics_events WHERE event_name='growth_page_view' AND created_at >= $1 AND created_at < $2), sessions AS (SELECT visitor_id,session_id,min(created_at) first_at FROM e GROUP BY 1,2)
  SELECT (SELECT count(*)::int FROM e) views,(SELECT count(*)::int FROM sessions) sessions,(SELECT count(DISTINCT visitor_id)::int FROM e) visitors,
  (SELECT count(DISTINCT s.visitor_id)::int FROM sessions s WHERE EXISTS(SELECT 1 FROM analytics_events old WHERE old.event_name='growth_page_view' AND old.visitor_id=s.visitor_id AND old.session_id<>s.session_id AND old.created_at<s.first_at)) "returningVisitors",
@@ -85,7 +86,7 @@ export class GrowthAnalyticsStore {
   try{await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');await client.query("SET LOCAL statement_timeout='2000ms'");
    for(const [domain,sql] of Object.entries(GROWTH_SQL)){
     await client.query('SAVEPOINT analytics_domain');
-    try{const rows=(await client.query(sql,[period.start,period.end])).rows;result[domain]=domain==='campaigns'?rows:rows[0];}
+    try{const rows=(await client.query(sql,[period.start,period.end])).rows;result[domain]=['campaigns','experiences'].includes(domain)?rows:rows[0];}
     catch{await client.query('ROLLBACK TO SAVEPOINT analytics_domain');result[domain]=null;result.warnings.push(domain+' is temporarily unavailable.');}
     await client.query('RELEASE SAVEPOINT analytics_domain');
    }

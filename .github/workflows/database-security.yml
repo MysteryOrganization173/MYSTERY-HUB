@@ -39,6 +39,7 @@ jobs:
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_finance_reconciliation_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_shield_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_creative_test
+          createdb -h 127.0.0.1 -U postgres -O app_owner mystery_experiences_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_checkers_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_admin_alerts_test
       - name: Verify RLS, client denial and backend compatibility
@@ -77,3 +78,8 @@ jobs:
         env:
           MYSTERY_CHECKERS_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_checkers_test
         run: node --import tsx --test --test-force-exit server/suppliers/__tests__/resultsCheckersPostgres.test.ts
+
+      - name: Verify dormant seasonal controls and private anonymous greetings
+        env:
+          MYSTERY_EXPERIENCES_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_experiences_test
+        run: node --import tsx --test --test-force-exit server/suppliers/__tests__/mysteryExperiencesPostgres.test.ts
