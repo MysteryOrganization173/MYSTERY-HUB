@@ -24,6 +24,7 @@ import {
 import { SERVICE_PREVIEWS } from '../../data/servicePreviews';
 import { ServicePreview } from './ServicePreview';
 import { ServiceIcon, ServiceVisual, accentStyle } from './ServiceVisual';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 /** The everyday purchases and the free website lead "Available now". */
 const FEATURED = new Set(['srv-data', 'srv-airtime', 'srv-website']);
@@ -177,6 +178,7 @@ export const MoreServicesPage: React.FC = () => {
       <div className="sd-inner">
         <header className="sd-intro">
           <div className="sd-intro-copy">
+            <Seasonal slot="page" page="services" />
             <p className="sd-eyebrow">All services</p>
             <h1>Explore Mystery Hub</h1>
             <p>Find the digital services you need, all in one place.</p>

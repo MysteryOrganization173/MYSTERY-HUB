@@ -12,6 +12,7 @@ import { EarnSharing } from './EarnSharing';
 import { EarnMetrics, EarnNetwork, EarnRewardActivity, EarnRules } from './EarnDetails';
 import './earn.css';
 import type { PublicDataReferralPolicy } from '../../../shared/publicReferralPolicy';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 export interface MysteryEarnPageProps { highestActiveReferralRewardMinor?: number | null }
 
@@ -135,7 +136,7 @@ function GuestEarn() {
   ];
   return <main className="earn-page earn-guest-page" aria-label="About Mystery Earn">
     <section className="earn-guest-hero" aria-labelledby="earn-guest-title"><EarnHeroArt />
-      <div className="earn-guest-copy"><p className="earn-hero-pill"><Gift size={14} aria-hidden="true" />Mystery Earn · Free to join</p>
+      <div className="earn-guest-copy"><Seasonal slot="page" page="earn" /><p className="earn-hero-pill"><Gift size={14} aria-hidden="true" />Mystery Earn · Free to join</p>
         <h1 id="earn-guest-title">Share Mystery Hub.<br /><span>Earn real rewards.</span></h1>
         <p className="earn-hero-lede">Invite friends to useful digital services. Earn a referral reward when their purchases qualify, then withdraw it or spend it.</p>
         <div className="earn-actions"><button className="earn-primary earn-hero-cta" onClick={() => openAuth('signup')}>Create a Free Account <ArrowRight size={18} aria-hidden="true" /></button><a className="earn-secondary earn-hero-secondary" href="#earn-how">How It Works</a></div>

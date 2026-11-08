@@ -20,6 +20,8 @@ import { MarketplaceInquiryModal } from './components/marketplace/MarketplaceInq
 import { lazyPage } from './utils/lazyPage';
 import { AppLaunchLayer } from './components/pwa/AppLaunchLayer';
 import {GrowthTracker} from './components/common/GrowthTracker';
+import { SeasonProvider, seasonShellAttributes, useSeason } from './seasonal/SeasonProvider';
+import { SeasonalShellLayer } from './seasonal/Seasonal';
 
 // Home is the start URL and ships with the app. Every other page downloads when it is first opened (and is
 // warmed during idle time, see utils/lazyPage), so a phone on a slow network starts with far less JavaScript.
@@ -58,6 +60,9 @@ const AppContent: React.FC = () => {
   const { activePage, selectedTemplatePreview, isMysteryAiOpen } = useApp();
   const templatePreviewNeeded = useOnceTrue(Boolean(selectedTemplatePreview));
   const assistantNeeded = useOnceTrue(isMysteryAiOpen);
+  // Seasonal Experience: only the customer shell below carries the season. The editor, Admin and My Business
+  // return earlier and never receive it; published customer sites never reach AppContent at all.
+  const season = useSeason();
 
   // Builder V6: the website editor is an application of its own. No Mystery Hub header, footer, bottom bar or
   // assistant launcher competes with the editor's toolbar and dock; sign-in, account prompts and toasts stay.
@@ -106,8 +111,9 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="mh-app min-h-screen bg-[#0b0f12] text-slate-100 flex flex-col font-sans selection:bg-[#00c365] selection:text-black">
+    <div className="mh-app min-h-screen bg-[#0b0f12] text-slate-100 flex flex-col font-sans selection:bg-[#00c365] selection:text-black" {...seasonShellAttributes(season)}>
       <SEOHead />
+      <SeasonalShellLayer />
       {/* 3-zone Header Contract */}
       <GrowthTracker />
       <a href="#main-content" className="fixed -top-20 left-4 focus:top-3 z-[120] mh-button">Skip to content</a>
@@ -172,7 +178,9 @@ export default function App() {
 
   return (
     <AppProvider>
-      <AppContent />
+      <SeasonProvider>
+        <AppContent />
+      </SeasonProvider>
     </AppProvider>
   );
 }

@@ -3,6 +3,7 @@ import { useOverlayLock } from '../../utils/overlayStack';
 import { ShareAppButton } from '../app/ShareAppButton';
 import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { BrandLogo } from './BrandLogo';
+import { Seasonal } from '../../seasonal/Seasonal';
 import { ownerHasWebsite } from '../../hooks/useOwnerWebsites';
 import { WEBSITE_DESIGNS_PATH } from '../../utils/businessWorkspace';
 import { ActivePage } from '../../types';
@@ -132,6 +133,7 @@ export const Navbar: React.FC = () => {
 
   return (
     <header ref={headerRef} className="sticky top-0 z-40 bg-[#0a0e11]/90 backdrop-blur-md border-b border-slate-800/80">
+      <Seasonal slot="header" />
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-1 sm:gap-4">
         {/* Zone 1: Brand Wordmark */}
         <a

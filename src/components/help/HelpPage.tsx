@@ -5,12 +5,14 @@ import { HELP_CATEGORIES } from '../../data/helpFaqs';
 import { useApp } from '../../context/AppContext';
 import { FaqAccordion } from '../common/FaqAccordion';
 import '../home/homepage.css';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 export function HelpPage() {
   const { openMysteryAi } = useApp();
   return (
     <div className="help-page home-container">
       <header className="help-intro">
+        <Seasonal slot="page" page="help" />
         <p className="home-eyebrow">Help & FAQs</p>
         <h1>Useful answers.<br /><span>More confidence.</span></h1>
         <p>Find your next step, understand an order or get to know Mystery Hub.</p>

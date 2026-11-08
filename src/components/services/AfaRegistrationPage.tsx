@@ -32,6 +32,7 @@ import {
   Wifi,
   ChevronDown,
 } from 'lucide-react';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 const HIGHLIGHT_ICONS = { cug: Users, onNet: Phone, offNet: PhoneOutgoing, data: Wifi } as const;
 const highlights = afaHighlights(AFA_PACKAGES);
@@ -358,6 +359,7 @@ export const AfaRegistrationPage: React.FC = () => {
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-[1.35fr_1fr] lg:gap-8 lg:items-stretch">
           <div className="space-y-3 sm:space-y-4 min-w-0">
             <div className="space-y-1.5 sm:space-y-2">
+              <Seasonal slot="page" page="afa" />
               <p className="text-xs font-semibold text-[#44df95]">MTN AFA registration</p>
               <h1 id="afa-title" className="text-[1.6rem] leading-[1.12] sm:text-4xl font-extrabold text-white tracking-tight">Get more from your MTN line</h1>
               <p className="text-[15px] sm:text-base text-slate-300 leading-relaxed max-w-xl">{afaConfig.tagline}</p>

@@ -12,6 +12,7 @@ import { HomeComingSoonSection } from './HomeComingSoonSection';
 import { MemberHome } from './MemberHome';
 import { InstallAppPromo } from '../pwa/InstallAppPromo';
 import { CreativeStudioEntry } from '../creative/CreativeStudioEntry';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 export const HomePage: React.FC = () => {
   const { user, isAuthChecking } = useApp();
@@ -42,6 +43,7 @@ export const HomePage: React.FC = () => {
       <Hero />
       <QuickServicesBar />
       <HomeFeaturedData />
+      <Seasonal slot="home-share" />
       {/* P0-C: install card (renders nothing where installing cannot work). Layout around it belongs to Homepage V3. */}
       <div className="home-container home-install-band empty:hidden"><InstallAppPromo /></div>
       <HomeWebsiteSection />

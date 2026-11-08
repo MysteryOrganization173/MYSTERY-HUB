@@ -5,6 +5,7 @@ import { BUSINESS_CONFIG } from '../../config/business';
 import { ROUTE_PATH_MAP } from '../../utils/routing';
 import type { ActivePage } from '../../types';
 import { ArrowUpRight, Mail, MessageCircle, Phone, Send, ShieldCheck } from 'lucide-react';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 type FooterLink = { label: string; page: ActivePage; note?: string; open?: () => void };
 
@@ -40,6 +41,7 @@ export const Footer: React.FC = () => {
     <footer className="relative mt-10 sm:mt-14 border-t border-slate-800/80 bg-[#070b0e] text-slate-400 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:pb-[env(safe-area-inset-bottom,0px)] overflow-hidden">
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#00c365]/50 to-transparent" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_at_15%_0%,rgba(0,195,101,0.08),transparent_60%)]" />
+      <Seasonal slot="footer" />
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12">
         <div className="grid gap-6 lg:grid-cols-12 lg:gap-12">
           {/* Identity and community */}

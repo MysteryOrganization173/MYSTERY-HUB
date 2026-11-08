@@ -16,6 +16,7 @@ import {
   Sparkles,
   MessageSquare,
 } from 'lucide-react';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 export const AboutPage: React.FC = () => {
   const { setActivePage, openWaitlist } = useApp();
@@ -70,6 +71,7 @@ export const AboutPage: React.FC = () => {
 
           {/* Hero Foreground Content */}
           <div className="relative z-20 w-full max-w-xl lg:max-w-2xl p-10 lg:p-12 space-y-4 text-left">
+            <Seasonal slot="page" page="about" />
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#112019]/90 border border-[#00c365]/30 text-xs font-semibold text-[#00c365] backdrop-blur-sm">
               <Sparkles className="w-3.5 h-3.5" />
               <span>About Mystery Hub</span>
@@ -107,6 +109,7 @@ export const AboutPage: React.FC = () => {
         <div className="block sm:hidden rounded-3xl bg-[#070b0e] border border-slate-800/80 overflow-hidden shadow-xl p-4 space-y-3.5 text-left">
           {/* Top Crisp Text Region */}
           <div className="space-y-2">
+            <Seasonal slot="page" page="about" />
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#112019] border border-[#00c365]/30 text-[11px] font-semibold text-[#00c365]">
               <Sparkles className="w-3 h-3" />
               <span>About Mystery Hub</span>

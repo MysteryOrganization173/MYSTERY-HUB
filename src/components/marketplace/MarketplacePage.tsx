@@ -41,6 +41,7 @@ import {
   SlidersHorizontal,
   ArrowUpDown,
 } from 'lucide-react';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 type HistoryState = { page?: string; mhProduct?: string; mhScroll?: number } & Record<string, unknown>;
 const historyState = (): HistoryState => (typeof window !== 'undefined' && window.history.state && typeof window.history.state === 'object' ? window.history.state : {});
@@ -417,6 +418,7 @@ export const MarketplacePage: React.FC = () => {
 
           <div className="relative z-10 w-full px-4 pt-4 pb-4 sm:p-7 lg:p-9 space-y-3 sm:space-y-4 text-left">
             <div className="max-w-xl lg:max-w-2xl space-y-1.5 sm:space-y-3">
+              <Seasonal slot="page" page="marketplace" />
               <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#111e18]/90 border border-[#00c365]/30 text-xs font-semibold text-[#00c365] backdrop-blur-sm">
                 <Sparkles className="w-3 h-3" />
                 <span>Tech &amp; Digital Marketplace</span>

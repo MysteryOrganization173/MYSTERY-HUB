@@ -12,6 +12,7 @@ import { BrandMark } from '../common/BrandLogo';
 import { AppPhonePreview } from './AppPhonePreview';
 import { ShareAppButton } from './ShareAppButton';
 import './app-landing.css';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 const userAgent = () => (typeof navigator === 'undefined' ? '' : navigator.userAgent || '');
 
@@ -149,6 +150,7 @@ export const AppLandingPage: React.FC = () => {
       <div className="mh-applp-glow" aria-hidden="true" />
       <div className="mh-applp-container mh-applp-hero-grid">
         <div className="mh-applp-copy">
+          <Seasonal slot="page" page="app" />
           <p className="mh-applp-eyebrow"><BrandMark size="sm" ariaHidden /><span>The Mystery Hub app</span></p>
           <h1 id="app-landing-title">Everything digital.<br /><span>One trusted place.</span></h1>
           <p className="mh-applp-sub">Your everyday digital services, one tap away. Buy data and airtime, build a free business website and follow every order from your home screen.</p>

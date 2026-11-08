@@ -3,6 +3,7 @@ import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { ActivePage } from '../../types';
 import { Home, Wifi, Globe, Gift, ReceiptText } from 'lucide-react';
 import { ownerHasWebsite } from '../../hooks/useOwnerWebsites';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 /**
  * Phone tab bar (<768px): five fixed destinations with labels. The selected tab carries aria-current and a quiet
@@ -47,6 +48,7 @@ export const MobileNav: React.FC = () => {
             >
               <span className="mh-bottom-nav-indicator" aria-hidden="true">
                 <Icon className="mh-bottom-nav-icon" strokeWidth={isActive ? 2.25 : 1.85} aria-hidden />
+                {item.id === 'home' && <Seasonal slot="nav-home" />}
               </span>
               <span className="mh-bottom-nav-label">{item.label}</span>
             </a>

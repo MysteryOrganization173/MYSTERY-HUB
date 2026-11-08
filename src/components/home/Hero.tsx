@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
 import { Wifi, ArrowRight, Globe, Check } from 'lucide-react';
+import { Seasonal } from '../../seasonal/Seasonal';
 
 // Existing approved Accra artwork; keep text independent of image availability.
 const HERO_ARTWORK = 'https://res.cloudinary.com/da6oeat7m/image/upload/v1790778037/ChatGPT_Image_Sep_30_2026_02_14_20_PM_baowst.png';
@@ -33,8 +34,10 @@ export const Hero: React.FC = () => {
           />
         </picture>}
       </div>
+      <Seasonal slot="home-hero-scene" />
       <div className="home-container home-hero-content">
         <div className="home-hero-copy">
+          <Seasonal slot="home-hero-greeting" />
           <p className="home-eyebrow"><span className="home-status-dot" />Digital services for everyday life in Ghana</p>
           <h1 id="home-headline">Everything digital.<br /><span>One trusted place.</span></h1>
           <p className="home-hero-description">Buy data and airtime, build a free website for your business, and follow every order from payment to delivery.</p>
@@ -50,6 +53,7 @@ export const Hero: React.FC = () => {
             {LIVE_NOW.map(item => <li key={item}><Check className="w-3.5 h-3.5" aria-hidden="true" />{item}</li>)}
           </ul>
         </div>
+        <Seasonal slot="home-hero-card" />
         <div className="home-hero-caption" aria-hidden="true"><span>Made for everyday life.</span><span>And your next big idea.</span></div>
       </div>
     </section>
