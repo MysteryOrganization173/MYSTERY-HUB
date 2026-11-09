@@ -1,7 +1,8 @@
 import React from 'react';
 import './christmas.css';
 import type { SeasonStatus } from '../../../shared/seasonal';
-import { Bell, Celebrate, Gift, GiftTag, Ornament, Star, StringLights, Twinkle } from './art';
+import { useApp } from '../../context/AppContext';
+import { Bell, Celebrate, Gift, GiftTag, InviteBanner, Ornament, Star, StringLights, Twinkle } from './art';
 import { CONFIRMED_LINE, PAGE_LINE, isChristmasTime, type SeasonPage } from './copy';
 import { loadSeasonalSerif } from './font';
 
@@ -71,14 +72,20 @@ function Celebration({ status }: { status: SeasonStatus }) {
   );
 }
 
-/** An ornament hanging into the sign-in sheet, with a quiet greeting. */
-const AuthOrnament = ({ status }: { status: SeasonStatus }) => (
-  <div className="xmas-auth" aria-hidden="true">
-    <Ornament tone="berry" size={26} drop={18} />
-    <Ornament tone="gold" size={20} drop={34} delay={140} />
-    <span className="xmas-auth-greeting">{isChristmasTime(status) ? 'Merry Christmas' : 'Happy New Year'}</span>
-  </div>
-);
+/**
+ * The sign-up / sign-in sheet as a seasonal invitation: an illustrated header band and one quiet line above the
+ * sheet's own title. The form, its rules and its wording are the sheet's own; this is decoration only.
+ */
+function AuthInvitation({ status }: { status: SeasonStatus }) {
+  const { authMode } = useApp();
+  const christmas = isChristmasTime(status);
+  return (
+    <div className="xmas-invite" aria-hidden="true">
+      <InviteBanner newYear={!christmas} />
+      <p className="xmas-invite-line"><span lang="ak">Afehyia pa</span> · {authMode === 'signup' ? 'Your next chapter starts here' : christmas ? 'Merry Christmas, welcome back' : 'Happy New Year, welcome back'}</p>
+    </div>
+  );
+}
 
 /** Creative Studio keeps its own identity: one gold ornament and a star hang over its showroom stage. */
 const CreativeStage = () => (
@@ -94,7 +101,7 @@ export default function ChristmasPack({ slot, page, status }: ChristmasSlotProps
     case 'footer': return <FooterGreeting status={status} />;
     case 'page': return page ? <PageAccent page={page} status={status} /> : null;
     case 'celebrate': return <Celebration status={status} />;
-    case 'auth': return <AuthOrnament status={status} />;
+    case 'auth': return <AuthInvitation status={status} />;
     case 'creative-stage': return <CreativeStage />;
     default: return null;
   }

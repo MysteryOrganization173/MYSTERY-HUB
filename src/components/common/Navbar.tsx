@@ -3,7 +3,7 @@ import { useOverlayLock } from '../../utils/overlayStack';
 import { ShareAppButton } from '../app/ShareAppButton';
 import { useApp, ROUTE_PATH_MAP } from '../../context/AppContext';
 import { BrandLogo } from './BrandLogo';
-import { Seasonal } from '../../seasonal/Seasonal';
+import { Seasonal, SeasonalShell } from '../../seasonal/Seasonal';
 import { ownerHasWebsite } from '../../hooks/useOwnerWebsites';
 import { WEBSITE_DESIGNS_PATH } from '../../utils/businessWorkspace';
 import { ActivePage } from '../../types';
@@ -142,10 +142,11 @@ export const Navbar: React.FC = () => {
             e.preventDefault();
             handleNavClick('home');
           }}
-          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] rounded-lg transition-transform active:scale-95 inline-flex items-center shrink-0"
+          className="relative focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] rounded-lg transition-transform active:scale-95 inline-flex items-center shrink-0"
           aria-label="Mystery Hub Homepage"
         >
           <BrandLogo size="sm" priority="high" wordmarkClassName="max-sm:text-sm whitespace-nowrap sm:!text-lg" />
+          <SeasonalShell slot="logo-hat" />
         </a>
 
         {/* Zone 2: Navigation Links (Desktop) */}
@@ -332,13 +333,13 @@ export const Navbar: React.FC = () => {
             <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 onClick={() => openAuth('login')}
-                className="hidden sm:inline-flex px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white transition-colors cursor-pointer"
+                className="mh-login hidden sm:inline-flex px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white transition-colors cursor-pointer"
               >
                 Login
               </button>
               <button
                 onClick={() => openAuth('signup')}
-                className="min-h-11 px-2 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold text-black bg-[#00c365] hover:bg-[#00e575] rounded-xl transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] active:scale-95 whitespace-nowrap cursor-pointer"
+                className="mh-signup min-h-11 px-2 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold text-black bg-[#00c365] hover:bg-[#00e575] rounded-xl transition-all shadow-[0_0_15px_rgba(0,195,101,0.25)] active:scale-95 whitespace-nowrap cursor-pointer"
               >
                 Sign Up
               </button>
@@ -350,7 +351,7 @@ export const Navbar: React.FC = () => {
             ref={menuTrigger}
             onClick={() => {setAccountDropdownOpen(false);setMobileMenuOpen(!mobileMenuOpen);}}
             aria-expanded={mobileMenuOpen} aria-controls="mobile-menu"
-            className="xl:hidden min-w-11 min-h-11 flex items-center justify-center p-2 text-slate-400 hover:text-white rounded-lg focus:outline-none cursor-pointer"
+            className="mh-menu-trigger xl:hidden min-w-11 min-h-11 flex items-center justify-center p-2 text-slate-400 hover:text-white rounded-lg focus:outline-none cursor-pointer"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -362,6 +363,7 @@ export const Navbar: React.FC = () => {
       {mobileMenuOpen && (
         <div className="mh-mobile-menu xl:hidden">
         <div id="mobile-menu" className="mh-mobile-menu-panel bg-[#0c1116] border-b border-slate-800 px-4 pt-3 pb-5 space-y-3">
+          <SeasonalShell slot="menu-header" />
           {user && (
             <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
@@ -386,9 +388,11 @@ export const Navbar: React.FC = () => {
           )}
 
           <div className="space-y-1">
-            <button type="button" onClick={() => { setMobileMenuOpen(false); openMysteryAi(); }} className="flex items-center gap-2 min-h-11 px-3 rounded-xl text-sm text-slate-300 hover:bg-slate-900" aria-label="Open Mystery AI Assistant"><MessageCircle className="w-4 h-4" />Help · Mystery AI</button>
+            <button type="button" onClick={() => { setMobileMenuOpen(false); openMysteryAi(); }} className="mh-menu-ai flex items-center gap-2 min-h-11 px-3 rounded-xl text-sm text-slate-300 hover:bg-slate-900" aria-label="Open Mystery AI Assistant"><MessageCircle className="w-4 h-4" />Help · Mystery AI</button>
             {user && <a href="/wallet" onClick={(e) => { e.preventDefault(); handleNavClick('wallet'); }} className="flex items-center gap-2 min-h-11 px-3 rounded-xl text-sm text-slate-300 hover:bg-slate-900"><Wallet className="w-4 h-4" />Mystery Wallet</a>}
-            {navLinks.map((link) => (
+            {navLinks.map((link) => {
+              const current = activePage === link.id || (link.id === 'website' && activePage === 'business') || (link.id === 'marketplace' && activePage === 'creative');
+              return (
               <a
                 key={link.id}
                 href={ROUTE_PATH_MAP[link.id]}
@@ -396,15 +400,17 @@ export const Navbar: React.FC = () => {
                   e.preventDefault();
                   handleNavClick(link.id);
                 }}
-                className={`block w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  activePage === link.id || (link.id === 'website' && activePage === 'business') || (link.id === 'marketplace' && activePage === 'creative')
+                aria-current={current ? 'page' : undefined}
+                className={`mh-menu-link block w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                  current
                     ? 'bg-[#00c365]/10 text-[#00c365] font-semibold'
                     : 'text-slate-300 hover:bg-slate-900 hover:text-white'
                 }`}
               >
                 {link.label}
               </a>
-            ))}
+              );
+            })}
 
             <a
               href={ROUTE_PATH_MAP['earn']}
@@ -412,7 +418,8 @@ export const Navbar: React.FC = () => {
                 e.preventDefault();
                 handleNavClick('earn');
               }}
-              className={`flex items-center justify-between w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              aria-current={activePage === 'earn' ? 'page' : undefined}
+              className={`mh-menu-link flex items-center justify-between w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
                 activePage === 'earn'
                   ? 'bg-[#00c365]/10 text-[#00c365] font-semibold'
                   : 'text-slate-300 hover:bg-slate-900 hover:text-white'
@@ -428,13 +435,13 @@ export const Navbar: React.FC = () => {
           <ShareAppButton onDone={() => setMobileMenuOpen(false)} className="flex items-center gap-2 w-full min-h-11 px-3 rounded-xl text-sm text-slate-300 hover:bg-slate-900 cursor-pointer" />
 
           {!user && (
-            <div className="pt-2 border-t border-slate-800 flex gap-2">
+            <div className="mh-menu-auth pt-2 border-t border-slate-800 flex gap-2">
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
                   openAuth('login');
                 }}
-                className="flex-1 py-2 text-center text-xs font-medium text-slate-300 bg-slate-900 rounded-xl cursor-pointer"
+                className="mh-login flex-1 py-2 text-center text-xs font-medium text-slate-300 bg-slate-900 rounded-xl cursor-pointer"
               >
                 Login
               </button>
@@ -443,7 +450,7 @@ export const Navbar: React.FC = () => {
                   setMobileMenuOpen(false);
                   openAuth('signup');
                 }}
-                className="flex-1 py-2 text-center text-xs font-semibold text-black bg-[#00c365] rounded-xl cursor-pointer"
+                className="mh-signup flex-1 py-2 text-center text-xs font-semibold text-black bg-[#00c365] rounded-xl cursor-pointer"
               >
                 Sign Up
               </button>

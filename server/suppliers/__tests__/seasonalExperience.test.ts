@@ -10,6 +10,7 @@ import {
   CHRISTMAS_2026, accraDate, isLivePhase, parsePreviewDate, parseSeasonSetting, previewSeasonStatus, seasonPhase, serverSeasonStatus,
 } from '../../../shared/seasonal.js';
 import { GREETING, HERO_LINE, PAGE_LINE, SHARE_TEXT, seasonCountdown } from '../../../src/seasonal/christmas/copy.js';
+import { WELCOME_HEADLINE_CEILING, welcomeFigure } from '../../../src/seasonal/christmas/kit/welcome.js';
 
 const read = (file: string) => readFileSync(file, 'utf8');
 const at = (iso: string) => new Date(iso);
@@ -91,7 +92,13 @@ test('the season reaches only the signed-out customer shell, never Admin, the ed
   const provider = read('src/seasonal/SeasonProvider.tsx');
   assert.match(provider, /const signedOut = !user && !isAuthChecking;/);
   assert.match(provider, /active: status\.active && signedOut/);
-  assert.match(provider, /if \(!season\.active \|\| !season\.status\.pack\) return \{\};/);
+  // V3: signed-in customers get the member homepage; the shared shell follows the season for everyone (no flicker
+  // while the account loads); the guest pack attribute stays guest-only.
+  assert.match(provider, /memberActive: status\.active && signedIn/);
+  assert.match(provider, /const signedIn = Boolean\(user\) && !isAuthChecking;/);
+  assert.match(provider, /shellActive: status\.active/);
+  assert.match(provider, /if \(!season\.shellActive \|\| !season\.status\.pack\) return \{\};/);
+  assert.match(provider, /\.\.\.\(season\.active \? \{ 'data-season': 'christmas' \} : \{\}\)/);
   // Published sites, template previews, the editor and Admin never use a seasonal slot.
   const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]);
   for (const file of [...walk('src/components/admin'), ...walk('src/components/website/templates').filter(f => f.endsWith('.tsx')), 'src/components/website/PublicPublishedSite.tsx', 'src/components/website/IsolatedTemplatePreview.tsx', 'src/components/website/WebsiteEditorPage.tsx']) {
@@ -115,8 +122,9 @@ test('every Christmas style is scoped to the seasonal shell, so switching off re
     selectors.push(current.trim());
     for (const selector of selectors.filter(Boolean)) {
       assert.match(selector, /^\.mh-app\[data-season="christmas"\]/, selector);
-      // Bare element selectors could reach Website Builder template previews rendered inside the shell.
-      assert.doesNotMatch(selector, /\] (header|footer|main|section|nav|button|a|img|h[1-6])\b/, selector);
+      // Bare element selectors right under the shell could reach Website Builder template previews rendered inside
+      // it. (Elements inside a named component, such as [data-dialog-variant="auth"] h2, are scoped by that hook.)
+      assert.doesNotMatch(selector, /^\.mh-app\[data-season="christmas"\](?:\[[^\]]+\]|:has\([^)]*\))* (header|footer|main|section|nav|button|a|img|h[1-6])\b/, selector);
     }
   }
   // The pack (artwork + stylesheet) is only ever loaded lazily, so normal visitors never download it.
@@ -203,18 +211,25 @@ test('every Christmas homepage style lives in its own xh- namespace, with transf
   const selectors = selectorsOf(css);
   assert.ok(selectors.length > 150);
   for (const selector of selectors) assert.match(selector, /^\.xh-[a-z]/, `${selector} starts inside the homepage's own classes`);
-  // The xh- class names are used nowhere else, so these rules can never reach another page. The one exception is the
-  // pack's shell rule that joins the footer to this page, which only tests whether the page is present.
+  // The xh- names are used only by the seasonal homepage family (guest home, member home and their shared kit), so
+  // these rules can never reach another page. The exceptions are the shell rules that join the footer to those pages,
+  // which only test whether the page is present.
   const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]);
-  for (const file of walk('src').filter(f => /\.(tsx?|css)$/.test(f) && !f.startsWith(HOME_DIR.split('/').join(path.sep)))) {
-    assert.doesNotMatch(read(file).replace(/\.mh-app\[data-season="christmas"\]:has\(\.xh-home\) > (footer|main) \{/g, ''), /["'`\s.]xh-[a-z]/, file);
+  const family = ['home', 'kit', 'member'].map(d => `src/seasonal/christmas/${d}`.split('/').join(path.sep));
+  for (const file of walk('src').filter(f => /\.(tsx?|css)$/.test(f) && !family.some(d => f.startsWith(d)))) {
+    const text = read(file)
+      .replace(/\.mh-app\[data-season="christmas"\]:has\(\.xh-home\) > (footer|main) \{/g, '')
+      .replace(/:has\(:is\(\.xh-home, \.xm-home\)\)/g, '');
+    assert.doesNotMatch(text, /["'`\s.]xh-[a-z]/, file);
   }
   // Motion uses transform and opacity only.
   for (const [, name, body] of css.matchAll(/@keyframes ([\w-]+) \{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}/g)) {
     const props = new Set(Array.from(body.matchAll(/([a-z-]+)\s*:/g), m => m[1]));
     for (const prop of props) assert.ok(['transform', 'opacity', 'rotate', 'animation-timing-function'].includes(prop), `${name} animates ${prop}`);
   }
-  for (const [, value] of css.matchAll(/transition:\s*([^;]+);/g)) assert.match(value, /^(transform [^,]+|none !important)$/, value);
+  // Transitions move transform only (the envelope flap also swaps its stacking order in one step, at the moment it
+  // stands edge-on: a discrete z-index change, not an animated one).
+  for (const [, value] of css.matchAll(/transition:\s*([^;]+);/g)) assert.match(value, /^(transform [^,]+(, z-index 0s [\d.]+s)?|none !important)$/, value);
   // Endless loops only on large hover screens that welcome motion, and only while the hero is on screen.
   const loops = css.split('\n').filter(line => /infinite/.test(line));
   assert.ok(loops.length > 0);
@@ -222,7 +237,7 @@ test('every Christmas homepage style lives in its own xh- namespace, with transf
   for (const line of loops) { assert.ok(idle.includes(line), line); assert.match(line, /^\s*\.xh-hero\[data-xh-visible\]/, line); }
   // Reduced motion: every animation and transition stops, and no section waits for a reveal.
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\.xh-home \*, \.xh-home \*::before, \.xh-home \*::after \{ animation: none !important; transition: none !important; \}/);
-  assert.match(read(`${HOME_DIR}/ChristmasHome.tsx`), /if \(!el \|\| reduced\(\) \|\| typeof IntersectionObserver === 'undefined'\) return;/);
+  assert.match(read('src/seasonal/christmas/kit/motion.ts'), /if \(prefersReducedMotion\(\) \|\| typeof IntersectionObserver === 'undefined'\) \{ items\.forEach\(settle\); return; \}/);
   // The homepage-only shell changes: the shared light strand and footer greeting step aside, the hat is replaced.
   const pack = read('src/seasonal/christmas/christmas.css');
   assert.match(pack, /\.mh-app\[data-season="christmas"\]\[data-season-page="home"\] \.xmas-header-lights, \.mh-app\[data-season="christmas"\]\[data-season-page="home"\] \.xmas-footer \{ display: none; \}/);
@@ -232,7 +247,7 @@ test('every Christmas homepage style lives in its own xh- namespace, with transf
 test('the Christmas homepage keeps the real catalogue, prices, checkout, templates and Marketplace, and promises nothing new', () => {
   const page = read(`${HOME_DIR}/ChristmasHome.tsx`);
   // Real data and the existing actions, never copies of them.
-  for (const used of ['useDirectCatalog()', 'useWelcomeOffer(bundles)', '<CompactBundleRow key={b.id} bundle={b} directWelcomeOffer={welcomeOffer} onBuy={bundle => openCheckout(bundle)} />', 'GHANA_NETWORKS[id].brandColor', '<InstallAppPromo />', '<TemplateCardPreview template={template} onPreview={() => openTemplatePreview(template)} />', 'getPublicMarketplaceProducts({ featured: true })', "DIGITAL_SERVICES.filter(s => s.status === 'coming_soon')", '<FaqAccordion questions={HOME_FAQS} />', 'creativeWorkById']) {
+  for (const used of ['useDirectCatalog()', 'useWelcomeOffer(bundles)', '<CompactBundleRow key={b.id} bundle={b} directWelcomeOffer={welcomeOffer} onBuy={bundle => openCheckout(bundle)} />', 'GHANA_NETWORKS[id].brandColor', '<InstallAppPromo />', '<TemplateCardPreview key={selected.id} template={selected} onPreview={() => openTemplatePreview(selected)} />', 'getPublicMarketplaceProducts({ featured: true })', "DIGITAL_SERVICES.filter(s => s.status === 'coming_soon')", '<FaqAccordion questions={HOME_FAQS} />', 'creativeWorkById']) {
     assert.ok(page.includes(used), used);
   }
   // The hero keeps the brand line and both actions.
@@ -263,4 +278,93 @@ test('the Christmas homepage keeps the real catalogue, prices, checkout, templat
   assert.match(page, /Coming soon · Not available yet/);
   assert.match(page, /Studio Concepts: sample designs for fictional brands\./);
   assert.doesNotMatch(page.slice(page.indexOf('function Creative'), page.indexOf('function ComingSoon')), /GH₵|price|\d+\s?cedis/i);
+});
+
+/* ───────── V3 Stage 1: the shared seasonal shell, guest refinements, welcome figure, sign-up invitation ───────── */
+
+test('the seasonal shell (logo hat, menu, Sign Up, footer) is its own lazy chunk, scoped to data-season-shell, for every visitor', () => {
+  const seasonal = read('src/seasonal/Seasonal.tsx');
+  assert.match(seasonal, /const loadShell = retryOnce\(\(\) => import\('\.\/christmas\/shell\/ChristmasShell'\)\);/);
+  assert.match(seasonal, /if \(!season\.shellActive \|\| season\.status\.pack !== 'christmas-2026'\) return null;/);
+  assert.match(seasonal, /<Suspense fallback=\{fallback\}><ShellFooter status=\{season\.status\} \/><\/Suspense>/);
+  // The ordinary footer is untouched: the season's footer replaces it in the shell only while a pack applies.
+  assert.match(read('src/App.tsx'), /<SeasonalFooter fallback=\{<Footer \/>\} \/>/);
+  // The hat sits on the brand mark in the header link, never on a navigation icon.
+  const navbar = read('src/components/common/Navbar.tsx');
+  assert.match(navbar, /<BrandLogo size="sm"[^>]*\/>\n\s*<SeasonalShell slot="logo-hat" \/>/);
+  assert.equal((navbar.match(/slot="logo-hat"/g) || []).length, 1);
+  assert.doesNotMatch(read('src/components/common/MobileNav.tsx'), /Seasonal|\bhat\b|logo-hat|xmas/i);
+  // Menu and Sign Up keep their actions; the season adds class hooks, and the current page is announced.
+  assert.match(navbar, /className="mh-signup [^"]*"/);
+  assert.match(navbar, /onClick=\{\(\) => openAuth\('signup'\)\}/);
+  assert.match(navbar, /aria-current=\{current \? 'page' : undefined\}/);
+  // Every shell style is scoped to the shell attribute.
+  for (const selector of selectorsOf(read('src/seasonal/christmas/shell/shell.css'))) assert.match(selector, /^\.mh-app\[data-season-shell="christmas"\]/, selector);
+});
+
+test('the season’s footer keeps every real destination of the ordinary footer, addresses Ghana, and keeps staff access', () => {
+  const shell = read('src/seasonal/christmas/shell/ChristmasShell.tsx');
+  for (const page of ['data', 'afa', 'website', 'marketplace', 'creative', 'orders', 'wallet', 'earn', 'services', 'help', 'about']) assert.match(shell, new RegExp(`page: '${page}'`), page);
+  assert.match(shell, /open: \(\) => openDataPage\('airtime'\)/);
+  for (const contact of ['contact.supportWhatsAppUrl', 'contact.phoneLink', 'contact.emailLink', 'contact.whatsappChannelUrl', 'contact.telegramChannelUrl', 'contact.supportLocation']) assert.ok(shell.includes(contact), contact);
+  assert.match(shell, /Join WhatsApp Channel/);
+  assert.match(shell, /Join Telegram Channel/);
+  assert.match(shell, /setActivePage\('admin'\)[^]*Staff Portal/);
+  assert.match(shell, /customers across Ghana/);
+  assert.doesNotMatch(shell.replace(/contact\.supportLocation/g, ''), /Accra/);
+});
+
+test('the welcome figure is computed from the live offer and catalogue, never above the approved 18%, and names its bundle', () => {
+  const offer = { enabled: true, state: 'guest', discountMinor: 100 };
+  const b = (id: string, network: string, dataAmount: string, priceGhc: number, extra = {}) => ({ id, network, dataAmount, priceGhc, ...extra }) as never;
+  const catalogue = [b('mtn-1gb', 'mtn', '1GB', 5.49), b('at-1gb', 'airteltigo', '1GB', 4.99), b('mtn-2gb', 'mtn', '2GB', 9.99), b('airtime-10', 'mtn', 'GH₵10', 3, { serviceType: 'airtime' })];
+  assert.equal(WELCOME_HEADLINE_CEILING, 18);
+  // GH₵1.00 on GH₵4.99 is 20%, above the approved headline, so the headline uses the best bundle within it: MTN 1GB (18.2% → 18%).
+  assert.deepEqual(welcomeFigure(offer, catalogue, true), { percent: 18, regularMinor: 549, label: 'MTN 1GB' });
+  // Never before the server's catalogue is on screen, never for a disabled offer, and airtime never qualifies.
+  assert.equal(welcomeFigure(offer, catalogue, false), null);
+  assert.equal(welcomeFigure({ ...offer, enabled: false }, catalogue, true), null);
+  assert.equal(welcomeFigure(offer, [b('airtime-10', 'mtn', 'GH₵10', 3, { serviceType: 'airtime' })], true), null);
+  // If prices rise, the figure falls with them (GH₵1 on GH₵9.99 is 10%).
+  assert.equal(welcomeFigure(offer, [b('mtn-2gb', 'mtn', '2GB', 9.99)], true)?.percent, 10);
+  const card = read('src/seasonal/christmas/kit/WelcomeCard.tsx');
+  assert.match(card, /if \(!offer\?\.enabled \|\| !\['guest', 'eligible'\]\.includes\(offer\.state\)\) return null;/);
+  assert.match(card, /\{amount\} off one qualifying data purchase/);
+  assert.match(read(`${HOME_DIR}/ChristmasHome.tsx`), /catalogConfirmed=\{directCatalogConfirmed\(\)\}/);
+  assert.match(read('src/hooks/useDirectCatalog.ts'), /confirmed=true;/);
+});
+
+test('interaction bugs stay fixed: one owner per moving element, entrances once per visit, the envelope is a real two-state toggle', () => {
+  const page = read(`${HOME_DIR}/ChristmasHome.tsx`), css = read(`${HOME_DIR}/christmasHome.css`), kit = read('src/seasonal/christmas/kit/motion.ts');
+  // Entrances are remembered for the visit and removed once played, so Back, a press or a re-render cannot replay them.
+  assert.match(kit, /const seen = new Set<string>\(\);/);
+  assert.match(kit, /if \(seenThisVisit\(key\(item\)\)\) settle\(item\);/);
+  assert.match(css, /\.xh-gifts\[data-xh-in\]:not\(\[data-xh-done\]\) \.xh-gift \{ animation: xh-gift-in/);
+  assert.match(page, /useReveal\(root, 'guest'\)/);
+  // The envelope: a button with two states moved by transitions; the letter is clipped at the envelope's bottom edge.
+  assert.match(page, /className="xh-env" data-state=\{open \? 'open' : 'closed'\} aria-pressed=\{open\}/);
+  assert.match(css, /\.xh-env-letterbox \{[^}]*clip-path: inset\(-70% -8% 0 -8%\)/);
+  assert.match(css, /\.xh-letter \{[^}]*transition: transform/);
+  assert.doesNotMatch(css, /\.xh-letter[^{]*\{[^}]*animation:/, 'no keyframe animation competes with the letter’s transitions');
+  // Creative Studio: the arrival is on the list item, the swing on the card inside (Web Animations), never the same element.
+  assert.match(page, /<span className="xh-card" onPointerDown=\{sway\}>/);
+  assert.match(page, /swing\(e\.currentTarget/);
+  assert.doesNotMatch(css, /\.xh-line li\[data-press\]/);
+  // Website Builder: no ribbon on the frame; a real design selector.
+  assert.doesNotMatch(page + css, /xh-browser-bow|CornerBow/);
+  assert.match(page, /aria-pressed=\{t\.id === selected\?\.id\}/);
+  // Tag words always fit their tags.
+  assert.match(read(`${HOME_DIR}/heroArt.tsx`), /data-fit="128"/);
+  assert.match(read(`${HOME_DIR}/homeArt.tsx`), /data-fit="70"/);
+});
+
+test('the sign-up / sign-in sheet is restyled for the season without touching its logic', () => {
+  const modal = read('src/components/auth/AuthModal.tsx');
+  assert.match(modal, /variant="auth" decoration=\{<Seasonal slot="auth" \/>\}/);
+  // The account rules and calls are exactly the existing ones.
+  for (const logic of ["if(password.length<8){setError('Password must be at least 8 characters long.');return;}", 'registerOnServer({name:name.trim(),identifier:identifier.trim(),phone:identifier.trim(),email:email.trim()||undefined,password,rememberMe})', 'loginOnServer({identifier:identifier.trim(),password,rememberMe})', 'loginUser(result.user,result.token,rememberMe)']) assert.ok(modal.includes(logic), logic);
+  assert.match(read('src/components/auth/SecurityDialog.tsx'), /data-dialog-variant=\{variant\}/);
+  const pack = read('src/seasonal/christmas/ChristmasPack.tsx');
+  assert.match(pack, /authMode === 'signup' \? 'Your next chapter starts here'/);
+  assert.match(pack, /<div className="xmas-invite" aria-hidden="true">/);
 });

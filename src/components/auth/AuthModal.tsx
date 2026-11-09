@@ -28,7 +28,7 @@ export const AuthModal:React.FC=()=>{
     } catch(e){setExisting(signup&&(e as {status?:number}).status===409);setError(e instanceof Error?e.message:'Could not sign in. Please try again.');}
     finally{submitting.current=false;setBusy(false);}
   };
-  return <SecurityDialog title={recovery?'Account recovery':signup?'Create your account':'Sign in'} onClose={close} decoration={<Seasonal slot="auth" />}>
+  return <SecurityDialog title={recovery?'Account recovery':signup?'Create your account':'Sign in'} onClose={close} variant="auth" decoration={<Seasonal slot="auth" />}>
     {recovery?<div className="space-y-4 text-sm"><p>We can help you restore access to your Mystery Hub account.</p><p className="text-slate-300">Contact support to confirm ownership. Never send your password.</p><a className="mh-button-secondary w-full" href={BUSINESS_CONFIG.getGeneralWhatsAppUrl('Hi Mystery Hub, I need help accessing my account.')} target="_blank" rel="noopener noreferrer">Contact support on WhatsApp</a><a className="block min-h-11 text-emerald-300 underline break-all" href={BUSINESS_CONFIG.contact.emailLink}>{BUSINESS_CONFIG.contact.supportEmail}</a><button className="mh-button-secondary w-full" onClick={()=>setRecovery(false)}>Back to sign in</button></div>:<>
       <p className="text-sm text-slate-300 mb-4">{signup?'Track your orders, use Wallet and create your business website.':'Your orders, Wallet and websites, all in one place.'}</p>
       {authContextMessage&&<p className="text-sm text-emerald-300 mb-4">{authContextMessage}</p>}

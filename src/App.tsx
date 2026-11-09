@@ -21,7 +21,7 @@ import { lazyPage } from './utils/lazyPage';
 import { AppLaunchLayer } from './components/pwa/AppLaunchLayer';
 import {GrowthTracker} from './components/common/GrowthTracker';
 import { SeasonProvider, seasonShellAttributes, useSeason } from './seasonal/SeasonProvider';
-import { SeasonalShellLayer } from './seasonal/Seasonal';
+import { SeasonalFooter, SeasonalShellLayer } from './seasonal/Seasonal';
 
 // Home is the start URL and ships with the app. Every other page downloads when it is first opened (and is
 // warmed during idle time, see utils/lazyPage), so a phone on a slow network starts with far less JavaScript.
@@ -137,8 +137,8 @@ const AppContent: React.FC = () => {
         {activePage === 'app' && <AppLandingPage />}
       </main>
 
-      {/* Footer */}
-      <Footer />
+      {/* Footer (the season's own footer while a pack applies; the ordinary one otherwise) */}
+      <SeasonalFooter fallback={<Footer />} />
 
       {/* Mobile Sticky Bottom Nav (<15% viewport height cap) */}
       <MobileNav />

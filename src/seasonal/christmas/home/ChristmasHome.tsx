@@ -1,17 +1,18 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './christmasHome.css';
-import { ArrowRight, ArrowUpRight, Check, Eye, FileQuestion, Lock, MessageCircle, PackageSearch, ReceiptText, ShieldCheck, ShoppingBag, Zap } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, FileQuestion, Lock, MessageCircle, PackageSearch, ReceiptText, ShieldCheck, ShoppingBag, Zap } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../../config/business';
 import type { SeasonPhase, SeasonStatus } from '../../../../shared/seasonal';
 import { isChristmasTime, seasonCountdown } from '../copy';
 import { loadSeasonalSerif } from '../font';
 import { HeroScene } from './heroArt';
-import { AfaArt, AirtimeArt, CornerBow, DataArt, EarnArt, EnvelopeBack, EnvelopeFront, MarketArt, ParcelStack, Peg, WebArt } from './homeArt';
+import { AfaArt, AirtimeArt, Bow, DataArt, EarnArt, EnvelopeBack, EnvelopeFront, FlapInside, FlapOutside, HangingTag, MarketArt, ParcelStack, Peg, TwineBow, WebArt } from './homeArt';
+import { markSeen, prefersReducedMotion, press, pressEnd, seenThisVisit, swing, useMedia, useReveal } from '../kit/motion';
+import { WelcomeCard } from '../kit/WelcomeCard';
 // Real business logic, shared with the ordinary homepage: catalogue, offers, checkout, templates, Marketplace, FAQs.
-import { useDirectCatalog } from '../../../hooks/useDirectCatalog';
+import { directCatalogConfirmed, useDirectCatalog } from '../../../hooks/useDirectCatalog';
 import { useWelcomeOffer } from '../../../hooks/useWelcomeOffer';
-import { WelcomeOfferNotice } from '../../../components/data/WelcomeOfferNotice';
 import { CompactBundleRow } from '../../../components/data/CompactBundleRow';
 import { GHANA_NETWORKS } from '../../../data/bundles';
 import type { MarketplaceProduct, NetworkId } from '../../../types';
@@ -36,10 +37,12 @@ import { HOME_FAQS } from '../../../data/helpFaqs';
  * Shown only while a season is on (see SeasonalHome); the ordinary homepage is untouched and returns the moment the
  * season ends. Every section keeps the ordinary homepage's facts and actions (live bundles and prices, checkout,
  * template previews, Marketplace items, planned services, FAQs) and changes only how they are composed.
+ *
+ * Motion follows the kit's rules (kit/motion.ts): one owner per moving element, entrances once per visit, nothing
+ * ever left hidden.
  */
 
 const plain = (e: React.MouseEvent) => !(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0);
-const reduced = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 /** Words that change with the calendar. Greetings only: no offers, prices or promises. */
 function heroWords(phase: SeasonPhase): { kicker: string; greeting: string } {
@@ -54,39 +57,7 @@ function heroWords(phase: SeasonPhase): { kicker: string; greeting: string } {
   }
 }
 
-/**
- * Compositions settle in once as they scroll into view. Content is visible by default; only when the browser can
- * observe scrolling and motion is welcome is a section held back until it arrives, so nothing is ever left hidden.
- */
-function useReveal(root: React.RefObject<HTMLElement | null>) {
-  useLayoutEffect(() => {
-    const el = root.current;
-    if (!el || reduced() || typeof IntersectionObserver === 'undefined') return;
-    const items = Array.from(el.querySelectorAll<HTMLElement>('[data-xh-reveal]'));
-    const io = new IntersectionObserver(entries => {
-      for (const entry of entries) if (entry.isIntersecting) { entry.target.setAttribute('data-xh-in', ''); io.unobserve(entry.target); }
-    }, { threshold: 0.18, rootMargin: '0px 0px -6% 0px' });
-    for (const item of items) { item.setAttribute('data-xh-armed', ''); io.observe(item); }
-    return () => io.disconnect();
-  }, [root]);
-}
-
-/** Replays a card's or artwork's one-shot reaction on press (touch, mouse or keyboard), without delaying its action. */
-const press = (e: React.PointerEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>) => {
-  if ('key' in e && e.key !== 'Enter' && e.key !== ' ') return;
-  const el = e.currentTarget; el.removeAttribute('data-press'); void el.offsetWidth; el.setAttribute('data-press', '');
-};
-/** Clears the press once its last reaction has finished (a card can play several of different lengths). */
-const pressEnd = (e: React.AnimationEvent<HTMLElement>) => {
-  if (!e.animationName.startsWith('xh-press')) return;
-  const el = e.currentTarget;
-  const still = typeof el.getAnimations === 'function' && el.getAnimations({ subtree: true }).some(a => a.playState === 'running' && String((a as Animation & { animationName?: string }).animationName || '').startsWith('xh-press'));
-  if (!still) el.removeAttribute('data-press');
-};
-
-/* ───────────────────────── Hero ───────────────────────── */
-
-/** Marks the hero while it is on screen, so its few idle loops (desktop only, see CSS) stop once it scrolls away. */
+/** Marks an element while it is on screen, so its few idle loops (desktop only, see CSS) stop once it scrolls away. */
 function useOnScreen(ref: React.RefObject<HTMLElement | null>) {
   useEffect(() => {
     const el = ref.current;
@@ -97,15 +68,27 @@ function useOnScreen(ref: React.RefObject<HTMLElement | null>) {
   }, [ref]);
 }
 
+/* ───────────────────────── Hero ───────────────────────── */
+
 function Hero({ status }: { status: SeasonStatus }) {
   const { setActivePage } = useApp();
   const ref = useRef<HTMLElement>(null);
   useOnScreen(ref);
+  // Phones get the compact composition (smaller gift, services gathered close), so the greeting, the explanation
+  // and both actions sit in the first screen with the scene.
+  const compact = useMedia('(max-width: 599px)');
+  // The entrance plays once per visit: once it has played, coming back to the homepage shows the scene settled.
+  const [settled] = useState(() => seenThisVisit('hero') || prefersReducedMotion());
+  useEffect(() => {
+    if (settled) return;
+    const timer = window.setTimeout(() => markSeen('hero'), 2800);
+    return () => window.clearTimeout(timer);
+  }, [settled]);
   const words = heroWords(status.phase);
   const { big, small } = seasonCountdown(status);
   const go = (page: 'website' | 'data') => (e: React.MouseEvent) => { if (!plain(e)) return; e.preventDefault(); setActivePage(page); };
   return (
-    <section ref={ref} className="xh-hero" data-phase={status.phase} aria-labelledby="xh-hero-title">
+    <section ref={ref} className="xh-hero" data-phase={status.phase} data-xh-settled={settled ? '' : undefined} aria-labelledby="xh-hero-title">
       <div className="xh-hero-atmos" aria-hidden="true" />
       <div className="xh-wrap xh-hero-grid">
         <div className="xh-hero-greet">
@@ -113,7 +96,7 @@ function Hero({ status }: { status: SeasonStatus }) {
           <p className="xh-hero-greeting">{words.greeting}</p>
         </div>
         <div className="xh-hero-stage">
-          <HeroScene phase={status.phase} countBig={big} countSmall={small} />
+          <HeroScene phase={status.phase} countBig={big} countSmall={small} layout={compact ? 'compact' : 'wide'} />
           <p className="sr-only">{big} {small}.</p>
         </div>
         <div className="xh-hero-main">
@@ -135,18 +118,31 @@ function Hero({ status }: { status: SeasonStatus }) {
 /* ───────────────────────── Services, gift-wrapped ───────────────────────── */
 
 type Wrap = 'pine' | 'berry' | 'cream' | 'gold' | 'midnight' | 'kraft';
-interface GiftService { id: string; title: string; desc: string; tag: string; tone: 'live' | 'free' | 'neutral'; wrap: Wrap; bow: 'gold' | 'berry' | 'cream'; art: React.ReactNode; action: () => void }
+/** How each gift is tied. Deliberately different: a ribbon only where it reads as packaging, never as a sticker. */
+type Tie = 'satin-gold' | 'satin-ivory' | 'tag' | 'none' | 'pinstripe' | 'twine';
+interface GiftService { id: string; title: string; desc: string; tag: string; tone: 'live' | 'free' | 'neutral'; wrap: Wrap; tie: Tie; art: React.ReactNode; action: () => void }
+
+function Tied({ tie }: { tie: Tie }) {
+  switch (tie) {
+    case 'satin-gold': return <><span className="xh-band is-gold" aria-hidden="true" /><span className="xh-gift-bow" aria-hidden="true"><Bow tone="gold" /></span></>;
+    case 'satin-ivory': return <span className="xh-band is-ivory" aria-hidden="true"><span className="xh-band-knot" /></span>;
+    case 'tag': return <span className="xh-gift-hang" aria-hidden="true"><HangingTag /></span>;
+    case 'pinstripe': return <span className="xh-pinstripe" aria-hidden="true" />;
+    case 'twine': return <><span className="xh-twine" aria-hidden="true" /><span className="xh-gift-twinebow" aria-hidden="true"><TwineBow /></span></>;
+    default: return null;
+  }
+}
 
 function Services({ christmas }: { christmas: boolean }) {
   const { setActivePage, openDataPage } = useApp();
   // The same six destinations, labels and availability as the ordinary homepage (QuickServicesBar).
   const services: GiftService[] = [
-    { id: 'data', title: 'Data Bundles', desc: 'MTN, Telecel & AirtelTigo', tag: 'Available', tone: 'live', wrap: 'pine', bow: 'gold', art: <DataArt />, action: () => openDataPage('data') },
-    { id: 'airtime', title: 'Airtime Top-Up', desc: 'Top up any Ghana number', tag: 'Available', tone: 'live', wrap: 'berry', bow: 'cream', art: <AirtimeArt />, action: () => openDataPage('airtime') },
-    { id: 'website', title: 'Website Builder', desc: 'A website for your business', tag: 'Free plan', tone: 'free', wrap: 'cream', bow: 'berry', art: <WebArt />, action: () => setActivePage('website') },
-    { id: 'earn', title: 'Mystery Earn', desc: 'Refer friends & earn', tag: 'Available', tone: 'live', wrap: 'gold', bow: 'berry', art: <EarnArt />, action: () => setActivePage('earn') },
-    { id: 'afa', title: 'AFA Registration', desc: 'MTN AFA bundles', tag: 'Check Status', tone: 'neutral', wrap: 'midnight', bow: 'gold', art: <AfaArt />, action: () => setActivePage('afa') },
-    { id: 'marketplace', title: 'Marketplace', desc: 'Tech, by enquiry', tag: 'Enquiry', tone: 'neutral', wrap: 'kraft', bow: 'cream', art: <MarketArt />, action: () => setActivePage('marketplace') },
+    { id: 'data', title: 'Data Bundles', desc: 'MTN, Telecel & AirtelTigo', tag: 'Available', tone: 'live', wrap: 'pine', tie: 'satin-gold', art: <DataArt />, action: () => openDataPage('data') },
+    { id: 'airtime', title: 'Airtime Top-Up', desc: 'Top up any Ghana number', tag: 'Available', tone: 'live', wrap: 'berry', tie: 'satin-ivory', art: <AirtimeArt />, action: () => openDataPage('airtime') },
+    { id: 'website', title: 'Website Builder', desc: 'A website for your business', tag: 'Free plan', tone: 'free', wrap: 'cream', tie: 'tag', art: <WebArt />, action: () => setActivePage('website') },
+    { id: 'earn', title: 'Mystery Earn', desc: 'Refer friends & earn', tag: 'Available', tone: 'live', wrap: 'gold', tie: 'none', art: <EarnArt />, action: () => setActivePage('earn') },
+    { id: 'afa', title: 'AFA Registration', desc: 'MTN AFA bundles', tag: 'Check Status', tone: 'neutral', wrap: 'midnight', tie: 'pinstripe', art: <AfaArt />, action: () => setActivePage('afa') },
+    { id: 'marketplace', title: 'Marketplace', desc: 'Tech, by enquiry', tag: 'Enquiry', tone: 'neutral', wrap: 'kraft', tie: 'twine', art: <MarketArt />, action: () => setActivePage('marketplace') },
   ];
   return (
     <section className="xh-sec xh-services" aria-labelledby="xh-services-title">
@@ -158,11 +154,12 @@ function Services({ christmas }: { christmas: boolean }) {
           </div>
           <button type="button" onClick={() => setActivePage('services')} className="xh-link">All Services<ArrowRight className="w-4 h-4" aria-hidden /></button>
         </div>
-        <ul className="xh-gifts" data-xh-reveal>
+        <ul className="xh-gifts" data-xh-reveal="gifts">
           {services.map((s, i) => (
             <li key={s.id} style={{ '--i': i } as React.CSSProperties}>
-              <button type="button" className={`xh-gift xh-wrap-${s.wrap} xh-gift-${s.id}`} onClick={s.action} onPointerDown={press} onKeyDown={press} onAnimationEnd={pressEnd}>
-                <span className="xh-gift-ribbon" aria-hidden="true"><CornerBow tone={s.bow} /></span>
+              <button type="button" className={`xh-gift xh-wrap-${s.wrap} xh-gift-${s.id} xh-tie-${s.tie}`} onClick={s.action} onPointerDown={press} onKeyDown={press} onAnimationEnd={pressEnd}>
+                <span className="xh-gift-paper" aria-hidden="true" />
+                <Tied tie={s.tie} />
                 <span className="xh-gift-art" aria-hidden="true">{s.art}</span>
                 <span className="xh-gift-text">
                   <span className="xh-gift-title">{s.title}</span>
@@ -178,7 +175,7 @@ function Services({ christmas }: { christmas: boolean }) {
   );
 }
 
-/* ───────────────────────── Featured data: the velvet tray and the paper receipt ───────────────────────── */
+/* ───────────────────────── Featured data: the velvet tray, the welcome invitation and the receipt ───────────────────────── */
 
 const NETWORKS: { id: NetworkId; label: string }[] = [{ id: 'mtn', label: 'MTN' }, { id: 'airteltigo', label: 'AirtelTigo' }, { id: 'telecel', label: 'Telecel' }];
 // The same buying facts as the ordinary homepage: no delivery promise, timing depends on the network.
@@ -191,7 +188,7 @@ const STEPS = [
 function FeaturedData() {
   const bundles = useDirectCatalog();
   const welcomeOffer = useWelcomeOffer(bundles);
-  const { openCheckout, openDataPage, setActivePage } = useApp();
+  const { openCheckout, openDataPage, setActivePage, openAuth } = useApp();
   const [network, setNetwork] = useState<NetworkId>('mtn');
   const [instantAvailable, setInstantAvailable] = useState(false);
   useEffect(() => {
@@ -212,6 +209,9 @@ function FeaturedData() {
           </div>
         </div>
         <div className="xh-data-layout">
+          <div className="xh-data-welcome">
+            <WelcomeCard offer={welcomeOffer} bundles={bundles} catalogConfirmed={directCatalogConfirmed()} onCreateAccount={() => openAuth('signup')} headingId="xh-welcome-title" />
+          </div>
           <div className="xh-tray">
             <div className="xh-net" role="group" aria-label="Choose network" style={{ '--xh-i': index, '--net': GHANA_NETWORKS[network].brandColor } as React.CSSProperties}>
               <span className="xh-net-ribbon" aria-hidden="true" />
@@ -221,7 +221,6 @@ function FeaturedData() {
                 </button>
               ))}
             </div>
-            <div className="xh-offer"><WelcomeOfferNotice offer={welcomeOffer} /></div>
             <div className="xh-bundles" key={network}>
               {popular.map(b => <CompactBundleRow key={b.id} bundle={b} directWelcomeOffer={welcomeOffer} onBuy={bundle => openCheckout(bundle)} />)}
               {popular.length === 0 && <p className="xh-empty" role="status">No popular bundles to show for this network. Browse all bundles to check availability.</p>}
@@ -253,10 +252,32 @@ function FeaturedData() {
  * Mystery Greetings is being built separately (creation, links and the recipient screen). Until it is live this
  * section only previews it and offers no button that pretends to create one. `createHref` is the integration point:
  * pass the real creator route once it exists and the call to action appears.
+ *
+ * The sample envelope is a real toggle with two states, closed and open. It opens by itself once, the first time it
+ * comes into view this visit; after that a tap (or Enter/Space) opens or closes it. CSS transitions carry it between
+ * the states, so a quick second tap reverses the movement from where it is instead of restarting it, and the letter
+ * is clipped at the envelope's bottom edge, so it can never appear below it.
  */
 function Greetings({ christmas, createHref }: { christmas: boolean; createHref?: string }) {
   const shareText = `${christmas ? 'Merry Christmas!' : 'Happy New Year!'} I use Mystery Hub for data, airtime and more. Have a look:`;
   const share = `https://wa.me/?text=${encodeURIComponent(`${shareText} https://${BUSINESS_CONFIG.domain}/`)}`;
+  const envelope = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(() => seenThisVisit('envelope') || prefersReducedMotion());
+  const autoOpened = useRef(open);
+  useEffect(() => {
+    const el = envelope.current;
+    if (autoOpened.current || !el) return;
+    if (typeof IntersectionObserver === 'undefined') { autoOpened.current = true; setOpen(true); return; }
+    let timer = 0;
+    const io = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      io.disconnect(); autoOpened.current = true;
+      timer = window.setTimeout(() => { setOpen(true); markSeen('envelope'); }, 450);
+    }, { threshold: 0.5 });
+    io.observe(el);
+    return () => { io.disconnect(); window.clearTimeout(timer); };
+  }, []);
+  const toggle = () => { autoOpened.current = true; markSeen('envelope'); setOpen(value => !value); };
   return (
     <section className="xh-sec xh-greet" aria-labelledby="xh-greet-title">
       <div className="xh-wrap xh-greet-grid">
@@ -270,15 +291,22 @@ function Greetings({ christmas, createHref }: { christmas: boolean; createHref?:
             <a className="xh-link" href={share} target="_blank" rel="noopener noreferrer"><MessageCircle className="w-4 h-4" aria-hidden />Share the Mystery Hub website on WhatsApp<span className="sr-only"> (opens WhatsApp)</span></a>
           </div>
         </div>
-        <div className="xh-env" data-xh-reveal onPointerDown={press} onAnimationEnd={pressEnd} aria-hidden="true">
-          <EnvelopeBack />
-          <div className="xh-letter">
-            <p className="xh-letter-to">Dear Ama,</p>
-            <p className="xh-letter-body">{christmas ? 'Merry Christmas! Wishing you joy, rest and good company this season.' : 'Happy New Year! Wishing you joy and good things all year.'}</p>
-            <p className="xh-letter-from">— Kojo</p>
-            <p className="xh-letter-sample">Sample greeting</p>
-          </div>
-          <EnvelopeFront />
+        <div className="xh-env-wrap">
+          <button ref={envelope} type="button" className="xh-env" data-state={open ? 'open' : 'closed'} aria-pressed={open} onClick={toggle}
+            aria-label={open ? 'Sample greeting card: tuck it back into the envelope' : 'Sample greeting card: open the envelope'}>
+            <EnvelopeBack />
+            <span className="xh-env-letterbox" aria-hidden="true">
+              <span className="xh-letter">
+                <span className="xh-letter-sample">Sample greeting</span>
+                <span className="xh-letter-to">Dear Ama,</span>
+                <span className="xh-letter-body">{christmas ? 'Merry Christmas! Wishing you joy, rest and good company this season.' : 'Happy New Year! Wishing you joy and good things all year.'}</span>
+                <span className="xh-letter-from">— Kojo</span>
+              </span>
+            </span>
+            <EnvelopeFront />
+            <span className="xh-env-flap" aria-hidden="true"><FlapOutside /><FlapInside /></span>
+          </button>
+          <p className="xh-env-hint" aria-hidden="true">{open ? 'Tap to tuck it back in' : 'Tap to open'}</p>
         </div>
       </div>
     </section>
@@ -292,15 +320,17 @@ function Install({ status }: { status: SeasonStatus }) {
   const christmas = isChristmasTime(status);
   return (
     <section className="xh-install" aria-label="Mystery Hub app">
-      <div className="xh-wrap xh-install-grid">
-        <div className="xh-phone" aria-hidden="true">
-          <div className="xh-phone-screen">
-            <p className="xh-phone-time">{day}</p>
-            <p className="xh-phone-greet">{christmas ? 'Merry Christmas' : 'Happy New Year'}</p>
-            <div className="xh-phone-apps">{Array.from({ length: 7 }, (_, i) => <i key={i} />)}<b><BrandMark size="sm" ariaHidden /></b></div>
+      <div className="xh-wrap">
+        <div className="xh-install-card">
+          <div className="xh-phone" aria-hidden="true">
+            <div className="xh-phone-screen">
+              <p className="xh-phone-time">{day}</p>
+              <p className="xh-phone-greet">{christmas ? 'Merry Christmas' : 'Happy New Year'}</p>
+              <div className="xh-phone-apps">{Array.from({ length: 5 }, (_, i) => <i key={i} />)}<b><BrandMark size="sm" ariaHidden /></b></div>
+            </div>
           </div>
+          <div className="xh-install-body"><InstallAppPromo /></div>
         </div>
-        <div className="xh-install-card"><InstallAppPromo /></div>
       </div>
     </section>
   );
@@ -312,8 +342,11 @@ function Website() {
   const { setActivePage, openTemplatePreview } = useApp();
   // Real templates and the real renderer, never a fabricated screenshot.
   const designs = orderedWebsiteTemplates().filter(isReadyDesign);
-  const template = designs.find(t => t.id === 'tmpl-data-reseller') || designs[0];
-  const more = designs.filter(t => t.id !== template?.id).slice(0, 4);
+  const first = designs.find(t => t.id === 'tmpl-data-reseller') || designs[0];
+  const choices = first ? [first, ...designs.filter(t => t.id !== first.id).slice(0, 4)] : [];
+  const [selectedId, setSelectedId] = useState(first?.id);
+  const selected = choices.find(t => t.id === selectedId) || first;
+  const name = (t: typeof first) => t ? (t.demoBusinessName || t.title) : '';
   return (
     <section className="xh-sec xh-web" aria-labelledby="xh-web-title">
       <div className="xh-wrap xh-web-grid">
@@ -326,19 +359,22 @@ function Website() {
             <a href="/website-builder" onClick={e => { if (!plain(e)) return; e.preventDefault(); setActivePage('website'); }} className="mh-button xh-btn-primary">Browse Templates<ArrowRight className="w-4 h-4" aria-hidden /></a>
             <p className="xh-note"><Check className="w-4 h-4" aria-hidden />Works on phones, tablets and desktop</p>
           </div>
-          {more.length > 0 && (
+          {choices.length > 1 && (
             <div className="xh-chips">
-              <p>Preview a design</p>
-              <ul>{more.map(t => <li key={t.id}><button type="button" onClick={() => openTemplatePreview(t)} aria-label={`Preview ${t.demoBusinessName || t.title} design`}><Eye className="w-3.5 h-3.5" aria-hidden />{t.demoBusinessName || t.title}</button></li>)}</ul>
+              <p id="xh-chips-title">Try a design here</p>
+              <ul aria-labelledby="xh-chips-title">{choices.map(t => (
+                <li key={t.id}><button type="button" aria-pressed={t.id === selected?.id} onClick={() => setSelectedId(t.id)}>{t.id === selected?.id && <Check className="w-3.5 h-3.5" aria-hidden />}{name(t)}</button></li>
+              ))}</ul>
             </div>
           )}
         </div>
-        <div className="xh-browser" data-xh-reveal>
-          <div className="xh-browser-bar" aria-hidden="true"><i /><i /><i /><span>Design preview</span></div>
-          <div className="xh-browser-body">{template && <TemplateCardPreview template={template} onPreview={() => openTemplatePreview(template)} />}</div>
-          <span className="xh-browser-bow" aria-hidden="true"><CornerBow tone="berry" /></span>
-          <p className="xh-browser-note">Sample design and content. Your website uses your own business details.</p>
-        </div>
+        {selected && (
+          <div className="xh-browser" data-xh-reveal="browser">
+            <div className="xh-browser-bar" aria-hidden="true"><i /><i /><i /><span className="xh-browser-url"><Lock className="w-3 h-3" />Design preview · {name(selected)}</span></div>
+            <div className="xh-browser-body"><TemplateCardPreview key={selected.id} template={selected} onPreview={() => openTemplatePreview(selected)} /></div>
+            <p className="xh-browser-note">Sample design and content. Your website uses your own business details.</p>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -369,14 +405,12 @@ function Marketplace({ christmas }: { christmas: boolean }) {
   return (
     <section className="xh-sec xh-market" aria-labelledby="xh-market-title">
       <div className="xh-wrap">
-        <div className="xh-market-grid">
-          <div className="xh-market-art" data-xh-reveal onPointerDown={press} onAnimationEnd={pressEnd} aria-hidden="true"><ParcelStack label={christmas ? 'Merry Christmas' : 'Happy New Year'} /></div>
-          <div className="xh-market-copy">
-            <p className="xh-kicker">Tech & digital Marketplace</p>
-            <h2 id="xh-market-title">Find your next <em>work companion.</em></h2>
-            <p>Browse technology and digital tools. Buy online where an item says so, or send an enquiry to confirm price, availability and delivery.</p>
-            <a href="/marketplace" onClick={e => { if (!plain(e)) return; e.preventDefault(); setActivePage('marketplace'); }} className="mh-button-secondary xh-btn-quiet">Browse Marketplace<ArrowRight className="w-4 h-4" aria-hidden /></a>
-          </div>
+        <div className="xh-market-head">
+          <p className="xh-kicker">Tech & digital Marketplace</p>
+          <h2 id="xh-market-title">Find your next <em>work companion.</em></h2>
+          <div className="xh-market-art" data-xh-reveal="parcels" onPointerDown={press} onAnimationEnd={pressEnd} aria-hidden="true"><ParcelStack label={christmas ? 'Merry Christmas' : 'Happy New Year'} /></div>
+          <p className="xh-market-text">Browse technology and digital tools. Buy online where an item says so, or send an enquiry to confirm price, availability and delivery.</p>
+          <a href="/marketplace" onClick={e => { if (!plain(e)) return; e.preventDefault(); setActivePage('marketplace'); }} className="mh-button-secondary xh-btn-quiet xh-market-cta">Browse Marketplace<ArrowRight className="w-4 h-4" aria-hidden /></a>
         </div>
         {shortcuts.length > 0 && (
           <ul className="xh-tags" aria-label="Marketplace categories">
@@ -405,6 +439,9 @@ const STUDIO_CARDS = ['ht-flyer', 'ih-social-a', 'lz-social'].map(creativeWorkBy
 
 function Creative({ christmas }: { christmas: boolean }) {
   const { setActivePage } = useApp();
+  // The hanging design swings on its peg; its arrival is on the list item, the swing on the card inside, so a tap can
+  // never restart the arrival (which is what made a pressed design vanish and reappear).
+  const sway = (e: React.PointerEvent<HTMLElement>) => swing(e.currentTarget, 6.5, 1300);
   return (
     <section className="xh-sec xh-creative" aria-labelledby="xh-creative-title">
       <div className="xh-wrap xh-creative-grid">
@@ -414,13 +451,15 @@ function Creative({ christmas }: { christmas: boolean }) {
           <p>Church programmes, end-of-year parties, shop promotions: our studio team designs them for you. Each package shows what’s included before you send a request.</p>
           <a href="/creative-studio" onClick={e => { if (!plain(e)) return; e.preventDefault(); setActivePage('creative'); }} className="mh-button-secondary xh-btn-quiet">See design packages<ArrowRight className="w-4 h-4" aria-hidden /></a>
         </div>
-        <figure className="xh-line" data-xh-reveal>
+        <figure className="xh-line" data-xh-reveal="line">
           <span className="xh-line-twine" aria-hidden="true" />
           <ul>
             {STUDIO_CARDS.map((work, i) => (
-              <li key={work.id} style={{ '--i': i } as React.CSSProperties} onPointerDown={press} onAnimationEnd={pressEnd}>
-                <Peg />
-                <img src={getCloudinaryUrl(work.src, { width: 360, height: 450, crop: 'fill' })} alt={work.alt} width={180} height={225} loading="lazy" decoding="async" />
+              <li key={work.id} style={{ '--i': i } as React.CSSProperties}>
+                <span className="xh-card" onPointerDown={sway}>
+                  <Peg />
+                  <img src={getCloudinaryUrl(work.src, { width: 360, height: 450, crop: 'fill' })} alt={work.alt} width={180} height={225} loading="lazy" decoding="async" />
+                </span>
               </li>
             ))}
           </ul>
@@ -431,26 +470,27 @@ function Creative({ christmas }: { christmas: boolean }) {
   );
 }
 
-/* ───────────────────────── Coming soon: still wrapped ───────────────────────── */
+/* ───────────────────────── Coming soon: a short, honest teaser ───────────────────────── */
 
 function ComingSoon() {
   const { setActivePage } = useApp();
   const future = DIGITAL_SERVICES.filter(s => s.status === 'coming_soon');
+  const shown = future.slice(0, 3), more = future.length - shown.length;
   const open = (e: React.MouseEvent, service = '') => { if (!plain(e)) return; e.preventDefault(); openServicesAt(setActivePage, { service }); };
+  if (!future.length) return null;
   return (
     <section className="xh-sec xh-soon" aria-labelledby="xh-soon-title">
       <div className="xh-wrap">
-        <div className="xh-soon-panel">
-          <span className="xh-soon-bow" aria-hidden="true"><CornerBow tone="gold" /></span>
+        <div className="xh-soon-strip">
           <div className="xh-soon-intro">
             <p className="xh-soon-badge">Coming soon · Not available yet</p>
-            <h2 id="xh-soon-title">Still wrapped: <em>more services on the way</em></h2>
-            <p>Open one to see what’s planned. Launch updates are optional.</p>
-            <a href="/services" onClick={e => open(e)} className="xh-link">See What’s Coming<ArrowRight className="w-4 h-4" aria-hidden /></a>
+            <h2 id="xh-soon-title" className="xh-soon-title">Still wrapped: <em>more services on the way</em></h2>
           </div>
-          <ul className="xh-sealed">{future.map(svc => (
-            <li key={svc.id}><a href={servicesHref({ service: serviceSlug(svc) })} onClick={e => open(e, serviceSlug(svc))} aria-label={`Preview ${svc.title} — Coming Soon`}><span className="xh-seal" aria-hidden="true" />{svc.title}</a></li>
-          ))}</ul>
+          <ul className="xh-sealed">
+            {shown.map(svc => <li key={svc.id}><a href={servicesHref({ service: serviceSlug(svc) })} onClick={e => open(e, serviceSlug(svc))} aria-label={`Preview ${svc.title} — Coming Soon`}><span className="xh-seal" aria-hidden="true" />{svc.title}</a></li>)}
+            {more > 0 && <li><a href="/services" onClick={e => open(e)} className="xh-sealed-more">+{more} more</a></li>}
+          </ul>
+          <a href="/services" onClick={e => open(e)} className="xh-link xh-soon-link">See What’s Coming<ArrowRight className="w-4 h-4" aria-hidden /></a>
         </div>
       </div>
     </section>
@@ -505,7 +545,7 @@ function SignOff({ christmas }: { christmas: boolean }) {
 export function ChristmasHome({ status }: { status: SeasonStatus }) {
   const root = useRef<HTMLDivElement>(null);
   useEffect(loadSeasonalSerif, []);
-  useReveal(root);
+  useReveal(root, 'guest');
   const christmas = isChristmasTime(status);
   return (
     <div ref={root} className="xh-home" data-phase={status.phase}>

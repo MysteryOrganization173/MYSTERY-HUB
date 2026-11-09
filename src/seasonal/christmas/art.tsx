@@ -183,3 +183,50 @@ export function Celebrate({ className = '' }: { className?: string }) {
     </span>
   );
 }
+
+/**
+ * The header band of the sign-up / sign-in sheet: an evening scene with one strand of lights, a wrapped gift and a
+ * sealed envelope, like the top of an invitation card. Decorative; it scales to the sheet's width.
+ */
+export function InviteBanner({ newYear = false }: { newYear?: boolean }) {
+  const bulbs = Array.from({ length: 11 }, (_, i) => {
+    const t = (i + 0.5) / 11, x = -10 + t * 500, y = (1 - t) ** 2 * 16 + 2 * (1 - t) * t * 62 + t ** 2 * 12;
+    return { x, y, tone: newYear ? ['#fff1c9', '#f7d27a', '#e9eef7'][i % 3] : ['#f7d27a', '#e2566d', '#ffe9b3', '#7fe3ad'][i % 4] };
+  });
+  return (
+    <svg className="xmas-invite-art" viewBox="0 0 480 116" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="xi-bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#0f3527" /><stop offset=".55" stopColor="#0a2219" /><stop offset="1" stopColor="#2a0b17" /></linearGradient>
+        <radialGradient id="xi-glow" cx="50%" cy="50%" r="50%"><stop offset="0" stopColor="#ffe3a0" stopOpacity=".45" /><stop offset="1" stopColor="#e9b949" stopOpacity="0" /></radialGradient>
+        <radialGradient id="xi-bulb" cx="50%" cy="50%" r="50%"><stop offset="0" stopColor="#fff6dc" stopOpacity=".85" /><stop offset="1" stopColor="#f7d27a" stopOpacity="0" /></radialGradient>
+        <linearGradient id="xi-env" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#fffaf1" /><stop offset="1" stopColor="#ead9b8" /></linearGradient>
+        <linearGradient id="xi-gift" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#c5334c" /><stop offset="1" stopColor="#6f1430" /></linearGradient>
+        <linearGradient id="xi-gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#b98326" /><stop offset=".45" stopColor="#ffeebe" /><stop offset="1" stopColor="#a87420" /></linearGradient>
+        <radialGradient id="xi-seal" cx="40%" cy="35%" r="70%"><stop offset="0" stopColor="#fbe7a6" /><stop offset=".55" stopColor="#e9b949" /><stop offset="1" stopColor="#a8771d" /></radialGradient>
+      </defs>
+      <rect width="480" height="116" fill="url(#xi-bg)" />
+      <circle cx="300" cy="70" r="150" fill="url(#xi-glow)" />
+      <path d="M-10 16 Q240 108 490 12" fill="none" stroke="#2f4a3b" strokeWidth="1.4" />
+      {bulbs.map((b, i) => <g key={i}><circle cx={b.x} cy={b.y + 6} r="9" fill="url(#xi-bulb)" /><circle cx={b.x} cy={b.y + 6} r="2.6" fill={b.tone} /></g>)}
+      {/* A wrapped gift, left of centre. */}
+      <g transform="translate(176 52)">
+        <ellipse cx="22" cy="46" rx="30" ry="4" fill="#000" opacity=".35" />
+        <rect x="0" y="12" width="44" height="34" rx="2" fill="url(#xi-gift)" />
+        <rect x="-2" y="6" width="48" height="9" rx="2" fill="#d4465e" />
+        <rect x="18" y="6" width="8" height="40" fill="url(#xi-gold)" />
+        <path d="M22 6 C 12 -6 2 -2 6 4 C 9 8 16 8 22 6 Z M22 6 C 32 -6 42 -2 38 4 C 35 8 28 8 22 6 Z" fill="#f0c766" />
+        <circle cx="22" cy="6" r="3" fill="#f6d683" />
+      </g>
+      {/* A sealed envelope, tilted, right of centre. */}
+      <g transform="translate(252 36) rotate(-7)">
+        <rect x="0" y="0" width="112" height="70" rx="6" fill="url(#xi-env)" />
+        <path d="M0 6 L56 42 L112 6" fill="none" stroke="#c9b48d" strokeWidth="1.4" />
+        <path d="M0 70 L44 36 M112 70 L68 36" fill="none" stroke="#d9c7a2" strokeWidth="1" />
+        <circle cx="56" cy="42" r="10" fill="url(#xi-seal)" />
+        <path d="M51.5 45.5 V38.5 L56 43 L60.5 38.5 V45.5" fill="none" stroke="#7a4f12" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+      <path d="M118 30 c .6 3 1.6 4 4.6 4.6 c -3 .6 -4 1.6 -4.6 4.6 c -.6 -3 -1.6 -4 -4.6 -4.6 c 3 -.6 4 -1.6 4.6 -4.6 Z" fill="#f7dc8f" />
+      <path d="M398 74 c .5 2.4 1.3 3.2 3.7 3.7 c -2.4 .5 -3.2 1.3 -3.7 3.7 c -.5 -2.4 -1.3 -3.2 -3.7 -3.7 c 2.4 -.5 3.2 -1.3 3.7 -3.7 Z" fill="#fff4dc" />
+    </svg>
+  );
+}
