@@ -331,7 +331,10 @@ test('the welcome figure is computed from the live offer and catalogue, never ab
   assert.equal(welcomeFigure(offer, [b('mtn-2gb', 'mtn', '2GB', 9.99)], true)?.percent, 10);
   const card = read('src/seasonal/christmas/kit/WelcomeCard.tsx');
   assert.match(card, /if \(!offer\?\.enabled \|\| !\['guest', 'eligible'\]\.includes\(offer\.state\)\) return null;/);
-  assert.match(card, /\{amount\} off one qualifying data purchase/);
+  // V4: an advertisement, not documentation. Headline, one line, one small note and the sign-up action; checkout shows
+  // the exact saving and total, so the card carries no worked calculation, bundle price or fine print.
+  for (const line of ['Up to <b>{figure.percent}%</b> off', '<span>Your first data bundle</span>', "'For new customers'", 'Create Your Free Account']) assert.ok(card.includes(line), line);
+  assert.doesNotMatch(card, /qualifying data purchase|which is|regularMinor|figure\.label|applies once|xk-welcome-fine/);
   assert.match(read(`${HOME_DIR}/ChristmasHome.tsx`), /catalogConfirmed=\{directCatalogConfirmed\(\)\}/);
   assert.match(read('src/hooks/useDirectCatalog.ts'), /confirmed=true;/);
 });

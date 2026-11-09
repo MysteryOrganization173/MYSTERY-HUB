@@ -5,14 +5,12 @@
 .xk-welcome { position: relative; isolation: isolate; overflow: hidden; padding: 16px 16px 16px 18px; border-radius: 20px; color: #f6e9d6; background: radial-gradient(90% 120% at 100% 0%, #6e1a2f 0%, transparent 62%), radial-gradient(70% 90% at 0% 100%, #2a0a14 0%, transparent 70%), linear-gradient(160deg, #3d1020, #24070f 72%); box-shadow: 0 24px 40px -28px #000; }
 .xk-welcome-foil { position: absolute; inset: 0; z-index: -1; padding: 1.2px; border-radius: inherit; background: linear-gradient(135deg, #f7dc8f, #a8771d 28%, #fff1c1 50%, #c99230 72%, #f7dc8f); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; pointer-events: none; }
 .xk-welcome::after { content: ''; position: absolute; z-index: -1; top: -30px; right: -24px; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, #f3d79a33, transparent 70%); pointer-events: none; }
-.xk-welcome-kicker { margin: 0; color: #f3d79a; font: 700 .66rem/1.3 var(--font-heading); letter-spacing: .16em; text-transform: uppercase; }
-.xk-welcome-big { margin: 6px 0 0; color: #fff4dc; font: italic 500 clamp(1.75rem, 7.4vw, 2.3rem)/1.04 'Fraunces', Georgia, serif; letter-spacing: -.015em; }
+.xk-welcome-big { margin: 0; color: #fff4dc; font: italic 500 clamp(1.75rem, 7.4vw, 2.3rem)/1.04 'Fraunces', Georgia, serif; letter-spacing: .005em; text-transform: uppercase; }
 .xk-welcome-big b { font-weight: 650; background: linear-gradient(100deg, #fff4d6 0%, #f2cd73 45%, #e3ae4b 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.xk-welcome-big span { display: block; margin-top: 4px; color: #f6e9d6; font: 650 .9375rem/1.3 var(--font-heading); font-style: normal; letter-spacing: 0; }
-.xk-welcome-fine { margin: 8px 0 0; max-width: 420px; color: #d9c6b8; font-size: .75rem; line-height: 1.55; }
+.xk-welcome-big span { display: block; margin-top: 6px; color: #f6e9d6; font: 650 .9375rem/1.3 var(--font-heading); font-style: normal; letter-spacing: 0; text-transform: none; }
+/* One small supporting line; the exact saving and the total are shown by checkout, not explained here. */
+.xk-welcome-note { margin: 8px 0 0; color: #f3d79a; font: 700 .66rem/1.3 var(--font-heading); letter-spacing: .16em; text-transform: uppercase; }
 .xk-welcome-cta { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 12px; padding: 0 16px; border-radius: 12px; cursor: pointer; color: #03150c; font: 700 .875rem/1 var(--font-heading); background: linear-gradient(180deg, #34e892, #00c365 55%, #00ab58); box-shadow: inset 0 1px 0 #ffffff6b, 0 0 0 1px #e8c46f, 0 10px 22px -12px #00c365; transition: transform .15s ease; }
 .xk-welcome-cta:active { transform: scale(.97); }
 .xk-welcome-cta:focus-visible { outline: 2px solid #f3d79a; outline-offset: 3px; }
-.xk-welcome-ready { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 0; color: #b9f3d3; font-size: .8125rem; line-height: 1.45; }
-.xk-welcome-ready svg { flex: none; margin-top: 1px; color: #5ae6a0; }
 @media (prefers-reduced-motion: reduce) { .xk-welcome-cta { transition: none; } }
