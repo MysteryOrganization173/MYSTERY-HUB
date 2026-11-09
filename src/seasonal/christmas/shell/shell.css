@@ -48,6 +48,8 @@
 @media (min-width: 768px) { .mh-app[data-season-shell="christmas"] .xs-footer { padding-bottom: env(safe-area-inset-bottom, 0px); } }
 /* The seasonal homepages close with their own sign-off, which runs straight into the footer. */
 .mh-app[data-season-shell="christmas"]:has(:is(.xh-home, .xm-home)) .xs-footer { margin-top: 0; }
+/* The signed-in seasonal homepage ends on its own night colour, with no gap of the page colour before the footer. */
+.mh-app[data-season-shell="christmas"]:has(.xm-home) > main { padding-bottom: 0; background: #050d0a; }
 .mh-app[data-season-shell="christmas"] .xs-footer-edge { display: flex; align-items: center; gap: 10px; height: 1px; }
 .mh-app[data-season-shell="christmas"] .xs-footer-edge span { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #f3d79a59); }
 .mh-app[data-season-shell="christmas"] .xs-footer-edge span:last-child { background: linear-gradient(90deg, #f3d79a59, transparent); }

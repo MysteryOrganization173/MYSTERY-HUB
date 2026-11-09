@@ -238,10 +238,12 @@ test('every Christmas homepage style lives in its own xh- namespace, with transf
   // Reduced motion: every animation and transition stops, and no section waits for a reveal.
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\.xh-home \*, \.xh-home \*::before, \.xh-home \*::after \{ animation: none !important; transition: none !important; \}/);
   assert.match(read('src/seasonal/christmas/kit/motion.ts'), /if \(prefersReducedMotion\(\) \|\| typeof IntersectionObserver === 'undefined'\) \{ items\.forEach\(settle\); return; \}/);
-  // The homepage-only shell changes: the shared light strand and footer greeting step aside, the hat is replaced.
+  // The homepage-only shell changes: the shared light strand and footer greeting step aside. V3: nothing seasonal is
+  // drawn on a navigation icon (the hat lives on the logo); the active tab keeps only a quiet gold ring.
   const pack = read('src/seasonal/christmas/christmas.css');
   assert.match(pack, /\.mh-app\[data-season="christmas"\]\[data-season-page="home"\] \.xmas-header-lights, \.mh-app\[data-season="christmas"\]\[data-season-page="home"\] \.xmas-footer \{ display: none; \}/);
-  assert.match(pack, /\.mh-bottom-nav-item\[aria-current='page'\] \.mh-bottom-nav-indicator::after/);
+  assert.doesNotMatch(pack, /mh-bottom-nav[\w-]*(::?(after|before))/);
+  assert.match(pack, /\.mh-bottom-nav-item\[aria-current='page'\] \.mh-bottom-nav-indicator \{ box-shadow: /);
 });
 
 test('the Christmas homepage keeps the real catalogue, prices, checkout, templates and Marketplace, and promises nothing new', () => {

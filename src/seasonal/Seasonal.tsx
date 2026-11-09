@@ -1,11 +1,13 @@
 import React, { Suspense, lazy, useEffect, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { useSeason } from './SeasonProvider';
+import { useApp } from '../context/AppContext';
 import { retryOnce } from '../utils/lazyPage';
 import { isChristmasPhase } from '../../shared/seasonal';
 import type { ChristmasSlot } from './christmas/ChristmasPack';
 import type { ShellSlotName } from './christmas/shell/ChristmasShell';
 import type { SeasonPage } from './christmas/copy';
+import type { MemberHomeViewProps } from '../components/home/MemberHomeView';
 
 /**
  * A place in the site where the active seasonal pack may draw. When no season is active it renders nothing and
@@ -21,6 +23,9 @@ const ChristmasHome = lazy(loadChristmasHome);
 const loadShell = retryOnce(() => import('./christmas/shell/ChristmasShell'));
 const ShellSlot = lazy(() => loadShell().then(m => ({ default: m.ShellSlot })));
 const ShellFooter = lazy(() => loadShell().then(m => ({ default: m.ChristmasFooter })));
+/** The signed-in customer's seasonal homepage, also its own chunk. */
+const loadMemberHome = retryOnce(() => import('./christmas/member/ChristmasMemberHome'));
+const ChristmasMemberHome = lazy(loadMemberHome);
 
 /** If a seasonal chunk cannot load or render, show the ordinary interface instead of an error. */
 class SeasonalBoundary extends React.Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
@@ -44,6 +49,17 @@ export function SeasonalHome({ fallback }: { fallback: ReactNode }) {
   const season = useSeason();
   if (!season.active || season.status.pack !== 'christmas-2026') return <>{fallback}</>;
   return <SeasonalBoundary fallback={fallback}><Suspense fallback={<div className="mh-season-home-wait" aria-busy="true" />}><ChristmasHome status={season.status} /></Suspense></SeasonalBoundary>;
+}
+
+/**
+ * The signed-in customer's seasonal homepage. It receives exactly the props the ordinary member homepage gets (the
+ * same orders, Wallet, website record and actions, read once by MemberDashboard for this account), so the season
+ * changes presentation only. If its chunk cannot load or render, `fallback` (the ordinary member homepage) shows.
+ */
+export function SeasonalMemberHome({ view, fallback }: { view: MemberHomeViewProps; fallback: ReactNode }) {
+  const season = useSeason();
+  if (!season.memberActive || season.status.pack !== 'christmas-2026') return <>{fallback}</>;
+  return <SeasonalBoundary fallback={fallback}><Suspense fallback={<div className="mh-season-home-wait is-member" aria-busy="true" />}><ChristmasMemberHome view={view} status={season.status} /></Suspense></SeasonalBoundary>;
 }
 
 /** A place in the shared shell (header logo, phone menu) where the season may draw, for guests and members alike. */
@@ -75,9 +91,14 @@ const PHASE_LABEL: Record<string, string> = {
  */
 export function SeasonalShellLayer({ page }: { page?: string }) {
   const season = useSeason();
+  const { isAuthModalOpen } = useApp();
   useEffect(() => { if (season.shellActive) void loadShell().catch(() => undefined); }, [season.shellActive]);
   useEffect(() => { if (season.active) void loadChristmas().catch(() => undefined); }, [season.active]);
   useEffect(() => { if (season.active && page === 'home') void loadChristmasHome().catch(() => undefined); }, [season.active, page]);
+  // The member homepage starts downloading while a returning customer's session is still being checked, and when a
+  // guest opens Sign in / Create account, so signing in moves straight to it instead of waiting on a download.
+  useEffect(() => { if (season.heldForSignedIn && page === 'home') void loadMemberHome().catch(() => undefined); }, [season.heldForSignedIn, page]);
+  useEffect(() => { if (season.active && isAuthModalOpen) void loadMemberHome().catch(() => undefined); }, [season.active, isAuthModalOpen]);
   if (!season.previewing) return null;
   const date = new Date(season.status.date + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
   const title = isChristmasPhase(season.status.phase) ? 'Christmas preview' : 'New Year preview';

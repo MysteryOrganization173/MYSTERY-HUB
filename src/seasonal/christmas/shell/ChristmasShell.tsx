@@ -11,7 +11,8 @@ import { loadSeasonalSerif } from '../font';
 
 /**
  * The seasonal shell: what every visitor sees around the page while a pack applies, signed in or not.
- * - `logo-hat`: a velvet Santa hat fitted onto the official brand mark in the header (never on a navigation icon).
+ * - `logo-hat`: a velvet Santa hat fitted onto the official brand mark in the header (never on a navigation icon),
+ *   through Boxing Day only: from 27 December the site greets the New Year and the logo goes back to plain.
  * - `menu-header`: a quiet festive heading at the top of the phone menu.
  * - `ChristmasFooter`: the season's footer. The ordinary footer is untouched and returns the moment the season ends.
  * Everything here is presentation: links, contacts and routes are the ordinary footer's own.
@@ -80,7 +81,7 @@ function MenuHeader({ status }: { status: SeasonStatus }) {
 
 export function ShellSlot({ slot, status }: { slot: ShellSlotName; status: SeasonStatus }) {
   switch (slot) {
-    case 'logo-hat': return <LogoHat />;
+    case 'logo-hat': return isChristmasPhase(status.phase) ? <LogoHat /> : null;
     case 'menu-header': return <MenuHeader status={status} />;
     default: return null;
   }
