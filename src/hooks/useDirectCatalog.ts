@@ -3,10 +3,15 @@ import {DATA_BUNDLES} from '../data/bundles';
 import {commercialRequest} from '../services/commercialApi';
 let current=DATA_BUNDLES.slice();const listeners=new Set<()=>void>();
 let request:Promise<void>|null=null;
+// True once this page has the server's own catalogue (until then `current` is the bundled fallback list).
+let confirmed=false;
+/** Whether the catalogue on screen came from the server, so derived figures (e.g. "up to X% off") can rely on it. */
+export const directCatalogConfirmed=()=>confirmed;
 export async function refreshDirectCatalog(){
  if(request)return request;
  request=commercialRequest('commercial/products').then(result=>{
   current=result.products.map((p:any)=>({...DATA_BUNDLES.find(b=>b.id===p.id),id:p.id,network:p.network,dataAmount:p.dataAmount,priceGhc:p.priceGhc}));
+  confirmed=true;
   // Consumers outside React read the same latest price projection.
   for(const b of DATA_BUNDLES){const p=current.find(x=>x.id===b.id);if(p)b.priceGhc=p.priceGhc;}
   for(const listener of listeners)listener();

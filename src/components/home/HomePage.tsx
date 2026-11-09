@@ -22,6 +22,9 @@ export const HomePage: React.FC = () => {
   const season = useSeason();
 
   if (isAuthChecking) {
+    // While a season is on, a returning customer's session check holds the season's quiet placeholder, so the page
+    // does not flash the ordinary skeleton between the seasonal header and footer before their homepage appears.
+    if (season.shellActive) return <div className="mh-season-home-wait is-member" aria-busy="true"><p className="sr-only" role="status">Loading Mystery Hub…</p></div>;
     return (
       <div className="home-page space-y-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-8">

@@ -1,7 +1,9 @@
 /* Mystery Hub Christmas homepage: "The Gift of Connection — Christmas After Dark".
-   Every rule is scoped to .xh-home, which exists only while a season is on screen, so the ordinary homepage is never
-   touched. Palette: night evergreen, the Mystery Hub green for action, champagne gold, berry, cream paper.
-   Motion: one entrance per composition, one short reaction per press; idle loops only on capable desktops. */
+   Every rule is scoped to an .xh- class, a namespace used only by this page, which exists only while a season is on
+   screen, so the ordinary homepage is never touched. Palette: night evergreen, the Mystery Hub green for action,
+   champagne gold, berry, cream paper.
+   Motion (see kit/motion.ts): one owner per moving element; entrances only while a composition is arriving
+   (armed → in, removed once done); one short reaction per press; idle loops only on capable desktops. */
 
 .xh-home {
   --xh-night: #050d0a; --xh-pine: #0b2a20; --xh-velvet: #0f3a2b;
@@ -18,8 +20,8 @@
 .xh-wrap { width: 100%; max-width: 1240px; margin-inline: auto; padding-inline: 16px; }
 @media (min-width: 640px) { .xh-wrap { padding-inline: 24px; } }
 @media (min-width: 1024px) { .xh-wrap { padding-inline: 32px; } }
-.xh-sec { position: relative; padding-block: 52px; }
-@media (min-width: 960px) { .xh-sec { padding-block: 88px; } }
+.xh-sec { position: relative; padding-block: 48px; }
+@media (min-width: 960px) { .xh-sec { padding-block: 84px; } }
 
 /* Shared typography */
 .xh-kicker { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 12px; font: 700 .72rem/1.25 var(--font-heading); letter-spacing: .16em; text-transform: uppercase; color: var(--xh-champagne); }
@@ -39,7 +41,7 @@
 .xh-home :is(a, button):focus-visible { outline: 3px solid var(--xh-champagne); outline-offset: 3px; }
 
 /* ───────────────────────── Hero ───────────────────────── */
-.xh-hero { position: relative; isolation: isolate; overflow: hidden; padding: 18px 0 34px;
+.xh-hero { position: relative; isolation: isolate; overflow: hidden; padding: 14px 0 26px;
   background:
     radial-gradient(75% 55% at 74% 40%, #164a35 0%, transparent 66%),
     radial-gradient(60% 45% at 6% 96%, #4c1324 0%, transparent 70%),
@@ -51,25 +53,46 @@
   -webkit-mask-image: radial-gradient(85% 75% at 55% 30%, #000, transparent 78%); mask-image: radial-gradient(85% 75% at 55% 30%, #000, transparent 78%); }
 .xh-hero::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 90px; z-index: -1; background: linear-gradient(180deg, transparent, var(--xh-night)); pointer-events: none; }
 .xh-hero-grid { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "greet" "stage" "main"; }
-.xh-hero-greet { grid-area: greet; position: relative; z-index: 2; padding-top: 6px; animation: xh-up .7s var(--xh-ease) both; }
+.xh-hero-greet { grid-area: greet; position: relative; z-index: 2; padding-top: 4px; }
 .xh-hero-kicker { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin: 0; font: 700 .68rem/1.3 var(--font-heading); letter-spacing: .2em; text-transform: uppercase; color: #e6cd94; }
 .xh-hero-kicker span { font: italic 600 1.05rem/1 var(--xh-serif); letter-spacing: .01em; text-transform: none; color: var(--xh-champagne); }
 .xh-hero-kicker i { flex: none; width: 22px; height: 1px; background: #e6cd9480; }
-.xh-hero-greeting { margin: 8px 0 0; font: italic 500 clamp(2.2rem, 10vw, 4.7rem)/1.02 var(--xh-serif); letter-spacing: -.025em; padding-bottom: .1em;
+.xh-hero-greeting { margin: 6px 0 0; font: italic 500 clamp(2.1rem, 9.6vw, 4.7rem)/1.02 var(--xh-serif); letter-spacing: -.025em; padding-bottom: .1em;
   background: linear-gradient(100deg, #fff4d6 0%, #f2cd73 34%, #fff1cc 58%, #e3ae4b 82%, #f7dc8f 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent; }
-.xh-hero-stage { grid-area: stage; position: relative; z-index: 1; margin: -6px -16px 0; aspect-ratio: 600 / 420; }
+/* Phones: the compact composition (640 × 354) tucks a little under the greeting, so the scene supports it. */
+.xh-hero-stage { grid-area: stage; position: relative; z-index: 1; margin: -16px -16px 0; aspect-ratio: 640 / 354; }
 .xh-scene { display: block; width: 100%; height: 100%; overflow: visible; }
-.xh-hero-main { grid-area: main; position: relative; z-index: 2; margin-top: -8px; animation: xh-up .7s .15s var(--xh-ease) both; }
-.xh-hero-title { margin: 0; font: 800 clamp(2rem, 9vw, 3.35rem)/1.03 var(--font-heading); letter-spacing: -.045em; color: #fff; }
+.xh-hero-main { grid-area: main; position: relative; z-index: 2; margin-top: 2px; }
+.xh-hero-title { margin: 0; font: 800 clamp(1.95rem, 8.8vw, 3.35rem)/1.03 var(--font-heading); letter-spacing: -.045em; color: #fff; }
 .xh-hero-title span { color: #48dc8f; }
-.xh-hero-lede { margin: 14px 0 0; max-width: 480px; color: var(--xh-text-2); font-size: .9375rem; line-height: 1.6; }
-.xh-hero-actions { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 20px; max-width: 470px; }
-.xh-hero-live { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 16px 0 0; padding: 0; list-style: none; }
+.xh-hero-lede { margin: 12px 0 0; max-width: 480px; color: var(--xh-text-2); font-size: .9375rem; line-height: 1.58; }
+.xh-hero-actions { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 18px; max-width: 470px; }
+.xh-hero-live { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 14px 0 0; padding: 0; list-style: none; }
 .xh-hero-live li { display: inline-flex; align-items: center; gap: 6px; font-size: .75rem; color: #e3dbc9; }
 .xh-hero-live svg { flex: none; color: #5fd897; }
-@media (min-width: 400px) { .xh-hero-actions { grid-template-columns: 1.5fr 1fr; } }
-@media (min-width: 600px) and (max-width: 899px) { .xh-hero-stage { justify-self: center; width: min(100%, 600px); margin-inline: 0; } }
+/* From 360px both actions share one row: the main action keeps its full words, Buy Data sits beside it. */
+@media (min-width: 360px) {
+  .xh-hero-actions { grid-template-columns: minmax(0, 1fr) auto; }
+  .xh-hero-actions > a { white-space: nowrap; }
+}
+@media (min-width: 360px) and (max-width: 399px) { .xh-home .xh-hero-actions > a { padding-inline: .9rem; font-size: .875rem; } }
+/* Short phones (an older Android, or any phone with its browser bars showing): the scene scales down as a whole and
+   the type tightens, so the greeting, the scene and both actions sit above the tab bar on the first screen. */
+@media (max-width: 599px) and (max-height: 720px) {
+  .xh-hero { padding-top: 8px; }
+  .xh-hero-greeting { margin-top: 2px; font-size: clamp(1.75rem, 8vw, 2.2rem); }
+  .xh-hero-stage { justify-self: center; width: calc((100% + 32px) * .78); margin: -12px auto 0; }
+  .xh-hero-title { font-size: clamp(1.7rem, 7.6vw, 2rem); }
+  .xh-hero-lede { margin-top: 8px; font-size: .875rem; line-height: 1.5; }
+  .xh-hero-actions { margin-top: 12px; }
+}
+@media (max-width: 599px) and (max-height: 600px) {
+  .xh-hero-greeting { font-size: clamp(1.6rem, 7vw, 2rem); }
+  .xh-hero-stage { width: calc((100% + 32px) * .6); }
+  .xh-hero-lede { font-size: .8125rem; }
+}
+@media (min-width: 600px) and (max-width: 899px) { .xh-hero-stage { justify-self: center; width: min(100%, 600px); margin: -6px 0 0; aspect-ratio: 600 / 420; } }
 @media (min-width: 900px) {
   .xh-hero { padding: 36px 0 76px; }
   .xh-hero-grid { grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); grid-template-areas: "greet stage" "main stage"; column-gap: 28px; }
@@ -92,53 +115,65 @@
 .xh-scene[data-phase="christmas-day"] .xh-sc-open { opacity: 1; }
 .xh-scene[data-phase="christmas-day"] .xh-sc-slit { opacity: 0; }
 .xh-scene[data-phase="christmas-day"] .xh-sc-beam { opacity: .9; }
-.xh-scene[data-phase="christmas-day"] .xh-sc-halo { opacity: 1.0; }
 .xh-scene[data-phase="boxing-day"] .xh-sc-lid { transform: translate(-178px, 178px) scale(.62) rotate(-4deg); }
 .xh-scene[data-phase="boxing-day"] .xh-sc-gift-l { display: none; }
 .xh-scene[data-phase="boxing-day"] .xh-sc-open { opacity: 1; }
 .xh-scene[data-phase="boxing-day"] .xh-sc-slit { opacity: 0; }
 .xh-scene[data-phase="boxing-day"] .xh-sc-beam { opacity: .5; }
-.xh-scene .xh-sc-gift { cursor: pointer; }
+.xh-scene .xh-sc-gift { cursor: pointer; transform-box: fill-box; transform-origin: 50% 100%; }
+.xh-scene .xh-sc-bow { transform-box: fill-box; transform-origin: 50% 70%; }
+.xh-scene .xh-sc-tokens .xh-token { transform-box: fill-box; transform-origin: center; }
+.xh-scene .xh-sc-tag { transform-box: fill-box; transform-origin: 0 0; }
+.xh-scene .xh-sc-tw, .xh-scene .xh-fw { transform-box: fill-box; transform-origin: center; }
+.xh-scene .xh-sc-confetti rect { transform-box: fill-box; }
 .xh-scene .xh-sc-burst circle { opacity: 0; transform-box: fill-box; transform-origin: center; }
-.xh-scene .xh-sc-tag-big { font: italic 600 27px/1 var(--xh-serif); fill: #6f1430; }
-.xh-scene .xh-sc-tag-small { font: 650 11.5px/1 var(--font-heading); fill: #5c4a2c; letter-spacing: .02em; }
-
-/* Scene entrance: the gift rises, the bow ties, lights come on, services float up, the tag swings in. */
-.xh-scene .xh-sc-gift { transform-box: fill-box; transform-origin: 50% 100%; animation: xh-rise .9s .1s var(--xh-ease) both; }
-.xh-scene .xh-sc-gift-l, .xh-scene .xh-sc-gift-r { animation: xh-rise .8s .3s var(--xh-ease) both; }
-.xh-scene .xh-sc-bow { transform-box: fill-box; transform-origin: 50% 70%; animation: xh-bow .8s .55s var(--xh-spring) both; }
-.xh-scene .xh-sc-bulb { animation: xh-on .5s ease-out both; }
-.xh-scene .xh-sc-tokens .xh-token { transform-box: fill-box; transform-origin: center; animation: xh-token-in 1s var(--xh-ease) both; }
 .xh-scene .xh-token-icon { color: var(--xh-champagne); }
 .xh-scene .xh-token-data .xh-token-icon, .xh-scene .xh-token-web .xh-token-icon { color: #7fe3ad; }
-.xh-scene .xh-sc-streams { animation: xh-on 1s 1.1s ease-out both; }
-.xh-scene .xh-sc-tag { transform-box: fill-box; transform-origin: 0 0; animation: xh-tag-in 1.2s 1s var(--xh-ease) both; }
-.xh-scene .xh-sc-tw { transform-box: fill-box; transform-origin: center; animation: xh-on .6s ease-out both; }
-.xh-scene .xh-sc-confetti rect { transform-box: fill-box; animation: xh-confetti 1.2s var(--xh-ease) both; }
-.xh-scene .xh-sc-sky { animation: xh-on 1s ease-out both; }
+.xh-scene .xh-sc-tag-big { font: italic 600 27px/1 var(--xh-serif); fill: #6f1430; }
+.xh-scene .xh-sc-tag-small { font: 650 11.5px/1 var(--font-heading); fill: #5c4a2c; letter-spacing: .02em; }
+.xh-scene[data-layout="compact"] .xh-sc-tag-big { font-size: 30px; }
+.xh-scene[data-layout="compact"] .xh-sc-tag-small { font-size: 12.5px; }
+
+/* Arrival, once per visit: the gift rises, the bow ties, lights come on, services float up, the tag swings in.
+   Back on the homepage later in the visit the hero is marked settled and simply appears. */
+.xh-hero:not([data-xh-settled]) .xh-hero-greet { animation: xh-up .7s var(--xh-ease) both; }
+.xh-hero:not([data-xh-settled]) .xh-hero-main { animation: xh-up .7s .15s var(--xh-ease) both; }
+.xh-hero:not([data-xh-settled]) .xh-scene .xh-sc-gift { animation: xh-rise .9s .1s var(--xh-ease) both; }
+.xh-hero:not([data-xh-settled]) .xh-scene :is(.xh-sc-gift-l, .xh-sc-gift-r) { animation: xh-rise .8s .3s var(--xh-ease) both; }
+.xh-hero:not([data-xh-settled]) .xh-scene .xh-sc-bow { animation: xh-bow .8s .55s var(--xh-spring) both; }
+.xh-hero:not([data-xh-settled]) .xh-scene .xh-sc-bulb { animation: xh-on .5s ease-out both; }
+.xh-hero:not([data-xh-settled]) .xh-scene .xh-sc-tokens .xh-token { animation: xh-token-in 1s var(--xh-ease) both; }
+.xh-hero:not([data-xh-settled]) .xh-scene .xh-sc-streams { animation: xh-on 1s 1.1s ease-out both; }
+.xh-hero:not([data-xh-settled]) .xh-scene .xh-sc-tag { animation: xh-tag-in 1.2s 1s var(--xh-ease) both; }
+.xh-hero:not([data-xh-settled]) .xh-scene .xh-sc-tw { animation: xh-on .6s ease-out both; }
+.xh-hero:not([data-xh-settled]) .xh-scene .xh-fw { animation: xh-fw-bloom 1.6s ease-out both; }
+.xh-hero:not([data-xh-settled]) .xh-scene .xh-sc-confetti rect { animation: xh-confetti 1.2s var(--xh-ease) both; }
+.xh-hero:not([data-xh-settled]) .xh-scene .xh-sc-sky { animation: xh-on 1s ease-out both; }
 /* A tap on the gift: the lid hops, sparks fly. */
 .xh-scene[data-nudge] .xh-sc-lid-hop { animation: xh-lid-hop .95s var(--xh-ease); }
 .xh-scene[data-nudge] .xh-sc-burst circle { animation: xh-burst .95s ease-out both; }
 .xh-scene[data-nudge] .xh-sc-burst circle:nth-child(odd) { animation-delay: .06s; }
 /* Idle life, only on desktop screens that hover, and only while the hero is on screen. */
 @media (min-width: 900px) and (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .xh-hero[data-xh-visible] .xh-scene .xh-sc-tokens .xh-token { animation: xh-token-in 1s var(--xh-ease) both, xh-bob 6.5s ease-in-out infinite; }
-  .xh-hero[data-xh-visible] .xh-scene .xh-sc-bulb-twinkle { animation: xh-on .5s ease-out both, xh-twinkle 5s 2.5s ease-in-out infinite; }
+  .xh-hero[data-xh-visible]:not([data-xh-settled]) .xh-scene .xh-sc-tokens .xh-token { animation: xh-token-in 1s var(--xh-ease) both, xh-bob 6.5s ease-in-out infinite; }
+  .xh-hero[data-xh-visible][data-xh-settled] .xh-scene .xh-sc-tokens .xh-token { animation: xh-bob 6.5s ease-in-out infinite; }
+  .xh-hero[data-xh-visible]:not([data-xh-settled]) .xh-scene .xh-sc-bulb-twinkle { animation: xh-on .5s ease-out both, xh-twinkle 5s 2.5s ease-in-out infinite; }
+  .xh-hero[data-xh-visible][data-xh-settled] .xh-scene .xh-sc-bulb-twinkle { animation: xh-twinkle 5s ease-in-out infinite; }
 }
 
 /* ───────────────────────── Services, gift-wrapped ───────────────────────── */
-.xh-services { padding-top: 40px; }
-.xh-gifts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.xh-services { padding-top: 36px; }
+.xh-gifts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; margin: 0; padding: 14px 0 0; list-style: none; }
 .xh-gifts > li { min-width: 0; }
-@media (min-width: 768px) { .xh-gifts { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } .xh-gift-art { height: 100px; } }
+@media (min-width: 768px) { .xh-gifts { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px 16px; } .xh-gift-art { height: 100px; } }
 @media (min-width: 1180px) { .xh-gifts { grid-template-columns: repeat(6, minmax(0, 1fr)); } .xh-gift-art { height: 88px; } }
-.xh-gift { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 200px; padding: 10px 12px 14px; border-radius: 20px; text-align: left; cursor: pointer; color: var(--gift-ink); background: var(--gift-bg); border: 1px solid var(--gift-line); box-shadow: 0 20px 36px -24px #000, inset 0 1px 0 #ffffff24; transition: transform .35s var(--xh-ease); -webkit-tap-highlight-color: transparent; }
-.xh-gift::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--gift-pattern); pointer-events: none; }
-.xh-gift::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, #ffffff14, transparent 38%); pointer-events: none; }
+/* The card is the box; its paper is a clipped layer, so ribbons, tags and bows can wrap its edges for real. */
+.xh-gift { position: relative; isolation: isolate; display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 204px; padding: 12px 12px 14px; border: 0; border-radius: 20px; background: none; text-align: left; cursor: pointer; color: var(--gift-ink); transition: transform .35s var(--xh-ease); -webkit-tap-highlight-color: transparent; }
+.xh-gift-paper { position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; background: var(--gift-bg); border: 1px solid var(--gift-line); box-shadow: 0 20px 36px -24px #000, inset 0 1px 0 #ffffff24, inset 0 -12px 18px -14px #0000004d; }
+.xh-gift-paper::before { content: ''; position: absolute; inset: 0; background: var(--gift-pattern); opacity: var(--pattern-alpha, 1); }
+.xh-gift-paper::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, #ffffff14, transparent 38%); }
 .xh-gift:active { transform: scale(.98); }
-@media (hover: hover) { .xh-gift:hover { transform: translateY(-4px); box-shadow: 0 30px 44px -26px #000, inset 0 1px 0 #ffffff2e; } }
-.xh-gift-ribbon { position: absolute; top: 0; right: 0; z-index: 1; width: 62px; height: 62px; pointer-events: none; }
-.xh-corner-bow { display: block; width: 100%; height: 100%; }
+@media (hover: hover) { .xh-gift:hover { transform: translateY(-4px); } .xh-gift:hover .xh-gift-paper { box-shadow: 0 30px 44px -26px #000, inset 0 1px 0 #ffffff2e, inset 0 -12px 18px -14px #0000004d; } }
 .xh-gift-art { display: block; height: 88px; margin: 2px 22px 6px -6px; }
 .xh-art { display: block; width: 100%; height: 100%; overflow: visible; }
 .xh-gift-text { display: flex; flex-direction: column; gap: 3px; margin-top: auto; min-width: 0; }
@@ -148,20 +183,37 @@
 .xh-tag-live::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #3ee08f; box-shadow: 0 0 0 2px #3ee08f33; }
 .xh-tag-free { --tag-bg: #00c365 !important; --tag-ink: #04150c !important; }
 .xh-tag-neutral::before { content: ''; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid currentColor; }
-/* Six wraps: one family, six papers. */
+/* Cards tied with a band keep their words and art clear of it. */
+.xh-gift:is(.xh-tie-satin-gold, .xh-tie-satin-ivory, .xh-tie-pinstripe, .xh-tie-twine) .xh-gift-text { padding-right: calc(9% + 14px); }
+.xh-gift:is(.xh-tie-satin-gold, .xh-tie-satin-ivory, .xh-tie-pinstripe, .xh-tie-twine) .xh-gift-art { margin-right: calc(9% + 18px); }
+/* Six papers, one family. */
 .xh-wrap-pine { --gift-bg: linear-gradient(160deg, #17573f, #0c3527 60%, #08271d); --gift-ink: #f6f1e7; --gift-line: #2f6f55; --gift-pattern: repeating-linear-gradient(135deg, #f3d79a17 0 2px, transparent 2px 14px); --tag-bg: #f3d79a26; --tag-ink: #fbe9c0; }
-.xh-wrap-berry { --gift-bg: linear-gradient(160deg, #a7253f, #73152f 62%, #500d22); --gift-ink: #fff4f0; --gift-line: #c4465f; --gift-pattern: radial-gradient(#ffd9e1 1.1px, transparent 1.6px) 0 0 / 15px 15px; --tag-bg: #ffffff22; --tag-ink: #fff1e8; }
-.xh-wrap-berry::before { opacity: .35; }
+.xh-wrap-berry { --gift-bg: linear-gradient(160deg, #a7253f, #73152f 62%, #500d22); --gift-ink: #fff4f0; --gift-line: #c4465f; --gift-pattern: radial-gradient(#ffd9e1 1.1px, transparent 1.6px) 0 0 / 15px 15px; --pattern-alpha: .35; --tag-bg: #ffffff22; --tag-ink: #fff1e8; }
 .xh-wrap-cream { --gift-bg: linear-gradient(160deg, #fffaf2, #efe2c8); --gift-ink: var(--xh-ink); --gift-line: #e1cfaa; --gift-pattern: repeating-linear-gradient(45deg, #0f3b2c10 0 1px, transparent 1px 12px), repeating-linear-gradient(-45deg, #0f3b2c10 0 1px, transparent 1px 12px); }
-.xh-wrap-gold { --gift-bg: linear-gradient(160deg, #73541c, #47330e 64%, #33240a); --gift-ink: #fff4da; --gift-line: #9a7531; --gift-pattern: radial-gradient(#f7dc8f 1.2px, transparent 1.8px) 0 0 / 22px 22px, radial-gradient(#f7dc8f 1px, transparent 1.5px) 11px 11px / 22px 22px; --tag-bg: #f7dc8f2b; --tag-ink: #fff0c8; }
-.xh-wrap-gold::before { opacity: .45; }
+.xh-wrap-gold { --gift-bg: linear-gradient(160deg, #73541c, #47330e 64%, #33240a); --gift-ink: #fff4da; --gift-line: #9a7531; --gift-pattern: radial-gradient(#f7dc8f 1.2px, transparent 1.8px) 0 0 / 22px 22px, radial-gradient(#f7dc8f 1px, transparent 1.5px) 11px 11px / 22px 22px; --pattern-alpha: .45; --tag-bg: #f7dc8f2b; --tag-ink: #fff0c8; }
 .xh-wrap-midnight { --gift-bg: linear-gradient(160deg, #1d2d50, #111b33 64%, #0b1224); --gift-ink: #eef2fb; --gift-line: #31456f; --gift-pattern: repeating-linear-gradient(45deg, #f3d79a14 0 1px, transparent 1px 16px), repeating-linear-gradient(-45deg, #f3d79a14 0 1px, transparent 1px 16px); --tag-bg: #ffffff1a; --tag-ink: #eef2fb; }
 .xh-wrap-kraft { --gift-bg: linear-gradient(160deg, #a77649, #7c5131 66%, #66412a); --gift-ink: #fffaf0; --gift-line: #c28f5b; --gift-pattern: repeating-linear-gradient(92deg, #ffffff0a 0 1px, transparent 1px 6px), repeating-linear-gradient(8deg, #0000000c 0 1px, transparent 1px 9px); --tag-bg: #00000026; --tag-ink: #fff7ea; }
 .xh-wrap-kraft .xh-gift-title, .xh-wrap-kraft .xh-gift-desc { text-shadow: 0 1px 2px #0005; }
-/* Arrival: the gifts are set down one after another and their ribbons tie. */
+/* Satin bands: shaded across their width, folding over the top edge and under the bottom one, casting a shadow on the paper. */
+.xh-band { position: absolute; z-index: 0; top: 0; bottom: 0; right: 9%; width: 13px; pointer-events: none; background: linear-gradient(90deg, var(--b-deep) 0%, var(--b-mid) 22%, var(--b-light) 46%, var(--b-mid) 68%, var(--b-deep) 100%); box-shadow: -2px 0 3px -1px #00000070, 2px 0 3px -1px #00000070; }
+.xh-band::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 8px; background: linear-gradient(180deg, #00000059, transparent); }
+.xh-band::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 10px; background: linear-gradient(0deg, #00000066, transparent); border-radius: 0 0 2px 2px; }
+.xh-band.is-gold { --b-light: #fff1c4; --b-mid: #eec466; --b-deep: #9c6b1c; }
+.xh-band.is-ivory { --b-light: #ffffff; --b-mid: #f3e9d6; --b-deep: #b8a47e; }
+.xh-band-knot { position: absolute; left: -5px; right: -5px; top: 30px; height: 16px; border-radius: 5px; background: linear-gradient(180deg, #ffffff, #efe2c8 55%, #c9b48d); box-shadow: 0 3px 5px -2px #0009, inset 0 -1px 0 #0000001f; }
+.xh-gift-bow { position: absolute; z-index: 2; top: -17px; right: calc(9% + 6.5px - 31px); width: 62px; height: 47px; pointer-events: none; }
+.xh-bow { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 3px 2.5px #00000073); }
+.xh-gift-hang { position: absolute; z-index: 2; top: -2px; right: 12px; width: 30px; height: 45px; pointer-events: none; }
+.xh-hang-tag { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 4px 3px #0000004d); }
+.xh-hang-tag .xh-hang-tag-card { transform-box: fill-box; transform-origin: 50% 0; }
+.xh-pinstripe { position: absolute; z-index: 0; top: 0; bottom: 0; right: 9%; width: 10px; opacity: .8; pointer-events: none; background: linear-gradient(90deg, transparent 0 1px, #f3d79a 1px 2.5px, transparent 2.5px 7.5px, #f3d79a 7.5px 9px, transparent 9px); }
+.xh-twine { position: absolute; z-index: 0; top: 0; bottom: 0; right: 9%; width: 3px; pointer-events: none; background: repeating-linear-gradient(168deg, #f6e7c8 0 3px, #bf9b66 3px 5px); box-shadow: 1px 0 1px #00000059; }
+.xh-gift-twinebow { position: absolute; z-index: 2; top: -9px; right: calc(9% + 1.5px - 22px); width: 44px; height: 31px; pointer-events: none; }
+.xh-twine-bow { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 2px 1.5px #00000066); }
+/* Arrival, once per visit: the gifts are set down one after another and their bows and tags settle on. */
 .xh-gifts[data-xh-armed]:not([data-xh-in]) .xh-gift { opacity: 0; transform: translateY(16px); }
-.xh-gifts[data-xh-in] .xh-gift { animation: xh-gift-in .7s calc(var(--i) * 70ms) var(--xh-ease) both; }
-.xh-gifts[data-xh-in] .xh-gift-ribbon { animation: xh-ribbon-in .7s calc(var(--i) * 70ms + .28s) var(--xh-spring) both; }
+.xh-gifts[data-xh-in]:not([data-xh-done]) .xh-gift { animation: xh-gift-in .7s calc(var(--i) * 70ms) var(--xh-ease) both; }
+.xh-gifts[data-xh-in]:not([data-xh-done]) :is(.xh-gift-bow, .xh-gift-hang, .xh-gift-twinebow) { animation: xh-tie-in .7s calc(var(--i) * 70ms + .3s) var(--xh-spring) both; }
 /* Each service's own reaction to a press (and to hover or keyboard focus). It never delays the navigation. */
 .xh-art-data .xh-wave, .xh-art-airtime .xh-coin, .xh-art-web .xh-cursor, .xh-art-earn .xh-hop, .xh-art-market .xh-parcel, .xh-art-market .xh-tag-swing, .xh-art .xh-art-float { transform-box: fill-box; }
 .xh-art-data .xh-wave { transform-origin: 0 50%; }
@@ -174,6 +226,7 @@
 .xh-gift-airtime[data-press] .xh-art-float { animation: xh-press-bump 1s ease-out both; }
 .xh-gift-website[data-press] .xh-web-glow { animation: xh-press-glow 1s ease-out both; }
 .xh-gift-website[data-press] .xh-cursor { animation: xh-press-click .9s var(--xh-ease) both; }
+.xh-gift-website[data-press] .xh-hang-tag-card { animation: xh-press-swing 1s var(--xh-ease) both; }
 .xh-gift-earn[data-press] .xh-hop { animation: xh-press-pass 1.1s ease-in-out both; }
 .xh-gift-afa[data-press] .xh-shine { animation: xh-press-shine 1s ease-out both; }
 .xh-art-market .xh-parcel { transform-origin: 50% 100%; }
@@ -189,30 +242,37 @@
   .xh-gift-airtime:hover .xh-art-float { animation: xh-press-bump 1s ease-out both; }
   .xh-gift-website:hover .xh-web-glow { animation: xh-press-glow 1s ease-out both; }
   .xh-gift-website:hover .xh-cursor { animation: xh-press-click .9s var(--xh-ease) both; }
+  .xh-gift-website:hover .xh-hang-tag-card { animation: xh-press-swing 1s var(--xh-ease) both; }
   .xh-gift-earn:hover .xh-hop { animation: xh-press-pass 1.1s ease-in-out both; }
   .xh-gift-afa:hover .xh-shine { animation: xh-press-shine 1s ease-out both; }
   .xh-gift-marketplace:hover .xh-parcel { animation: xh-press-hop .75s var(--xh-ease) both; }
   .xh-gift-marketplace:hover .xh-tag-swing { animation: xh-press-swing 1s var(--xh-ease) both; }
 }
 
-/* ───────────────────────── Featured data: velvet tray and paper receipt ───────────────────────── */
+/* ───────────────────────── Featured data: welcome invitation, velvet tray and paper receipt ───────────────────────── */
 .xh-data { padding-top: 24px; background: radial-gradient(50% 35% at 10% 35%, #10382a 0%, transparent 70%), var(--xh-night); }
-.xh-data-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
-@media (min-width: 1024px) { .xh-data-layout { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 28px; align-items: start; } }
-.xh-tray { position: relative; isolation: isolate; padding: 12px; border-radius: 26px; background: linear-gradient(172deg, #113f2f 0%, #0b2b20 46%, #071d16 100%); border: 1px solid #2c6a51; box-shadow: 0 34px 60px -38px #000, inset 0 1px 0 #ffffff17; }
+.xh-data-layout { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "welcome" "tray" "receipt"; gap: 18px; }
+.xh-data-welcome { grid-area: welcome; min-width: 0; }
+.xh-data-welcome:empty { display: none; }
+.xh-tray { grid-area: tray; }
+.xh-receipt { grid-area: receipt; }
+@media (min-width: 1024px) { .xh-data-layout { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); grid-template-areas: "tray welcome" "tray receipt"; grid-template-rows: auto 1fr; gap: 22px 28px; align-items: start; } }
+.xh-tray { position: relative; isolation: isolate; min-width: 0; padding: 12px; border-radius: 26px; background: linear-gradient(172deg, #113f2f 0%, #0b2b20 46%, #071d16 100%); border: 1px solid #2c6a51; box-shadow: 0 34px 60px -38px #000, inset 0 1px 0 #ffffff17; }
 .xh-tray::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: repeating-linear-gradient(115deg, #ffffff06 0 2px, transparent 2px 5px); pointer-events: none; }
 .xh-tray::after { content: ''; position: absolute; inset: 6px; border-radius: 21px; border: 1px solid #f3d79a24; pointer-events: none; }
+/* Network choice: a sliding ribbon in the chosen network's own colour, with clear text weight for the active one. */
 .xh-net { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 16px; background: #04140e; border: 1px solid #1d4637; }
-.xh-net-ribbon { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 16px) / 3); border-radius: 12px; background: linear-gradient(180deg, #1d4c3a, #11352a); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--net, #00c365) 72%, #fff), 0 8px 18px -10px #000; transform: translateX(calc(var(--xh-i) * (100% + 4px))); transition: transform .45s var(--xh-ease); }
-.xh-net button { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; border-radius: 12px; font: 700 .8125rem/1 var(--font-heading); color: #b5c8be; cursor: pointer; }
-.xh-net button[aria-pressed="true"] { color: #fff; }
-.xh-net-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px #ffffff22; }
-.xh-offer { margin-top: 12px; }
-.xh-offer:empty { display: none; }
-.xh-offer > div { border-radius: 14px; background: #0c2c20; border: 1px solid #2f5840; padding: 10px 14px; font-size: .8125rem; }
+.xh-net-ribbon { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 16px) / 3); border-radius: 12px; background: linear-gradient(180deg, #1f5240, #11352a); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--net, #00c365) 78%, #fff), 0 0 18px -6px color-mix(in srgb, var(--net, #00c365) 60%, transparent), 0 8px 18px -10px #000; transform: translateX(calc(var(--xh-i) * (100% + 4px))); transition: transform .45s var(--xh-ease); }
+.xh-net button { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 12px; font: 650 .8125rem/1 var(--font-heading); color: #a9bfb4; cursor: pointer; }
+.xh-net button[aria-pressed="true"] { color: #fff; font-weight: 800; }
+.xh-net-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px #ffffff26; }
+.xh-net button[aria-pressed="true"] .xh-net-dot { box-shadow: 0 0 0 2px #ffffff59, 0 0 8px 1px var(--network-color); }
+/* The real bundle rows, finished for the tray: velvet surface, aligned prices, a clear Buy. */
 .xh-bundles { display: grid; gap: 8px; margin-top: 12px; animation: xh-swap .38s var(--xh-ease) both; }
-.xh-bundles > div { background: #061a13d9; border-color: #1f4a3a; }
-.xh-bundles > div:hover { background: #0a271d; border-color: #b98f4599; }
+.xh-bundles > .mh-press { border-radius: 16px; background: linear-gradient(180deg, #0b241b, #071a13); border-color: #22503f; box-shadow: inset 0 1px 0 #ffffff0d; }
+.xh-bundles > .mh-press:hover { background: linear-gradient(180deg, #0e2b20, #091e16); border-color: #c9a2589c; }
+.xh-bundles > .mh-press:focus-visible { box-shadow: 0 0 0 2px var(--xh-champagne); }
+.xh-bundles .mh-buy { min-width: 74px; border-radius: 12px; background: #00c36524; border-color: #00c3658c; color: #7af0b5; }
 .xh-empty { margin: 0; padding: 18px; border-radius: 16px; border: 1px dashed #2f5840; color: var(--xh-text-2); font-size: .875rem; }
 .xh-tray-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; margin-top: 6px; padding-inline: 6px; }
 .xh-instant { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #fbbf2440; background: #fbbf2412; color: #fbcf5a; font-size: .75rem; font-weight: 600; cursor: pointer; }
@@ -227,12 +287,12 @@
 .xh-receipt strong svg { flex: none; color: #0f6b48; }
 .xh-receipt li p { margin: 4px 0 0; font-size: .8125rem; line-height: 1.55; color: var(--xh-ink-2); }
 .xh-receipt-link { display: inline-flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; margin-top: 8px; padding-top: 12px; border-top: 1px dashed #cdb894; color: #0b6a43; font: 700 .875rem/1.2 var(--font-heading); cursor: pointer; }
-@media (min-width: 1024px) { .xh-receipt { transform: rotate(-.8deg); margin-top: 6px; } }
+@media (min-width: 1024px) { .xh-receipt { transform: rotate(-.8deg); } }
 @media (max-width: 479px) { .xh-receipt li p { display: none; } .xh-receipt li { align-items: center; } .xh-receipt ol { gap: 10px; } }
 
 /* ───────────────────────── Mystery Greetings preview ───────────────────────── */
 .xh-greet { overflow: hidden; background: radial-gradient(60% 50% at 82% 48%, #8e1d3540, transparent 70%), linear-gradient(180deg, var(--xh-night) 0%, #1b0810 14%, #2a0b17 55%, #1b0810 84%, var(--xh-night) 100%); }
-.xh-greet-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 30px; align-items: center; }
+.xh-greet-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; align-items: center; }
 @media (min-width: 900px) { .xh-greet-grid { grid-template-columns: minmax(0, 1fr) minmax(0, .95fr); gap: 56px; } }
 .xh-greet-copy > p { margin: 14px 0 0; max-width: 470px; color: #ecd8cf; font-size: .9375rem; line-height: 1.65; }
 .xh-kicker-soft { gap: 10px; }
@@ -241,53 +301,64 @@
 .xh-home .xh-greet-copy .xh-greet-note { display: flex; align-items: center; gap: 8px; color: var(--xh-champagne); font-size: .8125rem; }
 .xh-greet-note svg { flex: none; }
 .xh-greet-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-top: 16px; }
-.xh-env { position: relative; width: min(100%, 440px); aspect-ratio: 400 / 320; margin: 0 auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.xh-env-back, .xh-env-front { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+/* The envelope: back body → letter (clipped at the bottom edge) → front pocket → hinged flap. Two states carried by
+   transitions, so a second tap reverses the movement from wherever it is; the flap swaps in front of or behind the
+   letter at the moment it stands edge-on. */
+.xh-env-wrap { display: grid; justify-items: center; gap: 8px; padding-top: 34px; }
+.xh-env { position: relative; isolation: isolate; display: block; width: min(100%, 420px); aspect-ratio: 400 / 320; margin: 0; padding: 0; border: 0; background: none; cursor: pointer; perspective: 1100px; -webkit-tap-highlight-color: transparent; }
+.xh-home .xh-env:focus-visible { outline: 3px solid var(--xh-champagne); outline-offset: 12px; border-radius: 18px; }
+.xh-env-back, .xh-env-front { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
 .xh-env-back { z-index: 0; filter: drop-shadow(0 30px 40px #0009); }
-.xh-env-front { z-index: 2; pointer-events: none; }
-.xh-letter { position: absolute; z-index: 1; left: 8.5%; right: 8.5%; top: 18%; height: 74%; padding: 6.5% 7%; border-radius: 10px; color: #3a0f1c; background: repeating-linear-gradient(180deg, #fffaf1 0 27px, #f0e3c9 27px 28px) 0 18px / 100% 100% no-repeat, #fffaf1; box-shadow: 0 10px 26px -12px #000; transform: translateY(-15%) rotate(-1.6deg); transition: transform .5s var(--xh-ease); }
-.xh-letter-to { margin: 0; font: italic 600 clamp(1rem, 4.6vw, 1.32rem)/1.2 var(--xh-serif); }
-.xh-letter-body { margin: 6px 0 0; font: italic 500 clamp(.84rem, 3.5vw, 1.04rem)/1.5 var(--xh-serif); color: #4a1525; }
-.xh-letter-from { margin: 6px 0 0; text-align: right; font: italic 600 clamp(.88rem, 3.6vw, 1.05rem)/1 var(--xh-serif); }
-.xh-letter-sample { position: absolute; top: 9px; right: 12px; margin: 0; font: 700 .58rem/1 var(--font-heading); letter-spacing: .14em; text-transform: uppercase; color: #a07a52; }
-.xh-env[data-xh-armed]:not([data-xh-in]) .xh-letter { transform: translateY(22%) rotate(0deg); }
-.xh-env[data-xh-in] .xh-letter { animation: xh-letter-up 1.1s .25s var(--xh-ease) both; }
-.xh-env[data-press] .xh-letter { animation: xh-press-peek .9s var(--xh-ease) both; }
+.xh-env-front { z-index: 2; }
+.xh-env-letterbox { position: absolute; inset: 0; z-index: 1; pointer-events: none; clip-path: inset(-70% -8% 0 -8%); }
+.xh-letter { position: absolute; left: 8.5%; right: 8.5%; top: 18%; height: 74%; display: flex; flex-direction: column; padding: 6.5% 7%; border-radius: 10px; color: #3a0f1c; text-align: left; background: repeating-linear-gradient(180deg, #fffaf1 0 27px, #f0e3c9 27px 28px) 0 18px / 100% 100% no-repeat, #fffaf1; box-shadow: 0 10px 26px -12px #000; transform: translateY(78%); transition: transform .5s var(--xh-ease); }
+.xh-env[data-state="open"] .xh-letter { transform: translateY(-16%) rotate(-1.6deg); transition: transform .75s .32s var(--xh-ease); }
+.xh-letter-to { font: italic 600 clamp(1rem, 4.6vw, 1.32rem)/1.2 var(--xh-serif); }
+.xh-letter-body { margin-top: 6px; font: italic 500 clamp(.84rem, 3.5vw, 1.04rem)/1.5 var(--xh-serif); color: #4a1525; }
+.xh-letter-from { margin-top: 6px; text-align: right; font: italic 600 clamp(.88rem, 3.6vw, 1.05rem)/1 var(--xh-serif); }
+.xh-letter-sample { position: absolute; top: 9px; right: 12px; font: 700 .58rem/1 var(--font-heading); letter-spacing: .14em; text-transform: uppercase; color: #a07a52; }
+.xh-env-flap { position: absolute; left: 0; right: 0; top: 35%; height: 43.75%; z-index: 3; transform-origin: 50% 0; transform-style: preserve-3d; transform: rotateX(0deg); transition: transform .5s .38s var(--xh-ease), z-index 0s .62s; pointer-events: none; }
+.xh-env[data-state="open"] .xh-env-flap { z-index: 0; transform: rotateX(180deg); transition: transform .5s var(--xh-ease), z-index 0s .25s; }
+.xh-flap-face { position: absolute; inset: 0; display: block; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+.xh-flap-face.is-inside { transform: rotateX(180deg); }
+.xh-env-hint { margin: 0; color: #c9ab9c; font-size: .75rem; letter-spacing: .02em; }
 
 /* ───────────────────────── Install (only where installing works) ───────────────────────── */
-.xh-install { display: none; padding: 0 0 52px; }
+.xh-install { display: none; padding: 0 0 44px; }
 .xh-install:has(.mh-install-promo) { display: block; }
-.xh-install-grid { position: relative; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 16px; align-items: center; }
-.xh-install-grid::before { content: ''; position: absolute; inset: 0 16px; z-index: 0; border-radius: 26px; background: linear-gradient(135deg, #10202e, #0a1420 55%, #0b1711); border: 1px solid #22344a; pointer-events: none; }
-@media (min-width: 640px) { .xh-install-grid::before { inset: 0 24px; } }
-@media (min-width: 1024px) { .xh-install-grid::before { inset: 0 32px; } }
-.xh-phone { position: relative; z-index: 1; width: 92px; margin: 16px 0 16px 14px; aspect-ratio: 9 / 18.5; padding: 5px; border-radius: 20px; background: #0b0f14; border: 2px solid #2b3a4c; box-shadow: 0 18px 30px -16px #000; }
-.xh-phone-screen { display: flex; flex-direction: column; align-items: center; height: 100%; padding: 12% 6% 8%; border-radius: 15px; background: radial-gradient(60% 40% at 30% 20%, #8e1d3599, transparent 70%), radial-gradient(50% 40% at 80% 60%, #e9b94966, transparent 70%), linear-gradient(180deg, #0f2a20, #071510); }
-.xh-phone-time { margin: 0; font: 800 .82rem/1 var(--font-heading); color: #fff; }
-.xh-phone-greet { margin: 3px 0 0; font: italic 600 .58rem/1 var(--xh-serif); color: var(--xh-champagne); }
-.xh-phone-apps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; margin-top: auto; }
-.xh-phone-apps i { aspect-ratio: 1; border-radius: 7px; background: #ffffff21; }
-.xh-phone-apps b { display: grid; place-items: center; aspect-ratio: 1; border-radius: 7px; background: #0b1410; box-shadow: 0 0 0 1.5px var(--xh-champagne), 0 0 14px #f3d79a99; overflow: hidden; }
+.xh-install-card { position: relative; display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 14px; align-items: start; padding: 16px 14px 14px 16px; border-radius: 24px; background: radial-gradient(70% 90% at 0% 0%, #8e1d3524, transparent 70%), linear-gradient(135deg, #10202e, #0a1420 55%, #0b1711); border: 1px solid #22344a; }
+.xh-phone { position: relative; width: 58px; aspect-ratio: 9 / 18.5; padding: 4px; border-radius: 14px; background: #0b0f14; border: 1.5px solid #2b3a4c; box-shadow: 0 14px 24px -14px #000; }
+.xh-phone-screen { display: flex; flex-direction: column; align-items: center; height: 100%; padding: 14% 6% 9%; border-radius: 10px; background: radial-gradient(60% 40% at 30% 20%, #8e1d3599, transparent 70%), radial-gradient(50% 40% at 80% 60%, #e9b94966, transparent 70%), linear-gradient(180deg, #0f2a20, #071510); }
+.xh-phone-time { margin: 0; font: 800 .6rem/1 var(--font-heading); color: #fff; }
+.xh-phone-greet { margin: 3px 0 0; text-align: center; font: italic 600 .42rem/1.1 var(--xh-serif); color: var(--xh-champagne); }
+.xh-phone-apps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 100%; margin-top: auto; }
+.xh-phone-apps i { aspect-ratio: 1; border-radius: 4px; background: #ffffff21; }
+.xh-phone-apps b { display: grid; place-items: center; aspect-ratio: 1; border-radius: 4px; background: #0b1410; box-shadow: 0 0 0 1px var(--xh-champagne), 0 0 10px #f3d79a99; overflow: hidden; }
 .xh-phone-apps b > * { width: 80% !important; height: 80% !important; }
-.xh-install-card { position: relative; z-index: 1; min-width: 0; padding: 14px 30px 14px 0; }
+.xh-install-body { min-width: 0; }
 /* The existing install card, unchanged in behaviour, set beside the phone (its own icon is replaced by the phone). */
-.xh-install-card .mh-install-promo { grid-template-columns: minmax(0, 1fr); background: transparent; border: 0; box-shadow: none; padding: 0; }
-.xh-install-card .mh-install-icon { display: none; }
-.xh-install-card :is(.mh-install-copy, .mh-install-actions, .mh-install-note, .mh-install-steps) { grid-column: 1 / -1; }
-.xh-install-card .mh-install-eyebrow { color: var(--xh-champagne); }
+.xh-install-body .mh-install-promo { grid-template-columns: minmax(0, 1fr); background: transparent; border: 0; box-shadow: none; padding: 0; }
+.xh-install-body .mh-install-icon { display: none; }
+.xh-install-body :is(.mh-install-copy, .mh-install-actions, .mh-install-note, .mh-install-steps) { grid-column: 1 / -1; }
+.xh-install-body .mh-install-copy { padding-right: 34px; }
+.xh-install-body .mh-install-close { top: -8px; right: -6px; }
+.xh-install-body .mh-install-eyebrow { color: var(--xh-champagne); }
 @media (min-width: 768px) {
-  .xh-install-grid { grid-template-columns: 170px minmax(0, 1fr); gap: 24px; }
-  .xh-phone { width: 128px; margin: 22px 0 22px 34px; }
-  .xh-phone-greet { font-size: .72rem; }
-  .xh-install-card { padding: 22px 52px 22px 0; }
-  .xh-install-card .mh-install-promo { grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; }
-  .xh-install-card .mh-install-copy { grid-column: 1; grid-row: 1; }
-  .xh-install-card .mh-install-actions { grid-column: 2; grid-row: 1; padding-right: 36px; }
+  .xh-install-card { grid-template-columns: 116px minmax(0, 1fr); gap: 28px; align-items: center; padding: 20px 26px 20px 30px; }
+  .xh-phone { width: 104px; padding: 5px; border-radius: 18px; }
+  .xh-phone-screen { border-radius: 13px; }
+  .xh-phone-time { font-size: .8rem; }
+  .xh-phone-greet { font-size: .6rem; }
+  .xh-phone-apps { gap: 6px; }
+  .xh-phone-apps :is(i, b) { border-radius: 6px; }
+  .xh-install-body .mh-install-promo { grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; }
+  .xh-install-body .mh-install-copy { grid-column: 1; grid-row: 1; }
+  .xh-install-body .mh-install-actions { grid-column: 2; grid-row: 1; padding-right: 36px; }
 }
 
 /* ───────────────────────── Website Builder ───────────────────────── */
 .xh-web { background: radial-gradient(45% 45% at 82% 42%, #3a2f1188, transparent 70%), radial-gradient(40% 38% at 8% 60%, #0f3b2c88, transparent 70%), var(--xh-night); }
-.xh-web-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 34px; align-items: center; }
+.xh-web-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 30px; align-items: center; }
 @media (min-width: 1000px) { .xh-web-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 56px; } }
 .xh-web-copy > p { margin: 16px 0 0; max-width: 460px; color: var(--xh-text-2); font-size: .9375rem; line-height: 1.7; }
 .xh-steps { display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 20px 0 22px; padding: 0; list-style: none; }
@@ -296,51 +367,58 @@
 .xh-web-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
 .xh-note { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--xh-text-3); font-size: .75rem; }
 .xh-note svg { flex: none; color: #5fd897; }
-.xh-chips { margin-top: 26px; padding-top: 18px; border-top: 1px solid #ffffff14; }
+/* Design choices: pills that switch the live preview beside them; the chosen one is filled. */
+.xh-chips { margin-top: 24px; padding-top: 18px; border-top: 1px solid #ffffff14; }
 .xh-chips p { margin: 0 0 10px; color: var(--xh-text-3); font-size: .75rem; }
 .xh-chips ul { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.xh-chips button { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px 6px 22px; border-radius: 6px 999px 999px 6px; border: 1px solid #f3d79a44; background: #f3d79a12; color: #f5ead2; font-size: .75rem; font-weight: 600; cursor: pointer; }
-.xh-chips button::before { content: ''; position: absolute; left: 8px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: var(--xh-night); box-shadow: 0 0 0 1px #f3d79a88; }
+.xh-chips button { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; max-width: 100%; padding: 6px 14px; border-radius: 999px; border: 1px solid #f3d79a44; background: #f3d79a10; color: #f5ead2; font-size: .75rem; font-weight: 600; white-space: nowrap; cursor: pointer; }
 .xh-chips button:hover { border-color: var(--xh-champagne); color: #fff; }
-.xh-browser { position: relative; overflow: hidden; justify-self: center; width: 100%; max-width: 560px; padding-bottom: 14px; border-radius: 18px; background: #f7f1e6; box-shadow: 0 44px 80px -40px #000, 0 0 0 1px #ffffff1c; }
-.xh-browser-bar { display: flex; align-items: center; gap: 6px; padding: 11px 14px; border-radius: 18px 18px 0 0; background: #efe5d2; border-bottom: 1px solid #e0d2b7; }
-.xh-browser-bar i { width: 10px; height: 10px; border-radius: 50%; background: #e2566d; }
+.xh-chips button[aria-pressed="true"] { background: var(--xh-champagne); border-color: var(--xh-champagne); color: #2a1d08; }
+@media (max-width: 999px) { .xh-chips ul { flex-wrap: nowrap; overflow-x: auto; margin-inline: -16px; padding: 2px 16px 6px; scrollbar-width: none; } .xh-chips li { flex-shrink: 0; } }
+/* A real browser frame around the live design card: chrome, address pill, the card, a sample note. No ribbon. */
+.xh-browser { position: relative; overflow: hidden; justify-self: center; width: 100%; max-width: 560px; padding-bottom: 12px; border-radius: 18px; background: #f7f1e6; box-shadow: 0 44px 80px -40px #000, 0 0 0 1px #ffffff1c, 0 0 60px -30px #e9b94966; }
+.xh-browser-bar { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 10px 12px; background: linear-gradient(180deg, #f3eadb, #ebe0cb); border-bottom: 1px solid #e0d2b7; }
+.xh-browser-bar i { flex: none; width: 10px; height: 10px; border-radius: 50%; background: #e2566d; }
 .xh-browser-bar i:nth-child(2) { background: #e9b949; }
 .xh-browser-bar i:nth-child(3) { background: #00c365; }
-.xh-browser-bar span { margin-left: 8px; color: #7a6a52; font-size: .6875rem; font-weight: 600; }
+.xh-browser-url { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; padding: 4px 10px; border-radius: 999px; background: #fffaf1; border: 1px solid #e0d2b7; color: #6f604a; font-size: .6875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xh-browser-url svg { flex: none; color: #0f6b48; }
 .xh-browser-body { padding: 12px 12px 4px; }
-.xh-browser-bow { position: absolute; top: 0; right: 0; z-index: 3; width: 88px; height: 88px; pointer-events: none; }
+.xh-browser .template-card-live-frame { animation: xh-on .45s ease-out both; }
 .xh-browser-note { margin: 4px 16px 0; color: #7a6a52; font-size: .75rem; line-height: 1.5; }
-.xh-browser[data-xh-armed]:not([data-xh-in]) { opacity: 0; transform: translateY(24px) rotate(1deg); }
-.xh-browser[data-xh-in] { animation: xh-gift-in .9s var(--xh-ease) both; }
-.xh-browser[data-xh-in] .xh-browser-bow { animation: xh-ribbon-in .8s .45s var(--xh-spring) both; }
-@media (max-width: 999px) { .xh-chips ul { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; } .xh-chips li { flex-shrink: 0; } }
+.xh-browser[data-xh-armed]:not([data-xh-in]) { opacity: 0; transform: translateY(24px); }
+.xh-browser[data-xh-in]:not([data-xh-done]) { animation: xh-gift-in .9s var(--xh-ease) both; }
 
-/* ───────────────────────── Marketplace ───────────────────────── */
+/* ───────────────────────── Marketplace: real categories and products first, a small gift accent ───────────────────────── */
 .xh-market { background: radial-gradient(50% 42% at 22% 42%, #3b26127a, transparent 70%), var(--xh-night); }
-.xh-market-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; align-items: center; }
-@media (min-width: 900px) { .xh-market-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 52px; } }
-.xh-market-copy > p { margin: 16px 0 20px; max-width: 470px; color: var(--xh-text-2); font-size: .9375rem; line-height: 1.7; }
-.xh-market-art { width: 100%; max-width: 440px; margin: 0 auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.xh-market-head { display: grid; grid-template-columns: minmax(0, 1fr) clamp(104px, 31vw, 140px); grid-template-areas: "kicker art" "title art" "text text" "cta cta"; column-gap: 10px; align-items: end; }
+.xh-market-head > .xh-kicker { grid-area: kicker; }
+.xh-market-head > h2 { grid-area: title; }
+.xh-market-text { grid-area: text; margin: 14px 0 18px; max-width: 520px; color: var(--xh-text-2); font-size: .9375rem; line-height: 1.65; }
+.xh-market-cta { grid-area: cta; justify-self: start; }
+.xh-market-art { grid-area: art; align-self: center; width: 100%; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+@media (min-width: 900px) {
+  .xh-market-head { grid-template-columns: minmax(0, 1fr) minmax(0, 340px); grid-template-areas: "kicker art" "title art" "text art" "cta art"; column-gap: 56px; }
+}
 .xh-parcels { display: block; width: 100%; height: auto; overflow: visible; }
 .xh-parcels .xh-parcel-tag-text { font: italic 600 10.5px/1 var(--xh-serif); fill: #fbf0dc; }
 .xh-parcels .xh-parcel-front, .xh-parcels .xh-parcel-back, .xh-parcels .xh-parcel-small, .xh-parcels .xh-parcel-tag { transform-box: fill-box; }
 .xh-parcels .xh-parcel-front { transform-origin: 50% 100%; }
 .xh-parcels .xh-parcel-tag { transform-origin: 0 0; }
 .xh-market-art[data-xh-armed]:not([data-xh-in]) :is(.xh-parcel-front, .xh-parcel-back, .xh-parcel-small) { opacity: 0; transform: translateY(-30px); }
-.xh-market-art[data-xh-in] .xh-parcel-back { animation: xh-drop .7s var(--xh-ease) both; }
-.xh-market-art[data-xh-in] .xh-parcel-front { animation: xh-drop .7s .15s var(--xh-ease) both; }
-.xh-market-art[data-xh-in] .xh-parcel-small { animation: xh-drop .7s .3s var(--xh-ease) both; }
+.xh-market-art[data-xh-in]:not([data-xh-done]) .xh-parcel-back { animation: xh-drop .7s var(--xh-ease) both; }
+.xh-market-art[data-xh-in]:not([data-xh-done]) .xh-parcel-front { animation: xh-drop .7s .15s var(--xh-ease) both; }
+.xh-market-art[data-xh-in]:not([data-xh-done]) .xh-parcel-small { animation: xh-drop .7s .3s var(--xh-ease) both; }
 .xh-market-art[data-press] .xh-parcel-front { animation: xh-press-hop .75s var(--xh-ease) both; }
 .xh-market-art[data-press] .xh-parcel-tag { animation: xh-press-swing 1s var(--xh-ease) both; }
-.xh-tags { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 28px 0 0; padding: 0; list-style: none; }
-@media (min-width: 900px) { .xh-tags { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 36px; } }
-.xh-tags a { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-height: 84px; height: 100%; padding: 12px 14px 12px 28px; color: var(--xh-ink); text-decoration: none; background: linear-gradient(160deg, #f8ecd4, #ead6b0); clip-path: polygon(16px 0, 100% 0, 100% 100%, 16px 100%, 0 50%); border-radius: 0 14px 14px 0; transition: transform .3s var(--xh-ease); }
+.xh-tags { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 24px 0 0; padding: 0; list-style: none; }
+@media (min-width: 900px) { .xh-tags { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 32px; } }
+.xh-tags a { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-height: 78px; height: 100%; padding: 12px 12px 12px 28px; color: var(--xh-ink); text-decoration: none; background: linear-gradient(160deg, #f8ecd4, #ead6b0); clip-path: polygon(16px 0, 100% 0, 100% 100%, 16px 100%, 0 50%); border-radius: 0 14px 14px 0; transition: transform .3s var(--xh-ease); }
 .xh-tags a i { position: absolute; left: 12px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: #0d0a07; box-shadow: 0 0 0 1.5px #b98f45; }
-.xh-tags strong { font: 700 .85rem/1.25 var(--font-heading); }
+.xh-tags strong { font: 700 .85rem/1.25 var(--font-heading); overflow-wrap: anywhere; }
 .xh-tags span { color: #6a5a44; font-size: .72rem; line-height: 1.35; }
-@media (hover: hover) { .xh-tags a:hover { transform: translateY(-3px) rotate(-1deg); filter: brightness(1.04); } }
-.xh-products { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 24px; }
+@media (hover: hover) { .xh-tags a:hover { transform: translateY(-3px) rotate(-1deg); } }
+.xh-products { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
 @media (min-width: 1024px) { .xh-products { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; } }
 .xh-product { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 10px; border-radius: 18px; background: #0f0d0a; border: 1px solid #3a2f20; }
 .xh-product-image { display: block; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 12px; }
@@ -362,30 +440,30 @@
 .xh-line { position: relative; margin: 0; padding-top: 26px; }
 .xh-line-twine { position: absolute; left: -6%; right: -6%; top: -22px; height: 70px; border-bottom: 2px solid #c8a46a; border-radius: 0 0 50% 50% / 0 0 100% 100%; pointer-events: none; }
 .xh-line ul { position: relative; display: flex; justify-content: center; gap: 4%; margin: 0; padding: 0; list-style: none; }
-.xh-line li { position: relative; width: 30%; max-width: 200px; transform-origin: 50% 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* The list item hangs at its angle and owns the arrival; the card inside owns the swing (Web Animations). */
+.xh-line li { position: relative; width: 30%; max-width: 200px; transform-origin: 50% 0; }
 .xh-line li:nth-child(1) { transform: rotate(-5deg); margin-top: 4px; }
 .xh-line li:nth-child(2) { transform: rotate(1.5deg); margin-top: 24px; }
 .xh-line li:nth-child(3) { transform: rotate(5deg); margin-top: 2px; }
+.xh-card { position: relative; display: block; transform-origin: 50% 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .xh-line img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; border: 6px solid var(--xh-cream); border-bottom-width: 20px; border-radius: 3px; background: #1a1612; box-shadow: 0 22px 32px -18px #000; }
 .xh-peg { position: absolute; z-index: 2; top: -20px; left: 50%; width: 14px; height: 30px; margin-left: -7px; }
 .xh-line figcaption { margin-top: 18px; text-align: center; color: var(--xh-text-3); font-size: .75rem; }
 .xh-line[data-xh-armed]:not([data-xh-in]) li { opacity: 0; }
-.xh-line[data-xh-in] li { animation: xh-hang-in 1.2s calc(var(--i) * 120ms) var(--xh-ease) both; }
-.xh-line li[data-press] { animation: xh-press-sway 1.1s var(--xh-ease) both; }
+.xh-line[data-xh-in]:not([data-xh-done]) li { animation: xh-hang-in 1.2s calc(var(--i) * 120ms) var(--xh-ease) both; }
 
-/* ───────────────────────── Coming soon: still wrapped ───────────────────────── */
-.xh-soon { padding-top: 16px; }
-.xh-soon-panel { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 22px; border-radius: 24px; background: repeating-linear-gradient(135deg, #f3d79a08 0 2px, transparent 2px 16px), linear-gradient(135deg, #15110b, #0c100e); border: 1px dashed #5b4a2c; }
-.xh-soon-bow { position: absolute; top: 0; right: 0; width: 72px; height: 72px; pointer-events: none; }
-@media (min-width: 900px) { .xh-soon-panel { grid-template-columns: minmax(0, .9fr) minmax(0, 1.6fr); gap: 36px; align-items: center; padding: 32px; } }
-.xh-soon-intro .xh-soon-badge { margin-bottom: 12px; }
-.xh-home .xh-soon-intro h2 { font-size: clamp(1.35rem, 4.8vw, 1.9rem); }
-.xh-soon-intro > p:not(.xh-soon-badge) { margin: 10px 0 0; color: var(--xh-text-3); font-size: .875rem; line-height: 1.6; }
-.xh-sealed { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.xh-sealed a { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 14px 8px 10px; border-radius: 12px; background: #17130d; border: 1px solid #3a3020; color: #e8dfcc; font: 600 .8125rem/1.25 var(--font-heading); text-decoration: none; }
+/* ───────────────────────── Coming soon: a short, honest teaser ───────────────────────── */
+.xh-soon { padding-block: 8px 40px; }
+@media (min-width: 960px) { .xh-soon { padding-block: 8px 64px; } }
+.xh-soon-strip { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 16px; border-radius: 20px; border: 1px dashed #5b4a2c; background: repeating-linear-gradient(135deg, #f3d79a08 0 2px, transparent 2px 16px), linear-gradient(135deg, #15110b, #0c100e); }
+@media (min-width: 900px) { .xh-soon-strip { grid-template-columns: minmax(0, 300px) minmax(0, 1fr) auto; align-items: center; gap: 24px; padding: 18px 24px; } }
+.xh-home .xh-soon-title { margin-top: 10px; font-size: clamp(1.15rem, 4.4vw, 1.4rem); }
+.xh-sealed { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.xh-sealed a { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 12px 6px 8px; border-radius: 12px; background: #17130d; border: 1px solid #3a3020; color: #e8dfcc; font: 600 .75rem/1.25 var(--font-heading); text-decoration: none; }
 .xh-sealed a:hover { border-color: #b98f45; color: #fff; }
-.xh-seal { flex: none; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 32%, #f0798b, #b3263f 55%, #6f1430); box-shadow: 0 0 0 2px #8e1d3540; }
-@media (max-width: 479px) { .xh-sealed li:nth-child(n+5) { display: none; } .xh-sealed a { font-size: .75rem; padding: 8px 12px 8px 9px; } }
+.xh-sealed a.xh-sealed-more { padding-left: 12px; border-style: dashed; color: var(--xh-champagne); }
+.xh-seal { flex: none; width: 15px; height: 15px; border-radius: 50%; background: radial-gradient(circle at 35% 32%, #f0798b, #b3263f 55%, #6f1430); box-shadow: 0 0 0 2px #8e1d3540; }
+.xh-soon-link { justify-self: start; }
 
 /* ───────────────────────── Help and FAQs ───────────────────────── */
 .xh-help { padding-top: 24px; }
@@ -411,11 +489,13 @@
 .xh-faq .help-answer .home-text-action { color: var(--xh-champagne); }
 
 /* ───────────────────────── Sign-off into the footer ───────────────────────── */
-.xh-signoff { position: relative; padding: 52px 16px 60px; text-align: center; background: radial-gradient(46% 62% at 50% 58%, #e9b9491f, transparent 70%), linear-gradient(180deg, var(--xh-night), #070b0e); }
+.xh-signoff { position: relative; padding: 48px 16px 56px; text-align: center; background: radial-gradient(46% 62% at 50% 58%, #e9b9491f, transparent 70%), linear-gradient(180deg, var(--xh-night), #070b0e); }
 .xh-signoff-lights { display: flex; justify-content: center; gap: clamp(10px, 4vw, 22px); margin-bottom: 22px; }
 .xh-signoff-lights i { width: 7px; height: 7px; border-radius: 50%; background: #f7d27a; box-shadow: 0 0 12px 3px #f7d27a88; animation: xh-on .6s calc(var(--i) * 70ms + .2s) ease-out both; }
 .xh-signoff-lights i:nth-child(3n+2) { background: #e2566d; box-shadow: 0 0 12px 3px #e2566d77; }
 .xh-signoff-lights i:nth-child(3n) { background: #7fe3ad; box-shadow: 0 0 12px 3px #7fe3ad66; }
+.xh-home[data-phase="year-end"] .xh-signoff-lights i, .xh-home[data-phase^="new-year"] .xh-signoff-lights i { background: #f7d27a; box-shadow: 0 0 12px 3px #f7d27a88; }
+.xh-home[data-phase="year-end"] .xh-signoff-lights i:nth-child(even), .xh-home[data-phase^="new-year"] .xh-signoff-lights i:nth-child(even) { background: #e9eef7; box-shadow: 0 0 12px 3px #e9eef780; }
 .xh-signoff-line { margin: 0; font: italic 500 clamp(1.6rem, 6.4vw, 2.6rem)/1.15 var(--xh-serif); color: var(--xh-champagne); }
 .xh-signoff-from { margin: 10px 0 0; color: var(--xh-text-3); font-size: .875rem; }
 .xh-signoff-from span { margin-left: 6px; font: italic 600 1rem/1 var(--xh-serif); color: #e9cf91; }
@@ -430,12 +510,12 @@
 @keyframes xh-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 @keyframes xh-tag-in { 0% { opacity: 0; transform: rotate(-16deg); } 55% { opacity: 1; transform: rotate(5deg); } 80% { transform: rotate(-2deg); } 100% { opacity: 1; transform: none; } }
 @keyframes xh-confetti { from { opacity: 0; transform: translateY(-40px) rotate(-60deg); } to { opacity: 1; transform: none; } }
+@keyframes xh-fw-bloom { 0% { opacity: 0; transform: scale(.15); } 35% { opacity: 1; } 100% { opacity: .9; transform: none; } }
 @keyframes xh-lid-hop { 0% { transform: none; } 30% { transform: translateY(-30px) rotate(-3deg); } 55% { transform: translateY(-2px); } 75% { transform: translateY(-9px) rotate(-1deg); } 100% { transform: none; } }
 @keyframes xh-burst { 0% { opacity: 0; transform: translate(0, 0) scale(.3); } 18% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1); } }
 @keyframes xh-gift-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
-@keyframes xh-ribbon-in { from { opacity: 0; transform: translate(14px, -14px) scale(.4) rotate(20deg); } to { opacity: 1; transform: none; } }
+@keyframes xh-tie-in { from { opacity: 0; transform: translateY(-10px) scale(.6) rotate(-8deg); } to { opacity: 1; transform: none; } }
 @keyframes xh-swap { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-@keyframes xh-letter-up { from { transform: translateY(22%) rotate(0deg); } to { transform: translateY(-15%) rotate(-1.6deg); } }
 @keyframes xh-drop { 0% { opacity: 0; transform: translateY(-34px); } 70% { opacity: 1; transform: translateY(3px); } 100% { opacity: 1; transform: none; } }
 @keyframes xh-hang-in { 0% { opacity: 0; transform: translateY(-26px) rotate(-14deg); } 45% { opacity: 1; transform: rotate(8deg); } 70% { transform: rotate(-4deg); } 100% { opacity: 1; } }
 @keyframes xh-press-wave { 0% { opacity: 0; transform: translateX(-6px) scale(.6); } 50% { opacity: 1; transform: translateX(3px) scale(1.15); } 100% { opacity: 1; transform: none; } }
@@ -448,8 +528,6 @@
 @keyframes xh-press-shine { from { transform: skewX(-18deg) translateX(0); } to { transform: skewX(-18deg) translateX(150px); } }
 @keyframes xh-press-hop { 0% { transform: none; } 30% { transform: translateY(-10px) scale(1.02, .98); } 55% { transform: translateY(0) scale(1.03, .96); } 75% { transform: translateY(-3px); } 100% { transform: none; } }
 @keyframes xh-press-swing { 0% { transform: none; } 20% { transform: rotate(16deg); } 45% { transform: rotate(-10deg); } 70% { transform: rotate(5deg); } 100% { transform: none; } }
-@keyframes xh-press-peek { 0% { transform: translateY(-15%) rotate(-1.6deg); } 40% { transform: translateY(-26%) rotate(-3deg); } 100% { transform: translateY(-15%) rotate(-1.6deg); } }
-@keyframes xh-press-sway { 0% { rotate: 0deg; } 25% { rotate: 7deg; } 50% { rotate: -5deg; } 75% { rotate: 2deg; } 100% { rotate: 0deg; } }
 
 @media (prefers-reduced-motion: reduce) {
   .xh-home *, .xh-home *::before, .xh-home *::after { animation: none !important; transition: none !important; }

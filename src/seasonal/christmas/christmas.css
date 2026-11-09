@@ -69,8 +69,8 @@
 .mh-app[data-season="christmas"] .mh-bottom-nav-indicator { position: relative; }
 .mh-app[data-season="christmas"] .mh-bottom-nav { border-top-color: #4a1c2666; }
 /* The selected tab: the brand-green pill keeps its meaning, finished with a fine champagne ring and one small sparkle. */
+/* The active tab gets a quiet gold ring only: nothing seasonal is ever drawn on a navigation icon (the hat lives on the logo). */
 .mh-app[data-season="christmas"] .mh-bottom-nav-item[aria-current='page'] .mh-bottom-nav-indicator { box-shadow: inset 0 0 0 1px #00c36540, 0 0 0 1px #e9b94959, 0 0 14px -4px #e9b94980; }
-.mh-app[data-season="christmas"] .mh-bottom-nav-item[aria-current='page'] .mh-bottom-nav-indicator::after { content: ''; position: absolute; top: -3px; right: 6px; width: 9px; height: 9px; background: #f7dc8f; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 0c.9 5.6 4.4 9.1 10 10-5.6.9-9.1 4.4-10 10-.9-5.6-4.4-9.1-10-10 5.6-.9 9.1-4.4 10-10z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 0c.9 5.6 4.4 9.1 10 10-5.6.9-9.1 4.4-10 10-.9-5.6-4.4-9.1-10-10 5.6-.9 9.1-4.4 10-10z'/%3E%3C/svg%3E") center / contain no-repeat; }
 .mh-app[data-season="christmas"] .mh-bottom-nav-item[aria-current='page'] .mh-bottom-nav-indicator { position: relative; }
 /* The homepage composes its own lights and sign-off, so the shared strand and footer greeting step aside there. */
 .mh-app[data-season="christmas"][data-season-page="home"] .xmas-header-lights, .mh-app[data-season="christmas"][data-season-page="home"] .xmas-footer { display: none; }
@@ -127,9 +127,34 @@
 .mh-app[data-season="christmas"] .xmas-confirmed { position: relative; display: flex; justify-content: center; margin: 6px 0 2px; }
 .mh-app[data-season="christmas"] .xmas-confirmed .xmas-celebrate { top: -20px; }
 .mh-app[data-season="christmas"] .xmas-confirmed-line { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 8px; border-radius: 999px; background: #3a141c; border: 1px solid #e9b94955; color: #fbe7c4; font: italic 600 .875rem/1.3 var(--x-serif); animation: xmas-rise .5s .2s var(--x-ease) both; }
-.mh-app[data-season="christmas"] .xmas-auth { position: absolute; top: 0; right: 64px; display: flex; align-items: flex-start; gap: 10px; pointer-events: none; z-index: 2; }
-.mh-app[data-season="christmas"] .xmas-auth .xmas-ornament { pointer-events: auto; cursor: pointer; }
-.mh-app[data-season="christmas"] .xmas-auth-greeting { margin-top: 14px; font: italic 600 .8125rem/1 var(--x-serif); color: var(--x-gold-soft); white-space: nowrap; }
+/* Sign up / sign in: a seasonal invitation. The sheet becomes an illuminated evergreen card with a foil edge; an
+   illustrated band and one quiet line sit above the title; the form stays plain and serious, with clear focus,
+   error and busy states. Logic, rules and wording are the sheet's own. */
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] { border-color: #e8c46f73; background: radial-gradient(90% 50% at 100% 0%, #1b3a2c 0%, transparent 70%), radial-gradient(70% 45% at 0% 100%, #3a0f1c 0%, transparent 72%), linear-gradient(180deg, #0d1a15 0%, #0a120f 100%); box-shadow: 0 0 0 1px #00000080, 0 40px 80px -30px #000, 0 0 60px -30px #e9b94959; }
+.mh-app[data-season="christmas"] .xmas-invite { margin: -16px -16px 14px; }
+@media (min-width: 640px) { .mh-app[data-season="christmas"] .xmas-invite { margin: -24px -24px 16px; } }
+.mh-app[data-season="christmas"] .xmas-invite-art { display: block; width: 100%; height: 96px; border-bottom: 1px solid #e8c46f40; }
+@media (min-width: 640px) { .mh-app[data-season="christmas"] .xmas-invite-art { height: 112px; } }
+.mh-app[data-season="christmas"] .xmas-invite-line { margin: 12px 16px 0; color: #e9d7a8; font: italic 500 .9375rem/1.35 var(--x-serif); }
+@media (min-width: 640px) { .mh-app[data-season="christmas"] .xmas-invite-line { margin-inline: 24px; } }
+.mh-app[data-season="christmas"] .xmas-invite-line span { color: #f7dc8f; font-weight: 600; }
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] h2 { color: #fff8ec; font-family: var(--font-heading); font-size: 1.5rem; font-weight: 750; letter-spacing: -.02em; }
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] h2 + button { background: #ffffff12; color: #f3e7cc; border-radius: 12px; }
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] label { color: #efe6d2; }
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] :is(input[type="text"], input[type="tel"], input[type="email"], input[type="password"]) { min-height: 48px; border-radius: 12px; border-color: #2c4a3d; background: #08120e; color: #fff; }
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] :is(input[type="text"], input[type="tel"], input[type="email"], input[type="password"]):focus { border-color: #00c365; box-shadow: 0 0 0 3px #00c36533; }
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] input[aria-invalid="true"] { border-color: #f28b9b; }
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] [role="alert"] { border-color: #f28b9b59; background: #3a0f1c66; color: #ffd4da; }
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] button[type="submit"] { position: relative; min-height: 52px; border-radius: 14px; color: #03150c; font-weight: 750; background: linear-gradient(180deg, #34e892 0%, #00c365 50%, #00a957 100%); box-shadow: inset 0 1px 0 #ffffff7a, 0 0 0 1px #e8c46f, 0 14px 28px -14px #00c365; }
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] button[type="submit"]:focus-visible { outline: 2px solid #f3d79a; outline-offset: 3px; }
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] button[type="submit"]:disabled { opacity: .85; }
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] form[aria-busy="true"] button[type="submit"]::after { content: ''; position: absolute; top: 50%; right: 18px; width: 16px; height: 16px; margin-top: -8px; border-radius: 50%; border: 2px solid #03150c40; border-top-color: #03150c; animation: xmas-spin .8s linear infinite; }
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] .border-slate-800 { border-color: #e8c46f2e; }
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] .text-emerald-300 { color: #f3d79a; }
+.mh-app[data-season="christmas"] [data-dialog-variant="auth"] .mh-button-secondary { min-height: 48px; border-color: #e8c46f59; background: #ffffff0a; color: #fff3dc; }
+@keyframes xmas-spin { to { transform: rotate(360deg); } }
+/* Short phones (keyboard open): the sheet starts at the top so the field being typed in stays above the keyboard. */
+@media (max-height: 700px) { .mh-app[data-season="christmas"] .fixed.inset-0:has(> [data-dialog-variant="auth"]) { align-items: flex-start; } }
 
 /* ───────── Small screens ───────── */
 @media (max-width: 767px) {
@@ -138,7 +163,6 @@
   .mh-app[data-season="christmas"] .xmas-footer-row .xmas-bell svg { width: 24px; height: 28px; }
   .mh-app[data-season="christmas"] .xmas-creative-stage { right: 22%; }
 }
-@media (max-width: 639px) { .mh-app[data-season="christmas"] .xmas-auth-greeting { display: none; } }
 /* Sheets (checkout, order status, Marketplace) gain a fine festive edge and a ribbon bow in the top corner.
    Drawn in CSS so the checkout component itself is unchanged: no element, no text, nothing to tap or dismiss. */
 .mh-app[data-season="christmas"] .mh-sheet { box-shadow: inset 0 2px 0 #b3263fcc, 0 25px 50px -12px #000; }
@@ -148,4 +172,5 @@
 @media (prefers-reduced-motion: reduce) {
   .mh-app[data-season="christmas"] :is(.xmas-ornament, .xmas-star, .xmas-gift, .xmas-bell, .xmas-tag, .xmas-bulb, .xmas-page, .xmas-confirmed-line, .xmas-sparkle) { animation: none !important; }
   .mh-app[data-season="christmas"] .xmas-confetti { display: none; }
+  .mh-app[data-season="christmas"] [data-dialog-variant="auth"] form[aria-busy="true"] button[type="submit"]::after { animation: none; }
 }

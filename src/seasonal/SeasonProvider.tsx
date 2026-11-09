@@ -14,7 +14,12 @@ import {
  * - A founder preview (?season-preview=christmas-2026, optionally &season-date=2026-12-25) shows the pack in this
  *   browser tab only, with a visible "Preview" ribbon. It is kept in sessionStorage, so it ends with the tab, and
  *   it never changes what any other visitor sees.
- * - Phase 1 dresses the signed-out experience only. Signed-in customers keep the normal appearance until Phase 2.
+ * - Who sees what while a pack applies:
+ *   - the shared shell (header logo, menu, footer) follows the season for everyone, including while sign-in is checked,
+ *     so it never flickers on and off as the account loads (`shellActive`, `data-season-shell`);
+ *   - signed-out visitors get the whole guest journey: every guest page composition and the guest homepage
+ *     (`active`, `data-season`);
+ *   - signed-in customers get the seasonal member homepage (`memberActive`); their other pages stay normal for now.
  */
 
 const PREVIEW_KEY = 'mh-season-preview';
@@ -26,15 +31,19 @@ interface StoredPreview { pack: SeasonalPackId; date: string | null }
 export interface SeasonContextValue {
   /** The pack and phase that apply to this browser (server setting or preview), before the guest-only rule. */
   status: SeasonStatus;
-  /** True when the seasonal presentation is on screen: a pack applies and the visitor is signed out. */
+  /** The guest pack is on screen: a pack applies and the visitor is signed out. */
   active: boolean;
+  /** A pack applies and a customer is signed in: the seasonal member homepage is on screen. */
+  memberActive: boolean;
+  /** A pack applies, whoever is visiting: the shared header, menu and footer are seasonal. */
+  shellActive: boolean;
   previewing: boolean;
-  /** A pack applies, but this visitor is signed in, so Phase 1 keeps the normal appearance. */
+  /** A pack applies, but this visitor is signed in (or still being checked), so guest page compositions stay off. */
   heldForSignedIn: boolean;
   exitPreview: () => void;
 }
 
-const SeasonContext = createContext<SeasonContextValue>({ status: OFF, active: false, previewing: false, heldForSignedIn: false, exitPreview: () => {} });
+const SeasonContext = createContext<SeasonContextValue>({ status: OFF, active: false, memberActive: false, shellActive: false, previewing: false, heldForSignedIn: false, exitPreview: () => {} });
 export const useSeason = () => useContext(SeasonContext);
 
 function readStorage<T>(storage: () => Storage, key: string): T | null {
@@ -92,17 +101,30 @@ export const SeasonProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const value = useMemo<SeasonContextValue>(() => {
     const status = preview ? previewSeasonStatus(preview.pack, preview.date || accraDate()) : server;
     const signedOut = !user && !isAuthChecking;
-    return { status, active: status.active && signedOut, previewing: Boolean(preview), heldForSignedIn: status.active && !signedOut, exitPreview };
+    const signedIn = Boolean(user) && !isAuthChecking;
+    return {
+      status, active: status.active && signedOut, memberActive: status.active && signedIn, shellActive: status.active,
+      previewing: Boolean(preview), heldForSignedIn: status.active && !signedOut, exitPreview,
+    };
   }, [preview, server, user, isAuthChecking, exitPreview]);
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
 };
 
 /**
- * Attributes for the customer shell. Absent when the season is off, so the normal styles apply untouched. The page
- * lets the pack adjust shared chrome for one page only (for example, the homepage draws its own lights).
+ * Attributes for the customer shell. Absent when the season is off, so the normal styles apply untouched.
+ * - `data-season-shell`: a pack applies (any visitor): the shared header, menu and footer.
+ * - `data-season`: the guest pack (signed-out visitors only), exactly as before.
+ * - `data-season-audience`: guest, member, or pending while the account is being checked.
+ * - `data-season-page`: lets the pack adjust shared chrome for one page only (the homepage draws its own lights).
  */
 export function seasonShellAttributes(season: SeasonContextValue, page?: string): Record<string, string> {
-  if (!season.active || !season.status.pack) return {};
-  return { 'data-season': 'christmas', 'data-season-phase': season.status.phase, ...(page ? { 'data-season-page': page } : {}) };
+  if (!season.shellActive || !season.status.pack) return {};
+  return {
+    'data-season-shell': 'christmas',
+    'data-season-audience': season.active ? 'guest' : season.memberActive ? 'member' : 'pending',
+    'data-season-phase': season.status.phase,
+    ...(season.active ? { 'data-season': 'christmas' } : {}),
+    ...(page ? { 'data-season-page': page } : {}),
+  };
 }

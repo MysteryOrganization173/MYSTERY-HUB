@@ -188,5 +188,7 @@ test('welcome cannot cover checkout/auth or a navigated route; member install us
   assert.match(layer, /if \(!installed \|\| welcomeOpen \|\| busy \|\| activePage !== 'home'\) return;/);
   assert.match(layer, /welcomeOpen && !user && !busy && activePage === 'home'/);
   const member = source('src/components/home/MemberHome.tsx');
-  assert.equal((member.match(/promotion=\{<InstallAppPromo variant="compact"\/>\}/g) || []).length, 1);
+  // One compact slot, set once on the member view props (shared by the ordinary and the seasonal member homepage).
+  assert.equal((member.match(/promotion(=\{|:)<InstallAppPromo variant="compact"\/>/g) || []).length, 1);
+  assert.equal((member.match(/<InstallAppPromo/g) || []).length, 1);
 });

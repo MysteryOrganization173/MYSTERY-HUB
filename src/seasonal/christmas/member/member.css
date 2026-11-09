@@ -1,0 +1,299 @@
+/* Mystery Hub signed-in Christmas homepage: the customer's own control centre, dressed for the season.
+   Every rule starts with an .xm- class, a namespace used only by this page, which exists only while a season is on
+   screen for a signed-in customer, so the ordinary member homepage is never touched. Same palette and motion rules
+   as the guest homepage (kit/motion.ts): one owner per moving element, entrances once per visit, transform and
+   opacity only, idle loops only on capable desktops, and nothing at all with reduced motion.
+   Order truth outranks the season: attention keeps its amber voice, progress lights only confirmed steps, and no
+   celebration is ever drawn around an order. */
+
+.xm-home {
+  --xm-night: #050d0a; --xm-pine: #0b2a20; --xm-velvet: #0f3a2b;
+  --xm-berry: #b3263f; --xm-wine: #3a0f1c;
+  --xm-gold: #e9b949; --xm-champagne: #f3d79a; --xm-gold-deep: #a8771d;
+  --xm-cream: #fbf4e6; --xm-ink: #1b1510; --xm-ink-2: #5e5040;
+  --xm-text: #f6f1e7; --xm-text-2: #d3cbbb; --xm-text-3: #aea590;
+  --xm-line: #1c3027; --xm-line-2: #2b4a3b;
+  --xm-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --xm-ease: cubic-bezier(.2, .7, .2, 1);
+  --xm-spring: cubic-bezier(.34, 1.4, .5, 1);
+  position: relative; isolation: isolate; overflow-x: clip; background: var(--xm-night); color: var(--xm-text);
+}
+/* Evening light behind the greeting, and a few still points of light, both gone before the content below. */
+.xm-home::before { content: ''; position: absolute; inset: 0 0 auto; height: 440px; z-index: -1; pointer-events: none;
+  background: radial-gradient(58% 78% at 88% 0%, #164a3599, transparent 70%), radial-gradient(42% 60% at 0% 6%, #4c132450, transparent 70%), radial-gradient(28% 36% at 58% 0%, #2c251170, transparent 70%); }
+.xm-home::after { content: ''; position: absolute; inset: 0 0 auto; height: 300px; z-index: -1; pointer-events: none; opacity: .26;
+  background-image: radial-gradient(#f7dc8f 1px, transparent 1.7px), radial-gradient(#fff4dc 1px, transparent 1.5px);
+  background-size: 170px 170px, 250px 250px; background-position: 14px 6px, 96px 58px;
+  -webkit-mask-image: linear-gradient(180deg, #000 25%, transparent); mask-image: linear-gradient(180deg, #000 25%, transparent); }
+.xm-home *, .xm-home *::before, .xm-home *::after { box-sizing: border-box; }
+.xm-inner { max-width: 1180px; margin-inline: auto; padding: 14px 16px 8px; display: grid; gap: 16px; }
+.xm-home :is(button, a):focus-visible { outline: 3px solid var(--xm-champagne); outline-offset: 3px; }
+.xm-home h1, .xm-home h2, .xm-home h3, .xm-home p { margin: 0; }
+
+/* Shared type and links */
+.xm-section-title { font: 700 1.125rem/1.25 var(--font-heading); letter-spacing: -.01em; color: #fff8ec; }
+.xm-text-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0; border: 0; background: none; color: var(--xm-champagne); font: 600 .875rem/1.3 var(--font-heading); text-decoration: none; cursor: pointer; }
+.xm-text-link:hover { color: #fff3cf; }
+.xm-inline-link { min-height: 44px; padding: 0; border: 0; background: none; color: var(--xm-champagne); text-decoration: underline; cursor: pointer; font: inherit; }
+.xm-muted { padding-block: 12px; color: var(--xm-text-2); font-size: .875rem; line-height: 1.6; }
+/* The site's own buttons, in the season's materials (same actions, same sizes). */
+.xm-home .mh-button { box-shadow: inset 0 1px 0 #ffffff55, 0 0 0 1px #e8c46f, 0 10px 22px -14px #00c365; }
+.xm-home .mh-button-secondary { border-color: #f3d79a5c; background: #ffffff0c; color: #fff3dc; }
+.xm-home .mh-button-secondary:hover { border-color: var(--xm-champagne); background: #f3d79a14; }
+
+/* ───────── Welcome: their name, the real time of day, the real state of their orders ───────── */
+.xm-top { display: grid; gap: 12px; }
+.xm-welcome { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 10px 14px; padding-top: 2px; }
+/* The two greetings are told apart by type (serif Twi, small capitals English), so a wrap leaves no stray separator. */
+.xm-welcome-kicker { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font: 700 .68rem/1.3 var(--font-heading); letter-spacing: .18em; text-transform: uppercase; color: #e6cd94; }
+.xm-welcome-kicker [lang="ak"] { font: italic 600 1rem/1 var(--xm-serif); letter-spacing: .01em; text-transform: none; color: var(--xm-champagne); }
+.xm-welcome-name { margin-top: 4px; font: 750 clamp(2rem, 8.4vw, 2.9rem)/1.04 var(--font-heading); letter-spacing: -.035em; color: #fff8ec; overflow-wrap: anywhere; }
+.xm-welcome-sub { margin-top: 6px; color: var(--xm-text-2); font-size: .9375rem; line-height: 1.45; }
+.xm-welcome-season { margin-top: 6px; font: italic 500 1.0625rem/1.35 var(--xm-serif); color: var(--xm-champagne); text-wrap: balance; }
+.xm-welcome-gift { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 88px; }
+.xm-gift { display: block; width: 100%; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.xm-gift-art { display: block; width: 100%; height: auto; overflow: visible; }
+.xm-gift-lid, .xm-spark { transform-box: fill-box; }
+.xm-gift-lid { transform-origin: 50% 100%; }
+.xm-spark { transform-origin: 50% 50%; opacity: .6; }
+.xm-daycount { max-width: 100px; text-align: center; color: var(--xm-text-2); font-size: .6875rem; line-height: 1.25; }
+.xm-daycount b { display: block; font: italic 600 1.0625rem/1.1 var(--xm-serif); color: var(--xm-champagne); }
+
+/* The Wallet keeps its own component and real balance; only its materials change here. */
+.xm-home .member-wallet { position: relative; border: 0; border-radius: 20px; background: radial-gradient(90% 120% at 100% 0%, #1a5a40aa 0%, transparent 62%), linear-gradient(160deg, #0f2f22, #08170f 72%); box-shadow: inset 0 0 0 1px #f3d79a33, 0 20px 40px -28px #000; }
+.xm-home .member-wallet-label { color: #e6cd94; }
+.xm-home .member-wallet-label svg { color: var(--xm-gold); }
+.xm-home .member-wallet-balance { color: #fff8ec; }
+.xm-home .member-wallet-loading { color: var(--xm-text-3); }
+.xm-home .member-wallet-note { color: var(--xm-text-3); }
+.xm-home .member-wallet .member-text-link { color: var(--xm-champagne); }
+
+/* ───────── Buy now: the two everyday purchases, the strongest targets on the page ───────── */
+.xm-primary { display: grid; gap: 14px; }
+/* An order that needs the customer, or is still moving, comes before new buying (phones and tablets). */
+.xm-primary.is-urgent .xm-order { order: -1; }
+.xm-buy { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.xm-buy-tile { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-height: 108px; padding: 14px 16px; text-align: left; border: 0; border-radius: 20px; cursor: pointer; transition: transform .15s var(--xm-ease); }
+.xm-buy-tile:active { transform: scale(.98); }
+.xm-buy-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; }
+.xm-buy-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.xm-buy-text strong { font: 700 1.125rem/1.2 var(--font-heading); letter-spacing: -.01em; }
+.xm-buy-text > span { font-size: .75rem; line-height: 1.4; }
+.xm-buy-arrow { position: absolute; top: 18px; right: 16px; transition: transform .15s var(--xm-ease); }
+.xm-buy-tile:hover .xm-buy-arrow { transform: translateX(3px); }
+.xm-buy-tile.is-data { color: #03150c; background: linear-gradient(155deg, #34e892, #00c365 55%, #00a554); box-shadow: inset 0 1px 0 #ffffff6b, 0 0 0 1px #e8c46f, 0 16px 30px -18px #00c365; }
+.xm-buy-tile.is-data .xm-buy-icon { background: #03150c1f; }
+.xm-buy-tile.is-data .xm-buy-text > span { color: #053019; font-weight: 600; }
+.xm-buy-tile.is-airtime { color: #fff4e6; background: radial-gradient(90% 120% at 100% 0%, #6e1a2f, transparent 62%), linear-gradient(160deg, #3d1020, #24070f 72%); box-shadow: inset 0 0 0 1px #f3d79a40, 0 16px 30px -20px #000; }
+.xm-buy-tile.is-airtime .xm-buy-icon { background: #f3d79a1a; color: var(--xm-champagne); box-shadow: inset 0 0 0 1px #f3d79a33; }
+.xm-buy-tile.is-airtime .xm-buy-text > span { color: #e3cfc2; }
+.xm-buy-tile.is-airtime .xm-buy-arrow { color: #e6cd94; }
+/* A satin sheen crosses Buy Data once, as the tiles arrive. */
+.xm-buy-sheen { position: absolute; top: -20%; bottom: -20%; left: 0; width: 46%; z-index: -1; pointer-events: none; background: linear-gradient(100deg, transparent, #ffffff47 50%, transparent); transform: translateX(-120%) skewX(-16deg); }
+
+/* ───────── Order spotlight: one card whose voice follows the server status ───────── */
+.xm-order { position: relative; display: grid; gap: 12px; min-width: 0; padding: 16px; border-radius: 20px; border: 1px solid var(--xm-line); background: linear-gradient(165deg, #0c1d17, #08130f 75%); }
+.xm-order-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.xm-order-head h2 { display: flex; align-items: center; gap: 6px; font: 700 .72rem/1.3 var(--font-heading); letter-spacing: .14em; text-transform: uppercase; color: #e6cd94; }
+.xm-order-status { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; background: #0f2a3a; color: #9fd8ff; }
+.xm-order-body { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.xm-order-body h3 { font: 700 1.1875rem/1.25 var(--font-heading); letter-spacing: -.01em; color: #fff8ec; overflow-wrap: anywhere; }
+.xm-order-meta { margin-top: 2px !important; color: var(--xm-text-2); font-size: .8125rem; overflow-wrap: anywhere; }
+.xm-order-amount { padding-top: 2px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.xm-order-next { color: var(--xm-text-2); font-size: .8125rem; line-height: 1.55; }
+.xm-order-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.xm-order-actions > :is(.mh-button, .mh-button-secondary) { min-height: 44px; }
+.xm-order-error { color: #fcd34d; font-size: .9375rem; font-weight: 600; }
+.xm-order.is-active { border-color: #24465a; background: linear-gradient(160deg, #0d1c24, #08130f 70%); }
+/* Attention keeps the site's amber voice: no festive material at all on a problem. */
+.xm-order.is-attention { border-color: #6b5320; background: linear-gradient(160deg, #241b0b, #14120d 75%); }
+.xm-order.is-attention .xm-order-head h2 { color: #fcd34d; }
+.xm-order.is-attention .xm-order-status { background: #3a2a0b; color: #fcd34d; }
+/* Delivered: a quiet champagne edge, no celebration. */
+.xm-order.is-done { border-color: #f3d79a38; }
+.xm-order.is-done .xm-order-status { background: #10301f; color: #7ee2aa; }
+.xm-order.is-closed .xm-order-status { background: #1c252c; color: #c3ced6; }
+.xm-live-dot { position: relative; flex: none; width: 7px; height: 7px; border-radius: 50%; background: #5cc8ff; }
+.xm-live-dot::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: #5cc8ff; animation: xm-ring 2s ease-out infinite; }
+/* Progress: a step lights only when the server status has reached it. */
+.xm-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.xm-steps li { display: flex; flex-direction: column; gap: 6px; color: var(--xm-text-3); font-size: .6875rem; font-weight: 600; line-height: 1.3; }
+.xm-steps li > span:first-child { height: 4px; border-radius: 999px; background: #1f2c33; }
+.xm-steps li.is-done { color: #cfe9f7; }
+.xm-steps li.is-done > span:first-child { background: #5cc8ff; }
+.xm-order.is-loading { min-height: 150px; align-content: start; }
+.xm-order.is-loading p { color: var(--xm-text-3); font-size: .875rem; }
+.xm-skeleton { position: relative; overflow: hidden; display: block; height: 18px; border-radius: 8px; background: #10201a; }
+.xm-skeleton.is-short { width: 55%; }
+.xm-skeleton::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, #f3d79a14, transparent); transform: translateX(-100%); animation: xm-shimmer 1.4s linear infinite; }
+/* First purchase: an invitation with real next steps, not an empty table. */
+.xm-order.is-first { border-color: #f3d79a38; background: radial-gradient(80% 120% at 100% 0%, #164a35, transparent 60%), linear-gradient(165deg, #0c1d17, #08130f 75%); }
+.xm-order.is-first .xm-order-head h2 { color: var(--xm-champagne); }
+.xm-first-title { font: italic 500 1.5rem/1.15 var(--xm-serif); color: #fff4dc; }
+.xm-networks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.xm-networks button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 8px; border-radius: 12px; border: 1px solid #f3d79a33; background: #050d0acc; color: var(--xm-text); font: 700 .8125rem/1.2 var(--font-heading); cursor: pointer; }
+.xm-networks button:hover { border-color: color-mix(in srgb, var(--network) 70%, #fff); }
+.xm-networks button > span:first-child { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--network); box-shadow: 0 0 0 2px #ffffff22; }
+.xm-primary-welcome:empty { display: none; }
+
+/* The reserved slot (today: the compact install card, only where installing can work). */
+.xm-slot:empty { display: none; }
+.xm-home .mh-install-promo { border-color: #f3d79a2e; background: radial-gradient(120% 140% at 0% 0%, #123526 0%, #0a1813 50%, #08120e 100%); }
+.xm-home .mh-install-eyebrow { color: #e6cd94; }
+.xm-home .mh-install-icon { border-color: #f3d79a40; }
+
+/* ───────── More from Mystery Hub: each service in its own material ───────── */
+.xm-more .xm-section-title { margin-bottom: 12px; }
+.xm-more-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.xm-tile { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; min-height: 132px; padding: 12px 14px 14px; text-align: left; border: 1px solid #ffffff14; border-radius: 18px; color: var(--xm-text); cursor: pointer; transition: transform .2s var(--xm-ease); }
+.xm-tile:active { transform: scale(.985); }
+.xm-tile-art { display: block; flex: none; width: 76px; height: 53px; }
+.xm-tile-art .xh-art { display: block; width: 100%; height: 100%; overflow: visible; }
+.xm-tile-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; color: var(--xm-champagne); background: #f3d79a14; box-shadow: inset 0 0 0 1px #f3d79a33; }
+.xm-tile-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.xm-tile-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding-right: 18px; font: 650 .9688rem/1.25 var(--font-heading); }
+.xm-tile-desc { font-size: .75rem; line-height: 1.45; overflow-wrap: anywhere; }
+.xm-tile-tag { padding: 4px 7px; border-radius: 999px; font: 700 .625rem/1 var(--font-body); letter-spacing: .02em; }
+.xm-tile-arrow { position: absolute; top: 14px; right: 12px; transition: transform .2s var(--xm-ease); }
+/* Website: evergreen velvet, and the only tile that speaks about the customer's own record (Live, Draft, none). */
+.xm-tile-website { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 14px; min-height: 0; padding: 14px 44px 14px 14px; border-color: #f3d79a38; background: radial-gradient(90% 120% at 100% 0%, #1c6b4b55, transparent 60%), linear-gradient(160deg, #0f3a2b, #08201a 75%); }
+.xm-tile-website .xm-tile-art { width: 92px; height: 64px; }
+.xm-tile-website .xm-tile-desc { color: #cfe3d6; }
+.xm-tile-website .xm-tile-arrow { top: 50%; margin-top: -8px; color: var(--xm-champagne); }
+.xm-tile-website.is-published .xm-tile-tag { background: #00c365; color: #03150c; }
+.xm-tile-website.is-draft .xm-tile-tag { background: var(--xm-champagne); color: #2a1a0c; }
+.xm-tile-website:is(.is-none, .is-unknown) .xm-tile-tag { background: transparent; color: var(--xm-champagne); box-shadow: inset 0 0 0 1px #f3d79a80; }
+/* Earn: wine velvet. */
+.xm-tile-earn { border-color: #f3d79a26; background: radial-gradient(90% 120% at 100% 0%, #6e1a2f, transparent 62%), linear-gradient(160deg, #3d1020, #24070f 72%); }
+.xm-tile-earn .xm-tile-desc { color: #e3cfc2; }
+.xm-tile-earn .xm-tile-arrow { color: #e6cd94; }
+/* Marketplace: cream paper, where the kraft parcels read best. */
+.xm-tile-market { color: var(--xm-ink); border-color: #fff2d6; background: linear-gradient(170deg, #fffaf0, #f3e6cc 85%); }
+.xm-tile-market .xm-tile-desc { color: var(--xm-ink-2); }
+.xm-tile-market .xm-tile-arrow { color: #8e1d35; }
+/* AFA: midnight velvet. */
+.xm-tile-afa { border-color: #f3d79a26; background: radial-gradient(90% 120% at 100% 0%, #26407099, transparent 62%), linear-gradient(160deg, #142544, #0a1428 75%); }
+.xm-tile-afa .xm-tile-desc { color: #c9d3e6; }
+.xm-tile-afa .xm-tile-arrow { color: #e6cd94; }
+/* All services: the plain night surface, with the season's champagne line. */
+.xm-tile-services { border-color: #f3d79a2e; background: linear-gradient(160deg, #0e1a16, #08110e 75%); }
+.xm-tile-services .xm-tile-desc { color: var(--xm-text-2); }
+.xm-tile-services .xm-tile-arrow { color: #e6cd94; }
+
+/* ───────── Mystery Greetings: a preview of a feature that is not open yet ───────── */
+.xm-greet { position: relative; isolation: isolate; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 96px; align-items: center; gap: 14px; padding: 16px; border-radius: 20px; border: 1px dashed #f3d79a4d; background: radial-gradient(70% 120% at 100% 50%, #3a0f1c99, transparent 70%), linear-gradient(160deg, #0b1a15, #07100d 75%); }
+.xm-greet-badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font: 700 .625rem/1.3 var(--font-heading); letter-spacing: .14em; text-transform: uppercase; color: #2a1a0c; background: var(--xm-champagne); }
+.xm-greet h2 { margin-top: 8px; font: italic 500 1.5rem/1.15 var(--xm-serif); color: #fff4dc; }
+.xm-greet-text > p:not(.xm-greet-badge):not(.xm-greet-note) { margin-top: 6px; color: var(--xm-text-2); font-size: .8125rem; line-height: 1.55; }
+.xm-greet-note { display: flex; align-items: center; gap: 6px; margin-top: 8px !important; color: var(--xm-text-3); font-size: .75rem; }
+.xm-env-art { display: block; width: 100%; height: auto; }
+
+/* ───────── Recent activity and help ───────── */
+.xm-lower { display: grid; gap: 22px; }
+.xm-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.xm-recent ul { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--xm-line); }
+.xm-recent li { border-bottom: 1px solid var(--xm-line); }
+.xm-recent li button { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 64px; padding-block: 10px; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.xm-recent li button:hover .xm-recent-title { color: #fff; }
+.xm-recent li svg { color: #8f8571; }
+.xm-recent-title { display: block; color: #ece4d4; font-size: .875rem; font-weight: 600; overflow-wrap: anywhere; }
+.xm-recent-ref { display: block; margin-top: 2px; color: var(--xm-text-3); font-size: .75rem; overflow-wrap: anywhere; }
+.xm-recent-end { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; max-width: 55%; margin-left: auto; font-size: .875rem; text-align: right; }
+.xm-recent-status { color: #9fd8ff; font-size: .75rem; font-weight: 600; }
+.xm-recent-status.is-done { color: #7ee2aa; }
+.xm-recent-status.is-attention { color: #fcd34d; }
+.xm-recent-status.is-closed { color: #c3ced6; }
+.xm-help { align-self: start; padding: 18px; border-radius: 20px; border: 1px solid #f3d79a2e; background: radial-gradient(80% 120% at 100% 0%, #164a3566, transparent 62%), linear-gradient(160deg, #0d1c17, #08110e 72%); }
+.xm-help h2 { font: 700 1.125rem/1.25 var(--font-heading); color: #fff8ec; }
+.xm-help > p { margin-top: 6px; color: var(--xm-text-2); font-size: .8125rem; line-height: 1.6; }
+.xm-help-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 14px; }
+.xm-help-ai { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #f3d79a5c; background: #ffffff0c; color: #fff3dc; font: 650 .875rem/1 var(--font-heading); cursor: pointer; }
+.xm-help-ai:hover { border-color: var(--xm-champagne); background: #f3d79a14; }
+.xm-help-ai svg { color: var(--xm-gold); }
+.xm-help-wa { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: var(--xm-champagne); font: 600 .875rem/1.3 var(--font-heading); text-decoration: none; }
+.xm-help-wa:hover { color: #fff3cf; }
+
+/* ───────── Sign-off: a line for them by name, running straight into the footer ───────── */
+.xm-signoff { position: relative; margin-top: 30px; padding: 40px 16px 48px; text-align: center; background: radial-gradient(46% 62% at 50% 58%, #e9b9491f, transparent 70%), linear-gradient(180deg, var(--xm-night), #070b0e); }
+.xm-signoff-lights { display: flex; justify-content: center; gap: clamp(10px, 4vw, 22px); margin-bottom: 20px; }
+.xm-signoff-lights i { width: 7px; height: 7px; border-radius: 50%; background: #f7d27a; box-shadow: 0 0 12px 3px #f7d27a88; }
+.xm-signoff-lights i:nth-child(3n+2) { background: #e2566d; box-shadow: 0 0 12px 3px #e2566d77; }
+.xm-signoff-lights i:nth-child(3n) { background: #7fe3ad; box-shadow: 0 0 12px 3px #7fe3ad66; }
+.xm-home:is([data-phase="year-end"], [data-phase^="new-year"]) .xm-signoff-lights i { background: #f7d27a; box-shadow: 0 0 12px 3px #f7d27a88; }
+.xm-home:is([data-phase="year-end"], [data-phase^="new-year"]) .xm-signoff-lights i:nth-child(even) { background: #e9eef7; box-shadow: 0 0 12px 3px #e9eef780; }
+.xm-signoff-line { font: italic 500 clamp(1.45rem, 6vw, 2.3rem)/1.18 var(--xm-serif); color: var(--xm-champagne); overflow-wrap: anywhere; text-wrap: balance; }
+.xm-signoff-from { margin-top: 10px !important; color: var(--xm-text-3); font-size: .875rem; }
+
+/* ───────── Entrances (once per visit; see useReveal) and the gift's press ───────── */
+.xm-welcome[data-xh-armed]:not([data-xh-in]) :is(.xm-welcome-text, .xm-welcome-gift) { opacity: 0; }
+.xm-welcome[data-xh-in]:not([data-xh-done]) .xm-welcome-text { animation: xm-up .55s var(--xm-ease) both; }
+.xm-welcome[data-xh-in]:not([data-xh-done]) .xm-welcome-gift { animation: xm-gift-in .8s .12s var(--xm-spring) both; }
+.xm-buy[data-xh-armed]:not([data-xh-in]) .xm-buy-tile { opacity: 0; }
+.xm-buy[data-xh-in]:not([data-xh-done]) .xm-buy-tile { animation: xm-up .5s .05s var(--xm-ease) both; }
+.xm-buy[data-xh-in]:not([data-xh-done]) .xm-buy-tile + .xm-buy-tile { animation-delay: .12s; }
+.xm-buy[data-xh-in]:not([data-xh-done]) .xm-buy-sheen { animation: xm-sheen 1.2s .5s var(--xm-ease) both; }
+.xm-more-grid[data-xh-armed]:not([data-xh-in]) .xm-tile { opacity: 0; }
+.xm-more-grid[data-xh-in]:not([data-xh-done]) .xm-tile { animation: xm-up .6s calc(var(--i) * 60ms) var(--xm-ease) both; }
+/* A press lifts the gift's lid for a moment and lets its sparks out (decorative; it opens nothing). */
+.xm-gift[data-press] .xm-gift-lid { animation: xh-press-xm-lid .9s var(--xm-ease) both; }
+.xm-gift[data-press] .xm-spark { animation: xh-press-xm-spark .9s calc(var(--i) * 60ms) ease-out both; }
+
+@keyframes xm-up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes xm-gift-in { from { opacity: 0; transform: translateY(10px) scale(.85) rotate(-6deg); } to { opacity: 1; transform: none; } }
+@keyframes xm-sheen { to { transform: translateX(330%) skewX(-16deg); } }
+@keyframes xm-ring { from { opacity: .55; transform: scale(1); } to { opacity: 0; transform: scale(2.8); } }
+@keyframes xm-shimmer { to { transform: translateX(100%); } }
+@keyframes xm-twinkle { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
+/* Press keyframes keep the kit's xh-press prefix, which pressEnd waits for before clearing the press. */
+@keyframes xh-press-xm-lid { 0% { transform: none; } 30% { transform: translateY(-14px) rotate(-4deg); } 55% { transform: translateY(-1px); } 75% { transform: translateY(-5px) rotate(-1deg); } 100% { transform: none; } }
+@keyframes xh-press-xm-spark { 0% { opacity: .6; transform: none; } 40% { opacity: 1; transform: scale(1.7) rotate(25deg); } 100% { opacity: .6; transform: none; } }
+
+/* ───────── Layout ───────── */
+@media (max-width: 359px) {
+  .xm-welcome-gift { width: 72px; }
+  .xm-buy-tile { padding: 14px 12px; }
+  .xm-networks { grid-template-columns: 1fr; }
+  .xm-greet { grid-template-columns: minmax(0, 1fr) 72px; }
+}
+@media (min-width: 640px) {
+  .xm-inner { padding: 24px 24px 12px; gap: 22px; }
+  .xm-more-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .xm-tile-website { grid-column: span 2; }
+  .xm-greet { grid-template-columns: minmax(0, 1fr) 132px; padding: 20px 24px; }
+  .xm-greet h2 { font-size: 1.75rem; }
+}
+@media (min-width: 768px) {
+  .xm-top { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); align-items: end; gap: 24px; }
+  .xm-welcome-gift { width: 108px; }
+  .xm-lower { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 28px; }
+}
+@media (min-width: 1024px) {
+  .xm-inner { padding: 34px 32px 16px; gap: 28px; }
+  .xm-welcome-gift { width: 124px; }
+  .xm-primary { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: stretch; gap: 16px; }
+  .xm-primary.is-urgent .xm-order { order: 0; }
+  /* With the welcome invitation, it sits under the two buy tiles and the first-order card takes the right column. */
+  .xm-primary:has(> .xm-primary-welcome > *) { grid-template-areas: "buy order" "welcome order"; align-items: start; }
+  .xm-primary:has(> .xm-primary-welcome > *) > .xm-buy { grid-area: buy; }
+  .xm-primary:has(> .xm-primary-welcome > *) > .xm-order { grid-area: order; align-self: stretch; }
+  .xm-primary:has(> .xm-primary-welcome > *) > .xm-primary-welcome { grid-area: welcome; }
+  .xm-buy { grid-template-columns: 1fr; }
+  .xm-buy-tile { flex-direction: row; align-items: center; min-height: 0; padding: 20px; }
+  .xm-buy-tile .xm-buy-arrow { position: static; margin-left: auto; }
+  .xm-order { padding: 20px 22px; }
+  .xm-more-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(132px, auto); }
+  .xm-tile-website { grid-column: span 2; grid-row: span 2; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 22px 22px; }
+  .xm-tile-website .xm-tile-art { width: 224px; height: 156px; }
+  .xm-tile-website .xm-tile-title { font-size: 1.375rem; }
+  .xm-tile-website .xm-tile-desc { font-size: .875rem; }
+  .xm-tile-website .xm-tile-arrow { top: 20px; margin-top: 0; right: 18px; }
+}
+/* Idle light only on capable desktops, and only once the page has settled. */
+@media (min-width: 900px) and (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .xm-welcome[data-xh-done] .xm-gift:not([data-press]) .xm-spark { animation: xm-twinkle 4.5s calc(var(--i) * .7s) ease-in-out infinite; }
+  .xm-tile:hover { transform: translateY(-2px); }
+  .xm-tile:hover .xm-tile-arrow { transform: translateX(2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xm-home *, .xm-home *::before, .xm-home *::after { animation: none !important; transition: none !important; }
+}

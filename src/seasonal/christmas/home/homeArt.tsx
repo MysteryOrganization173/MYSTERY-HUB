@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useId, useRef } from 'react';
+import { useFitSvgText } from '../kit/motion';
 
 /**
  * Christmas homepage illustrations, drawn for each service's purpose (no images). They are decorative
@@ -155,21 +156,71 @@ export const MarketArt = () => (
   </svg>
 );
 
-/** A satin ribbon around a card corner with a bow, used where a section is presented as a gift. */
-export const CornerBow = ({ tone = 'gold' }: { tone?: 'gold' | 'berry' | 'cream' }) => {
-  const c = tone === 'gold' ? ['#f6d683', '#c99230', '#fff1c1'] : tone === 'berry' ? ['#c93a53', '#7d1b33', '#e2566d'] : ['#fff6e6', '#d9c39b', '#ffffff'];
+const BOW_TONES = {
+  gold: { light: '#fff3c9', mid: '#f0c766', deep: '#b98326', shade: '#7c5414' },
+  ivory: { light: '#ffffff', mid: '#f5ecdc', deep: '#cdbb98', shade: '#9a8662' },
+  berry: { light: '#f0798b', mid: '#c93a53', deep: '#8e1d35', shade: '#5e0918' },
+} as const;
+const safeId = (raw: string) => raw.replace(/[^a-zA-Z0-9_-]/g, '');
+
+/**
+ * A satin bow that sits on a gift's ribbon band: two loops with their inner shadow, a knot, two notched tails, lit
+ * from the top-left like everything else on the page. Sized by its wrapper; decorative.
+ */
+export function Bow({ tone = 'gold' }: { tone?: keyof typeof BOW_TONES }) {
+  const c = BOW_TONES[tone], id = `xa-bow-${safeId(useId())}`;
   return (
-    <svg viewBox="0 0 120 120" className="xh-corner-bow" aria-hidden="true" focusable="false">
-      <path d="M0 22 L98 120 L120 120 L120 98 L22 0 L0 0 Z" fill={c[0]} opacity=".95" />
-      <path d="M0 22 L98 120" stroke={c[1]} strokeOpacity=".5" />
-      <g transform="translate(60 60) rotate(45)">
-        <path d="M0 0 C -14 -24 -34 -20 -30 -6 C -27 4 -12 4 0 0 Z M0 0 C 14 -24 34 -20 30 -6 C 27 4 12 4 0 0 Z" fill={c[0]} stroke={c[1]} strokeOpacity=".55" />
-        <path d="M-3 3 L -12 26 L -5 22 L -2 30 L 2 4 Z M3 3 L 12 26 L 5 22 L 2 30 L -2 4 Z" fill={c[1]} />
-        <ellipse rx="6" ry="5" fill={c[2]} />
+    <svg viewBox="0 0 72 54" className="xh-bow" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id={`${id}-l`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={c.light} /><stop offset=".55" stopColor={c.mid} /><stop offset="1" stopColor={c.deep} /></linearGradient>
+        <linearGradient id={`${id}-t`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={c.mid} /><stop offset="1" stopColor={c.shade} /></linearGradient>
+        <radialGradient id={`${id}-k`} cx="38%" cy="32%" r="75%"><stop offset="0" stopColor={c.light} /><stop offset="1" stopColor={c.deep} /></radialGradient>
+      </defs>
+      <path d="M33 25 C 30 33 25 42 18 51 L 24.5 49 L 26.5 54 C 32 44 35 35 36 26 Z" fill={`url(#${id}-t)`} />
+      <path d="M39 25 C 42 33 47 42 54 51 L 47.5 49 L 45.5 54 C 40 44 37 35 36 26 Z" fill={`url(#${id}-t)`} />
+      <path d="M36 22 C 26 7 8 3 6 13.5 C 4.2 23 20 27.5 36 23.2 Z" fill={`url(#${id}-l)`} />
+      <path d="M36 22 C 46 7 64 3 66 13.5 C 67.8 23 52 27.5 36 23.2 Z" fill={`url(#${id}-l)`} />
+      <path d="M34 21.6 C 26.5 13.4 15.5 11 13.2 15.6 C 15 19.4 24 21.4 34 22.2 Z" fill={c.shade} opacity=".42" />
+      <path d="M38 21.6 C 45.5 13.4 56.5 11 58.8 15.6 C 57 19.4 48 21.4 38 22.2 Z" fill={c.shade} opacity=".42" />
+      <path d="M9 11.5 C 13 6.6 21 7.4 27.4 11.6" fill="none" stroke="#fff" strokeOpacity=".6" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M63 11.5 C 59 6.6 51 7.4 44.6 11.6" fill="none" stroke="#fff" strokeOpacity=".35" strokeWidth="1.2" strokeLinecap="round" />
+      <rect x="31" y="17.4" width="10" height="10.4" rx="4.2" fill={`url(#${id}-k)`} stroke={c.shade} strokeOpacity=".5" strokeWidth=".8" />
+    </svg>
+  );
+}
+
+/** A paper gift tag hanging from a string at a card's corner (used where a full ribbon would crowd the design). */
+export function HangingTag() {
+  return (
+    <svg viewBox="0 0 44 66" className="xh-hang-tag" aria-hidden="true" focusable="false">
+      <path d="M30 0 C 30.5 8 27 14 22 21" fill="none" stroke="#9c7a4a" strokeWidth="1.4" strokeLinecap="round" />
+      <g className="xh-hang-tag-card">
+        <path d="M22 19 L 34 26 V 56 a4.5 4.5 0 0 1 -4.5 4.5 H 14.5 a4.5 4.5 0 0 1 -4.5 -4.5 V 26 Z" fill="#b3263f" />
+        <path d="M22 19 L 34 26 V 33 H 10 V 26 Z" fill="#000" opacity=".13" />
+        <path d="M33 27 V 56 a4.5 4.5 0 0 1 -3.5 4.4" fill="none" stroke="#7d1b33" strokeOpacity=".6" strokeWidth="1" />
+        <circle cx="22" cy="26.5" r="2.3" fill="#fbf0dc" stroke="#7d1b33" strokeWidth=".7" />
+        <path d="M22 38 c .7 3.2 1.8 4.3 5 5 c -3.2 .7 -4.3 1.8 -5 5 c -.7 -3.2 -1.8 -4.3 -5 -5 c 3.2 -.7 4.3 -1.8 5 -5 Z" fill="#f7dc8f" />
       </g>
     </svg>
   );
-};
+}
+
+/** A twine bow for kraft paper: thin twisted loops, no satin. */
+export function TwineBow() {
+  return (
+    <svg viewBox="0 0 48 34" className="xh-twine-bow" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="#f3e2bf" strokeWidth="2.2" strokeLinecap="round">
+        <path d="M24 14 C 16 2 4 2 6 10 C 7.5 16 17 16.5 24 14.5" />
+        <path d="M24 14 C 32 2 44 2 42 10 C 40.5 16 31 16.5 24 14.5" />
+        <path d="M23 15 C 21 21 18 26 14 32" /><path d="M25 15 C 27 21 30 26 34 32" />
+      </g>
+      <g fill="none" stroke="#a37a43" strokeWidth=".8" strokeLinecap="round" strokeDasharray="1.5 2.5">
+        <path d="M24 14 C 16 2 4 2 6 10" /><path d="M24 14 C 32 2 44 2 42 10" />
+      </g>
+      <circle cx="24" cy="14.6" r="3" fill="#e9d2a6" stroke="#a37a43" strokeWidth=".8" />
+    </svg>
+  );
+}
 
 /** A wooden peg that holds a card on the twine. */
 export const Peg = () => (
@@ -180,41 +231,67 @@ export const Peg = () => (
   </svg>
 );
 
-/** Mystery Greetings preview: an open envelope (back with its raised flap, then the front pocket). The letter card
- *  is real HTML between the two layers, so it can rise out of the pocket. */
+/**
+ * Mystery Greetings preview: a real envelope in four layers, so the letter can only ever move the way paper does.
+ * Back body (behind) → letter (in a box clipped at the envelope's bottom edge) → front pocket → flap, hinged on the
+ * body's top edge. The flap is drawn closed (pointing down, sealed); CSS turns it open around its hinge.
+ * All coordinates share one 400 × 320 box; the flap spans y 112–252.
+ */
 export const EnvelopeBack = () => (
   <svg viewBox="0 0 400 320" className="xh-env-back" aria-hidden="true" focusable="false">
     <defs>
       <linearGradient id="xa-e-back" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#4a0f1f" /><stop offset="1" stopColor="#2e0813" /></linearGradient>
-      <linearGradient id="xa-e-flap" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stopColor="#6f1430" /><stop offset="1" stopColor="#8e1d35" /></linearGradient>
     </defs>
-    <path className="xh-env-flap" d="M6 118 L186 30 Q200 23 214 30 L394 118 Z" fill="url(#xa-e-flap)" />
-    <path d="M6 118 L186 30 Q200 23 214 30 L394 118" fill="none" stroke="#e9b949" strokeOpacity=".3" strokeWidth="1.2" />
     <rect x="0" y="112" width="400" height="208" rx="16" fill="url(#xa-e-back)" />
+    {/* The shadowed inside of the opening. */}
+    <path d="M0 128 Q0 112 16 112 H384 Q400 112 400 128 V140 H0 Z" fill="#000" opacity=".28" />
   </svg>
 );
 export const EnvelopeFront = () => (
   <svg viewBox="0 0 400 320" className="xh-env-front" aria-hidden="true" focusable="false">
     <defs>
       <linearGradient id="xa-e-front" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#a8264a" /><stop offset="1" stopColor="#6f1430" /></linearGradient>
-      <linearGradient id="xa-e-side" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#8e1d35" /><stop offset="1" stopColor="#7a1830" /></linearGradient>
-      <radialGradient id="xa-e-seal" cx="40%" cy="35%" r="70%"><stop offset="0" stopColor="#fbe7a6" /><stop offset=".5" stopColor="#e9b949" /><stop offset="1" stopColor="#a8771d" /></radialGradient>
     </defs>
     <path d="M0 132 L176 226 Q200 238 224 226 L400 132 V304 Q400 320 384 320 H16 Q0 320 0 304 Z" fill="url(#xa-e-front)" />
     <path d="M0 304 L170 214 M400 304 L230 214" stroke="#4a0f1f" strokeOpacity=".35" strokeWidth="1.5" />
     <path d="M0 132 L176 226 Q200 238 224 226 L400 132" fill="none" stroke="#f3d79a" strokeOpacity=".45" strokeWidth="1.4" />
-    <g transform="translate(200 228)">
-      <circle r="27" fill="#a8771d" opacity=".55" transform="translate(1.5 2)" />
-      <path d="M0 -26 C 8 -26 12 -22 17 -19 C 24 -15 27 -8 26 0 C 27 9 22 15 17 19 C 11 24 6 27 0 26 C -8 27 -13 23 -18 19 C -24 14 -27 8 -26 0 C -27 -9 -23 -15 -17 -19 C -12 -23 -7 -27 0 -26 Z" fill="url(#xa-e-seal)" />
-      <circle r="17" fill="none" stroke="#fff1c1" strokeOpacity=".55" />
-      <path d="M-9 7 V-7 L0 2 L9 -7 V7" fill="none" stroke="#7a4f12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+/** The flap's outside (seen while closed): deep wine with the gold wax seal at its tip. */
+export const FlapOutside = () => (
+  <svg viewBox="0 0 400 140" className="xh-flap-face" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="xa-e-flap-out" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7c1832" /><stop offset="1" stopColor="#9b2343" /></linearGradient>
+      <radialGradient id="xa-e-seal" cx="40%" cy="35%" r="70%"><stop offset="0" stopColor="#fbe7a6" /><stop offset=".5" stopColor="#e9b949" /><stop offset="1" stopColor="#a8771d" /></radialGradient>
+    </defs>
+    <path d="M0 0 H400 L214 128 Q200 137 186 128 Z" fill="url(#xa-e-flap-out)" />
+    <path d="M0 0 L186 128 Q200 137 214 128 L400 0" fill="none" stroke="#f3d79a" strokeOpacity=".42" strokeWidth="1.4" />
+    <g transform="translate(200 116)">
+      <circle r="25" fill="#5e0918" opacity=".4" transform="translate(1.5 3)" />
+      <path d="M0 -24 C 7.5 -24 11 -20.5 15.5 -17.5 C 22 -14 25 -7.5 24 0 C 25 8.5 20.5 14 15.5 17.5 C 10 22 5.5 25 0 24 C -7.5 25 -12 21.5 -16.5 17.5 C -22 13 -25 7.5 -24 0 C -25 -8.5 -21 -14 -15.5 -17.5 C -11 -21.5 -6.5 -25 0 -24 Z" fill="url(#xa-e-seal)" />
+      <circle r="15.5" fill="none" stroke="#fff1c1" strokeOpacity=".55" />
+      <path d="M-8.5 6.5 V-6.5 L0 2 L8.5 -6.5 V6.5" fill="none" stroke="#7a4f12" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
     </g>
   </svg>
 );
+/** The flap's lining (seen once it has opened up). */
+export const FlapInside = () => (
+  <svg viewBox="0 0 400 140" className="xh-flap-face is-inside" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="xa-e-flap-in" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#5a1225" /><stop offset="1" stopColor="#3e0b19" /></linearGradient>
+      <pattern id="xa-e-lining" width="14" height="14" patternUnits="userSpaceOnUse"><circle cx="7" cy="7" r="1.1" fill="#f3d79a" opacity=".22" /></pattern>
+    </defs>
+    <path d="M0 0 H400 L214 128 Q200 137 186 128 Z" fill="url(#xa-e-flap-in)" />
+    <path d="M0 0 H400 L214 128 Q200 137 186 128 Z" fill="url(#xa-e-lining)" />
+  </svg>
+);
 
-/** The Marketplace stack: three kraft parcels, twine and a red tag carrying the season's greeting. */
-export const ParcelStack = ({ label }: { label: string }) => (
-  <svg viewBox="0 0 360 260" className="xh-parcels" aria-hidden="true" focusable="false">
+/** The Marketplace stack: three kraft parcels, twine and a red tag carrying the season's greeting (always fitted). */
+export function ParcelStack({ label }: { label: string }) {
+  const ref = useRef<SVGSVGElement>(null);
+  useFitSvgText(ref, [label]);
+  return (
+  <svg ref={ref} viewBox="0 0 360 260" className="xh-parcels" aria-hidden="true" focusable="false">
     <defs>
       <linearGradient id="xa-p-k1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#d7a46c" /><stop offset="1" stopColor="#a56f3c" /></linearGradient>
       <linearGradient id="xa-p-k2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#c99660" /><stop offset="1" stopColor="#8f5e31" /></linearGradient>
@@ -243,7 +320,7 @@ export const ParcelStack = ({ label }: { label: string }) => (
         <g transform="translate(180 196) rotate(-10)">
           <path d="M0 0 H78 a6 6 0 0 1 6 6 V26 a6 6 0 0 1 -6 6 H0 L-10 16 Z" fill="#b3263f" stroke="#7d1b33" />
           <circle cx="-2" cy="16" r="2.6" fill="#fbf0dc" />
-          <text x="6" y="20.5" className="xh-parcel-tag-text">{label}</text>
+          <text x="6" y="20.5" className="xh-parcel-tag-text" data-fit="70">{label}</text>
         </g>
       </g>
     </g>
@@ -255,4 +332,5 @@ export const ParcelStack = ({ label }: { label: string }) => (
       <path d="M259 193 c -8 -9 -17 -6 -14 0 c 2 3 7 3 14 0 Z M259 193 c 8 -9 17 -6 14 0 c -2 3 -7 3 -14 0 Z" fill="#17714f" />
     </g></g>
   </svg>
-);
+  );
+}

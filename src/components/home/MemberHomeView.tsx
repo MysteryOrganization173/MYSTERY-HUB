@@ -19,8 +19,9 @@ export interface MemberHomeViewProps {
   promotion?:React.ReactNode;
 }
 
-const NETWORKS:{id:NetworkId;label:string;color:string}[]=[{id:'mtn',label:'MTN',color:'#ffcc00'},{id:'telecel',label:'Telecel',color:'#e4002b'},{id:'airteltigo',label:'AirtelTigo',color:'#3d8bff'}];
-const orderTitle=(o:AuthenticatedCustomerOrderDetails)=>o.product_name_snapshot||o.bundle_size_snapshot||'Your order';
+// Exported so the seasonal member homepage presents exactly the same networks, titles and website states.
+export const NETWORKS:{id:NetworkId;label:string;color:string}[]=[{id:'mtn',label:'MTN',color:'#ffcc00'},{id:'telecel',label:'Telecel',color:'#e4002b'},{id:'airteltigo',label:'AirtelTigo',color:'#3d8bff'}];
+export const orderTitle=(o:AuthenticatedCustomerOrderDetails)=>o.product_name_snapshot||o.bundle_size_snapshot||'Your order';
 
 function OrderSpotlight({order,track,reorder}:{order:AuthenticatedCustomerOrderDetails;track:()=>void;reorder:(mode:'data'|'airtime',network:NetworkId)=>void}) {
   const tone=memberOrderTone(order),steps=memberOrderSteps(order),again=memberReorder(order);
@@ -54,7 +55,7 @@ function FirstPurchase({data,airtime}:{data:(network?:NetworkId)=>void;airtime:(
   </section>;
 }
 
-function websiteCard(website:MemberWebsiteSummary|undefined) {
+export function websiteCard(website:MemberWebsiteSummary|undefined) {
   if(website?.state==='published')return {title:'Your website is live',desc:website.name,tag:'Live',label:`Manage your website, ${website.name}`};
   if(website?.state==='draft')return {title:'Finish your website',desc:`${website.name} · not published yet`,tag:'Draft',label:`Continue your website, ${website.name}`};
   if(website?.state==='none')return {title:'Create a free website',desc:'Show your business or sell data online',tag:'Free plan',label:undefined};

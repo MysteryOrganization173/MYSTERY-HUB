@@ -289,3 +289,5 @@ html.mh-isolated-preview, html.mh-isolated-preview body { overscroll-behavior-y:
 @media (max-width: 639px) { .mh-season-preview-wide { display: none; } .mh-season-preview { padding-block: 4px; } }
 /* Holds the homepage's place for the moment the seasonal homepage downloads (only while a season is on). */
 .mh-season-home-wait { min-height: 78vh; background: radial-gradient(60% 50% at 70% 30%, #1d3b2c, transparent 70%), radial-gradient(50% 40% at 20% 90%, #3a1420, transparent 70%), #07110d; }
+/* The signed-in variant (and a returning customer's session check) is shorter: their page leads with compact cards. */
+.mh-season-home-wait.is-member { min-height: 62vh; background: radial-gradient(58% 44% at 86% 0%, #164a35, transparent 70%), radial-gradient(42% 40% at 0% 6%, #4c132440, transparent 70%), #050d0a; }

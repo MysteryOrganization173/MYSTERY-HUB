@@ -1,0 +1,110 @@
+/* The seasonal shell (header logo, Sign Up, phone menu, footer) for every visitor while a pack applies.
+   Every rule starts with .mh-app[data-season-shell="christmas"], which exists only while a season is on, so the
+   ordinary header, menu and footer are untouched the moment it ends. Motion: transform and opacity only. */
+
+/* ───────── Logo hat (header) ───────── */
+.mh-app[data-season-shell="christmas"] .xs-hat { position: absolute; left: 11px; top: -5px; width: 17px; height: 14.5px; overflow: visible; pointer-events: none; transform-origin: 30% 85%; animation: xs-hat-on .7s .25s cubic-bezier(.34, 1.4, .5, 1) both; transition: transform .3s cubic-bezier(.2, .7, .2, 1); }
+.mh-app[data-season-shell="christmas"] a:hover > .xs-hat { transform: rotate(-6deg) translateY(-1px); }
+@keyframes xs-hat-on { from { opacity: 0; transform: translateY(-7px) rotate(-16deg); } to { opacity: 1; transform: none; } }
+
+/* ───────── Sign Up and Login ───────── */
+.mh-app[data-season-shell="christmas"] .mh-signup { position: relative; isolation: isolate; overflow: hidden; border-radius: 12px; color: #03150c; font-weight: 700; background: linear-gradient(180deg, #34e892 0%, #00c365 50%, #00a957 100%); box-shadow: inset 0 1px 0 #ffffff7a, inset 0 -1px 0 #00000030, 0 0 0 1px #e8c46f, 0 0 0 3px #e8c46f1f, 0 10px 24px -12px #00c365; transition: transform .15s ease, filter .15s ease; }
+.mh-app[data-season-shell="christmas"] .mh-signup::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(112deg, transparent 30%, #ffffff66 48%, transparent 66%); transform: translateX(-130%); animation: xs-sheen 1.5s 1.4s ease-out both; pointer-events: none; }
+.mh-app[data-season-shell="christmas"] .mh-signup:hover { filter: brightness(1.06); }
+.mh-app[data-season-shell="christmas"] .mh-signup:active { transform: scale(.97); }
+.mh-app[data-season-shell="christmas"] .mh-signup:focus-visible { outline: 2px solid #f3d79a; outline-offset: 2px; }
+.mh-app[data-season-shell="christmas"] .mh-login:hover { color: #f7e3b2; }
+@keyframes xs-sheen { to { transform: translateX(130%); } }
+
+/* ───────── Phone menu ───────── */
+.mh-app[data-season-shell="christmas"] .mh-menu-trigger { color: #e9dcc0; border-radius: 12px; }
+.mh-app[data-season-shell="christmas"] .mh-menu-trigger[aria-expanded="true"] { color: #fff3dc; background: #f3d79a14; box-shadow: inset 0 0 0 1px #f3d79a47; }
+.mh-app[data-season-shell="christmas"] .mh-menu-trigger svg { animation: xs-icon-in .26s cubic-bezier(.2, .7, .2, 1) both; }
+.mh-app[data-season-shell="christmas"] .mh-menu-trigger:focus-visible { outline: 2px solid #f3d79a; outline-offset: 1px; }
+@keyframes xs-icon-in { from { opacity: 0; transform: rotate(-70deg) scale(.7); } to { opacity: 1; transform: none; } }
+.mh-app[data-season-shell="christmas"] .mh-mobile-menu-panel { border-bottom: 1px solid #f3d79a2e; background: radial-gradient(110% 55% at 100% 0%, #1b3a2c 0%, transparent 62%), radial-gradient(80% 50% at 0% 100%, #3a0f1c66 0%, transparent 70%), linear-gradient(180deg, #0c1915 0%, #090f0d 100%); box-shadow: 0 30px 60px -30px #000; transform-origin: top center; animation: xs-menu-in .3s cubic-bezier(.2, .7, .2, 1) both; }
+.mh-app[data-season-shell="christmas"] .mh-mobile-menu-scrim { animation: xs-fade .3s ease both; }
+@keyframes xs-menu-in { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+@keyframes xs-fade { from { opacity: 0; } to { opacity: 1; } }
+.mh-app[data-season-shell="christmas"] .mh-menu-link { position: relative; display: flex; align-items: center; min-height: 48px; padding-left: 16px; border-radius: 12px; font-size: .9375rem; color: #e6e0d2; }
+.mh-app[data-season-shell="christmas"] .mh-menu-link:hover { background: #ffffff0a; color: #fff; }
+.mh-app[data-season-shell="christmas"] .mh-menu-link[aria-current="page"] { color: #74f0b0; font-weight: 650; background: linear-gradient(90deg, #00c3651f, #00c36505 70%, transparent); }
+.mh-app[data-season-shell="christmas"] .mh-menu-link[aria-current="page"]::before { content: ''; position: absolute; left: 4px; top: 12px; bottom: 12px; width: 3px; border-radius: 3px; background: linear-gradient(180deg, #f7dc8f, #c99230); }
+.mh-app[data-season-shell="christmas"] .mh-menu-ai { color: #f1e6cd; border: 1px solid #f3d79a2e; background: #f3d79a0d; }
+.mh-app[data-season-shell="christmas"] .mh-menu-auth { border-top-color: #f3d79a26; }
+.mh-app[data-season-shell="christmas"] .mh-menu-auth .mh-signup { min-height: 44px; font-size: .875rem; }
+.mh-app[data-season-shell="christmas"] .mh-menu-auth .mh-login { min-height: 44px; font-size: .875rem; color: #efe6d2; background: #ffffff0d; box-shadow: inset 0 0 0 1px #f3d79a33; }
+.mh-app[data-season-shell="christmas"] .xs-menu-head { display: flex; flex-direction: column; gap: 6px; padding: 2px 4px 10px; margin-bottom: 2px; border-bottom: 1px solid #f3d79a1f; }
+.mh-app[data-season-shell="christmas"] .xs-menu-lights { display: flex; gap: 12px; padding-left: 2px; }
+.mh-app[data-season-shell="christmas"] .xs-menu-lights i { width: 5px; height: 5px; border-radius: 50%; background: #f7d27a; box-shadow: 0 0 8px 2px #f7d27a80; animation: xs-fade .5s calc(var(--i) * 50ms + .15s) ease-out both; }
+.mh-app[data-season-shell="christmas"] .xs-menu-lights i:nth-child(3n+2) { background: #e2566d; box-shadow: 0 0 8px 2px #e2566d70; }
+.mh-app[data-season-shell="christmas"] .xs-menu-lights i:nth-child(3n) { background: #7fe3ad; box-shadow: 0 0 8px 2px #7fe3ad66; }
+.mh-app[data-season-shell="christmas"] .xs-menu-head p { margin: 0; color: #e9d7a8; font: italic 500 .9375rem/1.3 'Fraunces', Georgia, serif; }
+.mh-app[data-season-shell="christmas"] .xs-menu-head span[lang] { color: #f7dc8f; font-weight: 600; }
+
+/* ───────── Footer ───────── */
+.mh-app[data-season-shell="christmas"] .xs-footer { position: relative; isolation: isolate; overflow: hidden; margin-top: 40px; color: #b9b2a3; padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)); background: radial-gradient(70% 55% at 88% 0%, #e9b94914, transparent 70%), radial-gradient(60% 50% at 0% 100%, #0f3b2c55, transparent 70%), linear-gradient(180deg, #070b0e 0%, #050908 100%); }
+@media (min-width: 640px) { .mh-app[data-season-shell="christmas"] .xs-footer { margin-top: 56px; } }
+@media (min-width: 768px) { .mh-app[data-season-shell="christmas"] .xs-footer { padding-bottom: env(safe-area-inset-bottom, 0px); } }
+/* The seasonal homepages close with their own sign-off, which runs straight into the footer. */
+.mh-app[data-season-shell="christmas"]:has(:is(.xh-home, .xm-home)) .xs-footer { margin-top: 0; }
+/* The signed-in seasonal homepage ends on its own night colour, with no gap of the page colour before the footer. */
+.mh-app[data-season-shell="christmas"]:has(.xm-home) > main { padding-bottom: 0; background: #050d0a; }
+.mh-app[data-season-shell="christmas"] .xs-footer-edge { display: flex; align-items: center; gap: 10px; height: 1px; }
+.mh-app[data-season-shell="christmas"] .xs-footer-edge span { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #f3d79a59); }
+.mh-app[data-season-shell="christmas"] .xs-footer-edge span:last-child { background: linear-gradient(90deg, #f3d79a59, transparent); }
+.mh-app[data-season-shell="christmas"] .xs-footer-edge i { width: 9px; height: 9px; background: #f3d79a; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 0c.9 5.6 4.4 9.1 10 10-5.6.9-9.1 4.4-10 10-.9-5.6-4.4-9.1-10-10 5.6-.9 9.1-4.4 10-10z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 0c.9 5.6 4.4 9.1 10 10-5.6.9-9.1 4.4-10 10-.9-5.6-4.4-9.1-10-10 5.6-.9 9.1-4.4 10-10z'/%3E%3C/svg%3E") center / contain no-repeat; }
+.mh-app[data-season-shell="christmas"] .xs-footer-inner { max-width: 1180px; margin-inline: auto; padding: 36px 16px 0; }
+@media (min-width: 640px) { .mh-app[data-season-shell="christmas"] .xs-footer-inner { padding: 48px 24px 0; } }
+@media (min-width: 1024px) { .mh-app[data-season-shell="christmas"] .xs-footer-inner { padding-inline: 32px; } }
+.mh-app[data-season-shell="christmas"] .xs-footer-greeting { margin: 0 0 28px; text-align: center; color: #f3d79a; font: italic 500 clamp(1.15rem, 4.6vw, 1.5rem)/1.3 'Fraunces', Georgia, serif; }
+.mh-app[data-season-shell="christmas"] .xs-footer-greeting span { color: #e9c87e; font-weight: 600; }
+.mh-app[data-season-shell="christmas"] .xs-footer-top { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
+@media (min-width: 900px) { .mh-app[data-season-shell="christmas"] .xs-footer-top { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 48px; align-items: start; } }
+.mh-app[data-season-shell="christmas"] .xs-footer-logo { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; color: #fff; font: 650 1.125rem/1 var(--font-heading); text-decoration: none; }
+.mh-app[data-season-shell="christmas"] .xs-footer-logo b { color: #00c365; font-weight: 650; }
+.mh-app[data-season-shell="christmas"] .xs-footer-logo:focus-visible { outline: 2px solid #f3d79a; outline-offset: 3px; border-radius: 8px; }
+.mh-app[data-season-shell="christmas"] .xs-footer-brand h2 { margin: 10px 0 0; color: #fff8ec; font: 750 clamp(1.35rem, 5.4vw, 1.9rem)/1.15 var(--font-heading); letter-spacing: -.025em; }
+.mh-app[data-season-shell="christmas"] .xs-footer-brand h2 em { color: #f3d79a; font: italic 500 1.05em/1 'Fraunces', Georgia, serif; letter-spacing: -.01em; }
+.mh-app[data-season-shell="christmas"] .xs-footer-brand > p { margin: 10px 0 0; max-width: 460px; font-size: .875rem; line-height: 1.6; color: #b9b2a3; }
+.mh-app[data-season-shell="christmas"] .xs-footer-help { padding: 16px; border-radius: 20px; background: linear-gradient(160deg, #0f1d18, #0a1310 70%); border: 1px solid #f3d79a26; box-shadow: inset 0 1px 0 #ffffff0d; }
+.mh-app[data-season-shell="christmas"] .xs-footer-help h3, .mh-app[data-season-shell="christmas"] .xs-footer-nav h3 { margin: 0 0 8px; color: #e9cf91; font: 700 .6875rem/1.2 var(--font-heading); letter-spacing: .16em; text-transform: uppercase; }
+.mh-app[data-season-shell="christmas"] .xs-footer-whatsapp { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 14px; border-radius: 14px; color: #dbffe9; text-decoration: none; background: #00c36517; border: 1px solid #00c36559; transition: transform .15s ease; }
+.mh-app[data-season-shell="christmas"] .xs-footer-whatsapp:hover { background: #00c36524; }
+.mh-app[data-season-shell="christmas"] .xs-footer-whatsapp:active { transform: scale(.985); }
+.mh-app[data-season-shell="christmas"] .xs-footer-whatsapp svg:first-child { color: #44df95; }
+.mh-app[data-season-shell="christmas"] .xs-footer-whatsapp > span:not(.sr-only) { display: grid; flex: 1; min-width: 0; gap: 2px; }
+.mh-app[data-season-shell="christmas"] .xs-footer-whatsapp strong { font: 650 .9375rem/1.2 var(--font-heading); color: #ecfff4; }
+.mh-app[data-season-shell="christmas"] .xs-footer-whatsapp small { font-size: .75rem; color: #a7d8bd; }
+.mh-app[data-season-shell="christmas"] .xs-footer-contacts { display: flex; flex-wrap: wrap; gap: 0 18px; margin: 8px 0 0; padding: 0; list-style: none; }
+.mh-app[data-season-shell="christmas"] .xs-footer-contacts a { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; color: #cfc6b4; font-size: .8125rem; text-decoration: none; }
+.mh-app[data-season-shell="christmas"] .xs-footer-contacts a:hover { color: #fff; }
+.mh-app[data-season-shell="christmas"] .xs-footer-contacts svg { color: #8f8a7e; flex: none; }
+.mh-app[data-season-shell="christmas"] .xs-footer-channels { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding-top: 12px; border-top: 1px dashed #f3d79a26; }
+.mh-app[data-season-shell="christmas"] .xs-footer-channels a { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border-radius: 999px; font-size: .75rem; font-weight: 600; color: #e9e2d2; text-decoration: none; border: 1px solid #ffffff1f; background: #ffffff08; }
+.mh-app[data-season-shell="christmas"] .xs-footer-channels a:hover { border-color: #f3d79a59; color: #fff; }
+.mh-app[data-season-shell="christmas"] .xs-footer-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; margin-top: 28px; padding-top: 22px; border-top: 1px solid #ffffff12; }
+@media (min-width: 640px) { .mh-app[data-season-shell="christmas"] .xs-footer-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Phones: the short third group sits on one line under the two columns instead of a tall column of its own. */
+@media (max-width: 639px) {
+  .mh-app[data-season-shell="christmas"] .xs-footer-nav > div:nth-child(3) { grid-column: 1 / -1; }
+  .mh-app[data-season-shell="christmas"] .xs-footer-nav > div:nth-child(3) ul { display: flex; flex-wrap: wrap; gap: 0 22px; }
+}
+.mh-app[data-season-shell="christmas"] .xs-footer-nav ul { margin: 0; padding: 0; list-style: none; }
+.mh-app[data-season-shell="christmas"] .xs-footer-nav a { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; color: #d5cebf; font-size: .875rem; text-decoration: none; }
+.mh-app[data-season-shell="christmas"] .xs-footer-nav a:hover { color: #fff; }
+.mh-app[data-season-shell="christmas"] .xs-footer :is(a, button):focus-visible { outline: 2px solid #f3d79a; outline-offset: 2px; border-radius: 6px; }
+.mh-app[data-season-shell="christmas"] .xs-footer-note { padding: 1px 6px; border-radius: 999px; border: 1px solid #f3d79a40; color: #e9cf91; font-size: .625rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.mh-app[data-season-shell="christmas"] .xs-footer-legal { display: grid; gap: 6px; margin-top: 22px; padding: 14px 0 16px; border-top: 1px solid #ffffff12; font-size: .75rem; }
+@media (min-width: 768px) { .mh-app[data-season-shell="christmas"] .xs-footer-legal { grid-template-columns: 1fr auto; align-items: center; } }
+.mh-app[data-season-shell="christmas"] .xs-footer-pay { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0; color: #a99f8c; }
+.mh-app[data-season-shell="christmas"] .xs-footer-pay svg { color: #44df95; }
+.mh-app[data-season-shell="christmas"] .xs-footer-pay b { padding: 1px 8px; border-radius: 6px; border: 1px solid #ffffff1f; background: #ffffff08; color: #e6e0d2; font-weight: 600; }
+.mh-app[data-season-shell="christmas"] .xs-footer-copy { margin: 0; color: #8f8778; }
+.mh-app[data-season-shell="christmas"] .xs-footer-staff { display: inline-flex; align-items: center; min-height: 40px; margin-left: 12px; color: #8f8778; font-size: .6875rem; text-decoration: none; }
+.mh-app[data-season-shell="christmas"] .xs-footer-staff:hover { color: #d5cebf; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mh-app[data-season-shell="christmas"] :is(.xs-hat, .mh-signup, .mh-menu-trigger svg, .mh-mobile-menu-panel, .mh-mobile-menu-scrim, .xs-menu-lights i, .xs-footer-whatsapp) { animation: none !important; transition: none !important; }
+  .mh-app[data-season-shell="christmas"] .mh-signup::before { display: none; }
+}

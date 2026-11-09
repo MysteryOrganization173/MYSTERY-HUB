@@ -21,7 +21,7 @@ const previewUrl = (date: string) => `${window.location.origin}/?season-preview=
 /**
  * Seasonal Experience: honest status and a founder preview. Production activation is the API service's
  * SEASONAL_EXPERIENCE setting; this panel reads it and never changes it. Previews affect only the browser tab that
- * opens them and cover the signed-out site (Phase 1), so they are best opened in a private window.
+ * opens them: a private window shows the signed-out site, a signed-in tab shows the customer's seasonal homepage.
  */
 export function AdminSeasonalPanel() {
   const [status, setStatus] = useState<SeasonStatus | null>(null);
@@ -49,14 +49,14 @@ export function AdminSeasonalPanel() {
 
   return (
     <AdminPanel title={<span className="inline-flex items-center gap-2"><Gift className="h-4 w-4 text-[#e9b949]" />Seasonal experience</span>}
-      description="Christmas to New Year presentation for the signed-out customer site. Presentation only: prices, products, orders and payments are never changed by it."
+      description="Christmas to New Year presentation for the customer site: the signed-out pages and the signed-in homepage. Presentation only: prices, products, orders and payments are never changed by it."
       actions={<RefreshButton onClick={() => void load()} busy={busy} />}>
       <div className="space-y-4">
         {error && <AdminNotice tone="warning" title="Status not available">{error}</AdminNotice>}
         <DefinitionList items={[
           ['For customers now', status ? <StatusPill tone={live ? 'success' : 'neutral'}>{live ? `On · ${status.pack}` : 'Off'}</StatusPill> : '…'],
           ['Calendar today (Accra)', status ? `${status.date} · ${status.phase.replace(/-/g, ' ')}` : '…'],
-          ['Who it shows to', 'Signed-out visitors only (Phase 1). Signed-in customers keep the normal appearance.'],
+          ['Who it shows to', 'Everyone gets the seasonal header, phone menu and footer. Signed-out visitors get every guest page; signed-in customers get the seasonal homepage, and their other account pages stay as they are.'],
           ['Where it never shows', 'Admin, the website editor, My Business and published customer websites.'],
         ]} />
         <AdminNotice tone="info" title="How it is switched on and off">
@@ -66,7 +66,7 @@ export function AdminSeasonalPanel() {
         </AdminNotice>
         <div className="rounded-xl border border-slate-800 bg-[#0b1116] p-4 space-y-3">
           <p className="text-sm font-semibold text-white">Preview a day</p>
-          <p className="text-xs text-slate-400">The preview shows only in the browser tab that opens it, with a “Christmas preview” ribbon. Open it in a private window to see the signed-out site; nobody else is affected.</p>
+          <p className="text-xs text-slate-400">The preview shows only in the browser tab that opens it, with a “Christmas preview” ribbon. Open it in a private window to see the signed-out site, or in a tab where you are signed in to see the customer homepage; nobody else is affected.</p>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Preview day">
             {PREVIEW_DAYS.map(day => (
               <button key={day.date} type="button" onClick={() => setDate(day.date)} aria-pressed={date === day.date}

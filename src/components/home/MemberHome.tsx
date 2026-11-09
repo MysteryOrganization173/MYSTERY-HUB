@@ -5,7 +5,8 @@ import {useApp} from '../../context/AppContext';
 import {getAccountOrdersOnServer,getMyWebsitesOnServer} from '../../services/apiClient';
 import type {AuthenticatedCustomerOrderDetails} from '../../../server/types/orders';
 import {HomeWalletSummary} from './HomeWalletSummary';
-import {MemberHomeView,type MemberWebsiteSummary} from './MemberHomeView';
+import {MemberHomeView,type MemberHomeViewProps,type MemberWebsiteSummary} from './MemberHomeView';
+import {SeasonalMemberHome} from '../../seasonal/Seasonal';
 import {memberGreeting,memberTrackingOrder} from '../../utils/memberHomePresentation';
 import {withoutDeletedWebsites} from '../../utils/websiteDeletion';
 import {primeOwnerWebsites} from '../../hooks/useOwnerWebsites';
@@ -33,7 +34,10 @@ function MemberDashboard(){
     }).catch(()=>{}),600);
     return()=>{active=false;window.clearTimeout(timer);};
   },[sessionToken]);
-  return <MemberHomeView name={user?.name.trim().split(/\s+/)[0]||'Member'} greeting={memberGreeting(new Date().getHours())} orders={orders} loading={loading} error={error} retry={()=>setRetry(x=>x+1)} track={o=>openOrderStatus(memberTrackingOrder(o))} wallet={<HomeWalletSummary compact/>} promotion={<InstallAppPromo variant="compact"/>} website={website} assistant={()=>openMysteryAi()} actions={{data:network=>openDataPage('data',network),airtime:network=>openDataPage('airtime',network),website:()=>setActivePage(website&&website.state!=='none'?'business':'website'),earn:()=>setActivePage('earn'),orders:()=>setActivePage('orders'),marketplace:()=>setActivePage('marketplace'),afa:()=>setActivePage('afa'),services:()=>setActivePage('services')}}/>;
+  const view:MemberHomeViewProps={name:user?.name.trim().split(/\s+/)[0]||'Member',greeting:memberGreeting(new Date().getHours()),orders,loading,error,retry:()=>setRetry(x=>x+1),track:o=>openOrderStatus(memberTrackingOrder(o)),wallet:<HomeWalletSummary compact/>,promotion:<InstallAppPromo variant="compact"/>,website,assistant:()=>openMysteryAi(),actions:{data:network=>openDataPage('data',network),airtime:network=>openDataPage('airtime',network),website:()=>setActivePage(website&&website.state!=='none'?'business':'website'),earn:()=>setActivePage('earn'),orders:()=>setActivePage('orders'),marketplace:()=>setActivePage('marketplace'),afa:()=>setActivePage('afa'),services:()=>setActivePage('services')}};
+  // While a season applies, the same account data is presented by the season's own member homepage (lazy, with
+  // this ordinary view as its fallback); otherwise the ordinary view, exactly as before.
+  return <SeasonalMemberHome view={view} fallback={<MemberHomeView {...view}/>}/>;
 }
 export const MemberHome:React.FC=()=>{
   const {user,sessionToken}=useApp();
