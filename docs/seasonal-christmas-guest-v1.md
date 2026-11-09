@@ -7,6 +7,11 @@ Baseline: `origin/main` `7de758510d1fcc797f35a4e1e1a1526e3d575d52`. Before this 
 - Nothing changes for any customer until the API service sets `SEASONAL_EXPERIENCE=christmas-2026`, and that needs separate founder approval.
 - The founder can preview it in one browser tab at any time.
 
+> **Homepage superseded (Focused Assignment 01).** The signed-out homepage is now its own Christmas composition, described in
+> [`christmas-homepage-v2.md`](christmas-homepage-v2.md). The hero ornaments, the service-card bow, the share band and the
+> Home-tab hat below are gone; the footer greeting now says "Ghana". Everything else in this document still applies to the
+> other guest pages.
+
 ## How it works
 
 | Piece | File | What it does |
@@ -72,7 +77,7 @@ Where it never applies:
 
 **Artwork:**
 
-- All original SVG drawn in code: ornaments, star, gift, bell, gift tag, Christmas hat, light strand, and a confetti burst.
+- All original SVG drawn in code: ornaments, star, gift, bell, gift tag, light strand, and a confetti burst. (The Christmas hat was removed in v2.)
 - There are no images, no Cloudinary assets and no network requests for art.
 - Nothing was generated, and nothing reuses unrelated assets.
 
@@ -82,7 +87,7 @@ Where it never applies:
 - Tap a bell: it rings.
 - Tap a gift: it bounces.
 - Tap a star: it spins and sparkles.
-- Press the Home tab: its hat wobbles. Keyboard activation does the same.
+- (v2) The Home tab no longer has a hat; the selected tab gets a champagne ring and one sparkle.
 - Ornaments, cards and page accents drop in once.
 - A few light bulbs twinkle slowly (opacity only).
 - Everything else is still.
@@ -101,10 +106,10 @@ Where it never applies:
 | Surface | Treatment |
 | --- | --- |
 | Header (desktop and mobile menu) | Warm light strand under the bar; berry hairline. Logo and navigation unchanged. |
-| Phone tab bar | A hat on the Home icon that wobbles when pressed. |
-| Footer | Light strand, bells, and "Wishing you a wonderful Christmas. From all of us at Mystery Hub, Accra." |
-| Homepage hero | Hero artwork warmed for evening. Four tappable ornaments and a star over the sky. Phase greeting chip. Countdown card with a serif line. Headline, description and actions unchanged. |
-| Homepage sections | Star eyebrows; a bow on the first service; a festive edge on the buy and Marketplace panels; warm Website Builder panel, steps and support card. New **Share the Christmas joy** band: WhatsApp share, native share or copy link of the public site only. No codes, no rewards. |
+| Phone tab bar | v2: no hat. The selected tab keeps its green pill with a fine champagne ring and one small sparkle. |
+| Footer | Light strand, bells, and "Wishing you a wonderful Christmas. With love from Mystery Hub, Ghana." (v2 wording). On the homepage the page's own sign-off replaces it. |
+| Homepage hero | Replaced in v2 by an original scene (see `christmas-homepage-v2.md`). |
+| Homepage sections | Replaced in v2: every section is recomposed for Christmas (see `christmas-homepage-v2.md`). |
 | Data & Airtime | Ornament composition and "Stay close this Christmas". Lightest touch, because this is the high-frequency purchase path. |
 | Guest checkout | A CSS-only ribbon bow on the sheet's top edge and a fine festive edge. `CheckoutModal.tsx` is unchanged. No popup, no step, no delay. |
 | Order status | The same edge and bow. "Merry Christmas!" and a short confetti burst appear **only** when the server reports `delivered`, never for initiated, pending, paid, queued or processing. |

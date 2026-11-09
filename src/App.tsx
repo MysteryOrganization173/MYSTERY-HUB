@@ -111,9 +111,9 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="mh-app min-h-screen bg-[#0b0f12] text-slate-100 flex flex-col font-sans selection:bg-[#00c365] selection:text-black" {...seasonShellAttributes(season)}>
+    <div className="mh-app min-h-screen bg-[#0b0f12] text-slate-100 flex flex-col font-sans selection:bg-[#00c365] selection:text-black" {...seasonShellAttributes(season, activePage)}>
       <SEOHead />
-      <SeasonalShellLayer />
+      <SeasonalShellLayer page={activePage} />
       {/* 3-zone Header Contract */}
       <GrowthTracker />
       <a href="#main-content" className="fixed -top-20 left-4 focus:top-3 z-[120] mh-button">Skip to content</a>

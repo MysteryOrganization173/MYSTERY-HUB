@@ -98,8 +98,11 @@ export const SeasonProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
 };
 
-/** Attributes for the customer shell. Absent when the season is off, so the normal styles apply untouched. */
-export function seasonShellAttributes(season: SeasonContextValue): Record<string, string> {
+/**
+ * Attributes for the customer shell. Absent when the season is off, so the normal styles apply untouched. The page
+ * lets the pack adjust shared chrome for one page only (for example, the homepage draws its own lights).
+ */
+export function seasonShellAttributes(season: SeasonContextValue, page?: string): Record<string, string> {
   if (!season.active || !season.status.pack) return {};
-  return { 'data-season': 'christmas', 'data-season-phase': season.status.phase };
+  return { 'data-season': 'christmas', 'data-season-phase': season.status.phase, ...(page ? { 'data-season-page': page } : {}) };
 }

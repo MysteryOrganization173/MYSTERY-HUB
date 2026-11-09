@@ -114,19 +114,6 @@ export function Gift({ size = 64, tone = 'berry', className = '' }: { size?: num
   );
 }
 
-/** A small Christmas hat, sized to sit on a 22px icon. Wobbles when its tab is tapped. */
-export const Hat = React.forwardRef<HTMLSpanElement, { className?: string }>(({ className = '' }, ref) => (
-  <span ref={ref} className={`xmas-hat ${className}`} aria-hidden="true">
-    <svg viewBox="0 0 32 26" width="22" height="18" focusable="false">
-      <path d="M4 19C7 9 13 3.5 21 3c3.6-.2 6.2 2.2 6.6 6.4L26 12c-1-3-3-4.2-5.2-3.4C17 10 14.6 14 13.7 19z" fill="#d23548" />
-      <path d="M8 13.5C11 8 15 5 20.5 4.6" fill="none" stroke="#ff8a98" strokeOpacity=".45" strokeWidth="1.4" strokeLinecap="round" />
-      <rect x="2" y="17.5" width="16.5" height="6" rx="3" fill="#fff6ea" />
-      <circle cx="27" cy="13.6" r="3.4" fill="#fff6ea" />
-    </svg>
-  </span>
-));
-Hat.displayName = 'Hat';
-
 /** A golden bell with a bow. Rings (swings) when tapped. */
 export function Bell({ size = 36, className = '' }: { size?: number; className?: string }) {
   const id = useId().replace(/:/g, '');
