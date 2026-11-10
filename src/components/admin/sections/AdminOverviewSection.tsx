@@ -209,7 +209,7 @@ export const AdminOverviewSection: React.FC<AdminOverviewSectionProps> = ({ sess
         <div className="order-1 xl:col-start-2 xl:row-start-1">{attentionPanel}</div>
         <div className="contents xl:col-start-1 xl:row-start-1 xl:block xl:space-y-6">
           <div className="order-2">
-            <AdminRecentOrders token={sessionToken} revision={revision} onOpenOrder={reference => onNavigateTab('orders', `ref/${reference}`)} onOpenAll={() => onNavigateTab('orders')} />
+            <AdminRecentOrders token={sessionToken} revision={revision} onOpenOrder={reference => onNavigateTab('orders', `ref/${reference}`)} onOpenAll={lens => onNavigateTab('orders',lens)} />
           </div>
           <div className="order-3">{healthPanel}</div>
         </div>

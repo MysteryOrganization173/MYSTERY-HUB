@@ -209,6 +209,7 @@ adminRouter.get('/orders', async (req: Request, res: Response) => {
       network,
       status,
       paymentStatus,
+      paymentView,
       archived,
       manualReview,
       dateFrom,
@@ -217,6 +218,7 @@ adminRouter.get('/orders', async (req: Request, res: Response) => {
       limit,
     } = req.query;
 
+    if (paymentView !== undefined && paymentView !== 'confirmed' && paymentView !== 'not_completed') { res.status(400).json({error:'Invalid payment view.'}); return; }
     const parsedManualReview =
       manualReview === 'true' ? true : manualReview === 'false' ? false : undefined;
 
@@ -226,6 +228,7 @@ adminRouter.get('/orders', async (req: Request, res: Response) => {
       serviceType: typeof serviceType === 'string' ? serviceType : undefined,
       network: typeof network === 'string' ? network : undefined,
       status: typeof status === 'string' ? status : undefined,
+      paymentView,
       paymentStatus: typeof paymentStatus === 'string' ? paymentStatus : undefined,
       manualReview: parsedManualReview,
       dateFrom: typeof dateFrom === 'string' ? dateFrom : undefined,

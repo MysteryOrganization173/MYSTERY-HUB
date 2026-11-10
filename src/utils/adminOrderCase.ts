@@ -90,7 +90,7 @@ export function describeOrderCase(order: AdminOrderCaseInput): OrderCase {
   }
 
   if (!paid) {
-    if (order.payment_status === 'pending') return make('awaiting_payment', 'Payment not confirmed', 'neutral', 'The customer started checkout, but no successful payment has been verified.', 'Nothing to fulfil. If the customer says they paid, search the Paystack reference before acting.');
+    if (order.payment_status === 'pending' && !failedStates.includes(order.status) && !order.failure_reason?.startsWith('paystack_initialization_')) return make('awaiting_payment', 'Payment not confirmed', 'neutral', 'The customer started checkout, but no successful payment has been verified.', 'Nothing to fulfil. If the customer says they paid, search the Paystack reference before acting.');
     return make('payment_not_completed', 'Payment not completed', 'neutral', `Payment is recorded as "${order.payment_status}". No successful payment has been verified for this order.`, 'If the customer reports a debit, verify the provider reference before deciding what happened.');
   }
 
@@ -142,8 +142,10 @@ export function orderTimeline(order: AdminOrderCaseInput & { updated_at?: string
 /** Operator lenses over the existing server filters (no new query semantics). */
 export const ORDER_LENSES = [
   { id: 'active', label: 'Active orders', params: {} },
+  { id: 'all', label: 'All attempts', params: {status:'all',archived:'include'} },
+  { id: 'confirmed', label: 'Confirmed payments', params: {status:'all',paymentView:'confirmed',archived:'include'} },
   { id: 'needs_attention', label: 'Needs attention', params: { status: 'needs_attention' } },
-  { id: 'awaiting_payment', label: 'Payment not confirmed', params: { paymentStatus: 'pending', status: 'all' } },
+  { id: 'awaiting_payment', label: 'Payment Not Completed', params: { paymentView: 'not_completed', status: 'all', archived:'include' } },
   { id: 'paid', label: 'Paid · not dispatched', params: { status: 'paid' } },
   { id: 'queued', label: 'Claimed / queued', params: { status: 'queued' } },
   { id: 'processing', label: 'With supplier', params: { status: 'with_supplier' } },
