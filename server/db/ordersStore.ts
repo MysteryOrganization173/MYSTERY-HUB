@@ -1,3 +1,4 @@
+import {legacySuccessBizHubIdentity} from '../suppliers/supplierRouting.js';
 import {ADMIN_PAYMENT_VIEW_SQL,matchesAdminPaymentView,type AdminPaymentView} from '../../shared/adminPaymentView.js';
 import {campaignForNewOrder} from '../services/campaignContext.js';
 import {isUnpaidFailedAttempt,unpaidFailedAttemptSql} from '../services/orderManagementPolicy.js';
@@ -956,29 +957,20 @@ export class OrdersStore {
   /**
    * Find order by supplier_order_id
    */
-  static async findOrderBySupplierOrderId(supplierOrderId: string, client?: PoolClient): Promise<OrderRecord | null> {
-    if (!supplierOrderId) return null;
-
+  static async findOrderBySupplierOrderId(supplierOrderId: string, client?: PoolClient, providerId = 'success_biz_hub'): Promise<OrderRecord | null> {
+    if (!supplierOrderId || !['success_biz_hub','telcogh'].includes(providerId)) return null;
     const pool = client || getPool();
     if (pool) {
-      const query = `
-        SELECT * FROM orders
-        WHERE supplier_order_id = $1
-        LIMIT 1 ${client ? 'FOR UPDATE' : ''};
-      `;
-      const result = await pool.query(query, [supplierOrderId]);
-      if (result.rows.length > 0) {
-        return result.rows[0] as OrderRecord;
-      }
-      return null;
-    } else {
-      for (const order of devMemoryStore.values()) {
-        if (order.supplier_order_id === supplierOrderId) {
-          return order;
-        }
-      }
-      return null;
+      const result = await pool.query<OrderRecord>(`
+        SELECT * FROM orders WHERE supplier_order_id = $1
+          AND (supplier_provider = $2 OR ($2 = 'success_biz_hub' AND supplier_provider IS NULL
+            AND ((COALESCE(service_type,'data') IN ('data','airtime','instant_bundle') AND network IN ('mtn','telecel','airteltigo')) OR service_type IN ('afa','results_checker'))))
+        LIMIT 2 ${client ? 'FOR UPDATE' : ''};`, [supplierOrderId,providerId]);
+      // Supplier references are not globally unique; ambiguity must never update an arbitrary order.
+      return result.rows.length === 1 ? result.rows[0] : null;
     }
+    const matches = [...new Map([...devMemoryStore.values()].map(o=>[o.id,o])).values()].filter(o => o.supplier_order_id === supplierOrderId && (o.supplier_provider === providerId || providerId === 'success_biz_hub' && legacySuccessBizHubIdentity(o)));
+    return matches.length === 1 ? matches[0] : null;
   }
 
   /**
@@ -1132,7 +1124,6 @@ export class OrdersStore {
     const updated: OrderRecord = {
       ...existing,
       status: submittedStatus,
-      supplier_provider: 'success_biz_hub',
       supplier_order_id: supplierOrderId,
       supplier_cost_minor: supplierCostMinor,
       supplier_offer_ref: supplierOfferRef,
@@ -1150,10 +1141,10 @@ export class OrdersStore {
     if (pool) {
       const query = `
         UPDATE orders
-        SET status = $1, supplier_provider = $2, supplier_order_id = $3,
+        SET status = $1, supplier_order_id = $3,
             supplier_cost_minor = $4, supplier_offer_ref = $5, supplier_response = $6,
             submitted_at = $7, updated_at = $8, supplier_last_checked_at = $9, manual_review = CASE WHEN (store_context IS NOT NULL OR $12::boolean) AND failure_reason='supplier_submission_uncertain' THEN FALSE ELSE manual_review END, failure_reason = NULL
-        WHERE id = $10 AND status = $11
+        WHERE id = $10 AND status = $11 AND supplier_provider IS NOT DISTINCT FROM $2::text
         RETURNING *;
       `;
       const result = await pool.query<OrderRecord>(query, [
@@ -1210,7 +1201,6 @@ export class OrdersStore {
     const nowIso = new Date().toISOString();
     const updated: OrderRecord = {
       ...existing,
-      supplier_provider: 'success_biz_hub',
       failure_reason: 'supplier_submission_uncertain',
       manual_review: true,
       supplier_response: JSON.stringify({
@@ -1226,8 +1216,8 @@ export class OrdersStore {
     if (pool) {
       const query = `
         UPDATE orders
-        SET supplier_provider = $1, failure_reason = $2, supplier_response = $3, updated_at = $4, manual_review = TRUE
-        WHERE id = $5 AND status = $6
+        SET failure_reason = $2, supplier_response = $3, updated_at = $4, manual_review = TRUE
+        WHERE id = $5 AND status = $6 AND supplier_provider IS NOT DISTINCT FROM $1::text
         RETURNING *;
       `;
       const result = await pool.query<OrderRecord>(query, [

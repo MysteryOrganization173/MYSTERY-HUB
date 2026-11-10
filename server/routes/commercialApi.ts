@@ -1,3 +1,4 @@
+import {FulfilmentService} from '../services/fulfilmentService.js';
 import { Router } from 'express';
 import { optionalAuth,requireAdmin } from '../middleware/authMiddleware.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
@@ -16,6 +17,7 @@ commercialRouter.get('/quote/:productId',optionalAuth,handle(async req=>{
 }));
 export const adminCommercialRouter=Router();
 adminCommercialRouter.use(requireAdmin);
+adminCommercialRouter.get('/supplier-routing',handle(async()=>FulfilmentService.routingOverview()));
 adminCommercialRouter.get('/readiness',createRateLimiter({windowMs:60_000,max:6}),handle(()=>CommercialReadinessService.snapshot()));
 adminCommercialRouter.get('/',handle(()=>CommercialService.admin()));
 adminCommercialRouter.post('/',createRateLimiter({windowMs:60_000,max:10}),handle(req=>CommercialService.save(req.user.id,req.body)));
