@@ -10,6 +10,7 @@ import { useReveal } from '../kit/motion';
 import { WelcomeCard } from '../kit/WelcomeCard';
 import { ChristmasMemberView } from './ChristmasMemberView';
 import { useMarketPreview } from './useMarketPreview';
+import { useSeason } from '../../SeasonProvider';
 
 /**
  * The signed-in customer's Christmas homepage (its own lazy chunk; see SeasonalMemberHome). It receives the account
@@ -30,8 +31,9 @@ export function ChristmasMemberHome({ view, status }: { view: MemberHomeViewProp
   // Entrances play once per visit (a re-render, an order refresh or Back to the homepage never replays them).
   useReveal(root, 'member');
   const market = useMarketPreview();
+  const { greetings } = useSeason();
   const firstPurchase = !view.loading && !view.error && view.orders.length === 0;
-  return <ChristmasMemberView {...view} status={status} rootRef={root} market={market} welcome={firstPurchase ? <MemberWelcomeOffer /> : undefined} />;
+  return <ChristmasMemberView {...view} status={status} rootRef={root} market={market} greetings={greetings} welcome={firstPurchase ? <MemberWelcomeOffer /> : undefined} />;
 }
 
 export default ChristmasMemberHome;

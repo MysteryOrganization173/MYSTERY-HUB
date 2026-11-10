@@ -12,7 +12,7 @@
 | Latest order | The phone number and reference were the only details. | A network dot, and the order's time ("Today, 10:42"). Attention gets an amber edge and a WhatsApp support button. Steps are tighter. Every state, label and action is the ordinary view's own. |
 | Recent activity and help | Plain rectangles below the services. | Recent orders print on a cream receipt beside the latest order (desktop) or under it (phones). A brand-new account has no receipt; the first-purchase invitation sits there instead. Help is a compact panel beside the Greetings preview. |
 | More from Mystery Hub | Generic illustrations; the website card did not say what to do next. | The website card draws the account's real site state (empty page, draft with a dashed edge and pencil, or live with a light and its `/sites/…` address) and names the next step: Start building, Continue editing or Manage website. Marketplace shows up to three real featured products from the public catalogue, falling back to the parcels. All services has its own mark. Each tile's press moves only its own detail. |
-| Mystery Greetings | A static teaser. | A shared kit entry (`kit/GreetingsPreview` plus `kit/greetings.ts`): the three steps, an envelope with a letter inside, and "Not open yet". It takes no account data, so guests and members can use the same component. |
+| Mystery Greetings | A static teaser; the guest homepage had its own, unconnected state. | A compact member preview (`kit/GreetingsPreview`): the three steps, an envelope with a letter inside, and "Not open yet". Both homepages now read one entry that the server reports (see below); the guest homepage keeps its own interactive envelope. |
 | Motion | — | Entrances still play once per visit. Product photos fade in only the first time they load in a visit. A data refresh replays nothing. Transform and opacity only. Reduced motion stops everything. |
 
 Desktop is shorter than V3 (2,070 px against 2,165 px). Phones are about the same length (3,247 px against 3,202 px) while adding the receipt and the Greetings steps.
@@ -25,7 +25,7 @@ The card keeps its design. Its copy is now:
 - **For new customers** (members who are eligible see **Ready on your account**);
 - the CTA **Create Your Free Account**, for guests.
 
-The paragraph explaining GH₵1, the bundle price and the percentage is gone. Checkout remains the place that shows the exact saving and the total. Eligibility (`guest`/`eligible` only), the figure (`welcomeFigure` with `WELCOME_HEADLINE_CEILING = 18`) and all pricing are unchanged. A future server-authorised campaign can change the headline at the same point (`welcomeFigure`/`WelcomeCard`) without redesigning the card. No 27% or 33% claim was added.
+The paragraph explaining GH₵1, the bundle price and the percentage is gone, and no money amount appears anywhere on the card. Nothing is advertised until the server's catalogue is confirmed. If the confirmed catalogue has no qualifying bundle, the headline is a percentage-free "WELCOME SAVING · On your first data bundle". Checkout remains the place that shows the exact saving and the total. Eligibility (`guest`/`eligible` only), the figure (`welcomeFigure` with `WELCOME_HEADLINE_CEILING = 18`) and all pricing are unchanged. A future server-authorised campaign can change the headline at the same point (`welcomeFigure`/`WelcomeCard`) without redesigning the card. No 27% or 33% claim was added.
 
 ## Mystery Greetings: what integrating PR #104 needs
 
@@ -43,7 +43,7 @@ To deliver the full experience:
 4. **Recipient screen** at `/g/:shareId`: the gift or envelope opens to reveal the message (plain text nodes only). Expired or revoked links show a 404 state. Include a "make your own" link back to the creator.
 5. **Final fixed gift artwork** for the social preview. Today's image is an interim app card.
 6. **Interaction-only analytics events**, respecting the existing consent rules.
-7. **Homepage switch:** set `GREETINGS_ENTRY` in `src/seasonal/christmas/kit/greetings.ts` from `creationConfigured`, with `createHref` pointing at the creator. Both homepages then show "Create a greeting" through the same `GreetingsPreview`.
+7. **Homepage switch:** the season status (`GET /api/seasonal/status`) carries `greetings: { createPath }`. On this server it is always `null`. When the creator ships, set it on the server from PR #104's creation gates and the real creator route. `SeasonProvider` reads it once (`greetingsEntry` in `shared/seasonal.ts` accepts only a plain same-site path). Both homepages then show "Create a greeting" leading to that one route: the guest envelope section and the member `GreetingsPreview`. Neither asks anyone to sign in.
 8. **New Year's Eve countdown:** use PR #104's `GET /api/experiences/countdown`, which targets `2027-01-01T00:00:00Z`.
 
 ## Verification

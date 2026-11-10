@@ -112,3 +112,16 @@ export function previewSeasonStatus(packId: SeasonalPackId, date: string): Seaso
 
 /** Christmas phases use the Christmas artwork; from 27 December the same pack carries New Year greetings. */
 export const isChristmasPhase = (phase: SeasonPhase) => phase === 'christmas-season' || phase === 'christmas-day' || phase === 'boxing-day';
+
+/**
+ * Mystery Greetings: one entry for both seasonal homepages, guest or signed in. The server reports it in the season
+ * status (`greetings.createPath`): a same-site path once the real greeting creator is open, null until then. Creating a
+ * greeting needs no account, so the entry never asks anyone to sign in. Anything that is not a plain same-site path
+ * reads as not open, so a malformed answer can never expose a link.
+ */
+export type GreetingsEntry = { state: 'coming-soon' } | { state: 'open'; createHref: string };
+export const GREETINGS_COMING_SOON: GreetingsEntry = { state: 'coming-soon' };
+export function greetingsEntry(reported: unknown): GreetingsEntry {
+  const path = reported && typeof reported === 'object' ? (reported as { createPath?: unknown }).createPath : null;
+  return typeof path === 'string' && /^\/[a-z0-9][a-z0-9/-]*$/i.test(path) && !path.includes('//') ? { state: 'open', createHref: path } : GREETINGS_COMING_SOON;
+}

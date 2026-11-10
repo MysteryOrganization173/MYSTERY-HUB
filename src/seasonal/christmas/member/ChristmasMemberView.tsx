@@ -2,7 +2,7 @@ import React from 'react';
 import { AlertTriangle, ArrowRight, Check, MessageCircle, RefreshCw, RotateCcw, Smartphone, Sparkles, Wifi } from 'lucide-react';
 import type { AuthenticatedCustomerOrderDetails } from '../../../../server/types/orders';
 import type { MarketplaceProduct, NetworkId } from '../../../types';
-import type { SeasonPhase, SeasonStatus } from '../../../../shared/seasonal';
+import { GREETINGS_COMING_SOON, type GreetingsEntry, type SeasonPhase, type SeasonStatus } from '../../../../shared/seasonal';
 import { formatGhs } from '../../../../shared/money';
 import { BUSINESS_CONFIG } from '../../../config/business';
 import { memberOrderLabel, memberOrderNext, memberOrderSelection, memberOrderSteps, memberOrderTone, memberReorder } from '../../../utils/memberHomePresentation';
@@ -31,6 +31,8 @@ export type ChristmasMemberViewProps = MemberHomeViewProps & {
   welcome?: React.ReactNode;
   /** Featured public Marketplace products to picture on its shortcut; `fresh` when they arrived during this visit. */
   market?: { items: MarketplaceProduct[]; fresh: boolean };
+  /** Mystery Greetings as the server reports it (useSeason().greetings): the same entry the guest homepage reads. */
+  greetings?: GreetingsEntry;
   rootRef?: React.Ref<HTMLDivElement>;
 };
 
@@ -117,7 +119,7 @@ function FirstPurchase({ data, airtime }: { data: (network?: NetworkId) => void;
 
 const SITE_ACTION = { none: 'Start building', draft: 'Continue editing', published: 'Manage website', unknown: 'Open Website Builder' } as const;
 
-export function ChristmasMemberView({ name, greeting, orders, loading, error, wallet, retry, track, actions, assistant, website, promotion, status, welcome, market, rootRef }: ChristmasMemberViewProps) {
+export function ChristmasMemberView({ name, greeting, orders, loading, error, wallet, retry, track, actions, assistant, website, promotion, status, welcome, market, greetings = GREETINGS_COMING_SOON, rootRef }: ChristmasMemberViewProps) {
   const christmas = isChristmasTime(status);
   const { big, small } = seasonCountdown(status);
   const { latest, recent, prioritizesActive } = memberOrderSelection(orders);
@@ -253,7 +255,7 @@ export function ChristmasMemberView({ name, greeting, orders, loading, error, wa
               <a className="xm-help-wa" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" aria-hidden="true" />WhatsApp support</a>
             </div>
           </section>
-          <GreetingsPreview newYear={!christmas} headingId="xm-greet-title" />
+          <GreetingsPreview newYear={!christmas} headingId="xm-greet-title" entry={greetings} />
         </div>
       </div>
 

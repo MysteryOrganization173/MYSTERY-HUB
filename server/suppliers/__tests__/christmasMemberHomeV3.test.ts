@@ -6,9 +6,8 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemberHomeView, type MemberHomeViewProps } from '../../../src/components/home/MemberHomeView';
 import { ChristmasMemberView, MEMBER_LINE, memberSignoff, orderWhen } from '../../../src/seasonal/christmas/member/ChristmasMemberView';
-import { GREETINGS_ENTRY } from '../../../src/seasonal/christmas/kit/greetings';
 import { memberOrderLabel, memberOrderNext, memberOrderSelection } from '../../../src/utils/memberHomePresentation';
-import { previewSeasonStatus, type SeasonStatus } from '../../../shared/seasonal';
+import { greetingsEntry, previewSeasonStatus, type SeasonStatus } from '../../../shared/seasonal';
 import type { AuthenticatedCustomerOrderDetails } from '../../types/orders';
 
 /* The signed-in Christmas homepage (V3, refined in V4). It must present exactly the account truth the ordinary member
@@ -102,7 +101,9 @@ test('website none / draft / published name the next step; Earn and the Greeting
 });
 
 test('Mystery Greetings: one honest entry for guests and members, no endpoint that main does not have', () => {
-  assert.deepEqual(GREETINGS_ENTRY, { state: 'coming-soon' });
+  // The server reports no creator today, so the entry is "Coming soon"; the member view defaults to it as well.
+  assert.deepEqual(greetingsEntry({ createPath: null }), { state: 'coming-soon' });
+  assert.match(seasonal(SCENARIOS.delivered), /Coming soon/);
   const kit = read('src/seasonal/christmas/kit/GreetingsPreview.tsx');
   // The entry takes no account data, so the same component serves a guest page and a member page.
   assert.doesNotMatch(kit, /useApp|sessionToken|user\b|fetch\(|apiClient/);

@@ -13,5 +13,9 @@ seasonalRouter.get('/status', (_req, res) => {
   // Short public caching: a change of the setting reaches visitors within minutes, and every visitor sees the same answer.
   res.setHeader('Cache-Control', 'public, max-age=300');
   const { active, pack, phase, date, daysToChristmas, daysToNewYear, source } = serverSeasonStatus(process.env.SEASONAL_EXPERIENCE);
-  res.json({ active, pack, phase, date, daysToChristmas, daysToNewYear, source });
+  // Mystery Greetings creator: this server has none yet, so it reports none and both seasonal homepages say "Coming
+  // soon". The greetings backend (PR #104, unmerged) sets this path from its own creation gates once its creator route
+  // exists; nothing else may open it.
+  const greetings = { createPath: null };
+  res.json({ active, pack, phase, date, daysToChristmas, daysToNewYear, source, greetings });
 });

@@ -1,14 +1,15 @@
 import React, { useId } from 'react';
 // Styles: kit.css, loaded by each seasonal homepage's chunk (this file stays importable by the pure, testable views).
 import { ArrowRight, Lock } from 'lucide-react';
-import { GREETINGS_ENTRY, type GreetingsEntry } from './greetings';
+import type { GreetingsEntry } from '../../../../shared/seasonal';
 
 /**
  * The Mystery Greetings entry, built for any seasonal page (it takes no account data). While the feature is not open it
  * is an honest preview: what a greeting will be, the three steps, and "Not open yet", with no button that pretends to
- * create anything. Once `entry` is open it becomes a link to the shared creator, for guests and members alike.
+ * create anything. `entry` is the server's answer (see greetingsEntry in shared/seasonal.ts), the same one the guest
+ * homepage reads: once open, this becomes a link to that one creator route, for guests and members alike.
  */
-export function GreetingsPreview({ newYear = false, headingId, entry = GREETINGS_ENTRY }: { newYear?: boolean; headingId: string; entry?: GreetingsEntry }) {
+export function GreetingsPreview({ newYear = false, headingId, entry }: { newYear?: boolean; headingId: string; entry: GreetingsEntry }) {
   return (
     <section className="xk-greet" aria-labelledby={headingId}>
       <div className="xk-greet-text">
