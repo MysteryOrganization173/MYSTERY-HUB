@@ -40,6 +40,18 @@ const request=(path:string,method='GET',body?:unknown,token='')=>originals.fetch
 const body=()=>({productId:'mtn-1gb',recipientPhone:'0241111111',customerEmail:'receipt@fixture.test',requestId:randomUUID()});
 async function configure(){await Business.savePolicy('admin',{confirmed:true,expectedVersion:'unconfigured',enabled:true,reserveBps:300,reserveFixedMinor:10,withdrawalMinimumMinor:500,withdrawalFeeBps:300});await Business.saveWholesale('admin',{confirmed:true,expectedVersion:'empty',productId:'mtn-1gb',wholesaleMinor:300,enabled:true});await Business.savePrices(site.id,'owner',{expectedVersion:'empty',products:[{productId:'mtn-1gb',retailMinor:500,enabled:true}]});}
 async function paid(delivered=false){await configure();const payment=await Business.initialize(site.id,body());await FulfilmentService.processPaidOrder(payment.reference,new Date().toISOString());const order=(await OrdersStore.findOrder(payment.reference))!;if(delivered)await OrdersStore.updateOrderStatus(order.id,'delivered',undefined,'fixture-supplier');return (await OrdersStore.findOrder(order.id))!;}
+test('managed checkout persists the selected provider and authoritative offer/cost',async()=>{
+ await configure();FulfilmentService.preflightCheck=async()=>({allowed:true,supplierCostMinor:cost,supplierOfferRef:'fixture'});
+ const result=await Business.initialize(site.id,body()),order=(await OrdersStore.findOrder(result.reference))!;
+ assert.equal(order.supplier_provider,'success_biz_hub');assert.equal(order.supplier_offer_ref,'fixture');assert.equal(order.supplier_cost_minor,cost);assert.equal(order.payment_status,'pending');
+});
+test('routing configuration failure preserves managed checkout rejection and existing-attempt recovery',async()=>{
+ await configure();const input=body(),first=await Business.initialize(site.id,input),key=process.env.SUCCESS_BIZ_HUB_API_KEY,enabled=process.env.SUCCESS_BIZ_HUB_FULFILLMENT_ENABLED;
+ try{delete process.env.SUCCESS_BIZ_HUB_API_KEY;process.env.SUCCESS_BIZ_HUB_FULFILLMENT_ENABLED='true';
+  await assert.rejects(()=>Business.initialize(site.id,body()),(e:any)=>e.checkout?.code==='SERVICE_TEMPORARILY_UNAVAILABLE');
+  await assert.rejects(()=>Business.initialize(site.id,input),(e:any)=>e.existingOrderReference===first.orderRef&&e.checkout?.paymentState==='unconfirmed');assert.equal(initCount,1);
+ }finally{if(key===undefined)delete process.env.SUCCESS_BIZ_HUB_API_KEY;else process.env.SUCCESS_BIZ_HUB_API_KEY=key;if(enabled===undefined)delete process.env.SUCCESS_BIZ_HUB_FULFILLMENT_ENABLED;else process.env.SUCCESS_BIZ_HUB_FULFILLMENT_ENABLED=enabled;}
+});
 test('default policy safely disables checkout without invented wholesale',async()=>{assert.equal((await Business.catalog(site.id)).products.length,0);await assert.rejects(()=>Business.initialize(site.id,body()),(e:any)=>e.checkout?.code==='PACKAGE_UNAVAILABLE');assert.equal(initCount,0);});
 test('explicit configured reserve required for activation',async()=>{await assert.rejects(()=>Business.savePolicy('admin',{confirmed:true,expectedVersion:'unconfigured',enabled:true,reserveBps:0,reserveFixedMinor:0,withdrawalMinimumMinor:500,withdrawalFeeBps:300}),/reserve/);});
 for(const amount of [0,1,199])test(`unsafe wholesale ${amount} rejected`,async()=>{await assert.rejects(()=>Business.saveWholesale('admin',{confirmed:true,expectedVersion:'empty',productId:'mtn-1gb',wholesaleMinor:amount,enabled:true}));});

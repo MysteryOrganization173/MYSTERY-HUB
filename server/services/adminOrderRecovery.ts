@@ -35,9 +35,9 @@ export class AdminOrderRecovery {
       const valid=await FinanceStore.read(initial.user_id,async tx=>{const ops=await tx.operations(),purchase=ops.find(p=>p.kind==='purchase'&&p.state==='completed'&&p.payload.orderId===initial.id&&p.amount_minor===initial.amount);return !!purchase&&!ops.some(p=>p.kind==='refund'&&p.payload.orderId===initial.id)&&(await tx.ledger()).filter(e=>e.operation_id===purchase.id&&e.bucket==='wallet').reduce((s,e)=>s+e.delta_minor,0)===-initial.amount;});
       if(!valid)throw new FinanceError('Original Wallet debit could not be verified.',409);
     }else throw new FinanceError('Unsupported payment provenance.',409);
-    const provider=FulfilmentService.getProvider();
+    const provider=FulfilmentService.getProviderForOrder(initial);
     if(!provider.client.isConfigured()||!provider.client.isFulfillmentEnabled()||FulfilmentService.isTestPaymentEnvironment())throw new FinanceError('Live supplier dispatch is disabled. Nothing was sent.',503);
-    const preflight=await FulfilmentService.preflightCheck(initial.network,initial.bundle_size_snapshot,initial.recipient_phone);
+    const preflight=await FulfilmentService.preflightExistingData(initial);
     if(!preflight.allowed)throw new FinanceError(preflight.customerMessage||'Supplier preflight did not permit recovery.',409);
     const claimed=await OrderResolutionStore.transaction(initial.id,null,async client=>{
       const current=await OrdersStore.findOrder(initial.id,client);if(!current)throw new FinanceError('Order not found.',404);

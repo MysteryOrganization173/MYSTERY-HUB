@@ -76,6 +76,16 @@ const initialize = async (body: Record<string, unknown> = {}) => {
   return { status: response.status, body: await response.json() };
 };
 
+test('new Data checkout durably snapshots the server-selected provider, offer and cost before payment',async()=>{
+  const result=await initialize();assert.equal(result.status,200);assert.equal(payments,1);
+  const order=(await OrdersStore.findOrder(result.body.orderRef))!;
+  assert.equal(order.supplier_provider,'success_biz_hub');assert.equal(order.supplier_offer_ref,'fixture-data');assert.equal(order.supplier_cost_minor,100);assert.equal(order.payment_status,'pending');
+});
+test('missing supplier configuration returns temporary-unavailable without payment initialization',async()=>{
+  delete process.env.SUCCESS_BIZ_HUB_API_KEY;
+  const result=await initialize();assert.equal(result.status,503);assert.equal(result.body.code,'SERVICE_TEMPORARILY_UNAVAILABLE');assert.equal(payments,0);assert.equal(calls.length,0);
+});
+
 test('services header timeout fires at 15000ms; failures are not cached and recovery succeeds', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   let signal: AbortSignal;

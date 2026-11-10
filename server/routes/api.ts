@@ -510,6 +510,8 @@ apiRouter.post('/payments/initialize', optionalAuth,campaignOrderContext, (req,r
       if (rawNet.includes('telecel') || rawNet === 't') network = 'telecel';
       else if (rawNet.includes('airtel') || rawNet.includes('tigo') || rawNet === 'at') network = 'airteltigo';
 
+      const supplierRoute = FulfilmentService.resolveRoute({service:'instant_bundle',network,productId:`instant-${pkg.id}`});
+
       // 3. Fast MTN duplicate check
       if (network === 'mtn') {
         const activeMtnOrder = await OrdersStore.findActiveMtnOrder(phoneVal.normalized);
@@ -571,7 +573,7 @@ apiRouter.post('/payments/initialize', optionalAuth,campaignOrderContext, (req,r
         payment_provider: 'paystack',
         payment_reference: paymentRef,
         payment_status: 'pending',
-        supplier_provider: 'success_biz_hub',
+        supplier_provider: supplierRoute.providerId,
         supplier_order_id: null,
         supplier_response: null,
         supplier_cost_minor: pricing.supplierCostPesewas,
@@ -694,6 +696,8 @@ apiRouter.post('/payments/initialize', optionalAuth,campaignOrderContext, (req,r
       // 3. Server-authoritative fee and total calculation (2% service fee)
       const calculation = calculateAirtimeOrder(airtimeFaceValue);
 
+      const supplierRoute = FulfilmentService.resolveRoute({service:'airtime',network:airtimeNet});
+
       // 4. Supplier Preflight Check for Airtime
       const preflight = await FulfilmentService.preflightCheckAirtime(
         airtimeNet,
@@ -747,7 +751,7 @@ apiRouter.post('/payments/initialize', optionalAuth,campaignOrderContext, (req,r
         payment_provider: 'paystack',
         payment_reference: paymentRef,
         payment_status: 'pending',
-        supplier_provider: 'success_biz_hub',
+        supplier_provider: supplierRoute.providerId,
         supplier_order_id: null,
         supplier_response: null,
         supplier_cost_minor: null,
@@ -862,6 +866,10 @@ apiRouter.post('/payments/initialize', optionalAuth,campaignOrderContext, (req,r
       }
     }
 
+    let supplierRoute: ReturnType<typeof FulfilmentService.resolveRoute>;
+    try { supplierRoute = FulfilmentService.resolveRoute({service:'data',network:product.network,productId:product.id}); }
+    catch { await rejectData('SERVICE_TEMPORARILY_UNAVAILABLE'); return; }
+
     // 4. Supplier Preflight Check (when fulfillment enabled)
     // Never take customer money for an order we already know cannot be submitted
     const preflight = await FulfilmentService.preflightCheck(
@@ -913,11 +921,11 @@ apiRouter.post('/payments/initialize', optionalAuth,campaignOrderContext, (req,r
       payment_provider: 'paystack',
       payment_reference: paymentRef,
       payment_status: 'pending',
-      supplier_provider: 'success_biz_hub',
+      supplier_provider: supplierRoute.providerId,
       supplier_order_id: null,
       supplier_response: null,
       supplier_cost_minor: preflight.supplierCostMinor ?? null,
-      supplier_offer_ref: null,
+      supplier_offer_ref: preflight.supplierOfferRef ?? null,
       supplier_last_checked_at: null,
       failure_reason: null,
       created_at: nowIso,

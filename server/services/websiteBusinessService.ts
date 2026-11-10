@@ -167,6 +167,9 @@ export class WebsiteBusinessService {
     const previous=await this.existingCheckout(initialSite.user_id,siteId,key,input,phone.normalized!,customerId);
     const reject=async(code:import('../../shared/checkoutFailure.js').PreflightCode):Promise<never>=>{const concurrent=await this.existingCheckout(initialSite.user_id,siteId,key,input,phone.normalized!,customerId);if(concurrent||previous)throw requireCheckoutRecovery((concurrent||previous)!.orderRef);throw rejectPreflight(code);};
     const product=getAuthoritativeProduct(String(input.productId));if(!product||product.id!==input.productId){return reject('PACKAGE_UNAVAILABLE');}
+    let supplierRoute:ReturnType<typeof FulfilmentService.resolveRoute>;
+    try {supplierRoute=FulfilmentService.resolveRoute({service:'data',network:product.network,productId:product.id});}
+    catch {return reject('SERVICE_TEMPORARILY_UNAVAILABLE');}
     const preflight=await FulfilmentService.preflightCheck(product.network,product.dataAmount,phone.normalized!);
     if(!preflight.allowed||!Number.isSafeInteger(preflight.supplierCostMinor)||Number(preflight.supplierCostMinor)<=0){
       return reject(!preflight.allowed&&isPreflightCode(preflight.code)?preflight.code:'PACKAGE_UNAVAILABLE');
@@ -184,7 +187,7 @@ export class WebsiteBusinessService {
         else if(await OrdersStore.findActiveMtnOrder(phone.normalized!))throw rejectPreflight('ACTIVE_MTN_ORDER');
       }
       const id=`ord_${randomUUID()}`,reference=`MH_STORE_${randomUUID()}`,publicRef=`MH-${randomUUID()}`,now=new Date().toISOString();
-      const order:OrderRecord={id,user_id:customerId||null,public_reference:publicRef,customer_name:null,customer_email:input.customerEmail as string,customer_phone:phone.normalized!,recipient_phone:phone.normalized!,network:product.network,service_type:'data',product_id:product.id,product_name_snapshot:`${product.networkName} ${product.dataAmount}`,bundle_size_snapshot:product.dataAmount,amount:snapshot.retailMinor,currency:'GHS',status:'pending_payment',payment_provider:'paystack',payment_reference:reference,payment_status:'pending',supplier_provider:'success_biz_hub',supplier_order_id:null,supplier_response:null,supplier_cost_minor:snapshot.supplierCostMinor,supplier_offer_ref:null,supplier_last_checked_at:null,failure_reason:null,created_at:now,updated_at:now,paid_at:null,submitted_at:null,delivered_at:null,referrer_user_id:null,referral_attribution_id:null,referral_code:null,store_context:snapshot};
+      const order:OrderRecord={id,user_id:customerId||null,public_reference:publicRef,customer_name:null,customer_email:input.customerEmail as string,customer_phone:phone.normalized!,recipient_phone:phone.normalized!,network:product.network,service_type:'data',product_id:product.id,product_name_snapshot:`${product.networkName} ${product.dataAmount}`,bundle_size_snapshot:product.dataAmount,amount:snapshot.retailMinor,currency:'GHS',status:'pending_payment',payment_provider:'paystack',payment_reference:reference,payment_status:'pending',supplier_provider:supplierRoute.providerId,supplier_order_id:null,supplier_response:null,supplier_cost_minor:snapshot.supplierCostMinor,supplier_offer_ref:preflight.supplierOfferRef??null,supplier_last_checked_at:null,failure_reason:null,created_at:now,updated_at:now,paid_at:null,submitted_at:null,delivered_at:null,referrer_user_id:null,referral_attribution_id:null,referral_code:null,store_context:snapshot};
       await OrdersStore.createOrder(order,tx.client);
       const row=await tx.create('store_checkout',key,order.amount,{siteId,productId:product.id,recipient:phone.normalized!,email:input.customerEmail,customerId:customerId||null,orderId:id,reference,publicRef},'initializing');return {row,fresh:true};
     });

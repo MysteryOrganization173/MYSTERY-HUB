@@ -109,12 +109,5 @@ export class UnconfiguredSupplierProvider implements SupplierProvider {
   }
 }
 
-let activeSupplier: SupplierProvider = new UnconfiguredSupplierProvider();
-
-export function getActiveSupplierProvider(): SupplierProvider {
-  return activeSupplier;
-}
-
-export function setActiveSupplierProvider(provider: SupplierProvider): void {
-  activeSupplier = provider;
-}
+// Execution is resolved by SupplierRegistry and the persisted order namespace.
+// A mutable global active provider must not select a provider for a request.

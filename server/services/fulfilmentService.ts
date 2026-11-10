@@ -15,6 +15,8 @@ import { OrdersStore } from '../db/ordersStore.js';
 import { OrderRecord, OrderStatus } from '../types/orders.js';
 import { SuccessBizHubProvider } from '../suppliers/successBizHub/provider.js';
 import { SuccessBizHubClient } from '../suppliers/successBizHub/client.js';
+import { DEFAULT_SUPPLIER_ROUTES, SupplierRegistry, resolveSupplierRoute, resolveOrderSupplier, legacySuccessBizHubIdentity, SupplierRoutingError, type SupplierRouteContext } from '../suppliers/supplierRouting.js';
+import { SUPPLIER_NETWORKS, SUPPLIER_SERVICES, type SupplierRoutingOverview } from '../../shared/supplierRouting.js';
 import {observeSalesPreflight,noteSalesFailure} from './salesReliability.js';
 
 export type PreflightErrorCode =
@@ -31,6 +33,7 @@ export interface PreflightResult {
   customerMessage?: string;
   internalReason?: string;
   supplierCostMinor?: number;
+  supplierOfferRef?: string;
   timings?: {
     servicesMs: number;
     catalogMs: number;
@@ -45,6 +48,36 @@ export class FulfilmentService {
 
   public static getProvider(): SuccessBizHubProvider {
     return this.provider;
+  }
+
+  /** Catalogue compatibility accessor above is SBH-specific. Order execution never consults defaults. */
+  private static registry(): SupplierRegistry {
+    return new SupplierRegistry([
+      { id: 'success_biz_hub', name: 'Success Biz Hub', provider: this.provider, services: SUPPLIER_SERVICES, networks: SUPPLIER_NETWORKS, plannedServices: [], configured: this.provider.client.isConfigured(), qualified: true, acceptsNewOrders: true },
+      { id: 'telcogh', name: 'TELCOGH', provider: null, services: [], networks: [], plannedServices: ['data', 'airtime'], configured: false, qualified: false, acceptsNewOrders: false },
+    ]);
+  }
+  static resolveRoute(context: SupplierRouteContext) {
+    // Disabled fulfillment retains the existing test/queued flow. Enabled production requires credentials.
+    try { return resolveSupplierRoute(this.registry(), context, undefined, this.provider.client.isFulfillmentEnabled()); }
+    catch { throw new FinanceError('Supplier service is temporarily unavailable. No payment has been taken.',503); }
+  }
+  static getProviderForOrder(order: OrderRecord): SuccessBizHubProvider {
+    if (['afa', 'results_checker'].includes(order.service_type || '')) {
+      if (order.supplier_provider !== 'success_biz_hub' && !legacySuccessBizHubIdentity(order)) throw new SupplierRoutingError('UNAVAILABLE_PROVIDER');
+    } else if (resolveOrderSupplier(this.registry(), order).id !== 'success_biz_hub') {
+      throw new SupplierRoutingError('UNAVAILABLE_PROVIDER');
+    }
+    // Explicit compatibility bridge: future providers require their own qualified preflight/status adapter.
+    return this.provider;
+  }
+  static async preflightExistingData(order: OrderRecord): Promise<PreflightResult> {
+    this.getProviderForOrder(order);
+    return observeSalesPreflight('data',()=>this.preflightData(order.network,order.bundle_size_snapshot,order.recipient_phone));
+  }
+  static routingOverview(): SupplierRoutingOverview {
+    const registry = this.registry();
+    return { mode: 'read_only', providers: registry.list().map(p => ({ id: p.id, name: p.name, implementedServices: p.services, plannedServices: p.plannedServices, networks: p.networks, configured: p.configured, qualified: p.qualified, acceptsNewOrders: p.acceptsNewOrders && p.configured && this.provider.client.isFulfillmentEnabled(), restriction: p.id === 'telcogh' ? 'Not integrated or qualified. Activation is unavailable in this release.' : 'Existing fulfillment configuration, preflight and payment safeguards remain required.' })), routes: DEFAULT_SUPPLIER_ROUTES.map(route => ({...route})) };
   }
 
   /**
@@ -63,6 +96,7 @@ export class FulfilmentService {
   static async preflightCheck(
     network: string, bundleSize: string, recipientPhone: string
   ): Promise<PreflightResult> {
+    try { this.resolveRoute({service:'data',network}); } catch { return {allowed:false,code:'SERVICE_TEMPORARILY_UNAVAILABLE',customerMessage:'Supplier service is temporarily unavailable.'}; }
     return observeSalesPreflight('data',()=>this.preflightData(network,bundleSize,recipientPhone));
   }
   private static async preflightData(
@@ -202,6 +236,7 @@ export class FulfilmentService {
       return {
         allowed: true,
         supplierCostMinor: supplierPackage.supplierCostMinor,
+        supplierOfferRef: supplierPackage.offerSlug || supplierPackage.offerId,
         timings: { servicesMs, catalogMs, beneficiaryMs, walletMs, totalMs: Math.round(performance.now() - startPreflight) },
       };
     } catch (err) {
@@ -225,6 +260,7 @@ export class FulfilmentService {
   static async preflightCheckAirtime(
     network: string, faceValuePesewas: number, recipientPhone: string
   ): Promise<PreflightResult> {
+    try { this.resolveRoute({service:'airtime',network}); } catch { return {allowed:false,code:'SERVICE_TEMPORARILY_UNAVAILABLE',customerMessage:'Supplier service is temporarily unavailable.'}; }
     return observeSalesPreflight('airtime',()=>this.preflightAirtime(network,faceValuePesewas,recipientPhone));
   }
   private static async preflightAirtime(
@@ -371,11 +407,18 @@ export class FulfilmentService {
       if(!guarded||!q||intent?.source!==claimedOrder.payment_provider||claimedOrder.status!=='queued'||claimedOrder.supplier_order_id||claimedOrder.payment_status!==(q.source==='complimentary'?'not_required':'recorded')||claimedOrder.amount!==(q.source==='complimentary'?0:q.product.retailMinor)||q.recipient!==claimedOrder.recipient_phone||q.product.id!==claimedOrder.product_id||expectedSupplierCostMinor!==q.product.supplierCostMinor||expectedSupplierOffer!==q.product.offerRef)throw new FinanceError('Assisted dispatch requires its exact durable operator authorization.',409);
     }
 
+    if (claimedOrder.service_type === 'marketplace') return {order: claimedOrder, alreadyHandled: false};
+    let provider: SuccessBizHubProvider;
+    try { provider = this.getProviderForOrder(claimedOrder); }
+    catch {
+      const held = claimedOrder.manual_review ? claimedOrder : await OrdersStore.updateOrderReview(claimedOrder.id, true, 'Original supplier is unavailable or unrecognized. No supplier request was sent; inspect the original assignment.');
+      return {order: held || claimedOrder, alreadyHandled: false};
+    }
     if (claimedOrder.service_type === 'afa') return { order: await AfaService.submit(claimedOrder), alreadyHandled: false };
     if (claimedOrder.service_type === 'results_checker') return { order: await ResultsCheckerService.fulfil(claimedOrder), alreadyHandled: false };
 
     // Step 3: Safety check: Is live fulfilment enabled?
-    const isFulfillmentEnabled = this.provider.client.isFulfillmentEnabled();
+    const isFulfillmentEnabled = provider.client.isFulfillmentEnabled();
     const isTestPayment = !assisted&&this.isTestPaymentEnvironment();
 
     // NEVER spend real supplier money from test payments!
@@ -419,13 +462,6 @@ export class FulfilmentService {
     }
 
     // Step 4: Live dispatch to Success Biz Hub (Data / Airtime / Instant)
-    if (claimedOrder.service_type === 'marketplace') {
-      console.info(
-        `[Fulfilment Dispatch] Marketplace order ${claimedOrder.public_reference} paid successfully. Retaining status for admin/supplier fulfilment.`
-      );
-      return { order: claimedOrder, alreadyHandled: false };
-    }
-
     const isAirtime = claimedOrder.service_type === 'airtime' || claimedOrder.product_id.startsWith('airtime-');
     const isInstantBundle =
       claimedOrder.service_type === 'instant_bundle' || claimedOrder.product_id.startsWith('instant-');
@@ -448,7 +484,7 @@ export class FulfilmentService {
           `[Fulfilment Dispatch] Submitting Instant Bundle order ${claimedOrder.public_reference} to Success Biz Hub (pkg: ${packageId}) for ${msisdn}...`
         );
 
-        const instantRes = await this.provider.placeInstantBundle({
+        const instantRes = await provider.placeInstantBundle({
           internalOrderId: claimedOrder.id,
           publicReference: claimedOrder.public_reference,
           packageId,
@@ -538,7 +574,7 @@ export class FulfilmentService {
           `[Fulfilment Dispatch] Submitting Airtime order ${claimedOrder.public_reference} to Success Biz Hub for ${msisdn} (${claimedOrder.network.toUpperCase()} GH₵${amountMajor})...`
         );
 
-        const airtimeRes = await this.provider.placeAirtime({
+        const airtimeRes = await provider.placeAirtime({
           internalOrderId: claimedOrder.id,
           publicReference: claimedOrder.public_reference,
           recipientPhone: msisdn,
@@ -617,7 +653,7 @@ export class FulfilmentService {
     // 4-Data: Live dispatch to Success Biz Hub Data catalog
     try {
       // 4a. Resolve live supplier package
-      const resolution = await this.provider.resolvePackage(
+      const resolution = await provider.resolvePackage(
         claimedOrder.network,
         claimedOrder.bundle_size_snapshot
       );
@@ -635,6 +671,13 @@ export class FulfilmentService {
       }
 
       const { offerSlug, offerId, sizeLabel, supplierCostMinor } = resolution.resolved;
+      // New Data checkouts capture an offer/cost pair. A later catalogue change must not silently replace it.
+      // Legacy rows without an offer snapshot retain the established preflight/economic checks below.
+      if (claimedOrder.supplier_offer_ref && (claimedOrder.supplier_offer_ref !== (offerSlug || offerId) || claimedOrder.supplier_cost_minor != null && claimedOrder.supplier_cost_minor !== supplierCostMinor)) {
+        const held = await OrdersStore.updateOrderReview(claimedOrder.id, true, 'Supplier offer or cost differs from the checkout snapshot. Nothing was sent; review the original quote.');
+        return {order: held || claimedOrder, alreadyHandled: false};
+      }
+
       if(expectedSupplierCostMinor!==undefined&&(supplierCostMinor!==expectedSupplierCostMinor||expectedSupplierOffer!==undefined&&expectedSupplierOffer!==(offerSlug||offerId||''))){
         const held=await OrdersStore.updateOrderReview(claimedOrder.id,true,'Supplier cost changed after confirmation. Nothing was sent; reconcile this authorization before creating another order.');
         return {order:held||claimedOrder,alreadyHandled:false};
@@ -661,7 +704,7 @@ export class FulfilmentService {
       // Persist uncertainty before POST: a process crash cannot leave an apparently safe queued sale.
       if(claimedOrder.store_context||guarded)await OrdersStore.saveSupplierUncertainSubmission(claimedOrder.id,'Supplier dispatch started; acceptance is awaiting confirmation.');
       storePostStarted=true;
-      const response = await this.provider.client.createOrder(orderPayload);
+      const response = await provider.client.createOrder(orderPayload);
       const data = response.data || {};
       const supplierOrderId = data.publicId || data.id;
 
@@ -672,7 +715,7 @@ export class FulfilmentService {
       }
 
       if(claimedOrder.store_context||guarded){storeSupplierId=String(supplierOrderId);await OrdersStore.updateOrderStatus(claimedOrder.id,'queued',undefined,storeSupplierId);}
-      const supplierDomainStatus = this.provider.mapSupplierStatus(data.status);
+      const supplierDomainStatus = provider.mapSupplierStatus(data.status);
       const mappedOrderStatus: OrderStatus =
         supplierDomainStatus === 'delivered'
           ? 'delivered'
@@ -737,6 +780,13 @@ export class FulfilmentService {
    * Can be forced by Admin manual refresh.
    */
   static async refreshOrderStatusIfDue(order: OrderRecord, force = false): Promise<OrderRecord> {
+    if (order.service_type === 'marketplace') return order;
+    let provider: SuccessBizHubProvider;
+    try { provider = this.getProviderForOrder(order); }
+    catch {
+      if (force) throw new FinanceError('Original supplier is unavailable. Review this order without changing its supplier.',409);
+      return order;
+    }
     if (order.service_type === 'afa') return AfaService.refresh(order);
     if (order.service_type === 'results_checker') return ResultsCheckerService.refresh(order);
     const uncertainWithId = order.failure_reason === 'supplier_submission_uncertain' && (order.status === 'queued' || order.store_context && order.manual_review && ['submitted','processing','delivered'].includes(order.status));
@@ -747,7 +797,7 @@ export class FulfilmentService {
       return order;
     }
 
-    if ((!force&&!this.provider.client.isFulfillmentEnabled()) || !this.provider.client.isConfigured()) {
+    if ((!force&&!provider.client.isFulfillmentEnabled()) || !provider.client.isConfigured()) {
       if(force)throw new FinanceError('Supplier status lookup is not configured. Use documented manual reconciliation.',503);
       return order;
     }
@@ -767,12 +817,12 @@ export class FulfilmentService {
         order.service_type === 'instant_bundle' || order.product_id.startsWith('instant-');
 
       let statusRes;
-      if (isInstantBundle && this.provider.getInstantBundleStatus) {
-        statusRes = await this.provider.getInstantBundleStatus(order.supplier_order_id);
-      } else if (isAirtime && this.provider.getAirtimeStatus) {
-        statusRes = await this.provider.getAirtimeStatus(order.supplier_order_id);
+      if (isInstantBundle && provider.getInstantBundleStatus) {
+        statusRes = await provider.getInstantBundleStatus(order.supplier_order_id);
+      } else if (isAirtime && provider.getAirtimeStatus) {
+        statusRes = await provider.getAirtimeStatus(order.supplier_order_id);
       } else {
-        statusRes = await this.provider.getOrderStatus(order.supplier_order_id);
+        statusRes = await provider.getOrderStatus(order.supplier_order_id);
       }
 
       order=(await OrdersStore.recordSupplierCheck(order.id,order.supplier_order_id!,statusRes.rawResponse?JSON.stringify(statusRes.rawResponse):undefined))||order;
