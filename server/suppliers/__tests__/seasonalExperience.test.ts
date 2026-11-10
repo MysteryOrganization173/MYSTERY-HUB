@@ -70,7 +70,9 @@ test('the status route is public, read-only, cacheable and off without the setti
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('cache-control'), 'public, max-age=300');
   const body = await res.json();
-  assert.deepEqual(Object.keys(body).sort(), ['active', 'date', 'daysToChristmas', 'daysToNewYear', 'pack', 'phase', 'source']);
+  assert.deepEqual(Object.keys(body).sort(), ['active', 'date', 'daysToChristmas', 'daysToNewYear', 'greetings', 'pack', 'phase', 'source']);
+  // Mystery Greetings: this server has no creator, so it reports none (both homepages show "Coming soon").
+  assert.deepEqual(body.greetings, { createPath: null });
   assert.equal(body.active, false);
   assert.equal(body.pack, null);
   // Nothing a visitor sends can switch it on: no write route exists and query strings are ignored.
@@ -263,7 +265,9 @@ test('the Christmas homepage keeps the real catalogue, prices, checkout, templat
   assert.match(words, /With love from Mystery Hub, Ghana\./);
   // Mystery Greetings is a preview only: no creator button unless a real route is passed, no fake links or API.
   assert.match(page, /\{createHref && <a className="mh-button xh-btn-primary" href=\{createHref\}>Create a greeting/);
-  assert.match(page, /<Greetings christmas=\{christmas\} \/>/, 'no creator route is passed yet');
+  // The only creator route is the server's (shared with the member homepage), and this server reports none yet.
+  assert.match(page, /<Greetings christmas=\{christmas\} entry=\{greetings\} \/>/);
+  assert.match(read('server/routes/seasonalApi.ts'), /const greetings = \{ createPath: null \};/, 'no creator route exists yet');
   assert.match(page, /Share the Mystery Hub website on WhatsApp/);
   assert.match(page, /Not open yet\. We’ll show it here when it is ready\./);
   assert.doesNotMatch(words, /\/api\/experiences|\/g\/|greetings\/|shareId|fetch\(/, 'no greeting API or link is invented');
@@ -330,8 +334,12 @@ test('the welcome figure is computed from the live offer and catalogue, never ab
   // If prices rise, the figure falls with them (GH₵1 on GH₵9.99 is 10%).
   assert.equal(welcomeFigure(offer, [b('mtn-2gb', 'mtn', '2GB', 9.99)], true)?.percent, 10);
   const card = read('src/seasonal/christmas/kit/WelcomeCard.tsx');
-  assert.match(card, /if \(!offer\?\.enabled \|\| !\['guest', 'eligible'\]\.includes\(offer\.state\)\) return null;/);
-  assert.match(card, /\{amount\} off one qualifying data purchase/);
+  // Eligibility is the server's; and nothing is advertised until the server catalogue is confirmed.
+  assert.match(card, /if \(!offer\?\.enabled \|\| !\['guest', 'eligible'\]\.includes\(offer\.state\) \|\| !catalogConfirmed\) return null;/);
+  // V4: an advertisement, not documentation. Headline, one line, one small note and the sign-up action; checkout shows
+  // the exact saving and total, so the card carries no worked calculation, bundle price or fine print.
+  for (const line of ['Up to <b>{figure.percent}%</b> off', "'Your first data bundle'", "'For new customers'", 'Create Your Free Account']) assert.ok(card.includes(line), line);
+  assert.doesNotMatch(card, /qualifying data purchase|which is|regularMinor|figure\.label|applies once|xk-welcome-fine|formatGhs|discountMinor\)/);
   assert.match(read(`${HOME_DIR}/ChristmasHome.tsx`), /catalogConfirmed=\{directCatalogConfirmed\(\)\}/);
   assert.match(read('src/hooks/useDirectCatalog.ts'), /confirmed=true;/);
 });

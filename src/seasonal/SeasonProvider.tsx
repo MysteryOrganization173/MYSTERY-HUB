@@ -2,8 +2,8 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useApp } from '../context/AppContext';
 import { API_BASE_URL } from '../services/apiClient';
 import {
-  accraDate, parsePreviewDate, parseSeasonSetting, previewSeasonStatus, serverSeasonStatus,
-  type SeasonalPackId, type SeasonStatus,
+  accraDate, greetingsEntry, GREETINGS_COMING_SOON, parsePreviewDate, parseSeasonSetting, previewSeasonStatus, serverSeasonStatus,
+  type GreetingsEntry, type SeasonalPackId, type SeasonStatus,
 } from '../../shared/seasonal';
 
 /**
@@ -40,10 +40,12 @@ export interface SeasonContextValue {
   previewing: boolean;
   /** A pack applies, but this visitor is signed in (or still being checked), so guest page compositions stay off. */
   heldForSignedIn: boolean;
+  /** Mystery Greetings, as the server reports it (the same for guests, members and previews). */
+  greetings: GreetingsEntry;
   exitPreview: () => void;
 }
 
-const SeasonContext = createContext<SeasonContextValue>({ status: OFF, active: false, memberActive: false, shellActive: false, previewing: false, heldForSignedIn: false, exitPreview: () => {} });
+const SeasonContext = createContext<SeasonContextValue>({ status: OFF, active: false, memberActive: false, shellActive: false, previewing: false, heldForSignedIn: false, greetings: GREETINGS_COMING_SOON, exitPreview: () => {} });
 export const useSeason = () => useContext(SeasonContext);
 
 function readStorage<T>(storage: () => Storage, key: string): T | null {
@@ -80,17 +82,19 @@ export const SeasonProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const { user, isAuthChecking } = useApp();
   const [preview, setPreview] = useState<StoredPreview | null>(takePreviewFromUrl);
   const [server, setServer] = useState<SeasonStatus>(cachedServerStatus);
+  const [greetings, setGreetings] = useState<GreetingsEntry>(GREETINGS_COMING_SOON);
 
   useEffect(() => {
     let alive = true;
     fetch(`${API_BASE_URL}/api/seasonal/status`, { headers: { Accept: 'application/json' } })
       .then(res => (res.ok ? res.json() : null))
-      .then((data: { active?: boolean; pack?: unknown } | null) => {
+      .then((data: { active?: boolean; pack?: unknown; greetings?: unknown } | null) => {
         if (!alive || !data) return;
         // The server is the only authority; the page recomputes the phase from today's Accra date.
         const pack = data.active ? parseSeasonSetting(data.pack) : null;
         writeStorage(() => localStorage, CACHE_KEY, { pack });
         setServer(serverSeasonStatus(pack));
+        setGreetings(greetingsEntry(data.greetings));
       })
       .catch(() => { /* offline or blocked: keep the last known answer, which defaults to off */ });
     return () => { alive = false; };
@@ -104,9 +108,9 @@ export const SeasonProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const signedIn = Boolean(user) && !isAuthChecking;
     return {
       status, active: status.active && signedOut, memberActive: status.active && signedIn, shellActive: status.active,
-      previewing: Boolean(preview), heldForSignedIn: status.active && !signedOut, exitPreview,
+      previewing: Boolean(preview), heldForSignedIn: status.active && !signedOut, greetings, exitPreview,
     };
-  }, [preview, server, user, isAuthChecking, exitPreview]);
+  }, [preview, server, greetings, user, isAuthChecking, exitPreview]);
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
 };

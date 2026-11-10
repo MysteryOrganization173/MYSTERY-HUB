@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './christmasHome.css';
+import '../kit/kit.css';
 import { ArrowRight, ArrowUpRight, Check, FileQuestion, Lock, MessageCircle, PackageSearch, ReceiptText, ShieldCheck, ShoppingBag, Zap } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../../config/business';
-import type { SeasonPhase, SeasonStatus } from '../../../../shared/seasonal';
+import type { GreetingsEntry, SeasonPhase, SeasonStatus } from '../../../../shared/seasonal';
+import { useSeason } from '../../SeasonProvider';
 import { isChristmasTime, seasonCountdown } from '../copy';
 import { loadSeasonalSerif } from '../font';
 import { HeroScene } from './heroArt';
@@ -258,7 +260,12 @@ function FeaturedData() {
  * the states, so a quick second tap reverses the movement from where it is instead of restarting it, and the letter
  * is clipped at the envelope's bottom edge, so it can never appear below it.
  */
-function Greetings({ christmas, createHref }: { christmas: boolean; createHref?: string }) {
+/**
+ * Mystery Greetings on the guest homepage: its own interactive sample envelope, with the same entry the member homepage
+ * reads (the server's answer). Not open: "Coming soon" and no create action. Open: one link to the shared creator.
+ */
+function Greetings({ christmas, entry }: { christmas: boolean; entry: GreetingsEntry }) {
+  const createHref = entry.state === 'open' ? entry.createHref : null;
   const shareText = `${christmas ? 'Merry Christmas!' : 'Happy New Year!'} I use Mystery Hub for data, airtime and more. Have a look:`;
   const share = `https://wa.me/?text=${encodeURIComponent(`${shareText} https://${BUSINESS_CONFIG.domain}/`)}`;
   const envelope = useRef<HTMLButtonElement>(null);
@@ -282,10 +289,10 @@ function Greetings({ christmas, createHref }: { christmas: boolean; createHref?:
     <section className="xh-sec xh-greet" aria-labelledby="xh-greet-title">
       <div className="xh-wrap xh-greet-grid">
         <div className="xh-greet-copy">
-          <p className="xh-kicker xh-kicker-soft"><span className="xh-soon-badge">Coming soon</span>Mystery Greetings</p>
+          <p className="xh-kicker xh-kicker-soft">{!createHref && <span className="xh-soon-badge">Coming soon</span>}Mystery Greetings</p>
           <h2 id="xh-greet-title">A {christmas ? 'Christmas' : 'New Year'} surprise, <em>wrapped by you.</em></h2>
           <p>Write a personal greeting, wrap it as a digital gift and send the link to someone you love. They tap to open it and read your words.</p>
-          <p className="xh-greet-note"><Lock className="w-4 h-4" aria-hidden="true" />Not open yet. We’ll show it here when it is ready.</p>
+          {!createHref && <p className="xh-greet-note"><Lock className="w-4 h-4" aria-hidden="true" />Not open yet. We’ll show it here when it is ready.</p>}
           <div className="xh-greet-actions">
             {createHref && <a className="mh-button xh-btn-primary" href={createHref}>Create a greeting<ArrowRight className="w-4 h-4" aria-hidden /></a>}
             <a className="xh-link" href={share} target="_blank" rel="noopener noreferrer"><MessageCircle className="w-4 h-4" aria-hidden />Share the Mystery Hub website on WhatsApp<span className="sr-only"> (opens WhatsApp)</span></a>
@@ -546,13 +553,14 @@ export function ChristmasHome({ status }: { status: SeasonStatus }) {
   const root = useRef<HTMLDivElement>(null);
   useEffect(loadSeasonalSerif, []);
   useReveal(root, 'guest');
+  const { greetings } = useSeason();
   const christmas = isChristmasTime(status);
   return (
     <div ref={root} className="xh-home" data-phase={status.phase}>
       <Hero status={status} />
       <Services christmas={christmas} />
       <FeaturedData />
-      <Greetings christmas={christmas} />
+      <Greetings christmas={christmas} entry={greetings} />
       <Install status={status} />
       <Website />
       <Marketplace christmas={christmas} />
