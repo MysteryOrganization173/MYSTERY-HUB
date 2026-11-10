@@ -68,7 +68,10 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
   // Data state
-  const [ordersData, setOrdersData] = useState<AdminOrdersResponse | null>(null);
+  const [storedOrders, setOrdersData] = useState<AdminOrdersResponse | null>(null);
+  const queryKey = JSON.stringify([sessionToken,lens,debouncedSearch,serviceTypeFilter,networkFilter,manualReviewFilter,dateFrom,dateTo,currentPage]);
+  const [ordersQuery,setOrdersQuery]=useState('');
+  const ordersData=ordersQuery===queryKey?storedOrders:null;
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
@@ -158,7 +161,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
       if (!res.success) throw new Error('Orders were not returned.');
       if (current()) {
         if (res.pagination.page > res.pagination.totalPages) { setCurrentPage(res.pagination.totalPages); return; }
-        setOrdersData(res);
+        setOrdersData(res);setOrdersQuery(queryKey);
         setLoadedAt(Date.now());
       }
     } catch (err: unknown) {
@@ -166,7 +169,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
     } finally {
       if(current()){setIsLoading(false);setIsSearching(false);}
     }
-  }, [sessionToken, debouncedSearch, serviceTypeFilter, networkFilter, lens, manualReviewFilter, dateFrom, dateTo, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [queryKey, sessionToken, debouncedSearch, serviceTypeFilter, networkFilter, lens, manualReviewFilter, dateFrom, dateTo, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
   refreshList.current = fetchOrders;
 
   useEffect(() => { void fetchOrders(); }, [fetchOrders]);
@@ -304,6 +307,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
         ))}
       </div>
 
+      {['all','confirmed','awaiting_payment'].includes(lens) && <p className="text-sm text-slate-400">Includes archived records. {lens==='all'?'All persisted attempts; preflight denials without an order record are not included.':lens==='confirmed'?'Confirmed Paystack or Wallet payments, regardless of fulfilment outcome. Operator-recorded and complimentary orders are excluded.':'Pending, cancelled, expired and failed customer payments. Supplier failure alone does not make a paid order unpaid.'}</p>}
       {/* Search & filters */}
       <div className="space-y-3 rounded-2xl border border-slate-800 bg-[#0d151b] p-3 sm:p-4">
         <div className="flex gap-2">
@@ -357,8 +361,8 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
       {!selectedOrder && isLoadingDetail && <p role="status" className="text-sm text-slate-400">Opening order details… <button type="button" className="min-h-11 px-2 text-[#00c365]" onClick={closeOrderDrawer}>Cancel opening</button></p>}
       {!selectedOrder && detailError && initialReference && <AdminError title="Order details could not load" message={detailError} onRetry={() => void loadOrderDetails(initialReference)} />}
       {error && <AdminError title={ordersData ? 'Refresh failed · showing last loaded orders' : 'Orders could not load'} message={error} onRetry={() => void fetchOrders()} />}
-      {isSearching && !isLoading && <p role="status" className="text-sm text-slate-400">Updating results… Previous results remain visible until the request completes.</p>}
-      {isLoading ? <AdminLoading label="Loading orders…" /> : !ordersData || ordersData.orders.length === 0 ? (
+      {isSearching && !isLoading && <p role="status" className="text-sm text-slate-400">Updating the selected results…</p>}
+      {(isLoading || (!ordersData && !error)) ? <AdminLoading label="Loading orders…" /> : !ordersData || ordersData.orders.length === 0 ? (
         <AdminEmpty title={error ? 'Current orders unavailable' : lens === 'needs_attention' ? 'No orders need attention' : 'No orders found'}>
           {error ? 'The current results could not be verified. Try refreshing again.' : lens === 'needs_attention' ? 'No actionable orders match these filters in the last successful check. Normal processing is not a failure.' : 'Nothing matches this search and filter. Try another lens or clear the filters.'}
         </AdminEmpty>

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getAdminOrdersOnServer } from '../../../services/apiClient';
 import type { AdminOrderDetails } from '../../../../server/types/orders';
+import {adminOrderSearchParams} from '../../../utils/adminOrderView';
 import { describeOrderCase } from '../../../utils/adminOrderCase';
 import { afaStatusLabel } from '../../../../shared/afa';
 import { AdminPanel, AdminButton, AdminError, StatusPill, ghs } from '../ui/AdminUi';
@@ -30,7 +31,7 @@ function createdLabel(iso: string) {
  * The newest orders, read through the existing passive admin order search. No customer contact
  * details are shown here; the order drawer in Orders & delivery holds those for the operator.
  */
-export function AdminRecentOrders({ token, revision = 0, onOpenOrder, onOpenAll }: { token: string; revision?: number; onOpenOrder: (reference: string) => void; onOpenAll: () => void }) {
+export function AdminRecentOrders({ token, revision = 0, onOpenOrder, onOpenAll }: { token: string; revision?: number; onOpenOrder: (reference: string) => void; onOpenAll: (lens: string) => void }) {
   const [scope, setScope] = useState<Scope>('paid');
   const [orders, setOrders] = useState<AdminOrderDetails[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +43,7 @@ export function AdminRecentOrders({ token, revision = 0, onOpenOrder, onOpenAll 
     const current = ++ticket.current;
     setError(null);
     setBusy(true);
-    getAdminOrdersOnServer(token, { ...(scope === 'paid' ? { paymentStatus: 'success', status: 'all' } : {}), page: 1, limit: LIMIT })
+    getAdminOrdersOnServer(token, { ...adminOrderSearchParams(scope==='paid'?'confirmed':'all',''), page: 1, limit: LIMIT })
       .then(res => { if (!res.success) throw new Error('Latest orders were not returned.'); if (current === ticket.current) setOrders(res.orders); })
       .catch(err => { if (current === ticket.current) setError(err instanceof Error ? err.message : 'Latest orders could not load.'); })
       .finally(() => { if (current === ticket.current) setBusy(false); });
@@ -59,8 +60,8 @@ export function AdminRecentOrders({ token, revision = 0, onOpenOrder, onOpenAll 
   return (
     <AdminPanel
       title="Latest orders"
-      description={scope === 'paid' ? 'Newest confirmed payments, any status.' : 'Every order attempt except abandoned checkouts.'}
-      actions={<div role="radiogroup" aria-label="Which orders to show" className="flex rounded-xl border border-slate-800 bg-slate-950/60 p-0.5">{scopeButton('paid', 'Paid')}{scopeButton('all', 'All attempts')}</div>}
+      description={scope === 'paid' ? 'Verified customer payments, any fulfilment status, including archived records.' : 'All persisted attempts, including abandoned and archived records. Latest eight shown.'}
+      actions={<div role="radiogroup" aria-label="Which orders to show" className="flex rounded-xl border border-slate-800 bg-slate-950/60 p-0.5">{scopeButton('paid', 'Confirmed payments')}{scopeButton('all', 'All attempts')}</div>}
       className="flex flex-col"
     >
       {error && <AdminError title={orders ? 'Refresh failed · last loaded orders' : 'Latest orders could not load'} message={error} onRetry={() => setRetry(n => n + 1)} />}
@@ -102,7 +103,7 @@ export function AdminRecentOrders({ token, revision = 0, onOpenOrder, onOpenAll 
           </ul>
         )}
       <div className="mt-auto pt-3">
-        <AdminButton variant="ghost" className="-ml-2" onClick={onOpenAll}>All orders<ChevronRight className="h-4 w-4" aria-hidden /></AdminButton>
+        <AdminButton variant="ghost" className="-ml-2" onClick={() => onOpenAll(scope==='paid'?'confirmed':'all')}>Full history<ChevronRight className="h-4 w-4" aria-hidden /></AdminButton>
       </div>
     </AdminPanel>
   );

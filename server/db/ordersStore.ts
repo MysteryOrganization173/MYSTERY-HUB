@@ -1,3 +1,4 @@
+import {ADMIN_PAYMENT_VIEW_SQL,matchesAdminPaymentView,type AdminPaymentView} from '../../shared/adminPaymentView.js';
 import {campaignForNewOrder} from '../services/campaignContext.js';
 import {isUnpaidFailedAttempt,unpaidFailedAttemptSql} from '../services/orderManagementPolicy.js';
 import { CommercialService } from '../services/commercialService.js';
@@ -1562,6 +1563,7 @@ export class OrdersStore {
     network?: string;
     status?: string;
     paymentStatus?: string;
+    paymentView?: AdminPaymentView;
     manualReview?: boolean;
     dateFrom?: string;
     dateTo?: string;
@@ -1622,6 +1624,7 @@ export class OrdersStore {
         conditions.push(`NOT ${unpaidFailedAttemptSql} AND status NOT IN ('cancelled', 'expired') AND (failure_reason IS NULL OR failure_reason NOT LIKE 'paystack_initialization_%')`);
       }
 
+      if (params.paymentView) conditions.push(ADMIN_PAYMENT_VIEW_SQL[params.paymentView]);
       if (params.paymentStatus) {
         conditions.push(`payment_status = $${valIdx}`);
         values.push(params.paymentStatus);
@@ -1654,7 +1657,7 @@ export class OrdersStore {
       const query = `
         SELECT * FROM orders 
         ${whereClause} 
-        ORDER BY ${params.prioritizePaidAttention ? `${alertPrioritySql}, ` : ''}created_at DESC${params.prioritizePaidAttention ? ', id' : ''}
+        ORDER BY ${params.prioritizePaidAttention ? `${alertPrioritySql}, ` : ''}created_at DESC, id
         LIMIT $${valIdx} OFFSET $${valIdx + 1};
       `;
       values.push(limit, offset);
@@ -1719,6 +1722,7 @@ export class OrdersStore {
       );
     }
 
+    if (params.paymentView) all = all.filter(o=>matchesAdminPaymentView(o,params.paymentView!));
     if (params.paymentStatus) {
       all = all.filter((o) => o.payment_status === params.paymentStatus);
     }
@@ -1738,7 +1742,7 @@ export class OrdersStore {
     all.sort((a, b) => {
       const priority = params.prioritizePaidAttention ? Number(paidOrderAlertReason(a) === 'flagged') - Number(paidOrderAlertReason(b) === 'flagged') : 0;
       const date = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      return priority || date || (params.prioritizePaidAttention ? a.id.localeCompare(b.id) : 0);
+      return priority || date || a.id.localeCompare(b.id);
     });
 
     const total = all.length;
