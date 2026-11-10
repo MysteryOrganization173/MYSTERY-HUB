@@ -362,7 +362,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
       {!selectedOrder && detailError && initialReference && <AdminError title="Order details could not load" message={detailError} onRetry={() => void loadOrderDetails(initialReference)} />}
       {error && <AdminError title={ordersData ? 'Refresh failed · showing last loaded orders' : 'Orders could not load'} message={error} onRetry={() => void fetchOrders()} />}
       {isSearching && !isLoading && <p role="status" className="text-sm text-slate-400">Updating the selected results…</p>}
-      {isLoading ? <AdminLoading label="Loading orders…" /> : !ordersData || ordersData.orders.length === 0 ? (
+      {(isLoading || (!ordersData && !error)) ? <AdminLoading label="Loading orders…" /> : !ordersData || ordersData.orders.length === 0 ? (
         <AdminEmpty title={error ? 'Current orders unavailable' : lens === 'needs_attention' ? 'No orders need attention' : 'No orders found'}>
           {error ? 'The current results could not be verified. Try refreshing again.' : lens === 'needs_attention' ? 'No actionable orders match these filters in the last successful check. Normal processing is not a failure.' : 'Nothing matches this search and filter. Try another lens or clear the filters.'}
         </AdminEmpty>
