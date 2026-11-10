@@ -62,9 +62,12 @@ function takePreviewFromUrl(): StoredPreview | null {
   const asked = url.searchParams.get('season-preview');
   if (asked !== null) {
     const pack = parseSeasonSetting(asked);
-    const stored: StoredPreview | null = pack ? { pack, date: parsePreviewDate(url.searchParams.get('season-date')) } : null;
+    // A link copied through email or a messaging app can arrive with its "&" escaped as "&amp;" ("?…&amp;season-date=…");
+    // without this the date would be lost and the preview would silently show today instead of the day asked for.
+    const date = url.searchParams.get('season-date') ?? url.searchParams.get('amp;season-date');
+    const stored: StoredPreview | null = pack ? { pack, date: parsePreviewDate(date) } : null;
     writeStorage(() => sessionStorage, PREVIEW_KEY, stored);
-    url.searchParams.delete('season-preview'); url.searchParams.delete('season-date');
+    url.searchParams.delete('season-preview'); url.searchParams.delete('season-date'); url.searchParams.delete('amp;season-date');
     window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
     return stored;
   }
