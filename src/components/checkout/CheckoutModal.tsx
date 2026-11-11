@@ -3,6 +3,8 @@ import { directAttemptKey, readDirectAttempt, saveDirectAttempt, clearDirectAtte
 import {useDialogFocus} from '../../hooks/useDialogFocus';
 import {useVisualViewport} from '../../hooks/useVisualViewport';
 import {commercialRequest} from '../../services/commercialApi';
+import { directQuoteView } from '../../utils/directQuotePresentation';
+import { formatGhs } from '../../../shared/money';
 import { WalletPaymentChoice } from '../finance/WalletPaymentChoice';
 import { dataValidityLabel } from '../../utils/dataPurchasePresentation';
 import { walletCheckout } from '../../services/financeApi';
@@ -63,6 +65,17 @@ export const CheckoutModal: React.FC = () => {
   const [commercial,setCommercial]=useState<any>(null);
   const [quoteError,setQuoteError]=useState('');
   const [quoteRefresh,setQuoteRefresh]=useState(0);
+  // If a refreshed quote (after a price, campaign or eligibility change) differs from the total already shown, say so.
+  const shownTotal=useRef<{id:string;total:number}|null>(null);
+  const [priceChange,setPriceChange]=useState('');
+  useEffect(()=>{
+    if(!isCheckoutOpen||!checkoutBundle){shownTotal.current=null;setPriceChange('');return;}
+    if(!commercial||!Number.isSafeInteger(commercial.totalMinor))return;
+    const previous=shownTotal.current;
+    if(previous&&previous.id===checkoutBundle.id&&previous.total!==commercial.totalMinor)setPriceChange(`The total changed from ${formatGhs(previous.total)} to ${formatGhs(commercial.totalMinor)}. Review it before paying.`);
+    else if(!previous||previous.id!==checkoutBundle.id)setPriceChange('');
+    shownTotal.current={id:checkoutBundle.id,total:commercial.totalMinor};
+  },[commercial,isCheckoutOpen,checkoutBundle?.id]);
   const directRequest=useRef<string>(crypto.randomUUID());
   const directScope=directAttemptKey(user?.id);
   const attemptGeneration=useRef(0),knownReference=useRef<string|null>(null),recoveryLocked=useRef(false);
@@ -205,6 +218,9 @@ export const CheckoutModal: React.FC = () => {
       })
     : null;
   const isRegularData = !isAirtime && !isInstantBundle;
+  // Direct Data: every amount shown comes from the server quote. Until it is confirmed nothing is shown as a total.
+  const quoteView = isRegularData ? directQuoteView(commercial) : null;
+  const quotePending = isRegularData && !quoteView;
   const quoteForThis = needsFlexiQuote && flexiQuote.key === flexiKey ? flexiQuote : null;
   const confirmedFlexi = quoteForThis?.quote?.success ? quoteForThis.quote : null;
   const flexiPending = needsFlexiQuote && !confirmedFlexi; // loading, or failed: Pay stays unavailable
@@ -317,7 +333,7 @@ export const CheckoutModal: React.FC = () => {
     if(isRegularData){checkpoint(knownReference.current||undefined);recoveryLocked.current=true;setRecoveryOnly(true);}
     return initializeServerPayment({
       isActive:active,
-      commercial:isRegularData?{requestId:directRequest.current,expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:undefined,
+      commercial:isRegularData?{requestId:directRequest.current,expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,expectedStandardMinor:commercial.standardMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:undefined,
       productId: checkoutBundle.id,
       recipientPhone: phone.trim(),
       customerEmail: receiptEmail || user?.email || undefined,
@@ -414,7 +430,7 @@ export const CheckoutModal: React.FC = () => {
     try {
       const body={productId:checkoutBundle.id,recipientPhone:phone.trim(),customerEmail:receiptEmail||user?.email,customerName:user?.name,serviceType:isAirtime?'airtime':'data',network:checkoutBundle.network,amount:requestedAmount,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()};
       const fingerprint=JSON.stringify(body);if(walletRequest.current?.fingerprint!==fingerprint)walletRequest.current={fingerprint,id:crypto.randomUUID()};
-      const result=await walletCheckout(sessionToken,'payments/initialize',{...body,requestId:walletRequest.current!.id,...(isRegularData&&commercial?{expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:{})});
+      const result=await walletCheckout(sessionToken,'payments/initialize',{...body,requestId:walletRequest.current!.id,...(isRegularData&&commercial?{expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,expectedStandardMinor:commercial.standardMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:{})});
       const newOrder=createOrder({...checkoutBundle,priceGhc:result.amountPesewas/100},phone.trim(),'wallet',result.reference,result.orderRef);
       closeCheckout();openOrderStatus(newOrder);
     }catch(error){setServerError(isConnectivityError(error as Error)?'We couldn’t reach Mystery Hub to confirm this Wallet payment. Check Track Order before trying again; repeating with the same details reuses this request.':(error as Error).message);}finally{submissionPending.current=false;setWalletBusy(false);}
@@ -498,7 +514,11 @@ export const CheckoutModal: React.FC = () => {
               </div>
             </div>
             <div className="text-right shrink-0">
-              <div className="text-lg font-bold text-white tabular-nums">GH₵{faceValue.toFixed(2)}</div>
+              {isRegularData ? (quoteView ? <div aria-label={`Total ${formatGhs(quoteView.totalMinor)}${quoteView.savingMinor>0?`, was ${formatGhs(quoteView.standardMinor)}`:''}`}>
+                {quoteView.savingMinor>0&&<del className="block text-xs text-slate-400 tabular-nums">{formatGhs(quoteView.standardMinor)}</del>}
+                <div className="text-lg font-bold text-white tabular-nums">{formatGhs(quoteView.totalMinor)}</div>
+              </div> : <div className="text-sm font-semibold text-slate-400">{quoteError ? 'Not confirmed' : 'Checking…'}</div>)
+              : <div className="text-lg font-bold text-white tabular-nums">GH₵{faceValue.toFixed(2)}</div>}
               {!awaitingPayment && !busy && !paymentClosed && (
                 <button type="button" onClick={closeCheckout} className="mh-compact-control text-xs text-[#44df95] hover:text-white min-h-8 px-1 cursor-pointer">Change</button>
               )}
@@ -822,13 +842,19 @@ export const CheckoutModal: React.FC = () => {
                 <div className="flex justify-between gap-3"><dt className="text-slate-400">{isAirtime ? 'Airtime value' : confirmedFlexi && faceValue !== requestedAmount ? `Bundle price (GH₵${requestedAmount.toFixed(2)} value)` : 'Bundle Price'}</dt><dd className="text-white tabular-nums">GH₵{faceValue.toFixed(2)}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-slate-400">{isAirtime ? 'Service Fee (0%)' : 'Checkout fee'}</dt><dd className="text-slate-300 tabular-nums">{flexiPending ? <span className="text-slate-500">{flexiError ? 'Not confirmed' : 'Confirming…'}</span> : `GH₵${serviceFee.toFixed(2)}`}</dd></div>
               </> : <>
-                {commercial?.discountMinor>0&&<><div className="flex justify-between gap-3"><dt className="text-slate-400">Regular price</dt><dd className="tabular-nums text-slate-300">GH₵{(commercial.regularMinor/100).toFixed(2)}</dd></div><div className="flex justify-between gap-3 text-emerald-400"><dt>Welcome Offer</dt><dd className="tabular-nums">−GH₵{(commercial.discountMinor/100).toFixed(2)}</dd></div></>}
+                {quoteView?.campaignLabel&&<><div className="flex justify-between gap-3"><dt className="text-slate-400">Regular price</dt><dd className="tabular-nums text-slate-400"><del aria-label={`Regular price ${formatGhs(quoteView.standardMinor)}, before the ${quoteView.campaignLabel}`}>{formatGhs(quoteView.standardMinor)}</del></dd></div><div className="flex justify-between gap-3"><dt className="text-amber-200">{quoteView.campaignLabel}</dt><dd className="tabular-nums text-white">{formatGhs(quoteView.sellingMinor)}</dd></div></>}
+                {quoteView&&!quoteView.campaignLabel&&quoteView.discountMinor>0&&<div className="flex justify-between gap-3"><dt className="text-slate-400">Regular price</dt><dd className="tabular-nums text-slate-300">{formatGhs(quoteView.sellingMinor)}</dd></div>}
+                {quoteView&&quoteView.discountMinor>0&&<div className="flex justify-between gap-3 text-emerald-400"><dt>First-order welcome benefit</dt><dd className="tabular-nums" aria-label={`minus ${formatGhs(quoteView.discountMinor)}`}>−{formatGhs(quoteView.discountMinor)}</dd></div>}
               </>}
               <div className="flex items-baseline justify-between gap-3 border-t border-slate-800 pt-2.5">
                 <dt className="font-semibold text-white">Total</dt>
-                <dd className="text-[#00c365] text-xl tabular-nums font-extrabold">{flexiPending ? <span className="text-base font-semibold text-slate-400">{flexiError ? 'Not confirmed' : 'Confirming price…'}</span> : `GH₵${totalAmount.toFixed(2)}`}</dd>
+                <dd className="text-[#00c365] text-xl tabular-nums font-extrabold">{flexiPending ? <span className="text-base font-semibold text-slate-400">{flexiError ? 'Not confirmed' : 'Confirming price…'}</span> : quotePending ? <span className="text-base font-semibold text-slate-400">{quoteError ? 'Not confirmed' : 'Checking price…'}</span> : `GH₵${totalAmount.toFixed(2)}`}</dd>
               </div>
+              {quoteView&&quoteView.savingMinor>0&&<div className="flex justify-end text-xs font-semibold text-emerald-300"><span>You save {formatGhs(quoteView.savingMinor)}</span></div>}
             </dl>
+            {quoteView?.welcomeNote&&<p className="text-xs text-emerald-200">{quoteView.welcomeNote}</p>}
+            {quoteView?.stateNote&&<p className="text-xs text-slate-400">{quoteView.stateNote}</p>}
+            {priceChange&&quoteView&&<p role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-100">{priceChange}</p>}
             {flexiError && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-3 text-xs text-amber-100">
               <span className="min-w-0 flex-1">{flexiError}</span>
               <button type="button" onClick={() => setFlexiRetry(x => x + 1)} className="shrink-0 min-h-11 rounded-lg border border-amber-400/40 px-3 font-semibold text-amber-200">Try again</button>
@@ -850,7 +876,7 @@ export const CheckoutModal: React.FC = () => {
           <button
             type="submit"
             form="checkout-form"
-            disabled={recoveryOnly || walletBusy || isInitializing || isRegularData && !commercial || flexiPending}
+            disabled={recoveryOnly || walletBusy || isInitializing || quotePending || flexiPending}
             aria-busy={walletBusy||isInitializing}
             className="w-full min-h-12 px-4 rounded-2xl bg-[#00c365] hover:bg-[#16d577] text-[#03160c] font-bold text-base transition-colors active:translate-y-px flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           >
@@ -863,7 +889,7 @@ export const CheckoutModal: React.FC = () => {
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                {flexiPending ? (flexiError ? 'Price not confirmed' : 'Confirming price…') : `Pay GH₵${totalAmount.toFixed(2)}`}
+                {flexiPending ? (flexiError ? 'Price not confirmed' : 'Confirming price…') : quotePending ? (quoteError ? 'Price not confirmed' : 'Checking price…') : `Pay GH₵${totalAmount.toFixed(2)}`}
                 <ArrowRight className="w-4 h-4" />
               </span>
             )}

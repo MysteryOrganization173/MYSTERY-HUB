@@ -259,7 +259,12 @@ test('the Christmas homepage keeps the real catalogue, prices, checkout, templat
   assert.match(page, /onClick=\{go\('website'\)\}[^>]*>Create a Free Website/);
   assert.match(page, /onClick=\{go\('data'\)\}[^>]*>Buy Data/);
   // Words: greetings only, Ghana nationally, no offers, promises or invented numbers.
-  const words = homeSource();
+  // One exception, approved for December Specials: the data tray's eyebrow may carry the campaign headline, but only
+  // the server's own figure (maxSavingPercent from applied campaign prices) and only while the server reports a campaign.
+  const campaignLine = '{campaign ? <>{campaign.title}{campaign.maxSavingPercent ? <> · Up to {campaign.maxSavingPercent}% off selected digital services</> : null}</> : \'Data bundles\'}';
+  assert.ok(page.includes(campaignLine), 'the campaign line reads only the server summary');
+  assert.match(page, /const campaign = directCampaign\(\);/);
+  const words = homeSource().replace(campaignLine, '');
   assert.doesNotMatch(words, /discount|% off|\bfree data\b|bonus|giveaway|prize|\bwin\b|guarantee|instant delivery|delivered in|customers served|trusted by \d|\b\d+\+? (customers|users|orders)|award|uptime|testimonial/i);
   assert.doesNotMatch(words, /Accra(?! day)/, 'the page addresses Ghana, not one city');
   assert.match(words, /With love from Mystery Hub, Ghana\./);

@@ -13,7 +13,7 @@ import { AfaArt, AirtimeArt, Bow, DataArt, EarnArt, EnvelopeBack, EnvelopeFront,
 import { markSeen, prefersReducedMotion, press, pressEnd, seenThisVisit, swing, useMedia, useReveal } from '../kit/motion';
 import { WelcomeCard } from '../kit/WelcomeCard';
 // Real business logic, shared with the ordinary homepage: catalogue, offers, checkout, templates, Marketplace, FAQs.
-import { directCatalogConfirmed, useDirectCatalog } from '../../../hooks/useDirectCatalog';
+import { directCampaign, directCatalogConfirmed, useDirectCatalog } from '../../../hooks/useDirectCatalog';
 import { useWelcomeOffer } from '../../../hooks/useWelcomeOffer';
 import { CompactBundleRow } from '../../../components/data/CompactBundleRow';
 import { GHANA_NETWORKS } from '../../../data/bundles';
@@ -200,12 +200,14 @@ function FeaturedData() {
   }, []);
   const popular = bundles.filter(b => b.network === network && b.isPopular).slice(0, 4);
   const index = NETWORKS.findIndex(n => n.id === network);
+  // Only while the server applies a campaign: its name and the largest saving it actually gives (never typed in).
+  const campaign = directCampaign();
   return (
     <section className="xh-sec xh-data" aria-labelledby="xh-data-title">
       <div className="xh-wrap">
         <div className="xh-head">
           <div>
-            <p className="xh-kicker">Data bundles</p>
+            <p className="xh-kicker">{campaign ? <>{campaign.title}{campaign.maxSavingPercent ? <> · Up to {campaign.maxSavingPercent}% off selected digital services</> : null}</> : 'Data bundles'}</p>
             <h2 id="xh-data-title">Stay close <em>all season</em></h2>
             <p className="xh-head-lede">Pick a bundle. You confirm the recipient number and total before you pay.</p>
           </div>

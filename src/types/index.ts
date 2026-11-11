@@ -22,6 +22,9 @@ export interface DataBundle {
   validity: string; // e.g., '7 Days', '30 Days', 'No Expiry', 'Direct Credit'
   validityCategory: BundleValidity;
   priceGhc: number; // editable price or total in Ghanaian Cedis
+  /** Direct catalogue only, while a server campaign lowers this bundle: its standard price before the campaign. */
+  standardPriceGhc?: number;
+  priceCampaign?: { label: string; stacksWithWelcome: boolean };
   isPopular?: boolean;
   isBestValue?: boolean;
   description?: string;
@@ -54,7 +57,7 @@ export interface OrderRecord {
   journey?: 'direct_checkout' | 'account'; // Presentation only: first-party origin; reference lookups leave it unset.
   network: NetworkId;
   paymentMethod: PaymentMethod;
-  commercialPricing?: {regularMinor:number;discountMinor:number;paidMinor:number};
+  commercialPricing?: {regularMinor:number;discountMinor:number;paidMinor:number;standardMinor?:number};
   amountGhc: number;
   faceValueGhc?: number;
   serviceFeeGhc?: number;

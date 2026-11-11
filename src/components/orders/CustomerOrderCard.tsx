@@ -41,7 +41,9 @@ export const OrderStatusPill: React.FC<{ status: CustomerOrderStatus }> = ({ sta
 export const CustomerOrderCard: React.FC<{ order: OrderRecord; status: CustomerOrderStatus; onOpen: () => void; now: Date }> = ({ order, status, onOpen, now }) => {
   const marketplace = isMarketplaceOrder(order);
   const recipient = customerOrderRecipient(order);
-  const saving = order.commercialPricing?.discountMinor ? order.commercialPricing.discountMinor / 100 : 0;
+  // From the order's own snapshot, never today's prices: the price before any campaign, less what was paid.
+  const pricing = order.commercialPricing;
+  const saving = pricing ? Math.max(0, (pricing.standardMinor ?? pricing.regularMinor) - pricing.paidMinor) / 100 : 0;
   return (
     <button
       type="button"

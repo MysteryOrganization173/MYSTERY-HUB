@@ -4,8 +4,8 @@ import { DataBundle } from '../../types';
 import { GHANA_NETWORKS } from '../../data/bundles';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { ArrowRight } from 'lucide-react';
-import { welcomePriceForBundle, type WelcomeOffer } from '../../utils/welcomeOfferPresentation';
-import { WelcomeBundlePrice } from './WelcomeBundlePrice';
+import { campaignPriceForBundle, welcomePriceForBundle, type WelcomeOffer } from '../../utils/welcomeOfferPresentation';
+import { CampaignBundlePrice, WelcomeBundlePrice } from './WelcomeBundlePrice';
 import { Money } from '../purchase/Money';
 import { useTapFeedback } from '../../hooks/useTapFeedback';
 
@@ -21,6 +21,8 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
   directWelcomeOffer,
 }) => {
   const welcomePrice = welcomePriceForBundle(bundle, directWelcomeOffer);
+  // One price per row: the eligible first-order price, else a server campaign price, else the bundle price.
+  const campaignPrice = welcomePrice ? null : campaignPriceForBundle(bundle);
   const network = GHANA_NETWORKS[bundle.network];
   const [tapped, confirmTap] = useTapFeedback();
   const buy = () => { confirmTap(); onBuy(bundle); };
@@ -42,7 +44,7 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
       onClick={buy}
       onKeyDown={handleKeyDown}
       data-tapped={tapped}
-      aria-label={`Buy ${bundle.dataAmount} ${network.name} data${welcomePrice ? '. '+welcomePrice.description : ` for GH₵${bundle.priceGhc.toFixed(2)}`}`}
+      aria-label={`Buy ${bundle.dataAmount} ${network.name} data${welcomePrice ? '. '+welcomePrice.description : campaignPrice ? '. '+campaignPrice.description : ` for GH₵${bundle.priceGhc.toFixed(2)}`}`}
       className="mh-press group relative rounded-2xl border border-slate-800/90 hover:border-[#00c365]/50 bg-[#0e141a] hover:bg-[#111922] p-3 sm:p-3.5 flex items-center justify-between gap-2.5 sm:gap-3 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] active:bg-[#131d26]"
     >
       {/* Left: Network logo & Data Details */}
@@ -57,7 +59,7 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
             </span>
 
             {/* Dominant Promotional Badge: responsive text to prevent narrow-screen collision */}
-            {welcomePrice ? null : isAirtelTigo ? (
+            {welcomePrice || campaignPrice ? null : isAirtelTigo ? (
               <span className="hidden min-[360px]:inline-flex text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded shrink-0">
                 AT<span className="hidden sm:inline"> Data</span>
               </span>
@@ -78,7 +80,7 @@ export const CompactBundleRow: React.FC<CompactBundleRowProps> = ({
 
       {/* Right: Price & Visual Buy Indicator (Not a nested button) */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {welcomePrice ? <WelcomeBundlePrice price={welcomePrice} /> : <div className="text-right">
+        {welcomePrice ? <WelcomeBundlePrice price={welcomePrice} /> : campaignPrice ? <CampaignBundlePrice price={campaignPrice} /> : <div className="text-right">
           <Money ghc={bundle.priceGhc} text="text-lg min-[360px]:text-xl sm:text-[1.35rem]" />
         </div>}
 
