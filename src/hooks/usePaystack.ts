@@ -42,7 +42,7 @@ declare global {
 export interface ServerPaystackOptions {
   // Storefront lifecycle guard; other checkout callers keep their existing behavior.
   isActive?: () => boolean;
-  commercial?:{requestId:string;expectedTotalMinor:number;expectedRegularMinor:number;pricingRevision:string;promotionRevision:string};
+  commercial?:{requestId:string;expectedTotalMinor:number;expectedRegularMinor:number;expectedStandardMinor?:number;pricingRevision:string;promotionRevision:string};
   store?: {siteId:string;requestId:string;expectedMinor:number};
   onOrderCreated?: (orderRef:string) => void;
   productId: string;

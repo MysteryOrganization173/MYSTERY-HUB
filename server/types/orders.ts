@@ -198,7 +198,7 @@ export function toSafePublicOrder(order: OrderRecord): SafePublicOrderDetails {
     product_name_snapshot: publicOrderSummary(order.product_name_snapshot, order),
     bundle_size_snapshot: publicOrderSummary(order.bundle_size_snapshot, order),
     amount: order.amount,
-    ...(order.commercial_context?{commercial_pricing:{regularMinor:order.commercial_context.regularMinor,discountMinor:order.commercial_context.discountMinor,paidMinor:order.commercial_context.paidMinor}}:{}),
+    ...(order.commercial_context?{commercial_pricing:{regularMinor:order.commercial_context.regularMinor,discountMinor:order.commercial_context.discountMinor,paidMinor:order.commercial_context.paidMinor,...(Number.isSafeInteger(order.commercial_context.standardMinor)?{standardMinor:order.commercial_context.standardMinor}:{})}}:{}),
     currency: order.currency,
     status: isUnpaidFailedAttempt(order) && Date.now()-new Date(order.created_at).getTime()>=86_400_000 ? 'expired' : order.status,
     classification: isUnpaidFailedAttempt(order) ? 'unpaid_attempt' : 'order',

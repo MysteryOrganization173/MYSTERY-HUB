@@ -27,7 +27,9 @@ test('production confirmation stays with recipient ahead of payment choices and 
   assert.match(checkout,/value=\{phone\}/);
   assert.match(checkout,/Pay GH₵/);
   assert.match(checkout,/submissionPending.current \|\| isInitializing \|\| walletBusy/);
-  assert.match(checkout,/disabled=\{recoveryOnly \|\| walletBusy \|\| isInitializing \|\| isRegularData && !commercial \|\| flexiPending\}/);
+  assert.match(checkout,/disabled=\{recoveryOnly \|\| walletBusy \|\| isInitializing \|\| quotePending \|\| flexiPending\}/);
+  // Direct Data stays unpayable until the server quote is confirmed and consistent.
+  assert.match(checkout,/const quotePending = isRegularData && !quoteView;/);
 });
 test('production bundle card stays first with compact receipt and payment controls',()=>{
   assert.match(checkout,/Bundle \/ Airtime Summary Card/);
@@ -44,8 +46,10 @@ test('production bundle card stays first with compact receipt and payment contro
 });
 test('discount and authoritative quote contract remain intact',()=>{
   for(const field of ['expectedTotalMinor:commercial.totalMinor','expectedRegularMinor:commercial.regularMinor','pricingRevision:commercial.pricingRevision','promotionRevision:commercial.promotionRevision']) assert.ok(checkout.includes(field));
-  assert.match(checkout,/commercial\?\.discountMinor>0/);
-  assert.match(checkout,/commercial.discountMinor\/100/);
+  // The breakdown is drawn only from the server quote, through one tested projection.
+  assert.match(checkout,/const quoteView = isRegularData \? directQuoteView\(commercial\) : null;/);
+  assert.match(checkout,/quoteView&&quoteView.discountMinor>0&&<div/);
+  assert.match(checkout,/−\{formatGhs\(quoteView.discountMinor\)\}/);
   assert.match(checkout,/commercial\?\.totalMinor\/100/);
   assert.match(checkout,/commercial&&\(\/price\|pricing\|quote\|welcome offer\|promotion\/i.test\(serverError\)/);
   assert.match(checkout,/quoteError&&<button/);

@@ -5,8 +5,8 @@ import { DataBundle, WebsiteTemplate } from '../../types';
 import { GHANA_NETWORKS } from '../../data/bundles';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { ArrowRight } from 'lucide-react';
-import { welcomePriceForBundle, type WelcomeOffer } from '../../utils/welcomeOfferPresentation';
-import { WelcomeBundlePrice } from './WelcomeBundlePrice';
+import { campaignPriceForBundle, welcomePriceForBundle, type WelcomeOffer } from '../../utils/welcomeOfferPresentation';
+import { CampaignBundlePrice, WelcomeBundlePrice } from './WelcomeBundlePrice';
 
 interface BundleCardProps {
   bundle: DataBundle;
@@ -28,6 +28,8 @@ export const BundleCard: React.FC<BundleCardProps> = ({
   directWelcomeOffer,
 }) => {
   const welcomePrice = colorScheme ? null : welcomePriceForBundle(bundle, directWelcomeOffer);
+  // Reseller-themed cards never show Mystery Hub's own campaign prices.
+  const campaignPrice = colorScheme || welcomePrice ? null : campaignPriceForBundle(bundle);
   const theme = colorScheme ? resolveResellerTheme(colorScheme) : undefined;
   const network = GHANA_NETWORKS[bundle.network] || GHANA_NETWORKS.mtn;
   const phoneInputRef = useRef<HTMLInputElement>(null);
@@ -65,12 +67,12 @@ export const BundleCard: React.FC<BundleCardProps> = ({
           </span>
 
           {/* Promo badge */}
-          {!welcomePrice && bundle.isBestValue && (
+          {!welcomePrice && !campaignPrice && bundle.isBestValue && (
             <span style={colorScheme?{color:theme!.surfaceAccentText,borderColor:theme!.border}:undefined} className={`text-[9px] font-bold border px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${colorScheme?'':'text-[#00c365] bg-[#00c365]/10 border-[#00c365]/30'}`}>
               Value
             </span>
           )}
-          {!welcomePrice && !bundle.isBestValue && bundle.isPopular && (
+          {!welcomePrice && !campaignPrice && !bundle.isBestValue && bundle.isPopular && (
             <span style={theme ? {color:theme.surfaceText,backgroundColor:theme.surface,borderColor:theme.border} : undefined} className="text-[9px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
               Popular
             </span>
@@ -79,7 +81,7 @@ export const BundleCard: React.FC<BundleCardProps> = ({
 
         {/* Price prominently at top right */}
         <div className="text-right shrink-0">
-          {welcomePrice ? <WelcomeBundlePrice price={welcomePrice} /> :
+          {welcomePrice ? <WelcomeBundlePrice price={welcomePrice} /> : campaignPrice ? <CampaignBundlePrice price={campaignPrice} /> :
           <span style={colorScheme?{color:theme!.surfaceText}:undefined} className="text-xl font-extrabold text-white tabular-nums tracking-tight">
             GH₵{bundle.priceGhc.toFixed(2)}
           </span>}
@@ -113,7 +115,7 @@ export const BundleCard: React.FC<BundleCardProps> = ({
         <button
           type="button"
           onClick={handleReviewOrder}
-          aria-label={`Review order for ${bundle.dataAmount} ${bundle.network.toUpperCase()} bundle${welcomePrice ? '. '+welcomePrice.description : ''}`}
+          aria-label={`Review order for ${bundle.dataAmount} ${bundle.network.toUpperCase()} bundle${welcomePrice ? '. '+welcomePrice.description : campaignPrice ? '. '+campaignPrice.description : ''}`}
           style={colorScheme?{backgroundColor:colorScheme.accent,color:websiteActionText(colorScheme.accent),borderColor:theme!.border,borderWidth:1}:undefined} className={`shrink-0 min-h-11 py-2 px-2.5 sm:px-3.5 rounded-xl font-bold text-xs tracking-wider transition-all active:scale-[0.98] flex items-center justify-center gap-1 cursor-pointer ${colorScheme?'hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--website-focus)]':'bg-[#00c365] hover:bg-[#00e575] text-black'}`}
         >
           <span>Buy</span>

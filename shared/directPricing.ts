@@ -8,4 +8,6 @@ export interface CommercialSnapshot {
   regularMinor:number; discountMinor:number; paidMinor:number; pricingRevision:string;
   promotionId:'welcome-v1'|null; promotionRevision:string|null; buyerPhone:string|null;
   supplierCostMinor:number|null; reserveMinor:number|null; normalReserveMinor?:number|null; contributionMinor:number|null;
+  /** Campaign sales only (absent on every other and every earlier order): the price before the campaign, and the campaign. */
+  standardMinor?:number; priceCampaignId?:string; priceCampaignRevision?:string;
 }

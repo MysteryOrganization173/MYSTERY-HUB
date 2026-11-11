@@ -57,3 +57,16 @@ test('PostgreSQL duplicate historical phone is denied promo without merging acco
 test('PostgreSQL schema uses canonical uniqueness, phone lock and one active benefit',()=>{
  assert.ok(COMMERCIAL_SCHEMA.includes("pg_advisory_xact_lock(hashtextextended('phone:'"));assert.ok(COMMERCIAL_SCHEMA.includes('CREATE UNIQUE INDEX IF NOT EXISTS finance_one_active_welcome'));assert.ok(COMMERCIAL_SCHEMA.includes('NEW.phone IS NOT DISTINCT FROM OLD.phone'));assert.ok(COMMERCIAL_SCHEMA.includes('users_phone_identity_unique'));
 });
+test('PostgreSQL December campaign: stored settings price 399, snapshot commits with the order, audit failure rolls back activation',async()=>{
+ const clock=C.now;C.now=()=>new Date('2026-12-10T12:00:00Z');
+ try{
+  P.initializeTransaction=async p=>{paymentCalls++;assert.equal(p.amountPesewas,399);return {success:true,reference:p.reference,accessCode:'fixture'};};
+  state.config['direct-campaign']={id:'december-specials-2026',label:'December Special',version:'pg-fixture',enabled:true,startDate:'2026-12-01',endDate:'2027-01-05',stacksWithWelcome:true,products:{'mtn-1gb':{campaignMinor:499}}};
+  await C.initialize(order(),{requestId:randomUUID(),expectedTotalMinor:399});
+  const saved=state.orders[0].commercial_context;assert.equal(saved.paidMinor,399);assert.equal(saved.regularMinor,499);assert.equal(saved.standardMinor,549);assert.equal(saved.priceCampaignRevision,'pg-fixture');assert.equal(paymentCalls,1);
+  assert.ok(sqls.some(s=>s.sql.startsWith('SELECT value FROM finance_config')&&s.values[0]==='direct-campaign'));
+  delete state.config['direct-campaign'];fail='INSERT INTO admin_audit_log';
+  await assert.rejects(()=>C.save('admin',{kind:'campaign',confirmed:true,expectedVersion:'december-2026-inactive-v1',enabled:true,activation:'december-specials-2026',startDate:'2026-12-01',endDate:'2027-01-05',products:[{productId:'mtn-1gb',campaignMinor:499}]}),/Fixture write/);
+  assert.equal(state.config['direct-campaign'],undefined,'activation and its audit commit together or not at all');
+ }finally{C.now=clock;}
+});

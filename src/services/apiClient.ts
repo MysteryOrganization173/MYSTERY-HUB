@@ -30,6 +30,7 @@ export interface InitializePaymentRequest {
   requestId?:string;
   expectedTotalMinor?:number;
   expectedRegularMinor?:number;
+  expectedStandardMinor?:number;
   pricingRevision?:string;
   promotionRevision?:string;
   productId: string;
