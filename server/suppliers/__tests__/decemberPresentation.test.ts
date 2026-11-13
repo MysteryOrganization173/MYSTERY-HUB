@@ -98,3 +98,25 @@ test('order history shows the saving from the order\'s own snapshot, not today\'
  assert.match(render({regularMinor:549,discountMinor:100,paidMinor:449}),/Saved GH₵1\.00/);
  assert.doesNotMatch(render({regularMinor:499,discountMinor:0,paidMinor:499}),/Saved/,'a sale with no campaign or welcome saving claims none');
 });
+
+test('after the boundary refresh every December price, badge and headline disappears from the shared catalogue',async()=>{
+ const {refreshDirectCatalog,directCampaign}=await import('../../../src/hooks/useDirectCatalog');
+ const {DATA_BUNDLES}=await import('../../../src/data/bundles');
+ const {CommercialService:C}=await import('../../services/commercialService.js');
+ const {FinanceStore}=await import('../../db/financeStore.js');
+ const {DIRECT_CAMPAIGN_DEFAULT}=await import('../../../shared/directCampaign.js');
+ process.env.NODE_ENV='test';delete process.env.DATABASE_URL;FinanceStore._reset();
+ await FinanceStore.transaction('admin',tx=>tx.saveConfig('direct-campaign',{...DIRECT_CAMPAIGN_DEFAULT,enabled:true,version:'fixture'}));
+ const clock=C.now,fetch0=globalThis.fetch;
+ // The browser reads exactly what the server's catalogue says, at each moment.
+ globalThis.fetch=(async()=>({ok:true,json:async()=>JSON.parse(JSON.stringify(await C.catalog()))})) as any;
+ try{
+  C.now=()=>new Date('2027-01-04T23:59:00Z');await refreshDirectCatalog();
+  const five=DATA_BUNDLES.find(b=>b.id==='mtn-5gb')!;assert.equal(five.priceGhc,21.99);assert.equal(five.standardPriceGhc,23.99);assert.equal(directCampaign()?.maxSavingPercent,14);
+  C.now=()=>new Date('2027-01-05T00:00:01Z');await refreshDirectCatalog();
+  assert.equal(directCampaign(),null,'no campaign headline');
+  for(const id of ['mtn-1gb','mtn-2gb','mtn-3gb','mtn-4gb','mtn-5gb']){const b=DATA_BUNDLES.find(x=>x.id===id)!;assert.equal(b.priceCampaign,undefined,id);assert.equal(b.standardPriceGhc,undefined,id);assert.equal(campaignPriceForBundle(b),null,id);}
+  assert.equal(DATA_BUNDLES.find(b=>b.id==='mtn-5gb')!.priceGhc,23.99);
+  const html=renderToStaticMarkup(React.createElement(CompactBundleRow,{bundle:DATA_BUNDLES.find(b=>b.id==='mtn-1gb')!,onBuy(){}}));assert.doesNotMatch(html,/December|<del>/);
+ }finally{C.now=clock;globalThis.fetch=fetch0;}
+});

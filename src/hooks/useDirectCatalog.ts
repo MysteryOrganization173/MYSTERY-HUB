@@ -9,6 +9,14 @@ let confirmed=false;
 /** The server's active price campaign (December Specials), or null. Never set by the client. */
 export interface DirectCampaignSummary {id:string;label:string;title:string;endDate:string|null;maxSavingPercent:number|null}
 let campaign:DirectCampaignSummary|null=null;
+// One pending refresh at the campaign's end, so an open page drops December prices and badges at the boundary.
+let boundary:ReturnType<typeof setTimeout>|null=null;
+/** Delay until the server says the campaign stops applying, measured on the server's clock (never the device's date). */
+export function campaignRefreshDelay(c:any):number|null{
+ const end=Date.parse(c?.endsAt),now=Date.parse(c?.serverTime);
+ if(!Number.isFinite(end)||!Number.isFinite(now))return null;
+ const delay=end-now;return delay>0&&delay<=7*86_400_000?delay+1500:null;
+}
 /** Whether the catalogue on screen came from the server, so derived figures (e.g. "up to X% off") can rely on it. */
 export const directCatalogConfirmed=()=>confirmed;
 export const directCampaign=()=>confirmed?campaign:null;
@@ -20,9 +28,12 @@ function campaignFields(p:any):Pick<DataBundle,'standardPriceGhc'|'priceCampaign
 export async function refreshDirectCatalog(){
  if(request)return request;
  request=commercialRequest('commercial/products').then(result=>{
-  current=result.products.map((p:any)=>({...DATA_BUNDLES.find(b=>b.id===p.id),id:p.id,network:p.network,dataAmount:p.dataAmount,priceGhc:p.priceGhc,...campaignFields(p)}));
+  // Rebuilt from the static fields only: campaign fields come from this response alone, so none outlives the campaign.
+  current=result.products.map((p:any)=>{const {standardPriceGhc:_s,priceCampaign:_c,...base}=(DATA_BUNDLES.find(b=>b.id===p.id)||{}) as DataBundle;return {...base,id:p.id,network:p.network,dataAmount:p.dataAmount,priceGhc:p.priceGhc,...campaignFields(p)};});
   const c=result.campaign;campaign=c&&typeof c.label==='string'&&typeof c.title==='string'?{id:String(c.id),label:c.label,title:c.title,endDate:typeof c.endDate==='string'?c.endDate:null,maxSavingPercent:Number.isSafeInteger(c.maxSavingPercent)&&c.maxSavingPercent>0?c.maxSavingPercent:null}:null;
   confirmed=true;
+  if(boundary){clearTimeout(boundary);boundary=null;}
+  const delay=campaignRefreshDelay(c);if(delay!==null)boundary=setTimeout(()=>{boundary=null;void refreshDirectCatalog().catch(()=>{});},delay);
   // Consumers outside React read the same latest price projection.
   for(const b of DATA_BUNDLES){const p=current.find(x=>x.id===b.id);if(p){b.priceGhc=p.priceGhc;if(p.priceCampaign){b.standardPriceGhc=p.standardPriceGhc;b.priceCampaign=p.priceCampaign;}else{delete b.standardPriceGhc;delete b.priceCampaign;}}}
   for(const listener of listeners)listener();

@@ -66,7 +66,7 @@ test('PostgreSQL December campaign: stored settings price 399, snapshot commits 
   const saved=state.orders[0].commercial_context;assert.equal(saved.paidMinor,399);assert.equal(saved.regularMinor,499);assert.equal(saved.standardMinor,549);assert.equal(saved.priceCampaignRevision,'pg-fixture');assert.equal(paymentCalls,1);
   assert.ok(sqls.some(s=>s.sql.startsWith('SELECT value FROM finance_config')&&s.values[0]==='direct-campaign'));
   delete state.config['direct-campaign'];fail='INSERT INTO admin_audit_log';
-  await assert.rejects(()=>C.save('admin',{kind:'campaign',confirmed:true,expectedVersion:'december-2026-inactive-v1',enabled:true,activation:'december-specials-2026',startDate:'2026-12-01',endDate:'2027-01-05',products:[{productId:'mtn-1gb',campaignMinor:499}]}),/Fixture write/);
+  await assert.rejects(()=>C.save('admin',{kind:'campaign',confirmed:true,expectedVersion:'december-2026-inactive-v2',enabled:true,activation:'december-specials-2026',startDate:'2026-12-01',endDate:'2027-01-05',products:[{productId:'mtn-1gb',campaignMinor:499}]}),/Fixture write/);
   assert.equal(state.config['direct-campaign'],undefined,'activation and its audit commit together or not at all');
  }finally{C.now=clock;}
 });
