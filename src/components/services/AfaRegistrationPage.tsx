@@ -7,7 +7,8 @@ import {
   AFA_CONFIG,
   AFA_PACKAGES,
 } from '../../config/afa';
-import { getAfaConfig, initializeAfaPayment, type AfaConfig } from '../../services/afaApi';
+import { getAfaQuote, initializeAfaPayment, type AfaQuote } from '../../services/afaApi';
+import { formatGhs } from '../../../shared/money';
 import { verifyPaymentOnServer } from '../../services/apiClient';
 import { GHANA_REGIONS, validateAfaPayload, afaStatusLabel, normalizeGhanaCard } from '../../../shared/afa';
 import { validateAndNormalizeGhanaPhone } from '../../../server/utils/phone';
@@ -100,7 +101,9 @@ function Section({ step, title, intro, children }: { step: number; title: string
 
 export const AfaRegistrationPage: React.FC = () => {
   const { setActivePage, showToast, user, sessionToken, openAuth, openAccount } = useApp();
-  const [config, setConfig] = useState<AfaConfig | null>(null);
+  const [config, setConfig] = useState<AfaQuote | null>(null);
+  // Shown when the server refused a fee that changed after it was displayed; the customer reviews and pays again.
+  const [priceChange, setPriceChange] = useState<string | null>(null);
   const afaConfig = { ...AFA_CONFIG, ...config };
   const [isPriceLoading, setIsPriceLoading] = useState(true);
   const [formData, setFormData] = useState<AfaFormData>(initialFormData);
@@ -126,7 +129,7 @@ export const AfaRegistrationPage: React.FC = () => {
     dateOfBirth:'dateOfBirth', region:'region', occupation:'occupation', consent:'consent', customerEmail:'customerEmail'};
   useEffect(() => {
     let active = true;
-    getAfaConfig().then(value => { if (active) setConfig(value); })
+    getAfaQuote().then(value => { if (active) setConfig(value); })
       .catch(() => { if (active) setSubmitError('AFA registration is temporarily unavailable.'); })
       .finally(() => { if (active) setIsPriceLoading(false); });
     return () => { active = false; };
@@ -178,9 +181,13 @@ export const AfaRegistrationPage: React.FC = () => {
     if (message) setFormErrors(prev => ({ ...prev, [field]: message }));
   };
   const [paymentMethod,setPaymentMethod]=React.useState<'paystack'|'wallet'>('paystack');
+  // The exact fee and pricing revision the customer is reviewing; the server refuses payment if either changed.
+  const accepted = config?.totalMinor != null && config.pricingRevision ? { expectedTotalMinor: config.totalMinor, pricingRevision: config.pricingRevision } : undefined;
+  // A promotional price shows only from the server quote, and only when it is genuinely below the standard price.
+  const promo = config?.campaign && config.standardMinor != null && config.totalMinor != null && config.standardMinor > config.totalMinor ? config : null;
   const requestKey=React.useRef<string>('');
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitError(null); setFormErrors({});
+    e.preventDefault(); setSubmitError(null); setFormErrors({}); setPriceChange(null);
     if (!user || !sessionToken) { openAuth('login', 'Sign in to register your MTN number for AFA.', () => document.getElementById(fullNameId)?.focus()); return; }
     if (user.mustChangePassword) { openAccount(); return; }
     if (!priceAvailable) { showToast('Registration is currently unavailable.', 'warning'); return; }
@@ -194,15 +201,27 @@ export const AfaRegistrationPage: React.FC = () => {
       confirmTap();
       if(paymentMethod==='wallet') {
         requestKey.current ||= crypto.randomUUID();
-        await walletCheckout(sessionToken,'afa/payments/initialize',{...payload,consent:true,customerEmail:formData.customerEmail,requestId:requestKey.current,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()});
+        await walletCheckout(sessionToken,'afa/payments/initialize',{...payload,consent:true,customerEmail:formData.customerEmail,...(accepted||{}),requestId:requestKey.current,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()});
         window.location.assign('/orders');return;
       }
-      const result = await initializeAfaPayment(payload, formData.consent, formData.customerEmail, sessionToken);
+      const result = await initializeAfaPayment(payload, formData.consent, formData.customerEmail, sessionToken, accepted);
       if (!result.authorizationUrl) throw new Error('Payment link unavailable. Check My Orders before trying again.');
       const url = new URL(result.authorizationUrl);
       if (url.protocol !== 'https:' || url.hostname !== 'checkout.paystack.com') throw new Error('Payment link unavailable. Contact support.');
       window.location.assign(url.href);
     } catch (err) {
+      const review = err as {code?:string; quote?:AfaQuote|null};
+      if (review.code === 'AFA_REVIEW_REQUIRED') {
+        // Nothing was charged. Show the server's current fee and ask the customer to confirm it.
+        const before = config?.totalMinor ?? null, next = review.quote || null;
+        if (next) setConfig(next);
+        requestKey.current = '';
+        setPriceChange(next?.totalMinor != null && before !== null && next.totalMinor !== before
+          ? `The registration fee changed from ${formatGhs(before)} to ${formatGhs(next.totalMinor)}. Nothing was charged. Review it and continue when ready.`
+          : 'The registration fee was updated. Nothing was charged. Review it and continue when ready.');
+        setIsSubmitting(false);
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Unable to start AFA registration.';
       const field = canonicalFields[(err as {field?:string}).field || ''];
       isSubmitAttempt.current = true;
@@ -329,7 +348,10 @@ export const AfaRegistrationPage: React.FC = () => {
         <span className="w-4 h-4 border-2 border-[#00c365] border-t-transparent rounded-full animate-spin motion-reduce:animate-none" aria-hidden="true" />
         Checking the fee…
       </span>
-    ) : fee !== null ? <Money ghc={fee} size="xl" className="text-white" />
+    ) : fee !== null ? (promo ? <span className="inline-flex flex-col" aria-label={`${promo.campaign!.label} ${formatGhs(promo.totalMinor!)}, regular price ${formatGhs(promo.standardMinor!)}`}>
+        <span className="text-xs text-slate-400"><span className="font-semibold text-amber-200">{promo.campaign!.label}</span> · <del>{formatGhs(promo.standardMinor!)}</del></span>
+        <Money ghc={fee} size="xl" className="text-white" />
+      </span> : <Money ghc={fee} size="xl" className="text-white" />)
       : <span className="inline-flex text-sm font-semibold text-amber-200 bg-amber-400/10 border border-amber-400/30 px-3 py-1.5 rounded-lg">Registration is currently unavailable</span>
   );
 
@@ -340,11 +362,17 @@ export const AfaRegistrationPage: React.FC = () => {
         <div className="flex justify-between gap-3"><dt className="text-slate-400">MTN line</dt>
           <dd className="font-semibold text-white tabular-nums">{formData.mtnNumber || <span className="font-normal text-slate-400">Not entered yet</span>}</dd></div>
         <div className="flex justify-between gap-3"><dt className="text-slate-400">Pay with</dt><dd className="text-slate-200">{paymentMethod==='wallet'?'Mystery Wallet':'Mobile Money or card (Paystack)'}</dd></div>
-        <div className="flex items-end justify-between gap-3 border-t border-slate-800 pt-3">
-          <dt><span className="block font-semibold text-white">One-time fee</span><span className="block text-xs text-slate-400">Charged once by Mystery Hub</span></dt>
+        {promo && <>
+          <div className="flex justify-between gap-3 border-t border-slate-800 pt-3"><dt className="text-slate-400">Regular price</dt><dd className="tabular-nums text-slate-400"><del aria-label={`Regular price ${formatGhs(promo.standardMinor!)}, before the ${promo.campaign!.label}`}>{formatGhs(promo.standardMinor!)}</del></dd></div>
+          <div className="flex justify-between gap-3"><dt className="text-amber-200">{promo.campaign!.label}</dt><dd className="tabular-nums text-white">{formatGhs(promo.totalMinor!)}</dd></div>
+        </>}
+        <div className={`flex items-end justify-between gap-3 ${promo ? '' : 'border-t border-slate-800 pt-3'}`}>
+          <dt><span className="block font-semibold text-white">{promo ? 'Total' : 'One-time fee'}</span><span className="block text-xs text-slate-400">Charged once by Mystery Hub</span></dt>
           <dd>{fee !== null ? <Money ghc={fee} size="lg" className="text-[#44df95]" /> : <span className="text-sm text-amber-200">{isPriceLoading ? 'Checking…' : 'Unavailable'}</span>}</dd>
         </div>
+        {promo && <div className="flex justify-end text-xs font-semibold text-emerald-300"><span>You save {formatGhs(promo.savingMinor!)}</span></div>}
       </dl>
+      <p className="text-xs text-slate-400 leading-relaxed">A one-time registration fee. MTN AFA call and data packages are bought separately from MTN afterwards. Data welcome benefits do not apply to AFA.</p>
     </section>
   );
 
@@ -525,6 +553,8 @@ export const AfaRegistrationPage: React.FC = () => {
           <div className="lg:hidden">{summary}</div>
 
           <div className="space-y-2.5">
+            {/* Next to the button the customer just pressed: the fee they are now asked to confirm. */}
+            {priceChange && <p role="status" className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-sm text-amber-100">{priceChange}</p>}
             <button type="submit" data-tapped={tapped} disabled={isSubmitting || isPriceLoading || !priceAvailable} aria-busy={isSubmitting}
               className="mh-buy w-full min-h-14 px-5 rounded-xl font-bold text-base flex items-center justify-center gap-2 cursor-pointer bg-[#00c365] hover:bg-[#00e070] text-[#03160c] disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
               {isSubmitting ? (

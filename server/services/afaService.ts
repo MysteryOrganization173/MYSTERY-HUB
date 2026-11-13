@@ -13,11 +13,15 @@ import { isAfaEncryptionConfigured } from './afaEncryption.js';
 import type { OrderRecord } from '../types/orders.js';
 export class AfaService {
   static provider = new SuccessBizHubProvider();
-  static async publicConfig() {
-    const enabled = /^(true|1)$/i.test(process.env.AFA_SERVICE_ENABLED || '');
+  /** The standard AFA registration price: the AFA_RETAIL_PRICE_MINOR server setting, or null when invalid. */
+  static standardPriceMinor(): number | null {
     const raw = process.env.AFA_RETAIL_PRICE_MINOR || '';
     const price = /^\d+$/.test(raw) ? Number(raw) : 0;
-    const retailPriceMinor = Number.isSafeInteger(price) && price > 0 && price <= 100_000_000 ? price : null;
+    return Number.isSafeInteger(price) && price > 0 && price <= 100_000_000 ? price : null;
+  }
+  static async publicConfig() {
+    const enabled = /^(true|1)$/i.test(process.env.AFA_SERVICE_ENABLED || '');
+    const retailPriceMinor = this.standardPriceMinor();
     const configured = this.provider.client.isConfigured() && this.provider.client.isFulfillmentEnabled() && isAfaEncryptionConfigured();
     const capability = enabled && configured && retailPriceMinor ? await this.provider.checkAfaAvailable() : { available: false, status: 'not_configured' };
     const available = enabled && configured && retailPriceMinor !== null && capability.available;
