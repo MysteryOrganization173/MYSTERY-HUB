@@ -79,7 +79,7 @@ test('the pay button says where the tap goes and payment code paths are unchange
   assert.match(afa, /`Continue to Paystack · \$\{feeText\}`/);
   assert.doesNotMatch(afa, /Activate/);
   assert.match(afa, /walletCheckout\(sessionToken,'afa\/payments\/initialize'/);
-  assert.match(afa, /initializeAfaPayment\(payload, formData.consent, formData.customerEmail, sessionToken\)/);
+  assert.match(afa, /initializeAfaPayment\(payload, formData.consent, formData.customerEmail, sessionToken, accepted\)/);
   assert.match(afa, /url.hostname !== 'checkout.paystack.com'/);
 });
 

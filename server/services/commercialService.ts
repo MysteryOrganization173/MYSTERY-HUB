@@ -15,8 +15,10 @@ import type { OrderRecord } from '../types/orders.js';
 import { PaystackServerService } from './paystackService.js';
 import { FinanceService, operationKey } from './financeService.js';
 import { FulfilmentService } from './fulfilmentService.js';
-import { normalizeCampaign, campaignPriceFor, campaignState, campaignHeadlinePercent, isCampaignDate, AFA_DECEMBER_PROPOSAL, DECEMBER_2026_APPROVED_PLAN, campaignPlanDifferences, campaignEndsAt, campaignValueWarnings, type DirectCampaignConfig } from '../../shared/directCampaign.js';
+import { normalizeCampaign, campaignPriceFor, campaignState, campaignHeadlinePercent, isCampaignDate, DECEMBER_2026_APPROVED_PLAN, campaignPlanDifferences, campaignEndsAt, campaignValueWarnings, type DirectCampaignConfig } from '../../shared/directCampaign.js';
 import { accraDate } from '../../shared/seasonal.js';
+import { AfaService } from './afaService.js';
+import { normalizeAfaPricing, afaPriceFor, afaPromotionBlockers, afaCampaignState, savingPercent, AFA_APPROVED, AFA_CAMPAIGN_ACTIVATION, AFA_COST_CONFIRMATION, AFA_COST_MAX_AGE_DAYS, type AfaPricingConfig } from '../../shared/afaPricing.js';
 import { DECEMBER_2026_CAMPAIGN_ID as CAMPAIGN_ID } from '../../shared/directCampaign.js';
 
 const PRICE_DEFAULT={version:'direct-launch-v1',products:{} as Record<string,{retailMinor:number;enabled:boolean;recommendedMinor:number|null}>,reserveBps:0,reserveFixedMinor:0,reserveConfigured:false};
@@ -25,6 +27,7 @@ const config=async(id:string,tx?:FinanceTx)=>{
   const read=(key:string)=>tx?tx.config(key):FinanceStore.readConfig(key);
   const stored=await read(id);
   if(id==='direct-campaign')return normalizeCampaign(stored);
+  if(id==='afa-pricing')return normalizeAfaPricing(stored);
   if(id!=='direct-pricing')return {...OFFER_DEFAULT,...stored};
   // Reuse an existing enabled Data economics reserve until explicitly configured here.
   const economics=await read('economics:data');
@@ -34,6 +37,9 @@ const config=async(id:string,tx?:FinanceTx)=>{
 const lock=async(tx:FinanceTx,exclusive=false)=>{if(tx.client)await tx.client.query(`SELECT pg_advisory_xact_lock${exclusive?'':'_shared'}(hashtextextended('commercial-policy',0))`);};
 const direct=(order:OrderRecord)=>!order.store_context&&(!order.service_type||order.service_type==='data');
 const campaignConfig=(tx?:FinanceTx)=>config('direct-campaign',tx) as Promise<DirectCampaignConfig>;
+const afaConfig=(tx?:FinanceTx)=>config('afa-pricing',tx) as Promise<AfaPricingConfig>;
+/** The AFA fee changed between the reviewed quote and payment; carries the current quote for the customer to review. */
+export class AfaReviewRequired extends FinanceError { constructor(public quote:unknown){super('The registration fee changed. Review the new total before paying.',409);} }
 export class CommercialService {
   /** Server clock for dated pricing. Tests replace it; nothing from a request can. */
   static now=()=>new Date();
@@ -187,6 +193,72 @@ export class CommercialService {
       }catch{/* Durable reservation remains held for subsequent recovery. */}
     }
   }
+  /** AFA price from the server setting and the AFA promotion settings; read under the commercial policy lock in a transaction. */
+  static async afaPrice(tx?:FinanceTx) {
+    if(tx)await lock(tx);
+    return afaPriceFor(await afaConfig(tx),AfaService.standardPriceMinor(),CommercialService.now());
+  }
+  /** The customer's AFA quote: existing availability plus the price. The data welcome benefit never applies to AFA. */
+  static async afaQuote() {
+    const [pub,price]=await Promise.all([AfaService.publicConfig(),CommercialService.afaPrice()]);
+    const available=pub.available&&price!==null,total=available?price!.totalMinor:null;
+    return {enabled:pub.enabled,available,status:pub.status,message:pub.message,standardMinor:price?.standardMinor??null,totalMinor:total,pricingRevision:price?.pricingRevision??null,
+      ...(available&&price!.campaign?{campaign:{id:price!.campaign.id,label:price!.campaign.label,endDate:price!.campaign.endDate},savingMinor:price!.savingMinor}:{}),
+      welcomeApplies:false,retailPriceMinor:total,retailPriceGhc:total===null?null:total/100};
+  }
+  /**
+   * Public catalogue headline: adds AFA's saving only while its promotional price actually applies AND AFA can be bought.
+   * When the AFA promotion does not apply the catalogue is returned unchanged (no supplier call).
+   */
+  static async withAfaHeadline<T extends {campaign?:any}>(catalog:T):Promise<T> {
+    const price=await CommercialService.afaPrice();if(!price?.campaign)return catalog;
+    if(!(await AfaService.publicConfig().catch(()=>null))?.available)return catalog;
+    const percent=savingPercent(price.standardMinor,price.totalMinor),now=CommercialService.now(),c=catalog.campaign;
+    return {...catalog,campaign:c?{...c,maxSavingPercent:Math.max(c.maxSavingPercent??0,percent)}:{id:price.campaign.id,label:price.campaign.label,title:'December Specials',endDate:price.campaign.endDate,endsAt:campaignEndsAt({endDate:price.campaign.endDate}),serverTime:now.toISOString(),maxSavingPercent:percent}};
+  }
+  static async afaAdmin(prices:any) {
+    const cfg=await afaConfig(),now=CommercialService.now(),standard=AfaService.standardPriceMinor();
+    const pub=await AfaService.publicConfig().catch(()=>({available:false,status:'supplier_error'}));
+    const reserveOf=(m:number)=>prices.reserveConfigured?percentMinor(m,prices.reserveBps)+prices.reserveFixedMinor:null;
+    const contribution=(revenue:number)=>cfg.cost&&reserveOf(revenue)!==null?revenue-cfg.cost.costMinor-reserveOf(revenue)!:null;
+    const blockers=afaPromotionBlockers(cfg,standard,now);
+    return {standardMinor:standard,approved:AFA_APPROVED,config:cfg,state:afaCampaignState(cfg,now),today:accraDate(now),endsAt:campaignEndsAt(cfg),
+      available:pub.available,supplierStatus:pub.status,costAgeDays:cfg.cost?Math.floor((now.getTime()-Date.parse(cfg.cost.confirmedAt))/86_400_000):null,
+      promotionApplies:blockers.length===0&&pub.available,blockers,enableProblems:afaEnableProblems(cfg,standard,pub.available,now),
+      discountPercent:standard===null?null:savingPercent(standard,cfg.campaignMinor),
+      promotionContributionMinor:contribution(cfg.campaignMinor),standardContributionMinor:standard===null?null:contribution(standard),
+      activation:AFA_CAMPAIGN_ACTIVATION,costConfirmation:AFA_COST_CONFIRMATION};
+  }
+  /** AFA promotion and contractual-cost changes: Admin only (route), typed confirmation, version check, exclusive lock, audited. */
+  static async saveAfa(adminId:string,input:any) {
+    const now=CommercialService.now();let patch:Partial<AfaPricingConfig>;
+    if(input.kind==='afa-cost') {
+      if(input.confirmation!==AFA_COST_CONFIRMATION)throw new FinanceError(`Type ${AFA_COST_CONFIRMATION} to record the AFA supplier cost.`);
+      const evidence=typeof input.evidence==='string'?input.evidence.trim():'';
+      if(evidence.length<10||evidence.length>300)throw new FinanceError('Describe the evidence for this cost in 10–300 characters (the agreement, written quote or invoice).');
+      patch={cost:{costMinor:moneyMinor(input.costMinor),evidence,confirmedAt:now.toISOString(),actorId:adminId}};
+    } else {
+      const dates=['startDate','endDate'].map(k=>input[k]===null||input[k]===''?null:input[k]);
+      if(typeof input.enabled!=='boolean'||dates.some(d=>d!==null&&!isCampaignDate(d)))throw new FinanceError('Invalid AFA promotion settings.');
+      if(dates[0]&&dates[1]&&dates[1]<dates[0])throw new FinanceError('The last day must be on or after the first day.');
+      patch={enabled:input.enabled,startDate:dates[0],endDate:dates[1],campaignMinor:moneyMinor(input.campaignMinor)};
+    }
+    // Availability is a supplier read, so it happens before the transaction (as supplier costs do for Data prices).
+    const enabling=input.kind==='afa-campaign'&&input.enabled===true;
+    const available=enabling?(await AfaService.publicConfig().catch(()=>null))?.available===true:false;
+    return FinanceStore.transaction(adminId,async tx=>{
+      await lock(tx,true);const previous=await afaConfig(tx);
+      if(previous.version!==input.expectedVersion)throw new FinanceError('Configuration changed. Refresh before saving.',409);
+      const candidate=normalizeAfaPricing({...previous,...patch});
+      if(enabling) {
+        if(input.activation!==AFA_CAMPAIGN_ACTIVATION)throw new FinanceError(`Type ${AFA_CAMPAIGN_ACTIVATION} to enable the AFA December price.`);
+        const problems=afaEnableProblems(candidate,AfaService.standardPriceMinor(),available,now);if(problems.length)throw new FinanceError(problems.join(' '));
+      }
+      await tx.saveConfig('afa-pricing',{...candidate,version:randomUUID(),updatedAt:now.toISOString(),actorId:adminId});
+      const effective=await afaConfig(tx);
+      await tx.audit(adminId,input.kind==='afa-cost'?'commercial_afa_cost_confirmed':'commercial_afa_campaign_changed','afa-pricing',{previous,next:effective});return effective;
+    });
+  }
   static async admin() {
     const [prices,offer,store,economy,campaign,savedCampaign]=await Promise.all([config('direct-pricing'),config('welcome-offer'),WebsiteConfig(),economicsPolicy('data'),campaignConfig(),FinanceStore.readConfig('direct-campaign')]);
     const now=CommercialService.now();
@@ -220,10 +292,11 @@ export class CommercialService {
     return {prices,offer,campaign:{...campaign,state:campaignState(campaign,now),today:accraDate(now),endsAt:campaignEndsAt(campaign),
       // A saved campaign is authoritative; the shipped draft applies only when nothing was ever saved. A deploy never migrates it.
       source:savedCampaign?'saved':'shipped-default',approvedPlan:DECEMBER_2026_APPROVED_PLAN,planDifferences:campaignPlanDifferences(campaign),
-      valueWarnings:campaignValueWarnings(ladder)},afa:afaCampaignStatus(),products,dataReferralPolicy:economy,audit:(await AdminAuditStore.findRecent(100)).filter(a=>a.action.startsWith('commercial_')||a.action==='store_wholesale_changed'||a.action==='store_policy_changed').slice(0,25)};
+      valueWarnings:campaignValueWarnings(ladder)},afa:await CommercialService.afaAdmin(prices),products,dataReferralPolicy:economy,audit:(await AdminAuditStore.findRecent(100)).filter(a=>a.action.startsWith('commercial_')||a.action==='store_wholesale_changed'||a.action==='store_policy_changed').slice(0,25)};
   }
   static async save(adminId:string,input:any) {
     if(input.confirmed!==true)throw new FinanceError('Confirm this commercial change.');
+    if(input.kind==='afa-campaign'||input.kind==='afa-cost')return CommercialService.saveAfa(adminId,input);
     if(!['pricing','offer','campaign'].includes(input.kind))throw new FinanceError('Unknown commercial setting.');
     const id=input.kind==='pricing'?'direct-pricing':input.kind==='campaign'?'direct-campaign':'welcome-offer';
     let next:any;
@@ -309,16 +382,25 @@ function checkCampaignAgainst(campaign:DirectCampaignConfig,prices:any,input:any
     if(input.enabled&&prices.products[productId]?.enabled===false)throw new FinanceError(`${p.networkName} ${p.dataAmount} is not available for sale.`);
   }
 }
-/** AFA's December price is prepared, not applied: these are the reasons it cannot be purchasable or advertised yet. */
-function afaCampaignStatus() {
-  const raw=process.env.AFA_RETAIL_PRICE_MINOR||'',current=/^\d+$/.test(raw)&&Number(raw)>0?Number(raw):null;
-  return {currentMinor:current,...AFA_DECEMBER_PROPOSAL,discountPercent:Math.floor(((AFA_DECEMBER_PROPOSAL.historicalRetailMinor-AFA_DECEMBER_PROPOSAL.proposedMinor)*100)/AFA_DECEMBER_PROPOSAL.historicalRetailMinor),purchasable:false,
-    reasons:['AFA checkout prices from its own server configuration, outside the commercial quote and revision checks.','No authoritative supplier cost is known before purchase (it is reported only after submission).','AFA checkout has no review step that would refuse a stale price before payment.']};
-}
 /**
  * The supplier that would fulfil a new direct Data order for this product now, if it is one whose catalogue cost can be
  * read (Success Biz Hub). Anything else (no route, TELCOGH, a disabled provider) means the cost is unconfirmed.
  */
 function routedDataSupplier(network:string,productId:string):'success_biz_hub'|null{
   try{return FulfilmentService.resolveRoute({service:'data',network,productId}).providerId==='success_biz_hub'?'success_biz_hub':null;}catch{return null;}
+}
+/** What stops the AFA promotion from being enabled now (empty when it may be enabled). */
+function afaEnableProblems(cfg:AfaPricingConfig,standard:number|null,available:boolean,now:Date):string[] {
+  const out:string[]=[];
+  if(!cfg.startDate||!cfg.endDate||cfg.endDate<cfg.startDate)out.push('Set the first and last day.');
+  else if(cfg.endDate<accraDate(now))out.push('The last day has passed.');
+  if(standard===null)out.push('The standard AFA price (AFA_RETAIL_PRICE_MINOR) is not configured.');
+  else if(!(cfg.campaignMinor>0&&cfg.campaignMinor<standard))out.push('The promotional price must be below the standard price.');
+  if(!cfg.cost)out.push('Confirm the contractual AFA supplier cost first.');
+  else {
+    if(cfg.campaignMinor<cfg.cost.costMinor)out.push('The promotional price is below the confirmed supplier cost.');
+    if(now.getTime()-Date.parse(cfg.cost.confirmedAt)>AFA_COST_MAX_AGE_DAYS*86_400_000)out.push(`The supplier cost was confirmed more than ${AFA_COST_MAX_AGE_DAYS} days ago; confirm it again.`);
+  }
+  if(!available)out.push('AFA registration is not currently available from the supplier.');
+  return out;
 }

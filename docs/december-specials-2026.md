@@ -149,14 +149,9 @@ MTN blocks a second active order for the same number, so combining is sequential
 - 8.80 matches nothing in the repository history.
 - Neither was assumed.
 
-## AFA Registration: blocked (prepared only)
+## AFA Registration
 
-AFA is live at GH₵29.99. The proposed December price of GH₵19.99 (33.34% off) is recorded in `AFA_DECEMBER_PROPOSAL` and shown in Admin, but applied nowhere. Three things block it:
-1. **AFA prices outside the commercial system.** The price comes from the `AFA_RETAIL_PRICE_MINOR` server setting, outside commercial quotes and revisions.
-2. **No authoritative pre-purchase cost.** The supplier reports cost only after submission. The historical 12.00 is unverified.
-3. **No review step.** AFA checkout has no expected-total step that would refuse a stale price.
-
-**To unblock:** move AFA pricing into `CommercialService` with a quote, revision and expected-total check, and confirm the supplier cost. Until then the "up to 33%" headline cannot appear: it is computed only from applied prices.
+Since PR B, AFA has its own commercial quote. The GH₵19.99 December price is built but switched off, and it needs an Admin-confirmed contractual supplier cost before it can be enabled. See `docs/afa-december-pricing.md`. The "up to 33%" headline appears only while that price applies and AFA can be bought.
 
 ## Referral and reseller interactions
 

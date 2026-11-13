@@ -63,13 +63,6 @@ export const DIRECT_CAMPAIGN_DEFAULT: DirectCampaignConfig = {
   products: { ...DECEMBER_2026_APPROVED_PLAN.products },
 };
 
-/**
- * AFA Registration December proposal, prepared but NOT applied anywhere: AFA checkout prices from its own
- * configuration, has no pre-purchase authoritative supplier cost and no quote-review step, so a discount cannot be
- * made purchasable or advertised from this campaign. See docs/december-specials-2026.md.
- */
-export const AFA_DECEMBER_PROPOSAL = { proposedMinor: 1999, historicalRetailMinor: 2999, historicalCostMinor: 1200 } as const;
-
 export type CampaignState = 'disabled' | 'incomplete' | 'scheduled' | 'active' | 'ended';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -102,7 +95,7 @@ export function normalizeCampaign(stored: unknown): DirectCampaignConfig {
 }
 
 /** Where the campaign stands on the server's clock, by Accra calendar date. */
-export function campaignState(config: DirectCampaignConfig, now: Date = new Date()): CampaignState {
+export function campaignState(config: Pick<DirectCampaignConfig, 'enabled' | 'startDate' | 'endDate'>, now: Date = new Date()): CampaignState {
   if (!config.enabled) return 'disabled';
   if (!config.startDate || !config.endDate || config.endDate < config.startDate) return 'incomplete';
   const today = accraDate(now);

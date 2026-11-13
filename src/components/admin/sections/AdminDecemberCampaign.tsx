@@ -44,9 +44,6 @@ export function AdminDecemberCampaign({data,busy,submit}:{data:any;busy:boolean;
    {p.campaignIssues.map((issue:string)=><p key={issue} role="alert" className="text-amber-300">{issue}</p>)}
    {p.campaignWelcomeContributionMinor!==null&&p.campaignWelcomeContributionMinor<0&&<p className="text-amber-300">First purchase is an acquisition subsidy of {cash(-p.campaignWelcomeContributionMinor)} before any referral reward.</p>}
   </div>)}</div>
-  <div className="rounded-lg border border-slate-700 p-3 text-sm"><h4 className="font-semibold">AFA Registration: prepared, not purchasable at a December price</h4>
-   <p>Current {cash(data.afa.currentMinor)} · proposed {cash(data.afa.proposedMinor)} ({data.afa.discountPercent}% off {cash(data.afa.historicalRetailMinor)}) · historical cost {cash(data.afa.historicalCostMinor)}, unverified.</p>
-   <ul className="list-disc pl-5 text-slate-400">{data.afa.reasons.map((r:string)=><li key={r}>{r}</li>)}</ul></div>
   <form className="space-y-3" onSubmit={e=>{e.preventDefault();submit(()=>body(false));}}>
    <div className="grid gap-3 sm:grid-cols-2"><label>First day (Accra)<input type="date" className={field} value={start} onChange={e=>setStart(e.target.value)}/></label><label>Last day (Accra), required to enable<input type="date" className={field} value={end} onChange={e=>setEnd(e.target.value)}/></label></div>
    {Object.entries(prices).map(([id,value])=>{const p=data.products.find((x:any)=>x.id===id);return <div key={id} className="flex items-end gap-2"><label className="flex-1">{p?`${p.networkName} ${p.dataAmount}`:id} December price (GH₵; standard {cash(p?.retailMinor)})<input className={field} value={value} onChange={e=>setPrices({...prices,[id]:e.target.value})}/></label><button type="button" className={`${button} border border-slate-600`} onClick={()=>{const next={...prices};delete next[id];setPrices(next);}}>Remove</button></div>;})}

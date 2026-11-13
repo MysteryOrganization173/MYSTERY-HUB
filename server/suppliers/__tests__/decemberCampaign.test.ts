@@ -274,7 +274,7 @@ test('Admin view: dates, state, standard vs December prices, contributions, issu
  assert.equal(one.retailMinor,549);assert.equal(one.campaignMinor,499);assert.equal(one.campaignApplies,false);assert.equal(one.effectiveMinor,549);assert.equal(one.campaignWelcomeTotalMinor,399);
  assert.equal(one.campaignContributionMinor,499-400-10);assert.equal(one.campaignWelcomeContributionMinor,399-400-8);assert.deepEqual(one.campaignIssues,[]);
  assert.equal(view.products.find((p:any)=>p.id==='mtn-3gb').campaignMinor,1339);assert.equal(view.products.find((p:any)=>p.id==='mtn-6gb').campaignMinor,null,'no unapproved size');
- assert.equal(view.afa.purchasable,false);assert.equal(view.afa.proposedMinor,1999);assert.equal(view.afa.discountPercent,33);assert.ok(view.afa.reasons.length>=3);
+ assert.equal(view.afa.promotionApplies,false);assert.equal(view.afa.config.enabled,false);assert.equal(view.afa.config.campaignMinor,1999);assert.equal(view.afa.config.cost,null);assert.ok(view.afa.blockers.includes('No Admin-confirmed contractual supplier cost.'));
  provider.resolvePackage=async()=>({resolved:{supplierCostMinor:520}} as any);
  assert.match(((await C.admin()) as any).products.find((p:any)=>p.id==='mtn-1gb').campaignIssues.join(' '),/below the current supplier cost/);
 });
