@@ -14,7 +14,10 @@
 - A campaign price applies only while the campaign is enabled and today's **Accra** date (on the server clock) is between its first and last day, inclusive.
 - Nothing from the browser is read: no URL, preview, client field or device time.
 - Malformed or incomplete settings fail closed to the standard price. A campaign never raises a price.
-- **Shipped draft:** off; first day 1 Dec 2026; last day not set (the founder must confirm it); MTN 1GB GH₵4.99; MTN 2GB GH₵8.99. Provisional prices are not configured.
+- **Shipped draft (finalized 13 November 2026, still off):**
+  - First day: 1 December 2026, 00:00 Accra.
+  - Last day: **4 January 2027**, inclusive. Normal prices return at 00:00 Accra on 5 January, while the New Year appearance runs through 5 January.
+  - MTN 1GB GH₵4.99 · 2GB GH₵8.99 · 3GB GH₵13.39 · 4GB GH₵17.79 · 5GB GH₵21.99. No other product is included.
 - **While it applies:**
   - `regularMinor` keeps its meaning: the price the product sells for now, before the welcome benefit. The reconciliation and referral invariant `regularMinor − discountMinor = amount` is unchanged.
   - New fields appear only on campaign quotes and orders: `standardMinor` (price before the campaign), `campaignSavingMinor`, and `campaign`. Orders also get `priceCampaignId` and `priceCampaignRevision`.
@@ -23,12 +26,29 @@
 - **Stacking:** `stacksWithWelcome: true` for December. A future limited deal can set it to `false` rather than stacking automatically.
 - **No changes to:** schema, migrations, supplier routing, Paystack, Wallet, authentication, referral rules, reseller stores or AFA checkout.
 
+## Finalized plan: shipped draft vs saved settings
+
+The approved plan is `DECEMBER_2026_APPROVED_PLAN` in `shared/directCampaign.ts`. The shipped draft (`DIRECT_CAMPAIGN_DEFAULT`, revision `december-2026-inactive-v2`) equals it and is **disabled**.
+
+- **Nothing saved in Admin yet** (Admin says "Using the shipped draft"): the deploy itself stages the approved plan. It stays off.
+- **A campaign was already saved:** the saved settings stay authoritative, and a deploy never migrates them.
+  - Admin lists every difference from the approved plan.
+  - **Load the approved plan into the form** fills the dates and five prices. Then choose **Save as draft**; prices stay standard.
+  - A saved list is never extended silently: an enabled older two-product campaign still applies only its own two products.
+- **Stale Admin pages:** the new revision makes any Admin page opened before this deploy refresh before saving.
+- **Before enabling:** Admin must read a known cost for each product from the supplier that would fulfil it today (the routed supplier, currently Success Biz Hub). TELCOGH is not executable and is never used for this. An unknown cost or a price below cost keeps the Enable blocker.
+
 ## Welcome benefit: verified stacking
 
 | | Standard | December | Welcome | **First purchase** | Saving |
 |---|---:|---:|---:|---:|---:|
 | MTN 1GB | 5.49 | 4.99 | −1.00 | **3.99** | 1.50 |
 | MTN 2GB | 10.49 | 8.99 | −1.00 | **7.99** | 2.50 |
+| MTN 3GB | 14.99 | 13.39 | −1.00 | **12.39** | 2.60 |
+| MTN 4GB | 19.49 | 17.79 | −1.00 | **16.79** | 2.70 |
+| MTN 5GB | 23.99 | 21.99 | −1.00 | **20.99** | 3.00 |
+
+These are examples. A customer gets the GH₵1 benefit once, on whichever qualifying bundle they buy first.
 
 All amounts are integer pesewas. The existing lifecycle is unchanged and was re-tested under the campaign:
 - The first qualifying bundle consumes the benefit. If MTN 2GB is bought first, a later MTN 1GB costs 4.99.
@@ -86,9 +106,9 @@ This was reproduced locally (`docs/screenshots/december-specials/1-checkout-befo
 |---|---:|---:|---:|---|---:|---:|---|---:|---|---|
 | MTN 1GB | 5.49 | 4.99 | **4.99** | 0.50 (9.1%) | 4.99 | 0.10 | 0.89 / 0.99 | 3.99 | −0.09 / +0.01 | Approved, configured (off) |
 | MTN 2GB | 10.49 | 8.99 | **8.99** | 1.50 (14.3%) | 4.50 | 0.18 | 0.81 / 1.01 | 7.99 | −0.17 / +0.03 | Approved, configured (off) |
-| MTN 3GB | 14.99 | 13.99 | **13.39** | 1.60 (10.7%) | 4.46 | 0.26 | 1.13 / 1.43 | 12.39 | 0.15 / 0.45 | Proposed, awaiting approval |
-| MTN 4GB | 19.49 | — | **17.79** | 1.70 (8.7%) | 4.45 | 0.35 | 1.44 / n/a | 16.79 | 0.46 / n/a | Proposed, awaiting approval |
-| MTN 5GB | 23.99 | 23.49 | **21.99** | 2.00 (8.3%) | 4.40 | 0.43 | 1.56 / 2.06 | 20.99 | 0.58 / 1.08 | Proposed, awaiting approval |
+| MTN 3GB | 14.99 | 13.99 | **13.39** | 1.60 (10.7%) | 4.46 | 0.26 | 1.13 / 1.43 | 12.39 | 0.15 / 0.45 | Approved 13 Nov, configured (off) |
+| MTN 4GB | 19.49 | — | **17.79** | 1.70 (8.7%) | 4.45 | 0.35 | 1.44 / n/a | 16.79 | 0.46 / n/a | Approved 13 Nov, configured (off) |
+| MTN 5GB | 23.99 | 23.49 | **21.99** | 2.00 (8.3%) | 4.40 | 0.43 | 1.56 / 2.06 | 20.99 | 0.58 / 1.08 | Approved 13 Nov, configured (off) |
 | AFA Registration | 29.99 | 19.99 | 19.99 | 10.00 (33.3%) | — | 0.39 | 7.60 vs historical 12.00 | — (excluded) | — | Blocked (below) |
 
 **Why the provisional 3GB/5GB figures are not recommended:**
@@ -100,9 +120,20 @@ This was reproduced locally (`docs/screenshots/december-specials/1-checkout-befo
 
 **Untouched standard sizes become poorer value than combinations of December bundles:**
 - 4GB at 19.49 vs 2 × 2GB = 17.98, hence the 4GB proposal.
-- 6GB at 28.49 vs 5GB + 1GB = 26.98.
-- 8GB at 36.99 vs 5GB + 3GB = 35.38.
-- 10GB at 44.99 vs 2 × 5GB = 43.98.
+- With all five approved prices, **every larger standard MTN bundle** costs more than the same data in December bundles. Admin lists these live as "Worse value than smaller December bundles":
+
+| Standard bundle | Price | Cheapest December combination |
+|---|---:|---|
+| 6GB | 28.49 | 2GB + 4GB = 26.78 |
+| 8GB | 36.99 | 3GB + 5GB = 35.38 |
+| 10GB | 44.99 | 2 × 5GB = 43.98 |
+| 15GB | 66.99 | 3 × 5GB = 65.97 |
+| 20GB | 88.99 | 4 × 5GB = 87.96 |
+| 25GB | 110.99 | 5 × 5GB = 109.95 |
+| 30GB | 132.99 | 6 × 5GB = 131.94 |
+| 40GB | 176.99 | 8 × 5GB = 175.92 |
+
+The cause is the 5GB at 4.40/GB. The gaps are small (GH₵1.01–1.71) and each extra bundle is a separate, sequential MTN order. The campaign was not extended to 6GB or larger.
 
 MTN blocks a second active order for the same number, so combining is sequential, not simultaneous. The founder should decide whether to extend the campaign or accept this.
 
@@ -136,21 +167,28 @@ AFA is live at GH₵29.99. The proposed December price of GH₵19.99 (33.34% off
 - **Admin-assisted orders:** these use the effective catalogue price, so they would use December prices while the campaign is active.
 - **Offer bundles (24–72 h):** no such service exists in the code. Nothing was activated, and no copy claims instant delivery.
 
-## Before 1 December: decisions and controls for the founder
+## Before 1 December: what remains for the founder
 
-1. **Last day of December pricing.** Required to enable. Seasonal visuals end on 5 January, but commercial dates are separate.
-2. **Approve or change MTN 3GB/4GB/5GB** (recommended 13.39 / 17.79 / 21.99), and decide on 6/8/10GB.
-3. **Confirm live supplier costs** in Admin → Commercial Pricing. Enabling refuses any product with an unknown cost or a price below cost.
-4. **Configure the direct processing reserve,** if it has not been set, so contributions are not "unknown".
-5. **Accept the first-purchase subsidy:** about −0.09 per new customer, or −0.59 with a referral, on SBH costs.
-6. **Welcome headline ceiling:** keep "up to 18%", or approve a new figure.
-7. **AFA:** approve the work to bring it into commercial pricing, or leave it out of December.
-8. **Enable:** Admin → Commercial Pricing → December Specials. Type `december-specials-2026` and choose **Enable December prices**. It stays scheduled, with standard prices, until 00:00 Accra on the first day. **Turn off December prices** restores standard prices immediately. Every change is audited (`commercial_campaign_changed`, previous and next).
+**Decided on 13 November and staged:** dates 1 December to 4 January, the five MTN prices, and no extension to 6GB+.
+
+**Still open:**
+1. **Check Admin → Commercial Pricing → December Specials.**
+   - If it says the settings differ from the approved plan, choose **Load the approved plan into the form**, then **Save as draft**.
+   - If it says "Using the shipped draft", nothing is needed.
+2. **Confirm live supplier costs** for the five products in Admin. Each December price must cover the routed supplier's cost, or Enable is refused. The figures in the matrix above are reference costs, not live costs.
+3. **Configure the direct processing reserve** if it has not been set, so contributions are not "unknown".
+4. **Accept the first-purchase economics** that Admin shows. On reference costs, 1GB and 2GB first purchases lose a few pesewas, more with a referral reward.
+5. **Accept the value inversion** for 6GB–40GB (table above), or approve further prices.
+6. **Enable when ready:** type `december-specials-2026` and choose **Enable December prices**.
+   - It stays scheduled, with standard prices, until 00:00 Accra on 1 December.
+   - It ends automatically after 4 January. An open page refreshes its prices at the boundary.
+   - **Turn off December prices** restores standard prices immediately.
+   - Every change is audited.
 
 ## Verification
 
 **Unit and integration tests:**
-- `decemberCampaign.test.ts`: 34 tests covering:
+- `decemberCampaign.test.ts`: 44 tests covering:
   - pricing at every boundary, Accra time, fail-closed settings, no price rises, disabled and unknown products, prototype keys, AFA and Instant excluded;
   - exact 549/499/399 and 1049/899/799;
   - Paystack and Wallet amounts and the snapshot;
@@ -158,8 +196,13 @@ AFA is live at GH₵29.99. The proposed December price of GH₵19.99 (33.34% off
   - stale quotes across start, end and change;
   - eligibility loss and below-cost refusal;
   - historical orders;
-  - the Admin confirmation, dates, cost, audit and RBAC.
-- `decemberPresentation.test.ts`: 14 tests.
+  - the Admin confirmation, dates, cost, audit and RBAC;
+  - all five approved prices with their first-purchase totals and one benefit;
+  - 4 January 23:59:59 versus 5 January 00:00;
+  - the shipped draft versus saved settings;
+  - routed-supplier costs, value warnings and referral exposure.
+- `decemberPresentation.test.ts`: 15 tests, including the boundary refresh clearing every December field.
+  - This test found and fixed a bug from PR #112: campaign fields outlived the campaign in the shared bundle list.
 - One mocked-PostgreSQL boundary test.
 
 **Native PostgreSQL 16** (disposable local cluster, non-superuser owner):
@@ -172,7 +215,7 @@ AFA is live at GH₵29.99. The proposed December price of GH₵19.99 (33.34% off
   - a stale quote writes nothing.
 - The existing supplier routing, checkout recovery and finance reconciliation native suites pass too: 99 of 99 in total.
 
-**Full suite:** 3404 tests, 3355 pass, 0 fail. The 49 skips are native-PostgreSQL suites with no database configured; the relevant ones were run above. TypeScript and the production build pass. The ordinary first load is unchanged (index 73.66 KB gzip).
+**Full suite:** 3415 tests, 3366 pass, 0 fail. The 49 skips are native-PostgreSQL suites with no database configured; the relevant ones were run above. TypeScript and the production build pass. The ordinary first load is unchanged (index 73.66 KB gzip).
 
 **Browser checks** (`localhost`, new server code): 18 of 18.
 - The campaign is off by default, and the catalogue and guest quotes are byte-identical to production.

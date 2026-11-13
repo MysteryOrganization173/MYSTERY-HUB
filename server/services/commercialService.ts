@@ -15,7 +15,7 @@ import type { OrderRecord } from '../types/orders.js';
 import { PaystackServerService } from './paystackService.js';
 import { FinanceService, operationKey } from './financeService.js';
 import { FulfilmentService } from './fulfilmentService.js';
-import { normalizeCampaign, campaignPriceFor, campaignState, campaignHeadlinePercent, isCampaignDate, AFA_DECEMBER_PROPOSAL, type DirectCampaignConfig } from '../../shared/directCampaign.js';
+import { normalizeCampaign, campaignPriceFor, campaignState, campaignHeadlinePercent, isCampaignDate, AFA_DECEMBER_PROPOSAL, DECEMBER_2026_APPROVED_PLAN, campaignPlanDifferences, campaignEndsAt, campaignValueWarnings, type DirectCampaignConfig } from '../../shared/directCampaign.js';
 import { accraDate } from '../../shared/seasonal.js';
 import { DECEMBER_2026_CAMPAIGN_ID as CAMPAIGN_ID } from '../../shared/directCampaign.js';
 
@@ -51,7 +51,7 @@ export class CommercialService {
     // The campaign revision joins the pricing revision while it applies, so a quote from before a start, end or
     // campaign change is refused at payment and the customer reviews the new total.
     return {version:applied?`${prices.version}~${campaign.version}`:prices.version,products,
-      ...(applied?{campaign:{id:campaign.id,label:campaign.label,title:campaign.title,endDate:campaign.endDate,maxSavingPercent:campaignHeadlinePercent(products)}}:{})};
+      ...(applied?{campaign:{id:campaign.id,label:campaign.label,title:campaign.title,endDate:campaign.endDate,endsAt:campaignEndsAt(campaign),serverTime:now.toISOString(),maxSavingPercent:campaignHeadlinePercent(products)}}:{})};
   }
   static async eligibility(tx:FinanceTx) {
     // Re-read and lock identity: middleware/cached profiles never establish eligibility.
@@ -188,7 +188,7 @@ export class CommercialService {
     }
   }
   static async admin() {
-    const [prices,offer,store,economy,campaign]=await Promise.all([config('direct-pricing'),config('welcome-offer'),WebsiteConfig(),economicsPolicy('data'),campaignConfig()]);
+    const [prices,offer,store,economy,campaign,savedCampaign]=await Promise.all([config('direct-pricing'),config('welcome-offer'),WebsiteConfig(),economicsPolicy('data'),campaignConfig(),FinanceStore.readConfig('direct-campaign')]);
     const now=CommercialService.now();
     const products=await Promise.all(Object.values(AUTHORITATIVE_PRODUCTS).map(async p=>{
       const resolved=await FulfilmentService.getProvider().resolvePackage(p.network,p.dataAmount).catch(()=>null),supplierCostMinor=resolved?.resolved?.supplierCostMinor??null;
@@ -203,8 +203,24 @@ export class CommercialService {
       const recurringReferralRewardMinor=dynamic&&recurringRule?computeEconomicReward({...estimate,amount:retailMinor,commercial_context:{...estimate.commercial_context!,reserveMinor}},recurringRule,0,economy,'recurring').amount:null;
       const promoContributionMinor=supplierCostMinor===null||!prices.reserveConfigured?null:discountedMinor-supplierCostMinor-percentMinor(discountedMinor,prices.reserveBps)-prices.reserveFixedMinor;
       const wholesale=store.wholesale[p.id];
-      return {...p,...campaignRow(p.id,p.dataAmount,retailMinor,setting?.enabled??true,supplierCostMinor,prices,offer,campaign,now),retailMinor,enabled:setting?.enabled??true,recommendedMinor:setting?.recommendedMinor??null,supplierCostMinor,reserveMinor,spreadMinor:supplierCostMinor===null?null:retailMinor-supplierCostMinor,contributionMinor:supplierCostMinor===null||reserveMinor===null?null:retailMinor-supplierCostMinor-reserveMinor,discountedMinor,promoContributionMinor,recurringReferralRewardMinor,normalContributionMinor:supplierCostMinor===null||reserveMinor===null?null:retailMinor-supplierCostMinor-reserveMinor,recurringContributionMinor:supplierCostMinor===null||reserveMinor===null||recurringReferralRewardMinor===null?null:retailMinor-supplierCostMinor-reserveMinor-recurringReferralRewardMinor,firstReferralRewardMinor,acquisitionContributionMinor:promoContributionMinor===null?null:promoContributionMinor-firstReferralRewardMinor,firstReferralRule:firstRule?{type:firstRule.reward_type,minor:firstRule.reward_minor,bps:firstRule.reward_percent_bps}:null,wholesaleMinor:wholesale?.wholesaleMinor??null,safeResellerFloor:wholesale?minimumFloor(wholesale.wholesaleMinor,store.policy):null,pricePerGb:retailMinor/100/parseFloat(p.dataAmount)};
-    }));return {prices,offer,campaign:{...campaign,state:campaignState(campaign,now),today:accraDate(now)},afa:afaCampaignStatus(),products,dataReferralPolicy:economy,audit:(await AdminAuditStore.findRecent(100)).filter(a=>a.action.startsWith('commercial_')||a.action==='store_wholesale_changed'||a.action==='store_policy_changed').slice(0,25)};
+      // Campaign economics only trust the cost of the supplier that would actually fulfil the order today.
+      const routed=routedDataSupplier(p.network,p.id),row=campaignRow(p.id,p.dataAmount,retailMinor,setting?.enabled??true,routed?supplierCostMinor:null,prices,offer,campaign,now);
+      // Referral exposure on a December first purchase, estimated as for standard prices above (not a promise of eligibility).
+      let campaignFirstReferralRewardMinor:number|null=null,campaignAcquisitionContributionMinor:number|null=null;
+      if(row.campaignMinor!==null){
+        const paid=row.campaignWelcomeTotalMinor!,welcome=row.campaignMinor-paid,reserveOf=(m:number)=>prices.reserveConfigured?percentMinor(Math.max(0,m),prices.reserveBps)+prices.reserveFixedMinor:null;
+        const campaignEstimate={service_type:'data',amount:paid,supplier_cost_minor:routed?supplierCostMinor:null,commercial_context:{regularMinor:row.campaignMinor,discountMinor:welcome,reserveMinor:reserveOf(paid),normalReserveMinor:reserveOf(row.campaignMinor)}} as OrderRecord;
+        const requested=firstRule?.reward_type==='fixed_minor'?firstRule.reward_minor??0:firstRule?.reward_percent_bps!=null?percentMinor(Math.max(0,paid),firstRule.reward_percent_bps):0;
+        campaignFirstReferralRewardMinor=dynamic?(firstRule?computeEconomicReward(campaignEstimate,firstRule,0,economy,'acquisition').amount:0):requested<=paid?requested:0;
+        campaignAcquisitionContributionMinor=row.campaignWelcomeContributionMinor==null?null:row.campaignWelcomeContributionMinor-campaignFirstReferralRewardMinor;
+      }
+      return {...p,...row,campaignSupplier:routed,campaignFirstReferralRewardMinor,campaignAcquisitionContributionMinor,retailMinor,enabled:setting?.enabled??true,recommendedMinor:setting?.recommendedMinor??null,supplierCostMinor,reserveMinor,spreadMinor:supplierCostMinor===null?null:retailMinor-supplierCostMinor,contributionMinor:supplierCostMinor===null||reserveMinor===null?null:retailMinor-supplierCostMinor-reserveMinor,discountedMinor,promoContributionMinor,recurringReferralRewardMinor,normalContributionMinor:supplierCostMinor===null||reserveMinor===null?null:retailMinor-supplierCostMinor-reserveMinor,recurringContributionMinor:supplierCostMinor===null||reserveMinor===null||recurringReferralRewardMinor===null?null:retailMinor-supplierCostMinor-reserveMinor-recurringReferralRewardMinor,firstReferralRewardMinor,acquisitionContributionMinor:promoContributionMinor===null?null:promoContributionMinor-firstReferralRewardMinor,firstReferralRule:firstRule?{type:firstRule.reward_type,minor:firstRule.reward_minor,bps:firstRule.reward_percent_bps}:null,wholesaleMinor:wholesale?.wholesaleMinor??null,safeResellerFloor:wholesale?minimumFloor(wholesale.wholesaleMinor,store.policy):null,pricePerGb:retailMinor/100/parseFloat(p.dataAmount)};
+    }));
+    const ladder=products.filter(p=>p.network==='mtn').map(p=>({id:p.id,label:`${p.networkName.replace(/ Ghana$/,'')} ${p.dataAmount}`,gb:parseFloat(p.dataAmount),minor:p.campaignMinor??p.retailMinor}));
+    return {prices,offer,campaign:{...campaign,state:campaignState(campaign,now),today:accraDate(now),endsAt:campaignEndsAt(campaign),
+      // A saved campaign is authoritative; the shipped draft applies only when nothing was ever saved. A deploy never migrates it.
+      source:savedCampaign?'saved':'shipped-default',approvedPlan:DECEMBER_2026_APPROVED_PLAN,planDifferences:campaignPlanDifferences(campaign),
+      valueWarnings:campaignValueWarnings(ladder)},afa:afaCampaignStatus(),products,dataReferralPolicy:economy,audit:(await AdminAuditStore.findRecent(100)).filter(a=>a.action.startsWith('commercial_')||a.action==='store_wholesale_changed'||a.action==='store_policy_changed').slice(0,25)};
   }
   static async save(adminId:string,input:any) {
     if(input.confirmed!==true)throw new FinanceError('Confirm this commercial change.');
@@ -278,8 +294,9 @@ async function campaignInput(input:any) {
     if(endDate<accraDate(CommercialService.now()))throw new FinanceError('This campaign has already ended.');
     if(!Object.keys(products).length)throw new FinanceError('Choose at least one product before enabling December prices.');
     for(const [productId,{campaignMinor}] of Object.entries(products)) {
-      const p=AUTHORITATIVE_PRODUCTS[productId],cost=(await FulfilmentService.getProvider().resolvePackage(p.network,p.dataAmount).catch(()=>null))?.resolved?.supplierCostMinor;
-      if(cost===undefined||cost===null||campaignMinor<cost)throw new FinanceError(`${p.networkName} ${p.dataAmount}: a December price must cover a known authoritative supplier cost.`);
+      const p=AUTHORITATIVE_PRODUCTS[productId],routed=routedDataSupplier(p.network,p.id);
+      const cost=routed?(await FulfilmentService.getProvider().resolvePackage(p.network,p.dataAmount).catch(()=>null))?.resolved?.supplierCostMinor:null;
+      if(cost===undefined||cost===null||campaignMinor<cost)throw new FinanceError(`${p.networkName} ${p.dataAmount}: a December price must cover a known authoritative supplier cost from the supplier that would fulfil it.`);
     }
   }
   return {id:CAMPAIGN_ID,enabled:input.enabled,startDate,endDate,stacksWithWelcome:input.stacksWithWelcome??true,products};
@@ -297,4 +314,11 @@ function afaCampaignStatus() {
   const raw=process.env.AFA_RETAIL_PRICE_MINOR||'',current=/^\d+$/.test(raw)&&Number(raw)>0?Number(raw):null;
   return {currentMinor:current,...AFA_DECEMBER_PROPOSAL,discountPercent:Math.floor(((AFA_DECEMBER_PROPOSAL.historicalRetailMinor-AFA_DECEMBER_PROPOSAL.proposedMinor)*100)/AFA_DECEMBER_PROPOSAL.historicalRetailMinor),purchasable:false,
     reasons:['AFA checkout prices from its own server configuration, outside the commercial quote and revision checks.','No authoritative supplier cost is known before purchase (it is reported only after submission).','AFA checkout has no review step that would refuse a stale price before payment.']};
+}
+/**
+ * The supplier that would fulfil a new direct Data order for this product now, if it is one whose catalogue cost can be
+ * read (Success Biz Hub). Anything else (no route, TELCOGH, a disabled provider) means the cost is unconfirmed.
+ */
+function routedDataSupplier(network:string,productId:string):'success_biz_hub'|null{
+  try{return FulfilmentService.resolveRoute({service:'data',network,productId}).providerId==='success_biz_hub'?'success_biz_hub':null;}catch{return null;}
 }

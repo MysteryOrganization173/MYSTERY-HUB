@@ -18,7 +18,10 @@ import {FulfilmentService as F} from '../../services/fulfilmentService.js';
 import {apiRouter} from '../../routes/api.js';
 import {adminRouter} from '../../routes/adminApi.js';
 import {toSafePublicOrder} from '../../types/orders.js';
-import {DIRECT_CAMPAIGN_DEFAULT,DECEMBER_2026_CAMPAIGN_ID,campaignState,campaignPriceFor,campaignHeadlinePercent,normalizeCampaign} from '../../../shared/directCampaign.js';
+import {DIRECT_CAMPAIGN_DEFAULT,DECEMBER_2026_CAMPAIGN_ID,campaignState,campaignPriceFor,campaignHeadlinePercent,normalizeCampaign,campaignEndsAt,campaignValueWarnings} from '../../../shared/directCampaign.js';
+import {DIRECT_RETAIL_MINOR} from '../../../shared/directPricing.js';
+import {serverSeasonStatus} from '../../../shared/seasonal.js';
+import {campaignRefreshDelay} from '../../../src/hooks/useDirectCatalog.js';
 
 /* December Specials 2026: a dated, server-authoritative selling price layered on the existing commercial pricing.
    Synthetic accounts and mocked Paystack/supplier responses only; no external request can leave this process. */
@@ -40,9 +43,9 @@ const order=(extra:any={}):any=>{const id=randomUUID();return {id,user_id:'buyer
 const request=(path:string,body?:any,token='buyer-token')=>originalFetch(base+'/api/'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});
 /** Stores campaign settings exactly as given (bypassing Admin validation), to prove the read side fails closed. */
 const store=(value:any)=>FinanceStore.transaction('admin',tx=>tx.saveConfig('direct-campaign',value));
-const ENABLED={...DIRECT_CAMPAIGN_DEFAULT,enabled:true,endDate:'2027-01-05',version:'december-test-enabled'};
+const ENABLED={...DIRECT_CAMPAIGN_DEFAULT,enabled:true,version:'december-test-enabled'};
 const enable=async(extra:any={})=>{await store({...ENABLED,...extra});};
-const adminEnable=(extra:any={})=>C.save('admin',{kind:'campaign',confirmed:true,expectedVersion:DIRECT_CAMPAIGN_DEFAULT.version,enabled:true,activation:DECEMBER_2026_CAMPAIGN_ID,startDate:'2026-12-01',endDate:'2027-01-05',products:[{productId:'mtn-1gb',campaignMinor:499},{productId:'mtn-2gb',campaignMinor:899}],...extra});
+const adminEnable=(extra:any={})=>C.save('admin',{kind:'campaign',confirmed:true,expectedVersion:DIRECT_CAMPAIGN_DEFAULT.version,enabled:true,activation:DECEMBER_2026_CAMPAIGN_ID,startDate:'2026-12-01',endDate:'2027-01-04',products:[{productId:'mtn-1gb',campaignMinor:499},{productId:'mtn-2gb',campaignMinor:899}],...extra});
 const price=async(id:string)=>(await C.catalog()).products.find(p=>p.id===id)!;
 
 // ───────── Pricing ─────────
@@ -53,10 +56,10 @@ test('shipped disabled: catalogue, quote and revision are exactly the ordinary o
  at('2026-12-15T12:00:00Z');// Even inside the dates, a disabled campaign changes nothing.
  const q=await C.quote('mtn-1gb');assert.deepEqual(Object.keys(q).sort(),['buyerPhone','discountMinor','offer','pricingRevision','product','promotionRevision','regularMinor','totalMinor']);
  assert.equal(q.totalMinor,549);assert.equal(q.pricingRevision,'direct-launch-v1');
- assert.equal(DIRECT_CAMPAIGN_DEFAULT.enabled,false);assert.equal(DIRECT_CAMPAIGN_DEFAULT.endDate,null,'the end date waits for the founder');
- assert.deepEqual(DIRECT_CAMPAIGN_DEFAULT.products,{'mtn-1gb':{campaignMinor:499},'mtn-2gb':{campaignMinor:899}},'only the two approved targets; provisional prices are not configured');
+ assert.equal(DIRECT_CAMPAIGN_DEFAULT.enabled,false,'shipped off, whatever the date');assert.equal(DIRECT_CAMPAIGN_DEFAULT.startDate,'2026-12-01');assert.equal(DIRECT_CAMPAIGN_DEFAULT.endDate,'2027-01-04','approved last day');
+ assert.deepEqual({...DIRECT_CAMPAIGN_DEFAULT.products},{'mtn-1gb':{campaignMinor:499},'mtn-2gb':{campaignMinor:899},'mtn-3gb':{campaignMinor:1339},'mtn-4gb':{campaignMinor:1779},'mtn-5gb':{campaignMinor:2199}},'exactly the five approved MTN prices');
 });
-for(const [when,iso,expected] of [['the day before (23:59:59 Accra)','2026-11-30T23:59:59Z',549],['the first second (00:00 Accra, 1 December)','2026-12-01T00:00:00Z',499],['during','2026-12-18T09:30:00Z',499],['the last second of the last day','2027-01-05T23:59:59Z',499],['after the last day','2027-01-06T00:00:00Z',549]] as const)
+for(const [when,iso,expected] of [['the day before (23:59:59 Accra)','2026-11-30T23:59:59Z',549],['the first second (00:00 Accra, 1 December)','2026-12-01T00:00:00Z',499],['during','2026-12-18T09:30:00Z',499],['the last second of 4 January (last day)','2027-01-04T23:59:59Z',499],['5 January 00:00 Accra (normal prices)','2027-01-05T00:00:00Z',549]] as const)
  test(`enabled campaign ${when}: MTN 1GB sells for ${expected}`,async()=>{await enable();at(iso);assert.equal((await price('mtn-1gb')).amountPesewas,expected);assert.equal((await C.quote('mtn-1gb')).totalMinor,expected);});
 test('Accra dates come from the server clock, not the time zone of the process',()=>{
  const tz=process.env.TZ;process.env.TZ='Pacific/Kiritimati';
@@ -85,7 +88,7 @@ test('active campaign: public catalogue labels the special and a truthful headli
  const catalog=await C.catalog(),one=catalog.products.find(p=>p.id==='mtn-1gb')!;
  assert.equal(one.standardPesewas,549);assert.equal(one.amountPesewas,499);assert.equal(one.priceGhc,4.99);assert.equal(one.campaign?.label,'December Special');
  // MTN 2GB: (1049-899)/1049 = 14.3% → "up to 14%". Not 33%: AFA is not part of the applied catalogue.
- assert.deepEqual(catalog.campaign,{id:DECEMBER_2026_CAMPAIGN_ID,label:'December Special',title:'December Specials',endDate:'2027-01-05',maxSavingPercent:14});
+ assert.deepEqual(catalog.campaign,{id:DECEMBER_2026_CAMPAIGN_ID,label:'December Special',title:'December Specials',endDate:'2027-01-04',endsAt:'2027-01-05T00:00:00.000Z',serverTime:'2026-12-10T12:00:00.000Z',maxSavingPercent:14});
  assert.equal(campaignHeadlinePercent([{amountPesewas:1999,standardPesewas:2999}]),33,'the AFA figure would be 33% once (and only if) it were applied');
  assert.equal(catalog.version,'direct-launch-v1~december-test-enabled');
  assert.doesNotMatch(JSON.stringify(catalog.campaign),/instant/i);
@@ -201,7 +204,7 @@ test('a quote taken before the start, the end or a campaign change is refused at
  at('2026-12-01T00:00:30Z');
  await assert.rejects(()=>C.initialize(order(),input({expectedTotalMinor:before.totalMinor,expectedRegularMinor:before.regularMinor,pricingRevision:before.pricingRevision,promotionRevision:before.promotionRevision})),(e:any)=>e.checkout?.code==='CHECKOUT_REVIEW_REQUIRED'&&e.checkout?.paymentState==='not_started');
  const during=await C.quote('mtn-1gb','buyer');assert.equal(during.totalMinor,399);
- at('2027-01-06T00:00:01Z');
+ at('2027-01-05T00:00:01Z');
  await assert.rejects(()=>C.initialize(order(),input({expectedTotalMinor:during.totalMinor,expectedRegularMinor:during.regularMinor,pricingRevision:during.pricingRevision,promotionRevision:during.promotionRevision})),(e:any)=>e.checkout?.code==='CHECKOUT_REVIEW_REQUIRED'&&e.checkout?.paymentState==='not_started');
  at('2026-12-10T00:00:00Z');const q=await C.quote('mtn-1gb');
  await store({...ENABLED,version:'december-test-changed',products:{'mtn-1gb':{campaignMinor:489}}});
@@ -243,13 +246,13 @@ test('enabling needs Admin, a typed confirmation, complete dates and known suppl
  provider.resolvePackage=async()=>null as any;await assert.rejects(()=>adminEnable(),/known authoritative supplier cost/);
  provider.resolvePackage=async()=>({resolved:{supplierCostMinor:520}} as any);await assert.rejects(()=>adminEnable(),/known authoritative supplier cost/);
  provider.resolvePackage=async()=>({resolved:{supplierCostMinor:400}} as any);
- at('2027-01-06T08:00:00Z');await assert.rejects(()=>adminEnable(),/already ended/);at('2026-11-11T10:00:00Z');
+ at('2027-01-05T08:00:00Z');await assert.rejects(()=>adminEnable(),/already ended/);at('2026-11-11T10:00:00Z');
  assert.equal((await price('mtn-1gb')).amountPesewas,549,'nothing was saved by the refused attempts');
  const saved=await adminEnable();assert.equal(saved.enabled,true);assert.notEqual(saved.version,DIRECT_CAMPAIGN_DEFAULT.version);
  assert.equal((await price('mtn-1gb')).amountPesewas,549,'scheduled: still the standard price on 11 November');
  at('2026-12-01T00:00:00Z');assert.equal((await price('mtn-1gb')).amountPesewas,499);
  const audit=(await AdminAuditStore.findRecent(10)).find(a=>a.action==='commercial_campaign_changed')!;const meta=JSON.parse(audit.metadata_safe_json||'{}');
- assert.equal(meta.previous.enabled,false);assert.equal(meta.next.enabled,true);assert.equal(meta.next.endDate,'2027-01-05');
+ assert.equal(meta.previous.enabled,false);assert.equal(meta.next.enabled,true);assert.equal(meta.next.endDate,'2027-01-04');
  const off=await C.save('admin',{kind:'campaign',confirmed:true,expectedVersion:saved.version,enabled:false,startDate:'2026-12-01',endDate:'2027-01-05',products:[{productId:'mtn-1gb',campaignMinor:499}]});
  assert.equal(off.enabled,false);assert.equal((await price('mtn-1gb')).amountPesewas,549,'turning it off restores the standard price immediately');
 });
@@ -270,11 +273,81 @@ test('Admin view: dates, state, standard vs December prices, contributions, issu
  const one=view.products.find((p:any)=>p.id==='mtn-1gb');
  assert.equal(one.retailMinor,549);assert.equal(one.campaignMinor,499);assert.equal(one.campaignApplies,false);assert.equal(one.effectiveMinor,549);assert.equal(one.campaignWelcomeTotalMinor,399);
  assert.equal(one.campaignContributionMinor,499-400-10);assert.equal(one.campaignWelcomeContributionMinor,399-400-8);assert.deepEqual(one.campaignIssues,[]);
- assert.equal(view.products.find((p:any)=>p.id==='mtn-3gb').campaignMinor,null,'provisional prices are not configured');
+ assert.equal(view.products.find((p:any)=>p.id==='mtn-3gb').campaignMinor,1339);assert.equal(view.products.find((p:any)=>p.id==='mtn-6gb').campaignMinor,null,'no unapproved size');
  assert.equal(view.afa.purchasable,false);assert.equal(view.afa.proposedMinor,1999);assert.equal(view.afa.discountPercent,33);assert.ok(view.afa.reasons.length>=3);
  provider.resolvePackage=async()=>({resolved:{supplierCostMinor:520}} as any);
  assert.match(((await C.admin()) as any).products.find((p:any)=>p.id==='mtn-1gb').campaignIssues.join(' '),/below the current supplier cost/);
 });
 test('the Data Store recommendation and reseller economics do not read the campaign',()=>{
  const store=readFileSync('server/services/websiteBusinessService.ts','utf8');assert.doesNotMatch(store,/direct-campaign|campaignPriceFor|CommercialService\.catalog/);
+});
+
+// ───────── Finalized plan (13 November 2026) ─────────
+const PLAN:[string,number,number,number][]=[['mtn-1gb',549,499,399],['mtn-2gb',1049,899,799],['mtn-3gb',1499,1339,1239],['mtn-4gb',1949,1779,1679],['mtn-5gb',2399,2199,2099]];
+for(const [id,standard,december,first] of PLAN)test(`approved ${id}: standard ${standard}, December ${december}, first purchase ${first} (one welcome benefit)`,async()=>{
+ await enable();at('2026-12-20T09:00:00Z');
+ const guest=await C.quote(id),eligible=await C.quote(id,'buyer');
+ assert.deepEqual([guest.standardMinor,guest.regularMinor,guest.discountMinor,guest.totalMinor],[standard,december,0,december]);
+ assert.deepEqual([eligible.standardMinor,eligible.regularMinor,eligible.discountMinor,eligible.totalMinor],[standard,december,100,first]);
+ const paid=await C.initialize(order({product_id:id,bundle_size_snapshot:id.slice(4).toUpperCase(),amount:standard}),input({expectedTotalMinor:first,expectedRegularMinor:december,expectedStandardMinor:standard,pricingRevision:eligible.pricingRevision,promotionRevision:eligible.promotionRevision}));
+ assert.equal(paid.amount,first);assert.equal(paid.commercial_context!.regularMinor-paid.commercial_context!.discountMinor,paid.amount);
+ assert.equal((await C.quote('mtn-1gb','buyer')).offer.state,'reserved','that first purchase holds the one benefit; no second redemption');
+});
+test('only the five approved products change; every other price, Instant and reseller pricing stay standard',async()=>{
+ await enable();at('2026-12-20T09:00:00Z');const approved=PLAN.map(p=>p[0]);
+ for(const p of (await C.catalog()).products){
+  if(approved.includes(p.id))assert.equal(p.standardPesewas,DIRECT_RETAIL_MINOR[p.id],p.id);
+  else{assert.equal(p.amountPesewas,DIRECT_RETAIL_MINOR[p.id],p.id);assert.equal(p.standardPesewas,undefined,p.id);}
+ }
+ assert.equal((await C.catalog()).products.some(p=>/^(instant|airtime)-/.test(p.id)),false);
+ const store=readFileSync('server/services/websiteBusinessService.ts','utf8');assert.doesNotMatch(store,/direct-campaign|campaignPriceFor/);
+});
+test('5 January: commercial prices are normal and every promotional field is gone, while the New Year appearance still runs',async()=>{
+ await enable();at('2027-01-05T00:00:00Z');const catalog=await C.catalog();
+ assert.equal(catalog.version,'direct-launch-v1');assert.equal('campaign' in catalog,false);
+ for(const p of catalog.products){assert.equal('standardPesewas' in p,false);assert.equal('campaign' in p,false);}
+ const q=await C.quote('mtn-5gb','buyer');assert.equal(q.totalMinor,2299);assert.equal('standardMinor' in q,false);
+ assert.equal(serverSeasonStatus('christmas-2026',new Date('2027-01-05T12:00:00Z')).active,true,'visuals continue on 5 January');
+ assert.equal(campaignEndsAt(ENABLED),'2027-01-05T00:00:00.000Z');
+});
+test('an open page refreshes at the server boundary, measured on the server clock (not the device date)',()=>{
+ assert.equal(campaignRefreshDelay({endsAt:'2027-01-05T00:00:00.000Z',serverTime:'2027-01-04T23:59:00.000Z'}),61500);
+ for(const c of [{endsAt:'2027-01-05T00:00:00.000Z',serverTime:'2027-01-05T00:00:01.000Z'},{endsAt:'x',serverTime:'2027-01-04T00:00:00Z'},{},null,{endsAt:'2027-03-05T00:00:00Z',serverTime:'2026-12-01T00:00:00Z'}])assert.equal(campaignRefreshDelay(c),null,JSON.stringify(c));
+});
+test('shipped draft vs saved Admin settings: a saved campaign is authoritative and never migrated by a deploy',async()=>{
+ let view:any=await C.admin();assert.equal(view.campaign.source,'shipped-default');assert.deepEqual(view.campaign.planDifferences,[]);assert.equal(view.campaign.enabled,false);
+ // An older saved draft (as PR #112 allowed): two products, no last day.
+ const old={id:DECEMBER_2026_CAMPAIGN_ID,enabled:false,startDate:'2026-12-01',endDate:null,stacksWithWelcome:true,products:{'mtn-1gb':{campaignMinor:499},'mtn-2gb':{campaignMinor:899}},version:'saved-older-draft'};
+ await store(old);view=await C.admin();
+ assert.equal(view.campaign.source,'saved');assert.equal(view.campaign.endDate,null,'the saved value wins over the shipped 4 January');
+ assert.deepEqual(view.campaign.planDifferences,['Last day is not set; approved 2027-01-04.','mtn-3gb is missing; approved 1339 pesewas.','mtn-4gb is missing; approved 1779 pesewas.','mtn-5gb is missing; approved 2199 pesewas.']);
+ assert.deepEqual(view.campaign.approvedPlan.products['mtn-5gb'],{campaignMinor:2199});
+ // Even enabled, the old saved list applies only its own products: nothing is silently added.
+ await store({...old,enabled:true,endDate:'2027-01-04',version:'saved-enabled'});at('2026-12-20T09:00:00Z');
+ assert.equal((await price('mtn-1gb')).amountPesewas,499);assert.equal((await price('mtn-3gb')).amountPesewas,1499);
+ // The Admin path: load the approved plan into a draft and save it, still disabled.
+ at('2026-11-13T10:00:00Z');await store(old);
+ const saved=await C.save('admin',{kind:'campaign',confirmed:true,expectedVersion:'saved-older-draft',enabled:false,startDate:'2026-12-01',endDate:'2027-01-04',products:PLAN.map(([productId,,campaignMinor])=>({productId,campaignMinor}))});
+ assert.equal(saved.enabled,false);view=await C.admin();assert.deepEqual(view.campaign.planDifferences,[]);assert.equal(view.campaign.source,'saved');
+ at('2026-12-20T09:00:00Z');assert.equal((await price('mtn-3gb')).amountPesewas,1499,'a saved draft stays standard until enabled');
+});
+test('economics: costs only from the routed supplier; unknown cost keeps the enable blocker; value ladder and referral exposure',async()=>{
+ for(const rule of STANDARD_DATA_REFERRAL_POLICY)await ReferralStore.createOrUpdateRule(rule);
+ await C.save('admin',{kind:'pricing',confirmed:true,expectedVersion:'direct-launch-v1',configureReserve:true,reserveBps:195,reserveFixedMinor:0,products:[]});
+ provider.resolvePackage=async(_n:string,size:string)=>({resolved:{supplierCostMinor:Math.round(parseFloat(size)*400)}} as any);
+ let view:any=await C.admin();const row=(id:string)=>view.products.find((p:any)=>p.id===id);
+ const five=row('mtn-5gb');assert.equal(five.campaignSupplier,'success_biz_hub');assert.equal(five.supplierCostMinor,2000);
+ assert.equal(five.campaignContributionMinor,2199-2000-43);assert.equal(five.campaignWelcomeContributionMinor,2099-2000-41);
+ assert.equal(row('mtn-1gb').campaignWelcomeContributionMinor,399-400-8,'a loss-making first purchase is reported, not repriced');
+ assert.equal(row('mtn-1gb').campaignFirstReferralRewardMinor,50);assert.equal(row('mtn-1gb').campaignAcquisitionContributionMinor,399-400-8-50);
+ // At 21.99 (4.40/GB) the 5GB undercuts every larger standard MTN bundle: reported, never silently repriced.
+ assert.deepEqual(view.campaign.valueWarnings.map((w:any)=>[w.id,w.minor,w.combinationMinor,w.combination.join(' + ')]),[['mtn-6gb',2849,2678,'MTN 2GB + MTN 4GB'],['mtn-8gb',3699,3538,'MTN 3GB + MTN 5GB'],['mtn-10gb',4499,4398,'2 × MTN 5GB'],['mtn-15gb',6699,6597,'3 × MTN 5GB'],['mtn-20gb',8899,8796,'4 × MTN 5GB'],['mtn-25gb',11099,10995,'5 × MTN 5GB'],['mtn-30gb',13299,13194,'6 × MTN 5GB'],['mtn-40gb',17699,17592,'8 × MTN 5GB']]);
+ for(const w of view.campaign.valueWarnings)assert.equal(row(w.id).campaignMinor,null,'only standard sizes are flagged; none was added to the campaign');
+ assert.deepEqual(campaignValueWarnings(Object.entries(DIRECT_RETAIL_MINOR).filter(([id])=>id.startsWith('mtn-')).map(([id,minor])=>({id,label:id,gb:parseFloat(id.slice(4)),minor}))),[],'standard prices have no such inversion');
+ // No routable supplier (e.g. a route that is not Success Biz Hub, or none): cost unconfirmed and enabling refused.
+ const route=F.resolveRoute;F.resolveRoute=(()=>{throw new Error('no route');}) as any;
+ try{view=await C.admin();assert.equal(row('mtn-1gb').campaignSupplier,null);assert.match(row('mtn-1gb').campaignIssues.join(' '),/Supplier cost is unknown/);
+  await assert.rejects(()=>adminEnable(),/supplier that would fulfil it/);}finally{F.resolveRoute=route;}
+ provider.resolvePackage=async(_n:string,size:string)=>size==='5GB'?null as any:({resolved:{supplierCostMinor:400}} as any);
+ await assert.rejects(()=>adminEnable({products:PLAN.map(([productId,,campaignMinor])=>({productId,campaignMinor}))}),/MTN Ghana 5GB: a December price must cover/);
 });
