@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../config/business';
-import { ShieldCheck, ArrowRight, MessageCircle } from 'lucide-react';
+import { ShieldCheck, ArrowRight, MessageCircle, MessageSquareText } from 'lucide-react';
 
 /** Support entry points beside the FAQ; the buying promises live next to the bundles. */
 export const WhyMysteryHub: React.FC = () => {
@@ -10,10 +10,11 @@ export const WhyMysteryHub: React.FC = () => {
     <section className="home-support" aria-labelledby="trust-heading">
       <p className="home-eyebrow">Help when you need it</p>
       <h2 id="trust-heading">Need help with an order?</h2>
-      <p>Keep your order reference handy. You can check its status any time, or message our support team on WhatsApp.</p>
+      <p>Keep your order reference handy. You can check its status any time, or contact our support team by WhatsApp or SMS.</p>
       <div className="home-support-actions">
         <button type="button" onClick={() => setActivePage('orders')} className="mh-button">Track an Order<ArrowRight className="w-4 h-4" /></button>
         <a href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="mh-button-secondary"><MessageCircle className="w-4 h-4" />WhatsApp Support</a>
+        <a href={BUSINESS_CONFIG.contact.smsLink} className="mh-button-secondary"><MessageSquareText className="w-4 h-4" aria-hidden="true" />SMS Support</a>
       </div>
       <p className="home-support-safety"><ShieldCheck className="w-4 h-4" aria-hidden="true" />Mystery Hub and its support team will never ask for your MoMo PIN.</p>
     </section>
