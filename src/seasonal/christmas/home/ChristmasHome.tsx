@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './christmasHome.css';
 import '../kit/kit.css';
-import { ArrowRight, ArrowUpRight, Check, FileQuestion, Lock, MessageCircle, PackageSearch, ReceiptText, ShieldCheck, ShoppingBag, Zap } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, FileQuestion, Lock, MessageCircle, MessageSquareText, PackageSearch, ReceiptText, ShieldCheck, ShoppingBag, Zap } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../../config/business';
 import { greetingCreateLink, type GreetingsEntry, type SeasonPhase, type SeasonStatus } from '../../../../shared/seasonal';
@@ -516,10 +516,11 @@ function Help() {
         <div className="xh-letter-card">
           <p className="xh-kicker xh-kicker-ink">Help when you need it</p>
           <h2 id="xh-help-title">Need help with an order?</h2>
-          <p>Keep your order reference handy. You can check its status any time, or message our support team on WhatsApp.</p>
+          <p>Keep your order reference handy. You can check its status any time, or contact our support team by WhatsApp or SMS.</p>
           <div className="xh-letter-actions">
             <button type="button" onClick={() => setActivePage('orders')} className="mh-button xh-btn-primary">Track an Order<ArrowRight className="w-4 h-4" aria-hidden /></button>
             <a href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="xh-btn-ink"><MessageCircle className="w-4 h-4" aria-hidden />WhatsApp Support<span className="sr-only"> (opens WhatsApp)</span></a>
+            <a href={BUSINESS_CONFIG.contact.smsLink} className="xh-btn-ink"><MessageSquareText className="w-4 h-4" aria-hidden />SMS Support</a>
           </div>
           <p className="xh-letter-safety"><ShieldCheck className="w-4 h-4" aria-hidden="true" />Mystery Hub and its support team will never ask for your MoMo PIN.</p>
         </div>
