@@ -78,6 +78,16 @@ const BRAND_IMAGE = BUSINESS_CONFIG.brandMarkUrl;
  */
 export const APP_SHARE_IMAGE = { image: 'https://res.cloudinary.com/da6oeat7m/image/upload/v1792879753/mystery-hub/app-share/mystery-hub-app-preview-v1.jpg', imageWidth: 1200, imageHeight: 630, imageType: 'image/jpeg' } as const;
 
+/** Mystery Greetings link previews: one fixed, branded gift card (1200x630 JPEG served from this site), the same for every
+ * greeting. Never a name, a message or a per-person image. Versioned file name, so a future change refreshes caches. */
+export const GREETINGS_SHARE_IMAGE = { image: `${PUBLIC_ORIGIN}/og/mystery-greetings-v1.jpg`, imageWidth: 1200, imageHeight: 630, imageType: 'image/jpeg' } as const;
+export const GREETINGS_IMAGE_ALT = 'A wrapped gift with a gold bow: Mystery Greetings from Mystery Hub';
+/** The creator page. Seasonal and personal, so it is never indexed. */
+export function greetingsCreatorHead(): SocialHead {
+  return { title: 'Mystery Greetings — Wrap a Christmas or New Year greeting', description: 'Write a personal greeting, wrap it as a digital gift and share the link. They tap to open it. No account needed.',
+    url: `${PUBLIC_ORIGIN}/greetings`, ...GREETINGS_SHARE_IMAGE, imageAlt: GREETINGS_IMAGE_ALT, icon: publicImageUrl(BRAND_IMAGE), noindex: true };
+}
+
 export const PUBLIC_PAGE_METADATA: Record<string, { title: string; description: string; image?: string; path: string; shareImage?: Pick<SocialHead, 'image' | 'imageWidth' | 'imageHeight' | 'imageType'>; imageAlt?: string }> = {
   home: { path: '/', title: 'Mystery Hub — Digital Services Marketplace in Ghana', description: 'Buy data and airtime in Ghana, create a free business website and track your orders. Explore Mystery Wallet, referral rewards and Marketplace enquiries.' },
   data: { path: '/data', title: 'Data & Airtime — Mystery Hub Ghana', description: 'Choose MTN, Telecel or AirtelTigo data and airtime. Review prices and recipient details, pay with Mobile Money and track your order.' },

@@ -120,6 +120,8 @@ export const isChristmasPhase = (phase: SeasonPhase) => phase === 'christmas-sea
  * reads as not open, so a malformed answer can never expose a link.
  */
 export type GreetingsEntry = { state: 'coming-soon' } | { state: 'open'; createHref: string };
+/** The creator link for an open entry, starting on the occasion the page is showing (Christmas phases or New Year). */
+export const greetingCreateLink = (createHref: string, newYear: boolean) => `${createHref}?occasion=${newYear ? 'new-year-2027' : 'christmas-2026'}`;
 export const GREETINGS_COMING_SOON: GreetingsEntry = { state: 'coming-soon' };
 export function greetingsEntry(reported: unknown): GreetingsEntry {
   const path = reported && typeof reported === 'object' ? (reported as { createPath?: unknown }).createPath : null;

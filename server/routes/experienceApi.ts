@@ -38,6 +38,7 @@ experienceRouter.post('/events',handle(req=>{
 }));
 adminExperienceRouter.use(privateResponse,createRateLimiter({windowMs:60000,max:60,key:peer}),jsonBody({limit:'8kb'}),bodyError,requireAdmin,createRateLimiter({windowMs:60000,max:30,key:req=>req.user!.id}));
 adminExperienceRouter.get('/',handle(()=>ExperienceService.admin()));
+adminExperienceRouter.get('/readiness',handle(()=>ExperienceService.readiness()));
 adminExperienceRouter.put('/configuration',handle(req=>ExperienceStore.configure(req.user!.id,req.body)));
 adminExperienceRouter.post('/preview',handle(req=>ExperienceService.preview(req.body)));
 adminExperienceRouter.get('/reports',handle(()=>ExperienceStore.reports()));

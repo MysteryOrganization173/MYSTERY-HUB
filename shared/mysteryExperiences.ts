@@ -31,16 +31,20 @@ export function countdownState(now=new Date()) {
   return {schemaVersion:1,timeZone:'Africa/Accra',target:COUNTDOWN_TARGET,serverTime:now.toISOString(),remainingMs,passed:remainingMs===0};
 }
 export const GREETING_TEMPLATES = [
+  {id:'christmas-afehyia-v1',occasion:'christmas-2026',category:'ghanaian',message:'Afehyia pa! Wishing you a Christmas full of good food, laughter and the people you love.'},
   {id:'christmas-warm-v1',occasion:'christmas-2026',category:'heartwarming',message:'May your Christmas be filled with warmth, peace and little moments of joy.'},
   {id:'christmas-love-v1',occasion:'christmas-2026',category:'romantic',message:'You make ordinary days feel special. Wishing you a Christmas as lovely as you are.'},
   {id:'christmas-friend-v1',occasion:'christmas-2026',category:'friendship',message:'Here is to friendship, good laughs and beautiful memories. Merry Christmas!'},
   {id:'christmas-family-v1',occasion:'christmas-2026',category:'family',message:'Near or far, you are close to my heart. Wishing our family a joyful Christmas.'},
   {id:'christmas-funny-v1',occasion:'christmas-2026',category:'funny',message:'May your Christmas plate be full and your chores mysteriously disappear!'},
+  {id:'newyear-afehyia-v1',occasion:'new-year-2027',category:'ghanaian',message:'Afehyia pa! May 2027 bring you peace, good health and plenty to celebrate.'},
   {id:'newyear-playful-v1',occasion:'new-year-2027',category:'playful',message:'New year, fresh energy! Here is to more laughter and fewer alarm snoozes.'},
   {id:'newyear-elegant-v1',occasion:'new-year-2027',category:'elegant',message:'Wishing you a peaceful beginning and a year filled with possibility.'},
   {id:'newyear-hope-v1',occasion:'new-year-2027',category:'inspirational',message:'May 2027 bring courage for new beginnings and joy in every step forward.'},
 ] as const;
 export const GREETING_VARIANTS = ['gift-classic-v1','gift-starlight-v1'] as const;
+/** Public greeting link IDs (18 random bytes, base64url). The one definition for server, browser and Admin. */
+export const GREETING_SHARE_ID = /^[A-Za-z0-9_-]{24}$/;
 export const EXPERIENCE_EVENTS = ['greeting_open','greeting_reveal','greeting_remix_started','countdown_open','discovery_open','platform_navigation'] as const;
 export type ExperienceEvent = typeof EXPERIENCE_EVENTS[number];
 export interface GreetingInput { occasion:'christmas-2026'|'new-year-2027'; recipientName:string; senderName:string|null; showSender:boolean; templateId:string|null; message:string; variant:typeof GREETING_VARIANTS[number]; parentShareId:string|null }

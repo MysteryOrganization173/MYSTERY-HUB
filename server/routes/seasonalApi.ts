@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { serverSeasonStatus } from '../../shared/seasonal.js';
+import { greetingCreationOffered } from '../services/experienceService.js';
 
 /**
  * Seasonal Experience status. Public and read-only: it says whether the seasonal presentation is switched on for
@@ -13,9 +14,8 @@ seasonalRouter.get('/status', (_req, res) => {
   // Short public caching: a change of the setting reaches visitors within minutes, and every visitor sees the same answer.
   res.setHeader('Cache-Control', 'public, max-age=300');
   const { active, pack, phase, date, daysToChristmas, daysToNewYear, source } = serverSeasonStatus(process.env.SEASONAL_EXPERIENCE);
-  // Mystery Greetings creator: this server has none yet, so it reports none and both seasonal homepages say "Coming
-  // soon". The greetings backend (PR #104, unmerged) sets this path from its own creation gates once its creator route
-  // exists; nothing else may open it.
-  const greetings = { createPath: null };
+  // Mystery Greetings creator: reported only while both greeting gates are on (MYSTERY_GREETING_LINKS_ENABLED and
+  // MYSTERY_GREETINGS_ENABLED) and the abuse secret is configured. Until then both seasonal homepages say "Coming soon".
+  const greetings = { createPath: greetingCreationOffered() ? '/greetings' : null };
   res.json({ active, pack, phase, date, daysToChristmas, daysToNewYear, source, greetings });
 });

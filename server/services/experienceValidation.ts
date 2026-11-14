@@ -1,6 +1,6 @@
-import {GREETING_TEMPLATES,GREETING_VARIANTS,type GreetingInput} from '../../shared/mysteryExperiences.js';
+import {GREETING_TEMPLATES,GREETING_VARIANTS,GREETING_SHARE_ID,type GreetingInput} from '../../shared/mysteryExperiences.js';
 export class ExperienceError extends Error {constructor(public code:string,public status=400){super(code);}}
-export const SHARE_ID=/^[A-Za-z0-9_-]{24}$/;
+export const SHARE_ID=GREETING_SHARE_ID;
 export const CREATOR_TOKEN=/^[A-Za-z0-9_-]{43}$/;
 export const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export function objectInput(input:unknown,keys:readonly string[]):Record<string,any> {

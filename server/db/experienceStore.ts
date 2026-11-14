@@ -18,9 +18,12 @@ const hash=(text:string)=>createHash('sha256').update(text).digest('hex');
 const iso=(value:any)=>value instanceof Date?value.toISOString():value;
 const normalizeConfig=(row:any):ExperienceConfig=>({...row,starts_at:iso(row.starts_at),ends_at:iso(row.ends_at),updated_at:iso(row.updated_at),override_until:iso(row.override_until)});
 const privateGreeting=(row:any):PublicGreeting=>({schemaVersion:1,shareId:row.share_id,occasion:row.occasion,recipientName:row.recipient_name,senderName:row.show_sender?row.sender_name:null,message:row.message,variant:row.variant,expiresAt:iso(row.expires_at)});
+/** Rows retention must delete first; while any exist, new greetings are refused. One rule for create, maintenance and readiness. */
+const RETENTION_DUE="expires_at<now()-interval '30 days' OR revoked_at<now()-interval '30 days'";
+export const abuseSecretConfigured=()=>/^[a-f0-9]{64}$/i.test(process.env.EXPERIENCES_ABUSE_SECRET||'');
 export function abuseIdentity(peer:string):string {
  const key=process.env.EXPERIENCES_ABUSE_SECRET||'';
- if(!/^[a-f0-9]{64}$/i.test(key))throw new ExperienceError('CONFIGURATION_UNAVAILABLE',503);
+ if(!abuseSecretConfigured())throw new ExperienceError('CONFIGURATION_UNAVAILABLE',503);
  // Never retain a raw address; daily rotation limits correlation. No arbitrary Forwarded headers.
  return createHmac('sha256',key).update(new Date().toISOString().slice(0,10)+':'+peer).digest('hex');
 }
@@ -76,7 +79,7 @@ export class ExperienceStore {
    const old=(await c.query('SELECT * FROM mysteryhub_experiences.greetings WHERE creator_hash=$1 AND idempotency_key=$2',[creator,key])).rows[0];
    if(old){if(old.payload_hash!==digest)throw new ExperienceError('IDEMPOTENCY_CONFLICT',409);if(old.revoked_at||new Date(old.expires_at).getTime()<=Date.now())throw new ExperienceError('GREETING_UNAVAILABLE',404);return {greeting:privateGreeting(old),duplicate:true};}
    if((await c.query("SELECT 1 FROM mysteryhub_experiences.greetings WHERE creator_hash=$1 AND payload_hash=$2 AND created_at>now()-interval '10 minutes' LIMIT 1",[creator,digest])).rowCount)throw new ExperienceError('DUPLICATE_CONTENT',409);
-   if((await c.query("SELECT 1 FROM mysteryhub_experiences.greetings WHERE expires_at<now()-interval '30 days' OR revoked_at<now()-interval '30 days' LIMIT 1")).rowCount)throw new ExperienceError('RETENTION_REQUIRED',503);
+   if((await c.query(`SELECT 1 FROM mysteryhub_experiences.greetings WHERE ${RETENTION_DUE} LIMIT 1`)).rowCount)throw new ExperienceError('RETENTION_REQUIRED',503);
    await budget(c,'create:'+peer,20,3600);await budget(c,'create:global',1000,86400);
    let parent:null|string=null;
    if(analytics&&value.parentShareId){parent=(await c.query('SELECT id FROM mysteryhub_experiences.greetings WHERE share_id=$1 AND revoked_at IS NULL AND expires_at>now()',[value.parentShareId])).rows[0]?.id;if(!parent)throw new ExperienceError('INVALID_PARENT');}
@@ -122,8 +125,17 @@ export class ExperienceStore {
   if(![7,30,90].includes(days))throw new ExperienceError('INVALID_RANGE');
   return experienceTransaction(async c=>({days,...(await c.query(`SELECT count(*)::int created,count(*) FILTER(WHERE parent_id IS NOT NULL)::int remix_context,count(*) FILTER(WHERE revoked_at IS NULL AND expires_at>now())::int valid FROM mysteryhub_experiences.greetings WHERE created_at>=now()-$1*interval '1 day'`,[days])).rows[0],events:(await c.query(`SELECT event_name,count(*)::int observations,count(DISTINCT visitor_id)::int estimated_browsers FROM analytics_events WHERE entity_type='experience' AND created_at>=now()-$1*interval '1 day' GROUP BY event_name ORDER BY event_name`,[days])).rows,conversions:null,limitations:['Client events are estimates, not verified humans or sales.','Cross-device identity and WhatsApp delivery are not measured.','Use existing Campaign Manager for authoritative attributed orders.']}),true);
  }
+ /** Read-only readiness for Admin: is the optional schema installed, is retention clean-up due (new greetings are refused
+  *  while it is), and when clean-up last ran. Counts only; no personal content. */
+ static async readiness(){return experienceTransaction(async c=>{
+  const installed=(await c.query("SELECT to_regclass('mysteryhub_experiences.configuration') IS NOT NULL AND to_regclass('mysteryhub_experiences.greetings') IS NOT NULL AND to_regclass('mysteryhub_experiences.budgets') IS NOT NULL AND to_regclass('mysteryhub_experiences.reports') IS NOT NULL AS ok")).rows[0]?.ok===true;
+  if(!installed)return {installed,retentionDue:null,lastMaintenance:null};
+  const retentionDue=(await c.query(`SELECT EXISTS(SELECT 1 FROM mysteryhub_experiences.greetings WHERE ${RETENTION_DUE}) AS due`)).rows[0]?.due===true;
+  const last=(await c.query("SELECT created_at,metadata_safe_json FROM admin_audit_log WHERE entity_type='experience' AND action='experience_retention' ORDER BY created_at DESC LIMIT 1")).rows[0];
+  return {installed,retentionDue,lastMaintenance:last?{at:iso(last.created_at),counts:last.metadata_safe_json??null}:null};
+ },true);}
  static async maintenance(actor:string){return experienceTransaction(async c=>{
-  const greetings=await c.query("DELETE FROM mysteryhub_experiences.greetings WHERE id IN (SELECT id FROM mysteryhub_experiences.greetings WHERE expires_at<now()-interval '30 days' OR revoked_at<now()-interval '30 days' LIMIT 500)");
+  const greetings=await c.query(`DELETE FROM mysteryhub_experiences.greetings WHERE id IN (SELECT id FROM mysteryhub_experiences.greetings WHERE ${RETENTION_DUE} LIMIT 500)`);
   const budgets=await c.query("DELETE FROM mysteryhub_experiences.budgets WHERE ctid IN (SELECT ctid FROM mysteryhub_experiences.budgets WHERE bucket<now()-interval '48 hours' LIMIT 5000)");
   const events=await c.query("DELETE FROM analytics_events WHERE id IN (SELECT id FROM analytics_events WHERE entity_type='experience' AND created_at<now()-interval '90 days' LIMIT 5000)");
   const counts={greetings:greetings.rowCount,budgets:budgets.rowCount,events:events.rowCount};await AdminAuditStore.record({adminUserId:actor,action:'experience_retention',entityType:'experience',entityId:EXPERIENCE_ID,metadata:counts},c);return counts;
