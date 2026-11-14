@@ -1,6 +1,6 @@
 import React from 'react';
 import './shell.css';
-import { ArrowUpRight, Mail, MessageCircle, Phone, Send, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight, Mail, MessageCircle, MessageSquareText, Phone, Send, ShieldCheck } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../../config/business';
 import { ROUTE_PATH_MAP } from '../../../utils/routing';
@@ -148,6 +148,7 @@ export function ChristmasFooter({ status }: { status: SeasonStatus }) {
             </a>
             <ul className="xs-footer-contacts">
               <li><a href={contact.phoneLink}><Phone className="h-4 w-4" aria-hidden="true" />{contact.supportPhone}</a></li>
+              <li><a href={contact.smsLink}><MessageSquareText className="h-4 w-4" aria-hidden="true" />SMS {contact.supportSms}</a></li>
               <li><a href={contact.emailLink} title={contact.supportEmail}><Mail className="h-4 w-4" aria-hidden="true" /><span>{emailUser}<wbr />@{emailDomain}</span></a></li>
             </ul>
             <div className="xs-footer-channels" aria-label="Announcements">
