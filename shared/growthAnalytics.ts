@@ -1,13 +1,14 @@
 /** Public, bounded analytics vocabulary. Financial outcomes cannot be submitted here. */
 export const GROWTH_EVENTS=['page_view','identity','checkout_opened','marketplace_product','marketplace_inquiry','creative_service','creative_brief_started','install_action','install_prompt','install_accepted','install_dismissed','installed','standalone_launch'] as const;
 export type GrowthEvent=typeof GROWTH_EVENTS[number];
-export const GROWTH_PAGES=['home','data','airtime','instant','afa','website','marketplace','creative','checkers','earn','wallet','orders','services','app','about','help'] as const;
+export const GROWTH_PAGES=['home','data','airtime','instant','afa','website','marketplace','creative','checkers','earn','wallet','orders','services','app','about','help','greetings','countdown'] as const;
 export type GrowthPage=typeof GROWTH_PAGES[number];
 export const GROWTH_SOURCES=['direct','whatsapp','facebook','instagram','google','bing','tiktok','youtube','x','email','referral','other'] as const;
 export const GROWTH_MEDIA=['none','message','social','organic','cpc','email','referral','qr','other'] as const;
 export interface GrowthMetadata {page:GrowthPage;source?:string;medium?:string;campaign?:string;display?:'web'|'standalone';promptSupport?:'yes'|'no';productId?:string}
 export interface GrowthInput {event:GrowthEvent;visitorId:string;sessionId:string;metadata:GrowthMetadata}
 export interface GrowthReport {
+ experiences?:null|{event_name:string;observations:number;estimated_browsers:number}[];
  range:number;start:string;end:string;generatedAt:string;warnings:string[];
  traffic:null|{views:number;sessions:number;visitors:number;returningVisitors:number;authenticatedUsers:number;firstObserved:string|null;trend:{day:string;views:number;sessions:number}[];pages:{page:string;views:number;visitors:number}[];engagement:{event:string;page:string;count:number}[]};
  adoption:null|{appVisits:number;actions:number;prompts:number;accepted:number;dismissed:number;installed:number;standaloneSessions:number;returningAppBrowsers:number;promptCapableSessions:number};
