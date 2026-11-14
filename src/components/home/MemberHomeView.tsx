@@ -40,7 +40,7 @@ function OrderSpotlight({order,track,reorder}:{order:AuthenticatedCustomerOrderD
     <div className="member-order-actions">
       {again&&<button className="mh-button" onClick={()=>reorder(again.mode,again.network)}><RotateCcw className="size-4" aria-hidden="true"/>Buy again</button>}
       <button className={again||tone==='attention'?'mh-button-secondary':'mh-button'} onClick={track}>Track Order</button>
-      {tone==='attention'&&<a className="member-text-link" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" aria-hidden="true"/>WhatsApp support</a>}
+      {tone==='attention'&&<a className="member-text-link" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" aria-hidden="true"/>WhatsApp support</a><a className="member-text-link" href={BUSINESS_CONFIG.contact.smsLink}>SMS support</a>}
     </div>
   </section>;
 }
@@ -116,7 +116,7 @@ export function MemberHomeView({name,greeting,orders,loading,error,wallet,retry,
           {loading?<p role="status" className="member-muted">Loading recent activity…</p>:error?<p className="member-muted">Try again above, or <button className="member-inline-link" onClick={actions.orders}>open My Orders</button>.</p>:recent.length?<ul>{recent.map(o=><li key={o.public_reference}><button onClick={()=>track(o)}><span className="min-w-0"><span className="member-recent-title">{orderTitle(o)}</span><span className="member-recent-ref">{o.public_reference}</span></span><span className="member-recent-end"><span className="tabular-nums">{formatGhs(o.amount)}</span><span className={`member-recent-status is-${memberOrderTone(o)}`}>{memberOrderLabel(o)}</span></span><ArrowUpRight className="size-4 shrink-0 text-slate-400" aria-hidden="true"/></button></li>)}</ul>:<p className="member-muted">{latest?'You’re all caught up. Other recent orders will appear here.':'Your account activity will appear after your first purchase.'}</p>}
         </section>
         <section aria-labelledby="member-help" className="member-help"><h2 id="member-help">Need a hand?</h2><p>Ask about bundles, orders or your website. For a problem with a paid order, message support with your reference.</p>
-          <div className="member-help-actions"><button className="mh-button-secondary" onClick={assistant}><Sparkles className="size-4 text-emerald-300" aria-hidden="true"/>Ask Mystery AI</button><a className="member-text-link" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" aria-hidden="true"/>WhatsApp support</a></div>
+          <div className="member-help-actions"><button className="mh-button-secondary" onClick={assistant}><Sparkles className="size-4 text-emerald-300" aria-hidden="true"/>Ask Mystery AI</button><a className="member-text-link" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" aria-hidden="true"/>WhatsApp support</a><a className="member-text-link" href={BUSINESS_CONFIG.contact.smsLink}>SMS support</a></div>
         </section>
       </div>
     </div>
