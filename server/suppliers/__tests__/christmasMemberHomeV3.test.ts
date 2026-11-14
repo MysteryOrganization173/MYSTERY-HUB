@@ -100,20 +100,21 @@ test('website none / draft / published name the next step; Earn and the Greeting
   assert.doesNotMatch(teaser, /<button|<a /, 'the preview is not an action while the feature is closed');
 });
 
-test('Mystery Greetings: one honest entry for guests and members, no endpoint that main does not have', () => {
-  // The server reports no creator today, so the entry is "Coming soon"; the member view defaults to it as well.
+test('Mystery Greetings: one honest entry for guests and members, and only the greetings pages call its API', () => {
+  // While the greeting gates are off the server reports no creator, so the entry is "Coming soon"; the member view
+  // defaults to it as well.
   assert.deepEqual(greetingsEntry({ createPath: null }), { state: 'coming-soon' });
   assert.match(seasonal(SCENARIOS.delivered), /Coming soon/);
   const kit = read('src/seasonal/christmas/kit/GreetingsPreview.tsx');
   // The entry takes no account data, so the same component serves a guest page and a member page.
   assert.doesNotMatch(kit, /useApp|sessionToken|user\b|fetch\(|apiClient/);
-  assert.match(kit, /entry\.state === 'open'\s*\? <a className="xk-greet-cta" href=\{entry\.createHref\}>/);
-  // PR #104's API is not on main: nothing in the app calls it yet.
+  assert.match(kit, /entry\.state === 'open'\s*\? <a className="xk-greet-cta" href=\{greetingCreateLink\(entry\.createHref, newYear\)\}>/);
+  // The greetings API is called only by the Mystery Greetings pages themselves (src/greetings).
   const files: string[] = [];
   const walk = (dir: string) => { for (const name of readdirSync(dir)) { const p = path.join(dir, name); if (statSync(p).isDirectory()) walk(p); else if (/\.(ts|tsx)$/.test(name)) files.push(p); } };
   walk('src');
   const code = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-  for (const file of files) assert.doesNotMatch(code(read(file)), /\/api\/experiences/, file);
+  for (const file of files) if (!file.replace(/\\/g, '/').startsWith('src/greetings/')) assert.doesNotMatch(code(read(file)), /\/api\/experiences/, file);
 });
 
 test('greetings follow the calendar: each day of the season has its own line, gift and sign-off, by name', () => {

@@ -66,8 +66,9 @@ test('greetings entry: only a plain same-site path from the server opens it', ()
 });
 
 test('greetings: both homepages read the same server answer; closed shows Coming soon and no create action', () => {
-  // One source: the server's season status, parsed once by SeasonProvider, read by both homepages.
-  assert.match(read('server/routes/seasonalApi.ts'), /const greetings = \{ createPath: null \};/);
+  // One source: the server's season status, parsed once by SeasonProvider, read by both homepages. The server reports
+  // the creator only while both greeting gates are on and the abuse secret is configured.
+  assert.match(read('server/routes/seasonalApi.ts'), /const greetings = \{ createPath: greetingCreationOffered\(\) \? '\/greetings' : null \};/);
   const provider = read('src/seasonal/SeasonProvider.tsx');
   assert.match(provider, /setGreetings\(greetingsEntry\(data\.greetings\)\);/);
   assert.equal((provider.match(/setGreetings\(/g) || []).length, 1, 'nothing else can open it');
@@ -83,7 +84,7 @@ test('greetings: both homepages read the same server answer; closed shows Coming
   assert.doesNotMatch(closed, /<a |<button|Create a greeting/);
   // Guest: the badge and note show only while closed, and the create action exists only for an open entry.
   const section = guestPage.slice(guestPage.indexOf('function Greetings('), guestPage.indexOf('function Install('));
-  assert.match(section, /const createHref = entry\.state === 'open' \? entry\.createHref : null;/);
+  assert.match(section, /const createHref = entry\.state === 'open' \? greetingCreateLink\(entry\.createHref, !christmas\) : null;/);
   assert.match(section, /\{!createHref && <span className="xh-soon-badge">Coming soon<\/span>\}/);
   assert.match(section, /\{createHref && <a className="mh-button xh-btn-primary" href=\{createHref\}>Create a greeting/);
   // The demonstration envelope stays a real two-state button, and sharing the website stays separate and labelled.
@@ -92,9 +93,11 @@ test('greetings: both homepages read the same server answer; closed shows Coming
 });
 
 test('greetings: once the server reports a creator, both entries lead to the same route, with no sign-in', () => {
-  const entry = greetingsEntry({ createPath: '/greetings/new' });
+  const entry = greetingsEntry({ createPath: '/greetings' });
   const open = renderToStaticMarkup(React.createElement(GreetingsPreview, { headingId: 'g', entry }));
-  assert.match(open, /<a class="xk-greet-cta" href="\/greetings\/new">Create a greeting/);
+  assert.match(open, /<a class="xk-greet-cta" href="\/greetings\?occasion=christmas-2026">Create a greeting/);
+  // The New Year homepage starts the creator on the New Year occasion.
+  assert.match(renderToStaticMarkup(React.createElement(GreetingsPreview, { headingId: 'g', entry, newYear: true })), /href="\/greetings\?occasion=new-year-2027"/);
   assert.doesNotMatch(text(open), /Not open yet|Coming soon/);
   // Neither entry asks for an account or reads one.
   const guestPage = read('src/seasonal/christmas/home/ChristmasHome.tsx');
@@ -102,13 +105,15 @@ test('greetings: once the server reports a creator, both entries lead to the sam
   for (const source of [section, read('src/seasonal/christmas/kit/GreetingsPreview.tsx'), read('shared/seasonal.ts')]) assert.doesNotMatch(source, /openAuth|sessionToken|useApp|user\./);
 });
 
-test('greetings: no call to the unmerged greetings API, and ordinary pages never see the entry', () => {
+test('greetings: only the Mystery Greetings pages call its API, and ordinary pages never see the entry', () => {
   const files: string[] = [];
   const walk = (dir: string) => { for (const name of readdirSync(dir)) { const p = path.join(dir, name); if (statSync(p).isDirectory()) walk(p); else if (/\.(ts|tsx)$/.test(name)) files.push(p); } };
   walk('src');
   const code = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-  for (const file of files) assert.doesNotMatch(code(read(file)), /\/api\/experiences/, file);
-  // Only the provider and the two seasonal homepages use it; ordinary components do not.
-  const users = files.filter(f => /greetingsEntry|GreetingsEntry|GreetingsPreview|\.greetings\b|greetings=\{/.test(read(f))).map(f => f.replace(/\\/g, '/')).sort();
+  const own = (f: string) => f.replace(/\\/g, '/').startsWith('src/greetings/');
+  for (const file of files) if (!own(file)) assert.doesNotMatch(code(read(file)), /\/api\/experiences/, file);
+  assert.ok(files.some(f => own(f) && /\/api\/experiences\/greetings/.test(read(f))), 'the greetings pages use the public contract');
+  // Only the provider and the two seasonal homepages use the entry; ordinary components (and the greetings pages) do not.
+  const users = files.filter(f => !own(f) && /greetingsEntry|GreetingsEntry|GreetingsPreview|\.greetings\b|greetings=\{/.test(read(f))).map(f => f.replace(/\\/g, '/')).sort();
   assert.deepEqual(users, ['src/seasonal/SeasonProvider.tsx', 'src/seasonal/christmas/home/ChristmasHome.tsx', 'src/seasonal/christmas/kit/GreetingsPreview.tsx', 'src/seasonal/christmas/member/ChristmasMemberHome.tsx', 'src/seasonal/christmas/member/ChristmasMemberView.tsx']);
 });
