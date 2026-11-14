@@ -40,7 +40,7 @@ function OrderSpotlight({order,track,reorder}:{order:AuthenticatedCustomerOrderD
     <div className="member-order-actions">
       {again&&<button className="mh-button" onClick={()=>reorder(again.mode,again.network)}><RotateCcw className="size-4" aria-hidden="true"/>Buy again</button>}
       <button className={again||tone==='attention'?'mh-button-secondary':'mh-button'} onClick={track}>Track Order</button>
-      {tone==='attention'&&<a className="member-text-link" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" aria-hidden="true"/>WhatsApp support</a><a className="member-text-link" href={BUSINESS_CONFIG.contact.smsLink}>SMS support</a>}
+      {tone==='attention'&&<><a className="member-text-link" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" aria-hidden="true"/>WhatsApp support</a><a className="member-text-link" href={BUSINESS_CONFIG.contact.smsLink}>SMS support</a></>}
     </div>
   </section>;
 }
