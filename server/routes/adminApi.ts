@@ -1,3 +1,5 @@
+import {contactHubRouter} from './contactHubApi.js';
+import {safeCsvCell} from '../utils/csv.js';
 import {orderManagementRouter} from './orderManagementApi.js';
 import {salesCollector} from '../services/salesReliability.js';
 import { OrderResolutionService } from '../services/orderResolutionService.js';
@@ -84,6 +86,7 @@ adminRouter.get('/sales-reliability',async(_req,res)=>{
 });
 adminRouter.use('/order-management',orderManagementRouter);
 adminRouter.use('/operations',adminOperationsRouter);
+adminRouter.use('/contacts',contactHubRouter);
 adminRouter.use('/finance', adminFinanceRouter);
 adminRouter.use('/commercial',adminCommercialRouter);
 adminRouter.use('/website-builder', adminWebsiteRouter);
@@ -112,18 +115,7 @@ adminRouter.get('/websites/ultra-enquiries/:reference', async (req, res) => {
  * Neutralizes spreadsheet formula injection (CSV Injection) and escapes quotes
  * Defends against cells starting with =, +, -, @, \t, \r
  */
-export function safeCsvCell(val: unknown): string {
-  if (val === null || val === undefined) return '""';
-  let str = String(val).trim();
-
-  // Formula injection defense: neutralize leading formula trigger characters
-  if (/^[=+\-@\t\r]/.test(str)) {
-    str = `'${str}`;
-  }
-
-  const escaped = str.replace(/"/g, '""');
-  return `"${escaped}"`;
-}
+export {safeCsvCell} from '../utils/csv.js';
 
 /**
  * 1. GET /api/admin/overview
