@@ -1,3 +1,4 @@
+import {experienceRouter,adminExperienceRouter} from './server/routes/experienceApi.js';
 import {campaignPublicRouter,campaignAdminRouter,campaignShortRouter} from './server/routes/campaignApi.js';
 import { createShieldRouter, shieldAdminRouter } from './server/routes/shieldApi.js';
 import { corsMiddleware } from './server/middleware/cors.js';
@@ -75,6 +76,9 @@ app.post(
   handleSuccessBizHubWebhook
 );
 
+// Optional experience APIs parse bounded private bodies before the general parser.
+app.use('/api/experiences',experienceRouter);
+app.use('/api/admin/experiences',adminExperienceRouter);
 app.use(express.json({ limit: '1mb' }));
 app.use('/api/campaigns',campaignPublicRouter);
 app.use('/api/admin/campaigns',campaignAdminRouter);
