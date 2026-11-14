@@ -16,8 +16,8 @@ export function readCheckoutFailure(value:unknown):CheckoutFailureDetails|null {
 }
 export function checkoutFailurePresentation(code:CheckoutFailureCode){
  switch(code){
- case 'BENEFICIARY_NOT_ELIGIBLE':return {title:"This number isn't eligible for this bundle yet",message:'The recipient was not approved for this selected bundle. Check the number, use another eligible number, or contact support about any verification requirements.',recipient:true};
- case 'BENEFICIARY_CHECK_UNAVAILABLE':return {title:"We couldn't check this number right now",message:'Eligibility could not be confirmed. This does not mean the number is ineligible. Please try the check again later.',recipient:false};
+ case 'BENEFICIARY_NOT_ELIGIBLE':return {title:"This number isn't ready for this bundle yet",message:`This number isn’t ready for the selected bundle. It may need additional verification. Becoming eligible can take time; repeatedly checking does not speed it up. Please try again tomorrow or contact Mystery Hub Support. We cannot confirm that this number has entered a verification queue.`,recipient:true};
+ case 'BENEFICIARY_CHECK_UNAVAILABLE':return {title:"We couldn't confirm this number’s status right now",message:'The check is temporarily unavailable. This does not mean the number is unverified or ineligible. You can deliberately retry the check later.',recipient:false};
  case 'CHECKOUT_REVIEW_REQUIRED':return {title:'Review your checkout details',message:'The current price or checkout details could not be accepted. Review the details and refresh the price before trying again.',recipient:false};
  case 'PACKAGE_UNAVAILABLE':return {title:'This bundle is temporarily unavailable',message:'Please choose another currently available bundle or check back later. You do not need to change the recipient number.',recipient:false};
  case 'SUPPLIER_WALLET_LOW':case 'SERVICE_TEMPORARILY_UNAVAILABLE':return {title:'Service temporarily unavailable',message:'We could not safely prepare this purchase. Try again shortly. You do not need to change the recipient number.',recipient:false};

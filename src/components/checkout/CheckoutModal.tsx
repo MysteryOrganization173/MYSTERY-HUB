@@ -25,7 +25,7 @@ import { NetworkId } from '../../types';
 import { GHANA_NETWORKS, detectGhanaNetwork } from '../../data/bundles';
 import { usePaystack } from '../../hooks/usePaystack';
 import { BUSINESS_CONFIG } from '../../config/business';
-import { lookupOrderOnServer, cancelPaymentOnServer, getInstantFlexiQuote, type InstantFlexiQuote } from '../../services/apiClient';
+import { lookupOrderOnServer, cancelPaymentOnServer, getInstantBundlesOnServer, getInstantFlexiQuote, type InstantFlexiQuote } from '../../services/apiClient';
 import { smoothScrollToElement } from '../../utils/scroll';
 import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
@@ -118,8 +118,15 @@ export const CheckoutModal: React.FC = () => {
     conversionNote?: string;
     supportingNote?: string;
     networkName?: string;
-    canViewInstant?: boolean;
   } | null>(null);
+
+  const [instantAlternative, setInstantAlternative] = useState(false);
+  useEffect(() => {
+    let active=true;setInstantAlternative(false);
+    if(!isCheckoutOpen||preflightIssue?.code!=='BENEFICIARY_NOT_ELIGIBLE'||!checkoutBundle)return;
+    getInstantBundlesOnServer().then(c=>{if(active)setInstantAlternative(c.success&&c.available&&c.products.some(p=>p.network===checkoutBundle.network&&p.recipientAlternative===true));}).catch(()=>{});
+    return()=>{active=false;};
+  },[isCheckoutOpen,preflightIssue,checkoutBundle?.id,checkoutBundle?.network]);
 
   const conflictRef = useRef<HTMLDivElement>(null);
   const preflightRef = useRef<HTMLDivElement>(null);
@@ -148,6 +155,7 @@ export const CheckoutModal: React.FC = () => {
       directRequest.current=saved?.requestId||crypto.randomUUID();
       recoveryLocked.current=!!saved;knownReference.current=saved?.reference||null;setRecoveryOnly(!!saved);
       setPaymentMethod('paystack');
+      submissionPending.current=false;setWalletBusy(false);
       walletRequest.current=null;
       const initial = checkoutInitialPhone !== undefined ? checkoutInitialPhone : (user?.phone || '');
       setPhone(formatGhanaPhone(initial));
@@ -252,6 +260,8 @@ export const CheckoutModal: React.FC = () => {
     const val = e.target.value;
     const clean = formatGhanaPhone(val.replace(/[^\d\s+]/g, ''));
     if(recoveryLocked.current||knownReference.current)return;
+    const identity=(value:string)=>value.replace(/\D/g,'').replace(/^233/,'0');
+    if(identity(clean)===identity(phone)){setPhone(clean);return;}
     ++attemptGeneration.current;
     setPhone(clean);
     directRequest.current=crypto.randomUUID();
@@ -377,7 +387,7 @@ export const CheckoutModal: React.FC = () => {
         if(details?.paymentState==='not_started'&&details.retryAllowed&&!knownReference.current){
           recoveryLocked.current=false;setRecoveryOnly(false);clearDirectAttempt(sessionStorage,key,requestId);
           const view=checkoutFailurePresentation(details.code);
-          setPreflightIssue({code:details.code,title:view.title,message:view.message,supportingNote:'No payment was started for this attempt.',networkName:currentNetwork.name});
+          setPreflightIssue({code:details.code,title:view.title,message:view.message,supportingNote:'No payment was taken, and no data order was placed for this rejected attempt.',networkName:currentNetwork.name});
           return;
         }
         if(err.code==='ACTIVE_MTN_ORDER_EXISTS'||err.code==='ACTIVE_MTN_ORDER')setActiveMtnConflict({orderRef:err.existingOrderReference,status:err.existingOrderStatus});
@@ -416,7 +426,7 @@ export const CheckoutModal: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submissionPending.current || isInitializing || walletBusy || recoveryLocked.current) return;
+    if (submissionPending.current || isInitializing || walletBusy || recoveryLocked.current || preflightIssue) return;
     if (!isCompleteGhanaPhone(phone)) {
       setPhoneError(ghanaPhoneDigits(phone).length ? 'Enter all 10 digits of the Ghana number, like 024 123 4567.' : 'Enter the recipient’s Ghana phone number before paying.');
       phoneInputRef.current?.focus(); return;
@@ -426,14 +436,23 @@ export const CheckoutModal: React.FC = () => {
     if(walletBusy||!sessionToken)return;
     if(isRegularData&&!commercial){setServerError('Refresh the current price before paying.');return;}
     if(flexiPending){setServerError('We are still confirming the price. Please wait a moment.');return;}
+    const generation=++attemptGeneration.current;
     submissionPending.current=true;setWalletBusy(true);setServerError('');
     try {
       const body={productId:checkoutBundle.id,recipientPhone:phone.trim(),customerEmail:receiptEmail||user?.email,customerName:user?.name,serviceType:isAirtime?'airtime':'data',network:checkoutBundle.network,amount:requestedAmount,referralCode:getStoredReferralCode(),visitorKey:getOrGenerateVisitorKey()};
       const fingerprint=JSON.stringify(body);if(walletRequest.current?.fingerprint!==fingerprint)walletRequest.current={fingerprint,id:crypto.randomUUID()};
       const result=await walletCheckout(sessionToken,'payments/initialize',{...body,requestId:walletRequest.current!.id,...(isRegularData&&commercial?{expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,expectedStandardMinor:commercial.standardMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:{})});
+      if(generation!==attemptGeneration.current)return;
       const newOrder=createOrder({...checkoutBundle,priceGhc:result.amountPesewas/100},phone.trim(),'wallet',result.reference,result.orderRef);
       closeCheckout();openOrderStatus(newOrder);
-    }catch(error){setServerError(isConnectivityError(error as Error)?'We couldn’t reach Mystery Hub to confirm this Wallet payment. Check Track Order before trying again; repeating with the same details reuses this request.':(error as Error).message);}finally{submissionPending.current=false;setWalletBusy(false);}
+    }catch(error){
+      if(generation!==attemptGeneration.current)return;
+      const details=readCheckoutFailure((error as any).checkout);
+      if(isRegularData&&details?.paymentState==='not_started'&&!knownReference.current&&!recoveryLocked.current){
+        const view=checkoutFailurePresentation(details.code);
+        setPreflightIssue({code:details.code,title:view.title,message:view.message,supportingNote:'This recipient check was rejected. If you have an earlier Wallet attempt, check My Orders before starting another purchase.'});return;
+      }
+      setServerError(isConnectivityError(error as Error)?'We couldn’t reach Mystery Hub to confirm this Wallet payment. Check Track Order before trying again; repeating with the same details reuses this request.':(error as Error).message);}finally{if(generation===attemptGeneration.current){submissionPending.current=false;setWalletBusy(false);}}
   };
 
   const handleViewInstantBundles = () => {
@@ -445,9 +464,8 @@ export const CheckoutModal: React.FC = () => {
     setActiveMtnConflict(null);
     closeCheckout();
 
-    // 2. Set intelligent Instant Bundle network filter:
-    // If the failed number/network was MTN, prefer MTN Instant Bundles; otherwise All Networks
-    const targetNetwork: NetworkId | 'all' = failedNet === 'mtn' ? 'mtn' : 'all';
+    // Preserve the network whose separately available products were observed.
+    const targetNetwork: NetworkId | 'all' = failedNet;
 
     // 3. Switch to instant mode & navigate to DataPage
     openDataPage('instant', targetNetwork);
@@ -666,6 +684,7 @@ export const CheckoutModal: React.FC = () => {
                     {preflightIssue.message}
                   </div>
 
+                  {instantAlternative && <p className="text-sm text-slate-300">Instant Bundles may use a different fulfillment process. Availability does not guarantee this recipient will qualify; their own checkout checks still apply.</p>}
                   {preflightIssue.supportingNote && (
                     <p className="text-[11px] text-slate-400 pt-1 leading-relaxed">
                       {preflightIssue.supportingNote}
@@ -678,7 +697,6 @@ export const CheckoutModal: React.FC = () => {
                 {preflightIssue.code === 'BENEFICIARY_NOT_ELIGIBLE' && <button
                   type="button"
                   onClick={() => {
-                    setPreflightIssue(null);
                     if (phoneInputRef.current) {
                       smoothScrollToElement(phoneInputRef.current, { block: 'center' });
                       phoneInputRef.current.focus();
@@ -690,54 +708,45 @@ export const CheckoutModal: React.FC = () => {
                   Try Another Number
                 </button>}
 
-                {preflightIssue.canViewInstant && (
+                {instantAlternative && (
                   <button
                     type="button"
                     onClick={handleViewInstantBundles}
                     className="min-h-11 px-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-sm font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <Zap className="w-4 h-4 fill-black text-black" />
-                    <span>View Instant Bundles</span>
+                    <span>Explore Instant Bundles</span>
                   </button>
                 )}
 
-                {preflightIssue.code==='CHECKOUT_REVIEW_REQUIRED'&&<button type="button" onClick={()=>setQuoteRefresh(x=>x+1)} className="mh-button-secondary">Refresh price</button>}
+                {preflightIssue.code==='CHECKOUT_REVIEW_REQUIRED'&&<button type="button" onClick={()=>{setPreflightIssue(null);setQuoteRefresh(x=>x+1);}} className="mh-button-secondary">Refresh price</button>}
                 {preflightIssue.code !== 'BENEFICIARY_NOT_ELIGIBLE' && (
                   <button
                     type="button"
-                    onClick={(event) => {
-                      setPreflightIssue(null);
-                      (event.currentTarget.form)?.requestSubmit();
-                    }}
+                    onClick={() => setPreflightIssue(null)}
                     className="min-h-11 px-3.5 rounded-xl border border-amber-500/30 text-amber-200 text-sm font-semibold transition-colors cursor-pointer"
                   >
-                    Try Again
+                    Review and retry
                   </button>
                 )}
               </div>
               <div className="flex items-center justify-between gap-2 border-t border-slate-800 pt-2">
                 <a
-                  href={`${BUSINESS_CONFIG.contact.supportWhatsAppUrl}?text=${encodeURIComponent(
-                    `Hello Mystery Hub Support, I am ordering ${checkoutBundle.network.toUpperCase()} bundle (${
-                      checkoutBundle.dataAmount || 'Airtime'
-                    }) for ${phone.trim()}, but preflight verification indicates: ${preflightIssue.title} (Code: ${
-                      preflightIssue.code
-                    }). Please assist me.`
-                  )}`}
+                  href={`${BUSINESS_CONFIG.contact.supportWhatsAppUrl}?text=${encodeURIComponent('Hello Mystery Hub Support, I need help with recipient eligibility for a data bundle.')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="min-h-11 text-xs text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1.5"
                 >
                   <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Report Issue</span>
+                  <span>Contact Support</span>
                 </a>
-                <button
+                {preflightIssue.code!=='BENEFICIARY_NOT_ELIGIBLE'&&<button
                   type="button"
                   onClick={() => setPreflightIssue(null)}
                   className="min-h-11 px-2 text-slate-400 hover:text-white text-xs transition-colors cursor-pointer"
                 >
                   Dismiss
-                </button>
+                </button>}
               </div>
             </div>
           )}
@@ -876,7 +885,7 @@ export const CheckoutModal: React.FC = () => {
           <button
             type="submit"
             form="checkout-form"
-            disabled={recoveryOnly || walletBusy || isInitializing || quotePending || flexiPending}
+            disabled={!!preflightIssue || recoveryOnly || walletBusy || isInitializing || quotePending || flexiPending}
             aria-busy={walletBusy||isInitializing}
             className="w-full min-h-12 px-4 rounded-2xl bg-[#00c365] hover:bg-[#16d577] text-[#03160c] font-bold text-base transition-colors active:translate-y-px flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           >

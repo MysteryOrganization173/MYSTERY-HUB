@@ -27,7 +27,7 @@ test('production confirmation stays with recipient ahead of payment choices and 
   assert.match(checkout,/value=\{phone\}/);
   assert.match(checkout,/Pay GH₵/);
   assert.match(checkout,/submissionPending.current \|\| isInitializing \|\| walletBusy/);
-  assert.match(checkout,/disabled=\{recoveryOnly \|\| walletBusy \|\| isInitializing \|\| quotePending \|\| flexiPending\}/);
+  assert.match(checkout,/disabled=\{!!preflightIssue \|\| recoveryOnly \|\| walletBusy \|\| isInitializing \|\| quotePending \|\| flexiPending\}/);
   // Direct Data stays unpayable until the server quote is confirmed and consistent.
   assert.match(checkout,/const quotePending = isRegularData && !quoteView;/);
 });

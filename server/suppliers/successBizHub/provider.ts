@@ -196,7 +196,7 @@ export class SuccessBizHubProvider implements SupplierProvider {
       const normalized=validateAndNormalizeGhanaPhone(phone);
       if(!normalized.isValid)return unknownBeneficiary();
       const response=await this.client.checkBeneficiary([normalized.formattedLocal!],offerSelector);
-      const result=parseBeneficiaryEligibility(response,phone);
+      const result=parseBeneficiaryEligibility(response,phone,offerSelector);
       noteBeneficiaryOutcome(result.outcome||'unknown');
       console.info('[SBH Beneficiary Check]',result.outcome);
       return result;
