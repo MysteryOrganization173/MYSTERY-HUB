@@ -58,6 +58,8 @@ export interface InitializeMarketplacePaymentRequest extends Omit<InitializePaym
 }
 
 export interface PublicInstantBundle {
+  /** Explicit catalogue evidence only; not recipient approval or delivery assurance. */
+  recipientAlternative?: boolean;
   productKey: string;
   packageId: string;
   name: string;

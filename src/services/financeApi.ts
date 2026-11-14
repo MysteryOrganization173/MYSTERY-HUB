@@ -6,5 +6,5 @@ export async function financeRequest<T=any>(token:string,path='',body?:unknown,a
 }
 export async function walletCheckout(token:string,path:string,body:Record<string,unknown>) {
   const response=await fetch(`${API_BASE_URL}/api/${path}`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({...body,...campaignCheckoutFields(body.requestId),paymentMethod:'wallet'})});
-  const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error||data.message||'Wallet payment not confirmed. Check My Orders before retrying.'),{status:response.status,code:data.code,quote:data.quote});return data;
+  const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error||data.message||'Wallet payment not confirmed. Check My Orders before retrying.'),{status:response.status,code:data.code,quote:data.quote,checkout:data.checkout,existingOrderReference:data.existingOrderReference});return data;
 }

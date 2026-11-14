@@ -186,6 +186,7 @@ apiRouter.get('/instant-bundles', async (_req: Request, res: Response) => {
       if (pkg.enabled === false) continue;
       const mapped = toPublicInstantBundle(pkg);
       if (mapped) {
+        mapped.recipientAlternative = (catalogRes as {success?:unknown}).success===true && pkg.available===true && ['mtn','telecel','airteltigo'].includes(String(pkg.network).toLowerCase());
         publicProducts.push(mapped);
       }
     }

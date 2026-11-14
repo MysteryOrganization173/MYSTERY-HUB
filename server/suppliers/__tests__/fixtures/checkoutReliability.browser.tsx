@@ -15,11 +15,12 @@ window.fetch=async(input,options)=>{
  const url=String(input);
  if(url.startsWith('http')&&!url.startsWith(location.origin)){blockedCalls++;report();throw Error('External fixture request blocked');}
  if(url.includes('/commercial/quote/'))return json({regularMinor:549,totalMinor:549,discountMinor:0,pricingRevision:'fixture',promotionRevision:'fixture',offer:{state:'guest'}});
- if(url.endsWith('/finance'))return json({walletMinor:0,restricted:false});
+ if(url.endsWith('/instant-bundles'))return json({success:true,available:true,products:query.has('instant')?[{network:'mtn',recipientAlternative:true}]:[]});
+ if(url.endsWith('/finance'))return json({walletMinor:query.has('wallet')?10000:0,restricted:false});
  if(url.endsWith('/storefront'))return json({data:{products:[{id:'mtn-1gb',network:'mtn',dataAmount:'1GB',retailMinor:549,validity:'30 days'}]}});
  if(url.includes('/public-events'))return json({data:{}});
  if(url.includes('/store-checkout')||url.endsWith('/payments/initialize')){
-  requests++;report();if(scenario==='slow')await new Promise(r=>setTimeout(r,1200));
+  requests++;report();if(scenario==='held-wallet')await new Promise(r=>{((window as any).__walletPending||=(([]) as any)).push(r);});if(scenario==='slow')await new Promise(r=>setTimeout(r,1200));
   if(scenario==='uncertain')throw new TypeError('Synthetic disconnected response');
   if(scenario==='retry'&&requests>1||scenario==='success'){
    const data={success:true,orderRef:'MH-synthetic-checkout',reference:'SYNTHETIC',accessCode:'synthetic',amountPesewas:549,currency:'GHS'};return json(surface==='store'?{data}:data);
@@ -32,9 +33,11 @@ window.fetch=async(input,options)=>{
  blockedCalls++;report();throw Error('Unexpected fixture request blocked');
 };
 function Fixture(){
- const [open,setOpen]=useState(true),[tick,setTick]=useState(0);
+ const [open,setOpen]=useState(true),[tick,setTick]=useState(0),[productVersion,setProductVersion]=useState(0);
+ (window as any).__swapProduct=()=>setProductVersion(v=>v+1);
+ const selectedBundle=React.useMemo(()=>productVersion?{...bundle,id:'mtn-2gb',dataAmount:'2GB'}:bundle,[productVersion]);
  React.useEffect(()=>{const listener=()=>setTick(x=>x+1);window.addEventListener('fixture-evidence',listener);return()=>window.removeEventListener('fixture-evidence',listener);},[]);
- (window as any).__checkoutApp={isCheckoutOpen:open,closeCheckout:()=>setOpen(false),checkoutBundle:bundle,user:query.has('signed')?{id:'synthetic-customer',name:'Synthetic',email:'fixture@example.test',phone:'0241234567'}:null,sessionToken:query.has('signed')?'synthetic-only':null,createOrder:()=>({}),openOrderStatus:()=>{},openDataPage:()=>setOpen(false),setActivePage:()=>{}};
+ (window as any).__checkoutApp={isCheckoutOpen:open,closeCheckout:()=>setOpen(false),checkoutBundle:selectedBundle,user:query.has('signed')?{id:'synthetic-customer',name:'Synthetic',email:'fixture@example.test',phone:'0241234567'}:null,sessionToken:query.has('signed')?'synthetic-only':null,createOrder:()=>({}),openOrderStatus:()=>{},openDataPage:()=>setOpen(false),setActivePage:()=>{}};
  return <><aside style={{padding:12,background:'#101725',color:'white'}}><h1>Synthetic checkout verification</h1><output aria-live="polite">Requests {requests} · Popups {popups} · Blocked unexpected calls {blockedCalls}</output><span hidden>{tick}</span>{!open&&<button onClick={()=>setOpen(true)}>Reopen checkout</button>}</aside>{surface==='store'?<ManagedDataStorefront siteId={`synthetic-reliability-${scenario}`} template={template} preview={query.has('preview')} previewProducts={[{id:'mtn-1gb',network:'mtn',dataAmount:'1GB',retailMinor:549,enabled:true} as any]}/>:<CheckoutModal/>}</>;
 }
 createRoot(document.getElementById('root')!).render(<Fixture/>);

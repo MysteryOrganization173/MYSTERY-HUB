@@ -3,10 +3,11 @@ export interface BeneficiaryEligibility {eligible:boolean;outcome?:'eligible'|'i
 export const unknownBeneficiary=(failure:BeneficiaryEligibility['failure']='invalid_response'):BeneficiaryEligibility=>({eligible:false,outcome:'unknown',failure,reason:'Recipient eligibility could not be confirmed.'});
 const object=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
 /** Supported legacy shapes remain compatible, but conflicting or mismatched identity never establishes eligibility. */
-export function parseBeneficiaryEligibility(body:unknown,phone:string):BeneficiaryEligibility {
+export function parseBeneficiaryEligibility(body:unknown,phone:string,selector?:{offerSlug?:string;offerId?:string}):BeneficiaryEligibility {
  const target=validateAndNormalizeGhanaPhone(phone).normalized;
  if(!target||!object(body)||'success' in body&&body.success!==true||body.status==='error'||body.status==='failed'||body.error)return unknownBeneficiary();
  const identity=(row:Record<string,unknown>)=>{
+  for(const key of ['offerSlug','offerId'] as const)if(selector?.[key]&&key in row&&row[key]!==selector[key])return false;
   for(const key of ['phone','msisdn'])if(key in row&&(typeof row[key]!=='string'||validateAndNormalizeGhanaPhone(row[key] as string).normalized!==target))return false;
   return true;
  };

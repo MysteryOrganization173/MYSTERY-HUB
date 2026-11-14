@@ -1,3 +1,4 @@
+import {recipientVerification} from '../suppliers/recipientVerification.js';
 import { FinanceError } from '../db/financeStore.js';
 import { CommercialService } from './commercialService.js';
 import { WebsiteBusinessService } from './websiteBusinessService.js';
@@ -196,8 +197,9 @@ export class FulfilmentService {
       const beneficiaryMs = beneficiaryResult.ms;
       const walletMs = walletResult.ms;
 
-      if (!beneficiaryResult.res.eligible) {
-        const confirmed=beneficiaryResult.res.outcome==='ineligible';
+      const verification=recipientVerification({recipient:recipientPhone,network,offer:supplierPackage.offerSlug||supplierPackage.offerId||'',provider:'success_biz_hub'},beneficiaryResult.res);
+      if (verification.outcome!=='eligible') {
+        const confirmed=verification.outcome==='ineligible';
         return {
           allowed: false,
           code: confirmed?'BENEFICIARY_NOT_ELIGIBLE':'BENEFICIARY_CHECK_UNAVAILABLE',

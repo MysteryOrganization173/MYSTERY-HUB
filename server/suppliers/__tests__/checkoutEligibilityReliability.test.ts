@@ -30,7 +30,7 @@ test('real HTTP client and provider: selectors, transport classification, privac
  const client=new SuccessBizHubClient(),provider=new SuccessBizHubProvider(client);
  try{
   for(const [name,status,body,expected]of [
-   ['eligible',200,result(true),'eligible'],['denied',200,result(false),'ineligible'],['permission',403,{error:{message:'PRIVATE '+phone}},'unknown'],
+   ['eligible',200,result(true),'eligible'],['wrong product',200,result(true,{offerSlug:'other'}),'unknown'],['denied',200,result(false),'ineligible'],['permission',403,{error:{message:'PRIVATE '+phone}},'unknown'],
    ['unavailable',503,{error:{message:'PRIVATE'}},'unknown'],['unexpected HTML',200,'<html>PRIVATE</html>','unknown'],['unexpected 302',302,{},'unknown'],
   ] as const)await t.test(name,async()=>{
    globalThis.fetch=async(input,options)=>{assert.equal(String(input),'https://supplier.invalid/v2/beneficiary-check');assert.equal(options!.redirect,'error');assert.deepEqual(JSON.parse(options!.body as string),{phones:[phone],offerSlug:'fixture-mtn'});return new Response(typeof body==='string'?body:JSON.stringify(body),{status});};
