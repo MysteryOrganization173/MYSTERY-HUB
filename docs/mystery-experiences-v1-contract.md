@@ -1,6 +1,6 @@
 # Mystery Experiences Core V1 — implemented integration contract
 
-**Status (14 November 2026): integrated into main dormant.** The code is merged with every gate off. The optional schema is not installed and nothing is activated; installation and gates still need separate approval. The original review status follows.
+**Status (14 November 2026): integrated into main dormant.** The code is merged with every gate off. The creator, recipient, sharing and Admin frontend is described in `docs/mystery-greetings-v1.md`. The optional schema is not installed and nothing is activated; installation and gates still need separate approval. The original review status follows.
 
 **Review branch only. Not merged, deployed, migrated or activated.** This is a backend/control-plane release. It does not include a visual Admin panel, creator/recipient screens, festive UI or countdown animation. Claude owns those interfaces. Base main: `7de758510d1fcc797f35a4e1e1a1526e3d575d52`.
 

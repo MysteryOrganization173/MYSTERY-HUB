@@ -35,6 +35,8 @@ test('Experiences native PostgreSQL, HTTP and raw HTML — isolated only',{skip:
   await t.test('startup leaves optional schema absent and failure is safe',async()=>{
    assert.equal((await db.query("SELECT to_regclass('mysteryhub_experiences.configuration') value")).rows[0].value,null);
    const response=await fetch(base+'/api/experiences/greetings',json(payload()));assert.equal(response.status,503);assert.doesNotMatch(JSON.stringify(await response.json()),/postgres|password|SQL/i);
+   // Admin readiness reports the missing schema instead of failing.
+   const ready=await ExperienceService.readiness();assert.equal(ready.storage,'not_installed');assert.equal(ready.retentionDue,null);assert.ok(ready.blockers.some(b=>/schema/.test(b)));
   });
   const schema=readFileSync('server/db/mysteryExperiences.sql','utf8');
   await t.test('failed schema installation rolls back the entire optional namespace',async()=>{
@@ -148,7 +150,12 @@ test('Experiences native PostgreSQL, HTTP and raw HTML — isolated only',{skip:
   await t.test('retention is bounded, audited and rollback-safe; no financial/order records were created',async()=>{
    const old=await create();await db.query("UPDATE mysteryhub_experiences.greetings SET created_at=now()-interval '400 days',expires_at=now()-interval '35 days' WHERE share_id=$1",[old.greeting.shareId]);
    await assert.rejects(create(),(e:any)=>e.code==='RETENTION_REQUIRED');
-   const cleanup=await ExperienceStore.maintenance('exp-admin');assert.ok(cleanup.greetings!>=1);assert.equal((await db.query('SELECT count(*)::int n FROM orders')).rows[0].n,0);assert.equal((await db.query('SELECT count(*)::int n FROM finance_ledger')).rows[0].n,0);
+   // Readiness shows the clean-up that new greetings are waiting for, then that it ran. Admin only; the secret never appears.
+   const due=await ExperienceService.readiness();assert.equal(due.storage,'installed');assert.equal(due.retentionDue,true);assert.ok(due.blockers.some(b=>/Retention clean-up is due/.test(b)));
+   assert.equal((await fetch(base+'/api/admin/experiences/readiness')).status,401);
+   const viaHttp=await fetch(base+'/api/admin/experiences/readiness',{headers:{Authorization:'Bearer synthetic-admin'}});assert.equal(viaHttp.status,200);const body=await viaHttp.text();assert.doesNotMatch(body,/cccccccc/);assert.equal(JSON.parse(body).abuseSecret,true);
+   const cleanup=await ExperienceStore.maintenance('exp-admin');
+   const after=await ExperienceService.readiness();assert.equal(after.retentionDue,false);assert.ok(after.lastMaintenance&&Date.parse(after.lastMaintenance.at)>0);assert.deepEqual(after.blockers,[]);assert.ok(cleanup.greetings!>=1);assert.equal((await db.query('SELECT count(*)::int n FROM orders')).rows[0].n,0);assert.equal((await db.query('SELECT count(*)::int n FROM finance_ledger')).rows[0].n,0);
    const plan=(await db.query("EXPLAIN SELECT share_id FROM mysteryhub_experiences.greetings WHERE share_id=$1",[first.shareId])).rows.map(r=>r['QUERY PLAN']).join(' ');assert.ok(plan);
   });
  }finally{mock.restoreAll();await new Promise<void>(r=>server.close(()=>r()));rmSync(dir,{recursive:true});await db.end();await getPool()?.end();}

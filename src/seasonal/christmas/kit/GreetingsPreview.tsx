@@ -1,7 +1,7 @@
 import React, { useId } from 'react';
 // Styles: kit.css, loaded by each seasonal homepage's chunk (this file stays importable by the pure, testable views).
 import { ArrowRight, Lock } from 'lucide-react';
-import type { GreetingsEntry } from '../../../../shared/seasonal';
+import { greetingCreateLink, type GreetingsEntry } from '../../../../shared/seasonal';
 
 /**
  * The Mystery Greetings entry, built for any seasonal page (it takes no account data). While the feature is not open it
@@ -22,7 +22,7 @@ export function GreetingsPreview({ newYear = false, headingId, entry }: { newYea
           <li><b aria-hidden="true">3</b>Share the link</li>
         </ol>
         {entry.state === 'open'
-          ? <a className="xk-greet-cta" href={entry.createHref}>Create a greeting<ArrowRight className="size-4" aria-hidden="true" /></a>
+          ? <a className="xk-greet-cta" href={greetingCreateLink(entry.createHref, newYear)}>Create a greeting<ArrowRight className="size-4" aria-hidden="true" /></a>
           : <p className="xk-greet-note"><Lock className="size-3.5" aria-hidden="true" />Not open yet. It will appear right here when it is ready.</p>}
       </div>
       <div className="xk-greet-art" aria-hidden="true"><GreetingEnvelope newYear={newYear} /></div>

@@ -17,7 +17,13 @@ captureInstallPrompt();
 
 captureCampaignToken();
 const shortCode=!isolatedTemplateId && window.location.pathname.match(/^\/c\/([^/]+)\/?$/)?.[1];
-const surface: Promise<ReactElement> = shortCode ? import('./components/common/CampaignRedirect').then(({CampaignRedirect})=><CampaignRedirect code={shortCode}/>) : isolatedTemplateId
+// Mystery Greetings: the recipient page (/g/…, the same paths the server answers with greeting metadata) and the creator.
+const greetingPath = /^\/g(?:\/|$)/i.test(window.location.pathname);
+const creatorPath = /^\/greetings\/?$/i.test(window.location.pathname);
+const surface: Promise<ReactElement> = shortCode ? import('./components/common/CampaignRedirect').then(({CampaignRedirect})=><CampaignRedirect code={shortCode}/>)
+  : greetingPath ? Promise.all([import('./greetings/RecipientPage'), import('./greetings/greetings.css')]).then(([{RecipientPage}]) => <RecipientPage path={window.location.pathname} />)
+  : creatorPath ? Promise.all([import('./greetings/CreatorPage'), import('./greetings/greetings.css')]).then(([{CreatorPage}]) => <CreatorPage search={window.location.search} />)
+  : isolatedTemplateId
   ? import('./components/website/IsolatedTemplatePreview').then(({IsolatedTemplatePreview}) => <IsolatedTemplatePreview templateId={isolatedTemplateId} />)
   : siteSlug
     ? import('./components/website/PublicPublishedSite').then(({PublicPublishedSite}) => <PublicPublishedSite slug={siteSlug} />)

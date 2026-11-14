@@ -4,7 +4,7 @@ import '../kit/kit.css';
 import { ArrowRight, ArrowUpRight, Check, FileQuestion, Lock, MessageCircle, PackageSearch, ReceiptText, ShieldCheck, ShoppingBag, Zap } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../../config/business';
-import type { GreetingsEntry, SeasonPhase, SeasonStatus } from '../../../../shared/seasonal';
+import { greetingCreateLink, type GreetingsEntry, type SeasonPhase, type SeasonStatus } from '../../../../shared/seasonal';
 import { useSeason } from '../../SeasonProvider';
 import { isChristmasTime, seasonCountdown } from '../copy';
 import { loadSeasonalSerif } from '../font';
@@ -250,12 +250,12 @@ function FeaturedData() {
   );
 }
 
-/* ───────────────────────── Mystery Greetings: a preview, not a product yet ───────────────────────── */
+/* ───────────────────────── Mystery Greetings ───────────────────────── */
 
 /**
- * Mystery Greetings is being built separately (creation, links and the recipient screen). Until it is live this
- * section only previews it and offers no button that pretends to create one. `createHref` is the integration point:
- * pass the real creator route once it exists and the call to action appears.
+ * Mystery Greetings: until the server reports the creator open (both greeting gates on), this section only previews it
+ * and offers no button that pretends to create one. Once open, one link leads to the creator at /greetings, starting
+ * on the occasion this page is showing.
  *
  * The sample envelope is a real toggle with two states, closed and open. It opens by itself once, the first time it
  * comes into view this visit; after that a tap (or Enter/Space) opens or closes it. CSS transitions carry it between
@@ -267,7 +267,7 @@ function FeaturedData() {
  * reads (the server's answer). Not open: "Coming soon" and no create action. Open: one link to the shared creator.
  */
 function Greetings({ christmas, entry }: { christmas: boolean; entry: GreetingsEntry }) {
-  const createHref = entry.state === 'open' ? entry.createHref : null;
+  const createHref = entry.state === 'open' ? greetingCreateLink(entry.createHref, !christmas) : null;
   const shareText = `${christmas ? 'Merry Christmas!' : 'Happy New Year!'} I use Mystery Hub for data, airtime and more. Have a look:`;
   const share = `https://wa.me/?text=${encodeURIComponent(`${shareText} https://${BUSINESS_CONFIG.domain}/`)}`;
   const envelope = useRef<HTMLButtonElement>(null);
