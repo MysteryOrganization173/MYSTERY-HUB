@@ -328,6 +328,7 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
               currentAdminId={adminId}
               initialUserId={param||null}
               onOpenEarn={id => navigate('earn', id)}
+              onOpenOrder={reference=>navigate('orders','ref/'+reference)}
             />
           )}
           {activeTab === 'websites' && <AdminWebsiteBuilderSection key={param} sessionToken={token} initialView={param} />}
