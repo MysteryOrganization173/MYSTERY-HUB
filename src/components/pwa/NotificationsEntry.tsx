@@ -3,7 +3,7 @@ import { BellOff, BellRing, Loader2, Smartphone } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { SecurityDialog, accountButton } from '../auth/SecurityDialog';
 import { httpCustomerNotificationsClient, httpGuestNotificationsClient } from '../../services/customerNotifications';
-import { IOS_HOME_SCREEN_COPY, PAUSED_NOTE, pushSupported, readGuestDeviceState, unsubscribeGuestDevice } from '../../pwa/push';
+import { IOS_HOME_SCREEN_COPY, PAUSED_NOTE, pushSupported, readGuestCredential, readGuestDeviceState, unsubscribeGuestDevice } from '../../pwa/push';
 import { activateNotificationInvite } from '../../pwa/notificationOnboarding';
 import { notificationPermissionState } from '../../pwa/notifications';
 import { isInstalledApp, supportsAppleHomeScreen } from '../../pwa/appEnvironment';
@@ -36,6 +36,7 @@ function GuestNotificationsSheet({ onClose }: { onClose: () => void }) {
   const [state, setState] = useState<SheetState>('loading');
   const [paused, setPaused] = useState(false);
   const [reason, setReason] = useState<string | null>(null);
+  const [guestsOpen, setGuestsOpen] = useState(true);
   const request = useRef(new AbortController());
   useEffect(() => {
     const controller = request.current;
@@ -43,12 +44,16 @@ function GuestNotificationsSheet({ onClose }: { onClose: () => void }) {
       const config = await httpCustomerNotificationsClient.configuration!().catch(() => ({ enabled: false, guests: false, paused: true }));
       if (controller.signal.aborted) return;
       setPaused(config.paused === true);
+      setGuestsOpen(config.guests === true);
       if (supportsAppleHomeScreen() && !isInstalledApp() && !pushSupported()) return setState('ios');
       if (!pushSupported() || !config.enabled) return setState('unsupported');
+      // Someone who registered while guest news was open can always see it and turn it off, even if it has since closed.
+      const device = readGuestCredential() ? await readGuestDeviceState(httpGuestNotificationsClient) : 'not_subscribed';
+      if (controller.signal.aborted) return;
+      if (device === 'subscribed') return setState('on');
       if (!config.guests) return setState('guests_off');
       if (notificationPermissionState() === 'denied') return setState('blocked');
-      const device = await readGuestDeviceState(httpGuestNotificationsClient);
-      if (!controller.signal.aborted) setState(device === 'subscribed' ? 'on' : device === 'error' ? 'error' : 'off');
+      setState(device === 'error' ? 'error' : 'off');
     })();
     return () => controller.abort();
   }, []);
@@ -63,7 +68,7 @@ function GuestNotificationsSheet({ onClose }: { onClose: () => void }) {
   const turnOff = async () => {
     setState('working');
     const result = await unsubscribeGuestDevice(httpGuestNotificationsClient);
-    if (!request.current.signal.aborted) setState(result.ok ? 'off' : 'error');
+    if (!request.current.signal.aborted) setState(result.ok ? (guestsOpen ? 'off' : 'guests_off') : 'error');
   };
   const signIn = () => { onClose(); openAuth('login', 'Sign in to get updates about your orders.'); };
 

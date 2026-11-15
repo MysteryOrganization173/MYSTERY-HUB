@@ -12,7 +12,8 @@ import express from 'express';
 import webPush from 'web-push';
 import {NOTIFICATION_SCHEMA} from '../../db/notificationSchema.js';
 import {getPool} from '../../db/connection.js';
-import {NotificationService as service, NOTIFICATIONS as n} from '../../services/notificationService.js';
+import {NotificationService as service, NOTIFICATIONS as n, pruneExpiredGuests} from '../../services/notificationService.js';
+import {visitorKey} from '../../utils/visitorKey.js';
 import {processNotificationBatch} from '../../services/notificationWorker.js';
 import {hashSessionToken} from '../../utils/crypto.js';
 import {notificationRouter} from '../../routes/notificationApi.js';
@@ -37,7 +38,9 @@ test('PostgreSQL notification consent evidence and guest news', {skip: process.e
       await pool.query('INSERT INTO users(id,name,password_hash,role) VALUES($1,$2,\'fixture\',$3)', [id, 'Synthetic ' + id, id === 'admin' ? 'admin' : 'customer']);
       await pool.query("INSERT INTO sessions(id,user_id,token_hash,expires_at) VALUES($1,$2,$3,NOW()+interval '1 day')", ['session-' + id, id, hashSessionToken(tokens[id as keyof typeof tokens])]);
     }
-    await pool.query(NOTIFICATION_SCHEMA); await pool.query(NOTIFICATION_SCHEMA);
+    await pool.query(NOTIFICATION_SCHEMA); await pool.query(NOTIFICATION_SCHEMA); await pool.query(NOTIFICATION_SCHEMA);
+    assert.equal(visitorKey({headers: {'x-forwarded-for': '9.9.9.9, 203.0.113.7'}, socket: {remoteAddress: '10.0.0.1'}}), '203.0.113.7', 'the proxy’s own hop, not the client-supplied first one');
+    assert.equal(visitorKey({headers: {'x-forwarded-for': 'not-an-ip'}, socket: {remoteAddress: '10.0.0.1'}}), '10.0.0.1');
     const consents = async (where: string, args: unknown[]) => (await pool!.query(`SELECT purpose,granted,source,copy_version FROM ${n}.consents WHERE ${where} ORDER BY seq`, args)).rows;
 
     await t.test('new tables are private: RLS on, nothing granted to PUBLIC, anon or authenticated', async () => {
@@ -97,6 +100,8 @@ test('PostgreSQL notification consent evidence and guest news', {skip: process.e
       await service.setPreferences('buyer1', {transactional: true, marketing: false, source: 'notification_invitation'});
       assert.deepEqual((await consents("user_id=$1 AND purpose='marketing'", ['buyer1'])).at(-1), {purpose: 'marketing', granted: false, source: 'notification_invitation', copy_version: 'invite-3.4-1'});
       await assert.rejects(() => service.setPreferences('buyer1', {transactional: true, marketing: false, source: 'admin'}), /explicitly/);
+      await assert.rejects(() => service.setPreferences('buyer1', {transactional: true, marketing: true, source: 'notification_invitation'}), /explicitly/, 'the invitation source can never record a grant of offers');
+      await assert.rejects(() => service.setPreferences('buyer1', {transactional: false, marketing: false, source: 'notification_invitation'}), /explicitly/);
     });
 
     await t.test('guest news is an operational gate: off unless WEB_PUSH_GUEST_NEWS=true', async () => {
@@ -136,8 +141,10 @@ test('PostgreSQL notification consent evidence and guest news', {skip: process.e
       assert.equal((await service.preferences('buyer2')).marketing, false, 'guest consent is never transferred to the account');
       const other = sub('OTHER-GUEST');
       const otherGuest = await service.guestSubscribe({subscription: other, consent: {purposes: ['marketing'], copyVersion: 'x'}});
-      await assert.rejects(() => service.subscribe('buyer2', tokens.buyer2, {subscription: {...other, keys: sub('FORGED').keys}}), /ownership/i, 'an endpoint alone never removes a guest registration');
-      assert.equal((await pool!.query(`SELECT COUNT(*)::int AS c FROM ${n}.guest_devices WHERE id=$1`, [otherGuest.deviceId])).rows[0].c, 1);
+      // The signed-in account outranks an anonymous row; the evidence records that the keys did not prove the same browser.
+      await service.subscribe('buyer2', tokens.buyer2, {subscription: {...other, keys: sub('FORGED').keys}});
+      assert.equal((await pool!.query(`SELECT COUNT(*)::int AS c FROM ${n}.guest_devices WHERE id=$1`, [otherGuest.deviceId])).rows[0].c, 0);
+      assert.equal((await consents('guest_device_id=$1', [otherGuest.deviceId])).at(-1)!.source, 'replaced_by_account_unverified');
       const stale = sub('STALE');
       await pool!.query("INSERT INTO sessions(id,user_id,token_hash,expires_at) VALUES('session-stale','buyer2','stale-hash',NOW()-interval '1 day')");
       await pool!.query(`INSERT INTO ${n}.devices(id,user_id,session_id,endpoint_hash,encrypted_subscription) SELECT gen_random_uuid(),'buyer2','session-stale',endpoint_hash,encrypted_subscription FROM ${n}.guest_devices WHERE id=$1`, [otherGuest.deviceId]).catch(() => {});
@@ -159,9 +166,20 @@ test('PostgreSQL notification consent evidence and guest news', {skip: process.e
       await service.guestUnsubscribe(credential);
       const old = await service.guestSubscribe({subscription: sub('OLD'), consent: {purposes: ['marketing'], copyVersion: 'x'}});
       await pool!.query(`UPDATE ${n}.guest_devices SET expires_at=NOW()-interval '2 days' WHERE id=$1`, [old.deviceId]);
-      await service.guestSubscribe({subscription: sub('TRIGGER-PRUNE'), consent: {purposes: ['marketing'], copyVersion: 'x'}});
-      assert.equal((await pool!.query(`SELECT COUNT(*)::int AS c FROM ${n}.guest_devices WHERE id=$1`, [old.deviceId])).rows[0].c, 0, 'expired registrations are removed, so retention is real');
+      assert.ok(await pruneExpiredGuests() >= 1, 'the worker removes expired registrations, so retention is real');
+      assert.equal((await pool!.query(`SELECT COUNT(*)::int AS c FROM ${n}.guest_devices WHERE id=$1`, [old.deviceId])).rows[0].c, 0);
       assert.equal((await consents('guest_device_id=$1', [old.deviceId])).at(-1)!.source, 'guest_expired');
+      await Promise.all([pruneExpiredGuests(), pruneExpiredGuests()]);
+    });
+
+    await t.test('the site-wide budget counts registrations actually created; re-registering is never blocked', async () => {
+      const keep = await service.guestSubscribe({subscription: sub('BUDGET-KEEP'), consent: {purposes: ['marketing'], copyVersion: 'x'}});
+      const recent = Number((await pool!.query(`SELECT COUNT(*) FROM ${n}.guest_devices WHERE created_at>NOW()-interval '10 minutes'`)).rows[0].count);
+      await pool!.query(`INSERT INTO ${n}.guest_devices(id,endpoint_hash,encrypted_subscription,secret_hash) SELECT gen_random_uuid(),md5(random()::text)||md5(random()::text),'x','x' FROM generate_series(1,$1)`, [Math.max(0, 200 - recent)]);
+      await assert.rejects(() => service.guestSubscribe({subscription: sub('BUDGET-NEW'), consent: {purposes: ['marketing'], copyVersion: 'x'}}), (e: any) => e.status === 429);
+      const refreshed = await pool!.query(`SELECT id FROM ${n}.guest_devices WHERE id=$1`, [keep.deviceId]);
+      assert.equal(refreshed.rowCount, 1);
+      await pool!.query(`DELETE FROM ${n}.guest_devices WHERE encrypted_subscription='x'`);
     });
 
     await t.test('HTTP: guest routes need no account, keep the credential out of URLs, and the public config reports pause', async () => {

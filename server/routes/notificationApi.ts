@@ -10,11 +10,10 @@ const handler=(work:(req:any)=>Promise<unknown>)=>async(req:any,res:any)=>{try{r
 const offset=(value:unknown)=>{const n=value===undefined?0:Number(value);if(!Number.isInteger(n)||n<0||n>100000)throw new FinanceError('Invalid pagination.');return n;};
 export const notificationRouter=Router();notificationRouter.use((_req,res,next)=>{res.set('Cache-Control','no-store');next();});
 notificationRouter.get('/config',async(_req,res)=>res.json(await NotificationService.publicConfig()));
-// Guest news (no account): the browser's own credential in a header, never in a URL. Throttled per visitor (behind
-// the proxy), and new registrations also have a site-wide ceiling so nobody can flood the table.
+// Guest news (no account): the browser's own credential in a header, never in a URL. Throttled per visitor (the
+// proxy's own hop, which a client cannot forge); new registrations also have a site-wide budget in the database.
 const guestLimiter=createRateLimiter({windowMs:10*60000,max:30,key:visitorKey});
-const guestRegistrations=createRateLimiter({windowMs:10*60000,max:200,key:()=>'notification-guest-registrations'});
-notificationRouter.put('/guest',guestLimiter,guestRegistrations,handler(req=>NotificationService.guestSubscribe(req.body)));
+notificationRouter.put('/guest',guestLimiter,handler(req=>NotificationService.guestSubscribe(req.body)));
 notificationRouter.get('/guest',guestLimiter,handler(req=>NotificationService.guestStatus(req.get('x-guest-notifications'))));
 notificationRouter.delete('/guest',guestLimiter,handler(req=>NotificationService.guestUnsubscribe(req.get('x-guest-notifications'))));
 notificationRouter.use(requireAuth,createRateLimiter({windowMs:60000,max:40,key:req=>req.user!.id}));

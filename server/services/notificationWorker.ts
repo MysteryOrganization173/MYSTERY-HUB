@@ -2,7 +2,7 @@ import {randomUUID} from 'node:crypto';
 import webPush from 'web-push';
 import {getPool} from '../db/connection.js';
 import {FinanceError} from '../db/financeStore.js';
-import {NOTIFICATIONS as n,notificationTransaction} from './notificationService.js';
+import {NOTIFICATIONS as n,notificationTransaction,pruneExpiredGuests} from './notificationService.js';
 import {pushConfiguration,decryptSubscription,validateSubscription,renderTemplate} from './notificationSafety.js';
 
 type Sender=(subscription:ReturnType<typeof decryptSubscription>,payload:string)=>Promise<unknown>;
@@ -35,6 +35,8 @@ async function current(job:any){return (await getPool()!.query(`SELECT d.encrypt
  AND ((e.template_snapshot->>'category'='transactional' AND COALESCE(p.transactional,TRUE)) OR (e.template_snapshot->>'category'='marketing' AND COALESCE(p.marketing,FALSE)))`,[job.device_id,job.user_id,job.binding_version,job.event_id])).rows[0];}
 export async function processNotificationBatch(sender:Sender=send,max=10){
  if(!pushConfiguration().enabled||!getPool())return {processed:0,disabled:true};
+ // Retention runs even while sending is paused: expired guest registrations never outlive their 180 days.
+ await pruneExpiredGuests().catch(()=>0);
  const settings=(await getPool()!.query(`SELECT paused FROM ${n}.settings WHERE id=TRUE`)).rows[0];if(settings?.paused)return {processed:0,disabled:true};
  await expandNotificationEvents();let processed=0;
  for(let i=0;i<Math.max(1,Math.min(max,25));i++){

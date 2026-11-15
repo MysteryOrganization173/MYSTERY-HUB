@@ -167,7 +167,7 @@ How consent is recorded:
 - **Never revived:** a withdrawn marketing choice is never switched back on by an invitation. Only the customer's own switch in My Account turns it back on. An answer to the old separate offers question on this device is also honoured.
   - The ledger is ordered by an identity sequence, so choices saved in the same moment never race.
   - A saved "off" from before the ledger counts as a withdrawal only for someone with no ledger entries, and is carried into the ledger the first time they act. Changing only order updates later never counts as declining offers.
-- **One-tap "Order updates only":** the success state for a member who accepted offers offers this right where the choice was made. It is recorded as an invitation answer. This keeps the founder's single decision while making order updates without offers one tap away.
+- **One-tap "Order updates only":** the success state for a member who accepted offers offers this right where the choice was made. It is recorded as an invitation answer. This keeps the founder's single decision while making order updates without offers one tap away. The server accepts the invitation source only for this exact answer (order updates on, offers off), so the evidence cannot be used to record a grant.
 - **Settings registration:** turning a device on in My Account changes no choice. The switches stay exactly as shown.
 - **Withdrawal:** settings changes record withdrawals and re-grants. Guest unsubscribes record a withdrawal, and an account taking over a guest browser records the end of the guest consent. Guest consent is never transferred to an account.
 - **Legal caveat:** this is an engineering reading of the rule, not legal advice. The founder should confirm the wording with counsel before activation.
@@ -180,10 +180,11 @@ How consent is recorded:
   - The server returns a random credential. The browser keeps it in local storage and sends it only in the `X-Guest-Notifications` header, never in a URL; the server stores only its hash.
   - Endpoint ownership is checked. A guest browser cannot take over an account's endpoint.
   - Registrations expire after 180 days without use (active use extends them).
-  - Rate limits: 30 requests per 10 minutes per visitor (keyed behind the proxy) and at most 200 new registrations per 10 minutes site-wide.
-  - Expired registrations are removed, with an evidence row, whenever a new one is made.
-  - An account taking over a guest browser must present the same keys. An endpoint alone never removes a guest registration.
+  - Rate limits: 30 requests per 10 minutes per visitor, keyed on the proxy's own X-Forwarded-For hop (which a client cannot forge). A database budget allows at most 200 newly created registrations per 10 minutes site-wide, and re-registering is never blocked.
+  - The notification worker removes expired registrations with an evidence row on every tick (one statement that skips locked rows), even while sending is paused.
+  - A signed-in account taking over a guest browser's endpoint replaces the guest row. The evidence records whether the keys proved it was the same browser (`replaced_by_account` / `replaced_by_account_unverified`).
   - A device left behind by an expired account session does not block guest news.
+  - A guest who registered while guest news was open can always see it and turn it off from the footer, even after the gate closes.
   - "Turn off for this browser" (footer › Notifications) deletes the registration and records the withdrawal.
 - **Order updates for guests: gated, not built.** The platform has no secret guest-order capability; order lookup works by public reference only. Binding push to a guest order securely needs:
   - a new per-order secret issued at checkout;
@@ -220,7 +221,7 @@ How consent is recorded:
   - service worker 24/24 (announcement display, unsafe text, click targets);
   - updated account, PWA and invitation suites.
 - **Native PostgreSQL 16:**
-  - new `notificationConsentPostgres` 12/12: private tables, consent per purpose, withdrawal never revived, the pre-ledger rule, invitation-sourced "Order updates only", the guest gate, guest credential hash and ownership, forged-key takeover refused, a stale session not blocking, account takeover, expiry clean-up and unsubscribe, HTTP (no account, no credential in URLs, paused flag), announcement payloads;
+  - new `notificationConsentPostgres` 14/14: private tables, consent per purpose, withdrawal never revived, the pre-ledger rule, invitation-sourced "Order updates only", the guest gate, guest credential hash and ownership, forged-key takeover refused, a stale session not blocking, account takeover, expiry clean-up and unsubscribe, HTTP (no account, no credential in URLs, paused flag), announcement payloads;
   - existing `notificationsPostgres` 18/18;
   - `backendRlsPostgres` with 53 private tables (its `MAINTAIN` check needs PostgreSQL 17, which CI uses).
 - **Independent review:** 10 findings, all addressed.
@@ -235,6 +236,19 @@ How consent is recorded:
   - No stray subscription after a refused registration.
   - Expiry clean-up.
   - Found while fixing: the ledger now has deterministic ordering.
+- **Verification review of the fixes:** 10 more findings. The fixes:
+  - a spoof-resistant visitor key;
+  - guests can withdraw while the gate is closed;
+  - the invitation source is limited to "Order updates only";
+  - a successful registration is never undone by a later failure;
+  - the ordering column is added idempotently to databases that already have the table;
+  - a signed-in account replaces an unproven guest row, with the evidence noted;
+  - the registration budget counts created rows;
+  - expiry clean-up moved to the worker as one lock-safe statement.
+
+  Not changed:
+  - One finding concerned an intermediate commit that was never merged or deployed.
+  - One concerned Creative Studio's existing copy of the visitor key, which is outside this assignment and recommended as a follow-up.
 - **Browser:** `scripts/reviewNotificationOnboarding.cjs` 28/28. It runs locally only, with synthetic push keys and a disposable database.
   - The browser permission answer and the push subscription are **simulated**: headless Chromium cannot show the prompt or reach a push service. This proves the product and server logic, not delivery.
   - No delivery was queued or attempted.

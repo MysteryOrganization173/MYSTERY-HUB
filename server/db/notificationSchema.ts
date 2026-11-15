@@ -57,7 +57,9 @@ CREATE TABLE IF NOT EXISTS mysteryhub_notifications.consents (
  source VARCHAR(40) NOT NULL,copy_version VARCHAR(40),created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  CHECK((user_id IS NULL)<>(guest_device_id IS NULL))
 );
-CREATE INDEX IF NOT EXISTS notification_consents_user ON mysteryhub_notifications.consents(user_id,purpose,seq DESC) WHERE user_id IS NOT NULL;
+ALTER TABLE mysteryhub_notifications.consents ADD COLUMN IF NOT EXISTS seq BIGINT GENERATED ALWAYS AS IDENTITY;
+CREATE INDEX IF NOT EXISTS notification_consents_user_seq ON mysteryhub_notifications.consents(user_id,purpose,seq DESC) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS notification_guest_devices_created ON mysteryhub_notifications.guest_devices(created_at);
 INSERT INTO mysteryhub_notifications.settings(id) VALUES(TRUE) ON CONFLICT DO NOTHING;
 INSERT INTO mysteryhub_notifications.templates(id,title,body,category,locked) VALUES
  ('payment_confirmed','Payment confirmed','Your payment is verified. Open Orders to follow delivery.','transactional',TRUE),

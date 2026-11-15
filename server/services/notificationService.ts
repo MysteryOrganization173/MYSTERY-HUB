@@ -43,11 +43,16 @@ async function carryLegacyOptOut(c:PoolClient,userId:string){
  const saved=(await c.query(`SELECT marketing FROM ${NOTIFICATIONS}.preferences WHERE user_id=$1`,[userId])).rows[0];
  if(saved&&saved.marketing===false)await recordConsent(c,{userId},'marketing',false,'legacy_preference',null);
 }
-/** Expired guest registrations are removed (with an evidence row), a few at a time, so retention really is 180 days. */
-async function pruneExpiredGuests(c:PoolClient){
- const gone=(await c.query(`DELETE FROM ${NOTIFICATIONS}.guest_devices WHERE id IN (SELECT id FROM ${NOTIFICATIONS}.guest_devices WHERE expires_at<NOW() ORDER BY expires_at LIMIT 100) RETURNING id`)).rows;
- for(const row of gone)await recordConsent(c,{guestDeviceId:row.id},'marketing',false,'guest_expired',null);
+/**
+ * Expired guest registrations are removed with an evidence row, in one statement that skips rows another worker holds,
+ * so retention really is 180 days. Run by the notification worker on every tick while delivery is configured.
+ */
+export async function pruneExpiredGuests(){
+ return (await db().query(`WITH gone AS (DELETE FROM ${NOTIFICATIONS}.guest_devices WHERE id IN (SELECT id FROM ${NOTIFICATIONS}.guest_devices WHERE expires_at<NOW() ORDER BY expires_at LIMIT 200 FOR UPDATE SKIP LOCKED) RETURNING id)
+  INSERT INTO ${NOTIFICATIONS}.consents(guest_device_id,purpose,granted,source) SELECT id,'marketing',FALSE,'guest_expired' FROM gone`)).rowCount||0;
 }
+/** At most this many new guest registrations in ten minutes, site-wide, counted from rows actually created. */
+const GUEST_REGISTRATION_BUDGET=200;
 /** Guest news is an operational gate (WEB_PUSH_GUEST_NEWS=true), off unless the operator turns it on. */
 const guestNewsEnabled=()=>process.env.WEB_PUSH_GUEST_NEWS==='true';
 const GUEST_CREDENTIAL=/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.([A-Za-z0-9_-]{43})$/i;
@@ -62,6 +67,8 @@ export class NotificationService {
  /** `marketingOptedOut`: the customer turned news and offers off before, so an invitation must not offer them again. */
  static async preferences(userId:string){const p=(await db().query(`SELECT transactional,marketing FROM ${NOTIFICATIONS}.preferences WHERE user_id=$1`,[userId])).rows[0]||{transactional:true,marketing:false};return {transactional:p.transactional,marketing:p.marketing,marketingOptedOut:await marketingOptedOut(db(),userId)};}
  static async setPreferences(userId:string,input:any){exact(input,['transactional','marketing','source']);if(typeof input.transactional!=='boolean'||typeof input.marketing!=='boolean'||input.source!==undefined&&input.source!=='notification_invitation')throw new FinanceError('Choose transactional and marketing preferences explicitly.');
+  // The invitation's only follow-up answer is "Order updates only": that source can never record a grant of offers.
+  if(input.source==='notification_invitation'&&(input.marketing!==false||input.transactional!==true))throw new FinanceError('Choose transactional and marketing preferences explicitly.');
   // Evidence names where the choice was made: My Account, or the invitation's own "Order updates only".
   const [source,copyVersion]=input.source==='notification_invitation'?['notification_invitation','invite-3.4-1']:['account_settings','settings-1'];
   return notificationTransaction(async c=>{
@@ -84,9 +91,11 @@ export class NotificationService {
    ON CONFLICT(endpoint_hash) DO UPDATE SET user_id=$2,session_id=$3,encrypted_subscription=$5,binding_version=${NOTIFICATIONS}.devices.binding_version+1,updated_at=NOW()`,[id,userId,session.id,hash,encryptSubscription(subscription)]);
   // The same browser was registered for guest news: the account takes over and the guest consent ends with it, but
   // only when the keys prove it is the same browser (an endpoint alone never removes someone else's registration).
+  // A guest row for this endpoint is replaced by the signed-in account, which outranks an anonymous registration;
+  // the evidence says whether the keys proved it was the same browser (a mismatch can only be a stale or planted row).
   const guest=(await c.query(`SELECT id,encrypted_subscription FROM ${NOTIFICATIONS}.guest_devices WHERE endpoint_hash=$1 FOR UPDATE`,[hash])).rows[0];
-  if(guest){const old=decryptSubscription(guest.encrypted_subscription);if(old.keys.auth!==subscription.keys.auth||old.keys.p256dh!==subscription.keys.p256dh)throw new FinanceError('Subscription ownership could not be verified.',409);
-   await c.query(`DELETE FROM ${NOTIFICATIONS}.guest_devices WHERE id=$1`,[guest.id]);await recordConsent(c,{guestDeviceId:guest.id},'marketing',false,'replaced_by_account',null);}
+  if(guest){const old=decryptSubscription(guest.encrypted_subscription),same=old.keys.auth===subscription.keys.auth&&old.keys.p256dh===subscription.keys.p256dh;
+   await c.query(`DELETE FROM ${NOTIFICATIONS}.guest_devices WHERE id=$1`,[guest.id]);await recordConsent(c,{guestDeviceId:guest.id},'marketing',false,same?'replaced_by_account':'replaced_by_account_unverified',null);}
   let preferences=(await c.query(`SELECT transactional,marketing FROM ${NOTIFICATIONS}.preferences WHERE user_id=$1 FOR UPDATE`,[userId])).rows[0]||null;
   if(consent){
    // One explicit "Allow Notifications" may record each purpose its copy named, but never revives withdrawn offers.
@@ -109,11 +118,12 @@ export class NotificationService {
   const subscription=validateSubscription(input.subscription),hash=digest(subscription.endpoint);
   return notificationTransaction(async c=>{
    await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['notification-endpoint:'+hash]);
-   await pruneExpiredGuests(c);
    // Only a live account registration blocks guest news; a device left behind by an expired session cannot receive.
    if((await c.query(`SELECT 1 FROM ${NOTIFICATIONS}.devices d JOIN sessions s ON s.id=d.session_id WHERE d.endpoint_hash=$1 AND s.expires_at>NOW()`,[hash])).rowCount)throw new FinanceError('This browser already receives your account notifications.',409);
    const previous=(await c.query(`SELECT * FROM ${NOTIFICATIONS}.guest_devices WHERE endpoint_hash=$1 FOR UPDATE`,[hash])).rows[0];
    if(previous){const old=decryptSubscription(previous.encrypted_subscription);if(old.keys.auth!==subscription.keys.auth||old.keys.p256dh!==subscription.keys.p256dh)throw new FinanceError('Subscription ownership could not be verified.',409);}
+   if(!previous&&Number((await c.query(`SELECT COUNT(*) FROM ${NOTIFICATIONS}.guest_devices WHERE created_at>NOW()-interval '10 minutes'`)).rows[0].count)>=GUEST_REGISTRATION_BUDGET)
+    throw new FinanceError('Too many new registrations right now. Please try again in a few minutes.',429);
    const id=previous?.id||randomUUID(),secret=randomBytes(32).toString('base64url');
    await c.query(`INSERT INTO ${NOTIFICATIONS}.guest_devices(id,endpoint_hash,encrypted_subscription,secret_hash) VALUES($1,$2,$3,$4)
     ON CONFLICT(endpoint_hash) DO UPDATE SET encrypted_subscription=$3,secret_hash=$4,binding_version=${NOTIFICATIONS}.guest_devices.binding_version+1,updated_at=NOW(),expires_at=NOW()+interval '180 days'`,[id,hash,encryptSubscription(subscription),digest(secret)]);

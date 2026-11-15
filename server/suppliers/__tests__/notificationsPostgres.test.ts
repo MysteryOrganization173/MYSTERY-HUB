@@ -82,7 +82,7 @@ test('PostgreSQL transactional notification lifecycle and operational security',
   try{await processNotificationBatch(async()=>{sent++;},25);assert.equal(sent,0);}finally{await pool!.query("UPDATE sessions SET expires_at=NOW()+interval '1 day' WHERE user_id='buyer1'");}
  });
  await t.test('marketing opt-in, preview counts, immutable snapshots and idempotent confirmed sends',async()=>{
-  assert.deepEqual(await service.preferences('buyer1'),{transactional:true,marketing:false,marketingOptedOut:true}); // 3.4: a saved "off" is never revived by an invitationassert.equal((await service.previewAudience('admin',{templateId:'special_offer'})).eligibleDevices,0);
+  assert.deepEqual(await service.preferences('buyer1'),{transactional:true,marketing:false,marketingOptedOut:false}); // 3.4: changing only order updates (recorded in the consent ledger) never counts as declining offersassert.equal((await service.previewAudience('admin',{templateId:'special_offer'})).eligibleDevices,0);
   await service.setPreferences('buyer1',{transactional:true,marketing:true});const preview=await service.previewAudience('admin',{templateId:'special_offer',userId:'buyer1'});assert.equal(preview.eligibleCustomers,1);assert.equal(preview.eligibleDevices,2);
   await assert.rejects(()=>service.campaign('admin',{previewId:preview.previewId,requestId:randomUUID(),confirmed:false}));const input={previewId:preview.previewId,requestId:randomUUID(),confirmed:true};const first=await service.campaign('admin',input);assert.equal((await service.campaign('admin',input)).campaignId,first.campaignId);
   await assert.rejects(()=>service.campaign('admin',{...input,requestId:randomUUID()}),/already sent/);
