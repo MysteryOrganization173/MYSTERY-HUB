@@ -1,6 +1,9 @@
 /* Web Push only. No fetch interception, offline caches, account credentials or customer information. */
 const ICON='https://res.cloudinary.com/da6oeat7m/image/upload/f_auto,q_auto,w_192,h_192,c_pad,b_rgb:070b0e/v1790859552/30338777-d9dc-4709-8603-b18a4dc8d0ca_tvptuc.png';
 const ID=/^[0-9a-f-]{36}$/i;
+// The only pages an announcement may open (mirrors ANNOUNCEMENT_DESTINATIONS); anything else opens the home page.
+const PAGES=['/','/data','/services','/marketplace','/earn'];
+const page=value=>PAGES.includes(value)?value:'/';
 const plain=(value,max)=>typeof value==='string'&&value.trim().length>0&&value.length<=max&&!/[<>\x00-\x1f]/.test(value);
 self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
@@ -12,13 +15,15 @@ self.addEventListener('push',event=>{
  const announcement=data.kind==='announcement'&&plain(data.title,80)&&plain(data.body,240);
  event.waitUntil(self.registration.showNotification(announcement?data.title:'Mystery Hub',{
   body:announcement?data.body:'An account update is available. Sign in to view it.',tag:'mh-'+data.notificationId,icon:ICON,
-  data:{notificationId:data.notificationId,kind:announcement?'announcement':'account'},renotify:false
+  data:{notificationId:data.notificationId,kind:announcement?'announcement':'account',url:announcement?page(data.url):null,
+   // An operator's own test carries a one-off token; opening the test with it is the phone check. Nothing else does.
+   open:!announcement&&typeof data.open==='string'&&/^[A-Za-z0-9_-]{43}$/.test(data.open)?data.open:null},renotify:false
  }));
 });
 self.addEventListener('notificationclick',event=>{
  event.notification.close();const id=event.notification.data?.notificationId;if(typeof id!=='string'||!ID.test(id))return;
- const target=event.notification.data?.kind==='announcement'?new URL('/',self.location.origin):new URL('/orders',self.location.origin);
- if(event.notification.data?.kind!=='announcement')target.searchParams.set('notification',id);
+ const target=event.notification.data?.kind==='announcement'?new URL(page(event.notification.data?.url),self.location.origin):new URL('/orders',self.location.origin);
+ if(event.notification.data?.kind!=='announcement'){target.searchParams.set('notification',id);if(event.notification.data?.open)target.searchParams.set('open',event.notification.data.open);}
  event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(async clients=>{
   const existing=clients.find(c=>new URL(c.url).origin===target.origin&&!new URL(c.url).pathname.startsWith('/sites/'));
   if(existing){await existing.navigate(target.href);return existing.focus();}return self.clients.openWindow(target.href);

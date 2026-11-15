@@ -188,7 +188,7 @@ export function Freshness({ at, prefix = 'Updated' }: { at: number | string | nu
   if (!Number.isFinite(time)) return null;
   const seconds = Math.max(0, Math.round((Date.now() - time) / 1000));
   const label = seconds < 45 ? 'just now' : seconds < 3600 ? `${Math.round(seconds / 60)} min ago` : seconds < 86400 ? `${Math.round(seconds / 3600)} h ago` : new Date(time).toLocaleString();
-  return <span className="text-xs text-slate-500" title={new Date(time).toLocaleString()}>{prefix} {label}</span>;
+  return <span className="text-xs text-slate-400" title={new Date(time).toLocaleString()}>{prefix} {label}</span>;
 }
 
 export function RefreshButton({ onClick, busy, label = 'Refresh' }: { onClick: () => void; busy?: boolean; label?: string }) {

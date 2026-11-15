@@ -39,6 +39,9 @@ test('PostgreSQL transactional notification lifecycle and operational security',
    assert.deepEqual((await pool!.query(`SELECT (SELECT COUNT(*) FROM ${n}.events) AS events,(SELECT COUNT(*) FROM ${n}.attempts) AS attempts`)).rows[0],before);
   }finally{stop();}assert.equal(notificationWorkerHealth().running,false);
  });
+ // 3.4-D: resuming needs a phone that opened an operator test; refused before, allowed after (synthetic fixture).
+ await assert.rejects(()=>service.setSettings('admin',{paused:false,confirmed:true,reason:'Resume before any phone was verified'}),/verify a phone/);assert.equal((await service.settings()).paused,true);
+ await pool.query(`INSERT INTO ${n}.events(user_id,event_key,template_id,label,operator_test,expanded_at,opened_at) VALUES('admin','fixture-verified-test','operator_test','Test notification',TRUE,NOW(),NOW())`);
  await service.setSettings('admin',{paused:false,confirmed:true,reason:'Resume isolated synthetic delivery tests'});
  await t.test('encrypted multi-device subscriptions bind to actual active sessions and reject endpoint spoofing',async()=>{
   deviceId=(await service.subscribe('buyer1',tokens.buyer1,{subscription})).deviceId;const row=(await pool!.query(`SELECT * FROM ${n}.devices WHERE id=$1`,[deviceId])).rows[0];assert.equal(row.session_id,'session-buyer1');assert.doesNotMatch(row.encrypted_subscription,/SYNTHETIC|fcm|synthetic-session/);
@@ -82,7 +85,8 @@ test('PostgreSQL transactional notification lifecycle and operational security',
   try{await processNotificationBatch(async()=>{sent++;},25);assert.equal(sent,0);}finally{await pool!.query("UPDATE sessions SET expires_at=NOW()+interval '1 day' WHERE user_id='buyer1'");}
  });
  await t.test('marketing opt-in, preview counts, immutable snapshots and idempotent confirmed sends',async()=>{
-  assert.deepEqual(await service.preferences('buyer1'),{transactional:true,marketing:false,marketingOptedOut:false}); // 3.4: changing only order updates (recorded in the consent ledger) never counts as declining offersassert.equal((await service.previewAudience('admin',{templateId:'special_offer'})).eligibleDevices,0);
+  assert.deepEqual(await service.preferences('buyer1'),{transactional:true,marketing:false,marketingOptedOut:false}); // 3.4: changing only order updates (recorded in the consent ledger) never counts as declining offers
+  assert.equal((await service.previewAudience('admin',{templateId:'special_offer'})).eligibleDevices,0);
   await service.setPreferences('buyer1',{transactional:true,marketing:true});const preview=await service.previewAudience('admin',{templateId:'special_offer',userId:'buyer1'});assert.equal(preview.eligibleCustomers,1);assert.equal(preview.eligibleDevices,2);
   await assert.rejects(()=>service.campaign('admin',{previewId:preview.previewId,requestId:randomUUID(),confirmed:false}));const input={previewId:preview.previewId,requestId:randomUUID(),confirmed:true};const first=await service.campaign('admin',input);assert.equal((await service.campaign('admin',input)).campaignId,first.campaignId);
   await assert.rejects(()=>service.campaign('admin',{...input,requestId:randomUUID()}),/already sent/);
