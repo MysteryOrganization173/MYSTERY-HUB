@@ -33,6 +33,8 @@ export function readAuthBootstrap(): { token: string | null; user: import('../..
       role: value.role, status: value.status, createdAt: value.createdAt,
       lastLoginAt: value.lastLoginAt, mustChangePassword: value.mustChangePassword,
       passwordChangedAt: value.passwordChangedAt,
+      // Profiles stored before 3.4.1 have no receipt email; the next session check fills it in.
+      receiptEmail: typeof value.receiptEmail === 'string' ? value.receiptEmail : null,
     } };
   } catch { return { token, user: null }; }
 }

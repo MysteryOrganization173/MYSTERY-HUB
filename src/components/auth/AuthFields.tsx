@@ -12,14 +12,12 @@ export interface AuthFieldValues {
 type FieldChanges = { [K in keyof AuthFieldValues]: (value: AuthFieldValues[K]) => void };
 
 /** Controlled presentation only. Authentication and validation remain server-authoritative. */
-export function AuthFields({ signup, values, changes, busy, error, emailOpen, revealEmail, recover }: {
+export function AuthFields({ signup, values, changes, busy, error, recover }: {
   signup: boolean;
   values: AuthFieldValues;
   changes: FieldChanges;
   busy: boolean;
   error: string;
-  emailOpen: boolean;
-  revealEmail: () => void;
   recover: () => void;
 }) {
   const description = error ? 'auth-error' : undefined;
@@ -39,17 +37,15 @@ export function AuthFields({ signup, values, changes, busy, error, emailOpen, re
         value={values.identifier} onChange={e => changes.identifier(e.target.value)}
         placeholder={signup ? '024 123 4567' : 'Phone number or email'} aria-invalid={invalid} aria-describedby={description} />
     </label>
-    {signup && <div>
-      {!emailOpen && !values.email
-        ? <button type="button" aria-expanded={false} aria-controls="auth-email" onClick={revealEmail}
-            className="min-h-11 text-sm text-emerald-300 underline underline-offset-4">Add email (optional)</button>
-        : <label className="block text-sm font-medium" htmlFor="auth-email">
-            Email (optional)
-            <input id="auth-email" type="email" autoComplete="email" autoCapitalize="none" spellCheck={false} maxLength={128}
-              className={inputClass} value={values.email} onChange={e => changes.email(e.target.value)}
-              aria-invalid={invalid} aria-describedby={description} placeholder="you@example.com" />
-          </label>}
-    </div>}
+    {/* Optional, and shown openly: an email gets payment receipts and makes later checkouts quicker. It is also a
+        second way to sign in, so it is never added or changed without the customer typing it. */}
+    {signup && <label className="block text-sm font-medium" htmlFor="auth-email">
+      Email address <span className="font-normal text-slate-400">(recommended)</span>
+      <input id="auth-email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} maxLength={128}
+        className={inputClass} value={values.email} onChange={e => changes.email(e.target.value)}
+        aria-invalid={invalid} aria-describedby={'auth-email-help' + (error ? ' auth-error' : '')} placeholder="you@example.com" />
+      <span id="auth-email-help" className="block text-xs font-normal text-slate-400 mt-1">For payment receipts and easier future checkouts.</span>
+    </label>}
     <div>
       <div className="flex items-center justify-between gap-2">
         <label className="text-sm font-medium" htmlFor="auth-password">Password</label>

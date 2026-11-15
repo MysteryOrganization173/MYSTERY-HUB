@@ -10,6 +10,7 @@ import {
   InstantBundleCategoryType,
 } from '../../utils/instantBundleUtils';
 import { revealPressedChip, revealFocusedChip } from '../../utils/scroll';
+import { instantBundleToCheckout } from '../../utils/instantBundleCheckout';
 import { Search, RefreshCw, WifiOff, Clock, PackageX, X, Info } from 'lucide-react';
 
 interface InstantBundlesCatalogProps {
@@ -115,40 +116,7 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
     product: PublicInstantBundle,
     options?: { flexiAmount?: number }
   ) => {
-    const finalPrice =
-      product.isFlexi && options?.flexiAmount ? options.flexiAmount : product.retailPriceGhc;
-    // The catalogue prices Flexi at its minimum; another amount gets checkout's fee estimate instead.
-    const catalogPriced = !product.isFlexi || finalPrice === product.retailPriceGhc;
-
-    const info = getInstantBundlePresentation(product);
-
-    const convertedBundle: DataBundle = {
-      id: product.productKey,
-      network: product.network,
-      dataAmount: info.formattedAmount,
-      dataBytesValue: 0,
-      validity: product.validity || 'Instant Direct',
-      validityCategory: 'Daily',
-      priceGhc: finalPrice,
-      faceValueGhc: finalPrice,
-      serviceFeeGhc: catalogPriced ? product.paymentProcessingFeeGhc : undefined,
-      estimatedTotalGhc: catalogPriced ? product.estimatedTotalGhc : undefined,
-      networkReferencePriceGhc: product.networkReferencePriceGhc,
-      savingsOnProductGhc: product.savingsOnProductGhc,
-      serviceType: 'instant_bundle',
-      category: info.categoryLabel,
-      restrictionNote: info.restrictionNote,
-      description:
-        info.restrictionNote ||
-        product.description ||
-        `Instant ${product.network.toUpperCase()} bundle with direct automated delivery.`,
-      packageId: product.packageId,
-      isFlexi: product.isFlexi,
-      minAmountGhc: product.minAmountGhc,
-      maxAmountGhc: product.maxAmountGhc,
-    };
-
-    openCheckout(convertedBundle);
+    openCheckout(instantBundleToCheckout(product, options));
   };
 
   const getCategoryFilterLabel = (cat: InstantBundleCategoryType) => {

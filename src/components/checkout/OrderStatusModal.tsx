@@ -15,6 +15,7 @@ import { OrderRecord } from '../../types';
 import { PostPurchaseInvite } from './PostPurchaseInvite';
 import { CheckCircle2, Clock, AlertTriangle, ArrowRight, MessageSquare, Copy, Check, RefreshCw, X, ShieldAlert, Phone as PhoneIcon } from 'lucide-react';
 import { Seasonal } from '../../seasonal/Seasonal';
+import { useBuyAgain } from '../../hooks/useBuyAgain';
 
 export const OrderStatusModal: React.FC = () => {
   const {
@@ -28,6 +29,7 @@ export const OrderStatusModal: React.FC = () => {
     sessionToken,
     openAuth,
   } = useApp();
+  const { buyAgain, pending: buyAgainPending } = useBuyAgain();
 
   const [copied, setCopied] = useState(false);
   // Shown so customers on weak connections know whether the status they see is current.
@@ -257,6 +259,10 @@ export const OrderStatusModal: React.FC = () => {
   ];
   const currentStep = journey.findIndex(step => !step.complete);
   const tone = activeOrder.status === 'delivered' || dataView.delivered ? 'success' : stopped || activeOrder.status === 'failed' ? 'attention' : 'progress';
+  // 3.4.1 Smart Buy Again for a signed-in customer's delivered Data, Airtime or Instant order. The server confirms the
+  // order is theirs and what it can be bought as today; anything else keeps the plain catalogue link.
+  const smartBuyAgain = tone === 'success' && Boolean(sessionToken && user && activeOrder.publicReference)
+    && (!activeOrder.serviceType || ['data', 'airtime', 'instant_bundle'].includes(activeOrder.serviceType));
 
   return (
     <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Order status and receipt" className="mh-sheet-backdrop fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/75 backdrop-blur-sm">
@@ -474,13 +480,14 @@ export const OrderStatusModal: React.FC = () => {
             </button>
             <button
               onClick={() => {
+                if (smartBuyAgain) { void buyAgain(activeOrder.publicReference!, { beforeOpen: closeOrderStatus }); return; }
                 closeOrderStatus();
                 if (activeOrder.serviceType === 'results_checker') { window.location.assign(`/results-checkers?order=${encodeURIComponent(activeOrder.publicReference || activeOrder.id)}`); return; }
                 setActivePage(isAfa ? 'home' : 'data');
               }}
               className="mh-button"
             >
-              <span>{activeOrder.serviceType === 'results_checker' ? 'Open your receipt' : isAfa ? 'Back to Home' : tone === 'success' ? 'Buy again' : 'Done'}</span>
+              <span>{activeOrder.serviceType === 'results_checker' ? 'Open your receipt' : isAfa ? 'Back to Home' : tone === 'success' ? (buyAgainPending ? 'Checking…' : 'Buy again') : 'Done'}</span>
             </button>
           </div>
 

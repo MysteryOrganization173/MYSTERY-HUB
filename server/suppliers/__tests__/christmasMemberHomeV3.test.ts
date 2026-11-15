@@ -166,7 +166,7 @@ test('the seasonal member homepage reads no account data of its own and can star
   assert.match(market, /getPublicMarketplaceProducts\(\{ featured: true \}\)/);
   // The same presentation helpers as the ordinary view (one source of truth for tones, steps, labels and Buy again).
   assert.match(view, /import \{ memberOrderLabel, memberOrderNext, memberOrderSelection, memberOrderSteps, memberOrderTone, memberReorder \} from '\.\.\/\.\.\/\.\.\/utils\/memberHomePresentation';/);
-  assert.match(view, /import \{ NETWORKS, orderTitle, websiteCard, type MemberHomeViewProps \} from '\.\.\/\.\.\/\.\.\/components\/home\/MemberHomeView';/);
+  assert.match(view, /import \{ NETWORKS, buyAgainButton, orderTitle, websiteCard, type MemberHomeViewProps \} from '\.\.\/\.\.\/\.\.\/components\/home\/MemberHomeView';/);
   // The welcome-offer quote is read only for a customer without orders.
   assert.match(home, /const firstPurchase = !view\.loading && !view\.error && view\.orders\.length === 0;/);
   assert.match(home, /welcome=\{firstPurchase \? <MemberWelcomeOffer \/> : undefined\}/);

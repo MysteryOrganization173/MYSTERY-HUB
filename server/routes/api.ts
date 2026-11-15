@@ -45,6 +45,7 @@ import { requireAuth, optionalAuth } from '../middleware/authMiddleware.js';
 import { loginRateLimiter, signupRateLimiter, waitlistRateLimiter, referralCaptureRateLimiter } from '../middleware/rateLimiter.js';
 import { PaystackServerService } from '../services/paystackService.js';
 import { FulfilmentService } from '../services/fulfilmentService.js';
+import { resolveReorder } from '../services/reorderService.js';
 import { validateOrderPayment } from '../services/paymentValidation.js';
 import { SuccessBizHubWebhookHandler } from '../suppliers/successBizHub/webhookHandler.js';
 import { websiteRouter, handlePublicSiteBySlug } from './websiteApi.js';
@@ -1472,6 +1473,27 @@ apiRouter.get('/account/orders', requireAuth, async (req: Request, res: Response
   } catch (err) {
     console.error('Account Orders API Exception: order retrieval unavailable');
     res.status(500).json({ error: 'Failed to retrieve account orders.' });
+  }
+});
+
+/**
+ * 12c. GET /api/account/orders/:reference/reorder (3.4.1 Smart Buy Again)
+ * For the signed-in customer's own delivered order: the product it was for, if it is still sold. Read-only; it never
+ * creates an order or a payment, and returns only public catalogue facts. Another customer's order reads as not found.
+ */
+const reorderLimit = createRateLimiter({ windowMs: 60_000, max: 20, key: req => `reorder:${req.user!.id}` });
+apiRouter.get('/account/orders/:reference/reorder', requireAuth, reorderLimit, async (req: Request, res: Response) => {
+  const notFound = () => res.status(404).json({ error: 'We couldn’t find that order in your account.', code: 'ORDER_NOT_FOUND' });
+  try {
+    const reference = String(req.params.reference || '');
+    if (!/^[A-Za-z0-9_-]{4,64}$/.test(reference)) { notFound(); return; }
+    const order = await OrdersStore.findOrder(reference);
+    // Only the public reference names an order here (never a payment reference or internal id), and only its owner may ask.
+    if (!order || order.public_reference !== reference || !order.user_id || order.user_id !== req.user!.id) { notFound(); return; }
+    res.json({ success: true, reorder: await resolveReorder(order) });
+  } catch {
+    console.error('Reorder lookup unavailable');
+    res.status(500).json({ error: 'We couldn’t check this order right now. Please try again.' });
   }
 });
 

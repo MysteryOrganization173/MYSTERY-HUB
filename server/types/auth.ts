@@ -20,6 +20,8 @@ export interface UserRecord {
   last_login_at: string | null;
   must_change_password: boolean;
   password_changed_at: string | null;
+  /** 3.4.1: where payment receipts go, when the customer chose to remember one. Never used to sign in. */
+  receipt_email?: string | null;
 }
 
 export interface SafeUserProfile {
@@ -33,6 +35,8 @@ export interface SafeUserProfile {
   lastLoginAt: string | null;
   mustChangePassword: boolean;
   passwordChangedAt: string | null;
+  /** Remembered receipt email (separate from the sign-in email). */
+  receiptEmail: string | null;
 }
 
 export interface SessionRecord {
@@ -78,5 +82,6 @@ export function toSafeUserProfile(user: UserRecord): SafeUserProfile {
     lastLoginAt: user.last_login_at,
     mustChangePassword: user.must_change_password === true,
     passwordChangedAt: user.password_changed_at ?? null,
+    receiptEmail: user.receipt_email ?? null,
   };
 }

@@ -55,7 +55,7 @@ test('discount and authoritative quote contract remain intact',()=>{
   assert.match(checkout,/quoteError&&<button/);
   assert.match(checkout,/setQuoteRefresh/);
   assert.match(checkout,/customerEmail: receiptEmail \|\| user\?\.email/);
-  assert.match(checkout,/setEditingReceipt\(!\//);
+  assert.match(checkout,/setEditingReceipt\(!RECEIPT_EMAIL_PATTERN\.test\(defaultReceiptEmail\(user\)\)\)/);
   assert.match(checkout,/onClick=\{\(\)=>setEditingReceipt\(true\)\}/);
 });
 test('customer Welcome Offer copy hides internal eligibility reasons',()=>{

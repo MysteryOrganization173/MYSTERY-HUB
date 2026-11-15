@@ -131,6 +131,26 @@ export async function updateAccountProfile(id: string, body: Record<string, unkn
   } catch (error) { throw identifierConflict(error) ?? error; }
 }
 
+/**
+ * 3.4.1: remember (or forget) where payment receipts go. This is a contact, not a sign-in detail, so it needs no
+ * password and never touches the sign-in email, phone or sessions. Only the signed-in customer can change it.
+ */
+export async function setAccountReceiptEmail(id: string, body: Record<string, unknown>, access: { token: string }) {
+  if (Object.keys(body).length !== 1 || !Object.hasOwn(body, 'email')) throw new AccountError(400, 'Provide the receipt email to remember.');
+  const raw = body.email;
+  if (raw !== null && typeof raw !== 'string') throw new AccountError(400, 'Enter a valid email address.');
+  const cleared = raw === null || raw.trim() === '';
+  const email = cleared ? null : normalizeEmail(raw);
+  if (!cleared && !email) throw new AccountError(400, 'Enter a valid email address.');
+  return AuthStore.withLockedUser(id, async (record, client) => {
+    const user = await activeSession(record, access.token, client);
+    if (user.must_change_password) throw new AccountError(403, 'Create a new password before continuing.', 'PASSWORD_CHANGE_REQUIRED');
+    const saved = await AuthStore.saveReceiptEmail(id, email, client);
+    if (!saved) throw new AccountError(401, 'Please log in again.');
+    return { success: true, user: toSafeUserProfile(saved) };
+  });
+}
+
 export async function revokeAccountSessions(id: string, access: { token: string } | { adminId: string }) {
   return AuthStore.withLockedUser(id, async (record, client) => {
     if ('adminId' in access) customerTarget(record, access.adminId);

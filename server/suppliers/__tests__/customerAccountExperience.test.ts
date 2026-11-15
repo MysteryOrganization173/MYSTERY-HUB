@@ -13,7 +13,7 @@ const props:MemberHomeViewProps={name:'Akosua',greeting:'Good morning',orders:[]
 const render=(extra:Partial<MemberHomeViewProps>={})=>renderToStaticMarkup(React.createElement(MemberHomeView,{...props,...extra}));
 
 const fieldProps = {
-  signup: true, busy: false, error: '', emailOpen: false, revealEmail: noop, recover: noop,
+  signup: true, busy: false, error: '', recover: noop,
   values: { name: '', identifier: '', email: '', password: '', rememberMe: false },
   changes: { name: noop, identifier: noop, email: noop, password: noop, rememberMe: noop },
 };
@@ -38,13 +38,17 @@ test('signup keeps labelled required name, Ghana phone and password with passwor
   assert.match(input(html, 'auth-password'), /minLength="8"/i);
 });
 
-test('optional email starts collapsed and is genuinely optional when revealed', () => {
-  assert.doesNotMatch(fields(), /<input[^>]*id="auth-email"/);
-  assert.match(fields(), /type="button" aria-expanded="false" aria-controls="auth-email"/);
-  const email = input(fields({ emailOpen: true }), 'auth-email');
+test('3.4.1: signup shows the email openly as recommended, with its purpose, and it stays optional', () => {
+  const html = fields();
+  const email = input(html, 'auth-email');
+  assert.match(html, /for="auth-email"/);
+  assert.match(html, /Email address <span[^>]*>\(recommended\)<\/span>/);
+  assert.match(html, /id="auth-email-help"[^>]*>For payment receipts and easier future checkouts\.</);
+  assert.match(email, /aria-describedby="auth-email-help"/);
   assert.match(email, /type="email"/);
   assert.match(email, /autoComplete="email"/i);
   assert.doesNotMatch(email, /required/);
+  assert.doesNotMatch(html, /Add email \(optional\)|aria-controls="auth-email"/, 'no hidden reveal step');
 });
 
 test('previously entered optional email stays visible when switching back to signup', () => {
@@ -61,7 +65,7 @@ test('signin accepts phone or email without signup fields and uses current-passw
 });
 
 test('validation associates every visible field with the inline error', () => {
-  const html = fields({ error: 'Invalid details', emailOpen: true });
+  const html = fields({ error: 'Invalid details' });
   for (const id of ['auth-name', 'auth-identifier', 'auth-email', 'auth-password']) {
     assert.match(input(html, id), /aria-invalid="true"/);
     assert.match(input(html, id), /aria-describedby="[^"]*auth-error/);

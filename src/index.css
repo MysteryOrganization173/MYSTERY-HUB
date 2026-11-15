@@ -135,6 +135,8 @@ dialog:modal { overscroll-behavior: contain; }
 .mh-mobile-menu { position: absolute; left: 0; right: 0; top: 100%; height: calc(100dvh - 4rem); display: flex; flex-direction: column; }
 .mh-mobile-menu-panel { max-height: 100%; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; flex-shrink: 1; }
 .mh-mobile-menu-scrim { flex: 1 0 1.5rem; background: rgb(3 6 9 / .72); }
+/* While the menu is open it is the navigation: the bottom bar steps aside so it never covers the menu's last items. */
+.mh-app:has(.mh-mobile-menu) .mh-bottom-nav { visibility: hidden; }
 /* Template preview documents (inside an iframe) never hand their scroll on to the page that hosts them. */
 html.mh-isolated-preview, html.mh-isolated-preview body { overscroll-behavior-y: contain; }
 

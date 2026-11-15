@@ -142,9 +142,11 @@ describe('Member Home & Logged-In Experience', () => {
       navbarCode.includes('accountDropdownOpen'),
       'Navbar must contain state for toggling account dropdown'
     );
+    // 3.4.1: Home is the logo and the Home link (header from 1280px, bottom nav on phones), so the account menu
+    // carries the account itself instead of a second Home.
     assert.ok(
-      navbarCode.includes('My Home'),
-      'Account dropdown must include My Home link'
+      navbarCode.includes("handleNavClick('home')"),
+      'Home stays one tap away'
     );
     assert.ok(
       navbarCode.includes('My Orders'),
