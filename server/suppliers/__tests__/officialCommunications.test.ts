@@ -7,7 +7,11 @@ test('official support and announcement links preserve distinct destinations', (
   assert.equal(business.contact.supportPhone, '0594521108');
   assert.equal(business.contact.supportPhoneIntl, '+233594521108');
   assert.equal(business.contact.phoneLink, 'tel:+233594521108');
-  assert.equal(business.contact.supportWhatsAppUrl, 'https://wa.me/233594521108');
+  // Temporary WhatsApp support (PR #118, owner-approved 14 Nov 2026); calls stay on 059 452 1108; SMS is a separate line.
+  assert.equal(business.contact.supportWhatsAppUrl, 'https://wa.me/233242836323');
+  assert.equal(business.contact.supportSms, '0592066298');
+  assert.equal(business.contact.supportSmsIntl, '+233592066298');
+  assert.equal(business.contact.smsLink, 'sms:+233592066298');
   assert.equal(business.contact.supportEmail, 'aryeeteyemmanuel852@gmail.com');
   assert.equal(business.contact.whatsappChannelUrl, 'https://whatsapp.com/channel/0029VbBt1MGC6ZvlDJ8Biz3l');
   assert.equal(business.contact.telegramChannelUrl, 'https://t.me/mysteryhubapp');
