@@ -76,7 +76,6 @@ const tail = id => `QA-D-${run}-${id}`.slice(-14);
     await ctx.addInitScript(token => { try { localStorage.setItem('mystery_hub_session_token', token); } catch {} }, tokens.browser);
     const p = await ctx.newPage();
     await p.goto(`${BASE}/admin#notifications`); await p.getByRole('heading', { name: 'Status' }).waitFor({ timeout: 20000 });
-    const status = () => p.locator('section, div').filter({ has: p.getByRole('heading', { name: 'Status' }) }).last();
 
     // 1. Status: plain words, the server's own numbers, paused, not yet checked on a phone.
     let h = await health(), body = await text(p);
@@ -103,7 +102,7 @@ const tail = id => `QA-D-${run}-${id}`.slice(-14);
     ok('test: another account cannot open it', (await api(`notifications/inbox/${testPush[0]?.payload.notificationId}`, tokens.c1)).status === 404);
     await p.getByRole('button', { name: 'Refresh' }).first().click(); await p.getByText('Checked on your phone.').waitFor({ timeout: 15000 });
     ok('status: checked on your phone; resume now available', !(await p.getByRole('button', { name: 'Resume sending' }).isDisabled()));
-    await status().screenshot({ path: `${OUT}/status-checked-1280.png` });
+    await p.evaluate(() => window.scrollTo(0, 0)); await p.screenshot({ path: `${OUT}/status-checked-1280.png` });
 
     // 3. Resume needs a reason and an explicit approval.
     await p.getByRole('button', { name: 'Resume sending' }).click();

@@ -61,6 +61,8 @@ const setPaused = paused => db.query(`UPDATE ${N}.settings SET paused=$1 WHERE i
 
 (async () => {
   const b = await chromium.launch();
+  // Counted at the start, so the check below means "during this review" even on a database other reviews have used.
+  const deliveriesBefore = (await db.query(`SELECT COUNT(*)::int AS c FROM ${N}.deliveries`)).rows[0].c;
   await setPaused(false);
   try {
     // 1. Guest: news and offers only, one invitation, server-confirmed, then off again from the footer.
@@ -207,7 +209,7 @@ const setPaused = paused => db.query(`UPDATE ${N}.settings SET paused=$1 WHERE i
       if (shown) await card(p).screenshot({ path: `${OUT}/invite-${w}x${h}.png` });
       await ctx.close();
     }
-    const deliveries = (await db.query(`SELECT COUNT(*)::int AS c FROM ${N}.deliveries`)).rows[0].c;
+    const deliveries = (await db.query(`SELECT COUNT(*)::int AS c FROM ${N}.deliveries`)).rows[0].c - deliveriesBefore;
     ok('no delivery was queued or attempted during this review', deliveries === 0, String(deliveries));
   } finally {
     await setPaused(true).catch(() => {});
