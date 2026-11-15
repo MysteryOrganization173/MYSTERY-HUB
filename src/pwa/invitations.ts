@@ -29,7 +29,6 @@ export const INVITATION_KEYS = {
   session: 'mh_invitation_session',
   seen: 'mh_invitation_seen',
   channel: 'mh_channel_invite',
-  installPending: 'mh_install_pending_at',
 } as const;
 
 /** No two unsolicited invitations within this time in one browser, whatever the tab. */
@@ -44,6 +43,8 @@ export const CHANNEL_OPENED_REST_DAYS = 90;
 export const INSTALL_PENDING_DAYS = 3;
 /** Installed here before (confirmed by the browser, or opened from the home screen): no automatic suggestion. */
 export const INSTALL_REMEMBERED_DAYS = 90;
+/** iPhone/iPad: someone read the Add to Home Screen steps. Safari cannot confirm an install, so rest without a strike. */
+export const INSTALL_STEPS_REST_DAYS = 30;
 export const ENGAGED_VIEWS = 2;
 export const ENGAGED_ACTIVE_MS = 25_000;
 /** A page must settle before an invitation appears, so a quick tap through pages never triggers one. */
@@ -73,11 +74,18 @@ export function engaged(session: InvitationSession) {
   return session.purchase || session.views >= ENGAGED_VIEWS || session.activeMs >= ENGAGED_ACTIVE_MS;
 }
 
-/** The session and browser-wide limits for one kind. The welcome sheet leaves room only for notifications. */
+/**
+ * The session and browser-wide limits for one kind. Notifications are a contextual first-use invitation with their
+ * own snooze: they share the visit (one at a time, one per visit, nothing after a dismissal) but not the 12-hour gap
+ * or the "seen" rests of the marketing invitations, and an unanswered notification card may return within its visit.
+ * The welcome sheet leaves room only for notifications.
+ */
 export function sessionAllows(kind: InvitationKind, session: InvitationSession, seen: SeenMap, now: number) {
-  if (session.shown || session.dismissed) return false;
+  if (session.dismissed) return false;
+  if (session.shown && !(kind === 'notifications' && session.shown === 'notifications')) return false;
   if (session.welcome && kind !== 'notifications') return false;
-  const times = Object.values(seen).filter((time): time is number => valid(time, now));
+  if (kind === 'notifications') return true;
+  const times = [seen.install, seen.channel].filter((time): time is number => valid(time, now));
   if (times.length && now - Math.max(...times) < INVITATION_GAP_MS) return false;
   const own = seen[kind];
   return !valid(own, now) || now - own >= SEEN_REST_DAYS[kind] * DAY;
@@ -92,10 +100,11 @@ export function channelInviteAllowed(state: ChannelInviteState, now: number) {
   return !(valid(state.openedAt, now) && now - state.openedAt < CHANNEL_OPENED_REST_DAYS * DAY);
 }
 
-/** Pending (accepted, unconfirmed) or remembered installs silence automatic install suggestions. */
-export function installRemembered({ installedAt, pendingAt, now }: { installedAt: number | null; pendingAt: number | null; now: number }) {
+/** Pending (accepted, unconfirmed), remembered or iPhone-steps-read installs silence automatic install suggestions. */
+export function installRemembered({ installedAt, pendingAt, stepsAt = null, now }: { installedAt: number | null; pendingAt: number | null; stepsAt?: number | null; now: number }) {
   return (valid(installedAt, now) && now - installedAt < INSTALL_REMEMBERED_DAYS * DAY)
-    || (valid(pendingAt, now) && now - pendingAt < INSTALL_PENDING_DAYS * DAY);
+    || (valid(pendingAt, now) && now - pendingAt < INSTALL_PENDING_DAYS * DAY)
+    || (valid(stepsAt, now) && now - stepsAt < INSTALL_STEPS_REST_DAYS * DAY);
 }
 
 /** Install first when it can genuinely happen here; the Channel otherwise. */
@@ -113,7 +122,10 @@ const count = (value: unknown) => (Number.isInteger(value) && (value as number) 
 const time = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null);
 
 let memorySession: InvitationSession | null = null;
+// Once a write fails (quota, privacy mode), the stored record may be stale: memory is the truth from then on.
+let sessionWritesFailed = false;
 export function readSession(store: Store | null = tab()): InvitationSession {
+  if (sessionWritesFailed && memorySession) return { ...memorySession };
   const raw = readJson(INVITATION_KEYS.session, store) as Partial<InvitationSession> | null;
   if (!raw || typeof raw !== 'object') return memorySession ? { ...memorySession } : { ...NEW_SESSION };
   const kinds: InvitationKind[] = ['install', 'channel', 'notifications'];
@@ -125,7 +137,7 @@ export function readSession(store: Store | null = tab()): InvitationSession {
 }
 export function writeSession(next: InvitationSession, store: Store | null = tab()) {
   memorySession = { ...next };
-  writeJson(INVITATION_KEYS.session, next, store);
+  if (!store || !writeJson(INVITATION_KEYS.session, next, store)) sessionWritesFailed = true;
 }
 const updateSession = (patch: (session: InvitationSession) => Partial<InvitationSession>) => {
   const current = readSession();
@@ -192,6 +204,8 @@ export const noteActive = (ms: number) => updateSession(session => ({ activeMs: 
 export const notePurchase = () => { updateSession(() => ({ purchase: true })); };
 /** Any "Not now", "Maybe later" or close: nothing else is suggested for the rest of this visit. */
 export const noteDismissal = () => { updateSession(() => ({ dismissed: true })); };
+/** Someone acted on an in-page suggestion (for example Install App on the Home card): that was this visit's one. */
+export const noteInvitationAnswered = (kind: InvitationKind) => { updateSession(session => (session.shown ? {} : { shown: kind })); };
 
 /** Claims the screen for the first kind whose rules allow it now, and remembers it was shown. */
 export function claimInvitation(kinds: InvitationKind[], now = Date.now()): InvitationKind | null {
@@ -223,5 +237,5 @@ export function releaseInvitation(slot: Slot) {
 
 /** Tests only: forget the in-memory coordinator state between cases. */
 export function resetInvitationsForTest() {
-  onScreen = null; inlineOffers.clear(); memorySession = null; notify();
+  onScreen = null; inlineOffers.clear(); memorySession = null; sessionWritesFailed = false; notify();
 }

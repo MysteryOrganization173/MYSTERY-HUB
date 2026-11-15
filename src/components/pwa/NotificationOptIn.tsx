@@ -3,7 +3,7 @@ import {BellRing, BellOff, CheckCircle2, X} from 'lucide-react';
 import {httpCustomerNotificationsClient, type CustomerNotificationsClient} from '../../services/customerNotifications';
 import {notificationOpportunity, activateNotificationOnboarding, acceptNotificationOffers, type OnboardingStep, type OnboardingOptions} from '../../pwa/notificationOnboarding';
 import {marketingPromptAnswered, markMarketingPromptAnswered, readSnooze, recordDismissal, STORAGE_KEYS} from '../../pwa/launchPolicy';
-import {claimInvitation, releaseInvitation} from '../../pwa/invitations';
+import {claimInvitation, noteDismissal, releaseInvitation} from '../../pwa/invitations';
 import './pwa.css';
 
 type Props = {token:string;accountId:string;allowOffers:boolean;onDone:()=>void;initialStep?:'enable'|'offers';variant?:'floating'|'inline';client?:CustomerNotificationsClient;environment?:OnboardingOptions['environment']};
@@ -31,7 +31,7 @@ export function NotificationOptIn({token,accountId,allowOffers,onDone,initialSte
   const titleId=useId(),request=useRef<AbortController|null>(null),inFlight=useRef(false);
   useEffect(()=>{request.current=new AbortController();return()=>{request.current?.abort();};},[token,accountId]);
   const active=()=>Boolean(request.current&&!request.current.signal.aborted);
-  const later=()=>{if(inFlight.current)return;if(step==='offers')markMarketingPromptAnswered(accountId);else recordDismissal(STORAGE_KEYS.notificationOptIn);onDone();};
+  const later=()=>{if(inFlight.current)return;if(step==='offers')markMarketingPromptAnswered(accountId);else recordDismissal(STORAGE_KEYS.notificationOptIn);noteDismissal();onDone();};
   const enable=async()=>{
     if(inFlight.current||!active())return;inFlight.current=true;setBusy(true);setMessage(null);
     try{

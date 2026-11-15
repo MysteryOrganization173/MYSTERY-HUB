@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { isInstalledApp } from '../../pwa/appEnvironment';
 import {
@@ -6,6 +6,7 @@ import {
 } from '../../pwa/launchPolicy';
 import { claimWelcome, releaseInvitation } from '../../pwa/invitations';
 import { AppWelcomeSheet } from './AppWelcomeSheet';
+import { appBusy } from './invitationBusy';
 import { InstalledNotificationOnboarding } from './NotificationOptIn';
 
 /**
@@ -21,8 +22,7 @@ export const AppLaunchLayer: React.FC = () => {
   const [launchPath] = useState(() => (typeof window === 'undefined' ? '/' : window.location.pathname));
   const [welcomeOpen, setWelcomeOpen] = useState(false);
 
-  const busy = Boolean(app.activeEditorSite || app.isMysteryAiOpen || app.isCheckoutOpen || app.isStatusModalOpen || app.isAuthModalOpen
-    || app.selectedTemplatePreview || app.marketplaceInquiryProduct || app.waitlistInfo.isOpen || app.isAccountOpen || user?.mustChangePassword);
+  const busy = appBusy(app);
 
   useEffect(() => {
     if (!installed || welcomeOpen || busy || activePage !== 'home') return;
@@ -35,7 +35,13 @@ export const AppLaunchLayer: React.FC = () => {
     }
   }, [installed, user, isAuthChecking, launchPath, welcomeOpen, busy, activePage]);
 
-  useEffect(() => { if (!welcomeOpen) releaseInvitation('welcome'); }, [welcomeOpen]);
+  // Free the coordinator's slot only once the sheet that claimed it has actually been open and closed.
+  const welcomeWasOpen = useRef(false);
+  useEffect(() => {
+    if (welcomeOpen) { welcomeWasOpen.current = true; return; }
+    if (welcomeWasOpen.current) { welcomeWasOpen.current = false; releaseInvitation('welcome'); }
+  }, [welcomeOpen]);
+  useEffect(() => () => { if (welcomeWasOpen.current) releaseInvitation('welcome'); }, []);
   if (!installed) return null;
   if (welcomeOpen && !user && !busy && activePage === 'home') return <AppWelcomeSheet onClose={() => setWelcomeOpen(false)} />;
   if (user && sessionToken && !isAuthChecking && activePage === 'home' && !busy)

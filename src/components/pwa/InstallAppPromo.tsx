@@ -3,11 +3,10 @@ import { CheckCircle2, Download, Share, SquarePlus, X } from 'lucide-react';
 import { BrandMark } from '../common/BrandLogo';
 import { useAppInstall } from '../../pwa/useAppInstall';
 import { installCopy, installProgressCopy } from '../../pwa/invitationCopy';
-import { noteDismissal, registerInlineOffer } from '../../pwa/invitations';
+import { noteDismissal, noteInvitationAnswered, registerInlineOffer } from '../../pwa/invitations';
+import { isCoarsePointer } from '../../pwa/appEnvironment';
 import {trackGrowth} from '../../utils/growthAnalytics';
 import './pwa.css';
-
-const coarsePointer = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
 
 /** iPhone and iPad: Share → Add to Home Screen. Shared by the page card and the floating invitation. */
 export const AppleInstallSteps: React.FC<{ id: string }> = ({ id }) => (
@@ -25,10 +24,11 @@ export const AppleInstallSteps: React.FC<{ id: string }> = ({ id }) => (
  * invitations stay away, and its "Not now" ends suggestions for the rest of the visit.
  */
 export const InstallAppPromo: React.FC<{ variant?: 'section' | 'compact'; className?: string }> = ({ variant = 'section', className = '' }) => {
-  const { mode, progress, install, dismiss } = useAppInstall();
+  const { mode, progress, install, dismiss, stepsSeen } = useAppInstall();
   const [shownMode, setShownMode] = useState(mode);
   const [stepsOpen, setStepsOpen] = useState(false);
-  const [phone] = useState(coarsePointer);
+  const [stepsRead, setStepsRead] = useState(false);
+  const [phone] = useState(() => isCoarsePointer());
   const titleId = useId(), stepsId = useId(), offerId = useId();
   useEffect(() => { if (mode !== 'hidden') setShownMode(mode); }, [mode]);
   const offering = mode !== 'hidden' && progress === 'idle';
@@ -38,6 +38,8 @@ export const InstallAppPromo: React.FC<{ variant?: 'section' | 'compact'; classN
   if (!visible) return null;
   const apple = (mode === 'hidden' ? shownMode : mode) === 'apple';
   const notNow = () => { noteDismissal(); dismiss(); };
+  // Closing after reading the iPhone steps is not a "no": Safari cannot tell us whether it was added.
+  const close = () => { if (stepsRead) { noteDismissal(); stepsSeen(); } else notNow(); };
 
   if (progress !== 'idle') {
     const copy = installProgressCopy(progress, phone);
@@ -52,7 +54,7 @@ export const InstallAppPromo: React.FC<{ variant?: 'section' | 'compact'; classN
 
   const copy = installCopy(phone);
   return <section aria-labelledby={titleId} className={`mh-install-promo mh-install-promo-${variant} ${className}`}>
-    <button type="button" className="mh-install-close mh-compact-control" onClick={notNow} aria-label="Hide the app suggestion">
+    <button type="button" className="mh-install-close mh-compact-control" onClick={close} aria-label="Hide the app suggestion">
       <X className="size-4" aria-hidden="true" />
     </button>
     <span className="mh-install-icon" aria-hidden="true"><BrandMark size="xl" ariaHidden /></span>
@@ -63,10 +65,10 @@ export const InstallAppPromo: React.FC<{ variant?: 'section' | 'compact'; classN
     </div>
     <div className="mh-install-actions">
       {apple
-        ? <button type="button" className="mh-button" aria-expanded={stepsOpen} aria-controls={stepsId} onClick={() => {if(!stepsOpen)trackGrowth('install_action',{page:'home'});setStepsOpen(open => !open);}}>
+        ? <button type="button" className="mh-button" aria-expanded={stepsOpen} aria-controls={stepsId} onClick={() => {if(!stepsOpen){trackGrowth('install_action',{page:'home'});noteInvitationAnswered('install');setStepsRead(true);}setStepsOpen(open => !open);}}>
             <SquarePlus className="size-4" aria-hidden="true" />{stepsOpen ? 'Hide steps' : 'Add to Home Screen'}
           </button>
-        : <button type="button" className="mh-button" onClick={() => { void install(); }}>
+        : <button type="button" className="mh-button" onClick={() => { noteInvitationAnswered('install'); void install(); }}>
             <Download className="size-4" aria-hidden="true" />Install App
           </button>}
       <button type="button" className="mh-install-later" onClick={notNow}>Not now</button>

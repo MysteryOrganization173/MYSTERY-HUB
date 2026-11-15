@@ -26,6 +26,10 @@ export const CHANNEL_COPY = {
   follow: 'Follow Channel', later: 'Maybe later', following: 'Already following',
 } as const;
 
-/** A receipt for a purchase made in this browser that the server has verified as paid. */
-export const verifiedPurchase = (order: Pick<OrderRecord, 'journey' | 'status'> | null) =>
-  Boolean(order && order.journey === 'direct_checkout' && (order.status === 'processing' || order.status === 'delivered'));
+/** A purchase made just now (within the hour) in this browser, verified by the server as paid. */
+export const PURCHASE_MOMENT_MS = 60 * 60 * 1000;
+export const verifiedPurchase = (order: Pick<OrderRecord, 'journey' | 'status' | 'createdAt'> | null, now = Date.now()) => {
+  if (!order || order.journey !== 'direct_checkout' || !(order.status === 'processing' || order.status === 'delivered')) return false;
+  const created = Date.parse(order.createdAt);
+  return Number.isFinite(created) && now - created >= 0 && now - created < PURCHASE_MOMENT_MS;
+};

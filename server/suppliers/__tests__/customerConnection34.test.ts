@@ -7,7 +7,7 @@ import {
   calmPage, engaged, sessionAllows, channelInviteAllowed, installRemembered, invitationOrder, NEW_SESSION, NO_CHANNEL_STATE, DAY,
   INVITATION_GAP_MS, ENGAGED_ACTIVE_MS, readSession, readChannelInvite, readTime, recordChannelLater, recordChannelFollowing,
   recordChannelOpened, claimInvitation, claimWelcome, releaseInvitation, invitationOnScreen, registerInlineOffer, inlineOfferVisible,
-  noteDismissal, noteView, notePurchase, resetInvitationsForTest, INVITATION_KEYS, readSeen,
+  noteDismissal, noteView, notePurchase, resetInvitationsForTest, INVITATION_KEYS, readSeen, noteInvitationAnswered,
 } from '../../../src/pwa/invitations.js';
 import { installPromoMode, NO_SNOOZE } from '../../../src/pwa/launchPolicy.js';
 import { CHANNEL_COPY, installCopy, installProgressCopy, verifiedPurchase } from '../../../src/pwa/invitationCopy.js';
@@ -38,13 +38,15 @@ test('engagement means a second page, about half a minute of active use, or a ve
   assert.equal(engaged({ ...NEW_SESSION, views: 2 }), true);
   assert.equal(engaged({ ...NEW_SESSION, activeMs: ENGAGED_ACTIVE_MS }), true);
   assert.equal(engaged({ ...NEW_SESSION, purchase: true }), true);
-  const order = (extra: object) => ({ journey: 'direct_checkout', status: 'delivered', ...extra }) as never;
-  assert.equal(verifiedPurchase(order({})), true);
-  assert.equal(verifiedPurchase(order({ status: 'processing' })), true, 'paid and verified, delivery in progress');
-  assert.equal(verifiedPurchase(order({ status: 'verifying' })), false, 'payment not yet verified');
-  assert.equal(verifiedPurchase(order({ status: 'failed' })), false);
-  assert.equal(verifiedPurchase(order({ journey: undefined })), false, 'a reference lookup (order recovery) is not a purchase here');
-  assert.equal(verifiedPurchase(null), false);
+  const order = (extra: object) => ({ journey: 'direct_checkout', status: 'delivered', createdAt: new Date(now - 5 * 60_000).toISOString(), ...extra }) as never;
+  assert.equal(verifiedPurchase(order({}), now), true);
+  assert.equal(verifiedPurchase(order({ status: 'processing' }), now), true, 'paid and verified, delivery in progress');
+  assert.equal(verifiedPurchase(order({ status: 'verifying' }), now), false, 'payment not yet verified');
+  assert.equal(verifiedPurchase(order({ status: 'failed' }), now), false);
+  assert.equal(verifiedPurchase(order({ journey: undefined }), now), false, 'a reference lookup (order recovery) is not a purchase here');
+  assert.equal(verifiedPurchase(order({ createdAt: new Date(now - 2 * 60 * 60_000).toISOString() }), now), false, 'tracking an older order is not a fresh purchase');
+  assert.equal(verifiedPurchase(order({ createdAt: 'soon' }), now), false);
+  assert.equal(verifiedPurchase(null, now), false);
 });
 
 test('one unsolicited invitation per visit, none after a dismissal, none within 12 hours, and each kind rests after being seen', () => {
@@ -60,6 +62,12 @@ test('one unsolicited invitation per visit, none after a dismissal, none within 
   assert.equal(sessionAllows('install', s, { install: now - 7 * DAY }, now), true);
   assert.equal(sessionAllows('channel', s, { channel: now - 13 * DAY }, now), false, 'the Channel rests two weeks after being ignored');
   assert.equal(sessionAllows('channel', s, { channel: now + 400 * DAY }, now), true, 'a timestamp far in the future (changed clock) never locks');
+  // Installed-app first use: notifications have their own snooze; marketing gaps and rests never block them.
+  assert.equal(sessionAllows('notifications', s, { install: now - 60_000, channel: now - 60_000, notifications: now - DAY }, now), true);
+  assert.equal(sessionAllows('notifications', { ...s, shown: 'notifications' }, {}, now), true, 'an unanswered notification card may return within its visit');
+  assert.equal(sessionAllows('notifications', { ...s, shown: 'channel' }, {}, now), false, 'but never after another invitation in the same visit');
+  assert.equal(sessionAllows('notifications', { ...s, dismissed: true }, {}, now), false);
+  assert.equal(sessionAllows('install', s, { notifications: now - 60_000 }, now), true, 'a notification card does not start the marketing gap');
 });
 
 test('Channel: "Maybe later" rests 30 then 60 days and stops at the third; "Already following" stops it; a click is not a follow', () => {
@@ -87,6 +95,8 @@ test('install: accepted but unconfirmed is pending (3 days), confirmed is rememb
   assert.equal(installRemembered({ installedAt: null, pendingAt: now - 3 * DAY, now }), false, 'an install that never completed is offered again');
   assert.equal(installRemembered({ installedAt: now - 89 * DAY, pendingAt: null, now }), true);
   assert.equal(installRemembered({ installedAt: now - 90 * DAY, pendingAt: null, now }), false);
+  assert.equal(installRemembered({ installedAt: null, pendingAt: null, stepsAt: now - 29 * DAY, now }), true, 'iPhone steps read: rests without a strike');
+  assert.equal(installRemembered({ installedAt: null, pendingAt: null, stepsAt: now - 30 * DAY, now }), false);
   const base = { installed: false, hasPrompt: true, appleHomeScreen: false, snooze: NO_SNOOZE, now };
   assert.equal(installPromoMode(base), 'install');
   assert.equal(installPromoMode({ ...base, remembered: true }), 'hidden');
@@ -146,6 +156,35 @@ test('the welcome sheet and any dismissal keep marketing invitations out of the 
   assert.equal(readSession().purchase, true);
 }));
 
+test('acting on the page card uses the visit; a failed session write never revives a stale record', () => withBrowser(() => {
+  noteView('home'); noteView('data');
+  noteInvitationAnswered('install');
+  assert.equal(claimInvitation(['channel']), null, 'Install App on the Home card: no Channel card follows it in this visit');
+  resetInvitationsForTest();
+  const stale = memory();
+  stale.setItem(INVITATION_KEYS.session, JSON.stringify({ ...NEW_SESSION, views: 5 }));
+  let writable = true;
+  (globalThis as { window: { sessionStorage: unknown } }).window.sessionStorage = { getItem: (k: string) => stale.getItem(k), setItem: (k: string, v: string) => { if (!writable) throw new Error('quota'); stale.setItem(k, v); } };
+  writable = false;
+  assert.equal(claimInvitation(['channel']), 'channel');
+  releaseInvitation('channel');
+  assert.equal(readSession().shown, 'channel', 'memory wins once storage stops accepting writes');
+  assert.equal(claimInvitation(['install']), null, 'still one per visit');
+}));
+
+test('the welcome slot is released only after the sheet has been open, and installed notifications use the coordinator', () => {
+  const layer = read('src/components/pwa/AppLaunchLayer.tsx');
+  assert.match(layer, /if \(welcomeOpen\) \{ welcomeWasOpen\.current = true; return; \}/);
+  assert.match(layer, /&& claimWelcome\(\)\)/);
+  assert.match(layer, /const busy = appBusy\(app\);/);
+  const optIn = read('src/components/pwa/NotificationOptIn.tsx');
+  assert.match(optIn, /claimInvitation\(\['notifications'\]\)/);
+  assert.match(optIn, /recordDismissal\(STORAGE_KEYS\.notificationOptIn\);noteDismissal\(\);onDone\(\);/);
+  const inline = read('src/components/pwa/InstallAppPromo.tsx');
+  assert.match(inline, /noteInvitationAnswered\('install'\); void install\(\);/);
+  assert.match(read('src/pwa/useAppInstall.ts'), /const remembered = installRemembered\(\{/, 'install marks are re-read on every render');
+});
+
 test('approved copy: one heading, one sentence, clear actions; installing is never shown as installed', () => {
   assert.deepEqual(installCopy(true), { title: 'Mystery Hub, one tap away.', text: 'Buy data, track orders and more, right from your home screen.' });
   assert.equal(installCopy(false).title, 'Mystery Hub, one click away.', 'computers have no home screen');
@@ -177,9 +216,10 @@ test('the layer lives only in the customer shell; Greetings, published sites, Ad
   const entry = read('src/main.tsx');
   assert.match(entry, /greetingPath \? Promise\.all\(\[import\('\.\/greetings\/RecipientPage'\)/);
   assert.match(entry, /siteSlug\s*\? import\('\.\/components\/website\/PublicPublishedSite'\)/);
-  const layer = read('src/components/pwa/InvitationLayer.tsx');
-  for (const guard of ['overlays > 0', 'isCheckoutOpen', 'isStatusModalOpen', 'isAuthModalOpen', 'activeEditorSite', 'isAccountOpen', 'mustChangePassword', 'isAuthChecking'])
-    assert.ok(layer.includes(guard), guard);
+  const layer = read('src/components/pwa/InvitationLayer.tsx'), busy = read('src/components/pwa/invitationBusy.ts');
+  assert.match(layer, /const busy = overlays > 0 \|\| isAuthChecking \|\| appBusy\(app\);/);
+  for (const guard of ['isCheckoutOpen', 'isStatusModalOpen', 'isAuthModalOpen', 'activeEditorSite', 'isAccountOpen', 'mustChangePassword', 'isMysteryAiOpen', 'selectedTemplatePreview', 'marketplaceInquiryProduct', 'waitlistInfo.isOpen'])
+    assert.ok(busy.includes(guard), guard);
   assert.match(read('src/utils/overlayStack.ts'), /export function subscribeOverlays/);
 });
 

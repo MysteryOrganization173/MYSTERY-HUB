@@ -22,10 +22,14 @@ const notify = () => listeners.forEach(listener => listener());
 export const INSTALLED_AT_KEY = 'mh_app_installed_at';
 /** Set when someone accepts the browser's install dialog; cleared once the install is confirmed. */
 export const INSTALL_PENDING_KEY = 'mh_install_pending_at';
+/** iPhone/iPad: the Add to Home Screen steps were read (Safari cannot confirm an install). */
+export const INSTALL_STEPS_SEEN_KEY = 'mh_install_steps_seen_at';
 
 const remember = (win: Window, key: string, value: string | null) => {
   try { if (value === null) win.localStorage.removeItem(key); else win.localStorage.setItem(key, value); } catch { /* storage unavailable */ }
 };
+export const markInstallPending = (win: Window = window) => remember(win, INSTALL_PENDING_KEY, String(Date.now()));
+export const markInstallStepsSeen = (win: Window = window) => remember(win, INSTALL_STEPS_SEEN_KEY, String(Date.now()));
 
 /** Platform pages only: a published business website must never advertise Mystery Hub's own app. */
 export function isPlatformPage(location: Pick<Location, 'pathname' | 'search'>) {

@@ -62,6 +62,7 @@ const engage = async (p, second = '/data') => { await p.goto(BASE + '/'); await 
       && card.links.length === 1 && card.links[0][1] === CHANNEL && card.links[0][2] === '_blank' && /noopener/.test(card.links[0][3])
       && card.buttons.includes('Maybe later') && card.buttons.includes('Already following'), JSON.stringify(card));
     ok('the invitation never takes focus', card.focusInside === false);
+    ok('screen readers hear a short polite note', await p.locator('[role="status"][aria-live="polite"]', { hasText: 'Suggestion: follow the Mystery Hub WhatsApp Channel' }).count() === 1);
     ok('no sideways scroll with the invitation', !(await overflow(p)));
     const v = await axe(p, 'aside.mh-invite'); if (v) ok('axe: invitation (serious/critical)', v.length === 0, v.join(', '));
     await invite(p).screenshot({ path: `${OUT}/channel-invite-1280.png` });
@@ -122,6 +123,17 @@ const engage = async (p, second = '/data') => { await p.goto(BASE + '/'); await 
     ok('after a confirmed install, no install card or invitation in this browser', (await p.locator('.mh-install-promo').count()) === 0 && await noInvite(p, 3000));
     await ctx.close();
   }
+  // 3b. Install accepted from the Home card: that was the visit's suggestion, so nothing floats in afterwards.
+  {
+    const ctx = await context(b, { ...devices['Pixel 7'] }); await simulateInstallPrompt(ctx); const p = await ctx.newPage();
+    await p.goto(BASE + '/help'); await settle(p); await p.goto(BASE + '/'); await settle(p); await sleep(800);
+    await p.locator('.mh-install-promo').getByRole('button', { name: 'Install App' }).click(); await sleep(500);
+    ok('Home card: accepted shows "Installing Mystery Hub…"', await p.locator('.mh-install-promo h2').textContent().then(t => t === 'Installing Mystery Hub…').catch(() => false));
+    ok('no Channel card appears beside the install in progress', await noInvite(p, 5000));
+    await p.goto(BASE + '/services'); await settle(p);
+    ok('nor on the next page of the visit', await noInvite(p));
+    await ctx.close();
+  }
   // 4. Install declined in the browser dialog: counts as a dismissal, nothing chained.
   {
     const ctx = await context(b, { ...devices['Pixel 7'] }); await simulateInstallPrompt(ctx); const p = await ctx.newPage();
@@ -179,7 +191,8 @@ const engage = async (p, second = '/data') => { await p.goto(BASE + '/'); await 
       if (w === 320 || w === 390) await p.screenshot({ path: `${OUT}/invite-page-${w}x${h}.png` });
       await invite(p).getByRole('button', { name: 'Maybe later', exact: true }).focus();
       await p.keyboard.press('Escape'); await sleep(200);
-      ok(`${w}: Escape inside the card closes it (as "Maybe later")`, (await invite(p).count()) === 0 && (await store(p, 'local', 'mh_channel_invite'))?.later === 1);
+      ok(`${w}: Escape inside the card closes it (as "Maybe later") and focus returns to the page`, (await invite(p).count()) === 0 && (await store(p, 'local', 'mh_channel_invite'))?.later === 1
+        && await p.evaluate(() => document.activeElement && document.activeElement.id === 'main-content'));
     }
     await ctx.close();
   }

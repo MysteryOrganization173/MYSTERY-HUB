@@ -17,17 +17,21 @@ Each rule is a pure, tested function.
 | On screen | One at a time. The installed app's welcome sheet also claims the screen. |
 | Never over | Any dialog, sheet or menu (tracked by the shared overlay stack), checkout, receipt or order status, sign-in, account, password change, the assistant, template preview, Marketplace enquiry or waitlist. |
 | Pages | Only calm browsing pages: Home, Data, Services, Marketplace, Creative, About, Help, Earn and Website.<br>Never on Orders (recovery and critical status), Wallet, AFA or Results Checker, `/app`, Admin, the editor or My Business.<br>Never after a Paystack return (`?reference=` / `?trxref=`).<br>Greetings and published business websites never load the app shell, so nothing can appear there. |
-| Timing | Only after real engagement: a second page in the visit, about 25 s of active use, or a verified purchase (a `direct_checkout` receipt in `processing` or `delivered`) once its receipt has been closed. Each page must also settle for 2 s, so rapid navigation never triggers one. |
+| Timing | Only after real engagement: a second page in the visit, about 25 s of active use, or a verified purchase (a `direct_checkout` receipt in `processing` or `delivered`, created within the last hour) once its receipt has been closed. Tracking an older order does not count. Each page must also settle for 2 s, so rapid navigation never triggers one. |
 | Frequency | At most one unsolicited invitation per browsing session (kept in `sessionStorage`, so Back and refresh do not show another), and none at all after any dismissal in that session.<br>No two within 12 hours in the same browser, across tabs.<br>An invitation that was shown and ignored rests (install 7 days, Channel 14). |
 | Step aside | A dialog opening, a page change or a scroll of 1.5 screens closes it for the rest of the visit, so it never becomes a permanent strip at the bottom of a small phone. |
-| Inline cards | The install card inside a page (Home, the member home, the December home) counts as that page's suggestion. Floating invitations stay away while it is visible, and its "Not now" ends suggestions for the visit. |
+| Inline cards | The install card inside a page (Home, the member home, the December home) counts as that page's suggestion. Floating invitations stay away while it is visible. Acting on it (Install App, or opening the iPhone steps) uses the visit's one invitation; its "Not now" ends suggestions for the visit. |
 | Welcome sheet | It is an account entry, not marketing. It keeps install and Channel invitations out of that visit; first-use notifications may still follow sign-in. |
+| Installed-app notifications | A contextual first-use invitation with its own snooze (21 days, two answers). It shares the visit rules: one at a time, never after another invitation or a dismissal in the visit. It is not held back by the marketing 12-hour gap or "seen" rests, so installing from a browser suggestion never blocks the app's first-use card. An unanswered card may return within its visit after a sheet closes. |
 | Storage failure | Corrupt or blocked storage reads as "nothing remembered". The session falls back to memory for the life of the page. |
 
 **Accessibility:**
 - The card is a labelled `aside`. It never takes focus and has no backdrop.
+- A polite status note tells screen readers that a suggestion appeared at the end of the page.
 - Escape (with focus inside), "Not now" / "Maybe later" and the Close button all dismiss it. Close acts as the dismissal under its own name.
+- Focus returns to the page's main region when the card closes from the keyboard.
 - Targets are at least 44 px. Reduced motion removes the entrance animation.
+- **Storage:** if session storage stops accepting writes, the in-memory record wins, so a stale stored record can never re-open the visit.
 
 ### Install
 - **Copy:** "Mystery Hub, one tap away." / "Buy data, track orders and more, right from your home screen." / **Install App** · Not now.
@@ -44,6 +48,8 @@ Each rule is a pure, tested function.
   - Only the browser's `appinstalled`, or opening from the home screen (standalone display mode), records a **confirmed** install (`mh_app_installed_at`) and clears the pending mark.
   - A pending install that never completes is offered again after 3 days, if the browser still offers installation.
   - A confirmed install silences automatic suggestions in that browser for 90 days.
+  - The install marks are re-read on every render, so one card, `/app` or another tab is honoured by the others.
+  - **iPhone and iPad:** closing after reading the Add to Home Screen steps is not counted as a "no", because Safari cannot confirm an install. It rests 30 days instead.
   - Another browser cannot know about an install made elsewhere, and the code does not pretend otherwise. iPhone home-screen apps keep their own storage.
 - **In-app browsers:** the WhatsApp, Facebook and Instagram browsers are no longer offered Add to Home Screen, which cannot work there.
 
@@ -80,9 +86,21 @@ The ordinary footer returns unchanged in structure when the season ends. Neither
 
 ### Verification (Release B)
 - **Unit:** `customerConnection34.test.ts` covers rules, storage failure, the coordinator, copy, shell placement, the Channel sweep and footer separation. The updated install, footer and seasonal suites pass.
-- **Browser:** `scripts/reviewCustomerConnection.cjs` runs locally only, on a production build with a disposable database. Results: 79/79.
+- **Independent review:** 10 findings, all fixed. The fixes:
+  - installed-app notifications are no longer blocked by marketing gaps or rests;
+  - the welcome-slot race;
+  - acting on the inline install card no longer lets a Channel card follow;
+  - unanswered notification cards can return within their visit;
+  - focus return and a polite announcement;
+  - a neutral close after reading the iPhone steps;
+  - install marks are re-read;
+  - the purchase moment requires a recent order;
+  - session storage write failures are handled;
+  - shared busy guards and install-mark helpers.
+- **Browser:** `scripts/reviewCustomerConnection.cjs` runs locally only, on a production build with a disposable database. Results: 83/83.
   - Covers:
-    - first look vs engagement;
+    - first look vs engagement, the polite note and focus return;
+    - Install App on the Home card with nothing following it;
     - the Channel (Maybe later, Already following, Follow and its outbound URL, no follow recorded);
     - session cap, refresh and the cross-tab gap;
     - install on a phone (inline card on Home, floating on Data, accept → pending → `appinstalled` → confirmed, decline → rest, no chaining);
