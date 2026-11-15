@@ -162,6 +162,7 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
 }) {
   // Memory only: preserve the operator's place without persisting customer searches to storage.
   // The workspace is keyed by session so another staff session cannot inherit these queries.
+  const [smsAudience,setSmsAudience]=useState<any>(null);
   const orderViews = useRef(new Map<string, AdminOrderView>());
   const rememberOrders = useCallback((view: AdminOrderView) => {
     if (!orderViews.current.has(param) && orderViews.current.size >= 20) orderViews.current.delete(orderViews.current.keys().next().value!);
@@ -318,7 +319,7 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
           {activeTab === 'marketplace' && (
             <AdminMarketplaceSection key={param} sessionToken={token} initialView={param} onChanged={onSignalsChanged} onShowAllEnquiries={() => navigate('marketplace', 'inquiries/all')} />
           )}
-          {activeTab === 'notifications' && <AdminNotificationsSection key={token} sessionToken={token} initialView={param} onNavigate={view => navigate('notifications', view)} />}
+          {activeTab === 'notifications' && <AdminNotificationsSection key={token} sessionToken={token} initialView={param} smsAudience={smsAudience} onContacts={()=>navigate('customers','')} onNavigate={view => navigate('notifications', view)} />}
           {activeTab === 'waitlist' && (
             <AdminWaitlistSection sessionToken={token} />
           )}
@@ -329,6 +330,7 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
               initialUserId={param||null}
               onOpenEarn={id => navigate('earn', id)}
               onOpenOrder={reference=>navigate('orders','ref/'+reference)}
+              onComposeSms={seed=>{setSmsAudience(seed);navigate('notifications','sms');}}
             />
           )}
           {activeTab === 'websites' && <AdminWebsiteBuilderSection key={param} sessionToken={token} initialView={param} />}
