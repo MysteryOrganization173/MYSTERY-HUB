@@ -46,6 +46,18 @@ CREATE TABLE IF NOT EXISTS mysteryhub_notifications.campaigns (
  request_id VARCHAR(64) NOT NULL UNIQUE,input_hash VARCHAR(64) NOT NULL,recipient_count INTEGER NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS mysteryhub_notifications.settings (id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK(id),paused BOOLEAN NOT NULL DEFAULT TRUE);
+CREATE TABLE IF NOT EXISTS mysteryhub_notifications.guest_devices (
+ id UUID PRIMARY KEY,endpoint_hash VARCHAR(64) UNIQUE NOT NULL,encrypted_subscription TEXT NOT NULL,secret_hash VARCHAR(64) NOT NULL,
+ binding_version INTEGER NOT NULL DEFAULT 1,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW()+interval '180 days'
+);
+CREATE TABLE IF NOT EXISTS mysteryhub_notifications.consents (
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id VARCHAR(64),guest_device_id UUID,
+ purpose VARCHAR(20) NOT NULL CHECK(purpose IN ('transactional','marketing')),granted BOOLEAN NOT NULL,
+ source VARCHAR(40) NOT NULL,copy_version VARCHAR(40),created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ CHECK((user_id IS NULL)<>(guest_device_id IS NULL))
+);
+CREATE INDEX IF NOT EXISTS notification_consents_user ON mysteryhub_notifications.consents(user_id,purpose,created_at DESC) WHERE user_id IS NOT NULL;
 INSERT INTO mysteryhub_notifications.settings(id) VALUES(TRUE) ON CONFLICT DO NOTHING;
 INSERT INTO mysteryhub_notifications.templates(id,title,body,category,locked) VALUES
  ('payment_confirmed','Payment confirmed','Your payment is verified. Open Orders to follow delivery.','transactional',TRUE),
@@ -87,7 +99,7 @@ END $$;
 DO $$ DECLARE t text;r text;BEGIN
  IF NOT EXISTS(SELECT FROM pg_trigger WHERE tgrelid='orders'::regclass AND tgname='notification_order_event') THEN
  CREATE TRIGGER notification_order_event AFTER INSERT OR UPDATE OF status,payment_status,paid_at,submitted_at,delivered_at,supplier_order_id,resolution_json,manual_review ON orders FOR EACH ROW EXECUTE FUNCTION mysteryhub_notifications.capture_order_event();END IF;
- FOREACH t IN ARRAY ARRAY['preferences','devices','templates','template_versions','events','deliveries','audiences','attempts','campaigns','settings'] LOOP
+ FOREACH t IN ARRAY ARRAY['preferences','devices','templates','template_versions','events','deliveries','audiences','attempts','campaigns','settings','guest_devices','consents'] LOOP
  EXECUTE format('ALTER TABLE mysteryhub_notifications.%I ENABLE ROW LEVEL SECURITY',t);
  EXECUTE format('REVOKE ALL ON mysteryhub_notifications.%I FROM PUBLIC',t);
  FOREACH r IN ARRAY ARRAY['anon','authenticated'] LOOP

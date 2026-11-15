@@ -1,4 +1,4 @@
-import {randomUUID} from 'node:crypto';
+import {randomBytes,randomUUID} from 'node:crypto';
 import type {PoolClient} from 'pg';
 import {getPool} from '../db/connection.js';
 import {FinanceError} from '../db/financeStore.js';
@@ -14,11 +14,45 @@ export async function notificationTransaction<T>(work:(client:PoolClient)=>Promi
 async function audience(c:PoolClient,userId?:string){return (await c.query(`SELECT d.id FROM ${NOTIFICATIONS}.devices d JOIN sessions s ON s.id=d.session_id AND s.user_id=d.user_id
  JOIN users u ON u.id=d.user_id JOIN ${NOTIFICATIONS}.preferences p ON p.user_id=d.user_id
  WHERE s.expires_at>NOW() AND u.status='active' AND u.role='customer' AND COALESCE(u.must_change_password,FALSE)=FALSE AND p.marketing=TRUE AND ($1::text IS NULL OR d.user_id=$1) ORDER BY d.id LIMIT 1001`,[userId||null])).rows.map(r=>r.id as string);}
+type Purpose='transactional'|'marketing';
+/** Purpose-specific consent from an explicit, first-party choice, with the copy version the person saw. */
+function consentInput(input:any,allowed:Purpose[]){
+ if(input===undefined)return null;exact(input,['purposes','copyVersion']);
+ if(!Array.isArray(input.purposes)||!input.purposes.length||input.purposes.some((p:unknown)=>!allowed.includes(p as Purpose))||new Set(input.purposes).size!==input.purposes.length
+  ||typeof input.copyVersion!=='string'||!/^[a-z0-9._-]{1,40}$/.test(input.copyVersion))throw new FinanceError('Invalid notification consent.');
+ return {purposes:input.purposes as Purpose[],copyVersion:input.copyVersion as string};
+}
+/** Append-only evidence: who (account or guest browser), which purpose, granted or withdrawn, from where, when. */
+async function recordConsent(c:PoolClient,subject:{userId?:string;guestDeviceId?:string},purpose:Purpose,granted:boolean,source:string,copyVersion:string|null){
+ await c.query(`INSERT INTO ${NOTIFICATIONS}.consents(user_id,guest_device_id,purpose,granted,source,copy_version) VALUES($1,$2,$3,$4,$5,$6)`,[subject.userId||null,subject.guestDeviceId||null,purpose,granted,source,copyVersion]);
+}
+/** A withdrawn marketing choice (or, before the ledger existed, a saved "off") is never switched back on implicitly. */
+async function marketingOptedOut(c:PoolClient|ReturnType<typeof db>,userId:string){
+ const last=(await c.query(`SELECT granted FROM ${NOTIFICATIONS}.consents WHERE user_id=$1 AND purpose='marketing' ORDER BY created_at DESC,id DESC LIMIT 1`,[userId])).rows[0];
+ if(last)return last.granted===false;
+ const saved=(await c.query(`SELECT marketing FROM ${NOTIFICATIONS}.preferences WHERE user_id=$1`,[userId])).rows[0];
+ return saved?saved.marketing===false:false;
+}
+const GUEST_CREDENTIAL=/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.([A-Za-z0-9_-]{43})$/i;
+function guestCredential(header:unknown){const match=typeof header==='string'?GUEST_CREDENTIAL.exec(header.trim()):null;if(!match)throw new FinanceError('Notifications are not on for this browser.',401);return {id:match[1].toLowerCase(),secretHash:digest(match[2])};}
 export class NotificationService {
- static config(){const c=pushConfiguration();return {enabled:c.enabled&&!!getPool(),publicKey:c.enabled?c.publicKey:null,workerPath:'/push-sw.js' as const};}
- static async preferences(userId:string){return (await db().query(`SELECT transactional,marketing FROM ${NOTIFICATIONS}.preferences WHERE user_id=$1`,[userId])).rows[0]||{transactional:true,marketing:false};}
- static async setPreferences(userId:string,input:any){exact(input,['transactional','marketing']);if(typeof input.transactional!=='boolean'||typeof input.marketing!=='boolean')throw new FinanceError('Choose transactional and marketing preferences explicitly.');return (await db().query(`INSERT INTO ${NOTIFICATIONS}.preferences(user_id,transactional,marketing) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET transactional=$2,marketing=$3,updated_at=NOW() RETURNING transactional,marketing`,[userId,input.transactional,input.marketing])).rows[0];}
- static async subscribe(userId:string,token:string,input:any){exact(input,['subscription']);if(!this.config().enabled)throw new FinanceError('Web Push is not enabled and configured.',503);const subscription=validateSubscription(input.subscription),hash=digest(subscription.endpoint);
+ static config(){const c=pushConfiguration(),enabled=c.enabled&&!!getPool();return {enabled,publicKey:enabled?c.publicKey:null,workerPath:'/push-sw.js' as const,guests:enabled};}
+ /** Public view: whether sending is actually on, so the site never invites people to something that is paused. */
+ static async publicConfig(){const c=this.config();if(!c.enabled)return {...c,paused:true};
+  try{const paused=(await db().query(`SELECT paused FROM ${NOTIFICATIONS}.settings WHERE id=TRUE`)).rows[0]?.paused!==false;return {...c,paused};}
+  catch{return {enabled:false,publicKey:null,workerPath:'/push-sw.js' as const,guests:false,paused:true};}
+ }
+ /** `marketingOptedOut`: the customer turned news and offers off before, so an invitation must not offer them again. */
+ static async preferences(userId:string){const p=(await db().query(`SELECT transactional,marketing FROM ${NOTIFICATIONS}.preferences WHERE user_id=$1`,[userId])).rows[0]||{transactional:true,marketing:false};return {transactional:p.transactional,marketing:p.marketing,marketingOptedOut:await marketingOptedOut(db(),userId)};}
+ static async setPreferences(userId:string,input:any){exact(input,['transactional','marketing']);if(typeof input.transactional!=='boolean'||typeof input.marketing!=='boolean')throw new FinanceError('Choose transactional and marketing preferences explicitly.');
+  return notificationTransaction(async c=>{
+   await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['notification-user:'+userId]);
+   const before=(await c.query(`SELECT transactional,marketing FROM ${NOTIFICATIONS}.preferences WHERE user_id=$1`,[userId])).rows[0]||{transactional:true,marketing:false};
+   const after=(await c.query(`INSERT INTO ${NOTIFICATIONS}.preferences(user_id,transactional,marketing) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET transactional=$2,marketing=$3,updated_at=NOW() RETURNING transactional,marketing`,[userId,input.transactional,input.marketing])).rows[0];
+   for(const purpose of ['transactional','marketing'] as const)if(before[purpose]!==after[purpose])await recordConsent(c,{userId},purpose,after[purpose],'account_settings','settings-1');
+   return after;
+  });}
+ static async subscribe(userId:string,token:string,input:any){exact(input,['subscription','consent']);if(!this.config().enabled)throw new FinanceError('Web Push is not enabled and configured.',503);const consent=consentInput(input.consent,['transactional','marketing']);const subscription=validateSubscription(input.subscription),hash=digest(subscription.endpoint);
  return notificationTransaction(async c=>{
   await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['notification-user:'+userId]);
   await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['notification-endpoint:'+hash]);
@@ -27,7 +61,48 @@ export class NotificationService {
   if(previous){const old=decryptSubscription(previous.encrypted_subscription);if(old.keys.auth!==subscription.keys.auth||old.keys.p256dh!==subscription.keys.p256dh)throw new FinanceError('Subscription ownership could not be verified.',409);}
   if(!previous||previous.user_id!==userId){const count=Number((await c.query(`SELECT COUNT(*) FROM ${NOTIFICATIONS}.devices WHERE user_id=$1`,[userId])).rows[0].count);if(count>=10)throw new FinanceError('Revoke an old notification device before adding another.',409);}
   const id=previous?.id||randomUUID();await c.query(`INSERT INTO ${NOTIFICATIONS}.devices(id,user_id,session_id,endpoint_hash,encrypted_subscription) VALUES($1,$2,$3,$4,$5)
-   ON CONFLICT(endpoint_hash) DO UPDATE SET user_id=$2,session_id=$3,encrypted_subscription=$5,binding_version=${NOTIFICATIONS}.devices.binding_version+1,updated_at=NOW()`,[id,userId,session.id,hash,encryptSubscription(subscription)]);return {success:true,deviceId:id};
+   ON CONFLICT(endpoint_hash) DO UPDATE SET user_id=$2,session_id=$3,encrypted_subscription=$5,binding_version=${NOTIFICATIONS}.devices.binding_version+1,updated_at=NOW()`,[id,userId,session.id,hash,encryptSubscription(subscription)]);
+  // The same browser was registered for guest news: the account takes over, and the guest consent ends with it.
+  const guest=(await c.query(`DELETE FROM ${NOTIFICATIONS}.guest_devices WHERE endpoint_hash=$1 RETURNING id`,[hash])).rows[0];
+  if(guest)await recordConsent(c,{guestDeviceId:guest.id},'marketing',false,'replaced_by_account',null);
+  let preferences=(await c.query(`SELECT transactional,marketing FROM ${NOTIFICATIONS}.preferences WHERE user_id=$1 FOR UPDATE`,[userId])).rows[0]||null;
+  if(consent){
+   // One explicit "Allow Notifications" may record each purpose its copy named, but never revives withdrawn offers.
+   const optedOut=await marketingOptedOut(c,userId),granted=consent.purposes.filter(p=>p!=='marketing'||!optedOut);
+   for(const purpose of granted)await recordConsent(c,{userId},purpose,true,'notification_invitation',consent.copyVersion);
+   preferences=(await c.query(`INSERT INTO ${NOTIFICATIONS}.preferences(user_id,transactional,marketing) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET transactional=$2,marketing=$3,updated_at=NOW() RETURNING transactional,marketing`,
+    [userId,granted.includes('transactional')||(preferences?.transactional??true),granted.includes('marketing')||(preferences?.marketing??false)])).rows[0];
+  }
+  return {success:true,deviceId:id,preferences:preferences?{transactional:preferences.transactional,marketing:preferences.marketing}:{transactional:true,marketing:false}};
+ });}
+ /**
+  * Guest news: a browser without an account may receive service news and offers after explicitly choosing them.
+  * Order updates are never offered to guests here (no guest order capability exists to bind them securely). The
+  * browser keeps a random credential; only its hash is stored. No account, phone number or order is involved.
+  */
+ static async guestSubscribe(input:any){exact(input,['subscription','consent']);if(!this.config().enabled)throw new FinanceError('Web Push is not enabled and configured.',503);
+  const consent=consentInput(input.consent,['marketing']);if(!consent)throw new FinanceError('Choose to receive Mystery Hub news first.');
+  const subscription=validateSubscription(input.subscription),hash=digest(subscription.endpoint);
+  return notificationTransaction(async c=>{
+   await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['notification-endpoint:'+hash]);
+   if((await c.query(`SELECT 1 FROM ${NOTIFICATIONS}.devices WHERE endpoint_hash=$1`,[hash])).rowCount)throw new FinanceError('This browser already receives your account notifications.',409);
+   const previous=(await c.query(`SELECT * FROM ${NOTIFICATIONS}.guest_devices WHERE endpoint_hash=$1 FOR UPDATE`,[hash])).rows[0];
+   if(previous){const old=decryptSubscription(previous.encrypted_subscription);if(old.keys.auth!==subscription.keys.auth||old.keys.p256dh!==subscription.keys.p256dh)throw new FinanceError('Subscription ownership could not be verified.',409);}
+   const id=previous?.id||randomUUID(),secret=randomBytes(32).toString('base64url');
+   await c.query(`INSERT INTO ${NOTIFICATIONS}.guest_devices(id,endpoint_hash,encrypted_subscription,secret_hash) VALUES($1,$2,$3,$4)
+    ON CONFLICT(endpoint_hash) DO UPDATE SET encrypted_subscription=$3,secret_hash=$4,binding_version=${NOTIFICATIONS}.guest_devices.binding_version+1,updated_at=NOW(),expires_at=NOW()+interval '180 days'`,[id,hash,encryptSubscription(subscription),digest(secret)]);
+   await recordConsent(c,{guestDeviceId:id},'marketing',true,'guest_invitation',consent.copyVersion);
+   return {success:true,deviceId:id,credential:`${id}.${secret}`};
+  });}
+ /** Server confirmation for a guest browser; also keeps an actively used registration from expiring. */
+ static async guestStatus(header:unknown){const cred=guestCredential(header);
+  const row=(await db().query(`UPDATE ${NOTIFICATIONS}.guest_devices SET expires_at=CASE WHEN expires_at<NOW()+interval '179 days' THEN NOW()+interval '180 days' ELSE expires_at END
+   WHERE id=$1 AND secret_hash=$2 AND expires_at>NOW() RETURNING endpoint_hash,expires_at`,[cred.id,cred.secretHash])).rows[0];
+  if(!row)throw new FinanceError('Notifications are not on for this browser.',404);return {success:true,subscribed:true,endpointHash:row.endpoint_hash as string,expiresAt:row.expires_at};
+ }
+ static async guestUnsubscribe(header:unknown){const cred=guestCredential(header);return notificationTransaction(async c=>{
+  const row=(await c.query(`DELETE FROM ${NOTIFICATIONS}.guest_devices WHERE id=$1 AND secret_hash=$2 RETURNING id`,[cred.id,cred.secretHash])).rows[0];
+  if(row)await recordConsent(c,{guestDeviceId:row.id},'marketing',false,'guest_unsubscribe',null);return {success:true};
  });}
  static async revoke(userId:string,id:string){requireUuid(id);await db().query(`DELETE FROM ${NOTIFICATIONS}.devices WHERE id=$1 AND user_id=$2`,[id,userId]);return {success:true};}
  static async devices(userId:string,token:string){return (await db().query(`SELECT d.id,d.endpoint_hash,d.created_at,d.updated_at,(s.token_hash=$2 AND s.expires_at>NOW()) AS current_session FROM ${NOTIFICATIONS}.devices d JOIN sessions s ON s.id=d.session_id WHERE d.user_id=$1 ORDER BY d.updated_at DESC LIMIT 10`,[userId,hashSessionToken(token)])).rows;}

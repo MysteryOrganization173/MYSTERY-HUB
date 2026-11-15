@@ -169,12 +169,12 @@ test('subscribe journey: permission, subscribe, register, server confirmation; r
 
 test('account settings: real preferences are available while delivery remains unconfigured; consent is separate', () => {
   const html = renderToStaticMarkup(React.createElement(NotificationSettings, {token: 't'}));
-  assert.match(html, /Phone alerts are not available/);
+  assert.match(html, /Notifications aren’t available here/, 'device-neutral wording (3.4): computers get notifications too');
   assert.match(html, /role="switch"/);
   const ui = source('src/components/auth/NotificationSettings.tsx');
   assert.match(ui, /'promotional', 'News and offers'/);
   assert.match(ui, /if \(res\.ok\) setPrefs\(res\.value\); else setPrefsError/, 'a switch changes only after the server saves');
-  assert.match(source('src/components/auth/AccountControls.tsx'), /<NotificationSettings key=\{sessionToken!\} token=\{sessionToken!\} \/>/);
+  assert.match(source('src/components/auth/AccountControls.tsx'), /<NotificationSettings key=\{sessionToken!\} token=\{sessionToken!\} onOpenNotification=\{destination => \{ closeAccount\(\); setActivePage\(destination === '\/orders' \? 'orders' : 'home'\); \}\} \/>/);
 });
 
 test('fixtures stay isolated: no application file imports them', () => {

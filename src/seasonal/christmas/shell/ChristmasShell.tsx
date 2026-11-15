@@ -9,6 +9,7 @@ import type { ActivePage } from '../../../types';
 import { isChristmasPhase, type SeasonStatus } from '../../../../shared/seasonal';
 import { loadSeasonalSerif } from '../font';
 import { isInstalledApp } from '../../../pwa/appEnvironment';
+import { openNotificationSettings } from '../../../components/pwa/NotificationsEntry';
 
 /**
  * The seasonal shell: what every visitor sees around the page while a pack applies, signed in or not.
@@ -90,7 +91,7 @@ export function ShellSlot({ slot, status }: { slot: ShellSlotName; status: Seaso
 
 /* ───────────────────────── Footer ───────────────────────── */
 
-type FooterLink = { label: string; page: ActivePage; note?: string; open?: () => void };
+type FooterLink = { label: string; page: ActivePage; note?: string; open?: () => void; button?: boolean };
 
 /**
  * The season's footer: a short brand statement, the real ways to get help, compact navigation and a quiet legal line.
@@ -123,6 +124,7 @@ export function ChristmasFooter({ status }: { status: SeasonStatus }) {
       { label: 'Help & FAQs', page: 'help' },
       { label: 'About Mystery Hub', page: 'about' },
       ...(installed ? [] : [{ label: 'Get the app', page: 'app' as ActivePage }]),
+      { label: 'Notifications', page: 'help', open: openNotificationSettings, button: true },
     ] },
   ];
   const go = (event: React.MouseEvent, link: FooterLink) => { event.preventDefault(); if (link.open) link.open(); else setActivePage(link.page); };
@@ -171,7 +173,9 @@ export function ChristmasFooter({ status }: { status: SeasonStatus }) {
               <h3>{column.title}</h3>
               <ul>
                 {column.links.map(link => (
-                  <li key={link.label}><a href={ROUTE_PATH_MAP[link.page]} onClick={event => go(event, link)}>{link.label}{link.note && <span className="xs-footer-note">{link.note}</span>}</a></li>
+                  <li key={link.label}>{link.button
+                    ? <button type="button" className="xs-footer-linkbutton" onClick={() => link.open?.()}>{link.label}</button>
+                    : <a href={ROUTE_PATH_MAP[link.page]} onClick={event => go(event, link)}>{link.label}{link.note && <span className="xs-footer-note">{link.note}</span>}</a>}</li>
                 ))}
               </ul>
             </div>

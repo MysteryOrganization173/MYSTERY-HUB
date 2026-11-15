@@ -117,6 +117,8 @@
 .mh-invite-close:hover { color: #fff; background: #ffffff0f; }
 .mh-invite :is(a, button):focus-visible { outline: 2px solid #7cedb3; outline-offset: 2px; }
 .mh-invite .mh-install-steps { flex-basis: 100%; margin-top: 8px; }
+/* Notifications: one quiet line saying the choice can be undone. */
+.mh-invite-note { flex-basis: 100%; margin: 2px 0 0; font-size: .75rem; line-height: 1.4; color: #8fa39a; }
 /* The Channel's two quiet answers sit together under its one primary action. */
 .mh-invite-quiet { display: flex; flex-wrap: wrap; flex-basis: 100%; gap: 0 4px; margin-left: -10px; }
 @media (max-height: 640px) and (max-width: 767px) {

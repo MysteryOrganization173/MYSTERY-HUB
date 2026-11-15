@@ -1,17 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bell, BellOff, BellRing, Loader2 } from 'lucide-react';
+import { Bell, BellOff, BellRing, Loader2, Smartphone } from 'lucide-react';
 import { notificationPermissionState, type NotificationPermissionState } from '../../pwa/notifications';
-import { PUSH_STATE_COPY, customerPushState, pushSupported, readServerDeviceState, subscribeThisDevice, unsubscribeThisDevice, type LocalPushStep, type ServerDeviceState } from '../../pwa/push';
-import { httpCustomerNotificationsClient, type CustomerNotificationsClient, type NotificationPreferences } from '../../services/customerNotifications';
+import { IOS_HOME_SCREEN_COPY, PAUSED_NOTE, PUSH_STATE_COPY, customerPushState, pushSupported, readServerDeviceState, subscribeThisDevice, unsubscribeThisDevice, type LocalPushStep, type ServerDeviceState } from '../../pwa/push';
+import { isInstalledApp, supportsAppleHomeScreen } from '../../pwa/appEnvironment';
+import { httpCustomerNotificationsClient, type CustomerNotificationsClient, type NotificationInboxEntry, type NotificationPreferences } from '../../services/customerNotifications';
 import { accountButton } from './SecurityDialog';
+
+/** Turning a device on here records only order and account updates; news and offers stay their own switch below. */
+const SETTINGS_CONSENT = { purposes: ['transactional' as const], copyVersion: 'settings-1' };
+const when = (iso: string) => { const t = Date.parse(iso); return Number.isFinite(t) ? new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : ''; };
 
 /**
  * My Account › Notifications. The device card reflects the server's confirmation, never browser permission alone,
  * and each preference changes only after the server saves it. Promotional updates are a separate choice that
  * starts off. Account choices remain available while real device delivery is disabled pending configuration.
  */
-export function NotificationSettings({ token, client = httpCustomerNotificationsClient }: { token: string; client?: CustomerNotificationsClient }) {
+export function NotificationSettings({ token, client = httpCustomerNotificationsClient, onOpenNotification }: { token: string; client?: CustomerNotificationsClient; onOpenNotification?: (destination: '/orders' | '/app') => void }) {
   const [configured,setConfigured]=useState(false);
+  const [paused,setPaused]=useState(false);
+  const [iosTab]=useState(()=>supportsAppleHomeScreen()&&!isInstalledApp()&&!pushSupported());
   const [permission, setPermission] = useState<NotificationPermissionState>(() => notificationPermissionState());
   const [server, setServer] = useState<ServerDeviceState>('unknown');
   const [local, setLocal] = useState<LocalPushStep>('idle');
@@ -25,14 +32,15 @@ export function NotificationSettings({ token, client = httpCustomerNotifications
   useEffect(() => {
     if (!client.available) return;
     let active=true;setConfigured(false);setPrefs(null);setServer('unknown');setLocal('idle');setMessage(null);
-    void (client.configuration?client.configuration():Promise.resolve({enabled:true})).then(c=>{if(active)setConfigured(c.enabled);},()=>{if(active)setConfigured(false);});
+    void (client.configuration?client.configuration():Promise.resolve({enabled:true,paused:false})).then(c=>{if(active){setConfigured(c.enabled);setPaused(c.paused===true);}},()=>{if(active)setConfigured(false);});
     void readServerDeviceState(client, token).then(s => { if (active&&alive.current) setServer(s); });
     client.preferences(token).then(p => { if (active&&alive.current) setPrefs(p); }, e => { if (active&&alive.current) setPrefsError(e instanceof Error ? e.message : 'Your choices could not be loaded.'); });
     return ()=>{active=false;};
   }, [client, token]);
 
   const state = customerPushState({ contract: client.available&&configured, pushSupported: pushSupported(), permission, server, local });
-  const copy = PUSH_STATE_COPY[state];
+  // An iPhone/iPad Safari tab cannot receive Web Push: show the Home Screen path instead of a dead end.
+  const copy = state === 'unavailable' && iosTab && configured ? { ...IOS_HOME_SCREEN_COPY, action: null } : PUSH_STATE_COPY[state];
 
   const act = async () => {
     setMessage(null);
@@ -44,7 +52,7 @@ export function NotificationSettings({ token, client = httpCustomerNotifications
       return;
     }
     setLocal('subscribing');
-    const res = await subscribeThisDevice(client, token);
+    const res = await subscribeThisDevice(client, token, undefined, undefined, SETTINGS_CONSENT);
     if (!alive.current) return;
     setPermission(res.permission); setServer(res.server);
     setLocal(res.server === 'subscribed' || res.permission !== 'granted' ? 'idle' : 'failed');
@@ -69,10 +77,11 @@ export function NotificationSettings({ token, client = httpCustomerNotifications
     <section aria-labelledby="account-notifications" className="mt-6 space-y-3 border-t border-slate-700 pt-4">
       <h3 id="account-notifications" className="font-bold">Notifications</h3>
       <div role="status" className={`flex gap-3 rounded-2xl border p-3.5 ${state === 'active' ? 'border-emerald-500/30 bg-emerald-500/5' : state === 'failed' || state === 'disabled' ? 'border-amber-500/30 bg-amber-500/5' : 'border-slate-700 bg-slate-900/40'}`}>
-        {busy ? <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-slate-300" aria-hidden /> : <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${state === 'active' ? 'text-emerald-300' : 'text-slate-300'}`} aria-hidden />}
+        {busy ? <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-slate-300" aria-hidden /> : state === 'unavailable' && iosTab ? <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-slate-300" aria-hidden /> : <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${state === 'active' ? 'text-emerald-300' : 'text-slate-300'}`} aria-hidden />}
         <div className="min-w-0 space-y-1">
           <p className="font-semibold text-white">{copy.title}</p>
           <p className="text-sm text-slate-300">{copy.body}</p>
+          {state === 'active' && paused && <p className="text-sm text-amber-200">{PAUSED_NOTE}</p>}
           {message && <p className="text-sm text-amber-200">{message}</p>}
         </div>
       </div>
@@ -98,7 +107,40 @@ export function NotificationSettings({ token, client = httpCustomerNotifications
           {state !== 'active' && prefs && <p className="text-xs text-slate-400">These choices are saved to your account. Alerts reach this phone only once it is registered above.</p>}
         </fieldset>
       )}
-      {!client.available && <p className="text-xs text-slate-400">When phone alerts start, you will choose here between order updates and, separately, news and offers.</p>}
+      {!client.available && <p className="text-xs text-slate-400">When notifications start, you will choose here between order updates and, separately, news and offers.</p>}
+      {client.available && client.inbox && <RecentNotifications token={token} client={client} onOpen={onOpenNotification} />}
     </section>
   );
+}
+
+/**
+ * The account's own notification history from the server, newest first. It shows what Mystery Hub sent to this
+ * account, never whether a device displayed or anyone read it, and nothing here exists for guests.
+ */
+function RecentNotifications({ token, client, onOpen }: { token: string; client: CustomerNotificationsClient; onOpen?: (destination: '/orders' | '/app') => void }) {
+  const [items, setItems] = useState<NotificationInboxEntry[] | null>(null);
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setItems(null); setError(false);
+    client.inbox!(token, 0, controller.signal).then(list => { if (!controller.signal.aborted) setItems(list.slice(0, 10)); }, () => { if (!controller.signal.aborted) setError(true); });
+    return () => controller.abort();
+  }, [client, token, attempt]);
+  const open = (item: NotificationInboxEntry) => onOpen?.(item.destination);
+  return <div className="space-y-2" aria-labelledby="account-recent-notifications">
+    <h4 id="account-recent-notifications" className="text-sm font-semibold text-white">Recent notifications</h4>
+    {!items && !error && <p role="status" className="text-xs text-slate-400">Loading…</p>}
+    {error && <p role="alert" className="text-sm text-slate-300">Your notifications couldn’t be loaded. <button type="button" className="font-semibold text-[#7cedb3] underline underline-offset-2" onClick={() => setAttempt(a => a + 1)}>Try again</button></p>}
+    {items && items.length === 0 && <p className="text-xs text-slate-400">Nothing yet. Order updates and any news you chose will appear here.</p>}
+    {items && items.length > 0 && <ul className="divide-y divide-slate-800 rounded-xl border border-slate-700">
+      {items.map(item => <li key={item.id}>
+        <button type="button" onClick={() => open(item)} className="flex w-full min-h-14 flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#00c365]">
+          <span className="flex items-center gap-2 text-xs text-slate-400"><span className={`rounded-full px-1.5 py-px font-semibold ${item.destination === '/orders' ? 'bg-emerald-500/10 text-emerald-200' : 'bg-sky-500/10 text-sky-200'}`}>{item.destination === '/orders' ? 'Order update' : 'News'}</span><time dateTime={item.createdAt}>{when(item.createdAt)}</time></span>
+          <span className="text-sm font-semibold text-white">{item.title}</span>
+          <span className="text-xs text-slate-300">{item.body}</span>
+        </button>
+      </li>)}
+    </ul>}
+  </div>;
 }

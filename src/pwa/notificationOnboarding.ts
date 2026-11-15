@@ -1,58 +1,72 @@
-import type {CustomerNotificationsClient} from '../services/customerNotifications';
+import type {CustomerNotificationsClient, GuestNotificationsClient, NotificationConsent} from '../services/customerNotifications';
 import {notificationPermissionState} from './notifications';
-import {pushSupported, readServerDeviceState, subscribeThisDevice} from './push';
-import {showNotificationOptIn, type Snooze} from './launchPolicy';
+import {pushSupported, readGuestDeviceState, readServerDeviceState, subscribeGuestDevice, subscribeThisDevice} from './push';
+import {marketingPromptAnswered, notificationInviteResting, type Snooze} from './launchPolicy';
 
+/**
+ * Notification onboarding (3.4): one first-party invitation, then the browser's own permission request, then
+ * server registration with purpose-specific consent, then one success state only after the server confirms.
+ *
+ * - Members: order updates, plus service news and offers unless they turned those off before (never revived).
+ * - Guests: service news and occasional offers only. Order updates for guests stay off: there is no guest order
+ *   capability to bind them to securely, so they are never offered here.
+ * - Browser permission alone is never treated as consent or as a registered device.
+ */
 type Environment = Parameters<typeof subscribeThisDevice>[2];
-export type OnboardingStep = 'enable' | 'offers' | 'registered' | 'denied' | 'dismissed' | 'error';
-export interface OnboardingOptions {
-  allowOffers: boolean; offersAnswered: boolean; signal: AbortSignal; environment?: Environment;
-}
+export type InviteAudience = 'member' | 'guest';
+export interface NotificationInvite { audience: InviteAudience; offers: boolean }
+export type InviteResult = { step: 'registered' | 'denied' | 'dismissed' | 'error'; message?: string };
+/** The version of the words a person saw when they chose; recorded with each consent on the server. */
+export const NOTIFICATION_COPY_VERSION = 'invite-3.4-1';
 const current = (signal: AbortSignal) => { if (signal.aborted) throw new Error('Notification screen closed.'); };
 
+/** The purposes one "Allow Notifications" tap records, exactly as its copy names them. */
+export function inviteConsent(invite: NotificationInvite): NotificationConsent {
+  if (invite.audience === 'guest') return { purposes: ['marketing'], copyVersion: NOTIFICATION_COPY_VERSION + '-guest' };
+  return invite.offers
+    ? { purposes: ['transactional', 'marketing'], copyVersion: NOTIFICATION_COPY_VERSION }
+    : { purposes: ['transactional'], copyVersion: NOTIFICATION_COPY_VERSION + '-orders' };
+}
+
 /** Read-only assessment: never asks permission, subscribes or writes consent. */
-export async function notificationOpportunity(client: CustomerNotificationsClient, token: string,
-  options: OnboardingOptions & {snooze: Snooze; now: number}): Promise<'enable' | 'offers' | null> {
+export async function notificationInviteOpportunity(client: CustomerNotificationsClient, guest: GuestNotificationsClient,
+  options: { token: string | null; accountId?: string; isCustomer?: boolean; signal: AbortSignal; snooze: Snooze; now: number; environment?: Environment }): Promise<NotificationInvite | null> {
   current(options.signal);
-  if (!client.available || !pushSupported(options.environment)) return null;
-  const config = client.configuration ? await client.configuration() : {enabled: true};
-  current(options.signal);
-  if (!config.enabled) return null;
+  if (!client.available || !pushSupported(options.environment) || notificationInviteResting(options.snooze, options.now)) return null;
+  // A blocked or unsupported browser is never asked: only "default" (not yet asked) or "granted" without a device.
   const permission = notificationPermissionState(options.environment as never);
-  if (!['default','granted'].includes(permission)) return null;
-  const device = permission === 'granted' ? await readServerDeviceState(client, token, options.environment) : 'not_subscribed';
+  if (permission !== 'default' && permission !== 'granted') return null;
+  const config = client.configuration ? await client.configuration() : { enabled: true, guests: false, paused: false };
   current(options.signal);
-  if (device === 'subscribed') {
-    if (!options.allowOffers || options.offersAnswered) return null;
-    const preferences = await client.preferences(token); current(options.signal);
-    return preferences.promotional ? null : 'offers';
-  }
-  if (device !== 'not_subscribed') return null;
-  return showNotificationOptIn({installed:true,signedIn:true,permission,registered:false,snooze:options.snooze,now:options.now}) ? 'enable' : null;
-}
-
-/** One explicit tap completes permission -> subscription -> authenticated confirmation. */
-export async function activateNotificationOnboarding(client: CustomerNotificationsClient, token: string,
-  options: OnboardingOptions): Promise<{step:OnboardingStep;message?:string}> {
-  const result = await subscribeThisDevice(client, token, options.environment, options.signal);
-  current(options.signal);
-  if (result.server !== 'subscribed') return {step:result.permission === 'denied' ? 'denied' : result.permission === 'default' ? 'dismissed' : 'error',message:result.message};
-  if (!options.allowOffers || options.offersAnswered) return {step:'registered'};
-  try {
-    const preferences = await client.preferences(token); current(options.signal);
-    return {step:preferences.promotional ? 'registered' : 'offers'};
-  } catch {
+  // Invite only when Mystery Hub is really sending: never while delivery is off or paused by the operator.
+  if (!config.enabled || config.paused !== false) return null;
+  if (options.token) {
+    if (options.isCustomer === false) return null;
+    const device = permission === 'granted' ? await readServerDeviceState(client, options.token, options.environment) : 'not_subscribed';
     current(options.signal);
-    return {step:'offers',message:'Your phone is registered. Your choices will be checked again before saving.'};
+    if (device !== 'not_subscribed') return null;
+    const preferences = await client.preferences(options.token);
+    current(options.signal);
+    // An earlier "no" to offers (on the server, or the old separate offers question on this device) is kept.
+    const declinedBefore = preferences.marketingOptedOut === true || (!preferences.promotional && !!options.accountId && marketingPromptAnswered(options.accountId));
+    return { audience: 'member', offers: !declinedBefore };
   }
+  if (!config.guests) return null;
+  const state = await readGuestDeviceState(guest, options.environment);
+  current(options.signal);
+  return state === 'not_subscribed' ? { audience: 'guest', offers: true } : null;
 }
 
-/** Only the separate affirmative button calls this. Preserve the latest order-update choice. */
-export async function acceptNotificationOffers(client: CustomerNotificationsClient, token: string, signal: AbortSignal) {
-  current(signal);
-  const latest = await client.preferences(token); current(signal);
-  const result = await client.savePreferences(token,{transactional:latest.transactional,promotional:true,expectedVersion:latest.version});
-  current(signal);
-  if (!result.ok) throw new Error(result.message);
-  if (result.value.promotional !== true) throw new Error('Your offers preference was not confirmed. Please try again.');
+/** One explicit tap: permission -> subscription -> registration with consent -> server confirmation. */
+export async function activateNotificationInvite(client: CustomerNotificationsClient, guest: GuestNotificationsClient, invite: NotificationInvite,
+  options: { token: string | null; signal: AbortSignal; environment?: Environment }): Promise<InviteResult> {
+  current(options.signal);
+  const consent = inviteConsent(invite);
+  if (invite.audience === 'member' && !options.token) return { step: 'error', message: 'Sign in again to turn on notifications.' };
+  const result = invite.audience === 'member'
+    ? await subscribeThisDevice(client, options.token!, options.environment, options.signal, consent)
+    : await subscribeGuestDevice(client, guest, consent, options.environment, options.signal);
+  current(options.signal);
+  if (result.server === 'subscribed') return { step: 'registered' };
+  return { step: result.permission === 'denied' ? 'denied' : result.permission === 'default' ? 'dismissed' : 'error', message: result.message };
 }

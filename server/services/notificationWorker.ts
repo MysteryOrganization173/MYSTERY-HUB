@@ -3,7 +3,7 @@ import webPush from 'web-push';
 import {getPool} from '../db/connection.js';
 import {FinanceError} from '../db/financeStore.js';
 import {NOTIFICATIONS as n,notificationTransaction} from './notificationService.js';
-import {pushConfiguration,decryptSubscription,validateSubscription} from './notificationSafety.js';
+import {pushConfiguration,decryptSubscription,validateSubscription,renderTemplate} from './notificationSafety.js';
 
 type Sender=(subscription:ReturnType<typeof decryptSubscription>,payload:string)=>Promise<unknown>;
 async function send(subscription:ReturnType<typeof decryptSubscription>,payload:string){const c=pushConfiguration();return webPush.sendNotification(subscription,payload,{TTL:3600,urgency:'normal',timeout:8000,vapidDetails:{subject:c.subject,publicKey:c.publicKey!,privateKey:c.privateKey}});}
@@ -42,8 +42,12 @@ export async function processNotificationBatch(sender:Sender=send,max=10){
   const live=await current(job);
   if(live){try{
     const subscription=validateSubscription(decryptSubscription(live.encrypted_subscription));
-    // Deliberately generic: a late packet following logout/account switch cannot expose another account's order or promotion.
-    const payload=JSON.stringify({version:1,notificationId:live.notification_id,title:'Mystery Hub',body:'An account update is available. Sign in to view it.',tag:'mh-'+live.notification_id});
+    // Account updates stay deliberately generic: a late packet after logout or an account switch cannot expose
+    // another account's order. Announcements (opted-in news and offers) carry their own approved, non-personal
+    // template text, so the phone can say what they are about.
+    const payload=JSON.stringify(live.template_snapshot?.category==='marketing'
+     ?{version:1,notificationId:live.notification_id,kind:'announcement',...renderTemplate(live.template_snapshot,'Service announcement'),tag:'mh-'+live.notification_id}
+     :{version:1,notificationId:live.notification_id,kind:'account',title:'Mystery Hub',body:'An account update is available. Sign in to view it.',tag:'mh-'+live.notification_id});
     await sender(subscription,payload);state='provider_accepted';code='accepted';
    }catch(error){const status=Number((error as {statusCode?:number})?.statusCode);if(error instanceof FinanceError&&error.status===400){state='invalid';code='subscription_invalid';}
     else if([404,410].includes(status)){state='invalid';code='endpoint_expired';}

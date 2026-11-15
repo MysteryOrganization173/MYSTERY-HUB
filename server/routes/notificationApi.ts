@@ -8,7 +8,12 @@ import {notificationWorkerHealth} from '../services/notificationWorker.js';
 const handler=(work:(req:any)=>Promise<unknown>)=>async(req:any,res:any)=>{try{res.json(await work(req));}catch(error){res.status(error instanceof FinanceError?error.status:503).json({error:error instanceof FinanceError?error.message:'Notification service unavailable. No send success is confirmed.'});}};
 const offset=(value:unknown)=>{const n=value===undefined?0:Number(value);if(!Number.isInteger(n)||n<0||n>100000)throw new FinanceError('Invalid pagination.');return n;};
 export const notificationRouter=Router();notificationRouter.use((_req,res,next)=>{res.set('Cache-Control','no-store');next();});
-notificationRouter.get('/config',(_req,res)=>res.json(NotificationService.config()));
+notificationRouter.get('/config',async(_req,res)=>res.json(await NotificationService.publicConfig()));
+// Guest news (no account): the browser's own credential in a header, never in a URL. Throttled per address.
+const guestLimiter=createRateLimiter({windowMs:10*60000,max:20});
+notificationRouter.put('/guest',guestLimiter,handler(req=>NotificationService.guestSubscribe(req.body)));
+notificationRouter.get('/guest',guestLimiter,handler(req=>NotificationService.guestStatus(req.get('x-guest-notifications'))));
+notificationRouter.delete('/guest',guestLimiter,handler(req=>NotificationService.guestUnsubscribe(req.get('x-guest-notifications'))));
 notificationRouter.use(requireAuth,createRateLimiter({windowMs:60000,max:40,key:req=>req.user!.id}));
 notificationRouter.get('/preferences',handler(req=>NotificationService.preferences(req.user.id)));
 notificationRouter.put('/preferences',handler(req=>NotificationService.setPreferences(req.user.id,req.body)));

@@ -47,6 +47,9 @@ export function showWelcomeSheet({ installed, signedIn, authChecking, path, show
   return guestChosenAt === null || now - guestChosenAt >= WELCOME_GUEST_REST_DAYS * DAY;
 }
 
+/** The notification invitation rests three weeks after "Not now" and stops after the second; the browser's answer is final. */
+export const notificationInviteResting = (snooze: Snooze, now: number) => resting(snooze, NOTIFICATION_REST_DAYS, NOTIFICATION_MAX_DISMISSALS, now);
+
 export function showNotificationOptIn({ installed, signedIn, permission, registered, snooze, now }: {
   installed: boolean; signedIn: boolean; permission: string; registered?: boolean; snooze: Snooze; now: number;
 }) {

@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
-import { CheckCircle2, Download, MessageCircle, SquarePlus, X } from 'lucide-react';
+import { BellOff, BellRing, CheckCircle2, Download, MessageCircle, SquarePlus, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { OrderRecord } from '../../types';
-import { CHANNEL_COPY, installCopy, installProgressCopy, verifiedPurchase } from '../../pwa/invitationCopy';
+import { CHANNEL_COPY, installCopy, installProgressCopy, NOTIFICATION_ACTIONS, NOTIFICATION_RESULT, notificationCopy, verifiedPurchase } from '../../pwa/invitationCopy';
+import { activateNotificationInvite, notificationInviteOpportunity, type NotificationInvite } from '../../pwa/notificationOnboarding';
+import { httpCustomerNotificationsClient, httpGuestNotificationsClient } from '../../services/customerNotifications';
+import { readSnooze, recordDismissal, STORAGE_KEYS } from '../../pwa/launchPolicy';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { BrandMark } from '../common/BrandLogo';
 import { useAppInstall } from '../../pwa/useAppInstall';
@@ -14,7 +17,7 @@ import {
 } from '../../pwa/invitations';
 import { trackGrowth } from '../../utils/growthAnalytics';
 import { GROWTH_PAGES, type GrowthPage } from '../../../shared/growthAnalytics';
-import { isCoarsePointer } from '../../pwa/appEnvironment';
+import { isCoarsePointer, isInstalledApp } from '../../pwa/appEnvironment';
 import { AppleInstallSteps } from './InstallAppPromo';
 import { appBusy } from './invitationBusy';
 import './pwa.css';
@@ -23,15 +26,25 @@ type Outcome = 'dismissed' | 'acted' | 'ignored';
 const ACTIVE_TICK_MS = 5_000;
 const growthPage = (page: string): GrowthPage => (GROWTH_PAGES.includes(page as GrowthPage) ? page as GrowthPage : 'home');
 
+const ANNOUNCEMENTS: Record<InvitationKind, string> = {
+  install: 'Suggestion: install Mystery Hub. Find it at the end of the page.',
+  notifications: 'Suggestion: turn on Mystery Hub notifications. Find it at the end of the page.',
+  channel: 'Suggestion: follow the Mystery Hub WhatsApp Channel. Find it at the end of the page.',
+};
+
 /**
- * Mystery Hub's own suggestions (install the app, follow the WhatsApp Channel), coordinated by pwa/invitations:
- * one small card at a time, on a calm page, after real engagement, at most once per visit. It is never a blocking
- * layer: no focus is taken, Escape and "Not now" close it, and it steps aside for any dialog, a page change or a long
- * scroll, so it never becomes a permanent strip at the bottom of a small phone.
+ * Mystery Hub's own suggestions (install the app, allow notifications, follow the WhatsApp Channel), coordinated by
+ * pwa/invitations: one small card at a time, on a calm page, after real engagement, at most once per visit. It is
+ * never a blocking layer: no focus is taken, Escape and "Not now" close it, and it steps aside for any dialog, a page
+ * change or a long scroll, so it never becomes a permanent strip at the bottom of a small phone.
+ *
+ * Order: installing comes first where it can genuinely happen. Notifications come first in the installed app (its
+ * first-use moment, after the welcome and sign-in) and for a member right after a verified purchase. The Channel last.
  */
 export const InvitationLayer: React.FC = () => {
   const app = useApp();
-  const { activePage, isAuthChecking, isStatusModalOpen, activeOrder } = app;
+  const { activePage, isAuthChecking, isStatusModalOpen, activeOrder, user, sessionToken } = app;
+  const [installedApp] = useState(() => isInstalledApp());
   const overlays = useSyncExternalStore(subscribeOverlays, openOverlayCount, () => 0);
   const slot = useSyncExternalStore(subscribeInvitations, invitationOnScreen, () => null);
   const inlineOffer = useSyncExternalStore(subscribeInvitations, inlineOfferVisible, () => false);
@@ -86,19 +99,51 @@ export const InvitationLayer: React.FC = () => {
     if (outcome === 'dismissed') noteDismissal();
   }, []);
 
+  // Installed app with a signed-in member: the first-use moment counts as engagement for notifications.
+  const ready = (session = readSession()) => engaged(session) || (installedApp && Boolean(sessionToken));
+
+  // Notifications: assessed once per account (or guest) per page life, read-only, only once a card could appear.
+  const [notifyInvite, setNotifyInvite] = useState<NotificationInvite | null>(null);
+  const assessment = useRef<{ key: string; controller: AbortController } | null>(null);
+  const accountKey = sessionToken && user ? `member:${user.id}:${sessionToken}` : 'guest';
+  useEffect(() => {
+    if (isAuthChecking || !ready()) return;
+    if (assessment.current?.key === accountKey) return;
+    assessment.current?.controller.abort();
+    const controller = new AbortController();
+    assessment.current = { key: accountKey, controller };
+    setNotifyInvite(null);
+    void notificationInviteOpportunity(httpCustomerNotificationsClient, httpGuestNotificationsClient, {
+      token: sessionToken || null, accountId: user?.id, isCustomer: user ? user.role === 'customer' : undefined,
+      signal: controller.signal, snooze: readSnooze(STORAGE_KEYS.notificationOptIn), now: Date.now(),
+    }).then(invite => { if (!controller.signal.aborted) setNotifyInvite(invite); }, () => {});
+  }, [accountKey, isAuthChecking, tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => assessment.current?.controller.abort(), []);
+
   const installOffer = installState.mode !== 'hidden' && installState.progress === 'idle';
   useEffect(() => {
-    if (shown || slot || busy || inlineOffer || !calmPage(activePage, window.location.search) || !engaged(readSession())) return;
+    if (shown || slot || busy || inlineOffer || !calmPage(activePage, window.location.search)) return;
+    const session = readSession();
+    if (!ready(session)) return;
     const timer = window.setTimeout(() => {
-      const kind = claimInvitation(invitationOrder({ install: installOffer, channel: channelInviteAllowed(readChannelInvite(), Date.now()) }));
+      const notificationsFirst = Boolean(notifyInvite) && (installedApp || (session.purchase && notifyInvite?.audience === 'member'));
+      const order: InvitationKind[] = [
+        ...(notificationsFirst ? ['notifications' as const] : []),
+        ...invitationOrder({ install: installOffer, channel: false }),
+        ...(notifyInvite && !notificationsFirst ? ['notifications' as const] : []),
+        ...invitationOrder({ install: false, channel: channelInviteAllowed(readChannelInvite(), Date.now()) }),
+      ];
+      const kind = claimInvitation(order);
       if (!kind) return;
       shownRef.current = kind;
       setShown({ kind, page: activePage });
       // A short, polite note for screen readers; the card itself is a labelled landmark at the end of the page.
-      setAnnouncement(kind === 'install' ? 'Suggestion: install Mystery Hub. Find it at the end of the page.' : 'Suggestion: follow the Mystery Hub WhatsApp Channel. Find it at the end of the page.');
+      setAnnouncement(ANNOUNCEMENTS[kind]);
     }, SETTLE_MS);
     return () => window.clearTimeout(timer);
-  }, [shown, slot, busy, inlineOffer, activePage, tick, installOffer]);
+  }, [shown, slot, busy, inlineOffer, activePage, tick, installOffer, notifyInvite]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Another account (or signing out) never inherits a notification card prepared for the previous one.
+  useEffect(() => { if (shown?.kind === 'notifications') close('ignored'); }, [accountKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Step aside for any dialog, sheet or menu, and when the visitor moves to another page: shown once is enough.
   useEffect(() => { if (shown && (busy || activePage !== shown.page)) close('ignored'); }, [shown, busy, activePage, close]);
@@ -114,9 +159,9 @@ export const InvitationLayer: React.FC = () => {
 
   return <>
     <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
-    {shown && (shown.kind === 'install'
-      ? <InstallInvitation cardRef={cardRef} page={growthPage(shown.page)} state={installState} onClose={close} />
-      : <ChannelInvitation cardRef={cardRef} onClose={close} />)}
+    {shown?.kind === 'install' && <InstallInvitation cardRef={cardRef} page={growthPage(shown.page)} state={installState} onClose={close} />}
+    {shown?.kind === 'notifications' && notifyInvite && <NotificationInvitation key={accountKey} cardRef={cardRef} invite={notifyInvite} token={sessionToken || null} onClose={close} />}
+    {shown?.kind === 'channel' && <ChannelInvitation cardRef={cardRef} onClose={close} />}
   </>;
 };
 
@@ -170,6 +215,47 @@ function InstallInvitation({ cardRef, page, state, onClose }: {
       : <button type="button" className="mh-button" onClick={() => { void accept(); }}><Download className="size-4" aria-hidden="true" />Install App</button>}
     <button type="button" className="mh-invite-later" onClick={notNow}>Not now</button>
     {mode === 'apple' && stepsOpen && <AppleInstallSteps id={stepsId} />}
+  </InvitationCard>;
+}
+
+/**
+ * One first-party invitation, then the browser's own permission request, then server registration with the consent
+ * the copy names, then one state for what really happened. "On" appears only after the server confirms the device.
+ */
+function NotificationInvitation({ cardRef, invite, token, onClose }: {
+  cardRef: React.RefObject<HTMLElement | null>; invite: NotificationInvite; token: string | null; onClose: (outcome: Outcome) => void;
+}) {
+  const titleId = useId();
+  const [step, setStep] = useState<'invite' | 'working' | 'registered' | 'denied' | 'error'>('invite');
+  const request = useRef<AbortController | null>(null);
+  useEffect(() => { request.current = new AbortController(); return () => request.current?.abort(); }, []);
+  // "Not now" (or closing) rests three weeks and stops after the second; the browser's own answer is final.
+  const notNow = () => { if (step === 'working') return; recordDismissal(STORAGE_KEYS.notificationOptIn); onClose('dismissed'); };
+  const allow = async () => {
+    const signal = request.current?.signal;
+    if (step === 'working' || !signal || signal.aborted) return;
+    setStep('working');
+    try {
+      const result = await activateNotificationInvite(httpCustomerNotificationsClient, httpGuestNotificationsClient, invite, { token, signal });
+      if (signal.aborted) return;
+      if (result.step === 'dismissed') { recordDismissal(STORAGE_KEYS.notificationOptIn); onClose('dismissed'); }
+      else setStep(result.step);
+    } catch { if (!signal.aborted) setStep('error'); }
+  };
+  if (step === 'registered' || step === 'denied' || step === 'error') {
+    const copy = NOTIFICATION_RESULT[step];
+    const done = () => onClose(step === 'registered' ? 'acted' : 'dismissed');
+    return <InvitationCard cardRef={cardRef} titleId={titleId} status icon={step === 'registered' ? <CheckCircle2 className="size-6 text-emerald-300" /> : <BellOff className="size-6 text-slate-300" />}
+      title={copy.title} text={copy.text} closeLabel="Close" onClose={done}>
+      {step === 'error' && <button type="button" className="mh-button" onClick={() => { void allow(); }}>Try again</button>}
+      <button type="button" className={step === 'error' ? 'mh-invite-later' : 'mh-button'} onClick={done}>{step === 'error' ? 'Close' : 'Done'}</button>
+    </InvitationCard>;
+  }
+  const copy = notificationCopy(invite);
+  return <InvitationCard cardRef={cardRef} titleId={titleId} icon={<BellRing className="size-6 text-[#44df95]" />} title={copy.title} text={copy.text} closeLabel="Close" onClose={notNow}>
+    <button type="button" className="mh-button" disabled={step === 'working'} onClick={() => { void allow(); }}>{step === 'working' ? 'Allowing…' : NOTIFICATION_ACTIONS.allow}</button>
+    <button type="button" className="mh-invite-later" disabled={step === 'working'} onClick={notNow}>{NOTIFICATION_ACTIONS.later}</button>
+    <p className="mh-invite-note">{NOTIFICATION_ACTIONS.note}</p>
   </InvitationCard>;
 }
 
