@@ -12,6 +12,9 @@ test('official support and announcement links preserve distinct destinations', (
   assert.equal(business.contact.supportSms, '0592066298');
   assert.equal(business.contact.supportSmsIntl, '+233592066298');
   assert.equal(business.contact.smsLink, 'sms:+233592066298');
+  assert.equal(business.contact.supportPhoneDisplay, '059 452 1108');
+  assert.equal(business.contact.supportSmsDisplay, '059 206 6298');
+  assert.equal(business.contact.supportWhatsAppDisplay, '024 283 6323');
   assert.equal(business.contact.supportEmail, 'aryeeteyemmanuel852@gmail.com');
   assert.equal(business.contact.whatsappChannelUrl, 'https://whatsapp.com/channel/0029VbBt1MGC6ZvlDJ8Biz3l');
   assert.equal(business.contact.telegramChannelUrl, 'https://t.me/mysteryhubapp');
@@ -32,6 +35,7 @@ test('every support generator targets the official number and safely encodes con
 test('public support shortcuts use central configuration; footer has both announcement actions', () => {
   for (const path of ['src/components/data/DataPage.tsx', 'src/components/marketplace/MarketplacePage.tsx', 'src/components/marketplace/MarketplaceInquiryModal.tsx']) {
     const source = readFileSync(path, 'utf8');
+    // 059 206 6298 is the SMS line only: never a WhatsApp or call destination.
     assert.doesNotMatch(source, /wa\.me\/233592066298|Call: 0592066298/);
     assert.match(source, /BUSINESS_CONFIG/);
   }

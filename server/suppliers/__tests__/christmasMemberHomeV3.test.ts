@@ -37,7 +37,7 @@ const SCENARIOS: Record<string, Partial<MemberHomeViewProps>> = {
   'active behind a newer delivered order': { orders: [order('processing', { public_reference: 'MH-OLD', created_at: '2026-12-08T09:00:00Z' }), order('delivered', { public_reference: 'MH-NEW' })] },
 };
 // Facts a customer reads on the ordinary member homepage; the seasonal one must say each of them exactly when it does.
-const FACTS = ['Needs attention', 'Order to follow', 'Latest order', 'Start here', 'Your first order starts here.', 'Buy again', 'Track Order', 'WhatsApp support', 'Loading your orders…', 'Your orders are unavailable right now.', 'Try again', 'Open My Orders', 'Loading recent activity…', 'View all orders', 'Ask Mystery AI', 'Or top up airtime', 'Wallet slot', 'You’re all caught up. Other recent orders will appear here.'];
+const FACTS = ['Needs attention', 'Order to follow', 'Latest order', 'Start here', 'Your first order starts here.', 'Buy again', 'Track Order', 'WhatsApp support', 'SMS 059 206 6298', 'Loading your orders…', 'Your orders are unavailable right now.', 'Try again', 'Open My Orders', 'Loading recent activity…', 'View all orders', 'Ask Mystery AI', 'Or top up airtime', 'Wallet slot', 'You’re all caught up. Other recent orders will appear here.'];
 
 test('the seasonal member homepage tells the same order truth as the ordinary one, in every state', () => {
   for (const [name, props] of Object.entries(SCENARIOS)) {
@@ -71,6 +71,7 @@ test('a problem is never dressed in celebration; the season line steps aside and
     const card = html.slice(html.indexOf('xm-order is-attention'), html.indexOf('</section>', html.indexOf('xm-order is-attention')));
     assert.doesNotMatch(card, /xm-gift|xh-|xk-|confetti|spark/i, 'no festive material on the problem card');
     assert.match(card, /WhatsApp support/);
+    assert.match(card, /href="sms:\+233592066298"/, 'the SMS fallback sits beside WhatsApp on a problem order');
   }
   assert.match(seasonal(SCENARIOS.delivered), /Your digital world, wrapped for the season\./);
   for (const props of Object.values(SCENARIOS)) assert.doesNotMatch(seasonal(props), /confetti|firework|xh-fw|celebrat/i);

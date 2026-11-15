@@ -21,7 +21,7 @@ export function HelpPage() {
           <a className="mh-button-secondary" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer">
             <MessageCircle size={17} aria-hidden="true" />WhatsApp Support
           </a>
-          <a className="mh-button-secondary" href={BUSINESS_CONFIG.contact.smsLink}><MessageSquareText size={17} aria-hidden="true" />SMS Support</a>
+          <a className="mh-button-secondary" href={BUSINESS_CONFIG.contact.smsLink}><MessageSquareText size={17} aria-hidden="true" />SMS {BUSINESS_CONFIG.contact.supportSmsDisplay}</a>
         </div>
       </header>
       <nav aria-label="FAQ categories" className="help-category-nav">
@@ -45,7 +45,7 @@ export function HelpPage() {
           <a className="mh-button-secondary" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer">
             <MessageCircle size={17} aria-hidden="true" />Contact Support
           </a>
-          <a className="mh-button-secondary" href={BUSINESS_CONFIG.contact.smsLink}><MessageSquareText size={17} aria-hidden="true" />SMS Support</a>
+          <a className="mh-button-secondary" href={BUSINESS_CONFIG.contact.smsLink}><MessageSquareText size={17} aria-hidden="true" />SMS {BUSINESS_CONFIG.contact.supportSmsDisplay}</a>
           <button type="button" className="mh-button-secondary" onClick={() => openMysteryAi()}>
             <Sparkles size={17} aria-hidden="true" />Ask Mystery AI
           </button>

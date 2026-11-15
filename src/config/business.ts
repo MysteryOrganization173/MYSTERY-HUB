@@ -4,7 +4,15 @@
  * service availability flags, and truthful operational settings.
  */
 
+// Support lines in international digits (no "+"). Every link and label below derives from these, so a number changes in
+// one place only. WhatsApp and SMS are temporary lines (PR #118, owner-approved Nov 2026); calls stay on the main line.
+const CALL_SUPPORT_NUMBER_INTL = '233594521108';
 const WHATSAPP_SUPPORT_NUMBER_INTL = '233242836323';
+const SMS_SUPPORT_NUMBER_INTL = '233592066298';
+/** 233XXXXXXXXX → 0XXXXXXXXX, the local form. */
+const ghanaLocal = (intl: string) => `0${intl.slice(3)}`;
+/** 233XXXXXXXXX → 0XX XXX XXXX, the readable form for labels. */
+const ghanaDisplay = (intl: string) => ghanaLocal(intl).replace(/^(\d{3})(\d{3})(\d{4})$/, '$1 $2 $3');
 
 export const BUSINESS_CONFIG = {
   brandName: 'Mystery Hub',
@@ -24,14 +32,17 @@ export const BUSINESS_CONFIG = {
   // Official Public Contact Information
   contact: {
     supportEmail: 'aryeeteyemmanuel852@gmail.com',
-    supportPhone: '0594521108',
-    supportPhoneIntl: '+233594521108',
-    phoneLink: 'tel:+233594521108',
+    supportPhone: ghanaLocal(CALL_SUPPORT_NUMBER_INTL),
+    supportPhoneIntl: `+${CALL_SUPPORT_NUMBER_INTL}`,
+    supportPhoneDisplay: ghanaDisplay(CALL_SUPPORT_NUMBER_INTL),
+    phoneLink: `tel:+${CALL_SUPPORT_NUMBER_INTL}`,
     emailLink: 'mailto:aryeeteyemmanuel852@gmail.com',
     supportWhatsAppUrl: `https://wa.me/${WHATSAPP_SUPPORT_NUMBER_INTL}`,
-    supportSms: '0592066298',
-    supportSmsIntl: '+233592066298',
-    smsLink: 'sms:+233592066298',
+    supportWhatsAppDisplay: ghanaDisplay(WHATSAPP_SUPPORT_NUMBER_INTL),
+    supportSms: ghanaLocal(SMS_SUPPORT_NUMBER_INTL),
+    supportSmsIntl: `+${SMS_SUPPORT_NUMBER_INTL}`,
+    supportSmsDisplay: ghanaDisplay(SMS_SUPPORT_NUMBER_INTL),
+    smsLink: `sms:+${SMS_SUPPORT_NUMBER_INTL}`,
     telegramChannelUrl: 'https://t.me/mysteryhubapp',
     whatsappChannelUrl: 'https://whatsapp.com/channel/0029VbBt1MGC6ZvlDJ8Biz3l',
     supportLocation: 'Accra, Ghana 🇬🇭',

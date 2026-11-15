@@ -520,7 +520,7 @@ function Help() {
           <div className="xh-letter-actions">
             <button type="button" onClick={() => setActivePage('orders')} className="mh-button xh-btn-primary">Track an Order<ArrowRight className="w-4 h-4" aria-hidden /></button>
             <a href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="xh-btn-ink"><MessageCircle className="w-4 h-4" aria-hidden />WhatsApp Support<span className="sr-only"> (opens WhatsApp)</span></a>
-            <a href={BUSINESS_CONFIG.contact.smsLink} className="xh-btn-ink"><MessageSquareText className="w-4 h-4" aria-hidden />SMS Support</a>
+            <a href={BUSINESS_CONFIG.contact.smsLink} className="xh-btn-ink"><MessageSquareText className="w-4 h-4" aria-hidden="true" />SMS {BUSINESS_CONFIG.contact.supportSmsDisplay}<span className="sr-only"> (opens your messages app)</span></a>
           </div>
           <p className="xh-letter-safety"><ShieldCheck className="w-4 h-4" aria-hidden="true" />Mystery Hub and its support team will never ask for your MoMo PIN.</p>
         </div>

@@ -80,9 +80,10 @@ export const Footer: React.FC = () => {
                     </li>
                   ))}
                   {column.title === 'Help' && <>
-                    <li><a href={contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer" className={linkClass}><MessageCircle className="h-4 w-4 text-[#44df95]" aria-hidden="true" />WhatsApp support</a></li>
-                    <li><a href={contact.phoneLink} className={linkClass}><Phone className="h-4 w-4 text-slate-400" aria-hidden="true" />{contact.supportPhone}</a></li>
-                    <li><a href={contact.smsLink} className={linkClass}><MessageSquareText className="h-4 w-4 text-slate-400" aria-hidden="true" />SMS {contact.supportSms}</a></li>
+                    {/* One contact per row on phones, so a line never sits beside an empty cell or wraps mid-number. */}
+                    <li className="col-span-2 sm:col-span-1"><a href={contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer" className={linkClass}><MessageCircle className="h-4 w-4 text-[#44df95]" aria-hidden="true" />WhatsApp support<span className="sr-only"> (opens WhatsApp)</span></a></li>
+                    <li className="col-span-2 sm:col-span-1"><a href={contact.phoneLink} className={linkClass}><Phone className="h-4 w-4 text-slate-400" aria-hidden="true" /><span className="whitespace-nowrap">Call {contact.supportPhoneDisplay}</span></a></li>
+                    <li className="col-span-2 sm:col-span-1"><a href={contact.smsLink} className={linkClass}><MessageSquareText className="h-4 w-4 text-slate-400" aria-hidden="true" /><span className="whitespace-nowrap">SMS {contact.supportSmsDisplay}</span></a></li>
                     <li className="col-span-2 sm:col-span-1"><a href={contact.emailLink} className={linkClass} title={contact.supportEmail}><Mail className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" /><span className="min-w-0">{contact.supportEmail.split('@')[0]}<wbr />@{contact.supportEmail.split('@')[1]}</span></a></li>
                   </>}
                 </ul>

@@ -14,7 +14,7 @@ export const WhyMysteryHub: React.FC = () => {
       <div className="home-support-actions">
         <button type="button" onClick={() => setActivePage('orders')} className="mh-button">Track an Order<ArrowRight className="w-4 h-4" /></button>
         <a href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="mh-button-secondary"><MessageCircle className="w-4 h-4" />WhatsApp Support</a>
-        <a href={BUSINESS_CONFIG.contact.smsLink} className="mh-button-secondary"><MessageSquareText className="w-4 h-4" aria-hidden="true" />SMS Support</a>
+        <a href={BUSINESS_CONFIG.contact.smsLink} className="mh-button-secondary"><MessageSquareText className="w-4 h-4" aria-hidden="true" />SMS {BUSINESS_CONFIG.contact.supportSmsDisplay}</a>
       </div>
       <p className="home-support-safety"><ShieldCheck className="w-4 h-4" aria-hidden="true" />Mystery Hub and its support team will never ask for your MoMo PIN.</p>
     </section>
