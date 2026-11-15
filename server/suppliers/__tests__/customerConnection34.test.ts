@@ -46,6 +46,8 @@ test('engagement means a second page, about half a minute of active use, or a ve
   assert.equal(verifiedPurchase(order({ journey: undefined }), now), false, 'a reference lookup (order recovery) is not a purchase here');
   assert.equal(verifiedPurchase(order({ createdAt: new Date(now - 2 * 60 * 60_000).toISOString() }), now), false, 'tracking an older order is not a fresh purchase');
   assert.equal(verifiedPurchase(order({ createdAt: 'soon' }), now), false);
+  assert.equal(verifiedPurchase(order({ createdAt: new Date(now + 5 * 60_000).toISOString() }), now), true, 'a phone clock a little behind the server');
+  assert.equal(verifiedPurchase(order({ createdAt: new Date(now + 20 * 60_000).toISOString() }), now), false);
   assert.equal(verifiedPurchase(null, now), false);
 });
 
@@ -64,7 +66,7 @@ test('one unsolicited invitation per visit, none after a dismissal, none within 
   assert.equal(sessionAllows('channel', s, { channel: now + 400 * DAY }, now), true, 'a timestamp far in the future (changed clock) never locks');
   // Installed-app first use: notifications have their own snooze; marketing gaps and rests never block them.
   assert.equal(sessionAllows('notifications', s, { install: now - 60_000, channel: now - 60_000, notifications: now - DAY }, now), true);
-  assert.equal(sessionAllows('notifications', { ...s, shown: 'notifications' }, {}, now), true, 'an unanswered notification card may return within its visit');
+  assert.equal(sessionAllows('notifications', { ...s, shown: 'notifications' }, {}, now), false, 'one notification card per visit (it pauses for dialogs instead)');
   assert.equal(sessionAllows('notifications', { ...s, shown: 'channel' }, {}, now), false, 'but never after another invitation in the same visit');
   assert.equal(sessionAllows('notifications', { ...s, dismissed: true }, {}, now), false);
   assert.equal(sessionAllows('install', s, { notifications: now - 60_000 }, now), true, 'a notification card does not start the marketing gap');
@@ -174,15 +176,29 @@ test('acting on the page card uses the visit; a failed session write never reviv
 
 test('the welcome slot is released only after the sheet has been open, and installed notifications use the coordinator', () => {
   const layer = read('src/components/pwa/AppLaunchLayer.tsx');
-  assert.match(layer, /if \(welcomeOpen\) \{ welcomeWasOpen\.current = true; return; \}/);
+  assert.match(layer, /const welcomeVisible = installed && welcomeOpen && !user && !busy && activePage === 'home';/);
+  assert.match(layer, /if \(welcomeVisible\) \{ welcomeShown\.current = true; return; \}/, 'held exactly while on screen');
   assert.match(layer, /&& claimWelcome\(\)\)/);
   assert.match(layer, /const busy = appBusy\(app\);/);
+  assert.match(layer, /suspended=\{busy\}/, 'the notification card pauses for dialogs instead of being used up');
   const optIn = read('src/components/pwa/NotificationOptIn.tsx');
   assert.match(optIn, /claimInvitation\(\['notifications'\]\)/);
   assert.match(optIn, /recordDismissal\(STORAGE_KEYS\.notificationOptIn\);noteDismissal\(\);onDone\(\);/);
   const inline = read('src/components/pwa/InstallAppPromo.tsx');
   assert.match(inline, /noteInvitationAnswered\('install'\); void install\(\);/);
-  assert.match(read('src/pwa/useAppInstall.ts'), /const remembered = installRemembered\(\{/, 'install marks are re-read on every render');
+  assert.match(read('src/pwa/useAppInstall.ts'), /useMemo\(\(\) => installRemembered\(\{ \.\.\.readInstallMarks\(readTime\)/, 'install marks are re-read when they change');
+});
+
+test('install marks survive blocked storage for the life of the page and notify every install card', async () => {
+  const prompt = await import('../../../src/pwa/installPrompt.js');
+  const blocked = { localStorage: broken } as unknown as Window;
+  const before = prompt.installMarksVersion();
+  prompt.markInstallStepsSeen(blocked);
+  prompt.markInstallPending(blocked);
+  assert.ok(prompt.installMarksVersion() > before, 'subscribers re-render');
+  const marks = prompt.readInstallMarks(() => null);
+  assert.ok(marks.stepsAt && marks.pendingAt, 'memory fills in where storage failed');
+  assert.equal(installRemembered({ ...marks, now: Date.now() }), true);
 });
 
 test('approved copy: one heading, one sentence, clear actions; installing is never shown as installed', () => {

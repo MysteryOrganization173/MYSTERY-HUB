@@ -9,7 +9,7 @@ import './pwa.css';
 type Props = {token:string;accountId:string;allowOffers:boolean;onDone:()=>void;initialStep?:'enable'|'offers';variant?:'floating'|'inline';client?:CustomerNotificationsClient;environment?:OnboardingOptions['environment']};
 
 /** Installed Home only; checking readiness never requests permission or subscribes. */
-export function InstalledNotificationOnboarding({token,accountId,allowOffers}: Pick<Props,'token'|'accountId'|'allowOffers'>) {
+export function InstalledNotificationOnboarding({token,accountId,allowOffers,suspended=false}: Pick<Props,'token'|'accountId'|'allowOffers'>&{suspended?:boolean}) {
   const [opportunity,setOpportunity]=useState<'enable'|'offers'|null>(null),[closed,setClosed]=useState(false);
   useEffect(()=>{
     const request=new AbortController();
@@ -22,7 +22,7 @@ export function InstalledNotificationOnboarding({token,accountId,allowOffers}: P
   },[token,accountId,allowOffers]);
   useEffect(()=>()=>releaseInvitation('notifications'),[]);
   if(closed||!opportunity)return null;
-  return <NotificationOptIn token={token} accountId={accountId} allowOffers={allowOffers} initialStep={opportunity} onDone={()=>{setClosed(true);releaseInvitation('notifications');}}/>;
+  return <div hidden={suspended}><NotificationOptIn token={token} accountId={accountId} allowOffers={allowOffers} initialStep={opportunity} onDone={()=>{setClosed(true);releaseInvitation('notifications');}}/></div>;
 }
 
 /** Permission never implies marketing consent. The optional offers step follows registration immediately. */

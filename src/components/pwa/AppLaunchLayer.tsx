@@ -35,16 +35,23 @@ export const AppLaunchLayer: React.FC = () => {
     }
   }, [installed, user, isAuthChecking, launchPath, welcomeOpen, busy, activePage]);
 
-  // Free the coordinator's slot only once the sheet that claimed it has actually been open and closed.
-  const welcomeWasOpen = useRef(false);
+  // The coordinator's slot is held exactly while the sheet is on screen. It is freed whenever the sheet stops
+  // showing, whatever the reason (closed, signed in elsewhere, a dialog), and then the sheet is not re-offered.
+  const welcomeVisible = installed && welcomeOpen && !user && !busy && activePage === 'home';
+  const welcomeShown = useRef(false);
   useEffect(() => {
-    if (welcomeOpen) { welcomeWasOpen.current = true; return; }
-    if (welcomeWasOpen.current) { welcomeWasOpen.current = false; releaseInvitation('welcome'); }
-  }, [welcomeOpen]);
-  useEffect(() => () => { if (welcomeWasOpen.current) releaseInvitation('welcome'); }, []);
+    if (welcomeVisible) { welcomeShown.current = true; return; }
+    if (!welcomeShown.current) return;
+    welcomeShown.current = false;
+    releaseInvitation('welcome');
+    setWelcomeOpen(false);
+  }, [welcomeVisible]);
+  useEffect(() => () => { if (welcomeShown.current) releaseInvitation('welcome'); }, []);
   if (!installed) return null;
-  if (welcomeOpen && !user && !busy && activePage === 'home') return <AppWelcomeSheet onClose={() => setWelcomeOpen(false)} />;
-  if (user && sessionToken && !isAuthChecking && activePage === 'home' && !busy)
-    return <InstalledNotificationOnboarding key={`${user.id}:${sessionToken}`} token={sessionToken} accountId={user.id} allowOffers={user.role==='customer'}/>;
+  if (welcomeVisible) return <AppWelcomeSheet onClose={() => setWelcomeOpen(false)} />;
+  // The notification card pauses (stays mounted, hidden) while a dialog or sheet is open, so it keeps its answer
+  // state and its one showing for the visit instead of being used up by a brief interruption.
+  if (user && sessionToken && !isAuthChecking && activePage === 'home')
+    return <InstalledNotificationOnboarding key={`${user.id}:${sessionToken}`} token={sessionToken} accountId={user.id} allowOffers={user.role==='customer'} suspended={busy}/>;
   return null;
 };

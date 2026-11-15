@@ -39,7 +39,7 @@ export const InstallAppPromo: React.FC<{ variant?: 'section' | 'compact'; classN
   const apple = (mode === 'hidden' ? shownMode : mode) === 'apple';
   const notNow = () => { noteDismissal(); dismiss(); };
   // Closing after reading the iPhone steps is not a "no": Safari cannot tell us whether it was added.
-  const close = () => { if (stepsRead) { noteDismissal(); stepsSeen(); } else notNow(); };
+  const close = () => { if (stepsRead) stepsSeen(); else notNow(); };
 
   if (progress !== 'idle') {
     const copy = installProgressCopy(progress, phone);

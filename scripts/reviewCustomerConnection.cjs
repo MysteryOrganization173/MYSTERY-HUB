@@ -230,6 +230,25 @@ const engage = async (p, second = '/data') => { await p.goto(BASE + '/'); await 
     await p.locator('.xh-install').screenshot({ path: `${OUT}/december-install-pixel7.png` }).catch(() => {});
     await ctx.close();
   }
+  // 9. Installed app (standalone display mode emulated): the welcome sheet is shown alone and nothing follows it in
+  //    that visit; no "Get the app" link inside the app; a later visit may offer the Channel (never install).
+  {
+    const ctx = await context(b, { ...devices['Pixel 7'] });
+    await ctx.addInitScript(() => { const original = window.matchMedia.bind(window); window.matchMedia = query => /display-mode: standalone/.test(query) ? { matches: true, media: query, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false } : original(query); });
+    const p = await ctx.newPage(); await p.goto(BASE + '/'); await settle(p);
+    const welcome = p.getByRole('dialog', { name: 'Welcome to Mystery Hub' });
+    ok('installed app: the welcome sheet opens on the start page', await welcome.isVisible().catch(() => false));
+    ok('nothing else appears on top of the welcome sheet', await noInvite(p, 3000));
+    await p.getByRole('button', { name: /Continue as a guest/ }).click(); await sleep(400);
+    await p.goto(BASE + '/services'); await settle(p);
+    ok('after the welcome sheet, no install or Channel invitation in that visit', await noInvite(p));
+    const appLink = await p.locator('footer a[href="/app"]').count();
+    ok('inside the installed app the footer has no "Get the app" link', appLink === 0, String(appLink));
+    const q = await ctx.newPage(); await q.goto(BASE + '/help'); await settle(q); await q.goto(BASE + '/services'); await settle(q);
+    const shown = await waitInvite(q);
+    ok('a later visit in the installed app may offer the Channel, never install', shown && (await invite(q).locator('h2').textContent()).startsWith('Stay in the Mystery.'));
+    await ctx.close();
+  }
   await b.close();
   const pass = results.filter(Boolean).length;
   console.log(`\n${pass}/${results.length} passed`);

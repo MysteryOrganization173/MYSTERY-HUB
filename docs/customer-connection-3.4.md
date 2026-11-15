@@ -17,21 +17,21 @@ Each rule is a pure, tested function.
 | On screen | One at a time. The installed app's welcome sheet also claims the screen. |
 | Never over | Any dialog, sheet or menu (tracked by the shared overlay stack), checkout, receipt or order status, sign-in, account, password change, the assistant, template preview, Marketplace enquiry or waitlist. |
 | Pages | Only calm browsing pages: Home, Data, Services, Marketplace, Creative, About, Help, Earn and Website.<br>Never on Orders (recovery and critical status), Wallet, AFA or Results Checker, `/app`, Admin, the editor or My Business.<br>Never after a Paystack return (`?reference=` / `?trxref=`).<br>Greetings and published business websites never load the app shell, so nothing can appear there. |
-| Timing | Only after real engagement: a second page in the visit, about 25 s of active use, or a verified purchase (a `direct_checkout` receipt in `processing` or `delivered`, created within the last hour) once its receipt has been closed. Tracking an older order does not count. Each page must also settle for 2 s, so rapid navigation never triggers one. |
+| Timing | Only after real engagement: a second page in the visit, about 25 s of active use, or a verified purchase (a `direct_checkout` receipt in `processing` or `delivered`, created within the last hour, tolerating a phone clock up to 10 minutes behind the server) once its receipt has been closed. Tracking an older order does not count. Each page must also settle for 2 s, so rapid navigation never triggers one. |
 | Frequency | At most one unsolicited invitation per browsing session (kept in `sessionStorage`, so Back and refresh do not show another), and none at all after any dismissal in that session.<br>No two within 12 hours in the same browser, across tabs.<br>An invitation that was shown and ignored rests (install 7 days, Channel 14). |
 | Step aside | A dialog opening, a page change or a scroll of 1.5 screens closes it for the rest of the visit, so it never becomes a permanent strip at the bottom of a small phone. |
 | Inline cards | The install card inside a page (Home, the member home, the December home) counts as that page's suggestion. Floating invitations stay away while it is visible. Acting on it (Install App, or opening the iPhone steps) uses the visit's one invitation; its "Not now" ends suggestions for the visit. |
 | Welcome sheet | It is an account entry, not marketing. It keeps install and Channel invitations out of that visit; first-use notifications may still follow sign-in. |
-| Installed-app notifications | A contextual first-use invitation with its own snooze (21 days, two answers). It shares the visit rules: one at a time, never after another invitation or a dismissal in the visit. It is not held back by the marketing 12-hour gap or "seen" rests, so installing from a browser suggestion never blocks the app's first-use card. An unanswered card may return within its visit after a sheet closes. |
+| Installed-app notifications | A contextual first-use invitation with its own snooze (21 days, two answers). It shares the visit rules: one at a time, never after another invitation or a dismissal in the visit. It is not held back by the marketing 12-hour gap or "seen" rests, so installing from a browser suggestion never blocks the app's first-use card. While a dialog or sheet is open it pauses (stays mounted, hidden), so a brief interruption does not use up its one showing. |
 | Storage failure | Corrupt or blocked storage reads as "nothing remembered". The session falls back to memory for the life of the page. |
 
 **Accessibility:**
 - The card is a labelled `aside`. It never takes focus and has no backdrop.
 - A polite status note tells screen readers that a suggestion appeared at the end of the page.
 - Escape (with focus inside), "Not now" / "Maybe later" and the Close button all dismiss it. Close acts as the dismissal under its own name.
-- Focus returns to the page's main region when the card closes from the keyboard.
+- Focus returns to the page's main region when someone answers the card from the keyboard. Automatic closes (a dialog, a page change, a long scroll) leave focus alone.
 - Targets are at least 44 px. Reduced motion removes the entrance animation.
-- **Storage:** if session storage stops accepting writes, the in-memory record wins, so a stale stored record can never re-open the visit.
+- **Storage:** while session storage refuses writes, the in-memory record wins, so a stale stored record can never re-open the visit. Install marks (pending, confirmed, steps read) also live in memory for the page, so blocked storage still hides what it should.
 
 ### Install
 - **Copy:** "Mystery Hub, one tap away." / "Buy data, track orders and more, right from your home screen." / **Install App** · Not now.
@@ -97,7 +97,16 @@ The ordinary footer returns unchanged in structure when the season ends. Neither
   - the purchase moment requires a recent order;
   - session storage write failures are handled;
   - shared busy guards and install-mark helpers.
-- **Browser:** `scripts/reviewCustomerConnection.cjs` runs locally only, on a production build with a disposable database. Results: 83/83.
+- **Second review (verification of the fixes):** 10 findings, all addressed. The fixes:
+  - install marks fall back to memory, re-render every card through a version subscription, and refresh across tabs;
+  - the welcome slot is tied to the sheet being on screen;
+  - the purchase moment tolerates clock skew;
+  - focus moves only after explicit answers;
+  - the same neutral close after the iPhone steps on both cards;
+  - per-store session write failure;
+  - the notification card is one per visit but pauses during dialogs;
+  - the shared pointer helper.
+- **Browser:** `scripts/reviewCustomerConnection.cjs` runs locally only, on a production build with a disposable database. Results: 88/88.
   - Covers:
     - first look vs engagement, the polite note and focus return;
     - Install App on the Home card with nothing following it;
@@ -108,5 +117,6 @@ The ordinary footer returns unchanged in structure when the season ends. Neither
     - sign-in, the phone menu and checkout making a visible invitation step aside for good;
     - seven sizes from 320×568 to 1440×900, above the tab bar, under 45 % of the height, Escape and reduced motion;
     - both footers at seven sizes with one-line numbers;
+    - the installed app (standalone display mode emulated): welcome sheet alone, nothing after it in that visit, no "Get the app", and the Channel (never install) on a later visit;
     - axe-core with no serious or critical issues.
   - The install prompt in that review is **simulated** (Chromium does not let automation open its real dialog), so it proves the product logic, not a device install.

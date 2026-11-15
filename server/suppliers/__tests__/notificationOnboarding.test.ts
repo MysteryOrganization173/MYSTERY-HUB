@@ -57,9 +57,9 @@ test('failed consent persistence remains an error and never marks consent confir
   const f=fixture();await assert.rejects(()=>acceptNotificationOffers({...f.client,savePreferences:async()=>({ok:false,message:'Temporary failure'})},'a',f.opts.signal),/Temporary failure/);assert.equal((await f.client.preferences('a')).promotional,false);
 });
 test('UI is installed-Home only, keyed to account/session and preserves checkout/editor overlay exclusion',()=>{
-  const layer=readFileSync('src/components/pwa/AppLaunchLayer.tsx','utf8');assert.match(layer,/if \(!installed\) return null/);assert.match(layer,/activePage === 'home' && !busy/);assert.match(layer,/key=\{`\$\{user.id\}:\$\{sessionToken\}`\}/);assert.match(layer,/allowOffers=\{user.role==='customer'\}/);
+  const layer=readFileSync('src/components/pwa/AppLaunchLayer.tsx','utf8');assert.match(layer,/if \(!installed\) return null/);assert.match(layer,/welcomeOpen && !user && !busy && activePage === 'home'/);assert.match(layer,/suspended=\{busy\}/);assert.match(layer,/key=\{`\$\{user.id\}:\$\{sessionToken\}`\}/);assert.match(layer,/allowOffers=\{user.role==='customer'\}/);
   // 3.4: the guard list is shared with the invitation layer (components/pwa/invitationBusy.ts).
   const busy=readFileSync('src/components/pwa/invitationBusy.ts','utf8');assert.match(layer,/const busy = appBusy\(app\);/);
   for(const guard of ['isCheckoutOpen','isAuthModalOpen','activeEditorSite','isAccountOpen','mustChangePassword'])assert.ok(busy.includes(guard),guard);
-  const ui=readFileSync('src/components/pwa/NotificationOptIn.tsx','utf8');assert.match(ui,/step==='offers'\)markMarketingPromptAnswered/);assert.match(ui,/acceptNotificationOffers/);assert.match(ui,/request.current\?\.abort/);
+  const ui=readFileSync('src/components/pwa/NotificationOptIn.tsx','utf8');assert.match(ui,/<div hidden=\{suspended\}>/,'hidden, never shown over checkout, sign-in or the editor');assert.match(ui,/step==='offers'\)markMarketingPromptAnswered/);assert.match(ui,/acceptNotificationOffers/);assert.match(ui,/request.current\?\.abort/);
 });

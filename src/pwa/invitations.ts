@@ -77,12 +77,10 @@ export function engaged(session: InvitationSession) {
 /**
  * The session and browser-wide limits for one kind. Notifications are a contextual first-use invitation with their
  * own snooze: they share the visit (one at a time, one per visit, nothing after a dismissal) but not the 12-hour gap
- * or the "seen" rests of the marketing invitations, and an unanswered notification card may return within its visit.
- * The welcome sheet leaves room only for notifications.
+ * or the "seen" rests of the marketing invitations. The welcome sheet leaves room only for notifications.
  */
 export function sessionAllows(kind: InvitationKind, session: InvitationSession, seen: SeenMap, now: number) {
-  if (session.dismissed) return false;
-  if (session.shown && !(kind === 'notifications' && session.shown === 'notifications')) return false;
+  if (session.shown || session.dismissed) return false;
   if (session.welcome && kind !== 'notifications') return false;
   if (kind === 'notifications') return true;
   const times = [seen.install, seen.channel].filter((time): time is number => valid(time, now));
@@ -122,10 +120,10 @@ const count = (value: unknown) => (Number.isInteger(value) && (value as number) 
 const time = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null);
 
 let memorySession: InvitationSession | null = null;
-// Once a write fails (quota, privacy mode), the stored record may be stale: memory is the truth from then on.
-let sessionWritesFailed = false;
+// While a store refuses writes (quota, privacy mode), what it holds may be stale: memory is the truth until it recovers.
+const failingStores = new WeakSet<object>();
 export function readSession(store: Store | null = tab()): InvitationSession {
-  if (sessionWritesFailed && memorySession) return { ...memorySession };
+  if ((!store || failingStores.has(store)) && memorySession) return { ...memorySession };
   const raw = readJson(INVITATION_KEYS.session, store) as Partial<InvitationSession> | null;
   if (!raw || typeof raw !== 'object') return memorySession ? { ...memorySession } : { ...NEW_SESSION };
   const kinds: InvitationKind[] = ['install', 'channel', 'notifications'];
@@ -137,7 +135,8 @@ export function readSession(store: Store | null = tab()): InvitationSession {
 }
 export function writeSession(next: InvitationSession, store: Store | null = tab()) {
   memorySession = { ...next };
-  if (!store || !writeJson(INVITATION_KEYS.session, next, store)) sessionWritesFailed = true;
+  if (!store) return;
+  if (writeJson(INVITATION_KEYS.session, next, store)) failingStores.delete(store); else failingStores.add(store);
 }
 const updateSession = (patch: (session: InvitationSession) => Partial<InvitationSession>) => {
   const current = readSession();
@@ -237,5 +236,5 @@ export function releaseInvitation(slot: Slot) {
 
 /** Tests only: forget the in-memory coordinator state between cases. */
 export function resetInvitationsForTest() {
-  onScreen = null; inlineOffers.clear(); memorySession = null; sessionWritesFailed = false; notify();
+  onScreen = null; inlineOffers.clear(); memorySession = null; notify();
 }

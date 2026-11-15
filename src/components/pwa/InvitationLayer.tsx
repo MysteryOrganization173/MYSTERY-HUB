@@ -76,8 +76,9 @@ export const InvitationLayer: React.FC = () => {
 
   const close = useCallback((outcome: Outcome) => {
     const kind = shownRef.current;
-    // Someone answering from the keyboard keeps their place: focus returns to the page, not to <body>.
-    if (cardRef.current?.contains(document.activeElement)) document.getElementById('main-content')?.focus({ preventScroll: true });
+    // Someone who answered from the keyboard keeps their place on the page rather than landing on <body>. Automatic
+    // closes (a dialog, a page change, a long scroll) leave focus to whatever caused them.
+    if (outcome !== 'ignored' && cardRef.current?.contains(document.activeElement)) document.getElementById('main-content')?.focus({ preventScroll: true });
     shownRef.current = null;
     setShown(null);
     setAnnouncement('');

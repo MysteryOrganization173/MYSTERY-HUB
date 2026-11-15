@@ -28,8 +28,23 @@ export const INSTALL_STEPS_SEEN_KEY = 'mh_install_steps_seen_at';
 const remember = (win: Window, key: string, value: string | null) => {
   try { if (value === null) win.localStorage.removeItem(key); else win.localStorage.setItem(key, value); } catch { /* storage unavailable */ }
 };
-export const markInstallPending = (win: Window = window) => remember(win, INSTALL_PENDING_KEY, String(Date.now()));
-export const markInstallStepsSeen = (win: Window = window) => remember(win, INSTALL_STEPS_SEEN_KEY, String(Date.now()));
+// Install marks live in localStorage and, for this page, in memory too, so blocked storage still behaves. Every
+// change bumps a version that useAppInstall subscribes to (other tabs reach it through the storage event).
+type Marks = { installed: number | null; pending: number | null; steps: number | null };
+const marks: Marks = { installed: null, pending: null, steps: null };
+let marksVersion = 0;
+const touchMarks = () => { marksVersion++; notify(); };
+const setMark = (win: Window, field: keyof Marks, key: string, value: number | null) => {
+  marks[field] = value;
+  remember(win, key, value === null ? null : field === 'installed' ? new Date(value).toISOString() : String(value));
+};
+export const markInstallPending = (win: Window = window) => { setMark(win, 'pending', INSTALL_PENDING_KEY, Date.now()); touchMarks(); };
+export const markInstallStepsSeen = (win: Window = window) => { setMark(win, 'steps', INSTALL_STEPS_SEEN_KEY, Date.now()); touchMarks(); };
+export const installMarksVersion = () => marksVersion;
+/** Stored install marks, with this page's own marks filling in where storage failed. */
+export function readInstallMarks(read: (key: string) => number | null) {
+  return { installedAt: read(INSTALLED_AT_KEY) ?? marks.installed, pendingAt: read(INSTALL_PENDING_KEY) ?? marks.pending, stepsAt: read(INSTALL_STEPS_SEEN_KEY) ?? marks.steps };
+}
 
 /** Platform pages only: a published business website must never advertise Mystery Hub's own app. */
 export function isPlatformPage(location: Pick<Location, 'pathname' | 'search'>) {
@@ -41,9 +56,13 @@ export function captureInstallPrompt(win: Window = window) {
   // Opened from the home screen: the install is confirmed. Remembered here, so the browser tab sharing this storage
   // (Android, desktop Chromium) stops suggesting it too. iPhone home screen apps keep their own storage.
   if (isInstalledApp(win as never)) {
+    marks.installed = Date.now();
     try { if (!win.localStorage.getItem(INSTALLED_AT_KEY)) win.localStorage.setItem(INSTALLED_AT_KEY, new Date().toISOString()); } catch { /* storage unavailable */ }
-    remember(win, INSTALL_PENDING_KEY, null);
+    setMark(win, 'pending', INSTALL_PENDING_KEY, null);
   }
+  win.addEventListener?.('storage', event => {
+    if (event.key === null || [INSTALLED_AT_KEY, INSTALL_PENDING_KEY, INSTALL_STEPS_SEEN_KEY].includes(event.key)) touchMarks();
+  });
   win.addEventListener('beforeinstallprompt', event => {
     // Keep the browser's own mini-infobar quiet; Mystery Hub offers install from its own card instead.
     event.preventDefault();
@@ -54,9 +73,9 @@ export function captureInstallPrompt(win: Window = window) {
     deferred = null;
     installedThisVisit = true;
     trackGrowth('installed',{page:win.location.pathname==='/app'?'app':'home'});
-    remember(win, INSTALLED_AT_KEY, new Date().toISOString());
-    remember(win, INSTALL_PENDING_KEY, null);
-    notify();
+    setMark(win, 'installed', INSTALLED_AT_KEY, Date.now());
+    setMark(win, 'pending', INSTALL_PENDING_KEY, null);
+    touchMarks();
   });
 }
 

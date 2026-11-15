@@ -26,10 +26,12 @@ export const CHANNEL_COPY = {
   follow: 'Follow Channel', later: 'Maybe later', following: 'Already following',
 } as const;
 
-/** A purchase made just now (within the hour) in this browser, verified by the server as paid. */
+/** A purchase made just now (within the hour) in this browser, verified by the server as paid. The order time
+ *  comes from the server, so a phone clock up to ten minutes behind it is tolerated. */
 export const PURCHASE_MOMENT_MS = 60 * 60 * 1000;
+export const CLOCK_SKEW_MS = 10 * 60 * 1000;
 export const verifiedPurchase = (order: Pick<OrderRecord, 'journey' | 'status' | 'createdAt'> | null, now = Date.now()) => {
   if (!order || order.journey !== 'direct_checkout' || !(order.status === 'processing' || order.status === 'delivered')) return false;
-  const created = Date.parse(order.createdAt);
-  return Number.isFinite(created) && now - created >= 0 && now - created < PURCHASE_MOMENT_MS;
+  const age = now - Date.parse(order.createdAt);
+  return Number.isFinite(age) && age > -CLOCK_SKEW_MS && age < PURCHASE_MOMENT_MS;
 };

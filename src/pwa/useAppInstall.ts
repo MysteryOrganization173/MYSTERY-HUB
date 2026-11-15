@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useReducer, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
-  hasInstallPrompt, INSTALL_PENDING_KEY, INSTALL_STEPS_SEEN_KEY, INSTALLED_AT_KEY, markInstallPending, markInstallStepsSeen,
-  promptInstall, subscribeInstallPrompt, wasInstalledThisVisit,
+  hasInstallPrompt, installMarksVersion, markInstallPending, markInstallStepsSeen, promptInstall, readInstallMarks,
+  subscribeInstallPrompt, wasInstalledThisVisit,
 } from './installPrompt';
 import { isInstalledApp, supportsAppleHomeScreen } from './appEnvironment';
 import { isInAppBrowser } from './installGuidance';
@@ -22,14 +22,12 @@ export function useAppInstall() {
   const installedNow = useSyncExternalStore(subscribeInstallPrompt, wasInstalledThisVisit, () => false);
   const [snooze, setSnooze] = useState(() => readSnooze(STORAGE_KEYS.installPromo));
   const [progress, setProgress] = useState<InstallProgress>('idle');
-  const [, refresh] = useReducer((n: number) => n + 1, 0);
+  const marksVersion = useSyncExternalStore(subscribeInstallPrompt, installMarksVersion, () => 0);
   // App browsers inside WhatsApp, Facebook or Instagram cannot add to the home screen, whatever they report.
   const [environment] = useState(() => ({ installed: isInstalledApp(), apple: supportsAppleHomeScreen() && !isInAppBrowser(userAgent()) }));
-  // Read on every render (two small reads), so a pending or confirmed install recorded by another card, /app or
-  // another tab is honoured the next time anything changes, e.g. when the browser offers installation again.
-  const remembered = installRemembered({
-    installedAt: readTime(INSTALLED_AT_KEY), pendingAt: readTime(INSTALL_PENDING_KEY), stepsAt: readTime(INSTALL_STEPS_SEEN_KEY), now: Date.now(),
-  });
+  // Re-read whenever a mark changes here, in another card or in another tab, and when the browser offers
+  // installation again; memory fills in when storage is blocked.
+  const remembered = useMemo(() => installRemembered({ ...readInstallMarks(readTime), now: Date.now() }), [marksVersion, hasPrompt]);
 
   useEffect(() => { if (installedNow) setProgress('installed'); }, [installedNow]);
 
@@ -39,7 +37,7 @@ export function useAppInstall() {
 
   const dismiss = useCallback(() => setSnooze(recordDismissal(STORAGE_KEYS.installPromo)), []);
   /** iPhone/iPad: the steps were read. Safari cannot confirm an install, so this rests without counting as a "no". */
-  const stepsSeen = useCallback(() => { markInstallStepsSeen(); refresh(); }, []);
+  const stepsSeen = useCallback(() => { markInstallStepsSeen(); }, []);
 
   /** Runs inside the button's click so the browser accepts it as a user gesture. */
   const install = useCallback(async () => {
