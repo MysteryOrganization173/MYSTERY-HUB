@@ -40,7 +40,7 @@ interface AdminCustomersSectionProps {
   currentAdminId: string;
   initialUserId?: string | null;
   onOpenEarn?: (id: string) => void;
-  onOpenOrder?: (reference:string)=>void;
+  onOpenOrder?: (reference:string)=>void; onComposeSms?:(seed:any)=>void;
 }
 
 const AccountSecuritySection: React.FC<AdminCustomersSectionProps> = ({
@@ -669,5 +669,5 @@ const AccountSecuritySection: React.FC<AdminCustomersSectionProps> = ({
 export const AdminCustomersSection:React.FC<AdminCustomersSectionProps>=(props)=>{
  const [view,setView]=useState<'audience'|'security'>(props.initialUserId?'security':'audience'),[account,setAccount]=useState<string|null>(props.initialUserId||null);
  useEffect(()=>{setAccount(props.initialUserId||null);setView(props.initialUserId?'security':'audience');},[props.initialUserId,props.sessionToken]);
- return <div className="space-y-4"><div role="tablist" aria-label="Customer workspace" className="flex flex-wrap gap-2">{(['audience','security'] as const).map(tab=><button type="button" key={tab} role="tab" aria-selected={view===tab} className={`min-h-11 rounded-xl border px-4 text-sm ${view===tab?'border-emerald-500 bg-emerald-950 text-emerald-200':'border-slate-700 text-slate-300'}`} onClick={()=>setView(tab)}>{tab==='audience'?'Audience & Contacts':'Accounts & Security'}</button>)}</div>{view==='audience'?<AdminContactHub key={props.sessionToken} token={props.sessionToken} onOpenAccount={id=>{setAccount(id);setView('security');}} onOpenOrder={props.onOpenOrder}/>:<AccountSecuritySection key={props.sessionToken} {...props} initialUserId={account}/>}</div>;
+ return <div className="space-y-4"><div role="tablist" aria-label="Customer workspace" className="flex flex-wrap gap-2">{(['audience','security'] as const).map(tab=><button type="button" key={tab} role="tab" aria-selected={view===tab} className={`min-h-11 rounded-xl border px-4 text-sm ${view===tab?'border-emerald-500 bg-emerald-950 text-emerald-200':'border-slate-700 text-slate-300'}`} onClick={()=>setView(tab)}>{tab==='audience'?'Audience & Contacts':'Accounts & Security'}</button>)}</div>{view==='audience'?<AdminContactHub key={props.sessionToken} token={props.sessionToken} onOpenAccount={id=>{setAccount(id);setView('security');}} onOpenOrder={props.onOpenOrder} onComposeSms={props.onComposeSms}/>:<AccountSecuritySection key={props.sessionToken} {...props} initialUserId={account}/>}</div>;
 };

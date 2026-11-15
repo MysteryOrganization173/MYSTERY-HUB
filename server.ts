@@ -1,3 +1,5 @@
+import {smsAdminRouter,smsPublicRouter} from './server/sms/routes.js';
+import {startSmsWorker} from './server/sms/worker.js';
 import {experienceRouter,adminExperienceRouter} from './server/routes/experienceApi.js';
 import {campaignPublicRouter,campaignAdminRouter,campaignShortRouter} from './server/routes/campaignApi.js';
 import { createShieldRouter, shieldAdminRouter } from './server/routes/shieldApi.js';
@@ -86,6 +88,8 @@ app.use('/api/analytics',growthAnalyticsRouter);
 app.use('/api/admin/analytics',adminGrowthAnalyticsRouter);
 
 // Mount Core Payments & Orders API Router
+app.use('/api/sms',smsPublicRouter);
+app.use('/api/admin/sms',smsAdminRouter);
 app.use('/api/notifications',notificationRouter);
 app.use('/api/admin/notifications',adminNotificationRouter);
 app.use('/api/shield', createShieldRouter());
@@ -104,6 +108,8 @@ app.use('/api/mystery-ai/feedback', mysteryAiFeedbackRouter);
 async function startServer() {
   await initDatabase();
   await bootstrapAdminAccount();
+  const stopSms=startSmsWorker();
+  process.once('SIGTERM',stopSms);
   const stopNotifications=startNotificationWorker();
   process.once('SIGTERM',stopNotifications);
   process.once('SIGTERM',startSalesReliabilityMonitor());

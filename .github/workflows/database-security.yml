@@ -35,6 +35,7 @@ jobs:
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE app_owner LOGIN PASSWORD 'local-owner-only' NOSUPERUSER NOBYPASSRLS; CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS; GRANT anon,authenticated TO app_owner;"
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_routing_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_contact_test
+          createdb -h 127.0.0.1 -U postgres -O app_owner mystery_sms_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_rls_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_monitor_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_admin_website_test
@@ -107,3 +108,8 @@ jobs:
         env:
           MYSTERY_CONTACT_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_contact_test
         run: node --import tsx --test server/suppliers/__tests__/contactHubPostgres.test.ts
+
+      - name: Verify dormant SMS schema, paid-send crash windows and signed-report isolation
+        env:
+          MYSTERY_SMS_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_sms_test
+        run: node --import tsx --test server/suppliers/__tests__/smsPostgres.test.ts

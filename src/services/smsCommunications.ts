@@ -1,0 +1,2 @@
+import {API_BASE_URL} from './apiClient';
+export async function smsRequest<T=any>(token:string,path:string,body?:unknown,method=body===undefined?'GET':'POST',signal?:AbortSignal):Promise<T>{const r=await fetch(`${API_BASE_URL}/api/admin/sms/${path}`,{method,cache:'no-store',signal,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});const data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||'SMS services are unavailable. No success is confirmed.');return data;}
