@@ -11,8 +11,12 @@ export function smsEstimate(message:string){
 export function channelDestination(value:string):string|null {
  try{const u=new URL(value);return u.protocol==='https:'&&u.hostname==='whatsapp.com'&&!u.port&&!u.username&&!u.password&&!u.search&&!u.hash&&/^\/channel\/[A-Za-z0-9]{10,100}$/.test(u.pathname)?u.href:null;}catch{return null;}
 }
-export function smsLink(phone:string,message:string){return `sms:${phone}?body=${encodeURIComponent(message)}`;}
-export function manualSmsTemplate(kind:'support'|'return'|'channel',origin:string,channel?:string){
+export function smsLink(phone:string,message:string){if(!/^\+233[235]\d{8}$/.test(phone))throw new Error('A valid Ghana contact number is required.');return `sms:${phone}?body=${encodeURIComponent(message)}`;}
+export type SmsKind='support'|'return'|'channel'|'interruption'|'delay'|'assistance'|'availability'|'custom';
+export function manualSmsTemplate(kind:SmsKind,origin:string,channel?:string){
  if(kind==='channel'){const destination=channelDestination(channel||'');return destination?`Mystery Hub has a new official WhatsApp channel for service updates and announcements. Join here: ${destination}. Thank you for staying with us.`:'';}
+ if(kind==='custom')return '';
+ const notices:Partial<Record<SmsKind,string>>={interruption:'Mystery Hub service notice: [Describe the verified service interruption and next update here].',delay:'Mystery Hub order assistance: [Describe the verified delay or investigation here. Do not promise delivery].',assistance:'Mystery Hub support: [Describe the assistance needed for this customer here].',availability:'Mystery Hub service update: [Describe verified availability here. No delivery guarantee].'};
+ if(notices[kind])return notices[kind]+` Current support: ${origin}/help`;
  return kind==='support'?`Mystery Hub Update: Our previous WhatsApp support accounts are unavailable. Visit ${origin}/help for our latest support contacts and updates. Thank you for your patience.`:`Hello! It's been a while since your last Mystery Hub purchase. You can still order data and other digital services at ${origin}. Thank you for choosing Mystery Hub.`;
 }
