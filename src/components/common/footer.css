@@ -1,0 +1,52 @@
+/* Shared first-party footer (3.4): brand, private support, community, navigation, then payments and legal.
+   Phones: one column in reading order. Tablets: support and community side by side. Desktop: brand and support on
+   the left, navigation, community and "Coming soon" on the right. */
+.mh-footer-grid {
+  display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "brand" "support" "community" "nav" "soon";
+}
+.mh-footer-brand { grid-area: brand; }
+.mh-footer-support { grid-area: support; align-self: start; }
+.mh-footer-community { grid-area: community; align-self: start; }
+.mh-footer-nav { grid-area: nav; }
+.mh-footer-soon { grid-area: soon; align-self: start; }
+@media (min-width: 640px) {
+  .mh-footer-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "brand brand" "support community" "nav nav" "soon soon"; gap: 28px 24px; }
+}
+@media (min-width: 1024px) {
+  .mh-footer-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); grid-template-areas: "brand nav" "support nav" "support community" "support soon"; gap: 20px 56px; }
+}
+
+.mh-footer-heading { margin: 0 0 6px; font-size: .75rem !important; font-weight: 600; line-height: 1.4; letter-spacing: .12em; text-transform: uppercase; color: #94a3b8; }
+
+/* Support: one card. WhatsApp leads (the usual way to reach support); SMS, call and email follow, each labelled. */
+.mh-footer-support { padding: 14px; border-radius: 20px; border: 1px solid #1c2a25; background: linear-gradient(160deg, #0d1814, #0a100e 70%); box-shadow: inset 0 1px 0 #ffffff08; }
+.mh-footer-support .mh-footer-heading { margin: 2px 2px 10px; }
+.mh-footer-whatsapp { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 14px; border-radius: 14px; border: 1px solid #00c36547; background: #00c36514; color: #dbffe9; text-decoration: none; transition: background-color .15s; }
+.mh-footer-whatsapp:hover { background: #00c36524; }
+.mh-footer-whatsapp > svg:first-child { color: #44df95; }
+.mh-footer-line { display: grid; flex: 1; min-width: 0; gap: 1px; }
+.mh-footer-line strong { font-size: .875rem; font-weight: 650; line-height: 1.25; color: #ecf3f0; }
+.mh-footer-line small { font-size: .8125rem; line-height: 1.35; color: #9fb2aa; overflow-wrap: anywhere; }
+.mh-footer-whatsapp .mh-footer-line strong { font-size: .9375rem; color: #ecfff4; }
+.mh-footer-whatsapp .mh-footer-line small { color: #a7d8bd; font-variant-numeric: tabular-nums; }
+.mh-footer-lines { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 10px; margin: 6px 0 0; padding: 0; list-style: none; }
+.mh-footer-lines .is-wide { grid-column: 1 / -1; }
+.mh-footer-lines a { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 4px 6px; border-radius: 12px; color: #cbd5e1; text-decoration: none; transition: background-color .15s; }
+.mh-footer-lines a:hover { background: #ffffff08; }
+.mh-footer-lines a > svg { color: #8aa197; }
+.mh-footer-lines small { font-variant-numeric: tabular-nums; }
+
+/* Community: announcements only, visibly separate from support. */
+.mh-footer-community > p { margin: 0 0 10px; max-width: 26rem; font-size: .875rem; line-height: 1.55; color: #94a3b8; }
+.mh-footer-follow { display: flex; flex-wrap: wrap; gap: 8px; }
+.mh-footer-follow a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 999px; font-size: .875rem; font-weight: 600; text-decoration: none; transition: background-color .15s, border-color .15s; }
+.mh-footer-follow .is-whatsapp { border: 1px solid #00c36559; background: #00c3651a; color: #8ff0bf; }
+.mh-footer-follow .is-whatsapp:hover { background: #00c3652b; }
+.mh-footer-follow .is-telegram { border: 1px solid #38bdf859; background: #38bdf81a; color: #c7e9fb; }
+.mh-footer-follow .is-telegram:hover { background: #38bdf82b; }
+
+.mh-footer-grid :is(a):focus-visible { outline: 2px solid #7cedb3; outline-offset: 2px; }
+/* A phone number never breaks across lines; on the narrowest phones SMS and call stack instead. */
+.mh-footer-lines li:not(.is-wide) small, .mh-footer-whatsapp small { white-space: nowrap; }
+@media (max-width: 359px) { .mh-footer-lines { grid-template-columns: minmax(0, 1fr); } }

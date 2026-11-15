@@ -6,6 +6,7 @@
  * (/sites/:slug) never offer Mystery Hub's install: their visitors are the owner's customers.
  */
 import {trackGrowth} from '../utils/growthAnalytics';
+import {isInstalledApp} from './appEnvironment';
 export interface InstallPromptEvent extends Event {
   prompt(): Promise<void>;
   readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform?: string }>;
@@ -19,6 +20,12 @@ const listeners = new Set<() => void>();
 const notify = () => listeners.forEach(listener => listener());
 
 export const INSTALLED_AT_KEY = 'mh_app_installed_at';
+/** Set when someone accepts the browser's install dialog; cleared once the install is confirmed. */
+export const INSTALL_PENDING_KEY = 'mh_install_pending_at';
+
+const remember = (win: Window, key: string, value: string | null) => {
+  try { if (value === null) win.localStorage.removeItem(key); else win.localStorage.setItem(key, value); } catch { /* storage unavailable */ }
+};
 
 /** Platform pages only: a published business website must never advertise Mystery Hub's own app. */
 export function isPlatformPage(location: Pick<Location, 'pathname' | 'search'>) {
@@ -27,6 +34,12 @@ export function isPlatformPage(location: Pick<Location, 'pathname' | 'search'>) 
 
 export function captureInstallPrompt(win: Window = window) {
   if (!isPlatformPage(win.location)) return;
+  // Opened from the home screen: the install is confirmed. Remembered here, so the browser tab sharing this storage
+  // (Android, desktop Chromium) stops suggesting it too. iPhone home screen apps keep their own storage.
+  if (isInstalledApp(win as never)) {
+    try { if (!win.localStorage.getItem(INSTALLED_AT_KEY)) win.localStorage.setItem(INSTALLED_AT_KEY, new Date().toISOString()); } catch { /* storage unavailable */ }
+    remember(win, INSTALL_PENDING_KEY, null);
+  }
   win.addEventListener('beforeinstallprompt', event => {
     // Keep the browser's own mini-infobar quiet; Mystery Hub offers install from its own card instead.
     event.preventDefault();
@@ -37,7 +50,8 @@ export function captureInstallPrompt(win: Window = window) {
     deferred = null;
     installedThisVisit = true;
     trackGrowth('installed',{page:win.location.pathname==='/app'?'app':'home'});
-    try { win.localStorage.setItem(INSTALLED_AT_KEY, new Date().toISOString()); } catch { /* storage unavailable */ }
+    remember(win, INSTALLED_AT_KEY, new Date().toISOString());
+    remember(win, INSTALL_PENDING_KEY, null);
     notify();
   });
 }

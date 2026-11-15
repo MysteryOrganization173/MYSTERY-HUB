@@ -4,6 +4,7 @@ import { isInstalledApp } from '../../pwa/appEnvironment';
 import {
   markWelcomeShown, readTimestamp, showWelcomeSheet, STORAGE_KEYS, welcomeShownThisLaunch,
 } from '../../pwa/launchPolicy';
+import { claimWelcome, releaseInvitation } from '../../pwa/invitations';
 import { AppWelcomeSheet } from './AppWelcomeSheet';
 import { InstalledNotificationOnboarding } from './NotificationOptIn';
 
@@ -26,12 +27,15 @@ export const AppLaunchLayer: React.FC = () => {
   useEffect(() => {
     if (!installed || welcomeOpen || busy || activePage !== 'home') return;
     if (showWelcomeSheet({ installed, signedIn: Boolean(user), authChecking: isAuthChecking, path: launchPath,
-      shownThisLaunch: welcomeShownThisLaunch(), guestChosenAt: readTimestamp(STORAGE_KEYS.welcomeGuest), now: Date.now() })) {
+      shownThisLaunch: welcomeShownThisLaunch(), guestChosenAt: readTimestamp(STORAGE_KEYS.welcomeGuest), now: Date.now() })
+      && claimWelcome()) {
+      // Shown alone; install and Channel suggestions then stay out of this visit (pwa/invitations).
       markWelcomeShown();
       setWelcomeOpen(true);
     }
   }, [installed, user, isAuthChecking, launchPath, welcomeOpen, busy, activePage]);
 
+  useEffect(() => { if (!welcomeOpen) releaseInvitation('welcome'); }, [welcomeOpen]);
   if (!installed) return null;
   if (welcomeOpen && !user && !busy && activePage === 'home') return <AppWelcomeSheet onClose={() => setWelcomeOpen(false)} />;
   if (user && sessionToken && !isAuthChecking && activePage === 'home' && !busy)

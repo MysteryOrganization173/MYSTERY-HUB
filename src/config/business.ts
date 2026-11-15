@@ -9,6 +9,8 @@
 const CALL_SUPPORT_NUMBER_INTL = '233594521108';
 const WHATSAPP_SUPPORT_NUMBER_INTL = '233242836323';
 const SMS_SUPPORT_NUMBER_INTL = '233592066298';
+// Official WhatsApp Channel: one-way announcements, never private support (replaced Nov 2026, Mystery Hub 3.4).
+const WHATSAPP_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb97gokADTOKgN8Nzr0s';
 /** 233XXXXXXXXX → 0XXXXXXXXX, the local form. */
 const ghanaLocal = (intl: string) => `0${intl.slice(3)}`;
 /** 233XXXXXXXXX → 0XX XXX XXXX, the readable form for labels. */
@@ -44,14 +46,14 @@ export const BUSINESS_CONFIG = {
     supportSmsDisplay: ghanaDisplay(SMS_SUPPORT_NUMBER_INTL),
     smsLink: `sms:+${SMS_SUPPORT_NUMBER_INTL}`,
     telegramChannelUrl: 'https://t.me/mysteryhubapp',
-    whatsappChannelUrl: 'https://whatsapp.com/channel/0029VbBt1MGC6ZvlDJ8Biz3l',
+    whatsappChannelUrl: WHATSAPP_CHANNEL_URL,
     supportLocation: 'Accra, Ghana 🇬🇭',
     supportHours: 'Mon – Sat: 8:00 AM – 8:00 PM GMT',
   },
 
   socials: {
     telegramChannel: 'https://t.me/mysteryhubapp',
-    whatsappChannel: 'https://whatsapp.com/channel/0029VbBt1MGC6ZvlDJ8Biz3l',
+    whatsappChannel: WHATSAPP_CHANNEL_URL,
     twitter: 'https://x.com/mysteryhubgh',
     instagram: 'https://instagram.com/mysteryhubgh',
     facebook: 'https://facebook.com/mysteryhubgh',
@@ -133,7 +135,5 @@ export const BUSINESS_CONFIG = {
     return `https://wa.me/${WHATSAPP_SUPPORT_NUMBER_INTL}?text=${text}`;
   },
 
-  getWhatsAppChannelUrl: () => {
-    return 'https://whatsapp.com/channel/0029VbBt1MGC6ZvlDJ8Biz3l';
-  },
+  getWhatsAppChannelUrl: () => WHATSAPP_CHANNEL_URL,
 };

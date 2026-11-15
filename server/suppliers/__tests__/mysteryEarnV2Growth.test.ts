@@ -203,9 +203,10 @@ test('member hero shows the real available balance from the financial account wi
 });
 test('Footer V2.1 keeps coming-soon services as text, not dead links, and uses the approved logo component', () => {
   const footer = source('src/components/common/Footer.tsx');
-  const coming = footer.slice(footer.indexOf('>Coming soon<'), footer.indexOf('</nav>'));
+  // 3.4: "Coming soon" sits in its own row after the navigation.
+  const coming = footer.slice(footer.indexOf('>Coming soon<'), footer.indexOf('</div>', footer.indexOf('>Coming soon<')));
   assert.match(coming, /ECG Prepaid Bills/); assert.ok(!/<a |href=/.test(coming), 'coming-soon services are not links');
-  assert.match(footer, /Join WhatsApp Channel/); assert.match(footer, /<BrandLogo size="md" \/>/);
+  assert.match(footer, />WhatsApp Channel</); assert.match(footer, /<BrandLogo size="md" \/>/);
   assert.ok(!/privacy|terms of/i.test(footer), 'no links to legal pages that do not exist');
   assert.ok(!/giveaway|friday|members/i.test(footer));
   assert.match(footer, /safe-area-inset-bottom/);

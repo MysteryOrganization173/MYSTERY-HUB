@@ -23,13 +23,13 @@ try:
    page=browser.new_page(viewport={'width':width,'height':900});errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
    page.route('**/*',lambda r:r.continue_() if r.request.url.startswith(f'http://127.0.0.1:{server.server_port}/') else r.abort())
    page.goto(f'http://127.0.0.1:{server.server_port}')
-   expect(page.get_by_role('link',name='Join WhatsApp Channel')).to_have_attribute('href','https://whatsapp.com/channel/0029VbBt1MGC6ZvlDJ8Biz3l')
-   expect(page.get_by_role('link',name='Join Telegram Channel')).to_have_attribute('href','https://t.me/mysteryhubapp')
-   expect(page.get_by_role('link',name='WhatsApp support (opens WhatsApp)',exact=True)).to_have_attribute('href','https://wa.me/233242836323')
+   expect(page.get_by_role('link',name='WhatsApp Channel (opens WhatsApp)')).to_have_attribute('href','https://whatsapp.com/channel/0029Vb97gokADTOKgN8Nzr0s')
+   expect(page.get_by_role('link',name='Telegram (opens Telegram)')).to_have_attribute('href','https://t.me/mysteryhubapp')
+   expect(page.get_by_role('link',name='WhatsApp support 024 283 6323 (opens WhatsApp)',exact=True)).to_have_attribute('href','https://wa.me/233242836323')
    expect(page.get_by_role('link',name='Call 059 452 1108')).to_have_attribute('href','tel:+233594521108')
    expect(page.get_by_role('link',name='SMS 059 206 6298')).to_have_attribute('href','sms:+233592066298')
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),f'overflow {width}'
-   page.get_by_role('link',name='Join Telegram Channel').focus();expect(page.get_by_role('link',name='Join Telegram Channel')).to_be_focused()
+   page.get_by_role('link',name='Telegram (opens Telegram)').focus();expect(page.get_by_role('link',name='Telegram (opens Telegram)')).to_be_focused()
    page.screenshot(path=str(out/f'{width}-footer.png'),full_page=True)
    assert not errors,errors
    results.append({'width':width,'checks':'channels/support/no overflow/keyboard focus','passed':True})
