@@ -163,9 +163,11 @@ test('push is isolated to explicit consent, with no offline cache or automatic p
 });
 
 test('install card copy is honest and the homepage change is one slot', () => {
-  const promo = source('src/components/pwa/InstallAppPromo.tsx');
-  assert.match(promo, /Mystery Hub, on your phone\./); assert.match(promo, /One tap away from data, orders, Wallet and more\./);
-  assert.match(promo, /Install Mystery Hub/); assert.match(promo, /no app store needed/); assert.match(promo, /no Play Store or App Store download/); assert.match(promo, /Free/);
+  const promo = source('src/components/pwa/InstallAppPromo.tsx'), copy = source('src/pwa/invitationCopy.ts');
+  // Approved 3.4 copy: one heading, one sentence, Install App / Not now; computers have no home screen.
+  assert.match(copy, /Mystery Hub, one tap away\./); assert.match(copy, /Buy data, track orders and more, right from your home screen\./);
+  assert.match(copy, /Mystery Hub, one click away\./); assert.match(promo, /installCopy\(phone\)/); assert.match(promo, /aria-hidden="true" \/>Install App/); assert.match(promo, />Not now</);
+  assert.match(promo, /no app store needed/); assert.match(promo, /Free/);
   assert.doesNotMatch(promo, /Get it on Google Play|Download on the App Store|play\.google\.com|apps\.apple\.com/);
   const home = source('src/components/home/HomePage.tsx');
   assert.equal((home.match(/<InstallAppPromo/g) || []).length, 1, 'one placement');

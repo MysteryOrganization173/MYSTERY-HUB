@@ -16,7 +16,10 @@ test('official support and announcement links preserve distinct destinations', (
   assert.equal(business.contact.supportSmsDisplay, '059 206 6298');
   assert.equal(business.contact.supportWhatsAppDisplay, '024 283 6323');
   assert.equal(business.contact.supportEmail, 'aryeeteyemmanuel852@gmail.com');
-  assert.equal(business.contact.whatsappChannelUrl, 'https://whatsapp.com/channel/0029VbBt1MGC6ZvlDJ8Biz3l');
+  // Official WhatsApp Channel replaced in Mystery Hub 3.4; the old channel must not survive anywhere first-party.
+  assert.equal(business.contact.whatsappChannelUrl, 'https://whatsapp.com/channel/0029Vb97gokADTOKgN8Nzr0s');
+  assert.equal(business.socials.whatsappChannel, business.contact.whatsappChannelUrl);
+  assert.equal(business.getWhatsAppChannelUrl(), business.contact.whatsappChannelUrl);
   assert.equal(business.contact.telegramChannelUrl, 'https://t.me/mysteryhubapp');
 });
 
@@ -40,7 +43,8 @@ test('public support shortcuts use central configuration; footer has both announ
     assert.match(source, /BUSINESS_CONFIG/);
   }
   const footer = readFileSync('src/components/common/Footer.tsx', 'utf8');
-  assert.match(footer, /Join WhatsApp Channel/);
-  assert.match(footer, /Join Telegram Channel/);
+  assert.match(footer, />WhatsApp Channel</);
+  assert.match(footer, />Telegram</);
+  assert.match(footer, /contact.whatsappChannelUrl/);
   assert.match(footer, /contact.telegramChannelUrl/);
 });

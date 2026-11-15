@@ -3,23 +3,26 @@ import {BellRing, BellOff, CheckCircle2, X} from 'lucide-react';
 import {httpCustomerNotificationsClient, type CustomerNotificationsClient} from '../../services/customerNotifications';
 import {notificationOpportunity, activateNotificationOnboarding, acceptNotificationOffers, type OnboardingStep, type OnboardingOptions} from '../../pwa/notificationOnboarding';
 import {marketingPromptAnswered, markMarketingPromptAnswered, readSnooze, recordDismissal, STORAGE_KEYS} from '../../pwa/launchPolicy';
+import {claimInvitation, noteDismissal, releaseInvitation} from '../../pwa/invitations';
 import './pwa.css';
 
 type Props = {token:string;accountId:string;allowOffers:boolean;onDone:()=>void;initialStep?:'enable'|'offers';variant?:'floating'|'inline';client?:CustomerNotificationsClient;environment?:OnboardingOptions['environment']};
 
 /** Installed Home only; checking readiness never requests permission or subscribes. */
-export function InstalledNotificationOnboarding({token,accountId,allowOffers}: Pick<Props,'token'|'accountId'|'allowOffers'>) {
+export function InstalledNotificationOnboarding({token,accountId,allowOffers,suspended=false}: Pick<Props,'token'|'accountId'|'allowOffers'>&{suspended?:boolean}) {
   const [opportunity,setOpportunity]=useState<'enable'|'offers'|null>(null),[closed,setClosed]=useState(false);
   useEffect(()=>{
     const request=new AbortController();
     const timer=window.setTimeout(()=>{
       void notificationOpportunity(httpCustomerNotificationsClient,token,{allowOffers,offersAnswered:marketingPromptAnswered(accountId),signal:request.signal,snooze:readSnooze(STORAGE_KEYS.notificationOptIn),now:Date.now()})
-        .then(next=>{if(!request.signal.aborted)setOpportunity(next);}).catch(()=>{});
+        // Coordinated with the other invitations: shown only if nothing else is on screen or was offered this visit.
+        .then(next=>{if(!request.signal.aborted&&next&&claimInvitation(['notifications']))setOpportunity(next);}).catch(()=>{});
     },2600);
     return()=>{window.clearTimeout(timer);request.abort();};
   },[token,accountId,allowOffers]);
+  useEffect(()=>()=>releaseInvitation('notifications'),[]);
   if(closed||!opportunity)return null;
-  return <NotificationOptIn token={token} accountId={accountId} allowOffers={allowOffers} initialStep={opportunity} onDone={()=>setClosed(true)}/>;
+  return <div hidden={suspended}><NotificationOptIn token={token} accountId={accountId} allowOffers={allowOffers} initialStep={opportunity} onDone={()=>{setClosed(true);releaseInvitation('notifications');}}/></div>;
 }
 
 /** Permission never implies marketing consent. The optional offers step follows registration immediately. */
@@ -28,7 +31,7 @@ export function NotificationOptIn({token,accountId,allowOffers,onDone,initialSte
   const titleId=useId(),request=useRef<AbortController|null>(null),inFlight=useRef(false);
   useEffect(()=>{request.current=new AbortController();return()=>{request.current?.abort();};},[token,accountId]);
   const active=()=>Boolean(request.current&&!request.current.signal.aborted);
-  const later=()=>{if(inFlight.current)return;if(step==='offers')markMarketingPromptAnswered(accountId);else recordDismissal(STORAGE_KEYS.notificationOptIn);onDone();};
+  const later=()=>{if(inFlight.current)return;if(step==='offers')markMarketingPromptAnswered(accountId);else recordDismissal(STORAGE_KEYS.notificationOptIn);noteDismissal();onDone();};
   const enable=async()=>{
     if(inFlight.current||!active())return;inFlight.current=true;setBusy(true);setMessage(null);
     try{

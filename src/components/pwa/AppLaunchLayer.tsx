@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { isInstalledApp } from '../../pwa/appEnvironment';
 import {
   markWelcomeShown, readTimestamp, showWelcomeSheet, STORAGE_KEYS, welcomeShownThisLaunch,
 } from '../../pwa/launchPolicy';
+import { claimWelcome, releaseInvitation } from '../../pwa/invitations';
 import { AppWelcomeSheet } from './AppWelcomeSheet';
+import { appBusy } from './invitationBusy';
 import { InstalledNotificationOnboarding } from './NotificationOptIn';
 
 /**
@@ -20,21 +22,36 @@ export const AppLaunchLayer: React.FC = () => {
   const [launchPath] = useState(() => (typeof window === 'undefined' ? '/' : window.location.pathname));
   const [welcomeOpen, setWelcomeOpen] = useState(false);
 
-  const busy = Boolean(app.activeEditorSite || app.isMysteryAiOpen || app.isCheckoutOpen || app.isStatusModalOpen || app.isAuthModalOpen
-    || app.selectedTemplatePreview || app.marketplaceInquiryProduct || app.waitlistInfo.isOpen || app.isAccountOpen || user?.mustChangePassword);
+  const busy = appBusy(app);
 
   useEffect(() => {
     if (!installed || welcomeOpen || busy || activePage !== 'home') return;
     if (showWelcomeSheet({ installed, signedIn: Boolean(user), authChecking: isAuthChecking, path: launchPath,
-      shownThisLaunch: welcomeShownThisLaunch(), guestChosenAt: readTimestamp(STORAGE_KEYS.welcomeGuest), now: Date.now() })) {
+      shownThisLaunch: welcomeShownThisLaunch(), guestChosenAt: readTimestamp(STORAGE_KEYS.welcomeGuest), now: Date.now() })
+      && claimWelcome()) {
+      // Shown alone; install and Channel suggestions then stay out of this visit (pwa/invitations).
       markWelcomeShown();
       setWelcomeOpen(true);
     }
   }, [installed, user, isAuthChecking, launchPath, welcomeOpen, busy, activePage]);
 
+  // The coordinator's slot is held exactly while the sheet is on screen. It is freed whenever the sheet stops
+  // showing, whatever the reason (closed, signed in elsewhere, a dialog), and then the sheet is not re-offered.
+  const welcomeVisible = installed && welcomeOpen && !user && !busy && activePage === 'home';
+  const welcomeShown = useRef(false);
+  useEffect(() => {
+    if (welcomeVisible) { welcomeShown.current = true; return; }
+    if (!welcomeShown.current) return;
+    welcomeShown.current = false;
+    releaseInvitation('welcome');
+    setWelcomeOpen(false);
+  }, [welcomeVisible]);
+  useEffect(() => () => { if (welcomeShown.current) releaseInvitation('welcome'); }, []);
   if (!installed) return null;
-  if (welcomeOpen && !user && !busy && activePage === 'home') return <AppWelcomeSheet onClose={() => setWelcomeOpen(false)} />;
-  if (user && sessionToken && !isAuthChecking && activePage === 'home' && !busy)
-    return <InstalledNotificationOnboarding key={`${user.id}:${sessionToken}`} token={sessionToken} accountId={user.id} allowOffers={user.role==='customer'}/>;
+  if (welcomeVisible) return <AppWelcomeSheet onClose={() => setWelcomeOpen(false)} />;
+  // The notification card pauses (stays mounted, hidden) while a dialog or sheet is open, so it keeps its answer
+  // state and its one showing for the visit instead of being used up by a brief interruption.
+  if (user && sessionToken && !isAuthChecking && activePage === 'home')
+    return <InstalledNotificationOnboarding key={`${user.id}:${sessionToken}`} token={sessionToken} accountId={user.id} allowOffers={user.role==='customer'} suspended={busy}/>;
   return null;
 };

@@ -17,6 +17,9 @@ import { useLayoutEffect, type RefObject } from 'react';
 type Entry = { surface: HTMLElement | null; modal: boolean };
 const stack: Entry[] = [];
 let marked: HTMLElement[] = [];
+// Observers of the stack (the invitation layer steps aside while any overlay is open).
+const listeners = new Set<() => void>();
+const changed = () => listeners.forEach(listener => { try { listener(); } catch { /* an observer never breaks an overlay */ } });
 
 /** The overlay's own layer: its outermost fixed-position ancestor, so a backdrop beside the surface stays usable. */
 function overlayLayer(surface: HTMLElement, root: HTMLElement) {
@@ -61,6 +64,7 @@ export function acquireOverlay(surface: HTMLElement | null, { modal = true }: { 
   stack.push(entry);
   if (stack.length === 1) lockPage();
   applyInert();
+  changed();
   let released = false;
   return () => {
     if (released) return;
@@ -69,10 +73,17 @@ export function acquireOverlay(surface: HTMLElement | null, { modal = true }: { 
     if (index >= 0) stack.splice(index, 1);
     applyInert();
     if (!stack.length) unlockPage();
+    changed();
   };
 }
 
 export function openOverlayCount() { return stack.length; }
+
+/** Notified whenever an overlay opens or closes. Returns the unsubscribe function. */
+export function subscribeOverlays(listener: () => void) {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
 
 /** Locks the page and makes the background inert while `active`; released on close, unmount or route change. */
 export function useOverlayLock(active: boolean, ref?: RefObject<HTMLElement | null>, options?: { modal?: boolean }) {

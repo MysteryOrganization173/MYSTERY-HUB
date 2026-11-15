@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './shell.css';
 import { ArrowUpRight, Mail, MessageCircle, MessageSquareText, Phone, Send, ShieldCheck } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
@@ -8,6 +8,7 @@ import { BrandMark } from '../../../components/common/BrandLogo';
 import type { ActivePage } from '../../../types';
 import { isChristmasPhase, type SeasonStatus } from '../../../../shared/seasonal';
 import { loadSeasonalSerif } from '../font';
+import { isInstalledApp } from '../../../pwa/appEnvironment';
 
 /**
  * The seasonal shell: what every visitor sees around the page while a pack applies, signed in or not.
@@ -100,6 +101,7 @@ type FooterLink = { label: string; page: ActivePage; note?: string; open?: () =>
 export function ChristmasFooter({ status }: { status: SeasonStatus }) {
   const { setActivePage, openDataPage, activePage } = useApp();
   const { contact } = BUSINESS_CONFIG;
+  const [installed] = useState(isInstalledApp);
   const christmas = isChristmasPhase(status.phase);
   const year = new Date().getFullYear();
   const columns: { title: string; links: FooterLink[] }[] = [
@@ -120,6 +122,7 @@ export function ChristmasFooter({ status }: { status: SeasonStatus }) {
     { title: 'Mystery Hub', links: [
       { label: 'Help & FAQs', page: 'help' },
       { label: 'About Mystery Hub', page: 'about' },
+      ...(installed ? [] : [{ label: 'Get the app', page: 'app' as ActivePage }]),
     ] },
   ];
   const go = (event: React.MouseEvent, link: FooterLink) => { event.preventDefault(); if (link.open) link.open(); else setActivePage(link.page); };
@@ -139,22 +142,26 @@ export function ChristmasFooter({ status }: { status: SeasonStatus }) {
             </a>
             <h2 id="xs-footer-title">Everything digital. <em>One trusted place.</em></h2>
             <p>Data, airtime, websites and tech for customers across Ghana, with every order tracked from payment to delivery.</p>
+            {/* Community: announcements only, kept apart from private support. */}
+            <section className="xs-footer-community" aria-labelledby="xs-footer-community-title">
+              <h3 id="xs-footer-community-title">Follow Mystery Hub</h3>
+              <div className="xs-footer-channels">
+                <a href={contact.whatsappChannelUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="h-4 w-4" aria-hidden="true" />WhatsApp Channel<ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /><span className="sr-only"> (opens WhatsApp)</span></a>
+                <a href={contact.telegramChannelUrl} target="_blank" rel="noopener noreferrer"><Send className="h-4 w-4" aria-hidden="true" />Telegram<ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /><span className="sr-only"> (opens Telegram)</span></a>
+              </div>
+            </section>
           </div>
 
           <section className="xs-footer-help" aria-labelledby="xs-footer-help-title">
             <h3 id="xs-footer-help-title">Need help?</h3>
             <a href={contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="xs-footer-whatsapp">
-              <MessageCircle className="h-5 w-5 shrink-0" aria-hidden="true" /><span><strong>WhatsApp support</strong><small>Message us with your order reference</small></span><ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="sr-only">(opens WhatsApp)</span>
+              <MessageCircle className="h-5 w-5 shrink-0" aria-hidden="true" /><span><strong>WhatsApp support</strong> <small><span className="xs-nowrap">{contact.supportWhatsAppDisplay}</span> · send your order reference</small></span><ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="sr-only"> (opens WhatsApp)</span>
             </a>
             <ul className="xs-footer-contacts">
-              <li><a href={contact.phoneLink}><Phone className="h-4 w-4" aria-hidden="true" />Call {contact.supportPhoneDisplay}</a></li>
-              <li><a href={contact.smsLink}><MessageSquareText className="h-4 w-4" aria-hidden="true" />SMS {contact.supportSmsDisplay}</a></li>
-              <li><a href={contact.emailLink} title={contact.supportEmail}><Mail className="h-4 w-4" aria-hidden="true" /><span>{emailUser}<wbr />@{emailDomain}</span></a></li>
+              <li><a href={contact.smsLink}><MessageSquareText className="h-4 w-4" aria-hidden="true" /><span><strong>SMS</strong> <small>{contact.supportSmsDisplay}</small></span></a></li>
+              <li><a href={contact.phoneLink}><Phone className="h-4 w-4" aria-hidden="true" /><span><strong>Call</strong> <small>{contact.supportPhoneDisplay}</small></span></a></li>
+              <li className="is-wide"><a href={contact.emailLink}><Mail className="h-4 w-4" aria-hidden="true" /><span><strong>Email</strong> <small>{emailUser}<wbr />@{emailDomain}</small></span></a></li>
             </ul>
-            <div className="xs-footer-channels" aria-label="Announcements">
-              <a href={contact.whatsappChannelUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="h-4 w-4" aria-hidden="true" />Join WhatsApp Channel<span className="sr-only"> (opens in a new tab)</span></a>
-              <a href={contact.telegramChannelUrl} target="_blank" rel="noopener noreferrer"><Send className="h-4 w-4" aria-hidden="true" />Join Telegram Channel<span className="sr-only"> (opens in a new tab)</span></a>
-            </div>
           </section>
         </div>
 

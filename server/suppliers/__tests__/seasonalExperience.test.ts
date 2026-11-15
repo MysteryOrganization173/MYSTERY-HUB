@@ -318,8 +318,10 @@ test('the season’s footer keeps every real destination of the ordinary footer,
   for (const page of ['data', 'afa', 'website', 'marketplace', 'creative', 'orders', 'wallet', 'earn', 'services', 'help', 'about']) assert.match(shell, new RegExp(`page: '${page}'`), page);
   assert.match(shell, /open: \(\) => openDataPage\('airtime'\)/);
   for (const contact of ['contact.supportWhatsAppUrl', 'contact.phoneLink', 'contact.emailLink', 'contact.whatsappChannelUrl', 'contact.telegramChannelUrl', 'contact.supportLocation']) assert.ok(shell.includes(contact), contact);
-  assert.match(shell, /Join WhatsApp Channel/);
-  assert.match(shell, /Join Telegram Channel/);
+  // 3.4: community (Channel, Telegram) is its own group, apart from private support.
+  assert.match(shell, />WhatsApp Channel</);
+  assert.match(shell, />Telegram</);
+  assert.match(shell, /Follow Mystery Hub/);
   assert.match(shell, /setActivePage\('admin'\)[^]*Staff Portal/);
   assert.match(shell, /customers across Ghana/);
   assert.doesNotMatch(shell.replace(/contact\.supportLocation/g, ''), /Accra/);

@@ -726,7 +726,7 @@ export const MarketplacePage: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3 text-left">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#00c365]/15 border border-[#00c365]/40 flex items-center justify-center text-[#00c365] shrink-0 shadow-inner">
-                <Radio className="w-4 h-4 sm:w-5 sm:h-5 text-[#00c365] animate-pulse" />
+                <Radio className="w-4 h-4 sm:w-5 sm:h-5 text-[#00c365] motion-safe:animate-pulse" aria-hidden="true" />
               </div>
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
@@ -738,7 +738,7 @@ export const MarketplacePage: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-[11px] sm:text-xs text-slate-300 leading-snug">
-                  Ask about available products and sourcing on WhatsApp.
+                  Follow our official channel for new arrivals and sourcing updates.
                 </p>
               </div>
             </div>
@@ -750,7 +750,7 @@ export const MarketplacePage: React.FC = () => {
               className="w-full sm:w-auto px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md shadow-[#00c365]/20 shrink-0 cursor-pointer active:scale-95"
             >
               <span>Follow Channel</span>
-              <ExternalLink className="w-3.5 h-3.5" />
+              <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /><span className="sr-only"> (opens WhatsApp)</span>
             </a>
           </div>
         </div>

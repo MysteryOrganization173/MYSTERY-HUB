@@ -38,6 +38,7 @@ Central source: `src/config/business.ts`.
   - Superseded Nov 2026 (PR #118): WhatsApp support is temporarily 024 283 6323 and SMS 059 206 6298; calls stay on 059 452 1108. `src/config/business.ts` is the source of truth.
 - Email preserved: aryeeteyemmanuel852@gmail.com.
 - [WhatsApp announcements](https://whatsapp.com/channel/0029VbBt1MGC6ZvlDJ8Biz3l) and [Telegram announcements](https://t.me/mysteryhubapp) appear together in the shared footer. Telegram is not a support bot.
+  - Superseded Nov 2026 (Mystery Hub 3.4): the official WhatsApp Channel is now https://whatsapp.com/channel/0029Vb97gokADTOKgN8Nzr0s.
 - Remaining old-number strings are synthetic customer fixtures/input examples, not official support links; customer and website-owner contacts were preserved.
 
 ## V3.2 sequence — future work, not implemented here

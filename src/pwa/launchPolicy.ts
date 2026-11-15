@@ -28,10 +28,11 @@ const resting = (snooze: Snooze, days: number, max: number, now: number) =>
   snooze.count >= max || (snooze.lastAt !== null && now - snooze.lastAt < days * DAY);
 
 export type InstallPromoMode = 'install' | 'apple' | 'hidden';
-export function installPromoMode({ installed, hasPrompt, appleHomeScreen, snooze, now }: {
-  installed: boolean; hasPrompt: boolean; appleHomeScreen: boolean; snooze: Snooze; now: number;
+/** `remembered`: this browser already accepted (pending) or confirmed an install recently (see pwa/invitations). */
+export function installPromoMode({ installed, hasPrompt, appleHomeScreen, snooze, now, remembered = false }: {
+  installed: boolean; hasPrompt: boolean; appleHomeScreen: boolean; snooze: Snooze; now: number; remembered?: boolean;
 }): InstallPromoMode {
-  if (installed || resting(snooze, INSTALL_PROMO_REST_DAYS, INSTALL_PROMO_MAX_DISMISSALS, now)) return 'hidden';
+  if (installed || remembered || resting(snooze, INSTALL_PROMO_REST_DAYS, INSTALL_PROMO_MAX_DISMISSALS, now)) return 'hidden';
   // Chromium only fires its prompt when the app is installable and not already installed.
   if (hasPrompt) return 'install';
   return appleHomeScreen ? 'apple' : 'hidden';

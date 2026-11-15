@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { BrandMark } from '../common/BrandLogo';
 import { STORAGE_KEYS, writeTimestamp } from '../../pwa/launchPolicy';
+import { isCoarsePointer } from '../../pwa/appEnvironment';
 import './pwa.css';
 
 /**
@@ -13,7 +14,7 @@ import './pwa.css';
 export const AppWelcomeSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { openAuth } = useApp();
   const titleId = useId();
-  const [phone] = useState(() => window.matchMedia?.('(pointer: coarse)').matches === true);
+  const [phone] = useState(() => isCoarsePointer());
   const ref = useDialogFocus(true, onClose);
   const auth = (mode: 'login' | 'signup') => { onClose(); openAuth(mode); };
   const guest = () => { writeTimestamp(STORAGE_KEYS.welcomeGuest); onClose(); };

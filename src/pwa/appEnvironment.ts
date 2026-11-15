@@ -26,3 +26,7 @@ export function supportsAppleHomeScreen(win: Win | undefined = typeof window ===
   nav: Nav | undefined = typeof navigator === 'undefined' ? undefined : navigator) {
   return Boolean(win && nav && 'standalone' in nav && (nav.maxTouchPoints || 0) > 0 && !supportsInstallPrompt(win));
 }
+
+/** Touch-first device (phone or tablet): wording says "tap" and "home screen". */
+export const isCoarsePointer = (win: Win | undefined = typeof window === 'undefined' ? undefined : window) =>
+  win?.matchMedia?.('(pointer: coarse)').matches === true;
