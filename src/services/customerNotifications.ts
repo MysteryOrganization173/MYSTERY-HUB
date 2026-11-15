@@ -32,7 +32,7 @@ export interface CustomerNotificationsClient {
   register(token: string, subscription: PushSubscriptionPayload, consent?: NotificationConsent): Promise<ClientResult<{ transactional: boolean; promotional: boolean } | undefined>>;
   unregister(token: string, endpoint: string): Promise<ClientResult>;
   preferences(token: string): Promise<NotificationPreferences>;
-  savePreferences(token: string, input: { transactional: boolean; promotional: boolean; expectedVersion: string }): Promise<ClientResult<NotificationPreferences>>;
+  savePreferences(token: string, input: { transactional: boolean; promotional: boolean; expectedVersion: string; source?: 'notification_invitation' }): Promise<ClientResult<NotificationPreferences>>;
 }
 
 export const CUSTOMER_NOTIFICATIONS_UNAVAILABLE = 'Mystery Hub is not sending phone notifications yet.';
@@ -55,7 +55,7 @@ export const httpCustomerNotificationsClient:CustomerNotificationsClient={
   return {ok:true,value:r.preferences&&typeof r.preferences.transactional==='boolean'&&typeof r.preferences.marketing==='boolean'?{transactional:r.preferences.transactional,promotional:r.preferences.marketing}:undefined};}catch(e){return {ok:false,message:(e as Error).message};}},
  async unregister(token,endpoint){try{const hash=await endpointHash(endpoint);const {devices}=await request(token,'subscriptions');for(const d of devices.filter((d:any)=>d.endpoint_hash===hash)){await request(token,'subscriptions/'+encodeURIComponent(d.id),'DELETE');}return {ok:true,value:undefined};}catch(e){return {ok:false,message:(e as Error).message};}},
  async preferences(token){return preferences(await request(token,'preferences'));},
- async savePreferences(token,input){try{const p=await request(token,'preferences','PUT',{transactional:input.transactional,marketing:input.promotional});return {ok:true,value:preferences(p)};}catch(e){return {ok:false,message:(e as Error).message};}},
+ async savePreferences(token,input){try{const p=await request(token,'preferences','PUT',{transactional:input.transactional,marketing:input.promotional,...(input.source?{source:input.source}:{})});return {ok:true,value:preferences(p)};}catch(e){return {ok:false,message:(e as Error).message};}},
  async inbox(token,offset=0,signal){const r=await notificationHttp(token,'notifications/inbox?offset='+offset,'GET',undefined,signal);if(r.success!==true||!Array.isArray(r.items))throw Error('Your notifications could not be loaded.');
   return r.items.filter((i:any)=>typeof i?.id==='string'&&typeof i.title==='string'&&typeof i.body==='string'&&['/orders','/app'].includes(i.destination)).map((i:any)=>({id:i.id,createdAt:String(i.createdAt),title:i.title,body:i.body,destination:i.destination}));}
 };

@@ -23,6 +23,7 @@ test('PostgreSQL notification consent evidence and guest news', {skip: process.e
   assert.equal(process.env.DATABASE_URL, undefined); assert.equal(process.env.NODE_ENV, 'test');
   const original = {...process.env}; const keys = webPush.generateVAPIDKeys();
   Object.assign(process.env, {WEB_PUSH_ENABLED: 'true', WEB_PUSH_VAPID_PUBLIC_KEY: keys.publicKey, WEB_PUSH_VAPID_PRIVATE_KEY: keys.privateKey, WEB_PUSH_VAPID_SUBJECT: 'mailto:synthetic@example.test', WEB_PUSH_STORAGE_KEY: randomBytes(32).toString('base64')});
+  delete process.env.WEB_PUSH_GUEST_NEWS;
   const control = new pg.Client({host: '127.0.0.1', port: 55491, user: 'backend_gate', database: 'postgres', ssl: false}); await control.connect();
   const name = 'notification_consent_' + randomUUID().replaceAll('-', '') + '_test'; let pool: pg.Pool | null = null;
   const tokens = {buyer1: 'consent-session-one', buyer2: 'consent-session-two', admin: 'consent-admin-session'};
@@ -37,7 +38,7 @@ test('PostgreSQL notification consent evidence and guest news', {skip: process.e
       await pool.query("INSERT INTO sessions(id,user_id,token_hash,expires_at) VALUES($1,$2,$3,NOW()+interval '1 day')", ['session-' + id, id, hashSessionToken(tokens[id as keyof typeof tokens])]);
     }
     await pool.query(NOTIFICATION_SCHEMA); await pool.query(NOTIFICATION_SCHEMA);
-    const consents = async (where: string, args: unknown[]) => (await pool!.query(`SELECT purpose,granted,source,copy_version FROM ${n}.consents WHERE ${where} ORDER BY created_at,id`, args)).rows;
+    const consents = async (where: string, args: unknown[]) => (await pool!.query(`SELECT purpose,granted,source,copy_version FROM ${n}.consents WHERE ${where} ORDER BY seq`, args)).rows;
 
     await t.test('new tables are private: RLS on, nothing granted to PUBLIC, anon or authenticated', async () => {
       for (const table of ['guest_devices', 'consents']) {
@@ -79,6 +80,32 @@ test('PostgreSQL notification consent evidence and guest news', {skip: process.e
       assert.equal((await consents('user_id=$1', ['buyer2'])).length, 0);
     });
 
+    await t.test('a preference saved after the ledger began is not an opt-out; a pre-ledger "off" is carried into the ledger', async () => {
+      await pool!.query(`INSERT INTO users(id,name,password_hash,role) VALUES('buyer3','Synthetic buyer3','fixture','customer')`);
+      await service.setPreferences('buyer3', {transactional: false, marketing: false});
+      assert.equal((await service.preferences('buyer3')).marketingOptedOut, false, 'changing only order updates never counts as declining offers');
+      await pool!.query(`INSERT INTO users(id,name,password_hash,role) VALUES('legacy','Synthetic legacy','fixture','customer')`);
+      await pool!.query(`INSERT INTO ${n}.preferences(user_id,transactional,marketing) VALUES('legacy',TRUE,FALSE)`);
+      assert.equal((await service.preferences('legacy')).marketingOptedOut, true, 'a pre-ledger saved "off" counts');
+      await service.setPreferences('legacy', {transactional: false, marketing: false});
+      assert.deepEqual((await consents('user_id=$1', ['legacy'])).map(r => [r.purpose, r.granted, r.source]), [['marketing', false, 'legacy_preference'], ['transactional', false, 'account_settings']]);
+      assert.equal((await service.preferences('legacy')).marketingOptedOut, true, 'and stays decisive once the ledger has entries');
+    });
+
+    await t.test('the invitation’s own "Order updates only" is recorded with its source; unknown sources are refused', async () => {
+      await service.setPreferences('buyer1', {transactional: true, marketing: true});
+      await service.setPreferences('buyer1', {transactional: true, marketing: false, source: 'notification_invitation'});
+      assert.deepEqual((await consents("user_id=$1 AND purpose='marketing'", ['buyer1'])).at(-1), {purpose: 'marketing', granted: false, source: 'notification_invitation', copy_version: 'invite-3.4-1'});
+      await assert.rejects(() => service.setPreferences('buyer1', {transactional: true, marketing: false, source: 'admin'}), /explicitly/);
+    });
+
+    await t.test('guest news is an operational gate: off unless WEB_PUSH_GUEST_NEWS=true', async () => {
+      assert.equal(service.config().guests, false);
+      await assert.rejects(() => service.guestSubscribe({subscription: sub('GATED'), consent: {purposes: ['marketing'], copyVersion: 'x'}}), /not available yet/);
+      process.env.WEB_PUSH_GUEST_NEWS = 'true';
+      assert.equal(service.config().guests, true);
+    });
+
     let credential = '';
     const guestSub = sub('GUEST');
     await t.test('guest news: explicit marketing consent, credential hash only, ownership and confirmation', async () => {
@@ -107,6 +134,16 @@ test('PostgreSQL notification consent evidence and guest news', {skip: process.e
       assert.equal((await pool!.query(`SELECT COUNT(*)::int AS c FROM ${n}.guest_devices WHERE id=$1`, [guest.deviceId])).rows[0].c, 0, 'no double registration');
       assert.deepEqual((await consents('guest_device_id=$1', [guest.deviceId])).map(r => [r.granted, r.source]), [[true, 'guest_invitation'], [false, 'replaced_by_account']]);
       assert.equal((await service.preferences('buyer2')).marketing, false, 'guest consent is never transferred to the account');
+      const other = sub('OTHER-GUEST');
+      const otherGuest = await service.guestSubscribe({subscription: other, consent: {purposes: ['marketing'], copyVersion: 'x'}});
+      await assert.rejects(() => service.subscribe('buyer2', tokens.buyer2, {subscription: {...other, keys: sub('FORGED').keys}}), /ownership/i, 'an endpoint alone never removes a guest registration');
+      assert.equal((await pool!.query(`SELECT COUNT(*)::int AS c FROM ${n}.guest_devices WHERE id=$1`, [otherGuest.deviceId])).rows[0].c, 1);
+      const stale = sub('STALE');
+      await pool!.query("INSERT INTO sessions(id,user_id,token_hash,expires_at) VALUES('session-stale','buyer2','stale-hash',NOW()-interval '1 day')");
+      await pool!.query(`INSERT INTO ${n}.devices(id,user_id,session_id,endpoint_hash,encrypted_subscription) SELECT gen_random_uuid(),'buyer2','session-stale',endpoint_hash,encrypted_subscription FROM ${n}.guest_devices WHERE id=$1`, [otherGuest.deviceId]).catch(() => {});
+      await pool!.query(`INSERT INTO ${n}.devices(id,user_id,session_id,endpoint_hash,encrypted_subscription) VALUES(gen_random_uuid(),'buyer2','session-stale',encode(sha256(convert_to($1,'UTF8')),'hex'),'x')`, [stale.endpoint]);
+      const staleGuest = await service.guestSubscribe({subscription: stale, consent: {purposes: ['marketing'], copyVersion: 'x'}});
+      assert.ok(staleGuest.deviceId, 'a device left behind by an expired session does not block guest news');
     });
 
     await t.test('expiry and unsubscribe: an expired guest registration is gone; unsubscribe deletes and records the withdrawal', async () => {
@@ -120,6 +157,11 @@ test('PostgreSQL notification consent evidence and guest news', {skip: process.e
       assert.equal((await pool!.query(`SELECT COUNT(*)::int AS c FROM ${n}.guest_devices WHERE id=$1`, [id])).rows[0].c, 0);
       assert.deepEqual((await consents('guest_device_id=$1', [id])).at(-1), {purpose: 'marketing', granted: false, source: 'guest_unsubscribe', copy_version: null});
       await service.guestUnsubscribe(credential);
+      const old = await service.guestSubscribe({subscription: sub('OLD'), consent: {purposes: ['marketing'], copyVersion: 'x'}});
+      await pool!.query(`UPDATE ${n}.guest_devices SET expires_at=NOW()-interval '2 days' WHERE id=$1`, [old.deviceId]);
+      await service.guestSubscribe({subscription: sub('TRIGGER-PRUNE'), consent: {purposes: ['marketing'], copyVersion: 'x'}});
+      assert.equal((await pool!.query(`SELECT COUNT(*)::int AS c FROM ${n}.guest_devices WHERE id=$1`, [old.deviceId])).rows[0].c, 0, 'expired registrations are removed, so retention is real');
+      assert.equal((await consents('guest_device_id=$1', [old.deviceId])).at(-1)!.source, 'guest_expired');
     });
 
     await t.test('HTTP: guest routes need no account, keep the credential out of URLs, and the public config reports pause', async () => {
@@ -156,6 +198,6 @@ test('PostgreSQL notification consent evidence and guest news', {skip: process.e
     });
   } finally {
     await pool?.end(); await control.query(`DROP DATABASE ${name} WITH (FORCE)`); await control.end();
-    for (const key of ['DATABASE_URL', 'DATABASE_SSL', 'MYSTERY_TEST_DATABASE_OPT_IN', 'WEB_PUSH_ENABLED', 'WEB_PUSH_VAPID_PUBLIC_KEY', 'WEB_PUSH_VAPID_PRIVATE_KEY', 'WEB_PUSH_VAPID_SUBJECT', 'WEB_PUSH_STORAGE_KEY']) { if (original[key] === undefined) delete process.env[key]; else process.env[key] = original[key]; }
+    for (const key of ['DATABASE_URL', 'DATABASE_SSL', 'MYSTERY_TEST_DATABASE_OPT_IN', 'WEB_PUSH_ENABLED', 'WEB_PUSH_VAPID_PUBLIC_KEY', 'WEB_PUSH_VAPID_PRIVATE_KEY', 'WEB_PUSH_VAPID_SUBJECT', 'WEB_PUSH_STORAGE_KEY', 'WEB_PUSH_GUEST_NEWS']) { if (original[key] === undefined) delete process.env[key]; else process.env[key] = original[key]; }
   }
 });

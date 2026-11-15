@@ -103,11 +103,13 @@ export async function subscribeThisDevice(client: CustomerNotificationsClient, t
   if (!manager) return { server: 'error', permission, message: 'Alerts are not ready on this device yet.' };
   let subscription: SubscriptionLike | null = null;
   try {
-    subscription = (await manager.getSubscription()) ?? await manager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(publicKey) });
+    const existing = await manager.getSubscription();
+    subscription = existing ?? await manager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(publicKey) });
     current();
     const registered = await client.register(token, subscription.toJSON() as PushSubscriptionPayload, consent);
     current();
-    if (!registered.ok) { await subscription.unsubscribe().catch(() => false); return { server: 'error', permission, message: registered.message }; }
+    // Remove only a subscription made by this attempt: an existing one may still serve a guest registration.
+    if (!registered.ok) { if (!existing) await subscription.unsubscribe().catch(() => false); return { server: 'error', permission, message: registered.message }; }
     const confirmed = await client.deviceStatus(token, subscription.endpoint);
     current();
     return confirmed.subscribed ? { server: 'subscribed', permission, preferences: registered.value } : { server: 'not_subscribed', permission, message: 'Mystery Hub could not confirm this phone yet. Try again in a moment.' };
@@ -171,8 +173,11 @@ export async function subscribeGuestDevice(client: CustomerNotificationsClient, 
   current();
   if (!manager) return { server: 'error', permission, message: 'Notifications are not ready in this browser yet.' };
   let subscription: SubscriptionLike | null = null;
+  let created = false;
   try {
-    subscription = (await manager.getSubscription()) ?? await manager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(publicKey) });
+    const existing = await manager.getSubscription();
+    created = !existing;
+    subscription = existing ?? await manager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(publicKey) });
     current();
     const { credential } = await guest.register(subscription.toJSON() as PushSubscriptionPayload, consent);
     writeGuestCredential(credential);
@@ -183,6 +188,9 @@ export async function subscribeGuestDevice(client: CustomerNotificationsClient, 
       ? { server: 'subscribed', permission }
       : { server: 'not_subscribed', permission, message: 'Mystery Hub could not confirm this browser yet. Try again in a moment.' };
   } catch (error) {
+    // A refused guest registration leaves no stray browser subscription behind (only one this attempt created:
+    // an existing one may belong to the signed-in account).
+    if (created) await subscription?.unsubscribe().catch(() => false);
     return { server: 'error', permission, message: error instanceof Error ? error.message : undefined };
   }
 }

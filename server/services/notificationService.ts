@@ -26,17 +26,34 @@ function consentInput(input:any,allowed:Purpose[]){
 async function recordConsent(c:PoolClient,subject:{userId?:string;guestDeviceId?:string},purpose:Purpose,granted:boolean,source:string,copyVersion:string|null){
  await c.query(`INSERT INTO ${NOTIFICATIONS}.consents(user_id,guest_device_id,purpose,granted,source,copy_version) VALUES($1,$2,$3,$4,$5,$6)`,[subject.userId||null,subject.guestDeviceId||null,purpose,granted,source,copyVersion]);
 }
-/** A withdrawn marketing choice (or, before the ledger existed, a saved "off") is never switched back on implicitly. */
+/**
+ * A withdrawn marketing choice is never switched back on implicitly. The ledger decides; for someone with no ledger
+ * entries at all (preferences saved before the ledger existed), a saved "off" counts as a withdrawal.
+ */
 async function marketingOptedOut(c:PoolClient|ReturnType<typeof db>,userId:string){
- const last=(await c.query(`SELECT granted FROM ${NOTIFICATIONS}.consents WHERE user_id=$1 AND purpose='marketing' ORDER BY created_at DESC,id DESC LIMIT 1`,[userId])).rows[0];
+ const last=(await c.query(`SELECT granted FROM ${NOTIFICATIONS}.consents WHERE user_id=$1 AND purpose='marketing' ORDER BY seq DESC LIMIT 1`,[userId])).rows[0];
  if(last)return last.granted===false;
+ if((await c.query(`SELECT 1 FROM ${NOTIFICATIONS}.consents WHERE user_id=$1 LIMIT 1`,[userId])).rowCount)return false;
  const saved=(await c.query(`SELECT marketing FROM ${NOTIFICATIONS}.preferences WHERE user_id=$1`,[userId])).rows[0];
  return saved?saved.marketing===false:false;
 }
+/** Before the first ledger entry for someone, a pre-ledger saved "off" is written into the ledger, so it stays decisive. */
+async function carryLegacyOptOut(c:PoolClient,userId:string){
+ if((await c.query(`SELECT 1 FROM ${NOTIFICATIONS}.consents WHERE user_id=$1 LIMIT 1`,[userId])).rowCount)return;
+ const saved=(await c.query(`SELECT marketing FROM ${NOTIFICATIONS}.preferences WHERE user_id=$1`,[userId])).rows[0];
+ if(saved&&saved.marketing===false)await recordConsent(c,{userId},'marketing',false,'legacy_preference',null);
+}
+/** Expired guest registrations are removed (with an evidence row), a few at a time, so retention really is 180 days. */
+async function pruneExpiredGuests(c:PoolClient){
+ const gone=(await c.query(`DELETE FROM ${NOTIFICATIONS}.guest_devices WHERE id IN (SELECT id FROM ${NOTIFICATIONS}.guest_devices WHERE expires_at<NOW() ORDER BY expires_at LIMIT 100) RETURNING id`)).rows;
+ for(const row of gone)await recordConsent(c,{guestDeviceId:row.id},'marketing',false,'guest_expired',null);
+}
+/** Guest news is an operational gate (WEB_PUSH_GUEST_NEWS=true), off unless the operator turns it on. */
+const guestNewsEnabled=()=>process.env.WEB_PUSH_GUEST_NEWS==='true';
 const GUEST_CREDENTIAL=/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.([A-Za-z0-9_-]{43})$/i;
 function guestCredential(header:unknown){const match=typeof header==='string'?GUEST_CREDENTIAL.exec(header.trim()):null;if(!match)throw new FinanceError('Notifications are not on for this browser.',401);return {id:match[1].toLowerCase(),secretHash:digest(match[2])};}
 export class NotificationService {
- static config(){const c=pushConfiguration(),enabled=c.enabled&&!!getPool();return {enabled,publicKey:enabled?c.publicKey:null,workerPath:'/push-sw.js' as const,guests:enabled};}
+ static config(){const c=pushConfiguration(),enabled=c.enabled&&!!getPool();return {enabled,publicKey:enabled?c.publicKey:null,workerPath:'/push-sw.js' as const,guests:enabled&&guestNewsEnabled()};}
  /** Public view: whether sending is actually on, so the site never invites people to something that is paused. */
  static async publicConfig(){const c=this.config();if(!c.enabled)return {...c,paused:true};
   try{const paused=(await db().query(`SELECT paused FROM ${NOTIFICATIONS}.settings WHERE id=TRUE`)).rows[0]?.paused!==false;return {...c,paused};}
@@ -44,12 +61,15 @@ export class NotificationService {
  }
  /** `marketingOptedOut`: the customer turned news and offers off before, so an invitation must not offer them again. */
  static async preferences(userId:string){const p=(await db().query(`SELECT transactional,marketing FROM ${NOTIFICATIONS}.preferences WHERE user_id=$1`,[userId])).rows[0]||{transactional:true,marketing:false};return {transactional:p.transactional,marketing:p.marketing,marketingOptedOut:await marketingOptedOut(db(),userId)};}
- static async setPreferences(userId:string,input:any){exact(input,['transactional','marketing']);if(typeof input.transactional!=='boolean'||typeof input.marketing!=='boolean')throw new FinanceError('Choose transactional and marketing preferences explicitly.');
+ static async setPreferences(userId:string,input:any){exact(input,['transactional','marketing','source']);if(typeof input.transactional!=='boolean'||typeof input.marketing!=='boolean'||input.source!==undefined&&input.source!=='notification_invitation')throw new FinanceError('Choose transactional and marketing preferences explicitly.');
+  // Evidence names where the choice was made: My Account, or the invitation's own "Order updates only".
+  const [source,copyVersion]=input.source==='notification_invitation'?['notification_invitation','invite-3.4-1']:['account_settings','settings-1'];
   return notificationTransaction(async c=>{
    await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['notification-user:'+userId]);
+   await carryLegacyOptOut(c,userId);
    const before=(await c.query(`SELECT transactional,marketing FROM ${NOTIFICATIONS}.preferences WHERE user_id=$1`,[userId])).rows[0]||{transactional:true,marketing:false};
    const after=(await c.query(`INSERT INTO ${NOTIFICATIONS}.preferences(user_id,transactional,marketing) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET transactional=$2,marketing=$3,updated_at=NOW() RETURNING transactional,marketing`,[userId,input.transactional,input.marketing])).rows[0];
-   for(const purpose of ['transactional','marketing'] as const)if(before[purpose]!==after[purpose])await recordConsent(c,{userId},purpose,after[purpose],'account_settings','settings-1');
+   for(const purpose of ['transactional','marketing'] as const)if(before[purpose]!==after[purpose])await recordConsent(c,{userId},purpose,after[purpose],source,copyVersion);
    return after;
   });}
  static async subscribe(userId:string,token:string,input:any){exact(input,['subscription','consent']);if(!this.config().enabled)throw new FinanceError('Web Push is not enabled and configured.',503);const consent=consentInput(input.consent,['transactional','marketing']);const subscription=validateSubscription(input.subscription),hash=digest(subscription.endpoint);
@@ -62,12 +82,15 @@ export class NotificationService {
   if(!previous||previous.user_id!==userId){const count=Number((await c.query(`SELECT COUNT(*) FROM ${NOTIFICATIONS}.devices WHERE user_id=$1`,[userId])).rows[0].count);if(count>=10)throw new FinanceError('Revoke an old notification device before adding another.',409);}
   const id=previous?.id||randomUUID();await c.query(`INSERT INTO ${NOTIFICATIONS}.devices(id,user_id,session_id,endpoint_hash,encrypted_subscription) VALUES($1,$2,$3,$4,$5)
    ON CONFLICT(endpoint_hash) DO UPDATE SET user_id=$2,session_id=$3,encrypted_subscription=$5,binding_version=${NOTIFICATIONS}.devices.binding_version+1,updated_at=NOW()`,[id,userId,session.id,hash,encryptSubscription(subscription)]);
-  // The same browser was registered for guest news: the account takes over, and the guest consent ends with it.
-  const guest=(await c.query(`DELETE FROM ${NOTIFICATIONS}.guest_devices WHERE endpoint_hash=$1 RETURNING id`,[hash])).rows[0];
-  if(guest)await recordConsent(c,{guestDeviceId:guest.id},'marketing',false,'replaced_by_account',null);
+  // The same browser was registered for guest news: the account takes over and the guest consent ends with it, but
+  // only when the keys prove it is the same browser (an endpoint alone never removes someone else's registration).
+  const guest=(await c.query(`SELECT id,encrypted_subscription FROM ${NOTIFICATIONS}.guest_devices WHERE endpoint_hash=$1 FOR UPDATE`,[hash])).rows[0];
+  if(guest){const old=decryptSubscription(guest.encrypted_subscription);if(old.keys.auth!==subscription.keys.auth||old.keys.p256dh!==subscription.keys.p256dh)throw new FinanceError('Subscription ownership could not be verified.',409);
+   await c.query(`DELETE FROM ${NOTIFICATIONS}.guest_devices WHERE id=$1`,[guest.id]);await recordConsent(c,{guestDeviceId:guest.id},'marketing',false,'replaced_by_account',null);}
   let preferences=(await c.query(`SELECT transactional,marketing FROM ${NOTIFICATIONS}.preferences WHERE user_id=$1 FOR UPDATE`,[userId])).rows[0]||null;
   if(consent){
    // One explicit "Allow Notifications" may record each purpose its copy named, but never revives withdrawn offers.
+   await carryLegacyOptOut(c,userId);
    const optedOut=await marketingOptedOut(c,userId),granted=consent.purposes.filter(p=>p!=='marketing'||!optedOut);
    for(const purpose of granted)await recordConsent(c,{userId},purpose,true,'notification_invitation',consent.copyVersion);
    preferences=(await c.query(`INSERT INTO ${NOTIFICATIONS}.preferences(user_id,transactional,marketing) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET transactional=$2,marketing=$3,updated_at=NOW() RETURNING transactional,marketing`,
@@ -81,11 +104,14 @@ export class NotificationService {
   * browser keeps a random credential; only its hash is stored. No account, phone number or order is involved.
   */
  static async guestSubscribe(input:any){exact(input,['subscription','consent']);if(!this.config().enabled)throw new FinanceError('Web Push is not enabled and configured.',503);
+  if(!this.config().guests)throw new FinanceError('Guest news is not available yet.',503);
   const consent=consentInput(input.consent,['marketing']);if(!consent)throw new FinanceError('Choose to receive Mystery Hub news first.');
   const subscription=validateSubscription(input.subscription),hash=digest(subscription.endpoint);
   return notificationTransaction(async c=>{
    await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['notification-endpoint:'+hash]);
-   if((await c.query(`SELECT 1 FROM ${NOTIFICATIONS}.devices WHERE endpoint_hash=$1`,[hash])).rowCount)throw new FinanceError('This browser already receives your account notifications.',409);
+   await pruneExpiredGuests(c);
+   // Only a live account registration blocks guest news; a device left behind by an expired session cannot receive.
+   if((await c.query(`SELECT 1 FROM ${NOTIFICATIONS}.devices d JOIN sessions s ON s.id=d.session_id WHERE d.endpoint_hash=$1 AND s.expires_at>NOW()`,[hash])).rowCount)throw new FinanceError('This browser already receives your account notifications.',409);
    const previous=(await c.query(`SELECT * FROM ${NOTIFICATIONS}.guest_devices WHERE endpoint_hash=$1 FOR UPDATE`,[hash])).rows[0];
    if(previous){const old=decryptSubscription(previous.encrypted_subscription);if(old.keys.auth!==subscription.keys.auth||old.keys.p256dh!==subscription.keys.p256dh)throw new FinanceError('Subscription ownership could not be verified.',409);}
    const id=previous?.id||randomUUID(),secret=randomBytes(32).toString('base64url');

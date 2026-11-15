@@ -6,8 +6,6 @@ import { isInstalledApp, supportsAppleHomeScreen } from '../../pwa/appEnvironmen
 import { httpCustomerNotificationsClient, type CustomerNotificationsClient, type NotificationInboxEntry, type NotificationPreferences } from '../../services/customerNotifications';
 import { accountButton } from './SecurityDialog';
 
-/** Turning a device on here records only order and account updates; news and offers stay their own switch below. */
-const SETTINGS_CONSENT = { purposes: ['transactional' as const], copyVersion: 'settings-1' };
 const when = (iso: string) => { const t = Date.parse(iso); return Number.isFinite(t) ? new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : ''; };
 
 /**
@@ -52,7 +50,8 @@ export function NotificationSettings({ token, client = httpCustomerNotifications
       return;
     }
     setLocal('subscribing');
-    const res = await subscribeThisDevice(client, token, undefined, undefined, SETTINGS_CONSENT);
+    // Registering this device changes no choice: order updates and news/offers stay exactly as the switches below say.
+    const res = await subscribeThisDevice(client, token);
     if (!alive.current) return;
     setPermission(res.permission); setServer(res.server);
     setLocal(res.server === 'subscribed' || res.permission !== 'granted' ? 'idle' : 'failed');

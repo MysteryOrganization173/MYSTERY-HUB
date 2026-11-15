@@ -45,8 +45,10 @@ export async function processNotificationBatch(sender:Sender=send,max=10){
     // Account updates stay deliberately generic: a late packet after logout or an account switch cannot expose
     // another account's order. Announcements (opted-in news and offers) carry their own approved, non-personal
     // template text, so the phone can say what they are about.
-    const payload=JSON.stringify(live.template_snapshot?.category==='marketing'
-     ?{version:1,notificationId:live.notification_id,kind:'announcement',...renderTemplate(live.template_snapshot,'Service announcement'),tag:'mh-'+live.notification_id}
+    const fit=(text:string,max:number)=>text.length<=max?text:text.slice(0,max-1).trimEnd()+'…';
+    const announcement=live.template_snapshot?.category==='marketing'?renderTemplate(live.template_snapshot,'Service announcement'):null;
+    const payload=JSON.stringify(announcement
+     ?{version:1,notificationId:live.notification_id,kind:'announcement',title:fit(announcement.title,80),body:fit(announcement.body,240),tag:'mh-'+live.notification_id}
      :{version:1,notificationId:live.notification_id,kind:'account',title:'Mystery Hub',body:'An account update is available. Sign in to view it.',tag:'mh-'+live.notification_id});
     await sender(subscription,payload);state='provider_accepted';code='accepted';
    }catch(error){const status=Number((error as {statusCode?:number})?.statusCode);if(error instanceof FinanceError&&error.status===400){state='invalid';code='subscription_invalid';}

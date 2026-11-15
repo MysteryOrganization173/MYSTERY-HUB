@@ -232,6 +232,13 @@ function NotificationInvitation({ cardRef, invite, token, onClose }: {
 }) {
   const titleId = useId();
   const [step, setStep] = useState<'invite' | 'working' | 'registered' | 'denied' | 'error'>('invite');
+  const [offersOff, setOffersOff] = useState<'no' | 'saving' | 'off' | 'failed'>('no');
+  const dropOffers = async () => {
+    if (!token || offersOff === 'saving') return;
+    setOffersOff('saving');
+    const saved = await httpCustomerNotificationsClient.savePreferences(token, { transactional: true, promotional: false, expectedVersion: '', source: 'notification_invitation' }).catch(() => ({ ok: false as const, message: '' }));
+    if (!request.current?.signal.aborted) setOffersOff(saved.ok && !saved.value.promotional ? 'off' : 'failed');
+  };
   const request = useRef<AbortController | null>(null);
   useEffect(() => { request.current = new AbortController(); return () => request.current?.abort(); }, []);
   // "Not now" (or closing) rests three weeks and stops after the second; the browser's own answer is final.
@@ -250,10 +257,14 @@ function NotificationInvitation({ cardRef, invite, token, onClose }: {
   if (step === 'registered' || step === 'denied' || step === 'error') {
     const copy = NOTIFICATION_RESULT[step];
     const done = () => onClose(step === 'registered' ? 'acted' : 'dismissed');
+    // Right where the choice was made, offers can be dropped in one tap (order updates stay on).
+    const ordersOnly = step === 'registered' && invite.audience === 'member' && invite.offers && token;
     return <InvitationCard cardRef={cardRef} titleId={titleId} status icon={step === 'registered' ? <CheckCircle2 className="size-6 text-emerald-300" /> : <BellOff className="size-6 text-slate-300" />}
-      title={copy.title} text={copy.text} closeLabel="Close" onClose={done}>
+      title={copy.title} text={offersOff === 'off' ? `${copy.text} Offers are off.` : copy.text} closeLabel="Close" onClose={done}>
       {step === 'error' && <button type="button" className="mh-button" onClick={() => { void allow(); }}>Try again</button>}
       <button type="button" className={step === 'error' ? 'mh-invite-later' : 'mh-button'} onClick={done}>{step === 'error' ? 'Close' : 'Done'}</button>
+      {ordersOnly && offersOff !== 'off' && <button type="button" className="mh-invite-later" disabled={offersOff === 'saving'} onClick={() => { void dropOffers(); }}>{offersOff === 'saving' ? 'Saving…' : NOTIFICATION_ACTIONS.ordersOnly}</button>}
+      {offersOff === 'failed' && <p className="mh-invite-note" role="alert">That didn’t save. You can turn offers off in My Account.</p>}
     </InvitationCard>;
   }
   const copy = notificationCopy(invite);

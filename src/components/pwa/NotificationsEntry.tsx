@@ -29,7 +29,7 @@ export function NotificationsEntryHost() {
   return isOpen && !user ? <GuestNotificationsSheet onClose={closeNotificationSettings} /> : null;
 }
 
-type SheetState = 'loading' | 'on' | 'off' | 'working' | 'blocked' | 'unsupported' | 'ios' | 'error';
+type SheetState = 'loading' | 'on' | 'off' | 'working' | 'blocked' | 'unsupported' | 'guests_off' | 'ios' | 'error';
 
 function GuestNotificationsSheet({ onClose }: { onClose: () => void }) {
   const { openAuth } = useApp();
@@ -44,7 +44,8 @@ function GuestNotificationsSheet({ onClose }: { onClose: () => void }) {
       if (controller.signal.aborted) return;
       setPaused(config.paused === true);
       if (supportsAppleHomeScreen() && !isInstalledApp() && !pushSupported()) return setState('ios');
-      if (!pushSupported() || !config.enabled || !config.guests) return setState('unsupported');
+      if (!pushSupported() || !config.enabled) return setState('unsupported');
+      if (!config.guests) return setState('guests_off');
       if (notificationPermissionState() === 'denied') return setState('blocked');
       const device = await readGuestDeviceState(httpGuestNotificationsClient);
       if (!controller.signal.aborted) setState(device === 'subscribed' ? 'on' : device === 'error' ? 'error' : 'off');
@@ -74,6 +75,7 @@ function GuestNotificationsSheet({ onClose }: { onClose: () => void }) {
     off: { icon: <BellOff className="h-5 w-5 text-slate-300" aria-hidden />, title: 'Notifications are off', body: offer },
     blocked: { icon: <BellOff className="h-5 w-5 text-slate-300" aria-hidden />, title: 'Notifications are blocked', body: 'This browser is blocking notifications from Mystery Hub. Allow them in its site settings, then come back here.' },
     unsupported: { icon: <BellOff className="h-5 w-5 text-slate-300" aria-hidden />, title: 'Notifications aren’t available here', body: 'This browser can’t receive Mystery Hub notifications right now.' },
+    guests_off: { icon: <BellOff className="h-5 w-5 text-slate-300" aria-hidden />, title: 'Not available without an account yet', body: 'Mystery Hub news for visitors without an account is coming. Sign in to get updates about your orders.' },
     ios: { icon: <Smartphone className="h-5 w-5 text-slate-300" aria-hidden />, title: IOS_HOME_SCREEN_COPY.title, body: IOS_HOME_SCREEN_COPY.body },
     error: { icon: <BellOff className="h-5 w-5 text-amber-200" aria-hidden />, title: 'Something went wrong', body: reason ? `${reason} Nothing was changed.` : 'Nothing was changed. Please try again.' },
   };

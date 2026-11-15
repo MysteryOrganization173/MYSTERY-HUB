@@ -164,16 +164,26 @@ How consent is recorded:
 - **Evidence:** one explicit tap on a card that names each purpose records an append-only `mysteryhub_notifications.consents` row per purpose. Each row holds the subject (account, or guest browser), purpose, granted or withdrawn, source and the copy version shown (`invite-3.4-1`, `-orders`, `-guest`, `settings-1`).
 - **Atomic with the device:** the device registration and the consent are written in one transaction, and the success state appears only after the server confirms.
 - **Never inferred:** browser permission never creates consent.
-- **Never revived:** a withdrawn marketing choice (in the ledger, or a saved "off" from before the ledger) is never switched back on by an invitation. Only the customer's own switch in My Account turns it back on. An answer to the old separate offers question on this device is also honoured.
+- **Never revived:** a withdrawn marketing choice is never switched back on by an invitation. Only the customer's own switch in My Account turns it back on. An answer to the old separate offers question on this device is also honoured.
+  - The ledger is ordered by an identity sequence, so choices saved in the same moment never race.
+  - A saved "off" from before the ledger counts as a withdrawal only for someone with no ledger entries, and is carried into the ledger the first time they act. Changing only order updates later never counts as declining offers.
+- **One-tap "Order updates only":** the success state for a member who accepted offers offers this right where the choice was made. It is recorded as an invitation answer. This keeps the founder's single decision while making order updates without offers one tap away.
+- **Settings registration:** turning a device on in My Account changes no choice. The switches stay exactly as shown.
 - **Withdrawal:** settings changes record withdrawals and re-grants. Guest unsubscribes record a withdrawal, and an account taking over a guest browser records the end of the guest consent. Guest consent is never transferred to an account.
 - **Legal caveat:** this is an engineering reading of the rule, not legal advice. The founder should confirm the wording with counsel before activation.
+  - If counsel prefers fully unbundled consent, the alternative is an unticked "Also send me news and offers" line in the same card. Order updates would then be recorded alone unless ticked.
+  - The ledger and copy versions already support that change without a schema change.
 
 ### Guests
+- **Operational gate:** guest news is off unless the operator sets `WEB_PUSH_GUEST_NEWS=true`. Keep it off until guest delivery (Release D, Admin audiences) is merged and verified. Until then the guest sheet says news without an account is coming, and no guest invitation appears.
 - **Guest news:** a browser without an account can choose service news and occasional offers (marketing only).
   - The server returns a random credential. The browser keeps it in local storage and sends it only in the `X-Guest-Notifications` header, never in a URL; the server stores only its hash.
   - Endpoint ownership is checked. A guest browser cannot take over an account's endpoint.
   - Registrations expire after 180 days without use (active use extends them).
-  - Rate limit: 20 requests per 10 minutes per address.
+  - Rate limits: 30 requests per 10 minutes per visitor (keyed behind the proxy) and at most 200 new registrations per 10 minutes site-wide.
+  - Expired registrations are removed, with an evidence row, whenever a new one is made.
+  - An account taking over a guest browser must present the same keys. An endpoint alone never removes a guest registration.
+  - A device left behind by an expired account session does not block guest news.
   - "Turn off for this browser" (footer › Notifications) deletes the registration and records the withdrawal.
 - **Order updates for guests: gated, not built.** The platform has no secret guest-order capability; order lookup works by public reference only. Binding push to a guest order securely needs:
   - a new per-order secret issued at checkout;
@@ -210,10 +220,22 @@ How consent is recorded:
   - service worker 24/24 (announcement display, unsafe text, click targets);
   - updated account, PWA and invitation suites.
 - **Native PostgreSQL 16:**
-  - new `notificationConsentPostgres` 9/9: private tables, consent per purpose, withdrawal never revived, guest credential hash and ownership, account takeover, expiry and unsubscribe, HTTP (no account, no credential in URLs, paused flag), announcement payloads;
+  - new `notificationConsentPostgres` 12/12: private tables, consent per purpose, withdrawal never revived, the pre-ledger rule, invitation-sourced "Order updates only", the guest gate, guest credential hash and ownership, forged-key takeover refused, a stale session not blocking, account takeover, expiry clean-up and unsubscribe, HTTP (no account, no credential in URLs, paused flag), announcement payloads;
   - existing `notificationsPostgres` 18/18;
   - `backendRlsPostgres` with 53 private tables (its `MAINTAIN` check needs PostgreSQL 17, which CI uses).
-- **Browser:** `scripts/reviewNotificationOnboarding.cjs` 26/26. It runs locally only, with synthetic push keys and a disposable database.
+- **Independent review:** 10 findings, all addressed.
+  - Rate-limit key and site-wide ceiling.
+  - Guest news gated until delivery exists.
+  - Settings registration no longer re-enables order updates.
+  - Guest takeover requires matching keys.
+  - One-tap "Order updates only".
+  - Opt-out rule scoped to pre-ledger records.
+  - Announcement text clamped.
+  - Stale sessions no longer block guests.
+  - No stray subscription after a refused registration.
+  - Expiry clean-up.
+  - Found while fixing: the ledger now has deterministic ordering.
+- **Browser:** `scripts/reviewNotificationOnboarding.cjs` 28/28. It runs locally only, with synthetic push keys and a disposable database.
   - The browser permission answer and the push subscription are **simulated**: headless Chromium cannot show the prompt or reach a push service. This proves the product and server logic, not delivery.
   - No delivery was queued or attempted.
 - **Release B review re-run:** 88/88.
