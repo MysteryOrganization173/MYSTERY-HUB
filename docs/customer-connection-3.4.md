@@ -253,3 +253,129 @@ How consent is recorded:
   - The browser permission answer and the push subscription are **simulated**: headless Chromium cannot show the prompt or reach a push service. This proves the product and server logic, not delivery.
   - No delivery was queued or attempted.
 - **Release B review re-run:** 88/88.
+
+## Release D: Admin Notification Center, readiness and activation gates
+
+Activation runbook and the founder's phone checklist: `docs/notifications-activation-3.4.md`.
+
+### Status in plain words (Admin › Notifications)
+- **Checklist:** the server's facts, never secrets.
+  - Keys valid; the sending switch; paused or live.
+  - The background sender (last check, last failure).
+  - Devices that can receive versus registrations left by signed-out sessions.
+  - Customers who chose news and offers (people, and their devices); visitor browsers.
+  - Order updates waiting for a resume (last 24 hours only).
+  - The last 7 days by result, with the most common problem in words.
+- **Check it on your phone:** *Send a test to my devices* reaches only the signed-in operator's own devices (taken from the session, never from input). It is audited, idempotent per click, limited to 3 in 10 minutes, and works while paused.
+  - A plain test takes the private account path: generic lock-screen text, then "Test notification" after sign-in.
+  - Opening it from the notification marks it opened. This is recorded for operator tests only; customer notifications are never tracked.
+- **Pause and resume:** both need a reason (audited); resume also needs an explicit approval.
+  - **Resume is refused by the server** until an operator has opened a test from its notification in the last 30 days.
+  - **The open token:** an HMAC of the event id, keyed from the storage key, sent only inside that encrypted push and carried by the service worker into the tap's link. A link or an id alone records nothing.
+  - **One rule:** any operator's check counts, on the server and in Admin, so a second Admin can resume in an emergency.
+  - **Pause holds what is queued:** the worker re-checks pause before each claim and returns a delivery claimed just before a pause to the queue.
+  - **Queued announcements** are shown in Status and in both dialogs. They can be cancelled (all, or the rest of one announcement), with a reason and an audit entry. A delivery already being handed to the push service cannot be recalled and is counted separately.
+
+### Audiences, consent first
+- **Customers who chose news and offers:** active customers with a live session and `marketing=true`. Counted as people and devices.
+- **One customer:** the same rule for a single account ID.
+- **Visitors who chose news:** guest browsers with an unexpired registration. Only while `WEB_PUSH_GUEST_NEWS` is on, and never a browser that is also a live account device.
+- **Everyone who chose news:** both groups.
+- **Server-side enforcement:** the preview binds the template version, audience, page and exact recipients for 10 minutes.
+  - **At send:** the server sends to the reviewed recipients who still qualify. It never adds anyone, respects any withdrawal since the review, and refuses only if nobody is left.
+  - **Duplicates, per recipient:** nobody gets the same announcement (template and version) twice within 30 minutes, whichever audience, page or preview it comes from. Cancelled or skipped sends don't count.
+  - Campaign creation is serialised, so concurrent confirmations cannot both pass.
+
+### Pages an announcement may open
+- **Fixed list:** `/`, `/data`, `/services`, `/marketplace`, `/earn` (`ANNOUNCEMENT_DESTINATIONS`).
+- **Where it applies:** the server, the payload (`url`), the service worker (its own copy of the list; anything else opens Home) and the account inbox (`opens`).
+- **No URLs:** web addresses cannot be entered.
+
+### Delivery to visitor browsers
+- **Records:** one event per browser and one delivery per browser.
+- **At send time:** the worker re-checks the registration, the gate, pause, the template and the 24-hour freshness.
+- **A gone browser:** a 404/410 removes the registration and records `guest_endpoint_expired` in the consent ledger.
+
+### While paused
+- The worker expands and sends nothing for customers or visitors. Only operator tests move.
+
+### History
+- **Grouped:** announcements (one row per campaign), tests, and automatic order updates.
+  - **Tests:** which operator sent them and when they were opened. Announcement tests can't record a tap, and say so.
+  - **Order updates:** "Waiting for resume" while paused, "Not sent: older than 24 hours" (also after resuming), and "No eligible device".
+- **Filters:** by kind and by any delivery's result.
+- **Detail:** counts for the whole send, plus the first 200 devices with their tries, codes and times. Problems are in plain words, visitor browsers are marked, and the rest of a queued announcement can be cancelled.
+- **Never shown:** endpoints and people.
+- **Earlier campaigns:** grouped after the upgrade. Their id is recovered from the event key.
+
+### Composer
+- **Preview:** shows what the phone shows. An announcement shows its own text and page; an account update shows the generic notice and the signed-in content.
+- **Send to my devices first:** tests the exact saved announcement and page.
+- **Confirmation:** shows recipients now, made up of customers (devices) and visitor browsers, plus the page, the type and the consent rule.
+
+### Schema (additive, idempotent, mirrored in `schema.sql`)
+- **`events`:**
+  - nullable `user_id`, plus `guest_device_id`, `destination`, `campaign_id`, `operator_test`, `opened_at`;
+  - a subject check (an account or a guest browser);
+  - a one-time grouping backfill.
+- **`deliveries`:** nullable `user_id`, plus `guest_device_id` (unique per event).
+- **`audiences`:** `guest_device_ids`, `audience_kind`, `destination`.
+- **Templates:** a locked internal `operator_test` template, never listed among templates.
+- **Unchanged:** the order trigger.
+
+### Verification (Release D)
+- **Unit `notificationAdmin34` 7/7:**
+  - readiness wording and gating;
+  - no key material;
+  - one destination list shared by the server, Admin and the service worker;
+  - announcement versus account preview;
+  - audience counts and an unavailable visitor audience;
+  - history mapping without invented receipts.
+- **Updated suites:** `notificationCenter` 17/17.
+- **Native PostgreSQL 16, `notificationAdminPostgres` 12/12:**
+  - the schema upgrade and subject check;
+  - members, visitors and everyone, people versus devices, approved pages;
+  - a planted duplicate browser excluded;
+  - campaigns refused while paused, then fanned out per customer and per browser;
+  - idempotency and duplicate protection;
+  - audit details;
+  - visitor gate at delivery, and a gone browser removed with evidence;
+  - the operator test: own device only, while paused, account path, opened only by the owner, the resume gate;
+  - the announcement test, refusals and the rate limit;
+  - readiness without key material;
+  - grouped history, filters and detail without endpoints;
+  - the grouping backfill;
+  - admin-only HTTP;
+  - after the review: per-recipient duplicates across audiences and pages; a racing second confirmation; cancelled sends not counting;
+  - the open token: a link, a wrong token or another account records nothing; another operator can resume;
+  - only reviewed recipients are sent to; a pause while sending holds the rest;
+  - cancel (in-flight counted, audited); whole-send totals; old order updates marked;
+  - after the verification review: the 1,000-device limit cannot be slipped past; the duplicate window follows the delivery; a cancel landing during a send is never undone; "older than 24 hours" stays after resuming.
+- **Existing suites:** `notificationsPostgres` 19/19 (one assertion that a Release C edit had put inside a comment is restored); consent 14/14.
+- **Browser `scripts/reviewAdminNotifications.cjs`, 52/52 (final run on a fresh disposable database):**
+  - a local production build with synthetic keys and the simulated push service (`scripts/qa/simulatedPushProvider.cjs`), which refuses to load outside a local `*_test` database;
+  - the status checklist; the test on the operator's own phone while paused, with a simulated tap;
+  - the resume gate and confirmation; compose, page, preview, test-first, confirm and send to consenting customers only;
+  - duplicate protection; visitor browsers and a gone browser; history filters and detail;
+  - templates; layouts at 320–1440 and a 390×640 phone with the sheet open;
+  - axe clean at 1280 and 390 (serious and critical);
+  - pause with rate-limit recovery;
+  - after the review: the open token (a plain link does not count); duplicates stopped at review; a wider audience or another page leaves out earlier recipients.
+- **Independent review:** 10 findings (3 medium, 7 low) and 3 notes, all addressed.
+  - Queued announcements are visible, held by pause and can be cancelled.
+  - Duplicates are prevented per recipient.
+  - The phone check is tied to a token in the push, with one rule.
+  - The simulated provider guard is strict.
+  - Detail totals cover the whole send, with honest statuses and labels.
+  - Order-history filtering uses an index.
+  - Sends go to the reviewed recipients who still qualify.
+  - There is a new send key per review, and the composer test can be repeated.
+  - The legacy route has no customer ids, and the redundant index was replaced.
+- **Verification review of the fixes:** 7 findings (2 medium, 1 low–medium, 4 low), all fixed.
+  - The audience limit applies before anyone is left out, and send-time checks cover only the reviewed devices, so nothing is silently cut.
+  - The History result filter uses an indexed `EXISTS`, and no filter at all when none is chosen.
+  - The duplicate window is judged by the delivery (queued, or accepted in the last 30 minutes).
+  - A cancel is never undone by a slow send; only a real acceptance is recorded over it.
+  - "Older than 24 hours" stays after resuming, including in the detail.
+  - The composer test frees its key on any confirmed answer.
+  - The simulated provider's marker belongs to a live `server.ts` and is removed when it exits.

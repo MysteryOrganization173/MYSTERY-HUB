@@ -1,4 +1,4 @@
-import {createCipheriv,createDecipheriv,randomBytes,createHash,createECDH,ECDH} from 'node:crypto';
+import {createCipheriv,createDecipheriv,randomBytes,createHash,createHmac,timingSafeEqual,createECDH,ECDH} from 'node:crypto';
 import type {NotificationTemplate,SubscriptionInput} from '../../shared/notifications.js';
 import {FinanceError} from '../db/financeStore.js';
 const safe=(value:unknown,min:number,max:number)=>typeof value==='string'&&value.trim().length>=min&&value.length<=max&&!/[<>\x00-\x1f]/.test(value);
@@ -8,6 +8,12 @@ export function pushConfiguration(){
  let valid=false;try{const e=createECDH('prime256v1');e.setPrivateKey(Buffer.from(privateKey,'base64url'));valid=Buffer.from(key,'base64').length===32&&e.getPublicKey().toString('base64url')===publicKey&&/^(mailto:[^\s@]+@[^\s@]+\.[^\s@]+|https:\/\/[^\s]+)$/.test(subject);}catch{}
  return {enabled:process.env.WEB_PUSH_ENABLED==='true'&&valid,valid,publicKey:valid?publicKey:null,privateKey,subject};
 }
+/**
+ * The open token for an operator's test: derived from the storage key and the event id, sent only inside that
+ * encrypted push, and required to record "opened". Only a device that received the push can know it.
+ */
+export function testOpenToken(eventId:string){return createHmac('sha256',storageKey()).update('mysteryhub-test-open-v1:'+eventId).digest('base64url');}
+export function testOpenTokenMatches(eventId:string,token:string){try{const expected=Buffer.from(testOpenToken(eventId)),given=Buffer.from(token);return given.length===expected.length&&timingSafeEqual(given,expected);}catch{return false;}}
 function storageKey(){const key=Buffer.from(process.env.WEB_PUSH_STORAGE_KEY||'','base64');if(key.length!==32)throw new FinanceError('Notification encryption is not configured.',503);return key;}
 export function encryptSubscription(subscription:SubscriptionInput){const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',storageKey(),iv);cipher.setAAD(Buffer.from('mysteryhub-push-v1'));const data=Buffer.concat([cipher.update(JSON.stringify(subscription),'utf8'),cipher.final()]);return Buffer.concat([iv,cipher.getAuthTag(),data]).toString('base64');}
 export function decryptSubscription(value:string):SubscriptionInput{const data=Buffer.from(value,'base64');const cipher=createDecipheriv('aes-256-gcm',storageKey(),data.subarray(0,12));cipher.setAAD(Buffer.from('mysteryhub-push-v1'));cipher.setAuthTag(data.subarray(12,28));return JSON.parse(Buffer.concat([cipher.update(data.subarray(28)),cipher.final()]).toString('utf8'));}

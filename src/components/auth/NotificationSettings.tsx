@@ -14,7 +14,7 @@ const when = (iso: string) => { const t = Date.parse(iso); return Number.isFinit
  * and each preference changes only after the server saves it. Promotional updates are a separate choice that
  * starts off. Account choices remain available while real device delivery is disabled pending configuration.
  */
-export function NotificationSettings({ token, client = httpCustomerNotificationsClient, onOpenNotification }: { token: string; client?: CustomerNotificationsClient; onOpenNotification?: (destination: '/orders' | '/app') => void }) {
+export function NotificationSettings({ token, client = httpCustomerNotificationsClient, onOpenNotification }: { token: string; client?: CustomerNotificationsClient; onOpenNotification?: (destination: string) => void }) {
   const [configured,setConfigured]=useState(false);
   const [paused,setPaused]=useState(false);
   const [iosTab]=useState(()=>supportsAppleHomeScreen()&&!isInstalledApp()&&!pushSupported());
@@ -118,7 +118,7 @@ export function NotificationSettings({ token, client = httpCustomerNotifications
  * The account's own notification history from the server, newest first. It shows what Mystery Hub sent to this
  * account, never whether a device displayed or anyone read it, and nothing here exists for guests.
  */
-function RecentNotifications({ token, client, onOpen }: { token: string; client: CustomerNotificationsClient; onOpen?: (destination: '/orders' | '/app') => void }) {
+function RecentNotifications({ token, client, onOpen }: { token: string; client: CustomerNotificationsClient; onOpen?: (destination: string) => void }) {
   const [items, setItems] = useState<NotificationInboxEntry[] | null>(null);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -128,7 +128,8 @@ function RecentNotifications({ token, client, onOpen }: { token: string; client:
     client.inbox!(token, 0, controller.signal).then(list => { if (!controller.signal.aborted) setItems(list.slice(0, 10)); }, () => { if (!controller.signal.aborted) setError(true); });
     return () => controller.abort();
   }, [client, token, attempt]);
-  const open = (item: NotificationInboxEntry) => onOpen?.(item.destination);
+  // News opens the page it was sent with (an approved page); order updates open Orders.
+  const open = (item: NotificationInboxEntry) => onOpen?.(item.opens ?? item.destination);
   return <div className="space-y-2" aria-labelledby="account-recent-notifications">
     <h4 id="account-recent-notifications" className="text-sm font-semibold text-white">Recent notifications</h4>
     {!items && !error && <p role="status" className="text-xs text-slate-400">Loading…</p>}

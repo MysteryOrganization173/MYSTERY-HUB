@@ -16,7 +16,7 @@ import {NotificationPreview} from '../../../src/components/admin/sections/AdminN
 import {NotificationSettings} from '../../../src/components/auth/NotificationSettings.js';
 
 const source = (file: string) => readFileSync(file, 'utf8');
-const F3_FILES = ['src/services/adminNotifications.ts', 'src/services/adminAiDrafting.ts', 'src/services/customerNotifications.ts', 'src/pwa/push.ts', 'src/utils/notificationComposer.ts', 'src/components/admin/sections/AdminNotificationsSection.tsx', 'src/components/admin/sections/AdminNotificationComposer.tsx', 'src/components/auth/NotificationSettings.tsx'];
+const F3_FILES = ['src/services/adminNotifications.ts', 'src/services/adminAiDrafting.ts', 'src/services/customerNotifications.ts', 'src/pwa/push.ts', 'src/utils/notificationComposer.ts', 'src/components/admin/sections/AdminNotificationsSection.tsx', 'src/components/admin/sections/AdminNotificationComposer.tsx', 'src/components/admin/sections/AdminNotificationReadiness.tsx', 'src/components/auth/NotificationSettings.tsx'];
 
 test('without Codex contracts nothing is called, drafting and preview still work, and sending says it is waiting', () => {
   assert.equal(pendingAdminNotificationsClient.available, false);
@@ -174,7 +174,8 @@ test('account settings: real preferences are available while delivery remains un
   const ui = source('src/components/auth/NotificationSettings.tsx');
   assert.match(ui, /'promotional', 'News and offers'/);
   assert.match(ui, /if \(res\.ok\) setPrefs\(res\.value\); else setPrefsError/, 'a switch changes only after the server saves');
-  assert.match(source('src/components/auth/AccountControls.tsx'), /<NotificationSettings key=\{sessionToken!\} token=\{sessionToken!\} onOpenNotification=\{destination => \{ closeAccount\(\); setActivePage\(destination === '\/orders' \? 'orders' : 'home'\); \}\} \/>/);
+  // 3.4-D: an announcement opens its approved page; an order update opens Orders.
+  assert.match(source('src/components/auth/AccountControls.tsx'), /<NotificationSettings key=\{sessionToken!\} token=\{sessionToken!\} onOpenNotification=\{destination => \{ closeAccount\(\); setActivePage\(notificationPage\(destination\)\); \}\} \/>/);
 });
 
 test('fixtures stay isolated: no application file imports them', () => {
