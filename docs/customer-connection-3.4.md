@@ -302,7 +302,7 @@ Activation runbook and the founder's phone checklist: `docs/notifications-activa
 ### History
 - **Grouped:** announcements (one row per campaign), tests, and automatic order updates.
   - **Tests:** which operator sent them and when they were opened. Announcement tests can't record a tap, and say so.
-  - **Order updates:** "Waiting for resume" while paused, "Not sent: older than 24 hours", and "No device registered".
+  - **Order updates:** "Waiting for resume" while paused, "Not sent: older than 24 hours" (also after resuming), and "No eligible device".
 - **Filters:** by kind and by any delivery's result.
 - **Detail:** counts for the whole send, plus the first 200 devices with their tries, codes and times. Problems are in plain words, visitor browsers are marked, and the rest of a queued announcement can be cancelled.
 - **Never shown:** endpoints and people.
@@ -332,7 +332,7 @@ Activation runbook and the founder's phone checklist: `docs/notifications-activa
   - audience counts and an unavailable visitor audience;
   - history mapping without invented receipts.
 - **Updated suites:** `notificationCenter` 17/17.
-- **Native PostgreSQL 16, `notificationAdminPostgres` 11/11:**
+- **Native PostgreSQL 16, `notificationAdminPostgres` 12/12:**
   - the schema upgrade and subject check;
   - members, visitors and everyone, people versus devices, approved pages;
   - a planted duplicate browser excluded;
@@ -349,7 +349,8 @@ Activation runbook and the founder's phone checklist: `docs/notifications-activa
   - after the review: per-recipient duplicates across audiences and pages; a racing second confirmation; cancelled sends not counting;
   - the open token: a link, a wrong token or another account records nothing; another operator can resume;
   - only reviewed recipients are sent to; a pause while sending holds the rest;
-  - cancel (in-flight counted, audited); whole-send totals; old order updates marked.
+  - cancel (in-flight counted, audited); whole-send totals; old order updates marked;
+  - after the verification review: the 1,000-device limit cannot be slipped past; the duplicate window follows the delivery; a cancel landing during a send is never undone; "older than 24 hours" stays after resuming.
 - **Existing suites:** `notificationsPostgres` 19/19 (one assertion that a Release C edit had put inside a comment is restored); consent 14/14.
 - **Browser `scripts/reviewAdminNotifications.cjs`, 52/52 (final run on a fresh disposable database):**
   - a local production build with synthetic keys and the simulated push service (`scripts/qa/simulatedPushProvider.cjs`), which refuses to load outside a local `*_test` database;
@@ -370,3 +371,11 @@ Activation runbook and the founder's phone checklist: `docs/notifications-activa
   - Sends go to the reviewed recipients who still qualify.
   - There is a new send key per review, and the composer test can be repeated.
   - The legacy route has no customer ids, and the redundant index was replaced.
+- **Verification review of the fixes:** 7 findings (2 medium, 1 low–medium, 4 low), all fixed.
+  - The audience limit applies before anyone is left out, and send-time checks cover only the reviewed devices, so nothing is silently cut.
+  - The History result filter uses an indexed `EXISTS`, and no filter at all when none is chosen.
+  - The duplicate window is judged by the delivery (queued, or accepted in the last 30 minutes).
+  - A cancel is never undone by a slow send; only a real acceptance is recorded over it.
+  - "Older than 24 hours" stays after resuming, including in the detail.
+  - The composer test frees its key on any confirmed answer.
+  - The simulated provider's marker belongs to a live `server.ts` and is removed when it exits.

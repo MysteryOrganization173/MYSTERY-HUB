@@ -122,8 +122,9 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
     setTesting(true); setTestResult(null);
     const res = await client.testSelf(token, { requestId: testKey.current.key, templateId: savedMatch.id, destination: draft.destination || '/' });
     setTesting(false);
-    // A confirmed test frees the key, so the same draft can be tested again (for example after a missed notification).
-    if (res.ok && !res.duplicate) testKey.current = null;
+    // Any confirmed answer frees the key (a retry after a lost response comes back as "already sent"), so the same
+    // draft can always be tested again, for example after a missed notification.
+    if (res.ok) testKey.current = null;
     setTestResult(res.ok ? { ok: true, message: res.duplicate ? 'This test was already sent. Check your phone.' : `Sent to your ${plural(res.devices, 'device')} only. Check how it looks and that it opens the right page.` } : { ok: false, message: res.message });
   };
 

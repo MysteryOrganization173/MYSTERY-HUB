@@ -50,8 +50,10 @@ async function current(job:any){
  AND (e.operator_test OR config.paused=FALSE AND ((e.template_snapshot->>'category'='transactional' AND COALESCE(p.transactional,TRUE)) OR (e.template_snapshot->>'category'='marketing' AND COALESCE(p.marketing,FALSE))))`,[job.device_id,job.user_id,job.binding_version,job.event_id])).rows[0];}
 /** Puts a claimed delivery back in the queue untouched (sending was paused after the claim); the try is noted. */
 async function requeue(job:any){await notificationTransaction(async c=>{
- const back=await c.query(`UPDATE ${n}.deliveries SET lease=NULL,lease_until=NULL,next_at=NOW(),updated_at=NOW() WHERE id=$1 AND lease=$2 RETURNING id`,[job.id,job.lease]);
- if(back.rowCount)await c.query(`UPDATE ${n}.attempts SET code='paused',finished_at=NOW() WHERE delivery_id=$1 AND attempt=$2`,[job.id,job.attempts]);
+ // Only a delivery that is still queued goes back; one cancelled meanwhile stays cancelled.
+ const back=await c.query(`UPDATE ${n}.deliveries SET lease=NULL,lease_until=NULL,next_at=NOW(),updated_at=NOW() WHERE id=$1 AND lease=$2 AND state IN ('queued','retry') RETURNING id`,[job.id,job.lease]);
+ await c.query(`UPDATE ${n}.attempts SET code='paused',finished_at=NOW() WHERE delivery_id=$1 AND attempt=$2`,[job.id,job.attempts]);
+ if(!back.rowCount)await c.query(`UPDATE ${n}.deliveries SET lease=NULL,lease_until=NULL WHERE id=$1 AND lease=$2`,[job.id,job.lease]);
 });}
 export async function processNotificationBatch(sender:Sender=send,max=10){
  if(!pushConfiguration().enabled||!getPool())return {processed:0,disabled:true};
@@ -89,9 +91,15 @@ export async function processNotificationBatch(sender:Sender=send,max=10){
    }
   }
   await notificationTransaction(async c=>{
-    const result=await c.query(`UPDATE ${n}.deliveries SET state=$3,last_code=$4,lease=NULL,lease_until=NULL,next_at=NOW()+($5::int*interval '1 second'),updated_at=NOW() WHERE id=$1 AND lease=$2 RETURNING id`,[job.id,job.lease,state,code,Math.min(1800,30*2**job.attempts)]);
-    if(result.rowCount){await c.query(`UPDATE ${n}.attempts SET code=$3,finished_at=NOW() WHERE delivery_id=$1 AND attempt=$2`,[job.id,job.attempts,code]);
-     // A subscription the push service says is gone is removed; for a guest browser that ends its news, with evidence.
+    // A delivery cancelled while this send was in flight is never revived; it is recorded as accepted only if the push
+    // service had already taken it (the truth). The try itself is always recorded.
+    const result=await c.query(`UPDATE ${n}.deliveries SET state=$3,last_code=$4,lease=NULL,lease_until=NULL,next_at=NOW()+($5::int*interval '1 second'),updated_at=NOW()
+     WHERE id=$1 AND lease=$2 AND (state IN ('queued','retry') OR $3='provider_accepted') RETURNING id`,[job.id,job.lease,state,code,Math.min(1800,30*2**job.attempts)]);
+    await c.query(`UPDATE ${n}.attempts SET code=$3,finished_at=NOW() WHERE delivery_id=$1 AND attempt=$2 AND finished_at IS NULL`,[job.id,job.attempts,code]);
+    if(!result.rowCount)await c.query(`UPDATE ${n}.deliveries SET lease=NULL,lease_until=NULL WHERE id=$1 AND lease=$2`,[job.id,job.lease]);
+    {
+     // A subscription the push service says is gone is removed (even if this delivery was cancelled meanwhile); for a
+     // guest browser that ends its news, with evidence. Both statements are idempotent.
      if(state==='invalid'&&job.guest_device_id)await c.query(`WITH gone AS (DELETE FROM ${n}.guest_devices WHERE id=$1 AND binding_version=$2 RETURNING id)
       INSERT INTO ${n}.consents(guest_device_id,purpose,granted,source) SELECT id,'marketing',FALSE,'guest_endpoint_expired' FROM gone`,[job.guest_device_id,job.binding_version]);
      else if(state==='invalid'&&job.device_id)await c.query(`DELETE FROM ${n}.devices WHERE id=$1 AND binding_version=$2`,[job.device_id,job.binding_version]);}

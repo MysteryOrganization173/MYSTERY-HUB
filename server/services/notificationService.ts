@@ -12,21 +12,23 @@ export const requireUuid=(id:unknown)=>{if(typeof id!=='string'||!/^[0-9a-f]{8}-
 export const exact=(input:any,keys:string[])=>{if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!keys.includes(k)))throw new FinanceError('Unexpected notification field.');};
 function db(){const pool=getPool();if(!pool)throw new FinanceError('Durable notifications require PostgreSQL.',503);return pool;}
 export async function notificationTransaction<T>(work:(client:PoolClient)=>Promise<T>):Promise<T>{const c=await db().connect();try{await c.query('BEGIN');const result=await work(c);await c.query('COMMIT');return result;}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}
-async function audience(c:PoolClient,userId?:string){return (await c.query(`SELECT d.id FROM ${NOTIFICATIONS}.devices d JOIN sessions s ON s.id=d.session_id AND s.user_id=d.user_id
+/** Customers' devices that may receive announcements now; `only` re-checks just the devices someone reviewed. */
+async function audience(c:PoolClient,userId?:string,only?:string[]){return (await c.query(`SELECT d.id FROM ${NOTIFICATIONS}.devices d JOIN sessions s ON s.id=d.session_id AND s.user_id=d.user_id
  JOIN users u ON u.id=d.user_id JOIN ${NOTIFICATIONS}.preferences p ON p.user_id=d.user_id
- WHERE s.expires_at>NOW() AND u.status='active' AND u.role='customer' AND COALESCE(u.must_change_password,FALSE)=FALSE AND p.marketing=TRUE AND ($1::text IS NULL OR d.user_id=$1) ORDER BY d.id LIMIT 1001`,[userId||null])).rows.map(r=>r.id as string);}
+ WHERE s.expires_at>NOW() AND u.status='active' AND u.role='customer' AND COALESCE(u.must_change_password,FALSE)=FALSE AND p.marketing=TRUE AND ($1::text IS NULL OR d.user_id=$1)
+ AND ($2::uuid[] IS NULL OR d.id=ANY($2::uuid[])) ORDER BY d.id LIMIT 1001`,[userId||null,only??null])).rows.map(r=>r.id as string);}
 /**
  * Guest browsers that chose news: unexpired, and not this same browser's live account registration (a browser that
  * signed in gets its account notifications instead, never both).
  */
-async function guestAudience(c:PoolClient){return (await c.query(`SELECT g.id FROM ${NOTIFICATIONS}.guest_devices g WHERE g.expires_at>NOW()
- AND NOT EXISTS(SELECT 1 FROM ${NOTIFICATIONS}.devices d JOIN sessions s ON s.id=d.session_id WHERE d.endpoint_hash=g.endpoint_hash AND s.expires_at>NOW()) ORDER BY g.id LIMIT 1001`)).rows.map(r=>r.id as string);}
+async function guestAudience(c:PoolClient,only?:string[]){return (await c.query(`SELECT g.id FROM ${NOTIFICATIONS}.guest_devices g WHERE g.expires_at>NOW() AND ($1::uuid[] IS NULL OR g.id=ANY($1::uuid[]))
+ AND NOT EXISTS(SELECT 1 FROM ${NOTIFICATIONS}.devices d JOIN sessions s ON s.id=d.session_id WHERE d.endpoint_hash=g.endpoint_hash AND s.expires_at>NOW()) ORDER BY g.id LIMIT 1001`,[only??null])).rows.map(r=>r.id as string);}
 const AUDIENCE_KINDS:NotificationAudienceKind[]=['members','guests','everyone'];
 const HISTORY_KINDS:NotificationHistoryKind[]=['announcement','test','order'];
 const DELIVERY_STATES=['queued','retry','provider_accepted','failed','invalid','skipped'];
 /** Who an announcement may reach, from consent only: customers who chose news and offers, guest browsers that did, or both. */
-async function audienceFor(c:PoolClient,kind:NotificationAudienceKind,userId?:string|null){
- return {members:kind==='guests'?[]:await audience(c,userId||undefined),guests:kind==='members'?[]:await guestAudience(c)};
+async function audienceFor(c:PoolClient,kind:NotificationAudienceKind,userId?:string|null,only?:{members:string[];guests:string[]}){
+ return {members:kind==='guests'?[]:await audience(c,userId||undefined,only?.members),guests:kind==='members'?[]:await guestAudience(c,only?.guests)};
 }
 const audienceHash=(kind:NotificationAudienceKind,destination:string|null,ids:{members:string[];guests:string[]})=>digest(JSON.stringify([kind,destination,ids.members,ids.guests]));
 /**
@@ -35,9 +37,11 @@ const audienceHash=(kind:NotificationAudienceKind,destination:string|null,ids:{m
  * version) is a new announcement.
  */
 async function withoutRecentRecipients(c:PoolClient,ids:{members:string[];guests:string[]},templateId:string,version:number){
- // "Received" means accepted by the push service or still on its way; a cancelled or skipped send does not count.
- const recent=`e.template_id=$2 AND (e.template_snapshot->>'version')::int=$3 AND NOT e.operator_test AND e.created_at>NOW()-interval '30 minutes'
-  AND EXISTS(SELECT 1 FROM ${NOTIFICATIONS}.deliveries q WHERE q.event_id=e.id AND q.state IN ('queued','retry','provider_accepted'))`;
+ // "Received" means accepted by the push service in the last 30 minutes, or still on its way (queued or retrying, and
+ // fresh enough to be sent). Judged by the delivery, not by when the announcement was queued; a cancelled or skipped
+ // send does not count.
+ const recent=`e.template_id=$2 AND (e.template_snapshot->>'version')::int=$3 AND NOT e.operator_test AND e.created_at>NOW()-interval '24 hours'
+  AND EXISTS(SELECT 1 FROM ${NOTIFICATIONS}.deliveries q WHERE q.event_id=e.id AND (q.state IN ('queued','retry') OR q.state='provider_accepted' AND q.updated_at>NOW()-interval '30 minutes'))`;
  const members=ids.members.length?(await c.query(`SELECT d.id FROM ${NOTIFICATIONS}.devices d WHERE d.id=ANY($1::uuid[]) AND NOT EXISTS(SELECT 1 FROM ${NOTIFICATIONS}.events e WHERE e.user_id=d.user_id AND ${recent}) ORDER BY d.id`,[ids.members,templateId,version])).rows.map(r=>r.id as string):[];
  const guests=ids.guests.length?(await c.query(`SELECT g.id FROM ${NOTIFICATIONS}.guest_devices g WHERE g.id=ANY($1::uuid[]) AND NOT EXISTS(SELECT 1 FROM ${NOTIFICATIONS}.events e WHERE e.guest_device_id=g.id AND ${recent}) ORDER BY g.id`,[ids.guests,templateId,version])).rows.map(r=>r.id as string):[];
  return {members,guests};
@@ -210,8 +214,11 @@ export class NotificationService {
    ||!AUDIENCE_KINDS.includes(kind)||!ANNOUNCEMENT_DESTINATIONS.includes(destination))throw new FinanceError('Choose a valid template, audience, page and optional customer.');
   if(kind!=='members'&&!this.config().guests)throw new FinanceError('Guest news is off, so only customers with accounts can receive announcements.',409);
   return notificationTransaction(async c=>{const t=(await c.query(`SELECT * FROM ${NOTIFICATIONS}.templates WHERE id=$1`,[input.templateId])).rows[0];if(!t||t.category!=='marketing'||!t.enabled)throw new FinanceError('Choose an enabled marketing template.',409);
-   const all=await audienceFor(c,kind,input.userId),ids=await withoutRecentRecipients(c,all,t.id,t.version);
-   if(ids.members.length+ids.guests.length>1000)throw new FinanceError('Audience exceeds this release’s safe campaign limit. Select a customer instead.',409);
+   // The limit applies to everyone who qualifies, before anyone is left out, so a list cut at the limit is never
+   // mistaken for the whole audience.
+   const all=await audienceFor(c,kind,input.userId);
+   if(all.members.length+all.guests.length>1000)throw new FinanceError('Audience exceeds this release’s safe campaign limit. Select a customer instead.',409);
+   const ids=await withoutRecentRecipients(c,all,t.id,t.version);
    const alreadyReceived=all.members.length+all.guests.length-ids.members.length-ids.guests.length;
    const previewId=randomUUID();await c.query(`INSERT INTO ${NOTIFICATIONS}.audiences(id,actor_id,template_id,template_version,user_filter,device_ids,guest_device_ids,audience_kind,destination,audience_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
     [previewId,actor,t.id,t.version,input.userId||null,ids.members,ids.guests,kind,destination,audienceHash(kind,destination,ids)]);
@@ -233,7 +240,8 @@ export class NotificationService {
    await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['notification-campaigns']);
    // The reviewed recipients who still qualify now: a withdrawal since the preview is respected, nobody new is added,
    // and anyone who received this announcement in the last 30 minutes (from any audience or page) is left out.
-   const now=await audienceFor(c,kind,a.user_filter),reviewed={members:new Set<string>(a.device_ids||[]),guests:new Set<string>(a.guest_device_ids||[])};
+   const reviewed={members:new Set<string>(a.device_ids||[]),guests:new Set<string>(a.guest_device_ids||[])};
+   const now=await audienceFor(c,kind,a.user_filter,{members:[...reviewed.members],guests:[...reviewed.guests]});
    const qualifying={members:now.members.filter(id=>reviewed.members.has(id)),guests:now.guests.filter(id=>reviewed.guests.has(id))};
    const ids=await withoutRecentRecipients(c,qualifying,t.id,t.version),total=ids.members.length+ids.guests.length;
    if(total===0)throw new FinanceError(qualifying.members.length+qualifying.guests.length?'Everyone in this audience already received this announcement in the last 30 minutes. It was not sent again.':'Audience changed or is empty. Preview again.',409);
@@ -326,24 +334,31 @@ export class NotificationService {
  static async history(input:{kind?:unknown;state?:unknown;offset?:number;actor?:string}){const n=NOTIFICATIONS,kind=(input.kind??'announcement') as NotificationHistoryKind,state=input.state??null,offset=input.offset??0;
   if(!HISTORY_KINDS.includes(kind)||state!==null&&!DELIVERY_STATES.includes(state as string))throw new FinanceError('Choose a valid history filter.');
   const states=(where:string)=>`(SELECT COALESCE(jsonb_object_agg(x.state,x.n),'{}'::jsonb) FROM (SELECT d.state,COUNT(*)::int n FROM ${n}.deliveries d JOIN ${n}.events e ON e.id=d.event_id WHERE ${where} GROUP BY d.state) x)`;
-  const has=(where:string)=>`($1::text IS NULL OR EXISTS(SELECT 1 FROM ${n}.deliveries d JOIN ${n}.events e ON e.id=d.event_id WHERE ${where} AND d.state=$1))`;
+  // The result filter is added only when one is chosen, as a correlated EXISTS on the deliveries (state,event_id)
+  // index; an unfiltered page has no filter at all. Parameters are numbered as they are used.
+  const build=(make:(param:(value:unknown)=>string)=>string)=>{const values:unknown[]=[];const sql=make(value=>{values.push(value);return `$${values.length}`;});return {sql,values};};
+  const filter=(param:(value:unknown)=>string,where:string)=>state===null?'':` AND EXISTS(SELECT 1 FROM ${n}.deliveries d JOIN ${n}.events e ON e.id=d.event_id WHERE ${where} AND d.state=${param(state)})`;
+  const orderFilter=(param:(value:unknown)=>string)=>state===null?'':` AND EXISTS(SELECT 1 FROM ${n}.deliveries d WHERE d.event_id=o.id AND d.state=${param(state)})`;
   // Totals stop counting at 10,000: enough for paging, without scanning everything on a busy site.
   const capped=(sql:string)=>`SELECT COUNT(*)::int AS total FROM (${sql} LIMIT 10000) x`;
+  // An order update is "too old" when it was saved more than 24 hours before sending could expand it: still waiting
+  // and older than 24 hours, or expanded more than 24 hours after it was saved (it then gets no deliveries by design).
+  const stale=`(o.expanded_at IS NULL AND o.created_at<=NOW()-interval '24 hours' OR o.expanded_at IS NOT NULL AND o.expanded_at-o.created_at>interval '24 hours')`;
   const query=kind==='announcement'
-   ?{rows:`SELECT k.id,k.created_at,k.actor_id,k.recipient_count AS targeted,p.audience_kind,p.user_filter IS NOT NULL AS single_customer,COALESCE(p.destination,'/') AS destination,
+   ?{rows:build(param=>`SELECT k.id,k.created_at,k.actor_id,k.recipient_count AS targeted,p.audience_kind,p.user_filter IS NOT NULL AS single_customer,COALESCE(p.destination,'/') AS destination,
       (SELECT e.template_snapshot FROM ${n}.events e WHERE e.campaign_id=k.id ORDER BY e.created_at,e.id LIMIT 1) AS snapshot,${states('e.campaign_id=k.id')} AS states,FALSE AS waiting
-      FROM ${n}.campaigns k JOIN ${n}.audiences p ON p.id=k.preview_id WHERE ${has('e.campaign_id=k.id')} ORDER BY k.created_at DESC,k.id DESC LIMIT 25 OFFSET $2`,
-     total:capped(`SELECT 1 FROM ${n}.campaigns k WHERE ${has('e.campaign_id=k.id')}`)}
+      FROM ${n}.campaigns k JOIN ${n}.audiences p ON p.id=k.preview_id WHERE TRUE${filter(param,'e.campaign_id=k.id')} ORDER BY k.created_at DESC,k.id DESC LIMIT 25 OFFSET ${param(offset)}`),
+     total:build(param=>capped(`SELECT 1 FROM ${n}.campaigns k WHERE TRUE${filter(param,'e.campaign_id=k.id')}`))}
    :kind==='test'
-   ?{rows:`SELECT o.id,o.created_at,o.user_id AS actor_id,o.user_id=$3::text AS mine,o.template_snapshot AS snapshot,o.label,o.destination,o.opened_at,(SELECT COUNT(*)::int FROM ${n}.deliveries d WHERE d.event_id=o.id) AS targeted,
-      ${states('e.id=o.id')} AS states,FALSE AS waiting FROM ${n}.events o WHERE o.operator_test AND ${has('e.id=o.id')} ORDER BY o.created_at DESC,o.id DESC LIMIT 25 OFFSET $2`,
-     total:capped(`SELECT 1 FROM ${n}.events o WHERE o.operator_test AND ${has('e.id=o.id')}`)}
-   // Automatic order updates (every one carries its order). Filtering by result starts from the deliveries index.
-   :{rows:`SELECT o.id,o.created_at,o.order_id,o.template_snapshot AS snapshot,o.label,(SELECT COUNT(*)::int FROM ${n}.deliveries d WHERE d.event_id=o.id) AS targeted,
-      ${states('e.id=o.id')} AS states,o.expanded_at IS NULL AND o.created_at>NOW()-interval '24 hours' AS waiting,o.expanded_at IS NULL AND o.created_at<=NOW()-interval '24 hours' AS stale FROM ${n}.events o
-      WHERE o.order_id IS NOT NULL AND ($1::text IS NULL OR o.id IN (SELECT event_id FROM ${n}.deliveries WHERE state=$1)) ORDER BY o.created_at DESC,o.id DESC LIMIT 25 OFFSET $2`,
-     total:capped(`SELECT 1 FROM ${n}.events o WHERE o.order_id IS NOT NULL AND ($1::text IS NULL OR o.id IN (SELECT event_id FROM ${n}.deliveries WHERE state=$1))`)};
-  const [rows,total]=await Promise.all([db().query(query.rows,kind==='test'?[state,offset,input.actor||null]:[state,offset]),db().query(query.total,[state])]);
+   ?{rows:build(param=>`SELECT o.id,o.created_at,o.user_id AS actor_id,o.user_id=${param(input.actor||null)}::text AS mine,o.template_snapshot AS snapshot,o.label,o.destination,o.opened_at,(SELECT COUNT(*)::int FROM ${n}.deliveries d WHERE d.event_id=o.id) AS targeted,
+      ${states('e.id=o.id')} AS states,FALSE AS waiting FROM ${n}.events o WHERE o.operator_test${filter(param,'e.id=o.id')} ORDER BY o.created_at DESC,o.id DESC LIMIT 25 OFFSET ${param(offset)}`),
+     total:build(param=>capped(`SELECT 1 FROM ${n}.events o WHERE o.operator_test${filter(param,'e.id=o.id')}`))}
+   // Automatic order updates (every one carries its order), newest first on the order-events index.
+   :{rows:build(param=>`SELECT o.id,o.created_at,o.order_id,o.template_snapshot AS snapshot,o.label,(SELECT COUNT(*)::int FROM ${n}.deliveries d WHERE d.event_id=o.id) AS targeted,
+      ${states('e.id=o.id')} AS states,o.expanded_at IS NULL AND o.created_at>NOW()-interval '24 hours' AS waiting,${stale} AS stale FROM ${n}.events o
+      WHERE o.order_id IS NOT NULL${orderFilter(param)} ORDER BY o.created_at DESC,o.id DESC LIMIT 25 OFFSET ${param(offset)}`),
+     total:build(param=>capped(`SELECT 1 FROM ${n}.events o WHERE o.order_id IS NOT NULL${orderFilter(param)}`))};
+  const [rows,total]=await Promise.all([db().query(query.rows.sql,query.rows.values),db().query(query.total.sql,query.total.values)]);
   const text=(r:any)=>{try{return r.snapshot?.title?renderTemplate(r.snapshot,r.label||'Service announcement'):{title:'Announcement',body:''};}catch{return {title:r.snapshot?.title||'Announcement',body:r.snapshot?.body||''};}};
   return {success:true,total:total.rows[0].total as number,items:rows.rows.map(r=>({id:r.id,kind,createdAt:r.created_at,actorId:r.actor_id??null,...text(r),
    audience:kind==='announcement'?r.audience_kind:kind==='test'?'self':'account',singleCustomer:!!r.single_customer,
@@ -369,9 +384,12 @@ export class NotificationService {
   */
  static async cancelQueued(actor:string,input:any){exact(input,['campaignId','confirmed','reason']);if(input.campaignId!==undefined)requireUuid(input.campaignId);const reason=safeReason(input);
   return notificationTransaction(async c=>{const n=NOTIFICATIONS,campaign=input.campaignId??null;
-   const cancelled=(await c.query(`UPDATE ${n}.deliveries q SET state='skipped',last_code='cancelled',updated_at=NOW() FROM ${n}.events e
-    WHERE e.id=q.event_id AND e.campaign_id IS NOT NULL AND ($1::uuid IS NULL OR e.campaign_id=$1) AND q.state IN ('queued','retry') AND (q.lease_until IS NULL OR q.lease_until<NOW())`,[campaign])).rowCount||0;
-   const inFlight=Number((await c.query(`SELECT COUNT(*) FROM ${n}.deliveries q JOIN ${n}.events e ON e.id=q.event_id WHERE e.campaign_id IS NOT NULL AND ($1::uuid IS NULL OR e.campaign_id=$1) AND q.state IN ('queued','retry')`,[campaign])).rows[0].count);
+   // Everything still queued is cancelled, including deliveries a sender holds right now: the worker never revives a
+   // cancelled delivery, and records it as accepted only if the push service had already taken it.
+   const rows=(await c.query(`UPDATE ${n}.deliveries q SET state='skipped',last_code='cancelled',updated_at=NOW() FROM ${n}.events e
+    WHERE e.id=q.event_id AND e.campaign_id IS NOT NULL AND ($1::uuid IS NULL OR e.campaign_id=$1) AND q.state IN ('queued','retry')
+    RETURNING (q.lease_until IS NOT NULL AND q.lease_until>NOW()) AS busy`,[campaign])).rows;
+   const cancelled=rows.length,inFlight=rows.filter(r=>r.busy).length;
    await AdminAuditStore.record({adminUserId:actor,action:'notification_announcements_cancelled',entityType:'notification',entityId:campaign??'all_queued',metadata:{cancelled,in_flight:inFlight,reason}},c);
    return {success:true,cancelled,inFlight};
   });

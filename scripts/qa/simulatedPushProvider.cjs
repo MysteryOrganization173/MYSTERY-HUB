@@ -21,6 +21,11 @@ webPush.sendNotification = async (subscription, payload) => {
   if (endpoint.includes('GONE')) throw Object.assign(new Error('simulated: this browser unsubscribed'), { statusCode: 410 });
   return { statusCode: 201, body: '', headers: {} };
 };
-// A marker the review script checks before it starts: the server under review really has the simulated provider.
-if (process.env.QA_PUSH_LOG) fs.writeFileSync(`${process.env.QA_PUSH_LOG}.active`, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }));
+// A marker the review script checks before it starts: which live process (the server) has the simulated provider.
+// Only the process running server.ts writes it, and it removes its own marker when it exits.
+const marker = process.env.QA_PUSH_LOG ? `${process.env.QA_PUSH_LOG}.active` : null;
+if (marker && process.argv.some(arg => /server\.ts$/.test(arg))) {
+  fs.writeFileSync(marker, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }));
+  process.on('exit', () => { try { if (JSON.parse(fs.readFileSync(marker, 'utf8')).pid === process.pid) fs.unlinkSync(marker); } catch {} });
+}
 console.warn('[QA] Simulated push provider active: no notification leaves this machine.');

@@ -95,7 +95,7 @@ If any step fails, leave sending paused. Record the step, the phone model and th
   recorded only for operator tests. Customer notifications are never tracked as opened.
 - **Not sent / Cancelled**: nothing went to the device. The reason is shown in words, for example cancelled by an
   operator, signed out, or a changed choice.
-- **No device registered**: an order update for someone with no registered device.
+- **No eligible device**: an order update that had nobody to go to: no signed-in device, or order updates turned off.
 - **Not sent: older than 24 hours**: saved while paused and too old when sending resumed.
 - **Duplicates:** nobody receives the same announcement twice within 30 minutes, whichever audience, page or review
   it comes from. A corrected template (a new version) is a new announcement.
@@ -110,7 +110,7 @@ If any step fails, leave sending paused. Record the step, the phone model and th
 ## Evidence (local, not production)
 
 - Native PostgreSQL:
-  - Admin Notification Center 11/11;
+  - Admin Notification Center 12/12;
   - notifications lifecycle 19/19;
   - consent and guests 14/14.
 - Browser review `scripts/reviewAdminNotifications.cjs`, 52/52:

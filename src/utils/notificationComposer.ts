@@ -97,7 +97,7 @@ export const SEND_STATUS_LABELS: Record<NotificationSendStatus, { label: string;
   completed_with_errors: { label: 'Finished with failures', tone: 'warning' },
   failed: { label: 'Failed', tone: 'danger' },
   not_sent: { label: 'Not sent', tone: 'neutral' },
-  no_device: { label: 'No device registered', tone: 'neutral' },
+  no_device: { label: 'No eligible device', tone: 'neutral' },
   too_old: { label: 'Not sent: older than 24 hours', tone: 'neutral' },
 };
 

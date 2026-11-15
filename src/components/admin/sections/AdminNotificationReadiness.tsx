@@ -79,7 +79,7 @@ export function AdminNotificationReadiness({ token, client, overview, onChanged 
       setBusy(false);
       if (!res.ok) return setError(res.message);
       setConfirm(null); onChanged();
-      setNotice(`${plural(res.cancelled, 'queued announcement delivery', 'queued announcement deliveries')} cancelled.${res.inFlight ? ` ${plural(res.inFlight, 'was', 'were')} already being handed to the push service and could not be stopped.` : ''}`);
+      setNotice(`${plural(res.cancelled, 'queued announcement delivery', 'queued announcement deliveries')} cancelled.${res.inFlight ? ` ${res.inFlight.toLocaleString()} ${res.inFlight === 1 ? 'was' : 'were'} being handed to the push service at that moment and may still arrive.` : ''}`);
       return;
     }
     if (!client.setPaused) return setBusy(false);

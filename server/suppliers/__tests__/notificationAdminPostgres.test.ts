@@ -241,22 +241,56 @@ test('PostgreSQL Admin Notification Center: audiences, guests, own-device tests,
       assert.deepEqual(held.map((r: any) => r.state).sort(), ['provider_accepted', 'queued', 'queued']);
       const health = await service.health('admin');
       assert.equal(health.queuedAnnouncements, 2); assert.equal(health.queuedCampaigns, 1);
-      // Cancel: a delivery being handed to the push service right now cannot be recalled; the rest are cancelled.
+      // Cancel: everything still queued is cancelled, including a delivery a sender holds right now (counted as
+      // possibly on its way); nothing revives a cancelled delivery afterwards.
       await pool!.query(`UPDATE ${n}.deliveries SET lease=gen_random_uuid(),lease_until=NOW()+interval '1 minute' WHERE id=(SELECT d.id FROM ${n}.deliveries d JOIN ${n}.events e ON e.id=d.event_id WHERE e.campaign_id=$1 AND d.state='queued' ORDER BY d.id LIMIT 1)`, [result.campaignId]);
       await assert.rejects(() => service.cancelQueued('admin', {campaignId: result.campaignId, confirmed: true, reason: 'x'}), /safe reason/);
       await assert.rejects(() => service.cancelQueued('admin', {campaignId: result.campaignId, reason: 'Wrong page in the announcement'}), /safe reason/, 'needs explicit confirmation');
-      assert.deepEqual(await service.cancelQueued('admin', {campaignId: result.campaignId, confirmed: true, reason: 'Wrong page in the announcement'}), {success: true, cancelled: 1, inFlight: 1});
+      assert.deepEqual(await service.cancelQueued('admin', {campaignId: result.campaignId, confirmed: true, reason: 'Wrong page in the announcement'}), {success: true, cancelled: 2, inFlight: 1});
       const audit = await q(`SELECT metadata_safe_json FROM admin_audit_log WHERE action='notification_announcements_cancelled' AND entity_id=$1`, [result.campaignId]);
-      assert.equal(JSON.parse(audit[0].metadata_safe_json).cancelled, 1);
+      assert.equal(JSON.parse(audit[0].metadata_safe_json).cancelled, 2);
       const detail = await service.historyDetail('announcement', result.campaignId);
-      assert.deepEqual(detail.problems, [{code: 'cancelled', count: 1}]); assert.equal(detail.total, 3); assert.equal(detail.totals.skipped, 1);
-      // The simulated in-flight send never finished: its lease lapses and it goes out on resume; the cancelled one never does.
+      assert.deepEqual(detail.problems, [{code: 'cancelled', count: 2}]); assert.equal(detail.total, 3); assert.equal(detail.totals.skipped, 2);
       await pool!.query(`UPDATE ${n}.deliveries SET lease=NULL,lease_until=NULL WHERE lease_until>NOW()`);
       await setPaused(false); payloads.length = 0; await processNotificationBatch(capture, 25);
-      assert.equal(payloads.length, 1, 'the held delivery went out on resume; the cancelled one did not');
+      assert.equal(payloads.length, 0, 'nothing cancelled goes out on resume');
+      // A send in flight when the cancel lands: a failure never revives it; an acceptance is recorded as the truth.
+      for (const [answer, expected] of [['unavailable', 'skipped'], ['accepted', 'provider_accepted']] as const) {
+        const again = await service.previewAudience('admin', {templateId: 'special_offer', userId: 'buyer1'});
+        const queued = await service.campaign('admin', {previewId: again.previewId, requestId: key(), confirmed: true});
+        await processNotificationBatch(async () => {
+          await service.cancelQueued('admin', {campaignId: queued.campaignId, confirmed: true, reason: 'Cancelled while sending'});
+          if (answer === 'unavailable') throw Object.assign(new Error('busy'), {statusCode: 503});
+        }, 1);
+        const rows = await q(`SELECT d.state FROM ${n}.deliveries d JOIN ${n}.events e ON e.id=d.event_id WHERE e.campaign_id=$1 ORDER BY d.updated_at DESC`, [queued.campaignId]);
+        assert.ok(rows.some((r: any) => r.state === expected), `${answer}: ${JSON.stringify(rows)}`);
+        assert.ok(!rows.some((r: any) => r.state === 'retry'), 'a cancelled delivery is never put back for another try');
+        await pool!.query(`UPDATE ${n}.deliveries SET state='skipped',last_code='cancelled' WHERE state IN ('queued','retry')`);
+      }
       await setPaused(true);
       // Cancelling everything that is queued is also possible (nothing left here).
       assert.deepEqual(await service.cancelQueued('admin', {confirmed: true, reason: 'Nothing should be waiting now'}), {success: true, cancelled: 0, inFlight: 0});
+    });
+
+    await t.test('the 1,000-device limit applies before anyone is left out, and the duplicate window follows the delivery', async () => {
+      await pool!.query("INSERT INTO users(id,name,password_hash,role) VALUES('bulk','Synthetic bulk','fixture','customer')");
+      await pool!.query("INSERT INTO sessions(id,user_id,token_hash,expires_at) VALUES('session-bulk','bulk',$1,NOW()+interval '1 day')", [hashSessionToken('d-bulk-session')]);
+      await pool!.query(`INSERT INTO ${n}.preferences(user_id,transactional,marketing) VALUES('bulk',TRUE,TRUE)`);
+      await pool!.query(`INSERT INTO ${n}.devices(id,user_id,session_id,endpoint_hash,encrypted_subscription) SELECT gen_random_uuid(),'bulk','session-bulk',md5('bulk'||i),'never-sent' FROM generate_series(1,1001) i`);
+      // buyer1 already received "maintenance" and is left out, yet everyone who qualifies still exceeds the limit:
+      // refused, never cut short to the first 1,000.
+      await assert.rejects(() => service.previewAudience('admin', {templateId: 'maintenance', audience: 'members'}), /safe campaign limit/);
+      await pool!.query(`DELETE FROM ${n}.devices WHERE user_id='bulk'`);
+      // Queued (or held by a pause) counts as received however long ago it was queued; an acceptance counts for 30 minutes.
+      await service.saveTemplate('admin', undefined, {id: 'd_window', title: 'Window check', body: 'Open {{appName}} for the window check.', category: 'marketing', enabled: true});
+      const preview = await service.previewAudience('admin', {templateId: 'd_window', userId: 'buyer1'});
+      await setPaused(false); const queued = await service.campaign('admin', {previewId: preview.previewId, requestId: key(), confirmed: true}); await setPaused(true);
+      await pool!.query(`UPDATE ${n}.events SET created_at=NOW()-interval '31 minutes' WHERE campaign_id=$1`, [queued.campaignId]);
+      assert.equal((await service.previewAudience('admin', {templateId: 'd_window', userId: 'buyer1'})).eligibleDevices, 0, 'still on its way: left out');
+      await pool!.query(`UPDATE ${n}.deliveries d SET state='provider_accepted',updated_at=NOW()-interval '31 minutes' FROM ${n}.events e WHERE e.id=d.event_id AND e.campaign_id=$1`, [queued.campaignId]);
+      assert.equal((await service.previewAudience('admin', {templateId: 'd_window', userId: 'buyer1'})).eligibleDevices, 2, 'received over 30 minutes ago: may receive it again');
+      await pool!.query(`UPDATE ${n}.deliveries d SET updated_at=NOW()-interval '5 minutes' FROM ${n}.events e WHERE e.id=d.event_id AND e.campaign_id=$1`, [queued.campaignId]);
+      assert.equal((await service.previewAudience('admin', {templateId: 'd_window', userId: 'buyer1'})).eligibleDevices, 0, 'received 5 minutes ago: left out');
     });
 
     await t.test('readiness facts separate people, devices and guest browsers, and never include keys', async () => {
@@ -294,8 +328,11 @@ test('PostgreSQL Admin Notification Center: audiences, guests, own-device tests,
       const orders = await service.history({kind: 'order'});
       assert.ok(orders.items.some(i => i.orderId === 'd-order-new' && i.waiting && !i.stale && i.title === 'Payment confirmed'));
       assert.ok(orders.items.some(i => i.orderId === 'd-order-old' && i.stale && !i.waiting));
+      await setPaused(false); await processNotificationBatch(async () => {}, 25); await setPaused(true);
+      const afterResume = await service.history({kind: 'order'});
+      assert.ok(afterResume.items.some(i => i.orderId === 'd-order-old' && i.stale && i.targeted === 0), 'still "older than 24 hours" after resuming, not "no device"');
       assert.ok(orders.items.every(i => i.audience === 'account'));
-      assert.equal((await service.history({kind: 'order', state: 'provider_accepted'})).total, 0, 'filtering starts from the deliveries');
+      assert.ok((await service.history({kind: 'order', state: 'provider_accepted'})).items.every(i => (i.states.provider_accepted ?? 0) > 0), 'the result filter keeps only matching updates');
       await assert.rejects(() => service.history({kind: 'everything'}), /valid history filter/);
       await assert.rejects(() => service.history({kind: 'test', state: 'read'}), /valid history filter/, 'there is no "read" state');
       const detail = await service.historyDetail('announcement', first.id);

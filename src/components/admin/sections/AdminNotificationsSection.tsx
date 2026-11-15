@@ -180,13 +180,14 @@ function SendDetail({ token, client, summary, onClose }: { token: string; client
     setCancelBusy(false);
     if (!res.ok) return setCancelError(res.message);
     setCancelling(false); setAttempt(n => n + 1);
-    setCancelNote(`${res.cancelled.toLocaleString()} cancelled.${res.inFlight ? ` ${res.inFlight.toLocaleString()} already being sent could not be stopped.` : ''}`);
+    setCancelNote(`${res.cancelled.toLocaleString()} cancelled.${res.inFlight ? ` ${res.inFlight.toLocaleString()} ${res.inFlight === 1 ? 'was' : 'were'} being handed to the push service at that moment and may still arrive.` : ''}`);
   };
   useEffect(() => { let active = true; setError(null); client.send(token, summary.id, summary.kind).then(d => { if (active) setDetail(d); }, e => { if (active) setError(e instanceof Error ? e.message : 'Details could not be loaded.'); }); return () => { active = false; }; }, [client, token, summary.id, summary.kind, attempt]);
   const destination = (summary as { destination?: string | null }).destination;
   // The detail's counts cover the whole send and are the latest; the list row is only a starting point.
   const counts = detail?.devices ? detail.counts : summary.counts;
-  const status = detail?.devices ? detail.status : summary.status;
+  // Waiting and too-old are facts about the order update itself, so they win over the device counts.
+  const status = summary.waiting || summary.stale ? summary.status : detail?.devices ? detail.status : summary.status;
   const stillQueued = counts.pending + counts.retrying;
   return (
     <AdminSheet wide title={summary.title || 'Sent message'} subtitle={when(summary.createdAt)} onClose={onClose}

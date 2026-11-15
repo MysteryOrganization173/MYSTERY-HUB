@@ -20,7 +20,15 @@ if (!/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(BASE)) throw new Error('L
 const localTestDatabase = value => { let url; try { url = new URL(value || ''); } catch { return false; } return ['postgres:', 'postgresql:'].includes(url.protocol) && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) && /^\/[a-zA-Z0-9_]+_test$/.test(url.pathname) && [...url.searchParams.keys()].every(key => ['sslmode', 'connect_timeout', 'application_name'].includes(key)); };
 if (!localTestDatabase(process.env.REVIEW_DB)) throw new Error('REVIEW_DB must be a local, disposable *_test database.');
 const LOG = process.env.QA_PUSH_LOG; if (!LOG) throw new Error('QA_PUSH_LOG (the simulated provider log) is required.');
-if (!fs.existsSync(`${LOG}.active`)) throw new Error('The server under review has not loaded the simulated push provider (no marker next to QA_PUSH_LOG). Nothing was done.');
+// The marker must belong to a live server.ts process; a stale marker from an earlier run proves nothing.
+const providerLive = (() => {
+  try {
+    const { pid } = JSON.parse(fs.readFileSync(`${LOG}.active`, 'utf8'));
+    process.kill(pid, 0);
+    return !fs.existsSync(`/proc/${pid}/cmdline`) || /server\.ts/.test(fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8'));
+  } catch { return false; }
+})();
+if (!providerLive) throw new Error('The server under review has not loaded the simulated push provider (no live marker next to QA_PUSH_LOG). Nothing was done.');
 const OUT = process.argv[2] || path.join(process.cwd(), 'tmp-review-34d'); fs.mkdirSync(OUT, { recursive: true });
 const AXE = process.env.AXE_PATH ? fs.readFileSync(process.env.AXE_PATH, 'utf8') : null;
 const db = new pg.Pool({ connectionString: process.env.REVIEW_DB, ssl: false });
@@ -198,7 +206,10 @@ const tail = id => `QA-D-${run}-${id}`.slice(-14);
     await p.goto(`${BASE}/admin#notifications/history`); await p.getByRole('button', { name: 'Announcements' }).waitFor();
     await p.getByText(title).first().waitFor({ timeout: 15000 });
     await p.screenshot({ path: `${OUT}/history-1280.png`, fullPage: true });
-    await p.getByLabel('Filter by result').selectOption('invalid'); await sleep(1500);
+    await p.getByLabel('Filter by result').selectOption('invalid');
+    // Wait for the filtered list itself (the list reloads), so the click below opens the right announcement.
+    await p.getByText('Loading history…').waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+    await p.waitForFunction(t => [...document.querySelectorAll('main li button')].filter(b => b.textContent.includes(t)).length === 1, title, { timeout: 10000 });
     const filtered = await text(p);
     ok('history: the result filter keeps only announcements with an expired browser', filtered.includes(title) && /Expired or invalid/.test(filtered));
     await p.locator('li button').filter({ hasText: title }).first().click();

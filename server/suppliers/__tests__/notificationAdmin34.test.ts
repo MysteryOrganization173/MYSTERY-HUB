@@ -139,4 +139,6 @@ test('history maps the server’s answers without inventing receipts', () => {
   assert.equal(notificationHistoryItem({id: 'i', kind: 'announcement', createdAt: '2026-11-15', title: 't', body: 'b', audience: 'members', targeted: 2, states: {skipped: 2}}).status, 'not_sent');
   for (const code of ['endpoint_expired', 'subscription_invalid', 'provider_rejected', 'retry_exhausted', 'provider_rate_limit', 'provider_unavailable', 'ineligible']) assert.ok(PROBLEM_LABELS[code], code);
   for (const label of Object.values(PROBLEM_LABELS)) assert.doesNotMatch(label, /\b(read|seen|delivered to)\b/i);
+  // A retry after a lost response comes back as "already sent"; the composer must still let the operator test again.
+  assert.match(readFileSync('src/components/admin/sections/AdminNotificationComposer.tsx', 'utf8'), /if \(res\.ok\) testKey\.current = null;/);
 });
