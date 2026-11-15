@@ -1,3 +1,4 @@
+import {SmsPreferences} from './SmsPreferences';
 import React, { useEffect, useRef, useState } from 'react';
 import { Bell, BellOff, BellRing, Loader2, Smartphone } from 'lucide-react';
 import { notificationPermissionState, type NotificationPermissionState } from '../../pwa/notifications';
@@ -107,6 +108,7 @@ export function NotificationSettings({ token, client = httpCustomerNotifications
         </fieldset>
       )}
       {!client.available && <p className="text-xs text-slate-400">When notifications start, you will choose here between order updates and, separately, news and offers.</p>}
+      <SmsPreferences token={token}/>
       {client.available && client.inbox && <RecentNotifications token={token} client={client} onOpen={onOpenNotification} />}
     </section>
   );

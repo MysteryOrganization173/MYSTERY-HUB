@@ -1,3 +1,4 @@
+import {AdminSmsCenter,type SmsAudienceSeed} from './AdminSmsCenter';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Pencil, Plus } from 'lucide-react';
 import {
@@ -21,7 +22,7 @@ const settle = <T,>(promise: Promise<T>) => promise.then(value => value, () => n
  * is the server's. The production client uses the reviewed HTTP contract. Configuration and operational pause
  * are shown separately from template/history availability; neither browser permission nor preview proves delivery.
  */
-export function AdminNotificationsSection({ sessionToken, initialView = '', client = httpAdminNotificationsClient, ai = httpAiDraftingClient, onNavigate }: {
+function PushNotificationSection({ sessionToken, initialView = '', client = httpAdminNotificationsClient, ai = httpAiDraftingClient, onNavigate }: {
   sessionToken: string; initialView?: string; client?: AdminNotificationsClient; ai?: AdminAiDraftingClient; onNavigate?: (view: string) => void;
 }) {
   const [view, setView] = useState<View>(VIEWS.includes(initialView as View) ? initialView as View : 'compose');
@@ -241,4 +242,9 @@ function TemplateEditor({ token, client, template, limits, onClose, onSaved }: {
       </div>
     </AdminSheet>
   );
+}
+
+export function AdminNotificationsSection(props:React.ComponentProps<typeof PushNotificationSection>&{smsAudience?:SmsAudienceSeed|null;onContacts?:()=>void}){
+ const [channel,setChannel]=useState(props.initialView==='sms'?'sms':'push');useEffect(()=>setChannel(props.initialView==='sms'?'sms':'push'),[props.initialView,props.sessionToken]);
+ return <div className="space-y-4"><div className="flex gap-2" role="tablist" aria-label="Communication channel">{(['push','sms'] as const).map(c=><button type="button" role="tab" aria-selected={channel===c} key={c} className="min-h-11 rounded-xl border border-emerald-800 px-4 text-sm text-emerald-200" onClick={()=>{setChannel(c);props.onNavigate?.(c==='sms'?'sms':'compose');}}>{c==='sms'?'SMS Center':'Web Push & In-App'}</button>)}</div>{channel==='sms'?<AdminSmsCenter key={props.sessionToken} token={props.sessionToken} seed={props.smsAudience} onContacts={props.onContacts}/>:<PushNotificationSection {...props}/>}</div>;
 }
