@@ -271,17 +271,20 @@ Activation runbook and the founder's phone checklist: `docs/notifications-activa
   - Opening it from the notification marks it opened. This is recorded for operator tests only; customer notifications are never tracked.
 - **Pause and resume:** both need a reason (audited); resume also needs an explicit approval.
   - **Resume is refused by the server** until an operator has opened a test from its notification in the last 30 days.
-  - The Admin page mirrors this rule for the viewer's own phone.
+  - **The open token:** an HMAC of the event id, keyed from the storage key, sent only inside that encrypted push and carried by the service worker into the tap's link. A link or an id alone records nothing.
+  - **One rule:** any operator's check counts, on the server and in Admin, so a second Admin can resume in an emergency.
+  - **Pause holds what is queued:** the worker re-checks pause before each claim and returns a delivery claimed just before a pause to the queue.
+  - **Queued announcements** are shown in Status and in both dialogs. They can be cancelled (all, or the rest of one announcement), with a reason and an audit entry. A delivery already being handed to the push service cannot be recalled and is counted separately.
 
 ### Audiences, consent first
 - **Customers who chose news and offers:** active customers with a live session and `marketing=true`. Counted as people and devices.
 - **One customer:** the same rule for a single account ID.
 - **Visitors who chose news:** guest browsers with an unexpired registration. Only while `WEB_PUSH_GUEST_NEWS` is on, and never a browser that is also a live account device.
 - **Everyone who chose news:** both groups.
-- **Server-side enforcement:** the preview binds the template version, audience, page and exact recipients (hash) for 10 minutes.
-  - The send re-checks all of it, plus pause and the guest gate.
-  - It refuses the same announcement to the same audience within 30 minutes, even from a second preview.
-  - Campaign creation is serialised.
+- **Server-side enforcement:** the preview binds the template version, audience, page and exact recipients for 10 minutes.
+  - **At send:** the server sends to the reviewed recipients who still qualify. It never adds anyone, respects any withdrawal since the review, and refuses only if nobody is left.
+  - **Duplicates, per recipient:** nobody gets the same announcement (template and version) twice within 30 minutes, whichever audience, page or preview it comes from. Cancelled or skipped sends don't count.
+  - Campaign creation is serialised, so concurrent confirmations cannot both pass.
 
 ### Pages an announcement may open
 - **Fixed list:** `/`, `/data`, `/services`, `/marketplace`, `/earn` (`ANNOUNCEMENT_DESTINATIONS`).
@@ -297,9 +300,11 @@ Activation runbook and the founder's phone checklist: `docs/notifications-activa
 - The worker expands and sends nothing for customers or visitors. Only operator tests move.
 
 ### History
-- **Grouped:** announcements (one row per campaign), tests (with when the operator opened them), and automatic order updates (with "Waiting for resume" while paused).
+- **Grouped:** announcements (one row per campaign), tests, and automatic order updates.
+  - **Tests:** which operator sent them and when they were opened. Announcement tests can't record a tap, and say so.
+  - **Order updates:** "Waiting for resume" while paused, "Not sent: older than 24 hours", and "No device registered".
 - **Filters:** by kind and by any delivery's result.
-- **Detail:** per-device tries with codes and times, problems in plain words, and visitor browsers marked.
+- **Detail:** counts for the whole send, plus the first 200 devices with their tries, codes and times. Problems are in plain words, visitor browsers are marked, and the rest of a queued announcement can be cancelled.
 - **Never shown:** endpoints and people.
 - **Earlier campaigns:** grouped after the upgrade. Their id is recovered from the event key.
 
@@ -327,7 +332,7 @@ Activation runbook and the founder's phone checklist: `docs/notifications-activa
   - audience counts and an unavailable visitor audience;
   - history mapping without invented receipts.
 - **Updated suites:** `notificationCenter` 17/17.
-- **Native PostgreSQL 16, `notificationAdminPostgres` 10/10:**
+- **Native PostgreSQL 16, `notificationAdminPostgres` 11/11:**
   - the schema upgrade and subject check;
   - members, visitors and everyone, people versus devices, approved pages;
   - a planted duplicate browser excluded;
@@ -340,13 +345,28 @@ Activation runbook and the founder's phone checklist: `docs/notifications-activa
   - readiness without key material;
   - grouped history, filters and detail without endpoints;
   - the grouping backfill;
-  - admin-only HTTP.
+  - admin-only HTTP;
+  - after the review: per-recipient duplicates across audiences and pages; a racing second confirmation; cancelled sends not counting;
+  - the open token: a link, a wrong token or another account records nothing; another operator can resume;
+  - only reviewed recipients are sent to; a pause while sending holds the rest;
+  - cancel (in-flight counted, audited); whole-send totals; old order updates marked.
 - **Existing suites:** `notificationsPostgres` 19/19 (one assertion that a Release C edit had put inside a comment is restored); consent 14/14.
-- **Browser `scripts/reviewAdminNotifications.cjs`, 48/48:**
+- **Browser `scripts/reviewAdminNotifications.cjs`, 52/52 (final run on a fresh disposable database):**
   - a local production build with synthetic keys and the simulated push service (`scripts/qa/simulatedPushProvider.cjs`), which refuses to load outside a local `*_test` database;
   - the status checklist; the test on the operator's own phone while paused, with a simulated tap;
   - the resume gate and confirmation; compose, page, preview, test-first, confirm and send to consenting customers only;
   - duplicate protection; visitor browsers and a gone browser; history filters and detail;
   - templates; layouts at 320–1440 and a 390×640 phone with the sheet open;
   - axe clean at 1280 and 390 (serious and critical);
-  - pause with rate-limit recovery.
+  - pause with rate-limit recovery;
+  - after the review: the open token (a plain link does not count); duplicates stopped at review; a wider audience or another page leaves out earlier recipients.
+- **Independent review:** 10 findings (3 medium, 7 low) and 3 notes, all addressed.
+  - Queued announcements are visible, held by pause and can be cancelled.
+  - Duplicates are prevented per recipient.
+  - The phone check is tied to a token in the push, with one rule.
+  - The simulated provider guard is strict.
+  - Detail totals cover the whole send, with honest statuses and labels.
+  - Order-history filtering uses an index.
+  - Sends go to the reviewed recipients who still qualify.
+  - There is a new send key per review, and the composer test can be repeated.
+  - The legacy route has no customer ids, and the redundant index was replaced.

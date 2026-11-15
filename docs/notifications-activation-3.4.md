@@ -25,12 +25,14 @@ resume.
 2. **Paused.** The default, and production's state today. Pause stops every customer and visitor notification. The
    operator's own test still works, so a phone can be checked first.
 3. **A phone check (enforced).** Admin › Notifications › Status › *Send a test to my devices*, then tap the
-   notification on the phone. Status changes to *Checked on your phone*. The server refuses to resume until an
-   operator has opened a test from its notification within the last 30 days.
+   notification on the phone. Status changes to *Checked on your phone*.
+   - **What counts:** the test push carries a one-off token, and only opening it from the notification records the check. A copied link does not.
+   - **The rule:** the server refuses to resume until an operator has opened a test this way within the last 30 days. Any operator's check counts, so a second Admin can resume in an emergency.
 4. **Controlled acceptance.** The checklist below, on a phone the founder controls.
 5. **Founder approval to resume.** Status › *Resume sending*: a reason for the audit log, plus an explicit approval
-   tick. The dialog says how many order updates from the last 24 hours are waiting and will be sent. Anything older is
-   never sent.
+   tick. The dialog says what will go out:
+   - order updates from the last 24 hours that are waiting (anything older is never sent);
+   - any announcement deliveries still queued. Cancel those first in Status if they should not go out.
 6. **First announcement.** Write it and save it as a template. Choose the page it opens and *Send to my devices
    first*. Then send to *One customer who chose news and offers* (a customer account the founder controls) before
    any wider audience.
@@ -73,7 +75,9 @@ the Home Screen and open it from there, because Safari tabs cannot receive web n
     devices* now says no phone is registered, unless another of the founder's devices still is.
 
 **F. Pause and error recovery**
-14. While paused, tests still arrive and customers receive nothing.
+14. While paused, tests still arrive and customers receive nothing. Anything queued is held, not lost. To stop
+    queued announcements for good, use *Cancel queued announcements* in Status, or *Cancel the rest* in an
+    announcement's History detail. Either needs a reason and is audited.
 15. History shows each send. A device whose subscription is gone shows *Expired or invalid*, with *The phone or
     browser is no longer subscribed, so it was removed.* A temporary push-service problem shows *Retrying*.
 
@@ -89,21 +93,27 @@ If any step fails, leave sending paused. Record the step, the phone model and th
   anyone saw it.
 - **Checked on your phone**: the operator opened their own test from its notification. This is real tap evidence,
   recorded only for operator tests. Customer notifications are never tracked as opened.
+- **Not sent / Cancelled**: nothing went to the device. The reason is shown in words, for example cancelled by an
+  operator, signed out, or a changed choice.
+- **No device registered**: an order update for someone with no registered device.
+- **Not sent: older than 24 hours**: saved while paused and too old when sending resumed.
+- **Duplicates:** nobody receives the same announcement twice within 30 minutes, whichever audience, page or review
+  it comes from. A corrected template (a new version) is a new announcement.
 - There is no "read" or "delivered to phone" state anywhere in Admin.
 
 ## Rollback
 
-- **Immediate:** Admin › *Pause sending*. All customer and visitor delivery stops; queued items wait.
+- **Immediate:** Admin › *Pause sending*. All customer and visitor delivery stops; anything queued is held, not lost. *Cancel queued announcements* stops queued announcements for good.
 - **Full stop:** set `WEB_PUSH_ENABLED=false` and restart. The background sender stops; registrations are kept.
 - **Visitor news:** unset `WEB_PUSH_GUEST_NEWS`. No new visitor registrations, and no more visitor deliveries.
 
 ## Evidence (local, not production)
 
 - Native PostgreSQL:
-  - Admin Notification Center 10/10;
+  - Admin Notification Center 11/11;
   - notifications lifecycle 19/19;
   - consent and guests 14/14.
-- Browser review `scripts/reviewAdminNotifications.cjs`, 48/48:
+- Browser review `scripts/reviewAdminNotifications.cjs`, 52/52:
   - a local production build with synthetic keys and the simulated push service (`scripts/qa/simulatedPushProvider.cjs`);
   - nothing leaves the machine;
   - the phone tap is simulated by the signed-in lookup a real tap performs.

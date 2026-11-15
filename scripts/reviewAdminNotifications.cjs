@@ -169,11 +169,17 @@ const tail = id => `QA-D-${run}-${id}`.slice(-14);
     await p.getByLabel(/Opens when tapped/).selectOption('/data');
     await p.getByRole('radio', { name: /^Customers who chose news and offers/ }).check();
     await p.getByRole('button', { name: 'Review and send' }).click();
-    const again = p.getByRole('dialog', { name: 'Send this notification?' }); await again.waitFor();
-    await again.getByRole('checkbox').check(); await again.getByRole('button', { name: /^Send to/ }).click();
-    await again.getByText(/already queued from an earlier review|already received this announcement/).waitFor({ timeout: 10000 });
-    ok('duplicate: a second send of the same announcement is refused in plain words', true);
-    await again.getByRole('button', { name: 'Cancel' }).click();
+    // Caught at review: everyone in this audience already received this exact announcement in the last 30 minutes.
+    await p.getByText(/Everyone in this audience already received this announcement in the last 30 minutes/).waitFor({ timeout: 10000 });
+    ok('duplicate: the same announcement again is stopped at review, in plain words, before any confirmation', !(await p.getByRole('dialog', { name: 'Send this notification?' }).isVisible()));
+    // A different page or a wider audience does not get around it either: the customers are left out, visitors remain.
+    await p.getByLabel(/Opens when tapped/).selectOption('/services');
+    await p.getByRole('radio', { name: /^Everyone who chose news/ }).check();
+    await p.getByRole('button', { name: 'Review and send' }).click();
+    const wider = p.getByRole('dialog', { name: 'Send this notification?' }); await wider.waitFor();
+    const widerText = (await wider.innerText()).replace(/\s+/g, ' ');
+    ok('duplicate: a wider audience or another page leaves out those who already received it', /Left out 2 devices that already received this announcement/.test(widerText) && !/customer/.test(widerText.slice(widerText.indexOf('Made up of'), widerText.indexOf('Opens'))), widerText.slice(0, 260));
+    await wider.getByRole('button', { name: 'Cancel' }).click();
 
     // 7. Visitors who chose news: their own count; a browser that unsubscribed is removed and explained.
     await p.getByRole('radio', { name: /^Visitors who chose news/ }).check();
@@ -204,7 +210,7 @@ const tail = id => `QA-D-${run}-${id}`.slice(-14);
     await p.screenshot({ path: `${OUT}/history-detail-1280.png` });
     await detail.getByRole('button', { name: 'Done' }).click();
     await p.getByLabel('Filter by result').selectOption('');
-    await p.getByRole('button', { name: 'Tests' }).click(); await p.getByText('You opened it from the notification at', { exact: false }).first().waitFor({ timeout: 10000 });
+    await p.getByRole('button', { name: 'Tests' }).click(); await p.getByText('You opened it from its notification at', { exact: false }).first().waitFor({ timeout: 10000 });
     ok('history: tests show when the operator opened one from its notification', true);
     await p.screenshot({ path: `${OUT}/history-tests-1280.png`, fullPage: true });
     ok('history: no endpoint or customer id anywhere on the page', !/fcm\.googleapis|QA-D-|qa-d-[a-z0-9]+-c\d/.test(await p.content()));
@@ -223,9 +229,9 @@ const tail = id => `QA-D-${run}-${id}`.slice(-14);
       await p.screenshot({ path: `${OUT}/notifications-${width}.png`, fullPage: true });
     }
     await p.setViewportSize({ width: 390, height: 640 });
-    await p.locator('#notif-title').fill(title); await p.locator('#notif-body').fill(message);
-    await p.getByRole('button', { name: new RegExp(title) }).first().click();
-    await p.getByRole('radio', { name: /^Visitors who chose news/ }).check();
+    // A saved announcement nobody has received yet ("Current offers"), so the confirmation opens.
+    await p.getByRole('button', { name: /^Current offers/ }).first().click();
+    await p.getByRole('radio', { name: /^Everyone who chose news/ }).check();
     await p.getByRole('button', { name: 'Review and send' }).click();
     const short = p.getByRole('dialog', { name: 'Send this notification?' }); await short.waitFor();
     const footerVisible = await short.getByRole('button', { name: 'Cancel' }).isVisible();
