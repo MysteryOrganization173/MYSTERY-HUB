@@ -7,9 +7,10 @@ import type { ActivePage } from '../../types';
 import { ArrowUpRight, Mail, MessageCircle, MessageSquareText, Phone, Send, ShieldCheck } from 'lucide-react';
 import { Seasonal } from '../../seasonal/Seasonal';
 import { isInstalledApp } from '../../pwa/appEnvironment';
+import { openNotificationSettings } from '../pwa/NotificationsEntry';
 import './footer.css';
 
-type FooterLink = { label: string; page: ActivePage; note?: string; open?: () => void };
+type FooterLink = { label: string; page: ActivePage; note?: string; open?: () => void; button?: boolean };
 
 /**
  * Shared first-party footer. Admin and published customer sites render outside this shell and never receive it.
@@ -42,6 +43,8 @@ export const Footer: React.FC = () => {
       { label: 'About Mystery Hub', page: 'about' },
       // A voluntary way to install, always available; pointless inside the installed app itself.
       ...(installed ? [] : [{ label: 'Get the app', page: 'app' as ActivePage }]),
+      // Opens notification settings (My Account when signed in, a small sheet otherwise): always reachable.
+      { label: 'Notifications', page: 'help', open: openNotificationSettings, button: true },
     ] },
   ];
   const go = (event: React.MouseEvent, link: FooterLink) => { event.preventDefault(); if (link.open) link.open(); else setActivePage(link.page); };
@@ -94,9 +97,11 @@ export const Footer: React.FC = () => {
                 <ul className={column.title === 'Help' ? 'flex flex-wrap gap-x-6 sm:block' : undefined}>
                   {column.links.map(link => (
                     <li key={link.label}>
-                      <a href={ROUTE_PATH_MAP[link.page]} onClick={event => go(event, link)} className={linkClass}>
-                        <span className="whitespace-nowrap">{link.label}</span>{link.note && <span className="hidden sm:inline rounded-full border border-slate-700 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-slate-400 group-hover:border-[#00c365]/50 group-hover:text-[#7cedb3]">{link.note}</span>}
-                      </a>
+                      {link.button
+                        ? <button type="button" onClick={() => link.open?.()} className={linkClass}><span className="whitespace-nowrap">{link.label}</span></button>
+                        : <a href={ROUTE_PATH_MAP[link.page]} onClick={event => go(event, link)} className={linkClass}>
+                            <span className="whitespace-nowrap">{link.label}</span>{link.note && <span className="hidden sm:inline rounded-full border border-slate-700 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-slate-400 group-hover:border-[#00c365]/50 group-hover:text-[#7cedb3]">{link.note}</span>}
+                          </a>}
                     </li>
                   ))}
                 </ul>

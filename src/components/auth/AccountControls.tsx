@@ -31,7 +31,7 @@ function PasswordForm({ forced }: { forced: boolean }) {
 }
 
 function MyAccount() {
-  const { user, sessionToken, updateUserProfile, closeAccount, logoutUser, showToast } = useApp();
+  const { user, sessionToken, updateUserProfile, closeAccount, logoutUser, showToast, setActivePage } = useApp();
   const [name, setName] = useState(user!.name), [email, setEmail] = useState(user!.email ?? ''), [phone, setPhone] = useState(user!.phone ?? '');
   const [currentPassword, setPassword] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const [code, setCode] = useState<string | null>(null), [confirmSignOut, setConfirmSignOut] = useState(false);
@@ -54,7 +54,7 @@ function MyAccount() {
       {error && <p role="alert" className="text-rose-300 text-sm">{error}</p>}
       <button disabled={busy} className={accountButton}>{busy ? 'Saving…' : 'Save profile'}</button>
     </form>
-    <NotificationSettings key={sessionToken!} token={sessionToken!} />
+    <NotificationSettings key={sessionToken!} token={sessionToken!} onOpenNotification={destination => { closeAccount(); setActivePage(destination === '/orders' ? 'orders' : 'home'); }} />
     <section className="mt-6 border-t border-slate-700 pt-4 space-y-4"><h3 className="font-bold">Security · Change Password</h3><PasswordForm forced={false} />
       <button onClick={logoutUser} className={`${accountButton} w-full`}>Sign Out</button>
       {!confirmSignOut ? <button onClick={() => setConfirmSignOut(true)} className={`${accountButton} w-full`}>Sign out of all devices</button> : <div className="space-y-2"><p className="text-sm">This signs out this device too.</p><button disabled={busy} className={`${accountButton} w-full !text-rose-300`} onClick={async () => { setBusy(true); try { await revokeOwnSessionsOnServer(sessionToken!); logoutUser(); } catch (err) { setError(err instanceof Error ? err.message : 'Could not sign out devices.'); } finally { setBusy(false); } }}>Confirm sign out of all devices</button><button className={accountButton} onClick={() => setConfirmSignOut(false)}>Cancel</button></div>}

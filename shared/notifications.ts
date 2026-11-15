@@ -2,12 +2,15 @@
 export type NotificationCategory='transactional'|'marketing';
 export type NotificationKind='payment_confirmed'|'order_processing'|'order_delivered'|'delivery_attention'|'refund_update'|'maintenance'|'new_service'|'special_offer';
 export interface NotificationTemplate {id:string;title:string;body:string;category:NotificationCategory;enabled:boolean;version:number;locked:boolean}
-export interface NotificationPreferences {transactional:boolean;marketing:boolean}
+export interface NotificationPreferences {transactional:boolean;marketing:boolean;marketingOptedOut?:boolean}
+export type NotificationPurpose='transactional'|'marketing';
+/** One explicit first-party choice, recorded per purpose with the version of the words the person saw. */
+export interface NotificationConsentInput {purposes:NotificationPurpose[];copyVersion:string}
 export interface SubscriptionInput {endpoint:string;expirationTime?:number|null;keys:{p256dh:string;auth:string}}
-export interface NotificationConfig {enabled:boolean;publicKey:string|null;workerPath:'/push-sw.js'}
+export interface NotificationConfig {enabled:boolean;publicKey:string|null;workerPath:'/push-sw.js';guests?:boolean;paused?:boolean}
 export type NotificationDeliveryState='queued'|'retry'|'provider_accepted'|'invalid'|'failed'|'skipped';
 export const NOTIFICATION_PLACEHOLDERS=['appName','eventLabel'] as const;
-export interface NotificationSubscriptionRequest {subscription:SubscriptionInput}
+export interface NotificationSubscriptionRequest {subscription:SubscriptionInput;consent?:NotificationConsentInput}
 export interface NotificationDevice {id:string;created_at:string;updated_at:string;current_session:boolean}
 export interface NotificationInboxItem {id:string;createdAt:string;title:string;body:string;destination:'/orders'|'/app'}
 export interface NotificationAudienceRequest {templateId:string;userId?:string}

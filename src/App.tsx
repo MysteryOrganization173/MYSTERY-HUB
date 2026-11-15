@@ -20,6 +20,7 @@ import { MarketplaceInquiryModal } from './components/marketplace/MarketplaceInq
 import { lazyPage } from './utils/lazyPage';
 import { AppLaunchLayer } from './components/pwa/AppLaunchLayer';
 import { InvitationLayer } from './components/pwa/InvitationLayer';
+import { NotificationsEntryHost } from './components/pwa/NotificationsEntry';
 import {GrowthTracker} from './components/common/GrowthTracker';
 import { SeasonProvider, seasonShellAttributes, useSeason } from './seasonal/SeasonProvider';
 import { SeasonalFooter, SeasonalShellLayer } from './seasonal/Seasonal';
@@ -156,6 +157,7 @@ const AppContent: React.FC = () => {
       {assistantNeeded && <MysteryAiAssistant />}
       <AppLaunchLayer />
       <InvitationLayer />
+      <NotificationsEntryHost />
     </div>
   );
 };

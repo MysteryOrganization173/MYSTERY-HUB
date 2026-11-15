@@ -154,12 +154,12 @@ test('push is isolated to explicit consent, with no offline cache or automatic p
   assert.match(source('src/components/auth/NotificationSettings.tsx'), /client = httpCustomerNotificationsClient/);
   assert.match(push,/register\('\/push-sw.js',\{scope:'\/',updateViaCache:'none'\}\)/);
   assert.doesNotMatch(source('public/push-sw.js'),/addEventListener\(['"]fetch|caches\.open/);
-  const optIn = source('src/components/pwa/NotificationOptIn.tsx');
-  assert.match(optIn, /onClick=\{\(\)=>\{void enable\(\);\}\}/, 'requested from the button');
-  assert.match(optIn, /activateNotificationOnboarding/);
-  assert.match(optIn, /Want offers, discounts and news too\?/);
-  assert.match(optIn, /Yes, send me offers/);
-  assert.doesNotMatch(optIn, /Alerts are not switched on yet|Nothing is sent yet/);
+  // 3.4: one invitation in the coordinated layer; the browser prompt comes only from its button; no second offers question.
+  const card = source('src/components/pwa/InvitationLayer.tsx');
+  assert.match(card, /onClick=\{\(\) => \{ void allow\(\); \}\}/, 'requested from the button');
+  assert.match(card, /activateNotificationInvite/);
+  assert.doesNotMatch(card, /Want offers, discounts and news too\?|Yes, send me offers/);
+  assert.doesNotMatch(card, /Alerts are not switched on yet|Nothing is sent yet/);
 });
 
 test('install card copy is honest and the homepage change is one slot', () => {

@@ -180,10 +180,10 @@ test('the welcome slot is released only after the sheet has been open, and insta
   assert.match(layer, /if \(welcomeVisible\) \{ welcomeShown\.current = true; return; \}/, 'held exactly while on screen');
   assert.match(layer, /&& claimWelcome\(\)\)/);
   assert.match(layer, /const busy = appBusy\(app\);/);
-  assert.match(layer, /suspended=\{busy\}/, 'the notification card pauses for dialogs instead of being used up');
-  const optIn = read('src/components/pwa/NotificationOptIn.tsx');
-  assert.match(optIn, /claimInvitation\(\['notifications'\]\)/);
-  assert.match(optIn, /recordDismissal\(STORAGE_KEYS\.notificationOptIn\);noteDismissal\(\);onDone\(\);/);
+  assert.doesNotMatch(layer, /InstalledNotificationOnboarding/, '3.4-C: the coordinated invitation layer offers notifications');
+  const invitations = read('src/components/pwa/InvitationLayer.tsx');
+  assert.match(invitations, /notificationsFirst/, 'first use in the installed app and after a member purchase');
+  assert.match(invitations, /recordDismissal\(STORAGE_KEYS\.notificationOptIn\); onClose\('dismissed'\)/);
   const inline = read('src/components/pwa/InstallAppPromo.tsx');
   assert.match(inline, /noteInvitationAnswered\('install'\); void install\(\);/);
   assert.match(read('src/pwa/useAppInstall.ts'), /useMemo\(\(\) => installRemembered\(\{ \.\.\.readInstallMarks\(readTime\)/, 'install marks are re-read when they change');

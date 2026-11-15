@@ -2,8 +2,8 @@ import {randomUUID} from 'node:crypto';
 import webPush from 'web-push';
 import {getPool} from '../db/connection.js';
 import {FinanceError} from '../db/financeStore.js';
-import {NOTIFICATIONS as n,notificationTransaction} from './notificationService.js';
-import {pushConfiguration,decryptSubscription,validateSubscription} from './notificationSafety.js';
+import {NOTIFICATIONS as n,notificationTransaction,pruneExpiredGuests} from './notificationService.js';
+import {pushConfiguration,decryptSubscription,validateSubscription,renderTemplate} from './notificationSafety.js';
 
 type Sender=(subscription:ReturnType<typeof decryptSubscription>,payload:string)=>Promise<unknown>;
 async function send(subscription:ReturnType<typeof decryptSubscription>,payload:string){const c=pushConfiguration();return webPush.sendNotification(subscription,payload,{TTL:3600,urgency:'normal',timeout:8000,vapidDetails:{subject:c.subject,publicKey:c.publicKey!,privateKey:c.privateKey}});}
@@ -35,6 +35,8 @@ async function current(job:any){return (await getPool()!.query(`SELECT d.encrypt
  AND ((e.template_snapshot->>'category'='transactional' AND COALESCE(p.transactional,TRUE)) OR (e.template_snapshot->>'category'='marketing' AND COALESCE(p.marketing,FALSE)))`,[job.device_id,job.user_id,job.binding_version,job.event_id])).rows[0];}
 export async function processNotificationBatch(sender:Sender=send,max=10){
  if(!pushConfiguration().enabled||!getPool())return {processed:0,disabled:true};
+ // Retention runs even while sending is paused: expired guest registrations never outlive their 180 days.
+ await pruneExpiredGuests().catch(()=>0);
  const settings=(await getPool()!.query(`SELECT paused FROM ${n}.settings WHERE id=TRUE`)).rows[0];if(settings?.paused)return {processed:0,disabled:true};
  await expandNotificationEvents();let processed=0;
  for(let i=0;i<Math.max(1,Math.min(max,25));i++){
@@ -42,8 +44,14 @@ export async function processNotificationBatch(sender:Sender=send,max=10){
   const live=await current(job);
   if(live){try{
     const subscription=validateSubscription(decryptSubscription(live.encrypted_subscription));
-    // Deliberately generic: a late packet following logout/account switch cannot expose another account's order or promotion.
-    const payload=JSON.stringify({version:1,notificationId:live.notification_id,title:'Mystery Hub',body:'An account update is available. Sign in to view it.',tag:'mh-'+live.notification_id});
+    // Account updates stay deliberately generic: a late packet after logout or an account switch cannot expose
+    // another account's order. Announcements (opted-in news and offers) carry their own approved, non-personal
+    // template text, so the phone can say what they are about.
+    const fit=(text:string,max:number)=>text.length<=max?text:text.slice(0,max-1).trimEnd()+'…';
+    const announcement=live.template_snapshot?.category==='marketing'?renderTemplate(live.template_snapshot,'Service announcement'):null;
+    const payload=JSON.stringify(announcement
+     ?{version:1,notificationId:live.notification_id,kind:'announcement',title:fit(announcement.title,80),body:fit(announcement.body,240),tag:'mh-'+live.notification_id}
+     :{version:1,notificationId:live.notification_id,kind:'account',title:'Mystery Hub',body:'An account update is available. Sign in to view it.',tag:'mh-'+live.notification_id});
     await sender(subscription,payload);state='provider_accepted';code='accepted';
    }catch(error){const status=Number((error as {statusCode?:number})?.statusCode);if(error instanceof FinanceError&&error.status===400){state='invalid';code='subscription_invalid';}
     else if([404,410].includes(status)){state='invalid';code='endpoint_expired';}

@@ -35,3 +35,18 @@ export const verifiedPurchase = (order: Pick<OrderRecord, 'journey' | 'status' |
   const age = now - Date.parse(order.createdAt);
   return Number.isFinite(age) && age > -CLOCK_SKEW_MS && age < PURCHASE_MOMENT_MS;
 };
+
+/** Notifications: one heading, one sentence naming exactly what the tap agrees to, one action, one way out. */
+export function notificationCopy(invite: { audience: 'member' | 'guest'; offers: boolean }) {
+  if (invite.audience === 'guest') return { title: 'Stay updated.', text: 'Get Mystery Hub service news and occasional offers.' };
+  return invite.offers
+    ? { title: 'Stay updated.', text: 'Get order updates, service news and occasional offers.' }
+    : { title: 'Stay updated.', text: 'Get updates about your orders on this device.' };
+}
+export const NOTIFICATION_ACTIONS = { allow: 'Allow Notifications', later: 'Not now', note: 'You can turn them off anytime.', ordersOnly: 'Order updates only' } as const;
+/** One state after the tap, shown only for what really happened. "On" appears only after server confirmation. */
+export const NOTIFICATION_RESULT = {
+  registered: { title: 'You’re all set.', text: 'Notifications are on for this device.' },
+  denied: { title: 'Notifications are blocked.', text: 'Your browser is blocking them. You can allow them in its site settings.' },
+  error: { title: 'Notifications aren’t on yet.', text: 'Something went wrong on our side. Please try again later.' },
+} as const;

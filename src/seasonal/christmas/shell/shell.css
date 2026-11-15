@@ -106,6 +106,8 @@
 .mh-app[data-season-shell="christmas"] .xs-footer-nav ul { margin: 0; padding: 0; list-style: none; }
 .mh-app[data-season-shell="christmas"] .xs-footer-nav a { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; color: #d5cebf; font-size: .875rem; text-decoration: none; }
 .mh-app[data-season-shell="christmas"] .xs-footer-nav a:hover { color: #fff; }
+.mh-app[data-season-shell="christmas"] .xs-footer-nav .xs-footer-linkbutton { display: inline-flex; align-items: center; min-height: 40px; padding: 0; color: #d5cebf; font-size: .875rem; cursor: pointer; }
+.mh-app[data-season-shell="christmas"] .xs-footer-nav .xs-footer-linkbutton:hover { color: #fff; }
 .mh-app[data-season-shell="christmas"] .xs-footer :is(a, button):focus-visible { outline: 2px solid #f3d79a; outline-offset: 2px; border-radius: 6px; }
 .mh-app[data-season-shell="christmas"] .xs-footer-note { padding: 1px 6px; border-radius: 999px; border: 1px solid #f3d79a40; color: #e9cf91; font-size: .625rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .mh-app[data-season-shell="christmas"] .xs-footer-legal { display: grid; gap: 6px; margin-top: 22px; padding: 14px 0 16px; border-top: 1px solid #ffffff12; font-size: .75rem; }
