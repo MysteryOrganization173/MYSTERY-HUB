@@ -41,6 +41,22 @@ test('push worker ignores untrusted payload destinations, masks content and open
  assert.equal(shown[0][0],'Mystery Hub');assert.doesNotMatch(JSON.stringify(shown),/PRIVATE|private phone|evil/);
  handlers.notificationclick({notification:{data:{notificationId:id},close:()=>{}},waitUntil:(p:Promise<any>)=>pending=p});await pending;assert.deepEqual(opened,['https://mysterybundlehub.com/orders?notification='+id]);
  assert.equal(handlers.fetch,undefined);assert.equal(handlers.pushsubscriptionchange,undefined); // Re-subscription always needs a current authenticated page.
+ // 3.4: an account update that claims to be something else is still masked.
+ shown.length=0;handlers.push({data:{json:()=>({version:1,notificationId:id,kind:'account',title:'PRIVATE ORDER',body:'private amount'})},waitUntil:(p:Promise<any>)=>pending=p});await pending;
+ assert.equal(shown[0][0],'Mystery Hub');assert.doesNotMatch(JSON.stringify(shown),/PRIVATE|private amount/);
+});
+test('push worker shows opted-in announcements with their approved text, opens the app, and rejects unsafe text',async()=>{
+ const handlers:Record<string,Function>={},shown:any[]=[],opened:string[]=[];const id='22222222-2222-4222-8222-222222222222';
+ const self={addEventListener:(type:string,fn:Function)=>handlers[type]=fn,location:{origin:'https://mysterybundlehub.com'},skipWaiting:async()=>{},registration:{showNotification:async(...args:any[])=>shown.push(args),getNotifications:async()=>[]},clients:{claim:async()=>{},matchAll:async()=>[],openWindow:async(url:string)=>opened.push(url)}};
+ vm.runInNewContext(fs.readFileSync('public/push-sw.js','utf8'),{self,URL});let pending:Promise<any>=Promise.resolve();
+ handlers.push({data:{json:()=>({version:1,notificationId:id,kind:'announcement',title:'Service update',body:'Open Mystery Hub for the current service notice.'})},waitUntil:(p:Promise<any>)=>pending=p});await pending;
+ assert.equal(shown[0][0],'Service update');assert.equal(shown[0][1].body,'Open Mystery Hub for the current service notice.');assert.equal(shown[0][1].data.kind,'announcement');
+ handlers.notificationclick({notification:{data:{notificationId:id,kind:'announcement'},close:()=>{}},waitUntil:(p:Promise<any>)=>pending=p});await pending;
+ assert.deepEqual(opened,['https://mysterybundlehub.com/'],'an announcement opens the app, never an inbox link that a guest cannot read');
+ shown.length=0;handlers.push({data:{json:()=>({version:1,notificationId:id,kind:'announcement',title:'<img src=x>',body:'Hi'})},waitUntil:(p:Promise<any>)=>pending=p});await pending;
+ assert.equal(shown[0][0],'Mystery Hub');assert.equal(shown[0][1].data.kind,'account','unsafe announcement text falls back to the generic notice');
+ shown.length=0;handlers.push({data:{json:()=>({version:1,notificationId:'not-a-uuid',kind:'announcement',title:'Hello',body:'World'})},waitUntil:(p:Promise<any>)=>pending=p});
+ assert.equal(shown.length,0,'malformed packets show nothing');
 });
 test('real Web Push library encrypts synthetic payload and signs VAPID without any provider call',()=>{
  const keys=webPush.generateVAPIDKeys();const details=webPush.generateRequestDetails(syntheticSubscription(),'synthetic plaintext',{vapidDetails:{subject:'mailto:synthetic@example.test',...keys},TTL:3600});

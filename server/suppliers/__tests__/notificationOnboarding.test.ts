@@ -111,6 +111,8 @@ test('guests: news and occasional offers only, recorded as marketing consent; or
   assert.deepEqual(s.calls.guestRegister, [{ purposes: ['marketing'], copyVersion: NOTIFICATION_COPY_VERSION + '-guest' }]);
   assert.equal(s.calls.register.length, 0, 'no account registration for a guest');
   assert.doesNotMatch(notificationCopy({ audience: 'guest', offers: true }).text, /order/i);
+  const accountBrowser = setup({ permission: 'granted', preRegistered: true });
+  assert.equal(await notificationInviteOpportunity(accountBrowser.client, accountBrowser.guest, accountBrowser.options(null)), null, 'a browser already holding a subscription (an account’s) is never offered guest news');
   const off = setup({ guests: false });
   assert.equal(await notificationInviteOpportunity(off.client, off.guest, off.options(null)), null, 'guest news switched off on the server: nothing offered');
   assert.deepEqual(inviteConsent({ audience: 'guest', offers: false }).purposes, ['marketing'], 'a guest choice can only ever be news and offers');

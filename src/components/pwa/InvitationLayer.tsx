@@ -104,6 +104,9 @@ export const InvitationLayer: React.FC = () => {
 
   // Notifications: assessed once per account (or guest) per page life, read-only, only once a card could appear.
   const [notifyInvite, setNotifyInvite] = useState<NotificationInvite | null>(null);
+  // The order of suggestions is decided only once this read-only check has answered (or failed), so a quick
+  // Channel card never takes the visit's one slot from a notification invitation that was still being checked.
+  const [notifyAssessed, setNotifyAssessed] = useState<string | null>(null);
   const assessment = useRef<{ key: string; controller: AbortController } | null>(null);
   const accountKey = sessionToken && user ? `member:${user.id}:${sessionToken}` : 'guest';
   useEffect(() => {
@@ -113,16 +116,18 @@ export const InvitationLayer: React.FC = () => {
     const controller = new AbortController();
     assessment.current = { key: accountKey, controller };
     setNotifyInvite(null);
+    const key = accountKey;
     void notificationInviteOpportunity(httpCustomerNotificationsClient, httpGuestNotificationsClient, {
       token: sessionToken || null, accountId: user?.id, isCustomer: user ? user.role === 'customer' : undefined,
       signal: controller.signal, snooze: readSnooze(STORAGE_KEYS.notificationOptIn), now: Date.now(),
-    }).then(invite => { if (!controller.signal.aborted) setNotifyInvite(invite); }, () => {});
+    }).then(invite => { if (!controller.signal.aborted) { setNotifyInvite(invite); setNotifyAssessed(key); } },
+      () => { if (!controller.signal.aborted) setNotifyAssessed(key); });
   }, [accountKey, isAuthChecking, tick]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => assessment.current?.controller.abort(), []);
 
   const installOffer = installState.mode !== 'hidden' && installState.progress === 'idle';
   useEffect(() => {
-    if (shown || slot || busy || inlineOffer || !calmPage(activePage, window.location.search)) return;
+    if (shown || slot || busy || inlineOffer || !calmPage(activePage, window.location.search) || notifyAssessed !== accountKey) return;
     const session = readSession();
     if (!ready(session)) return;
     const timer = window.setTimeout(() => {
@@ -141,7 +146,7 @@ export const InvitationLayer: React.FC = () => {
       setAnnouncement(ANNOUNCEMENTS[kind]);
     }, SETTLE_MS);
     return () => window.clearTimeout(timer);
-  }, [shown, slot, busy, inlineOffer, activePage, tick, installOffer, notifyInvite]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shown, slot, busy, inlineOffer, activePage, tick, installOffer, notifyInvite, notifyAssessed, accountKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // Another account (or signing out) never inherits a notification card prepared for the previous one.
   useEffect(() => { if (shown?.kind === 'notifications') close('ignored'); }, [accountKey]); // eslint-disable-line react-hooks/exhaustive-deps
 

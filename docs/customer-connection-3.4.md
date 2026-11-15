@@ -120,3 +120,100 @@ The ordinary footer returns unchanged in structure when the season ends. Neither
     - the installed app (standalone display mode emulated): welcome sheet alone, nothing after it in that visit, no "Get the app", and the Channel (never install) on a later visit;
     - axe-core with no serious or critical issues.
   - The install prompt in that review is **simulated** (Chromium does not let automation open its real dialog), so it proves the product logic, not a device install.
+
+## Release C: notification onboarding, consent, guests and the account notification centre
+
+### One invitation, one decision
+- **Copy:** "Stay updated." / "Get order updates, service news and occasional offers." / **Allow Notifications** · Not now, with one quiet line: "You can turn them off anytime."
+- **Variants:**
+  - members who turned offers off before read "Get updates about your orders on this device.";
+  - guests read "Get Mystery Hub service news and occasional offers." (see Guests).
+- **Flow:**
+  1. The first-party card.
+  2. The browser's own permission request (only from the button).
+  3. Registration with the server.
+  4. The server confirms the device.
+  5. One result:
+     - "You're all set. Notifications are on for this device.";
+     - or "Notifications are blocked." (the browser said no);
+     - or "Notifications aren't on yet." (registration or confirmation failed).
+- **Closing the browser prompt** without answering changes nothing and rests the invitation. There is no second "offers?" card any more.
+- **Coordination:** the card is part of the Release B invitation coordinator.
+  - One at a time, calm pages, after engagement, once per visit.
+  - It comes first in the installed app (first use after the welcome and sign-in) and for a member right after a verified purchase.
+  - Installing comes first elsewhere; the Channel comes last.
+  - The coordinator waits for the read-only eligibility check, so a quick Channel card never takes the visit's slot from it.
+- **Never offered:**
+  - while the operator has sending paused (`/api/notifications/config` now reports `paused`);
+  - in a browser that blocked notifications or cannot receive Web Push;
+  - to staff;
+  - on a device the server already confirmed;
+  - as guest news over a browser that already holds an account's subscription.
+- "Not now" rests three weeks and stops after the second time. The browser's own answer is final.
+
+### Consent and Ghana's direct-marketing rule
+Ghana's Data Protection Act, 2012 (Act 843) requires a data subject's prior consent before their data is used for direct marketing, and lets them require the marketing to stop.
+
+The implementation keeps four things separate:
+- browser permission;
+- a registered device;
+- order and account updates (`transactional`);
+- service news and offers (`marketing`).
+
+How consent is recorded:
+- **Evidence:** one explicit tap on a card that names each purpose records an append-only `mysteryhub_notifications.consents` row per purpose. Each row holds the subject (account, or guest browser), purpose, granted or withdrawn, source and the copy version shown (`invite-3.4-1`, `-orders`, `-guest`, `settings-1`).
+- **Atomic with the device:** the device registration and the consent are written in one transaction, and the success state appears only after the server confirms.
+- **Never inferred:** browser permission never creates consent.
+- **Never revived:** a withdrawn marketing choice (in the ledger, or a saved "off" from before the ledger) is never switched back on by an invitation. Only the customer's own switch in My Account turns it back on. An answer to the old separate offers question on this device is also honoured.
+- **Withdrawal:** settings changes record withdrawals and re-grants. Guest unsubscribes record a withdrawal, and an account taking over a guest browser records the end of the guest consent. Guest consent is never transferred to an account.
+- **Legal caveat:** this is an engineering reading of the rule, not legal advice. The founder should confirm the wording with counsel before activation.
+
+### Guests
+- **Guest news:** a browser without an account can choose service news and occasional offers (marketing only).
+  - The server returns a random credential. The browser keeps it in local storage and sends it only in the `X-Guest-Notifications` header, never in a URL; the server stores only its hash.
+  - Endpoint ownership is checked. A guest browser cannot take over an account's endpoint.
+  - Registrations expire after 180 days without use (active use extends them).
+  - Rate limit: 20 requests per 10 minutes per address.
+  - "Turn off for this browser" (footer › Notifications) deletes the registration and records the withdrawal.
+- **Order updates for guests: gated, not built.** The platform has no secret guest-order capability; order lookup works by public reference only. Binding push to a guest order securely needs:
+  - a new per-order secret issued at checkout;
+  - guest events in the order outbox;
+  - worker changes.
+
+  That touches the payment-initialisation path and needs its own reviewed change. So guests are never offered order updates and never told they will receive them. The guest sheet says order updates need an account.
+- **No guest inbox:** there is no guest inbox and no fake account.
+- **Announcement clicks:** they open the app's home page, not an inbox link a guest cannot read.
+
+### Members and the installed app
+- **Browser tabs:** members can enable notifications in a browser tab; installing the app is not required.
+- **Installed app:** the first-use invitation now comes from the coordinated layer. The old installed-only two-step card was removed.
+- **Account changes:** another account never inherits a card prepared for the previous one.
+- **Device binding:** devices stay bound to the signed-in session, and logout still removes them.
+
+### Account notification centre (My Account › Notifications)
+- **Wording:** device-neutral ("this device", not "this phone"), because computers get notifications too.
+- **iPhone and iPad Safari tabs:** they see "Use the Home Screen app" with the exact steps, instead of a dead end.
+- **Paused:** a registered device while sending is paused shows that nothing is being sent right now.
+- **Recent notifications:** this account's own server history, newest first, up to 10.
+  - Each item shows an "Order update" or "News" label, a time, a title and a body, and opens Orders or Home.
+  - Loading, empty and error-with-retry states are shown.
+  - It never claims a notification was displayed or read.
+
+### Service worker and payloads
+- **Account updates:** they stay generic ("An account update is available. Sign in to view it."). Details appear only through the signed-in inbox lookup.
+- **Announcements:** opted-in news and offers now carry their own approved, non-personal template text (`kind: 'announcement'`) and open the home page.
+- **Unsafe text:** text containing markup or control characters, or that is too long, falls back to the generic notice.
+
+### Verification (Release C)
+- **Unit:**
+  - onboarding 7/7 (read-only assessment, purposes per copy, blocked, closed and aborted prompts, guests, copy, single surface);
+  - service worker 24/24 (announcement display, unsafe text, click targets);
+  - updated account, PWA and invitation suites.
+- **Native PostgreSQL 16:**
+  - new `notificationConsentPostgres` 9/9: private tables, consent per purpose, withdrawal never revived, guest credential hash and ownership, account takeover, expiry and unsubscribe, HTTP (no account, no credential in URLs, paused flag), announcement payloads;
+  - existing `notificationsPostgres` 18/18;
+  - `backendRlsPostgres` with 53 private tables (its `MAINTAIN` check needs PostgreSQL 17, which CI uses).
+- **Browser:** `scripts/reviewNotificationOnboarding.cjs` 26/26. It runs locally only, with synthetic push keys and a disposable database.
+  - The browser permission answer and the push subscription are **simulated**: headless Chromium cannot show the prompt or reach a push service. This proves the product and server logic, not delivery.
+  - No delivery was queued or attempted.
+- **Release B review re-run:** 88/88.

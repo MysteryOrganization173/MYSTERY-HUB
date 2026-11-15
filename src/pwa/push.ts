@@ -138,6 +138,11 @@ function writeGuestCredential(value: string | null) {
   try { if (value) window.localStorage.setItem(GUEST_KEY, value); else window.localStorage.removeItem(GUEST_KEY); } catch { /* storage unavailable */ }
 }
 
+/** Passive: whether this browser already holds any push subscription (an account's, a guest's or a stale one). */
+export async function hasPushSubscription(win: PushEnv | undefined = env()): Promise<boolean> {
+  try { return Boolean(await (await pushManager(win))?.getSubscription()); } catch { return false; }
+}
+
 /** Passive: whether the server confirms this browser's guest registration (for its current subscription). */
 export async function readGuestDeviceState(guest: GuestNotificationsClient, win: PushEnv | undefined = env()): Promise<ServerDeviceState> {
   const credential = readGuestCredential();

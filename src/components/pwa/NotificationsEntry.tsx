@@ -35,6 +35,7 @@ function GuestNotificationsSheet({ onClose }: { onClose: () => void }) {
   const { openAuth } = useApp();
   const [state, setState] = useState<SheetState>('loading');
   const [paused, setPaused] = useState(false);
+  const [reason, setReason] = useState<string | null>(null);
   const request = useRef(new AbortController());
   useEffect(() => {
     const controller = request.current;
@@ -52,9 +53,10 @@ function GuestNotificationsSheet({ onClose }: { onClose: () => void }) {
   }, []);
 
   const turnOn = async () => {
-    setState('working');
-    const result = await activateNotificationInvite(httpCustomerNotificationsClient, httpGuestNotificationsClient, { audience: 'guest', offers: true }, { token: null, signal: request.current.signal }).catch(() => ({ step: 'error' as const }));
+    setState('working'); setReason(null);
+    const result: { step: string; message?: string } = await activateNotificationInvite(httpCustomerNotificationsClient, httpGuestNotificationsClient, { audience: 'guest', offers: true }, { token: null, signal: request.current.signal }).catch(() => ({ step: 'error' }));
     if (request.current.signal.aborted) return;
+    if (result.step === 'error' && result.message) setReason(result.message);
     setState(result.step === 'registered' ? 'on' : result.step === 'denied' ? 'blocked' : result.step === 'dismissed' ? 'off' : 'error');
   };
   const turnOff = async () => {
@@ -73,7 +75,7 @@ function GuestNotificationsSheet({ onClose }: { onClose: () => void }) {
     blocked: { icon: <BellOff className="h-5 w-5 text-slate-300" aria-hidden />, title: 'Notifications are blocked', body: 'This browser is blocking notifications from Mystery Hub. Allow them in its site settings, then come back here.' },
     unsupported: { icon: <BellOff className="h-5 w-5 text-slate-300" aria-hidden />, title: 'Notifications aren’t available here', body: 'This browser can’t receive Mystery Hub notifications right now.' },
     ios: { icon: <Smartphone className="h-5 w-5 text-slate-300" aria-hidden />, title: IOS_HOME_SCREEN_COPY.title, body: IOS_HOME_SCREEN_COPY.body },
-    error: { icon: <BellOff className="h-5 w-5 text-amber-200" aria-hidden />, title: 'Something went wrong', body: 'Nothing was changed. Please try again.' },
+    error: { icon: <BellOff className="h-5 w-5 text-amber-200" aria-hidden />, title: 'Something went wrong', body: reason ? `${reason} Nothing was changed.` : 'Nothing was changed. Please try again.' },
   };
   const s = status[state];
   return <SecurityDialog title="Notifications" onClose={onClose}>
@@ -88,7 +90,7 @@ function GuestNotificationsSheet({ onClose }: { onClose: () => void }) {
     <div className="mt-3 grid gap-2">
       {(state === 'off' || state === 'error') && <button type="button" className={`${accountButton} w-full !bg-[#00c365] !text-black`} onClick={() => { void turnOn(); }}>{NOTIFICATION_ACTIONS.allow}</button>}
       {state === 'on' && <button type="button" className={`${accountButton} w-full`} onClick={() => { void turnOff(); }}>Turn off for this browser</button>}
-      {(state === 'off' || state === 'on') && <p className="text-xs text-slate-400">{NOTIFICATION_ACTIONS.note}</p>}
+      {state === 'off' && <p className="text-xs text-slate-400">{NOTIFICATION_ACTIONS.note}</p>}
     </div>
     <div className="mt-5 border-t border-slate-700 pt-4">
       <p className="text-sm text-slate-300">Order updates need an account, so only you can see them.</p>

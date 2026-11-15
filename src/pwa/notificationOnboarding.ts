@@ -1,6 +1,6 @@
 import type {CustomerNotificationsClient, GuestNotificationsClient, NotificationConsent} from '../services/customerNotifications';
 import {notificationPermissionState} from './notifications';
-import {pushSupported, readGuestDeviceState, readServerDeviceState, subscribeGuestDevice, subscribeThisDevice} from './push';
+import {hasPushSubscription, pushSupported, readGuestDeviceState, readServerDeviceState, subscribeGuestDevice, subscribeThisDevice} from './push';
 import {marketingPromptAnswered, notificationInviteResting, type Snooze} from './launchPolicy';
 
 /**
@@ -54,7 +54,12 @@ export async function notificationInviteOpportunity(client: CustomerNotification
   if (!config.guests) return null;
   const state = await readGuestDeviceState(guest, options.environment);
   current(options.signal);
-  return state === 'not_subscribed' ? { audience: 'guest', offers: true } : null;
+  if (state !== 'not_subscribed') return null;
+  // A subscription without a confirmed guest registration usually belongs to an account (another tab, or signed in
+  // earlier): never put guest news over it. Turning guest news on stays available from the footer's Notifications.
+  if (permission === 'granted' && await hasPushSubscription(options.environment)) return null;
+  current(options.signal);
+  return { audience: 'guest', offers: true };
 }
 
 /** One explicit tap: permission -> subscription -> registration with consent -> server confirmation. */
