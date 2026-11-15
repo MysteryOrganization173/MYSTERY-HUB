@@ -18,6 +18,18 @@ export async function suppressed(c:PoolClient,phone:string,userId?:string|null,p
  if(purpose==='marketing'){const x=(await c.query("SELECT granted FROM mysteryhub_sms.consents WHERE phone=$1 AND purpose='marketing' ORDER BY id DESC LIMIT 1",[phone])).rows[0];const denied=(await c.query("SELECT 1 FROM mysteryhub_sms.consents WHERE phone=$1 AND purpose='marketing' AND granted=false AND id IN(SELECT max(id) FROM mysteryhub_sms.consents WHERE phone=$1 AND purpose='marketing' GROUP BY user_id) LIMIT 1",[phone])).rowCount;return x?.granted!==true||!!denied;}
  return false;
 }
+/** Batch permission evidence for a full audience; never issue per-contact SQL reads. */
+export async function suppressedNumbers(c:PoolClient,targets:{phone:string;userId?:string|null}[],purpose:SmsPurpose){
+ const phones=[...new Set(targets.map(t=>t.phone))],userIds=[...new Set(targets.flatMap(t=>t.userId?[t.userId]:[]))],blocked=new Set<string>();
+ if(!phones.length)return blocked;
+ const byUser=new Map<string,string[]>();for(const t of targets)if(t.userId)byUser.set(t.userId,[...(byUser.get(t.userId)||[]),t.phone]);
+ const restrictions=(await c.query(`SELECT user_id,mystery_canonical_phone(COALESCE(NULLIF(contact_normalized,''),contact)) AS phone FROM waitlist WHERE channel='sms' AND status='unsubscribed' AND (user_id=ANY($2::text[]) OR mystery_canonical_phone(COALESCE(NULLIF(contact_normalized,''),contact))=ANY($1::text[])) UNION ALL SELECT p.user_id,mystery_canonical_phone(u.phone) AS phone FROM mysteryhub_notifications.preferences p JOIN users u ON u.id=p.user_id WHERE p.transactional=false AND (u.id=ANY($2::text[]) OR mystery_canonical_phone(u.phone)=ANY($1::text[]))`,[phones,userIds])).rows;
+ for(const r of restrictions){if(r.phone)blocked.add(r.phone);for(const phone of byUser.get(r.user_id)||[])blocked.add(phone);}
+ const consent=(await c.query("SELECT DISTINCT ON(phone,purpose,user_id) id,phone,purpose,granted FROM mysteryhub_sms.consents WHERE phone=ANY($1::text[]) AND purpose=ANY($2::text[]) ORDER BY phone,purpose,user_id,id DESC",[phones,purpose==='marketing'?['transactional','marketing']:['transactional']])).rows;
+ const marketing=new Map<string,{id:bigint;granted:boolean}>();for(const r of consent){if(r.granted===false)blocked.add(r.phone);if(r.purpose==='marketing'){const old=marketing.get(r.phone);if(!old||BigInt(r.id)>old.id)marketing.set(r.phone,{id:BigInt(r.id),granted:r.granted===true});}}
+ if(purpose==='marketing')for(const phone of phones)if(marketing.get(phone)?.granted!==true)blocked.add(phone);
+ return blocked;
+}
 export async function orderRecipients(c:PoolClient,orderId:string,templateId:string,allowRecipient=false,automatic=false):Promise<{body:string;recipients:Recipient[]}>{
  const o=(await c.query(`SELECT o.* FROM orders o WHERE (o.id=$1 OR o.public_reference=$1) AND ${DIRECT_CONTACT_SQL} AND NOT EXISTS(SELECT 1 FROM order_test_fixtures f WHERE f.order_id=o.id)`,[orderId])).rows[0];
  const validTime=(v:unknown)=>typeof v==='string'||v instanceof Date?Number.isFinite(+new Date(v))&&+new Date(v)<=Date.now():false;
@@ -50,10 +62,17 @@ export async function resolveAudience(c:PoolClient,input:any){
  if(input.selected!==undefined){if(!Array.isArray(input.selected)||!input.selected.length||input.selected.length>100||input.selected.some((s:any)=>typeof s?.id!=='string'||typeof s?.source!=='string'))throw new FinanceError('Select up to100 existing contacts.');rows=rows.filter(r=>input.selected.some((s:any)=>s.source===r.source&&s.id===r.id));if(rows.length!==input.selected.length)throw new FinanceError('Selected contacts changed. Refresh before review.',409);}
  if(input.numbers!==undefined){if(!Array.isArray(input.numbers)||input.numbers.length>100||input.numbers.some((n:any)=>!canonicalGhanaPhone(n)))throw new FinanceError('Enter up to100 valid Ghana numbers.');const phones=[...new Set(input.numbers.map(canonicalGhanaPhone))];rows=rows.filter(r=>phones.includes(r.phone));for(const phone of phones)if(!rows.some(r=>r.phone===phone)&&arkeselConfig().testNumbers.includes(phone as string))rows.push({phone,id:phone,source:'test'} as any);}
  const accountData=await ContactHubStore.query(contactFilters({source:'registered'}),new Date(),c,true);if(accountData.total>10000)throw new FinanceError('Account permission evidence exceeds safe preparation limits.',413);
+ const accounts=new Map(accountData.rows.filter(a=>a.phone&&a.supportReviewEligible).map(a=>[a.phone,a]));
+ // Suppression identity uses ALL related direct accounts, even when an opt-out makes
+ // that account ineligible for operational support. Permission is never inferred
+ // from the narrower relationship map used to choose an intended buyer.
+ const allAccountIds=new Map<string,string[]>();for(const a of accountData.rows)if(a.phone)allAccountIds.set(a.phone,[...(allAccountIds.get(a.phone)||[]),a.id]);
+ const targets=rows.filter(r=>r.phone).flatMap(r=>(allAccountIds.get(r.phone!)||[null]).map(userId=>({phone:r.phone!,userId})));
+ const blocked=await suppressedNumbers(c,targets,purpose);for(const r of [...accountData.rows,...rows])if(r.phone&&r.smsPermission==='sms_unsubscribed')blocked.add(r.phone);
  const recipients:Recipient[]=[];let excluded=0,invalid=0,duplicates=0;const seen=new Set<string>();
  for(const r of rows){if(!r.phone){invalid++;continue;}if(seen.has(r.phone)){duplicates++;continue;}seen.add(r.phone);
-  const account=accountData.rows.find(a=>a.phone===r.phone&&a.supportReviewEligible),test=(r.source as string)==='test';
-  if(await suppressed(c,r.phone,account?.id,purpose)||purpose==='operational'&&!account&&!test){excluded++;continue;}
+  const account=accounts.get(r.phone),test=(r.source as string)==='test';
+  if(blocked.has(r.phone)||purpose==='operational'&&!account&&!test){excluded++;continue;}
   recipients.push({phone:r.phone,userId:account?.id||null,role:test?'test':'buyer'});
  }
  const config=arkeselConfig();if(config.enabled&&config.testOnly){for(let i=recipients.length-1;i>=0;i--)if(!config.testNumbers.includes(recipients[i].phone)){recipients.splice(i,1);excluded++;}}const estimate=smsEstimate(body),credits=estimate.segments*recipients.length;

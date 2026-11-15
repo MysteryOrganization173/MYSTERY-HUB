@@ -2,7 +2,9 @@
 
 ## Release scope and current state
 
-Starts from main cd9a4f1c3cfb43f6b35e4cd3903c185e4da51acb. Reuses Contact Hub V2,
+Starts from main cd9a4f1c3cfb43f6b35e4cd3903c185e4da51acb; integrates subsequent
+main4001d850754628840e377a0f03ef21aa5967756f (Notification Center PR125/126)
+without changing its delivery or consent behavior. Reuses Contact Hub V2,
 Admin/session authentication, private audit, the existing Gemini client/model,
 notification outbox conventions and shared Admin design. Held PR69 is untouched.
 No supplier, pricing, wallet, payment verification, reseller ownership/earnings,
@@ -130,7 +132,8 @@ Contact Hub V2 is authoritative: no store_context, MH_STORE_ references or linke
 store finance evidence; registered identity stays user_id; direct recipients and
 verified guest payer evidence stay separate. Customer source qualification, archived
 history and refund exclusions are unchanged. SMS adds purpose selection, not a
-second customer database.
+second customer database. Audience permissions are fetched in two batched reads,
+with indexed consent scope and maps for account lookup, rather than per-contact SQL.
 
 Operational notices require a suitable established direct account relationship
 (or the separately configured controlled-test number). Promotional copy cannot be
