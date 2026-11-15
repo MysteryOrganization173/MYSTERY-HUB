@@ -12,7 +12,7 @@ import pg from 'pg';
 import express from 'express';
 import webPush from 'web-push';
 import {NOTIFICATION_SCHEMA} from '../../db/notificationSchema.js';
-import {getPool} from '../../db/connection.js';
+import {getPool, initDatabase} from '../../db/connection.js';
 import {NotificationService as service, NOTIFICATIONS as n} from '../../services/notificationService.js';
 import {processNotificationBatch} from '../../services/notificationWorker.js';
 import {hashSessionToken} from '../../utils/crypto.js';
@@ -41,6 +41,7 @@ test('PostgreSQL Admin Notification Center: audiences, guests, own-device tests,
       await pool.query('INSERT INTO users(id,name,password_hash,role) VALUES($1,$2,\'fixture\',$3)', [id, 'Synthetic ' + id, id.startsWith('admin') ? 'admin' : 'customer']);
       await pool.query("INSERT INTO sessions(id,user_id,token_hash,expires_at) VALUES($1,$2,$3,NOW()+interval '1 day')", ['session-' + id, id, hashSessionToken(tokens[id as keyof typeof tokens])]);
     }
+    await initDatabase(); // the full migrated schema (orders and their notification trigger), as in production
     await pool.query(NOTIFICATION_SCHEMA); await pool.query(NOTIFICATION_SCHEMA);
     const q = async (sql: string, args: unknown[] = []) => (await pool!.query(sql, args)).rows;
     const setPaused = (paused: boolean) => pool!.query(`UPDATE ${n}.settings SET paused=$1 WHERE id=TRUE`, [paused]);
@@ -110,8 +111,22 @@ test('PostgreSQL Admin Notification Center: audiences, guests, own-device tests,
       const audit = await q(`SELECT metadata_safe_json FROM admin_audit_log WHERE action='notification_campaign_queued' AND entity_id=$1`, [result.campaignId]);
       const metadata = JSON.parse(audit[0].metadata_safe_json);
       assert.equal(metadata.customer_devices, 2); assert.equal(metadata.guest_browsers, 2); assert.equal(metadata.audience, 'everyone'); assert.equal(metadata.destination, '/services');
-      const again = await service.previewAudience('admin', {templateId: 'maintenance', audience: 'everyone', destination: '/services'});
-      await assert.rejects(() => service.campaign('admin', {previewId: again.previewId, requestId: key(), confirmed: true}), /already queued for this audience/, 'a second preview of the same announcement is not a second send');
+      // Nobody gets the same announcement twice in 30 minutes, whichever audience, page or preview it comes from.
+      for (const [audience, destination] of [['everyone', '/services'], ['members', '/'], ['members', '/data'], ['guests', '/marketplace']] as const) {
+        const again = await service.previewAudience('admin', {templateId: 'maintenance', audience, destination});
+        assert.equal(again.eligibleDevices, 0, `${audience} ${destination}`); assert.ok(again.alreadyReceived > 0);
+      }
+      const single = await service.previewAudience('admin', {templateId: 'maintenance', userId: 'buyer1'});
+      assert.equal(single.eligibleDevices, 0); assert.equal(single.alreadyReceived, 2);
+      // A second confirmation racing the first cannot double-send either: the earlier preview's recipients are left out.
+      const early = await service.previewAudience('admin', {templateId: 'new_service', audience: 'members'});
+      const late = await service.previewAudience('admin', {templateId: 'new_service', audience: 'members'});
+      const sent = await service.campaign('admin', {previewId: early.previewId, requestId: key(), confirmed: true});
+      assert.equal(sent.eligibleDevices, 2);
+      await assert.rejects(() => service.campaign('admin', {previewId: late.previewId, requestId: key(), confirmed: true}), /already received this announcement/);
+      await pool!.query(`UPDATE ${n}.deliveries d SET state='skipped',last_code='cancelled' FROM ${n}.events e WHERE e.id=d.event_id AND e.campaign_id=$1`, [sent.campaignId]);
+      // A cancelled send does not count as received: the same announcement may go out again.
+      assert.equal((await service.previewAudience('admin', {templateId: 'new_service', audience: 'members'})).eligibleDevices, 2);
 
       payloads.length = 0;
       await processNotificationBatch(capture, 25);
@@ -160,18 +175,27 @@ test('PostgreSQL Admin Notification Center: audiences, guests, own-device tests,
       assert.equal((await q(`SELECT expanded_at FROM ${n}.events WHERE event_key='paused-order-event'`))[0].expanded_at, null, 'customer updates were not touched');
       const audit = await q(`SELECT admin_user_id FROM admin_audit_log WHERE action='notification_test_queued' AND entity_id=$1`, [result.eventId]);
       assert.deepEqual(audit, [{admin_user_id: 'admin'}]);
-      // Opening it from the notification (the signed-in inbox lookup) is recorded only for the owner.
+      // The phone check: only the owner, only with the token that travelled inside the push.
+      const token = payloads[0].payload.open;
+      assert.match(token, /^[A-Za-z0-9_-]{43}$/, 'the test push carries its open token');
       await assert.rejects(() => service.setSettings('admin', {paused: false, confirmed: true, reason: 'Resume before verification'}), /verify a phone/, 'resuming needs a phone that opened a test');
-      await assert.rejects(() => service.inbox('admin2', 0, result.eventId), /not found/);
-      assert.equal((await q(`SELECT opened_at FROM ${n}.events WHERE id=$1`, [result.eventId]))[0].opened_at, null);
+      await assert.rejects(() => service.inbox('admin2', 0, result.eventId, token), /not found/);
       const opened = await service.inbox('admin', 0, result.eventId);
       assert.deepEqual({title: opened[0].title, body: opened[0].body}, {title: 'Test notification', body: 'This is a test from Mystery Hub Admin. No action is needed.'});
+      await service.inbox('admin', 0, result.eventId, 'x'.repeat(43));
+      assert.equal((await q(`SELECT opened_at FROM ${n}.events WHERE id=$1`, [result.eventId]))[0].opened_at, null, 'a link or a wrong token proves nothing');
+      await assert.rejects(() => service.setSettings('admin', {paused: false, confirmed: true, reason: 'Resume after a plain link'}), /verify a phone/);
+      await service.inbox('admin', 0, result.eventId, token);
       assert.ok((await q(`SELECT opened_at FROM ${n}.events WHERE id=$1`, [result.eventId]))[0].opened_at);
-      assert.deepEqual(await service.setSettings('admin', {paused: false, confirmed: true, reason: 'Phone verified by the operator test'}), {paused: false});
+      // One rule for every operator: admin's phone check lets admin2 resume in an emergency.
+      assert.deepEqual(await service.setSettings('admin2', {paused: false, confirmed: true, reason: 'Phone verified by an operator test'}), {paused: false});
       assert.deepEqual(await service.setSettings('admin', {paused: true, confirmed: true, reason: 'Back to paused for the remaining checks'}), {paused: true});
       const health = await service.health('admin');
       assert.equal(health.lastTest.id, result.eventId); assert.ok(health.lastTest.openedAt); assert.deepEqual(health.lastTest.states, {provider_accepted: 1});
       assert.equal((await service.health('admin2')).lastTest, null, 'each operator sees their own last test');
+      assert.ok(health.phoneCheck.at && health.phoneCheck.yoursAt, 'admin checked their own phone');
+      const other = (await service.health('admin2')).phoneCheck;
+      assert.ok(other.at && other.yoursAt === null, 'admin2 sees that another operator checked a phone');
       await pool!.query(`DELETE FROM ${n}.events WHERE event_key='paused-order-event'`);
     });
 
@@ -182,7 +206,8 @@ test('PostgreSQL Admin Notification Center: audiences, guests, own-device tests,
       assert.equal((await service.inbox('admin', 0, result.eventId))[0].opens, '/earn');
       const health = await service.health('admin');
       assert.equal(health.lastTest.templateId, 'operator_test', 'an announcement test is not the phone check (it cannot record a tap)');
-      assert.ok(health.phoneCheckedAt, 'the earlier opened test still counts');
+      assert.ok(health.phoneCheck?.yoursAt, 'the earlier opened test still counts');
+      assert.equal(payloads[0].payload.open, undefined, 'only plain tests carry an open token');
       await assert.rejects(() => service.testToSelf('admin', {requestId: key(), templateId: 'payment_confirmed'}), /announcement template/);
       await assert.rejects(() => service.testToSelf('admin', {requestId: key(), templateId: 'operator_test'}), /valid test/);
       await assert.rejects(() => service.testToSelf('admin', {requestId: key(), destination: '/data'}), /valid test/);
@@ -194,6 +219,44 @@ test('PostgreSQL Admin Notification Center: audiences, guests, own-device tests,
       process.env.WEB_PUSH_ENABLED = 'false';
       await assert.rejects(() => service.testToSelf('admin2', {requestId: key()}), /not configured/);
       process.env.WEB_PUSH_ENABLED = 'true';
+    });
+
+    await t.test('only reviewed recipients are sent to; a pause while sending holds the rest; queued announcements can be cancelled', async () => {
+      // Let the operator's earlier test go out first (paused: only tests move), so this batch starts with the campaign.
+      await setPaused(true); await processNotificationBatch(async () => {}, 25);
+      await setPaused(false);
+      const preview = await service.previewAudience('admin', {templateId: 'new_service', audience: 'everyone', destination: '/data'});
+      assert.equal(preview.eligibleDevices, 3, 'buyer1’s two devices and guest B (cancelled or skipped sends do not count as received)');
+      const late = await service.subscribe('buyer1', tokens.buyer1, {subscription: sub('B1c')});
+      const result = await service.campaign('admin', {previewId: preview.previewId, requestId: key(), confirmed: true});
+      assert.equal(result.eligibleDevices, 3, 'a device added after the review is not sent to'); assert.equal(result.leftOut, 0);
+      const targets = await q(`SELECT d.device_id FROM ${n}.deliveries d JOIN ${n}.events e ON e.id=d.event_id WHERE e.campaign_id=$1 AND d.device_id IS NOT NULL`, [result.campaignId]);
+      assert.ok(!targets.some((t: any) => t.device_id === late.deviceId));
+      await service.revoke('buyer1', late.deviceId);
+      // A pause that lands while a batch is running holds the rest of it; nothing is dropped as "not sent".
+      payloads.length = 0;
+      await processNotificationBatch(async (sub2, payload) => { payloads.push({endpoint: sub2.endpoint, payload: JSON.parse(payload)}); await setPaused(true); }, 25);
+      assert.equal(payloads.length, 1, 'one went out before the pause');
+      const held = await q(`SELECT d.state FROM ${n}.deliveries d JOIN ${n}.events e ON e.id=d.event_id WHERE e.campaign_id=$1`, [result.campaignId]);
+      assert.deepEqual(held.map((r: any) => r.state).sort(), ['provider_accepted', 'queued', 'queued']);
+      const health = await service.health('admin');
+      assert.equal(health.queuedAnnouncements, 2); assert.equal(health.queuedCampaigns, 1);
+      // Cancel: a delivery being handed to the push service right now cannot be recalled; the rest are cancelled.
+      await pool!.query(`UPDATE ${n}.deliveries SET lease=gen_random_uuid(),lease_until=NOW()+interval '1 minute' WHERE id=(SELECT d.id FROM ${n}.deliveries d JOIN ${n}.events e ON e.id=d.event_id WHERE e.campaign_id=$1 AND d.state='queued' ORDER BY d.id LIMIT 1)`, [result.campaignId]);
+      await assert.rejects(() => service.cancelQueued('admin', {campaignId: result.campaignId, confirmed: true, reason: 'x'}), /safe reason/);
+      await assert.rejects(() => service.cancelQueued('admin', {campaignId: result.campaignId, reason: 'Wrong page in the announcement'}), /safe reason/, 'needs explicit confirmation');
+      assert.deepEqual(await service.cancelQueued('admin', {campaignId: result.campaignId, confirmed: true, reason: 'Wrong page in the announcement'}), {success: true, cancelled: 1, inFlight: 1});
+      const audit = await q(`SELECT metadata_safe_json FROM admin_audit_log WHERE action='notification_announcements_cancelled' AND entity_id=$1`, [result.campaignId]);
+      assert.equal(JSON.parse(audit[0].metadata_safe_json).cancelled, 1);
+      const detail = await service.historyDetail('announcement', result.campaignId);
+      assert.deepEqual(detail.problems, [{code: 'cancelled', count: 1}]); assert.equal(detail.total, 3); assert.equal(detail.totals.skipped, 1);
+      // The simulated in-flight send never finished: its lease lapses and it goes out on resume; the cancelled one never does.
+      await pool!.query(`UPDATE ${n}.deliveries SET lease=NULL,lease_until=NULL WHERE lease_until>NOW()`);
+      await setPaused(false); payloads.length = 0; await processNotificationBatch(capture, 25);
+      assert.equal(payloads.length, 1, 'the held delivery went out on resume; the cancelled one did not');
+      await setPaused(true);
+      // Cancelling everything that is queued is also possible (nothing left here).
+      assert.deepEqual(await service.cancelQueued('admin', {confirmed: true, reason: 'Nothing should be waiting now'}), {success: true, cancelled: 0, inFlight: 0});
     });
 
     await t.test('readiness facts separate people, devices and guest browsers, and never include keys', async () => {
@@ -214,26 +277,33 @@ test('PostgreSQL Admin Notification Center: audiences, guests, own-device tests,
 
     await t.test('history groups announcements, tests and order updates, filters by state, and hides endpoints and people', async () => {
       const announcements = await service.history({kind: 'announcement'});
-      assert.equal(announcements.total, 3);
+      assert.equal(announcements.total, (await q(`SELECT COUNT(*)::int AS c FROM ${n}.campaigns`))[0].c);
       const first = announcements.items[announcements.items.length - 1];
       assert.equal(first.audience, 'everyone'); assert.equal(first.destination, '/services'); assert.equal(first.targeted, 4); assert.deepEqual(first.states, {provider_accepted: 4}); assert.equal(first.title, 'Service update');
       const failedOnly = await service.history({kind: 'announcement', state: 'invalid'});
       assert.equal(failedOnly.total, 1); assert.deepEqual(failedOnly.items[0].states, {invalid: 1, provider_accepted: 1});
-      const tests = await service.history({kind: 'test'});
-      assert.equal(tests.total, 3); assert.ok(tests.items.some(i => i.openedAt)); assert.ok(tests.items.every(i => i.audience === 'self'));
+      const tests = await service.history({kind: 'test', actor: 'admin'});
+      assert.equal(tests.total, 3); assert.ok(tests.items.some(i => i.openedAt)); assert.ok(tests.items.every(i => i.audience === 'self' && i.mine === true));
       assert.deepEqual(tests.items.map(i => i.destination).sort(), ['/earn', '/orders', '/orders']);
-      await pool!.query(`INSERT INTO ${n}.events(user_id,event_key,template_id,label) VALUES('buyer2','history-order','order_delivered','Delivery confirmed')`);
+      assert.equal(tests.items.filter(i => i.announcementTest).length, 1);
+      assert.ok((await service.history({kind: 'test', actor: 'admin2'})).items.every(i => i.mine === false), 'another operator’s tests are not "yours"');
+      // Order updates are the events that carry an order: one waiting for resume, one too old to ever be sent.
+      const order = (id: string) => pool!.query("INSERT INTO orders(id,user_id,public_reference,customer_email,customer_phone,recipient_phone,network,product_id,product_name_snapshot,bundle_size_snapshot,amount,currency,status,payment_reference,payment_status,paid_at) VALUES($1,'buyer2',$1,'fixture@example.test','0241111111','0241111111','telecel','fixture','Synthetic bundle','1GB',500,'GHS','paid',$2,'success',NOW())", [id, 'pay-' + id]);
+      await order('d-order-new'); await order('d-order-old');
+      await pool!.query(`UPDATE ${n}.events SET created_at=NOW()-interval '2 days' WHERE order_id='d-order-old'`);
       const orders = await service.history({kind: 'order'});
-      assert.ok(orders.items.some(i => i.waiting && i.title === 'Order delivered'));
+      assert.ok(orders.items.some(i => i.orderId === 'd-order-new' && i.waiting && !i.stale && i.title === 'Payment confirmed'));
+      assert.ok(orders.items.some(i => i.orderId === 'd-order-old' && i.stale && !i.waiting));
       assert.ok(orders.items.every(i => i.audience === 'account'));
+      assert.equal((await service.history({kind: 'order', state: 'provider_accepted'})).total, 0, 'filtering starts from the deliveries');
       await assert.rejects(() => service.history({kind: 'everything'}), /valid history filter/);
       await assert.rejects(() => service.history({kind: 'test', state: 'read'}), /valid history filter/, 'there is no "read" state');
       const detail = await service.historyDetail('announcement', first.id);
       assert.equal(detail.deliveries.length, 4); assert.equal(detail.deliveries.filter((d: any) => d.guest).length, 2);
+      assert.deepEqual(detail.totals, {provider_accepted: 4}); assert.equal(detail.total, 4);
       assert.ok(detail.deliveries.every((d: any) => d.history.length === 1 && d.history[0].code === 'accepted'));
       assert.doesNotMatch(JSON.stringify(detail), /fcm\.googleapis|encrypted|endpoint|buyer|user_id/);
       await assert.rejects(() => service.historyDetail('announcement', 'not-a-uuid'), /Invalid notification identifier/);
-      await pool!.query(`DELETE FROM ${n}.events WHERE event_key='history-order'`);
     });
 
     await t.test('earlier campaigns are grouped after upgrade; Admin routes stay admin-only over HTTP', async () => {
@@ -250,7 +320,7 @@ test('PostgreSQL Admin Notification Center: audiences, guests, own-device tests,
       try {
         await new Promise<void>(r => server.once('listening', r)); const base = `http://127.0.0.1:${(server.address() as any).port}`;
         const call = (path: string, token?: string, init: RequestInit = {}) => fetch(base + path, {...init, headers: {'content-type': 'application/json', ...(token ? {authorization: 'Bearer ' + token} : {})}});
-        for (const [path, method] of [['/admin/history', 'GET'], ['/admin/test', 'POST'], [`/admin/history/announcement/${campaignId}`, 'GET']] as const) {
+        for (const [path, method] of [['/admin/history', 'GET'], ['/admin/test', 'POST'], [`/admin/history/announcement/${campaignId}`, 'GET'], ['/admin/announcements/cancel', 'POST']] as const) {
           assert.equal((await call(path, undefined, {method, body: method === 'POST' ? '{}' : undefined})).status, 401, path);
           assert.equal((await call(path, tokens.buyer1, {method, body: method === 'POST' ? '{}' : undefined})).status, 403, path);
         }

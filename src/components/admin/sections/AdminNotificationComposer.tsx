@@ -49,7 +49,7 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const keyRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const inFlight = useRef(false);
-  const [confirm, setConfirm] = useState<{ count: number;previewId?:string;revision:number;customers?:number;customerDevices?:number;guests?:number } | null>(null);
+  const [confirm, setConfirm] = useState<{ count: number;previewId?:string;revision:number;customers?:number;customerDevices?:number;guests?:number;alreadyReceived?:number } | null>(null);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const testKey = useRef<{ fingerprint: string; key: string } | null>(null);
@@ -122,6 +122,8 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
     setTesting(true); setTestResult(null);
     const res = await client.testSelf(token, { requestId: testKey.current.key, templateId: savedMatch.id, destination: draft.destination || '/' });
     setTesting(false);
+    // A confirmed test frees the key, so the same draft can be tested again (for example after a missed notification).
+    if (res.ok && !res.duplicate) testKey.current = null;
     setTestResult(res.ok ? { ok: true, message: res.duplicate ? 'This test was already sent. Check your phone.' : `Sent to your ${plural(res.devices, 'device')} only. Check how it looks and that it opens the right page.` } : { ok: false, message: res.message });
   };
 
@@ -139,8 +141,9 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
       const preview=client.prepareAudience?await client.prepareAudience(token,{templateId:draft.templateId!,audience:audience.kind??'members',destination:draft.destination||'/',...(single?{userId:draft.userId?.trim()}:{})}):{eligibleDevices:await client.countAudience(token,audience.id),previewId:undefined};
       if(current!==revision.current)return;
       const count=preview.eligibleDevices;
-      if (count <= 0) { setReviewError('Nobody in this audience can receive notifications right now.'); return; }
-      setConfirm({ count,previewId:preview.previewId,revision:current,customers:'eligibleCustomers' in preview?preview.eligibleCustomers:undefined,customerDevices:'eligibleCustomerDevices' in preview?preview.eligibleCustomerDevices:undefined,guests:'eligibleGuests' in preview?preview.eligibleGuests:undefined });
+      const already='alreadyReceived' in preview?preview.alreadyReceived??0:0;
+      if (count <= 0) { setReviewError(already>0?'Everyone in this audience already received this announcement in the last 30 minutes. To correct it, edit the template and send the new version.':'Nobody in this audience can receive notifications right now.'); return; }
+      setConfirm({ count,previewId:preview.previewId,revision:current,customers:'eligibleCustomers' in preview?preview.eligibleCustomers:undefined,customerDevices:'eligibleCustomerDevices' in preview?preview.eligibleCustomerDevices:undefined,guests:'eligibleGuests' in preview?preview.eligibleGuests:undefined,alreadyReceived:already });
     } catch (error) {
       setReviewError(error instanceof Error ? error.message : 'Could not check the audience. Nothing was sent.');
     } finally { setChecking(false); }
@@ -149,7 +152,9 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
   const send = async () => {
     if (!confirm || !audience || inFlight.current||confirm.revision!==revision.current) return;
     inFlight.current = true; setSending(true); setConfirmError(null);
-    const fingerprint = draftFingerprint(draft);
+    // The key belongs to this exact draft and this reviewed audience: a retry of the same confirmation reuses it, and
+    // a fresh review gets a new one (the server then reports anything already sent).
+    const fingerprint = `${draftFingerprint(draft)}|${confirm.previewId ?? ''}`;
     if (keyRef.current?.fingerprint !== fingerprint) keyRef.current = { fingerprint, key: newKey() };
     try {
       const res = await client.createSend(token, { previewId:confirm.previewId,idempotencyKey: keyRef.current.key, templateId: draft.templateId, category: draft.category, title: draft.title.trim(), body: draft.body.trim(), destination: draft.destination, audienceId: audience.id, confirmedRecipients: confirm.count });
@@ -188,6 +193,7 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
         <div className="space-y-3 text-sm text-slate-200">
           <p className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
             {result.duplicate ? 'This exact campaign was already queued. No second campaign was created.' : `“${result.send.title}” is queued for ${result.send.recipients.toLocaleString()} ${result.send.recipients === 1 ? 'device' : 'devices'} in ${result.send.audienceLabel}.`}</p>
+          {!result.duplicate && (result.send.leftOut ?? 0) > 0 && <p className="text-xs text-slate-300">{plural(result.send.leftOut!, 'reviewed device was', 'reviewed devices were')} left out: they no longer qualify, or already received this announcement in the last 30 minutes.</p>}
           <p className="text-xs text-slate-400">Delivery results arrive over the next minutes in History. “Accepted” means the push service took the message, not that someone read it.</p>
           <div className="flex flex-wrap gap-2"><AdminButton variant="primary" onClick={onViewHistory}>View delivery results</AdminButton><AdminButton onClick={reset}>Write another message</AdminButton></div>
         </div>
@@ -359,6 +365,7 @@ export function AdminNotificationComposer({ token, client, ai, data, seed, onSen
                 confirm.guests ? plural(confirm.guests, 'visitor browser') : null,
               ].filter(Boolean).join(' and ') || '—'}</dd></>}
               <dt className="text-slate-400">Opens</dt><dd className="text-white">{data.destinations?.find(d => d.value === draft.destination)?.label ?? 'Home'}</dd>
+              {(confirm.alreadyReceived ?? 0) > 0 && <><dt className="text-slate-400">Left out</dt><dd className="text-slate-200">{plural(confirm.alreadyReceived!, 'device')} that already received this announcement in the last 30 minutes</dd></>}
               <dt className="text-slate-400">Type</dt><dd className="text-white">{CATEGORY_LABELS[draft.category]}</dd>
               <dt className="text-slate-400">Consent</dt><dd className="text-slate-300">{audience.consentNote}</dd>
             </dl>

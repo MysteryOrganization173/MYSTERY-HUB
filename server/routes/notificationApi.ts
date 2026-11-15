@@ -23,7 +23,8 @@ notificationRouter.put('/subscriptions',handler(req=>NotificationService.subscri
 notificationRouter.get('/subscriptions',handler(async req=>({success:true,devices:await NotificationService.devices(req.user.id,req.sessionToken)})));
 notificationRouter.delete('/subscriptions/:id',handler(req=>NotificationService.revoke(req.user.id,req.params.id)));
 notificationRouter.get('/inbox',handler(async req=>({success:true,items:await NotificationService.inbox(req.user.id,offset(req.query.offset))})));
-notificationRouter.get('/inbox/:id',handler(async req=>({success:true,notification:(await NotificationService.inbox(req.user.id,0,req.params.id))[0]})));
+// `open`: the token an operator's own test carried in its push; it is what records the phone check.
+notificationRouter.get('/inbox/:id',handler(async req=>({success:true,notification:(await NotificationService.inbox(req.user.id,0,req.params.id,req.query.open))[0]})));
 export const adminNotificationRouter=Router();adminNotificationRouter.use(requireAdmin,(_req,res,next)=>{res.set('Cache-Control','no-store');next();},createRateLimiter({windowMs:60000,max:40,key:req=>req.user!.id}));
 adminNotificationRouter.get('/templates',handler(async()=>({success:true,templates:await NotificationService.templates()})));
 adminNotificationRouter.post('/templates',handler(req=>NotificationService.saveTemplate(req.user.id,undefined,req.body)));
@@ -34,7 +35,8 @@ adminNotificationRouter.post('/audiences/preview',handler(req=>NotificationServi
 adminNotificationRouter.post('/campaigns',createRateLimiter({windowMs:10*60000,max:10,key:req=>req.user!.id}),handler(req=>NotificationService.campaign(req.user.id,req.body)));
 // The operator's own test: their own signed-in devices only; works while paused. Also limited in the database.
 adminNotificationRouter.post('/test',createRateLimiter({windowMs:10*60000,max:6,key:req=>req.user!.id}),handler(req=>NotificationService.testToSelf(req.user.id,req.body)));
-adminNotificationRouter.get('/history',handler(req=>NotificationService.history({kind:req.query.kind,state:req.query.state,offset:offset(req.query.offset)})));
+adminNotificationRouter.get('/history',handler(req=>NotificationService.history({kind:req.query.kind,state:req.query.state,offset:offset(req.query.offset),actor:req.user.id})));
+adminNotificationRouter.post('/announcements/cancel',createRateLimiter({windowMs:10*60000,max:10,key:req=>req.user!.id}),handler(req=>NotificationService.cancelQueued(req.user.id,req.body)));
 adminNotificationRouter.get('/history/:kind/:id',handler(req=>NotificationService.historyDetail(req.params.kind,req.params.id)));
 adminNotificationRouter.get('/campaigns',handler(async req=>({success:true,campaigns:await NotificationService.campaigns(offset(req.query.offset))})));
 adminNotificationRouter.get('/deliveries',handler(async req=>({success:true,deliveries:await NotificationService.deliveries(offset(req.query.offset)),total:await NotificationService.deliveryCount()})));

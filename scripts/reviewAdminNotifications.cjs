@@ -16,8 +16,11 @@ const pg = require('pg');
 
 const BASE = process.env.REVIEW_BASE || 'http://localhost:3111';
 if (!/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(BASE)) throw new Error('Local review only.');
-if (!/_test$/.test(new URL(process.env.REVIEW_DB || 'postgresql://x/none').pathname)) throw new Error('REVIEW_DB must be a disposable *_test database.');
+// Same database rules as the simulated provider (loopback, *_test, no redirecting parameters), without loading it here.
+const localTestDatabase = value => { let url; try { url = new URL(value || ''); } catch { return false; } return ['postgres:', 'postgresql:'].includes(url.protocol) && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) && /^\/[a-zA-Z0-9_]+_test$/.test(url.pathname) && [...url.searchParams.keys()].every(key => ['sslmode', 'connect_timeout', 'application_name'].includes(key)); };
+if (!localTestDatabase(process.env.REVIEW_DB)) throw new Error('REVIEW_DB must be a local, disposable *_test database.');
 const LOG = process.env.QA_PUSH_LOG; if (!LOG) throw new Error('QA_PUSH_LOG (the simulated provider log) is required.');
+if (!fs.existsSync(`${LOG}.active`)) throw new Error('The server under review has not loaded the simulated push provider (no marker next to QA_PUSH_LOG). Nothing was done.');
 const OUT = process.argv[2] || path.join(process.cwd(), 'tmp-review-34d'); fs.mkdirSync(OUT, { recursive: true });
 const AXE = process.env.AXE_PATH ? fs.readFileSync(process.env.AXE_PATH, 'utf8') : null;
 const db = new pg.Pool({ connectionString: process.env.REVIEW_DB, ssl: false });
@@ -97,9 +100,15 @@ const tail = id => `QA-D-${run}-${id}`.slice(-14);
     const after = pushes().slice(before);
     ok('test: the simulated push service got exactly one message, for the operator’s phone only, while paused', testPush.length === 1 && after.length === 1, JSON.stringify(after.map(x => x.endpointTail)));
     ok('test: the lock screen text is generic (the private account path)', testPush[0]?.payload.body === 'An account update is available. Sign in to view it.');
-    const tapped = await api(`notifications/inbox/${testPush[0]?.payload.notificationId}`, tokens.admin);
+    const open = testPush[0]?.payload.open;
+    ok('test: the push carries a one-off open token', /^[A-Za-z0-9_-]{43}$/.test(open || ''));
+    ok('test: another account cannot open it, even with the token', (await api(`notifications/inbox/${testPush[0]?.payload.notificationId}?open=${open}`, tokens.c1)).status === 404);
+    await api(`notifications/inbox/${testPush[0]?.payload.notificationId}`, tokens.admin);
+    await p.getByRole('button', { name: 'Refresh' }).first().click(); await sleep(1500);
+    ok('test: opening the link without the token does not count as a phone check', await p.getByRole('button', { name: 'Resume sending' }).isDisabled());
+    // The tap: the service worker opens /orders?notification=…&open=…, and the signed-in app looks it up with the token.
+    const tapped = await api(`notifications/inbox/${testPush[0]?.payload.notificationId}?open=${open}`, tokens.admin);
     ok('test: tapping it opens "Test notification" for the signed-in operator', tapped.status === 200 && tapped.json.notification.title === 'Test notification', JSON.stringify(tapped.json));
-    ok('test: another account cannot open it', (await api(`notifications/inbox/${testPush[0]?.payload.notificationId}`, tokens.c1)).status === 404);
     await p.getByRole('button', { name: 'Refresh' }).first().click(); await p.getByText('Checked on your phone.').waitFor({ timeout: 15000 });
     ok('status: checked on your phone; resume now available', !(await p.getByRole('button', { name: 'Resume sending' }).isDisabled()));
     await p.evaluate(() => window.scrollTo(0, 0)); await p.screenshot({ path: `${OUT}/status-checked-1280.png` });
@@ -162,8 +171,8 @@ const tail = id => `QA-D-${run}-${id}`.slice(-14);
     await p.getByRole('button', { name: 'Review and send' }).click();
     const again = p.getByRole('dialog', { name: 'Send this notification?' }); await again.waitFor();
     await again.getByRole('checkbox').check(); await again.getByRole('button', { name: /^Send to/ }).click();
-    await again.getByText(/already queued for this audience in the last 30 minutes/).waitFor({ timeout: 10000 });
-    ok('duplicate: a second preview of the same announcement is refused in plain words', true);
+    await again.getByText(/already queued from an earlier review|already received this announcement/).waitFor({ timeout: 10000 });
+    ok('duplicate: a second send of the same announcement is refused in plain words', true);
     await again.getByRole('button', { name: 'Cancel' }).click();
 
     // 7. Visitors who chose news: their own count; a browser that unsubscribed is removed and explained.

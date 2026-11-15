@@ -3,7 +3,7 @@ import webPush from 'web-push';
 import {getPool} from '../db/connection.js';
 import {FinanceError} from '../db/financeStore.js';
 import {NOTIFICATIONS as n,notificationTransaction,pruneExpiredGuests,guestNewsEnabled,announcementPage} from './notificationService.js';
-import {pushConfiguration,decryptSubscription,validateSubscription,renderTemplate} from './notificationSafety.js';
+import {pushConfiguration,decryptSubscription,validateSubscription,renderTemplate,testOpenToken} from './notificationSafety.js';
 
 type Sender=(subscription:ReturnType<typeof decryptSubscription>,payload:string)=>Promise<unknown>;
 async function send(subscription:ReturnType<typeof decryptSubscription>,payload:string){const c=pushConfiguration();return webPush.sendNotification(subscription,payload,{TTL:3600,urgency:'normal',timeout:8000,vapidDetails:{subject:c.subject,publicKey:c.publicKey!,privateKey:c.privateKey}});}
@@ -41,23 +41,33 @@ async function current(job:any){
    WHERE g.id=$1 AND g.binding_version=$2 AND g.expires_at>NOW() AND t.enabled=TRUE AND config.paused=FALSE AND e.created_at>NOW()-interval '24 hours'
    AND e.template_snapshot->>'category'='marketing'`,[job.guest_device_id,job.binding_version,job.event_id])).rows[0];}
  if(!job.device_id||!job.user_id)return undefined;
- return (await getPool()!.query(`SELECT d.encrypted_subscription,e.id AS notification_id,e.template_snapshot,e.destination FROM ${n}.devices d
+ return (await getPool()!.query(`SELECT d.encrypted_subscription,e.id AS notification_id,e.template_snapshot,e.destination,e.operator_test FROM ${n}.devices d
  JOIN sessions s ON s.id=d.session_id AND s.user_id=d.user_id JOIN users u ON u.id=d.user_id
  JOIN ${n}.events e ON e.id=$4 AND e.user_id=d.user_id JOIN ${n}.templates t ON t.id=e.template_id
  LEFT JOIN ${n}.preferences p ON p.user_id=d.user_id JOIN ${n}.settings config ON config.id=TRUE
  WHERE d.id=$1 AND d.user_id=$2 AND d.binding_version=$3 AND s.expires_at>NOW() AND u.status='active' AND COALESCE(u.must_change_password,FALSE)=FALSE
  AND t.enabled=TRUE AND e.created_at>NOW()-interval '24 hours'
  AND (e.operator_test OR config.paused=FALSE AND ((e.template_snapshot->>'category'='transactional' AND COALESCE(p.transactional,TRUE)) OR (e.template_snapshot->>'category'='marketing' AND COALESCE(p.marketing,FALSE))))`,[job.device_id,job.user_id,job.binding_version,job.event_id])).rows[0];}
+/** Puts a claimed delivery back in the queue untouched (sending was paused after the claim); the try is noted. */
+async function requeue(job:any){await notificationTransaction(async c=>{
+ const back=await c.query(`UPDATE ${n}.deliveries SET lease=NULL,lease_until=NULL,next_at=NOW(),updated_at=NOW() WHERE id=$1 AND lease=$2 RETURNING id`,[job.id,job.lease]);
+ if(back.rowCount)await c.query(`UPDATE ${n}.attempts SET code='paused',finished_at=NOW() WHERE delivery_id=$1 AND attempt=$2`,[job.id,job.attempts]);
+});}
 export async function processNotificationBatch(sender:Sender=send,max=10){
  if(!pushConfiguration().enabled||!getPool())return {processed:0,disabled:true};
  // Retention runs even while sending is paused: expired guest registrations never outlive their 180 days.
  await pruneExpiredGuests().catch(()=>0);
  // Paused: no order update or announcement is expanded or sent; only the operator's own tests move.
- const paused=(await getPool()!.query(`SELECT paused FROM ${n}.settings WHERE id=TRUE`)).rows[0]?.paused!==false;
+ const pausedNow=async()=>(await getPool()!.query(`SELECT paused FROM ${n}.settings WHERE id=TRUE`)).rows[0]?.paused!==false;
+ const paused=await pausedNow();
  if(!paused)await expandNotificationEvents();let processed=0;
  for(let i=0;i<Math.max(1,Math.min(max,25));i++){
+  // A pause that lands while a batch is running holds the rest of it: nothing more is claimed for customers.
+  if(!paused&&i>0&&await pausedNow())break;
   const job=await claim(paused);if(!job)break;let state='skipped',code='ineligible';
   const live=await current(job);
+  // Not sendable only because sending was paused after this claim: it goes back in the queue, never dropped.
+  if(!live&&!paused&&await pausedNow()){await requeue(job);break;}
   if(live){try{
     const subscription=validateSubscription(decryptSubscription(live.encrypted_subscription));
     // Account updates stay deliberately generic: a late packet after logout or an account switch cannot expose
@@ -67,7 +77,9 @@ export async function processNotificationBatch(sender:Sender=send,max=10){
     const announcement=live.template_snapshot?.category==='marketing'?renderTemplate(live.template_snapshot,'Service announcement'):null;
     const payload=JSON.stringify(announcement
      ?{version:1,notificationId:live.notification_id,kind:'announcement',title:fit(announcement.title,80),body:fit(announcement.body,240),url:announcementPage(live.destination),tag:'mh-'+live.notification_id}
-     :{version:1,notificationId:live.notification_id,kind:'account',title:'Mystery Hub',body:'An account update is available. Sign in to view it.',tag:'mh-'+live.notification_id});
+     :{version:1,notificationId:live.notification_id,kind:'account',title:'Mystery Hub',body:'An account update is available. Sign in to view it.',tag:'mh-'+live.notification_id,
+       // The operator's own test carries a token only this push delivers; opening the test with it is the phone check.
+       ...(live.operator_test?{open:testOpenToken(live.notification_id)}:{})});
     await sender(subscription,payload);state='provider_accepted';code='accepted';
    }catch(error){const status=Number((error as {statusCode?:number})?.statusCode);if(error instanceof FinanceError&&error.status===400){state='invalid';code='subscription_invalid';}
     else if([404,410].includes(status)){state='invalid';code='endpoint_expired';}

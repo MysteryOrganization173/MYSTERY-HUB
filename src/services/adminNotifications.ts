@@ -48,7 +48,7 @@ export interface NotificationTemplate {
 
 export interface NotificationLimits { titleMax: number; bodyMax: number }
 
-export type NotificationSendStatus = 'queued' | 'sending' | 'completed' | 'completed_with_errors' | 'failed';
+export type NotificationSendStatus = 'queued' | 'sending' | 'completed' | 'completed_with_errors' | 'failed' | 'not_sent' | 'no_device' | 'too_old';
 
 export type NotificationHistoryKind = 'announcement' | 'test' | 'order';
 
@@ -59,6 +59,13 @@ export interface NotificationSendSummary {
   openedAt?: string | null;
   /** Order updates saved while sending was paused, not yet sent to any device. */
   waiting?: boolean;
+  /** An order update saved more than 24 hours before sending resumed: it is never sent. */
+  stale?: boolean;
+  /** Tests: sent by the operator viewing this page; and whether it was an announcement test (taps aren't recorded). */
+  mine?: boolean;
+  announcementTest?: boolean;
+  /** A send: reviewed devices left out because they no longer qualified or already received this announcement. */
+  leftOut?: number;
   createdAt: string;
   createdBy: string | null;
   title: string;
@@ -84,6 +91,8 @@ export interface NotificationSendDetail extends NotificationSendSummary {
   destination: string | null;
   errors: Array<{ code: string; message: string; count: number }>;
   devices?: NotificationDeviceResult[];
+  /** Devices in the whole send; the device list shows the first 200. */
+  totalDevices?: number;
 }
 
 /** Plain-language readiness facts from the server. Never keys, endpoints or people. */
@@ -102,8 +111,14 @@ export interface NotificationReadiness {
   last7Days: Partial<Record<NotificationDeliveryState, number>>;
   commonProblem: string | null;
   lastTest: { id: string; createdAt: string; openedAt: string | null; states: Partial<Record<NotificationDeliveryState, number>> } | null;
-  /** When the viewer last opened a test from its notification (last 30 days): the phone check that allows resuming. */
-  phoneCheckedAt: string | null;
+  /**
+   * The phone check that allows resuming (the server's rule): any operator's test opened from its notification with
+   * its token in the last 30 days. `yoursAt` is the viewer's own latest check.
+   */
+  phoneCheck: { at: string; yoursAt: string | null } | null;
+  /** Announcement deliveries still queued (held while paused), and how many announcements they belong to. */
+  queuedAnnouncements: number;
+  queuedCampaigns: number;
 }
 
 export interface NotificationOverview {
@@ -141,7 +156,7 @@ export type NotificationSendResult =
 
 export type TemplateSaveResult = { ok: true; template: NotificationTemplate } | { ok: false; code: 'version_conflict' | 'invalid' | 'error'; message: string };
 
-export interface AudiencePreview { previewId: string; eligibleDevices: number; eligibleCustomers?: number; eligibleCustomerDevices?: number; eligibleGuests?: number }
+export interface AudiencePreview { previewId: string; eligibleDevices: number; eligibleCustomers?: number; eligibleCustomerDevices?: number; eligibleGuests?: number; alreadyReceived?: number }
 export type TestSendResult = { ok: true; devices: number; duplicate: boolean } | { ok: false; message: string };
 
 export interface AdminNotificationsClient {
@@ -150,6 +165,8 @@ export interface AdminNotificationsClient {
   testSelf?(token: string, input: { requestId: string; templateId?: string; destination?: string }): Promise<TestSendResult>;
   /** Pause or resume all customer sending, with a reason for the audit log. */
   setPaused?(token: string, paused: boolean, reason: string): Promise<{ ok: true; paused: boolean } | { ok: false; message: string }>;
+  /** Cancels announcement deliveries still queued: one announcement, or all of them. Audited with the reason. */
+  cancelQueued?(token: string, input: { campaignId?: string; reason: string }): Promise<{ ok: true; cancelled: number; inFlight: number } | { ok: false; message: string }>;
   readonly available: boolean;
   overview(token: string): Promise<NotificationOverview>;
   audiences(token: string): Promise<NotificationAudience[]>;
@@ -197,12 +214,18 @@ export const PROBLEM_LABELS:Record<string,string>={
  ineligible:'Not sent: the person signed out or changed their choice, the browser left guest news, or sending was paused.',
  accepted:'Accepted by the push service.',
  started:'Being sent.',
+ cancelled:'Cancelled by an operator before it was sent.',
+ paused:'Held because sending was paused; it goes out when sending resumes.',
 };
 const problem=(code:string)=>PROBLEM_LABELS[code]||String(code).replaceAll('_',' ');
-const statusOf=(c:Record<NotificationDeliveryState,number>,waiting=false):NotificationSendStatus=>{
+const statusOf=(c:Record<NotificationDeliveryState,number>,flags:{waiting?:boolean;stale?:boolean}={}):NotificationSendStatus=>{
  const total=Object.values(c).reduce((a,b)=>a+b,0);
- if(waiting||total===0||c.pending===total)return 'queued';
+ if(flags.waiting)return 'queued';
+ if(flags.stale)return 'too_old';
+ if(total===0)return 'no_device';
+ if(c.pending===total)return 'queued';
  if(c.pending||c.retrying)return 'sending';
+ if(c.skipped===total)return 'not_sent';
  const bad=c.failed+c.invalid;
  return bad===0?'completed':c.accepted>0?'completed_with_errors':'failed';
 };
@@ -210,8 +233,10 @@ const AUDIENCE_LABELS:Record<string,string>={members:'Customers who chose news a
 export function notificationHistoryItem(i:any):NotificationSendSummary&{destination:string|null}{
  const c=mapStates(i.states),kind=(['announcement','test','order'].includes(i.kind)?i.kind:'order') as NotificationHistoryKind;
  return {id:i.id,kind,createdAt:i.createdAt,createdBy:i.actorId??null,title:i.title,body:i.body,category:kind==='order'||kind==='test'&&i.destination==='/orders'?'transactional':'marketing',
-  audienceLabel:i.singleCustomer?'One customer who chose news and offers':AUDIENCE_LABELS[i.audience]||'Customers',recipients:Number(i.targeted)||0,status:statusOf(c,!!i.waiting),counts:c,
-  openedAt:i.openedAt??null,waiting:!!i.waiting,destination:i.destination??null};
+  audienceLabel:i.singleCustomer?'One customer who chose news and offers':kind==='test'&&i.mine===false?'Another operator’s devices':AUDIENCE_LABELS[i.audience]||'Customers',
+  recipients:Number(i.targeted)||0,status:statusOf(c,{waiting:!!i.waiting,stale:!!i.stale}),counts:c,
+  openedAt:i.openedAt??null,waiting:!!i.waiting,stale:!!i.stale,destination:i.destination??null,
+  ...(kind==='test'?{mine:i.mine!==false,announcementTest:!!i.announcementTest}:{})};
 }
 export function notificationDeliverySummary(d:any):NotificationSendDetail{
  const state=STATE[d.state]||'failed',c=counts();c[state]=1;
@@ -223,7 +248,8 @@ export function notificationReadiness(h:any):NotificationReadiness{
   announcementCustomers:num(h.announcementCustomers),announcementDevices:num(h.announcementDevices),guestBrowsers:num(h.guestBrowsers),ownDevices:num(h.ownDevices),waitingEvents:num(h.waitingEvents),
   last7Days:Object.fromEntries(Object.entries(mapStates(h.deliveries7Days)).filter(([,v])=>v>0)),commonProblem:h.commonProblem?problem(h.commonProblem):null,
   lastTest:h.lastTest?{id:h.lastTest.id,createdAt:h.lastTest.createdAt,openedAt:h.lastTest.openedAt??null,states:Object.fromEntries(Object.entries(mapStates(h.lastTest.states)).filter(([,v])=>v>0))}:null,
-  phoneCheckedAt:h.phoneCheckedAt??null};
+  phoneCheck:h.phoneCheck?.at?{at:h.phoneCheck.at,yoursAt:h.phoneCheck.yoursAt??null}:null,
+  queuedAnnouncements:num(h.queuedAnnouncements),queuedCampaigns:num(h.queuedCampaigns)};
 }
 const failure=(e:unknown)=>e instanceof Error?e.message:'The server did not answer. Nothing was changed.';
 // The overview and the audience counts load together; they share one status read while it is in flight. A read
@@ -248,6 +274,7 @@ export const httpAdminNotificationsClient:AdminNotificationsClient={
  async prepareAudience(token,input){const h=await request(token,'health');if(!h.configuration.enabled||h.paused)throw Error(h.configuration.enabled?'Sending is paused. Send a test to your own devices instead, or resume sending first.':'Web Push is not configured, so nothing can be sent. Templates and history are available.');
   const r=await request(token,'audiences/preview','POST',input);if(r.success!==true||!Number.isInteger(r.eligibleDevices)||!r.previewId)throw Error('Invalid audience preview. Nothing can be sent.');return r;},
  async testSelf(token,input){try{const r=await request(token,'test','POST',input);if(r.success!==true||!Number.isInteger(r.devices))throw Error('The test was not confirmed by the server.');return {ok:true,devices:r.devices,duplicate:!!r.duplicate};}catch(e){return {ok:false,message:failure(e)};}},
+ async cancelQueued(token,input){try{const r=await request(token,'announcements/cancel','POST',{...(input.campaignId?{campaignId:input.campaignId}:{}),reason:input.reason,confirmed:true});if(r.success!==true||!Number.isInteger(r.cancelled))throw Error('The cancellation was not confirmed by the server.');return {ok:true,cancelled:r.cancelled,inFlight:Number(r.inFlight)||0};}catch(e){return {ok:false,message:failure(e)};}},
  async setPaused(token,paused,reason){try{const r=await request(token,'settings','PUT',{paused,confirmed:true,reason});if(typeof r.paused!=='boolean')throw Error('The change was not confirmed by the server.');return {ok:true,paused:r.paused};}catch(e){return {ok:false,message:failure(e)};}},
  async placeholders(){return [{token:'{{appName}}',label:'Application name',sample:'Mystery Hub'},{token:'{{eventLabel}}',label:'Server event label',sample:'Service announcement'}];},
  async destinations(){return ANNOUNCEMENT_DESTINATIONS.map(value=>({value,label:DESTINATION_LABELS[value]}));},
@@ -262,16 +289,18 @@ export const httpAdminNotificationsClient:AdminNotificationsClient={
   return {items:r.items.map(notificationHistoryItem),page:query.page,totalPages:Math.max(1,Math.ceil(r.total/25))};},
  async send(token,id,kind='announcement'){const r=await request(token,`history/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`);
   const devices:NotificationDeviceResult[]=r.deliveries.map((d:any)=>({id:d.id,guest:!!d.guest,state:STATE[d.state]||'failed',code:d.lastCode??null,updatedAt:d.updatedAt,attempts:(d.history||[]).map((a:any)=>({attempt:a.attempt,code:a.code,startedAt:a.startedAt,finishedAt:a.finishedAt??null}))}));
-  const c=counts();for(const d of devices)c[d.state]++;
-  return {id,kind,createdAt:devices[0]?.updatedAt??new Date().toISOString(),createdBy:null,title:'',body:'',category:kind==='order'?'transactional':'marketing',audienceLabel:'',recipients:devices.length,status:statusOf(c),counts:c,destination:null,
-   errors:r.problems.map((p:any)=>({code:p.code,message:problem(p.code),count:p.count})),devices};},
+  // Counts cover the whole send (server totals); the device list is the first 200.
+  const c=r.totals?mapStates(r.totals):counts();if(!r.totals)for(const d of devices)c[d.state]++;
+  const total=Number.isInteger(r.total)?r.total:devices.length;
+  return {id,kind,createdAt:devices[0]?.updatedAt??new Date().toISOString(),createdBy:null,title:'',body:'',category:kind==='order'?'transactional':'marketing',audienceLabel:'',recipients:total,status:statusOf(c),counts:c,destination:null,
+   errors:r.problems.map((p:any)=>({code:p.code,message:problem(p.code),count:p.count})),devices,totalDevices:total};},
  async createSend(token,input){try{
   if(input.category!=='marketing'||!input.templateId||!input.previewId)throw Error('Prepare a saved marketing template and confirm its audience first.');
   const t=(await this.templates(token)).find(t=>t.id===input.templateId);if(!t||t.locked||!t.enabled||t.title!==input.title||t.body!==input.body)throw Error('Save and review the exact enabled marketing template before sending.');
   const r=await request(token,'campaigns','POST',{previewId:input.previewId,requestId:input.idempotencyKey,confirmed:true});if(r.success!==true||!r.campaignId||!Number.isInteger(r.eligibleDevices))throw Error('Campaign outcome unconfirmed. Retry only with the same request key.');const c=counts();c.pending=r.eligibleDevices;
-  return {ok:true,duplicate:r.duplicate,send:{id:r.campaignId,kind:'announcement',createdAt:new Date().toISOString(),createdBy:null,title:t.title,body:t.body,category:'marketing',audienceLabel:input.audienceId==='customer'?'One customer who chose news and offers':AUDIENCE_LABELS[input.audienceId==='marketing'?'members':input.audienceId]||AUDIENCE_LABELS.members,recipients:r.eligibleDevices,status:'queued',counts:c}};
+  return {ok:true,duplicate:r.duplicate,send:{id:r.campaignId,kind:'announcement',leftOut:Number(r.leftOut)||0,createdAt:new Date().toISOString(),createdBy:null,title:t.title,body:t.body,category:'marketing',audienceLabel:input.audienceId==='customer'?'One customer who chose news and offers':AUDIENCE_LABELS[input.audienceId==='marketing'?'members':input.audienceId]||AUDIENCE_LABELS.members,recipients:r.eligibleDevices,status:'queued',counts:c}};
  }catch(e){const error=e as NotificationHttpError;
   // A changed audience or template needs a fresh preview; a duplicate or a pause is explained in the server's words.
-  const stale=error.status===409&&!/already (queued|sent)|paused|turned off/i.test(error.message||'');
+  const stale=error.status===409&&!/already (queued|sent|received)|paused|turned off/i.test(error.message||'');
   return {ok:false,code:stale?'count_changed':[401,403].includes(error.status)?'forbidden':error.status===503?'unavailable':'invalid',message:error.message};}}
 };

@@ -752,7 +752,9 @@ UPDATE mysteryhub_notifications.events e SET campaign_id=k.id FROM mysteryhub_no
  WHERE e.campaign_id IS NULL AND left(e.event_key,9)='campaign:' AND substring(e.event_key from 10 for 36)=k.id::text;
 CREATE INDEX IF NOT EXISTS notification_events_campaign ON mysteryhub_notifications.events(campaign_id) WHERE campaign_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS notification_events_tests ON mysteryhub_notifications.events(created_at DESC) WHERE operator_test;
-CREATE INDEX IF NOT EXISTS notification_deliveries_event ON mysteryhub_notifications.deliveries(event_id);
+CREATE INDEX IF NOT EXISTS notification_deliveries_state_event ON mysteryhub_notifications.deliveries(state,event_id);
+CREATE INDEX IF NOT EXISTS notification_events_orders ON mysteryhub_notifications.events(created_at DESC,id DESC) WHERE order_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS notification_events_guest ON mysteryhub_notifications.events(guest_device_id,created_at DESC) WHERE guest_device_id IS NOT NULL;
 INSERT INTO mysteryhub_notifications.templates(id,title,body,category,locked) VALUES
  ('operator_test','Test notification','This is a test from {{appName}} Admin. No action is needed.','transactional',TRUE)
  ON CONFLICT DO NOTHING;

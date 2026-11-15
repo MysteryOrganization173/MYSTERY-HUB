@@ -7,7 +7,7 @@ import {
 import { httpAiDraftingClient, type AdminAiDraftingClient } from '../../../services/adminAiDrafting';
 import { CATEGORY_LABELS, DEFAULT_LIMITS, DELIVERY_LABELS, SEND_STATUS_LABELS, STARTER_TEMPLATES, lengthGuidance, unfilledBlanks } from '../../../utils/notificationComposer';
 import {
-  AdminButton, AdminEmpty, AdminError, AdminLoading, AdminNotice, AdminPageHeader, AdminPanel, AdminSheet, AdminTabs, Freshness, RefreshButton, StatusPill, adminField, adminLabel,
+  AdminButton, AdminEmpty, AdminError, AdminLoading, AdminNotice, AdminPageHeader, AdminPanel, AdminSheet, AdminTabs, ConfirmAction, Freshness, RefreshButton, StatusPill, adminField, adminLabel,
 } from '../ui/AdminUi';
 import { AdminNotificationComposer, type ComposerData } from './AdminNotificationComposer';
 import { AdminNotificationReadiness } from './AdminNotificationReadiness';
@@ -143,7 +143,10 @@ function NotificationHistory({ token, client, version }: { token: string; client
                     <StatusPill tone={s.waiting ? 'warning' : SEND_STATUS_LABELS[s.status].tone}>{s.waiting ? 'Waiting for resume' : SEND_STATUS_LABELS[s.status].label}</StatusPill>
                   </span>
                   <span className="block text-xs text-slate-400">{when(s.createdAt)} · {s.audienceLabel} · {s.recipients.toLocaleString()} {s.recipients === 1 ? 'device' : 'devices'}{(s as { destination?: string | null }).destination ? ` · Opens ${DESTINATION_LABELS[(s as { destination?: string }).destination!] ?? 'Home'}` : ''}</span>
-                  {s.kind === 'test' && <span className={`block text-xs ${s.openedAt ? 'text-emerald-300' : 'text-slate-400'}`}>{s.openedAt ? `You opened it from the notification at ${when(s.openedAt)}.` : 'Not opened from its notification yet.'}</span>}
+                  {s.kind === 'test' && <span className={`block text-xs ${s.openedAt ? 'text-emerald-300' : 'text-slate-400'}`}>{
+                    s.announcementTest ? 'Announcement test: taps are not recorded. Check it on the phone itself.'
+                    : s.openedAt ? `${s.mine === false ? 'The operator opened it' : 'You opened it'} from its notification at ${when(s.openedAt)}.`
+                    : 'Not opened from its notification yet.'}</span>}
                   <DeliveryCounts send={s} />
                 </button>
               </li>
@@ -166,16 +169,35 @@ function SendDetail({ token, client, summary, onClose }: { token: string; client
   const [detail, setDetail] = useState<NotificationSendDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelNote, setCancelNote] = useState<string | null>(null);
+  const cancelRest = async (values: Record<string, string>) => {
+    if (!client.cancelQueued) return;
+    setCancelBusy(true); setCancelError(null);
+    const res = await client.cancelQueued(token, { campaignId: summary.id, reason: values.reason });
+    setCancelBusy(false);
+    if (!res.ok) return setCancelError(res.message);
+    setCancelling(false); setAttempt(n => n + 1);
+    setCancelNote(`${res.cancelled.toLocaleString()} cancelled.${res.inFlight ? ` ${res.inFlight.toLocaleString()} already being sent could not be stopped.` : ''}`);
+  };
   useEffect(() => { let active = true; setError(null); client.send(token, summary.id, summary.kind).then(d => { if (active) setDetail(d); }, e => { if (active) setError(e instanceof Error ? e.message : 'Details could not be loaded.'); }); return () => { active = false; }; }, [client, token, summary.id, summary.kind, attempt]);
   const destination = (summary as { destination?: string | null }).destination;
+  // The detail's counts cover the whole send and are the latest; the list row is only a starting point.
   const counts = detail?.devices ? detail.counts : summary.counts;
+  const status = detail?.devices ? detail.status : summary.status;
+  const stillQueued = counts.pending + counts.retrying;
   return (
     <AdminSheet wide title={summary.title || 'Sent message'} subtitle={when(summary.createdAt)} onClose={onClose}
       footer={<div className="flex justify-between gap-2"><AdminButton onClick={() => setAttempt(n => n + 1)}>Refresh results</AdminButton><AdminButton variant="primary" onClick={onClose}>Done</AdminButton></div>}>
       <div className="space-y-4 text-sm">
         <div className="rounded-2xl border border-slate-800 p-3"><p className="font-semibold text-white">{summary.title}</p><p className="mt-1 whitespace-pre-line text-slate-300">{summary.body}</p>
           <p className="mt-2 text-xs text-slate-400">{summary.audienceLabel} · Opens: {destination ? DESTINATION_LABELS[destination] ?? 'Home' : 'Home'} · {CATEGORY_LABELS[summary.category]}</p></div>
-        <div className="flex flex-wrap items-center gap-2"><StatusPill tone={summary.waiting ? 'warning' : SEND_STATUS_LABELS[summary.status].tone}>{summary.waiting ? 'Waiting for resume' : SEND_STATUS_LABELS[summary.status].label}</StatusPill><span className="text-xs text-slate-400">{summary.recipients.toLocaleString()} {summary.recipients === 1 ? 'device' : 'devices'} targeted</span></div>
+        <div className="flex flex-wrap items-center gap-2"><StatusPill tone={summary.waiting ? 'warning' : SEND_STATUS_LABELS[status].tone}>{summary.waiting ? 'Waiting for resume' : SEND_STATUS_LABELS[status].label}</StatusPill><span className="text-xs text-slate-400">{(detail?.totalDevices ?? summary.recipients).toLocaleString()} {(detail?.totalDevices ?? summary.recipients) === 1 ? 'device' : 'devices'} targeted</span></div>
+        {summary.kind === 'announcement' && stillQueued > 0 && client.cancelQueued && <AdminNotice tone="warning" title={`${stillQueued.toLocaleString()} still queued`}
+          action={<AdminButton onClick={() => { setCancelError(null); setCancelling(true); }}>Cancel the rest</AdminButton>}>They go out as the sender works through them, or when sending resumes if it is paused.</AdminNotice>}
+        {cancelNote && <p role="status" className="text-emerald-200">{cancelNote}</p>}
         <dl className="divide-y divide-slate-800 rounded-2xl border border-slate-800">
           {DELIVERY_STATES.filter(s => s !== 'sent').map(s => (
             <div key={s} className="flex items-start justify-between gap-3 px-3 py-2.5">
@@ -198,11 +220,15 @@ function SendDetail({ token, client, summary, onClose }: { token: string; client
                 {d.attempts.length > 0 && <p className="text-xs text-slate-400">{d.attempts.map(a => `Try ${a.attempt}: ${String(a.code).replaceAll('_', ' ')}${a.finishedAt ? ` at ${when(a.finishedAt)}` : ''}`).join(' · ')}</p>}
               </li>)}
             </ol>
-            {detail.devices.length >= 200 && <p className="mt-1 text-xs text-slate-400">Showing the first 200 devices.</p>}
+            {(detail.totalDevices ?? 0) > detail.devices.length && <p className="mt-1 text-xs text-slate-400">Showing the first {detail.devices.length.toLocaleString()} of {(detail.totalDevices ?? 0).toLocaleString()} devices. The counts above cover all of them.</p>}
           </div>}
-          {detail.devices && detail.devices.length === 0 && <p className="text-xs text-slate-400">{summary.waiting ? 'Saved while sending was paused. Nothing has been sent to a device yet.' : 'No device was registered for this update.'}</p>}
+          {detail.devices && detail.devices.length === 0 && <p className="text-xs text-slate-400">{summary.waiting ? 'Saved while sending was paused. Nothing has been sent to a device yet.' : summary.stale ? 'Saved while sending was paused, more than 24 hours before it resumed, so it was never sent.' : 'No device was registered for this update.'}</p>}
         </>}
       </div>
+      {cancelling && <ConfirmAction title="Cancel the rest of this announcement?" summary={<>{stillQueued.toLocaleString()} queued {stillQueued === 1 ? 'delivery' : 'deliveries'} will not be sent. Anything already handed to the push service cannot be recalled.</>}
+        fields={[{ key: 'reason', label: 'Reason, for the audit log', minLength: 5, maxLength: 200, placeholder: 'Wrong page in the announcement' }]}
+        acknowledgement="I understand the rest of this announcement will not be sent." confirmLabel="Cancel the rest" tone="danger"
+        busy={cancelBusy} error={cancelError} onConfirm={values => void cancelRest(values)} onClose={() => { if (!cancelBusy) setCancelling(false); }} />}
     </AdminSheet>
   );
 }

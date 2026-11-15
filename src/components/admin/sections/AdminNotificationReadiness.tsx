@@ -38,7 +38,8 @@ export function AdminNotificationReadiness({ token, client, overview, onChanged 
   const r = overview.readiness;
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const [confirm, setConfirm] = useState<'pause' | 'resume' | null>(null);
+  const [confirm, setConfirm] = useState<'pause' | 'resume' | 'cancel' | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const testKey = useRef<string | null>(null);
@@ -46,9 +47,10 @@ export function AdminNotificationReadiness({ token, client, overview, onChanged 
 
   const paused = overview.paused !== false;
   const configured = r.keysValid && r.switchOn && overview.sendingEnabled === true;
-  // Mirrors the server's resume rule for this operator: a test opened from its notification in the last 30 days.
-  const verified = Boolean(r.phoneCheckedAt);
-  const newerTestWaiting = Boolean(r.lastTest && !r.lastTest.openedAt && (!r.phoneCheckedAt || r.lastTest.createdAt > r.phoneCheckedAt));
+  // The server's resume rule, shown as is: any operator's test opened from its notification in the last 30 days.
+  const check = r.phoneCheck, verified = Boolean(check);
+  const yours = check?.yoursAt ?? null;
+  const newerTestWaiting = Boolean(r.lastTest && !r.lastTest.openedAt && (!yours || r.lastTest.createdAt > yours));
   const worker = overview.worker;
   const workerFailing = Boolean(worker?.lastErrorAt && (!worker.lastCompletedAt || worker.lastErrorAt > worker.lastCompletedAt));
   const last7 = r.last7Days, problems = (last7.failed ?? 0) + (last7.invalid ?? 0);
@@ -70,12 +72,22 @@ export function AdminNotificationReadiness({ token, client, overview, onChanged 
     } else setTestResult({ ok: false, message: res.message });
   };
   const changePause = async (values: Record<string, string>) => {
-    if (!client.setPaused || !confirm) return;
-    setBusy(true); setError(null);
+    if (!confirm) return;
+    setBusy(true); setError(null); setNotice(null);
+    if (confirm === 'cancel') {
+      const res = client.cancelQueued ? await client.cancelQueued(token, { reason: values.reason }) : { ok: false as const, message: 'Cancelling is not available.' };
+      setBusy(false);
+      if (!res.ok) return setError(res.message);
+      setConfirm(null); onChanged();
+      setNotice(`${plural(res.cancelled, 'queued announcement delivery', 'queued announcement deliveries')} cancelled.${res.inFlight ? ` ${plural(res.inFlight, 'was', 'were')} already being handed to the push service and could not be stopped.` : ''}`);
+      return;
+    }
+    if (!client.setPaused) return setBusy(false);
     const res = await client.setPaused(token, confirm === 'pause', values.reason);
     setBusy(false);
     if (res.ok) { setConfirm(null); onChanged(); } else setError(res.message);
   };
+  const queued = r.queuedAnnouncements > 0 ? `${plural(r.queuedAnnouncements, 'announcement delivery', 'announcement deliveries')} from ${plural(r.queuedCampaigns, 'announcement')}` : null;
 
   const states = [['accepted', 'accepted'], ['retrying', 'retrying'], ['failed', 'failed'], ['invalid', 'expired'], ['skipped', 'not sent']] as const;
   const week = states.filter(([k]) => (last7[k] ?? 0) > 0).map(([k, label]) => `${(last7[k] ?? 0).toLocaleString()} ${label}`).join(' · ');
@@ -111,6 +123,11 @@ export function AdminNotificationReadiness({ token, client, overview, onChanged 
           {paused && r.waitingEvents > 0 && <Check tone="wait" title={`${plural(r.waitingEvents, 'order update is', 'order updates are')} waiting`}>
             Saved in the last 24 hours while paused. They are sent when you resume; anything older never is.
           </Check>}
+          {queued && <Check tone="wait" title={`${queued} still queued`}>
+            {paused ? 'Held while paused; they go out when sending resumes unless you cancel them.' : 'Going out now, about one a second.'}
+            {client.cancelQueued && <button type="button" onClick={() => { setError(null); setConfirm('cancel'); }} className="mt-1.5 block min-h-11 font-semibold text-amber-200 underline underline-offset-2 hover:text-white">Cancel queued announcements</button>}
+          </Check>}
+          {notice && <li role="status" className="py-3 text-sm text-emerald-200">{notice}</li>}
           <Check tone={problems > 0 ? 'wait' : week ? 'ok' : 'off'} title={week ? `Last 7 days: ${week}` : 'Nothing sent in the last 7 days'}>
             {r.commonProblem ? `Most common problem: ${r.commonProblem}` : '“Accepted” means the push service took it, not that a person saw it.'}
           </Check>
@@ -118,7 +135,8 @@ export function AdminNotificationReadiness({ token, client, overview, onChanged 
 
         <div className="space-y-3 self-start rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
           <p className="flex items-center gap-2 font-semibold text-white"><Smartphone className="h-4 w-4 text-[#00c365]" aria-hidden />Check it on your phone</p>
-          {verified && <p className="text-sm text-emerald-200">Checked on your phone. You opened a test from its notification at {time(r.phoneCheckedAt)}.</p>}
+          {yours ? <p className="text-sm text-emerald-200">Checked on your phone. You opened a test from its notification at {time(yours)}.</p>
+            : check && <p className="text-sm text-emerald-200">Another operator checked a phone at {time(check.at)}, so resuming is allowed. You can check yours too.</p>}
           {newerTestWaiting && r.lastTest ? <p className="text-sm text-amber-100">{verified ? 'Your latest test was sent' : 'Test sent'} {time(r.lastTest.createdAt)}{r.lastTest.states.accepted ? `, accepted by the push service for ${plural(r.lastTest.states.accepted, 'device')}` : ''}. Waiting for you to tap it on your phone.</p>
             : !verified && <p className="text-sm text-slate-300">Not checked on a phone yet. Send a test to your own devices, then tap it on your phone.</p>}
           <p className="text-xs text-slate-400">Only your own signed-in devices receive it: “Test notification” after you sign in, with generic text on the lock screen, like an order update.</p>
@@ -130,20 +148,22 @@ export function AdminNotificationReadiness({ token, client, overview, onChanged 
           {configured && client.setPaused && <div className="border-t border-slate-800 pt-3">
             {paused ? <>
               <AdminButton className="w-full" disabled={!verified} onClick={() => { setError(null); setConfirm('resume'); }}><PlayCircle className="h-4 w-4" />Resume sending</AdminButton>
-              {!verified && <p className="mt-1.5 text-xs text-slate-400">Available after you check a test on your phone.</p>}
+              {!verified && <p className="mt-1.5 text-xs text-slate-400">Available after a test is opened on a phone (in the last 30 days).</p>}
             </> : <AdminButton className="w-full" onClick={() => { setError(null); setConfirm('pause'); }}><PauseCircle className="h-4 w-4" />Pause sending</AdminButton>}
           </div>}
         </div>
       </div>
 
-      {confirm && <ConfirmAction title={confirm === 'resume' ? 'Resume sending to customers?' : 'Pause all sending?'}
+      {confirm && <ConfirmAction title={confirm === 'resume' ? 'Resume sending to customers?' : confirm === 'cancel' ? 'Cancel queued announcements?' : 'Pause all sending?'}
         summary={confirm === 'resume'
-          ? <>Order updates start going to customers’ registered devices, and you can send announcements to people who chose news.{r.waitingEvents > 0 ? ` ${plural(r.waitingEvents, 'waiting order update')} from the last 24 hours will be sent.` : ''}</>
-          : <>Customers and visitors stop receiving order updates and announcements until someone resumes. Your own tests keep working.</>}
+          ? <>Order updates start going to customers’ registered devices.{r.waitingEvents > 0 ? ` ${plural(r.waitingEvents, 'waiting order update')} from the last 24 hours will be sent.` : ''}{queued ? ` ${queued} still queued will also be sent. Cancel them first if they should not go out.` : ''}</>
+          : confirm === 'cancel'
+          ? <>{queued ?? 'Queued announcement deliveries'} will not be sent. Anything already handed to the push service cannot be recalled. Order updates are not affected.</>
+          : <>Customers and visitors stop receiving order updates and announcements until someone resumes. Anything still queued is held, not lost{queued ? `, including ${queued}; you can cancel those from Status` : ''}. Your own tests keep working.</>}
         warning={confirm === 'resume' ? <span className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />This turns on live delivery for real customers.</span> : undefined}
-        fields={[{ key: 'reason', label: 'Reason, for the audit log', minLength: 5, maxLength: 200, placeholder: confirm === 'resume' ? 'Phone checked; approved for live sending' : 'Maintenance' }]}
-        acknowledgement={confirm === 'resume' ? 'I checked notifications on a real phone and I approve live sending to customers.' : 'I understand customers will not receive notifications while paused.'}
-        confirmLabel={confirm === 'resume' ? 'Resume sending' : 'Pause sending'} tone={confirm === 'resume' ? 'primary' : 'danger'}
+        fields={[{ key: 'reason', label: 'Reason, for the audit log', minLength: 5, maxLength: 200, placeholder: confirm === 'resume' ? 'Phone checked; approved for live sending' : confirm === 'cancel' ? 'Wrong page in the announcement' : 'Maintenance' }]}
+        acknowledgement={confirm === 'resume' ? 'I checked notifications on a real phone and I approve live sending to customers.' : confirm === 'cancel' ? 'I understand these announcements will not be sent.' : 'I understand customers will not receive notifications while paused.'}
+        confirmLabel={confirm === 'resume' ? 'Resume sending' : confirm === 'cancel' ? 'Cancel queued announcements' : 'Pause sending'} tone={confirm === 'resume' ? 'primary' : 'danger'}
         busy={busy} error={error} onConfirm={values => void changePause(values)} onClose={() => { if (!busy) setConfirm(null); }} />}
     </AdminPanel>
   );

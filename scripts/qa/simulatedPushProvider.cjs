@@ -4,11 +4,16 @@
 // QA_PUSH_LOG instead; an endpoint containing "GONE" answers 410 like an unsubscribed browser. Simulated acceptance
 // proves the server's logic, never delivery to a phone. It refuses to load unless the database is a disposable
 // *_test database on this machine, so it cannot be preloaded into production by mistake.
-const url = (() => { try { return new URL(process.env.DATABASE_URL || ''); } catch { return null; } })();
-if (!url || !['127.0.0.1', 'localhost'].includes(url.hostname) || !/_test$/.test(url.pathname)) {
-  throw new Error('simulatedPushProvider: refused. Only for a local, disposable *_test database.');
-}
+// The same rules as the server's test-database guard (server/utils/environment.ts): loopback host, a name ending in
+// _test, and no connection parameter that could redirect the driver to another host or database.
+const localTestDatabase = value => {
+  let url; try { url = new URL(value || ''); } catch { return false; }
+  return ['postgres:', 'postgresql:'].includes(url.protocol) && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+    && /^\/[a-zA-Z0-9_]+_test$/.test(url.pathname) && [...url.searchParams.keys()].every(key => ['sslmode', 'connect_timeout', 'application_name'].includes(key));
+};
+if (!localTestDatabase(process.env.DATABASE_URL)) throw new Error('simulatedPushProvider: refused. Only for a local, disposable *_test database.');
 const fs = require('fs');
+module.exports = { localTestDatabase };
 const webPush = require('web-push');
 webPush.sendNotification = async (subscription, payload) => {
   const endpoint = String(subscription?.endpoint || '');
@@ -16,4 +21,6 @@ webPush.sendNotification = async (subscription, payload) => {
   if (endpoint.includes('GONE')) throw Object.assign(new Error('simulated: this browser unsubscribed'), { statusCode: 410 });
   return { statusCode: 201, body: '', headers: {} };
 };
+// A marker the review script checks before it starts: the server under review really has the simulated provider.
+if (process.env.QA_PUSH_LOG) fs.writeFileSync(`${process.env.QA_PUSH_LOG}.active`, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }));
 console.warn('[QA] Simulated push provider active: no notification leaves this machine.');

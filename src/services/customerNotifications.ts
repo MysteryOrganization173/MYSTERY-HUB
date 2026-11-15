@@ -63,9 +63,10 @@ export const httpCustomerNotificationsClient:CustomerNotificationsClient={
  async inbox(token,offset=0,signal){const r=await notificationHttp(token,'notifications/inbox?offset='+offset,'GET',undefined,signal);if(r.success!==true||!Array.isArray(r.items))throw Error('Your notifications could not be loaded.');
   return r.items.filter((i:any)=>typeof i?.id==='string'&&typeof i.title==='string'&&typeof i.body==='string'&&['/orders','/app'].includes(i.destination)).map((i:any)=>({id:i.id,createdAt:String(i.createdAt),title:i.title,body:i.body,destination:i.destination,...(announcementPage(i.opens)?{opens:announcementPage(i.opens)}:{})}));}
 };
-export async function readNotificationInbox(token:string,id:string,signal?:AbortSignal){
+export async function readNotificationInbox(token:string,id:string,signal?:AbortSignal,open?:string|null){
  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))throw Error('Invalid notification link.');
- const result=await notificationHttp(token,'notifications/inbox/'+encodeURIComponent(id),'GET',undefined,signal);
+ const proof=open&&/^[A-Za-z0-9_-]{43}$/.test(open)?'?open='+encodeURIComponent(open):'';
+ const result=await notificationHttp(token,'notifications/inbox/'+encodeURIComponent(id)+proof,'GET',undefined,signal);
  if(!result.notification||!['/orders','/app'].includes(result.notification.destination))throw Error('Invalid notification destination.');
  return {...result.notification,opens:announcementPage(result.notification.opens)} as {title:string;body:string;destination:'/orders'|'/app';opens?:AnnouncementPage};
 }

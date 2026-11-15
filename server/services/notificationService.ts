@@ -4,7 +4,7 @@ import {getPool} from '../db/connection.js';
 import {FinanceError} from '../db/financeStore.js';
 import {AdminAuditStore} from '../db/adminAuditStore.js';
 import {hashSessionToken} from '../utils/crypto.js';
-import {digest,encryptSubscription,decryptSubscription,pushConfiguration,validateSubscription,validateTemplate,renderTemplate} from './notificationSafety.js';
+import {digest,encryptSubscription,decryptSubscription,pushConfiguration,validateSubscription,validateTemplate,renderTemplate,testOpenTokenMatches} from './notificationSafety.js';
 import {ANNOUNCEMENT_DESTINATIONS,type AnnouncementDestination,type NotificationAudienceKind,type NotificationHistoryKind} from '../../shared/notifications.js';
 
 export const NOTIFICATIONS='mysteryhub_notifications';
@@ -29,6 +29,21 @@ async function audienceFor(c:PoolClient,kind:NotificationAudienceKind,userId?:st
  return {members:kind==='guests'?[]:await audience(c,userId||undefined),guests:kind==='members'?[]:await guestAudience(c)};
 }
 const audienceHash=(kind:NotificationAudienceKind,destination:string|null,ids:{members:string[];guests:string[]})=>digest(JSON.stringify([kind,destination,ids.members,ids.guests]));
+/**
+ * Nobody receives the same announcement (template and version) twice within 30 minutes, whichever audience, page or
+ * preview it comes from: such recipients are left out of the count and of the send. A corrected template (a new
+ * version) is a new announcement.
+ */
+async function withoutRecentRecipients(c:PoolClient,ids:{members:string[];guests:string[]},templateId:string,version:number){
+ // "Received" means accepted by the push service or still on its way; a cancelled or skipped send does not count.
+ const recent=`e.template_id=$2 AND (e.template_snapshot->>'version')::int=$3 AND NOT e.operator_test AND e.created_at>NOW()-interval '30 minutes'
+  AND EXISTS(SELECT 1 FROM ${NOTIFICATIONS}.deliveries q WHERE q.event_id=e.id AND q.state IN ('queued','retry','provider_accepted'))`;
+ const members=ids.members.length?(await c.query(`SELECT d.id FROM ${NOTIFICATIONS}.devices d WHERE d.id=ANY($1::uuid[]) AND NOT EXISTS(SELECT 1 FROM ${NOTIFICATIONS}.events e WHERE e.user_id=d.user_id AND ${recent}) ORDER BY d.id`,[ids.members,templateId,version])).rows.map(r=>r.id as string):[];
+ const guests=ids.guests.length?(await c.query(`SELECT g.id FROM ${NOTIFICATIONS}.guest_devices g WHERE g.id=ANY($1::uuid[]) AND NOT EXISTS(SELECT 1 FROM ${NOTIFICATIONS}.events e WHERE e.guest_device_id=g.id AND ${recent}) ORDER BY g.id`,[ids.guests,templateId,version])).rows.map(r=>r.id as string):[];
+ return {members,guests};
+}
+/** A reason for the audit log: 5–200 characters, no markup, control characters or credential-like words. */
+function safeReason(input:any){if(input.confirmed!==true||typeof input.reason!=='string'||input.reason.trim().length<5||input.reason.length>200||/[<>\x00-\x1f]|Bearer|secret|password/i.test(input.reason))throw new FinanceError('Confirm with a safe reason (5–200 characters).');return input.reason.trim();}
 /** The approved page an announcement opens; anything else falls back to the home page. */
 export const announcementPage=(value:unknown):AnnouncementDestination=>ANNOUNCEMENT_DESTINATIONS.includes(value as AnnouncementDestination)?value as AnnouncementDestination:'/';
 const requestKey=(value:unknown)=>typeof value==='string'&&/^[a-zA-Z0-9_-]{8,64}$/.test(value);
@@ -160,12 +175,13 @@ export class NotificationService {
  });}
  static async revoke(userId:string,id:string){requireUuid(id);await db().query(`DELETE FROM ${NOTIFICATIONS}.devices WHERE id=$1 AND user_id=$2`,[id,userId]);return {success:true};}
  static async devices(userId:string,token:string){return (await db().query(`SELECT d.id,d.endpoint_hash,d.created_at,d.updated_at,(s.token_hash=$2 AND s.expires_at>NOW()) AS current_session FROM ${NOTIFICATIONS}.devices d JOIN sessions s ON s.id=d.session_id WHERE d.user_id=$1 ORDER BY d.updated_at DESC LIMIT 10`,[userId,hashSessionToken(token)])).rows;}
- static async inbox(userId:string,offset=0,id?:string){if(id)requireUuid(id);
+ static async inbox(userId:string,offset=0,id?:string,open?:unknown){if(id)requireUuid(id);
   const rows=(await db().query(`SELECT e.id,e.created_at,e.order_id,e.label,e.template_snapshot,e.destination FROM ${NOTIFICATIONS}.events e WHERE e.user_id=$1 AND ($2::uuid IS NULL OR e.id=$2) ORDER BY e.created_at DESC,e.id DESC LIMIT 25 OFFSET $3`,[userId,id||null,offset])).rows;
   if(id&&!rows.length)throw new FinanceError('Notification not found.',404);
-  // Opening the operator's own test from its notification is the evidence that the whole path works on that phone.
+  // Opening the operator's own test from its notification is the evidence that the whole path works on a device. It
+  // counts only with the open token that travelled inside that encrypted push, so a link or an id alone proves nothing.
   // Only tests are marked this way; customer notifications are never tracked as opened.
-  if(id)await db().query(`UPDATE ${NOTIFICATIONS}.events SET opened_at=NOW() WHERE id=$1 AND user_id=$2 AND operator_test AND opened_at IS NULL`,[id,userId]);
+  if(id&&typeof open==='string'&&testOpenTokenMatches(id,open))await db().query(`UPDATE ${NOTIFICATIONS}.events SET opened_at=NOW() WHERE id=$1 AND user_id=$2 AND operator_test AND opened_at IS NULL`,[id,userId]);
   return rows.map(r=>({id:r.id,createdAt:r.created_at,...renderTemplate(r.template_snapshot,r.label),destination:r.order_id?'/orders' as const:'/app' as const,
    ...(r.template_snapshot?.category==='marketing'?{opens:announcementPage(r.destination)}:{})}));
  }
@@ -194,31 +210,34 @@ export class NotificationService {
    ||!AUDIENCE_KINDS.includes(kind)||!ANNOUNCEMENT_DESTINATIONS.includes(destination))throw new FinanceError('Choose a valid template, audience, page and optional customer.');
   if(kind!=='members'&&!this.config().guests)throw new FinanceError('Guest news is off, so only customers with accounts can receive announcements.',409);
   return notificationTransaction(async c=>{const t=(await c.query(`SELECT * FROM ${NOTIFICATIONS}.templates WHERE id=$1`,[input.templateId])).rows[0];if(!t||t.category!=='marketing'||!t.enabled)throw new FinanceError('Choose an enabled marketing template.',409);
-   const ids=await audienceFor(c,kind,input.userId);if(ids.members.length+ids.guests.length>1000)throw new FinanceError('Audience exceeds this release’s safe campaign limit. Select a customer instead.',409);
+   const all=await audienceFor(c,kind,input.userId),ids=await withoutRecentRecipients(c,all,t.id,t.version);
+   if(ids.members.length+ids.guests.length>1000)throw new FinanceError('Audience exceeds this release’s safe campaign limit. Select a customer instead.',409);
+   const alreadyReceived=all.members.length+all.guests.length-ids.members.length-ids.guests.length;
    const previewId=randomUUID();await c.query(`INSERT INTO ${NOTIFICATIONS}.audiences(id,actor_id,template_id,template_version,user_filter,device_ids,guest_device_ids,audience_kind,destination,audience_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
     [previewId,actor,t.id,t.version,input.userId||null,ids.members,ids.guests,kind,destination,audienceHash(kind,destination,ids)]);
    const customers=ids.members.length?Number((await c.query(`SELECT COUNT(DISTINCT user_id) FROM ${NOTIFICATIONS}.devices WHERE id=ANY($1::uuid[])`,[ids.members])).rows[0].count):0;
-   return {success:true,previewId,audience:kind,destination,eligibleDevices:ids.members.length+ids.guests.length,eligibleCustomers:customers,eligibleCustomerDevices:ids.members.length,eligibleGuests:ids.guests.length,expiresInSeconds:600,enabled:this.config().enabled};
+   return {success:true,previewId,audience:kind,destination,eligibleDevices:ids.members.length+ids.guests.length,eligibleCustomers:customers,eligibleCustomerDevices:ids.members.length,eligibleGuests:ids.guests.length,alreadyReceived,expiresInSeconds:600,enabled:this.config().enabled};
   });
  }
  static async campaign(actor:string,input:any){exact(input,['previewId','requestId','confirmed']);requireUuid(input.previewId);if(input.confirmed!==true||!requestKey(input.requestId))throw new FinanceError('Confirm the prepared audience with a valid request ID.');
   if(!this.config().enabled)throw new FinanceError('Real delivery is disabled until configuration is verified.',503);
   return notificationTransaction(async c=>{
    await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['notification-campaign:'+input.requestId]);const hash=digest(JSON.stringify([actor,input.previewId]));
-   const old=(await c.query(`SELECT * FROM ${NOTIFICATIONS}.campaigns WHERE request_id=$1`,[input.requestId])).rows[0];if(old){if(old.input_hash!==hash)throw new FinanceError('Campaign request changed.',409);return {success:true,campaignId:old.id,eligibleDevices:old.recipient_count,duplicate:true};}
+   const old=(await c.query(`SELECT * FROM ${NOTIFICATIONS}.campaigns WHERE request_id=$1`,[input.requestId])).rows[0];if(old){if(old.input_hash!==hash)throw new FinanceError('This send was already queued from an earlier review. It was not queued again.',409);return {success:true,campaignId:old.id,eligibleDevices:old.recipient_count,duplicate:true};}
    const a=(await c.query(`SELECT * FROM ${NOTIFICATIONS}.audiences WHERE id=$1 AND actor_id=$2 AND expires_at>NOW() FOR UPDATE`,[input.previewId,actor])).rows[0];if(!a)throw new FinanceError('Audience preview expired or is unavailable. Preview again.',409);
    if((await c.query(`SELECT 1 FROM ${NOTIFICATIONS}.campaigns WHERE preview_id=$1`,[a.id])).rowCount)throw new FinanceError('This audience preview was already sent. Do not duplicate the campaign.',409);
    const t=(await c.query(`SELECT * FROM ${NOTIFICATIONS}.templates WHERE id=$1 FOR SHARE`,[a.template_id])).rows[0];if(!t.enabled||t.category!=='marketing'||t.version!==a.template_version)throw new FinanceError('Template changed. Preview again.',409);
    if((await c.query(`SELECT paused FROM ${NOTIFICATIONS}.settings WHERE id=TRUE`)).rows[0].paused)throw new FinanceError('Notification sending is paused.',409);
    const kind=a.audience_kind as NotificationAudienceKind;if(kind!=='members'&&!this.config().guests)throw new FinanceError('Guest news was turned off. Preview again.',409);
-   const ids=await audienceFor(c,kind,a.user_filter),total=ids.members.length+ids.guests.length;
-   if(audienceHash(kind,a.destination,ids)!==a.audience_hash||total===0)throw new FinanceError('Audience changed or is empty. Preview again.',409);
-   // Campaigns are created one at a time, and the same announcement is never queued twice for the same audience
-   // within 30 minutes, even from a second preview (two tabs, a double confirmation, a retried request).
+   // One campaign at a time, so two confirmations (two tabs, a retried request) can never both pass the checks below.
    await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['notification-campaigns']);
-   if((await c.query(`SELECT 1 FROM ${NOTIFICATIONS}.campaigns k JOIN ${NOTIFICATIONS}.audiences p ON p.id=k.preview_id WHERE p.template_id=$1 AND p.template_version=$2 AND p.audience_kind=$3
-    AND p.user_filter IS NOT DISTINCT FROM $4 AND p.destination IS NOT DISTINCT FROM $5 AND k.created_at>NOW()-interval '30 minutes' LIMIT 1`,[a.template_id,a.template_version,kind,a.user_filter,a.destination])).rowCount)
-    throw new FinanceError('This announcement was already queued for this audience in the last 30 minutes. It was not queued again.',409);
+   // The reviewed recipients who still qualify now: a withdrawal since the preview is respected, nobody new is added,
+   // and anyone who received this announcement in the last 30 minutes (from any audience or page) is left out.
+   const now=await audienceFor(c,kind,a.user_filter),reviewed={members:new Set<string>(a.device_ids||[]),guests:new Set<string>(a.guest_device_ids||[])};
+   const qualifying={members:now.members.filter(id=>reviewed.members.has(id)),guests:now.guests.filter(id=>reviewed.guests.has(id))};
+   const ids=await withoutRecentRecipients(c,qualifying,t.id,t.version),total=ids.members.length+ids.guests.length;
+   if(total===0)throw new FinanceError(qualifying.members.length+qualifying.guests.length?'Everyone in this audience already received this announcement in the last 30 minutes. It was not sent again.':'Audience changed or is empty. Preview again.',409);
+   const leftOut=reviewed.members.size+reviewed.guests.size-total;
    const campaignId=randomUUID(),page=announcementPage(a.destination);await c.query(`INSERT INTO ${NOTIFICATIONS}.campaigns(id,actor_id,preview_id,request_id,input_hash,recipient_count) VALUES($1,$2,$3,$4,$5,$6)`,[campaignId,actor,a.id,input.requestId,hash,total]);
    // One event per customer (their inbox shows it once) with a delivery per device; one event per guest browser.
    if(ids.members.length)await c.query(`WITH ev AS (INSERT INTO ${NOTIFICATIONS}.events(user_id,event_key,template_id,label,destination,campaign_id,expanded_at)
@@ -229,11 +248,11 @@ export class NotificationService {
      SELECT g.id,$1||g.id::text,$2,'Service announcement',$3,$4,NOW() FROM ${NOTIFICATIONS}.guest_devices g WHERE g.id=ANY($5::uuid[]) RETURNING id,guest_device_id)
     INSERT INTO ${NOTIFICATIONS}.deliveries(event_id,guest_device_id,binding_version) SELECT ev.id,g.id,g.binding_version FROM ev JOIN ${NOTIFICATIONS}.guest_devices g ON g.id=ev.guest_device_id`,
     [`campaign:${campaignId}:guest:`,t.id,page,campaignId,ids.guests]);
-   await AdminAuditStore.record({adminUserId:actor,action:'notification_campaign_queued',entityType:'notification',entityId:campaignId,metadata:{eligible_devices:total,customer_devices:ids.members.length,guest_browsers:ids.guests.length,audience:kind,destination:page,template_id:t.id}},c);
-   return {success:true,campaignId,eligibleDevices:total,duplicate:false};
+   await AdminAuditStore.record({adminUserId:actor,action:'notification_campaign_queued',entityType:'notification',entityId:campaignId,metadata:{eligible_devices:total,customer_devices:ids.members.length,guest_browsers:ids.guests.length,left_out:leftOut,audience:kind,destination:page,template_id:t.id}},c);
+   return {success:true,campaignId,eligibleDevices:total,leftOut,duplicate:false};
   });
  }
- static async deliveries(offset=0,id?:string){if(id)requireUuid(id);return (await db().query(`SELECT d.id,d.event_id,d.user_id,d.state,d.attempts,d.last_code,d.created_at,d.updated_at,e.template_snapshot,(SELECT COALESCE(json_agg(a ORDER BY a.attempt),'[]') FROM (SELECT attempt,code,started_at,finished_at FROM ${NOTIFICATIONS}.attempts WHERE delivery_id=d.id) a) AS history FROM ${NOTIFICATIONS}.deliveries d JOIN ${NOTIFICATIONS}.events e ON e.id=d.event_id WHERE ($2::uuid IS NULL OR d.id=$2) ORDER BY d.created_at DESC,d.id DESC LIMIT 50 OFFSET $1`,[offset,id||null])).rows;}
+ static async deliveries(offset=0,id?:string){if(id)requireUuid(id);return (await db().query(`SELECT d.id,d.event_id,d.state,d.attempts,d.last_code,d.created_at,d.updated_at,e.template_snapshot,(SELECT COALESCE(json_agg(a ORDER BY a.attempt),'[]') FROM (SELECT attempt,code,started_at,finished_at FROM ${NOTIFICATIONS}.attempts WHERE delivery_id=d.id) a) AS history FROM ${NOTIFICATIONS}.deliveries d JOIN ${NOTIFICATIONS}.events e ON e.id=d.event_id WHERE ($2::uuid IS NULL OR d.id=$2) ORDER BY d.created_at DESC,d.id DESC LIMIT 50 OFFSET $1`,[offset,id||null])).rows;}
  static async deliveryCount(){return Number((await db().query(`SELECT COUNT(*) FROM ${NOTIFICATIONS}.deliveries`)).rows[0].count);}
  static async campaigns(offset=0){return (await db().query(`SELECT id,actor_id,preview_id,recipient_count,created_at FROM ${NOTIFICATIONS}.campaigns ORDER BY created_at DESC,id DESC LIMIT 50 OFFSET $1`,[offset])).rows;}
  static async templateHistory(id:string){return (await db().query(`SELECT version,snapshot,actor_id,created_at FROM ${NOTIFICATIONS}.template_versions WHERE template_id=$1 ORDER BY version DESC LIMIT 50`,[id])).rows;}
@@ -256,15 +275,18 @@ export class NotificationService {
     (SELECT COUNT(*)::int FROM ${n}.guest_devices WHERE expires_at>NOW()) AS "guestBrowsers",(SELECT COUNT(*)::int FROM live WHERE user_id=$1::text) AS "ownDevices",
     (SELECT COUNT(*)::int FROM ${n}.events e WHERE e.expanded_at IS NULL AND NOT e.operator_test AND e.created_at>NOW()-interval '24 hours' AND EXISTS(SELECT 1 FROM live WHERE live.user_id=e.user_id)) AS "waitingEvents",
     (SELECT COALESCE(jsonb_object_agg(x.state,x.n),'{}'::jsonb) FROM (SELECT state,COUNT(*)::int n FROM ${n}.deliveries WHERE updated_at>NOW()-interval '7 days' GROUP BY state) x) AS "deliveries7Days",
-    (SELECT last_code FROM ${n}.deliveries WHERE state IN ('failed','invalid','retry') AND last_code IS NOT NULL AND updated_at>NOW()-interval '7 days' GROUP BY last_code ORDER BY COUNT(*) DESC,last_code LIMIT 1) AS "commonProblem"`,[actor||null])).rows[0];
-  // The phone check is the viewer's latest plain test (an announcement test opens its page, so it cannot record a
-  // tap) and when they last opened any test from its notification within the 30 days the resume rule accepts.
+    (SELECT last_code FROM ${n}.deliveries WHERE state IN ('failed','invalid','retry') AND last_code IS NOT NULL AND updated_at>NOW()-interval '7 days' GROUP BY last_code ORDER BY COUNT(*) DESC,last_code LIMIT 1) AS "commonProblem",
+    (SELECT COUNT(*)::int FROM ${n}.deliveries q JOIN ${n}.events e ON e.id=q.event_id WHERE e.campaign_id IS NOT NULL AND q.state IN ('queued','retry')) AS "queuedAnnouncements",
+    (SELECT COUNT(DISTINCT e.campaign_id)::int FROM ${n}.deliveries q JOIN ${n}.events e ON e.id=q.event_id WHERE e.campaign_id IS NOT NULL AND q.state IN ('queued','retry')) AS "queuedCampaigns"`,[actor||null])).rows[0];
+  // The viewer's latest plain test (an announcement test opens its page, so it cannot record a tap), and the phone
+  // check the resume rule uses: any operator's test opened from its notification, with its token, in the last 30 days.
   const lastTest=actor?(await db().query(`SELECT e.id,e.created_at AS "createdAt",e.opened_at AS "openedAt",e.template_id AS "templateId",
    (SELECT COALESCE(jsonb_object_agg(x.state,x.n),'{}'::jsonb) FROM (SELECT state,COUNT(*)::int n FROM ${n}.deliveries WHERE event_id=e.id GROUP BY state) x) AS states
    FROM ${n}.events e WHERE e.operator_test AND e.template_id='operator_test' AND e.user_id=$1 ORDER BY e.created_at DESC,e.id DESC LIMIT 1`,[actor])).rows[0]||null:null;
-  const phoneCheckedAt=actor?(await db().query(`SELECT MAX(opened_at) AS at FROM ${n}.events WHERE operator_test AND user_id=$1 AND opened_at>NOW()-interval '30 days'`,[actor])).rows[0].at??null:null;
+  const check=(await db().query(`SELECT MAX(opened_at) AS at,MAX(opened_at) FILTER (WHERE user_id=$1::text) AS yours FROM ${n}.events WHERE operator_test AND opened_at>NOW()-interval '30 days'`,[actor||null])).rows[0];
+  const phoneCheck=check?.at?{at:check.at,yoursAt:check.yours??null}:null;
   const c=pushConfiguration();
-  return {configuration:{enabled:this.config().enabled,valid:c.valid,switchOn:process.env.WEB_PUSH_ENABLED==='true',guestNews:guestNewsEnabled()},deliverySemantics:'provider acceptance only; display/viewing unconfirmed',...facts,lastTest,phoneCheckedAt};
+  return {configuration:{enabled:this.config().enabled,valid:c.valid,switchOn:process.env.WEB_PUSH_ENABLED==='true',guestNews:guestNewsEnabled()},deliverySemantics:'provider acceptance only; display/viewing unconfirmed',...facts,lastTest,phoneCheck};
  }
  /**
   * The operator's own test, to their own signed-in devices only (taken from the session, never from input). It works
@@ -301,29 +323,33 @@ export class NotificationService {
   * History grouped the way an operator thinks: announcements (per campaign), the operator's tests, and automatic
   * order updates, each with the push service's answers per state. Filter by kind and by a state any delivery is in.
   */
- static async history(input:{kind?:unknown;state?:unknown;offset?:number}){const n=NOTIFICATIONS,kind=(input.kind??'announcement') as NotificationHistoryKind,state=input.state??null,offset=input.offset??0;
+ static async history(input:{kind?:unknown;state?:unknown;offset?:number;actor?:string}){const n=NOTIFICATIONS,kind=(input.kind??'announcement') as NotificationHistoryKind,state=input.state??null,offset=input.offset??0;
   if(!HISTORY_KINDS.includes(kind)||state!==null&&!DELIVERY_STATES.includes(state as string))throw new FinanceError('Choose a valid history filter.');
   const states=(where:string)=>`(SELECT COALESCE(jsonb_object_agg(x.state,x.n),'{}'::jsonb) FROM (SELECT d.state,COUNT(*)::int n FROM ${n}.deliveries d JOIN ${n}.events e ON e.id=d.event_id WHERE ${where} GROUP BY d.state) x)`;
   const has=(where:string)=>`($1::text IS NULL OR EXISTS(SELECT 1 FROM ${n}.deliveries d JOIN ${n}.events e ON e.id=d.event_id WHERE ${where} AND d.state=$1))`;
+  // Totals stop counting at 10,000: enough for paging, without scanning everything on a busy site.
+  const capped=(sql:string)=>`SELECT COUNT(*)::int AS total FROM (${sql} LIMIT 10000) x`;
   const query=kind==='announcement'
    ?{rows:`SELECT k.id,k.created_at,k.actor_id,k.recipient_count AS targeted,p.audience_kind,p.user_filter IS NOT NULL AS single_customer,COALESCE(p.destination,'/') AS destination,
       (SELECT e.template_snapshot FROM ${n}.events e WHERE e.campaign_id=k.id ORDER BY e.created_at,e.id LIMIT 1) AS snapshot,${states('e.campaign_id=k.id')} AS states,FALSE AS waiting
       FROM ${n}.campaigns k JOIN ${n}.audiences p ON p.id=k.preview_id WHERE ${has('e.campaign_id=k.id')} ORDER BY k.created_at DESC,k.id DESC LIMIT 25 OFFSET $2`,
-     total:`SELECT COUNT(*)::int AS total FROM ${n}.campaigns k WHERE ${has('e.campaign_id=k.id')}`}
+     total:capped(`SELECT 1 FROM ${n}.campaigns k WHERE ${has('e.campaign_id=k.id')}`)}
    :kind==='test'
-   ?{rows:`SELECT o.id,o.created_at,o.user_id AS actor_id,o.template_snapshot AS snapshot,o.label,o.destination,o.opened_at,(SELECT COUNT(*)::int FROM ${n}.deliveries d WHERE d.event_id=o.id) AS targeted,
+   ?{rows:`SELECT o.id,o.created_at,o.user_id AS actor_id,o.user_id=$3::text AS mine,o.template_snapshot AS snapshot,o.label,o.destination,o.opened_at,(SELECT COUNT(*)::int FROM ${n}.deliveries d WHERE d.event_id=o.id) AS targeted,
       ${states('e.id=o.id')} AS states,FALSE AS waiting FROM ${n}.events o WHERE o.operator_test AND ${has('e.id=o.id')} ORDER BY o.created_at DESC,o.id DESC LIMIT 25 OFFSET $2`,
-     total:`SELECT COUNT(*)::int AS total FROM ${n}.events o WHERE o.operator_test AND ${has('e.id=o.id')}`}
+     total:capped(`SELECT 1 FROM ${n}.events o WHERE o.operator_test AND ${has('e.id=o.id')}`)}
+   // Automatic order updates (every one carries its order). Filtering by result starts from the deliveries index.
    :{rows:`SELECT o.id,o.created_at,o.order_id,o.template_snapshot AS snapshot,o.label,(SELECT COUNT(*)::int FROM ${n}.deliveries d WHERE d.event_id=o.id) AS targeted,
-      ${states('e.id=o.id')} AS states,o.expanded_at IS NULL AS waiting FROM ${n}.events o
-      WHERE NOT o.operator_test AND o.campaign_id IS NULL AND o.guest_device_id IS NULL AND o.template_snapshot->>'category'='transactional' AND ${has('e.id=o.id')} ORDER BY o.created_at DESC,o.id DESC LIMIT 25 OFFSET $2`,
-     total:`SELECT COUNT(*)::int AS total FROM ${n}.events o WHERE NOT o.operator_test AND o.campaign_id IS NULL AND o.guest_device_id IS NULL AND o.template_snapshot->>'category'='transactional' AND ${has('e.id=o.id')}`};
-  const [rows,total]=await Promise.all([db().query(query.rows,[state,offset]),db().query(query.total,[state])]);
+      ${states('e.id=o.id')} AS states,o.expanded_at IS NULL AND o.created_at>NOW()-interval '24 hours' AS waiting,o.expanded_at IS NULL AND o.created_at<=NOW()-interval '24 hours' AS stale FROM ${n}.events o
+      WHERE o.order_id IS NOT NULL AND ($1::text IS NULL OR o.id IN (SELECT event_id FROM ${n}.deliveries WHERE state=$1)) ORDER BY o.created_at DESC,o.id DESC LIMIT 25 OFFSET $2`,
+     total:capped(`SELECT 1 FROM ${n}.events o WHERE o.order_id IS NOT NULL AND ($1::text IS NULL OR o.id IN (SELECT event_id FROM ${n}.deliveries WHERE state=$1))`)};
+  const [rows,total]=await Promise.all([db().query(query.rows,kind==='test'?[state,offset,input.actor||null]:[state,offset]),db().query(query.total,[state])]);
   const text=(r:any)=>{try{return r.snapshot?.title?renderTemplate(r.snapshot,r.label||'Service announcement'):{title:'Announcement',body:''};}catch{return {title:r.snapshot?.title||'Announcement',body:r.snapshot?.body||''};}};
   return {success:true,total:total.rows[0].total as number,items:rows.rows.map(r=>({id:r.id,kind,createdAt:r.created_at,actorId:r.actor_id??null,...text(r),
    audience:kind==='announcement'?r.audience_kind:kind==='test'?'self':'account',singleCustomer:!!r.single_customer,
    destination:kind==='order'||kind==='test'&&r.snapshot?.category!=='marketing'?'/orders':announcementPage(r.destination),orderId:r.order_id??null,
-   targeted:r.targeted,states:r.states||{},waiting:!!r.waiting,openedAt:r.opened_at??null}))};
+   targeted:r.targeted,states:r.states||{},waiting:!!r.waiting,stale:!!r.stale,openedAt:r.opened_at??null,
+   ...(kind==='test'?{mine:!!r.mine,announcementTest:r.snapshot?.category==='marketing'}:{})}))};
  }
  /** Every device's attempts for one announcement, test or order update: states, codes and times, never endpoints or people. */
  static async historyDetail(kind:unknown,id:unknown){requireUuid(id);if(!HISTORY_KINDS.includes(kind as NotificationHistoryKind))throw new FinanceError('Choose a valid history filter.');const n=NOTIFICATIONS;
@@ -332,10 +358,26 @@ export class NotificationService {
     (SELECT COALESCE(json_agg(a ORDER BY a.attempt),'[]') FROM (SELECT attempt,code,started_at AS "startedAt",finished_at AS "finishedAt" FROM ${n}.attempts WHERE delivery_id=d.id) a) AS history
     FROM ${n}.deliveries d JOIN ${n}.events e ON e.id=d.event_id WHERE ${where} ORDER BY d.created_at,d.id LIMIT 200`,[id]),
    db().query(`SELECT d.last_code AS code,COUNT(*)::int AS count FROM ${n}.deliveries d JOIN ${n}.events e ON e.id=d.event_id WHERE ${where} AND d.state IN ('failed','invalid','retry','skipped') AND d.last_code IS NOT NULL GROUP BY d.last_code ORDER BY count DESC,code`,[id])]);
-  return {success:true,deliveries:rows.rows,problems:problems.rows};
+  // Totals cover every device in the group; the device list shows the first 200.
+  const totals=(await db().query(`SELECT d.state,COUNT(*)::int AS n FROM ${n}.deliveries d JOIN ${n}.events e ON e.id=d.event_id WHERE ${where} GROUP BY d.state`,[id])).rows;
+  return {success:true,deliveries:rows.rows,problems:problems.rows,totals:Object.fromEntries(totals.map(r=>[r.state,r.n])),total:totals.reduce((sum,r)=>sum+r.n,0)};
+ }
+ /**
+  * Stops what is still queued for announcements (one campaign, or all of them), for example after a mistake or
+  * before resuming. Anything a sender is handing to the push service at this moment cannot be recalled; it is counted
+  * separately. Audited with the reason.
+  */
+ static async cancelQueued(actor:string,input:any){exact(input,['campaignId','confirmed','reason']);if(input.campaignId!==undefined)requireUuid(input.campaignId);const reason=safeReason(input);
+  return notificationTransaction(async c=>{const n=NOTIFICATIONS,campaign=input.campaignId??null;
+   const cancelled=(await c.query(`UPDATE ${n}.deliveries q SET state='skipped',last_code='cancelled',updated_at=NOW() FROM ${n}.events e
+    WHERE e.id=q.event_id AND e.campaign_id IS NOT NULL AND ($1::uuid IS NULL OR e.campaign_id=$1) AND q.state IN ('queued','retry') AND (q.lease_until IS NULL OR q.lease_until<NOW())`,[campaign])).rowCount||0;
+   const inFlight=Number((await c.query(`SELECT COUNT(*) FROM ${n}.deliveries q JOIN ${n}.events e ON e.id=q.event_id WHERE e.campaign_id IS NOT NULL AND ($1::uuid IS NULL OR e.campaign_id=$1) AND q.state IN ('queued','retry')`,[campaign])).rows[0].count);
+   await AdminAuditStore.record({adminUserId:actor,action:'notification_announcements_cancelled',entityType:'notification',entityId:campaign??'all_queued',metadata:{cancelled,in_flight:inFlight,reason}},c);
+   return {success:true,cancelled,inFlight};
+  });
  }
  static async settings(){return (await db().query(`SELECT paused FROM ${NOTIFICATIONS}.settings WHERE id=TRUE`)).rows[0];}
- static async setSettings(actor:string,input:any){exact(input,['paused','confirmed','reason']);if(typeof input.paused!=='boolean'||input.confirmed!==true||typeof input.reason!=='string'||input.reason.trim().length<5||input.reason.length>200||/[<>\x00-\x1f]|Bearer|secret|password/i.test(input.reason))throw new FinanceError('Confirm pause/resume with a safe reason.');return notificationTransaction(async c=>{
+ static async setSettings(actor:string,input:any){exact(input,['paused','confirmed','reason']);if(typeof input.paused!=='boolean')throw new FinanceError('Confirm pause/resume with a safe reason.');safeReason(input);return notificationTransaction(async c=>{
   // Resuming is the activation step: it needs a phone that really showed and opened an operator test (last 30 days).
   if(input.paused===false&&!(await c.query(`SELECT 1 FROM ${NOTIFICATIONS}.events WHERE operator_test AND opened_at>NOW()-interval '30 days' LIMIT 1`)).rowCount)
    throw new FinanceError('Before resuming, verify a phone: send a test to your devices and open it from the notification.',409);

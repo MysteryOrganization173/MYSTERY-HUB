@@ -19,7 +19,7 @@ import {notificationPage} from '../../../src/components/auth/AccountControls.js'
 const health = (over: Record<string, unknown> = {}) => ({
   configuration: {enabled: true, valid: true, switchOn: true, guestNews: false}, paused: true, devices: 4, pending: 0,
   liveDevices: 3, liveAccounts: 2, signedOutDevices: 1, announcementCustomers: 1, announcementDevices: 2, guestBrowsers: 0, ownDevices: 1, waitingEvents: 2,
-  deliveries7Days: {provider_accepted: 5, invalid: 1}, commonProblem: 'endpoint_expired', lastTest: null, phoneCheckedAt: null, ...over,
+  deliveries7Days: {provider_accepted: 5, invalid: 1}, commonProblem: 'endpoint_expired', lastTest: null, phoneCheck: null, queuedAnnouncements: 0, queuedCampaigns: 0, ...over,
 });
 const overview = (h: any): NotificationOverview => ({subscribedDevices: h.devices, marketingConsented: 1, sendsLast7Days: 0, failedLast7Days: 0, sendingEnabled: h.configuration.enabled, paused: h.paused,
   worker: {running: true, lastCompletedAt: '2026-11-15T10:00:00Z', lastErrorAt: null, lastResult: 'paused_or_disabled'}, readiness: notificationReadiness(h)});
@@ -43,16 +43,20 @@ test('resume needs a phone check first; a test needs the operator’s own device
   const unverified = render(health());
   assert.match(unverified, /Not checked on a phone yet/);
   assert.match(unverified, /<button[^>]*disabled=""[^>]*>.*?Resume sending/s, 'resume is disabled before a phone check');
-  assert.match(text(unverified), /Available after you check a test on your phone/);
+  assert.match(text(unverified), /Available after a test is opened on a phone \(in the last 30 days\)/);
   const waiting = text(render(health({lastTest: {id: 'x', createdAt: '2026-11-15T10:00:00Z', openedAt: null, states: {provider_accepted: 1}}})));
   assert.match(waiting, /accepted by the push service for 1 device/); assert.match(waiting, /Waiting for you to tap it on your phone/);
-  const verified = render(health({lastTest: {id: 'x', createdAt: '2026-11-15T10:00:00Z', openedAt: '2026-11-15T10:01:00Z', states: {provider_accepted: 1}}, phoneCheckedAt: '2026-11-15T10:01:00Z'}));
+  const verified = render(health({lastTest: {id: 'x', createdAt: '2026-11-15T10:00:00Z', openedAt: '2026-11-15T10:01:00Z', states: {provider_accepted: 1}}, phoneCheck: {at: '2026-11-15T10:01:00Z', yoursAt: '2026-11-15T10:01:00Z'}}));
   assert.match(text(verified), /Checked on your phone/); assert.doesNotMatch(text(verified), /Waiting for you to tap/);
   assert.doesNotMatch(verified, /<button[^>]*disabled=""[^>]*>[^<]*(<[^>]+>)*Resume sending/, 'resume is available after the check');
   // A newer test not yet tapped does not undo an earlier check within 30 days (the server's rule too).
-  const newer = render(health({lastTest: {id: 'y', createdAt: '2026-11-15T11:00:00Z', openedAt: null, states: {provider_accepted: 1}}, phoneCheckedAt: '2026-11-15T10:01:00Z'}));
+  const newer = render(health({lastTest: {id: 'y', createdAt: '2026-11-15T11:00:00Z', openedAt: null, states: {provider_accepted: 1}}, phoneCheck: {at: '2026-11-15T10:01:00Z', yoursAt: '2026-11-15T10:01:00Z'}}));
   assert.match(text(newer), /Checked on your phone/); assert.match(text(newer), /Your latest test was sent .* Waiting for you to tap it on your phone/);
   assert.doesNotMatch(newer, /<button[^>]*disabled=""[^>]*>[^<]*(<[^>]+>)*Resume sending/);
+  // One rule with the server: another operator's check within 30 days allows resuming here too (an emergency resume).
+  const other = render(health({phoneCheck: {at: '2026-11-15T09:00:00Z', yoursAt: null}}));
+  assert.match(text(other), /Another operator checked a phone at .*, so resuming is allowed/);
+  assert.doesNotMatch(other, /<button[^>]*disabled=""[^>]*>[^<]*(<[^>]+>)*Resume sending/);
   const noPhone = text(render(health({ownDevices: 0})));
   assert.match(noPhone, /No phone is registered to your account yet/);
   const unconfigured = render(health({configuration: {enabled: false, valid: false, switchOn: false, guestNews: false}}));
@@ -62,9 +66,21 @@ test('resume needs a phone check first; a test needs the operator’s own device
   assert.match(live, /Sending is live/); assert.match(live, /Pause sending/);
 });
 
+test('queued announcements are visible, held while paused, can be cancelled, and the resume dialog will say so', () => {
+  const paused = render(health({queuedAnnouncements: 3, queuedCampaigns: 1}));
+  assert.match(text(paused), /3 announcement deliveries from 1 announcement still queued/);
+  assert.match(text(paused), /Held while paused; they go out when sending resumes unless you cancel them/);
+  assert.match(paused, /Cancel queued announcements/);
+  const live = text(render(health({paused: false, queuedAnnouncements: 1, queuedCampaigns: 1})));
+  assert.match(live, /1 announcement delivery from 1 announcement still queued/); assert.match(live, /Going out now, about one a second/);
+  const source = readFileSync('src/components/admin/sections/AdminNotificationReadiness.tsx', 'utf8');
+  assert.match(source, /still queued will also be sent. Cancel them first if they should not go out./, 'resume warns about queued announcements');
+  assert.match(source, /Anything still queued is held, not lost/, 'pause says queued items are held');
+});
+
 test('readiness carries no key material, only booleans and counts', () => {
   const r = notificationReadiness(health({configuration: {enabled: true, valid: true, switchOn: true, guestNews: true, publicKey: 'BPUBLIC', privateKey: 'SECRET'}}));
-  assert.deepEqual(Object.keys(r).sort(), ['announcementCustomers', 'announcementDevices', 'commonProblem', 'guestBrowsers', 'guestNews', 'keysValid', 'last7Days', 'lastTest', 'liveAccounts', 'liveDevices', 'ownDevices', 'phoneCheckedAt', 'signedOutDevices', 'switchOn', 'waitingEvents']);
+  assert.deepEqual(Object.keys(r).sort(), ['announcementCustomers', 'announcementDevices', 'commonProblem', 'guestBrowsers', 'guestNews', 'keysValid', 'last7Days', 'lastTest', 'liveAccounts', 'liveDevices', 'ownDevices', 'phoneCheck', 'queuedAnnouncements', 'queuedCampaigns', 'signedOutDevices', 'switchOn', 'waitingEvents']);
   assert.doesNotMatch(JSON.stringify(r), /BPUBLIC|SECRET/);
 });
 
@@ -114,8 +130,13 @@ test('history maps the server’s answers without inventing receipts', () => {
   assert.equal(sending.status, 'sending');
   const failed = notificationHistoryItem({id: 'd', kind: 'announcement', createdAt: '2026-11-15', title: 't', body: 'b', audience: 'guests', targeted: 1, states: {failed: 1}});
   assert.equal(failed.status, 'failed');
-  const testItem = notificationHistoryItem({id: 'e', kind: 'test', createdAt: '2026-11-15', title: 'Test notification', body: 'b', audience: 'self', targeted: 1, states: {provider_accepted: 1}, openedAt: '2026-11-15T10:00:00Z', destination: '/orders'});
+  const testItem = notificationHistoryItem({id: 'e', kind: 'test', createdAt: '2026-11-15', title: 'Test notification', body: 'b', audience: 'self', targeted: 1, states: {provider_accepted: 1}, openedAt: '2026-11-15T10:00:00Z', destination: '/orders', mine: true});
   assert.equal(testItem.openedAt, '2026-11-15T10:00:00Z'); assert.equal(testItem.audienceLabel, 'Your own devices');
+  assert.equal(notificationHistoryItem({id: 'f', kind: 'test', createdAt: '2026-11-15', title: 't', body: 'b', audience: 'self', targeted: 1, states: {}, mine: false}).audienceLabel, 'Another operator’s devices');
+  // Honest end states: nobody to send to, too old to send, nothing sent.
+  assert.equal(notificationHistoryItem({id: 'g', kind: 'order', createdAt: '2026-11-15', title: 't', body: 'b', audience: 'account', targeted: 0, states: {}}).status, 'no_device');
+  assert.equal(notificationHistoryItem({id: 'h', kind: 'order', createdAt: '2026-11-13', title: 't', body: 'b', audience: 'account', targeted: 0, states: {}, stale: true}).status, 'too_old');
+  assert.equal(notificationHistoryItem({id: 'i', kind: 'announcement', createdAt: '2026-11-15', title: 't', body: 'b', audience: 'members', targeted: 2, states: {skipped: 2}}).status, 'not_sent');
   for (const code of ['endpoint_expired', 'subscription_invalid', 'provider_rejected', 'retry_exhausted', 'provider_rate_limit', 'provider_unavailable', 'ineligible']) assert.ok(PROBLEM_LABELS[code], code);
   for (const label of Object.values(PROBLEM_LABELS)) assert.doesNotMatch(label, /\b(read|seen|delivered to)\b/i);
 });

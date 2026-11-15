@@ -70,15 +70,15 @@ export const notificationPage = (destination: string): ActivePage => NOTIFICATIO
 export function AccountControls() {
   const { user,sessionToken,openAuth,showToast,setActivePage, isAccountOpen, isAuthChecking } = useApp();
   useEffect(()=>{
-    const url=new URL(window.location.href),id=url.searchParams.get('notification');
+    const url=new URL(window.location.href),id=url.searchParams.get('notification'),open=url.searchParams.get('open');
     if(!id||isAuthChecking||user?.mustChangePassword||url.pathname.startsWith('/sites/'))return;
     if(!sessionToken){openAuth('login','Sign in to view your notification.');return;}
     const controller=new AbortController();
-    void readNotificationInbox(sessionToken,id,controller.signal).then(n=>{
+    void readNotificationInbox(sessionToken,id,controller.signal,open).then(n=>{
       if(controller.signal.aborted)return;
-      url.searchParams.delete('notification');window.history.replaceState({},'',url.pathname+url.search+url.hash);
+      url.searchParams.delete('notification');url.searchParams.delete('open');window.history.replaceState({},'',url.pathname+url.search+url.hash);
       showToast(`${n.title}: ${n.body}`,'info','notification');setActivePage(notificationPage(n.opens??n.destination));
-    }).catch(()=>{if(!controller.signal.aborted){url.searchParams.delete('notification');window.history.replaceState({},'',url.pathname+url.search+url.hash);showToast('This notification is not available for the signed-in account.','info','notification');}});
+    }).catch(()=>{if(!controller.signal.aborted){url.searchParams.delete('notification');url.searchParams.delete('open');window.history.replaceState({},'',url.pathname+url.search+url.hash);showToast('This notification is not available for the signed-in account.','info','notification');}});
     return ()=>controller.abort();
   },[sessionToken,user?.id,user?.mustChangePassword,isAuthChecking]);
   useEffect(()=>{if('serviceWorker' in navigator)void navigator.serviceWorker.getRegistration('/').then(r=>r?.active?.postMessage({type:'CLEAR_ACCOUNT_NOTIFICATIONS'})).catch(()=>{});},[sessionToken]);
