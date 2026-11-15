@@ -4,6 +4,8 @@
  * service availability flags, and truthful operational settings.
  */
 
+const WHATSAPP_SUPPORT_NUMBER_INTL = '233242836323';
+
 export const BUSINESS_CONFIG = {
   brandName: 'Mystery Hub',
   tagline: 'Everything Digital. One Trusted Place.',
@@ -26,7 +28,10 @@ export const BUSINESS_CONFIG = {
     supportPhoneIntl: '+233594521108',
     phoneLink: 'tel:+233594521108',
     emailLink: 'mailto:aryeeteyemmanuel852@gmail.com',
-    supportWhatsAppUrl: 'https://wa.me/233594521108',
+    supportWhatsAppUrl: `https://wa.me/${WHATSAPP_SUPPORT_NUMBER_INTL}`,
+    supportSms: '0592066298',
+    supportSmsIntl: '+233592066298',
+    smsLink: 'sms:+233592066298',
     telegramChannelUrl: 'https://t.me/mysteryhubapp',
     whatsappChannelUrl: 'https://whatsapp.com/channel/0029VbBt1MGC6ZvlDJ8Biz3l',
     supportLocation: 'Accra, Ghana 🇬🇭',
@@ -92,20 +97,20 @@ export const BUSINESS_CONFIG = {
     const text = encodeURIComponent(
       `Hello Mystery Hub Support, I am inquiring about Order #${orderId} for recipient ${phone}.`
     );
-    return `https://wa.me/233594521108?text=${text}`;
+    return `https://wa.me/${WHATSAPP_SUPPORT_NUMBER_INTL}?text=${text}`;
   },
 
   getGeneralWhatsAppUrl: (message?: string) => {
     const defaultMsg = 'Hello Mystery Hub team, I would like to inquire about your digital services in Ghana.';
     const text = encodeURIComponent(message || defaultMsg);
-    return `https://wa.me/233594521108?text=${text}`;
+    return `https://wa.me/${WHATSAPP_SUPPORT_NUMBER_INTL}?text=${text}`;
   },
 
   getCheckoutSupportWhatsAppUrl: (dataAmount: string, networkName: string) => {
     const text = encodeURIComponent(
       `Hello Mystery Hub, I am currently purchasing a ${dataAmount} bundle for ${networkName} and have a quick question.`
     );
-    return `https://wa.me/233594521108?text=${text}`;
+    return `https://wa.me/${WHATSAPP_SUPPORT_NUMBER_INTL}?text=${text}`;
   },
 
   getMarketplaceInquiryWhatsAppUrl: (productName: string, notes?: string) => {
@@ -114,7 +119,7 @@ export const BUSINESS_CONFIG = {
         notes ? ` Notes: ${notes}` : ''
       }`
     );
-    return `https://wa.me/233594521108?text=${text}`;
+    return `https://wa.me/${WHATSAPP_SUPPORT_NUMBER_INTL}?text=${text}`;
   },
 
   getWhatsAppChannelUrl: () => {

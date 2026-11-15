@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUpRight, MessageCircle, Sparkles } from 'lucide-react';
+import { ArrowUpRight, MessageCircle, MessageSquareText, Sparkles } from 'lucide-react';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { HELP_CATEGORIES } from '../../data/helpFaqs';
 import { useApp } from '../../context/AppContext';
@@ -21,6 +21,7 @@ export function HelpPage() {
           <a className="mh-button-secondary" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer">
             <MessageCircle size={17} aria-hidden="true" />WhatsApp Support
           </a>
+          <a className="mh-button-secondary" href={BUSINESS_CONFIG.contact.smsLink}><MessageSquareText size={17} aria-hidden="true" />SMS Support</a>
         </div>
       </header>
       <nav aria-label="FAQ categories" className="help-category-nav">
@@ -44,6 +45,7 @@ export function HelpPage() {
           <a className="mh-button-secondary" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer">
             <MessageCircle size={17} aria-hidden="true" />Contact Support
           </a>
+          <a className="mh-button-secondary" href={BUSINESS_CONFIG.contact.smsLink}><MessageSquareText size={17} aria-hidden="true" />SMS Support</a>
           <button type="button" className="mh-button-secondary" onClick={() => openMysteryAi()}>
             <Sparkles size={17} aria-hidden="true" />Ask Mystery AI
           </button>

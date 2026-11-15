@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { ROUTE_PATH_MAP } from '../../utils/routing';
 import type { ActivePage } from '../../types';
-import { ArrowUpRight, Mail, MessageCircle, Phone, Send, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight, Mail, MessageCircle, MessageSquareText, Phone, Send, ShieldCheck } from 'lucide-react';
 import { Seasonal } from '../../seasonal/Seasonal';
 
 type FooterLink = { label: string; page: ActivePage; note?: string; open?: () => void };
@@ -54,7 +54,7 @@ export const Footer: React.FC = () => {
 
             <section aria-labelledby="footer-channel" className="max-w-md border-l-2 border-[#00c365]/60 pl-4">
               <h2 id="footer-channel" className="font-['Outfit'] text-base font-semibold text-white">Stay connected with Mystery Hub</h2>
-              <p className="mt-1 text-sm leading-relaxed text-slate-400">Service updates, new launches and special offers. For personal help, use WhatsApp support below.</p>
+              <p className="mt-1 text-sm leading-relaxed text-slate-400">Service updates, new launches and special offers. For personal help, use WhatsApp, SMS, phone or email support below.</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 <a href={contact.whatsappChannelUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center justify-between gap-2 rounded-xl border border-[#00c365]/40 bg-[#00c365]/10 px-3 py-3 text-sm font-semibold text-[#7cedb3] hover:bg-[#00c365]/20 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7cedb3]">
                   <MessageCircle className="h-5 w-5 shrink-0" aria-hidden="true" /><span>Join WhatsApp Channel</span><ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="sr-only">(opens in a new tab)</span>
@@ -82,6 +82,7 @@ export const Footer: React.FC = () => {
                   {column.title === 'Help' && <>
                     <li><a href={contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer" className={linkClass}><MessageCircle className="h-4 w-4 text-[#44df95]" aria-hidden="true" />WhatsApp support</a></li>
                     <li><a href={contact.phoneLink} className={linkClass}><Phone className="h-4 w-4 text-slate-400" aria-hidden="true" />{contact.supportPhone}</a></li>
+                    <li><a href={contact.smsLink} className={linkClass}><MessageSquareText className="h-4 w-4 text-slate-400" aria-hidden="true" />SMS {contact.supportSms}</a></li>
                     <li className="col-span-2 sm:col-span-1"><a href={contact.emailLink} className={linkClass} title={contact.supportEmail}><Mail className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" /><span className="min-w-0">{contact.supportEmail.split('@')[0]}<wbr />@{contact.supportEmail.split('@')[1]}</span></a></li>
                   </>}
                 </ul>
