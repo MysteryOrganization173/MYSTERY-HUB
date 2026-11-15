@@ -1,5 +1,8 @@
 # Customer Contact Hub — Release A
 
+Historical V1 design. For current direct/reseller scope, expanded recipients and
+export semantics, see [Customer Contact Hub V2](customer-contact-hub-v2.md).
+
 ## Repository inventory and isolation
 
 Started on main bd88e1ea50b7d9877bbad249ef7a0fca3e06cb0f. PR118 is a separate

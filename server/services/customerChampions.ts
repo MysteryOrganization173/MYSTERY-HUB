@@ -65,5 +65,6 @@ export class CustomerChampions {
   const row:GiveawayAward={id:'award_'+randomUUID(),round_id:id,winner_key:key,prize:winner.prize,reference,note,actor_id:adminId,request_id:requestId,created_at:new Date().toISOString()};if(client)await client.query('INSERT INTO admin_giveaway_awards(id,round_id,winner_key,prize,reference,note,actor_id,request_id,input_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[row.id,id,key,row.prize,reference,note,adminId,requestId,digest]);else{memory.awards.push(row);memory.hashes[`award:${requestId}`]=digest;}
   await AdminAuditStore.record({adminUserId:adminId,action:'giveaway_prize_recorded',entityType:'giveaway',entityId:id,metadata:{winnerCode:snapshot.code,prize:winner.prize,reference}},client);return row;
  });}
+ static contactEvidence(){return memory.evidence.map(({order_id,buyer_key,payer_name,payer_phone})=>({order_id,buyer_key,payer_name,payer_phone}));}
  static reset(){memory={evidence:[],rounds:[],awards:[],hashes:{}};}
 }

@@ -22,18 +22,18 @@ test('revoked or disabled Admin cannot retrieve contacts or exports',async()=>{
  await AuthStore.createSession('staff','disabled-admin-token');await AuthStore.updateUserStatus('staff','disabled');assert.equal((await request('query',{},'disabled-admin-token')).status,403);
 });
 test('authorized list, pagination, guest separation, profile and malformed input are real backend behavior',async()=>{
- const r=await request('query',{limit:1,page:2});assert.equal(r.status,200);assert.match(r.headers.get('cache-control')!,/private, no-store/);const data=await r.json();assert.equal(data.total,6);assert.equal(data.rows.length,1);assert.ok(!JSON.stringify(data).includes('NEVER-EXPORT-PASSWORD'));
+ const r=await request('query',{source:'registered',limit:1,page:2});assert.equal(r.status,200);assert.match(r.headers.get('cache-control')!,/private, no-store/);const data=await r.json();assert.equal(data.total,6);assert.equal(data.rows.length,1);assert.ok(!JSON.stringify(data).includes('NEVER-EXPORT-PASSWORD'));
  const buyer=await (await request('profile',{source:'registered',id:'repeat'})).json();assert.equal(buyer.contact.purchases,2);assert.equal(buyer.orders.length,2);
- const guest=await (await request('profile',{source:'guest',id:'+233241234567'})).json();assert.equal(guest.contact.name,null);assert.equal(guest.contact.purchases,2);assert.match(guest.warning,/actual purchasers/i);
+ const guest=await (await request('profile',{source:'guest',id:'+233241234567'})).json();assert.equal(guest.contact.name,null);assert.equal(guest.contact.purchases,2);assert.match(guest.warning,/purchaser/i);
  for(const body of [{source:'staff'},{q:['x']},{minSpending:-1},{page:0}])assert.equal((await request('query',body)).status,400);
  for(const body of [{source:'registered',id:'staff'},{source:'registered',id:'../one'},{source:'guest',id:'123'}])assert.ok([400,404].includes((await request('profile',body)).status));
 });
 test('export preview/confirmation download whole dataset and audit; unknown consent exports no marketing numbers',async()=>{
- const filters={limit:1,page:2,phone:'valid'},preview=await (await request('preview',{filters,purpose:'administrative'})).json();assert.equal(preview.uniqueNumbers,4);
+ const filters={source:'registered',limit:1,page:2,phone:'valid'},preview=await (await request('preview',{filters,purpose:'administrative'})).json();assert.equal(preview.uniqueNumbers,4);
  const txt=await request('export',{filters,purpose:'administrative',format:'txt',expectedRevision:preview.revision,confirmed:true});assert.equal(txt.status,200);assert.match(txt.headers.get('content-disposition')!,/attachment/);assert.match(txt.headers.get('cache-control')!,/no-store/);assert.equal((await txt.text()).split('\n').length,4);
  const audit=(await AdminAuditStore.findRecent())[0];assert.equal(audit.action,'contact_export_prepared');assert.ok(!audit.metadata_safe_json!.includes('+233'));
- const marketing=await (await request('preview',{filters:{},purpose:'marketing'})).json();assert.equal(marketing.uniqueNumbers,0);const empty=await request('export',{filters:{},purpose:'marketing',format:'txt',expectedRevision:marketing.revision,confirmed:true});assert.equal(await empty.text(),'');
- assert.equal((await request('preview',{filters:{source:'guest'},purpose:'marketing'})).status,400);
+ const marketing=await (await request('preview',{filters:{source:'registered'},purpose:'marketing'})).json();assert.equal(marketing.uniqueNumbers,0);const empty=await request('export',{filters:{source:'registered'},purpose:'marketing',format:'txt',expectedRevision:marketing.revision,confirmed:true});assert.equal(await empty.text(),'');
+ assert.equal((await request('preview',{filters:{source:'guest'},purpose:'marketing'})).status,200);
  assert.equal((await request('export',{filters,format:'txt',purpose:'administrative',confirmed:false,expectedRevision:preview.revision})).status,400);
 });
 test('database/report failure produces an error rather than an empty contact list',async()=>{
