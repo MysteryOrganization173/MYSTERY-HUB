@@ -253,3 +253,100 @@ How consent is recorded:
   - The browser permission answer and the push subscription are **simulated**: headless Chromium cannot show the prompt or reach a push service. This proves the product and server logic, not delivery.
   - No delivery was queued or attempted.
 - **Release B review re-run:** 88/88.
+
+## Release D: Admin Notification Center, readiness and activation gates
+
+Activation runbook and the founder's phone checklist: `docs/notifications-activation-3.4.md`.
+
+### Status in plain words (Admin › Notifications)
+- **Checklist:** the server's facts, never secrets.
+  - Keys valid; the sending switch; paused or live.
+  - The background sender (last check, last failure).
+  - Devices that can receive versus registrations left by signed-out sessions.
+  - Customers who chose news and offers (people, and their devices); visitor browsers.
+  - Order updates waiting for a resume (last 24 hours only).
+  - The last 7 days by result, with the most common problem in words.
+- **Check it on your phone:** *Send a test to my devices* reaches only the signed-in operator's own devices (taken from the session, never from input). It is audited, idempotent per click, limited to 3 in 10 minutes, and works while paused.
+  - A plain test takes the private account path: generic lock-screen text, then "Test notification" after sign-in.
+  - Opening it from the notification marks it opened. This is recorded for operator tests only; customer notifications are never tracked.
+- **Pause and resume:** both need a reason (audited); resume also needs an explicit approval.
+  - **Resume is refused by the server** until an operator has opened a test from its notification in the last 30 days.
+  - The Admin page mirrors this rule for the viewer's own phone.
+
+### Audiences, consent first
+- **Customers who chose news and offers:** active customers with a live session and `marketing=true`. Counted as people and devices.
+- **One customer:** the same rule for a single account ID.
+- **Visitors who chose news:** guest browsers with an unexpired registration. Only while `WEB_PUSH_GUEST_NEWS` is on, and never a browser that is also a live account device.
+- **Everyone who chose news:** both groups.
+- **Server-side enforcement:** the preview binds the template version, audience, page and exact recipients (hash) for 10 minutes.
+  - The send re-checks all of it, plus pause and the guest gate.
+  - It refuses the same announcement to the same audience within 30 minutes, even from a second preview.
+  - Campaign creation is serialised.
+
+### Pages an announcement may open
+- **Fixed list:** `/`, `/data`, `/services`, `/marketplace`, `/earn` (`ANNOUNCEMENT_DESTINATIONS`).
+- **Where it applies:** the server, the payload (`url`), the service worker (its own copy of the list; anything else opens Home) and the account inbox (`opens`).
+- **No URLs:** web addresses cannot be entered.
+
+### Delivery to visitor browsers
+- **Records:** one event per browser and one delivery per browser.
+- **At send time:** the worker re-checks the registration, the gate, pause, the template and the 24-hour freshness.
+- **A gone browser:** a 404/410 removes the registration and records `guest_endpoint_expired` in the consent ledger.
+
+### While paused
+- The worker expands and sends nothing for customers or visitors. Only operator tests move.
+
+### History
+- **Grouped:** announcements (one row per campaign), tests (with when the operator opened them), and automatic order updates (with "Waiting for resume" while paused).
+- **Filters:** by kind and by any delivery's result.
+- **Detail:** per-device tries with codes and times, problems in plain words, and visitor browsers marked.
+- **Never shown:** endpoints and people.
+- **Earlier campaigns:** grouped after the upgrade. Their id is recovered from the event key.
+
+### Composer
+- **Preview:** shows what the phone shows. An announcement shows its own text and page; an account update shows the generic notice and the signed-in content.
+- **Send to my devices first:** tests the exact saved announcement and page.
+- **Confirmation:** shows recipients now, made up of customers (devices) and visitor browsers, plus the page, the type and the consent rule.
+
+### Schema (additive, idempotent, mirrored in `schema.sql`)
+- **`events`:**
+  - nullable `user_id`, plus `guest_device_id`, `destination`, `campaign_id`, `operator_test`, `opened_at`;
+  - a subject check (an account or a guest browser);
+  - a one-time grouping backfill.
+- **`deliveries`:** nullable `user_id`, plus `guest_device_id` (unique per event).
+- **`audiences`:** `guest_device_ids`, `audience_kind`, `destination`.
+- **Templates:** a locked internal `operator_test` template, never listed among templates.
+- **Unchanged:** the order trigger.
+
+### Verification (Release D)
+- **Unit `notificationAdmin34` 7/7:**
+  - readiness wording and gating;
+  - no key material;
+  - one destination list shared by the server, Admin and the service worker;
+  - announcement versus account preview;
+  - audience counts and an unavailable visitor audience;
+  - history mapping without invented receipts.
+- **Updated suites:** `notificationCenter` 17/17.
+- **Native PostgreSQL 16, `notificationAdminPostgres` 10/10:**
+  - the schema upgrade and subject check;
+  - members, visitors and everyone, people versus devices, approved pages;
+  - a planted duplicate browser excluded;
+  - campaigns refused while paused, then fanned out per customer and per browser;
+  - idempotency and duplicate protection;
+  - audit details;
+  - visitor gate at delivery, and a gone browser removed with evidence;
+  - the operator test: own device only, while paused, account path, opened only by the owner, the resume gate;
+  - the announcement test, refusals and the rate limit;
+  - readiness without key material;
+  - grouped history, filters and detail without endpoints;
+  - the grouping backfill;
+  - admin-only HTTP.
+- **Existing suites:** `notificationsPostgres` 19/19 (one assertion that a Release C edit had put inside a comment is restored); consent 14/14.
+- **Browser `scripts/reviewAdminNotifications.cjs`, 48/48:**
+  - a local production build with synthetic keys and the simulated push service (`scripts/qa/simulatedPushProvider.cjs`), which refuses to load outside a local `*_test` database;
+  - the status checklist; the test on the operator's own phone while paused, with a simulated tap;
+  - the resume gate and confirmation; compose, page, preview, test-first, confirm and send to consenting customers only;
+  - duplicate protection; visitor browsers and a gone browser; history filters and detail;
+  - templates; layouts at 320–1440 and a 390×640 phone with the sheet open;
+  - axe clean at 1280 and 390 (serious and critical);
+  - pause with rate-limit recovery.

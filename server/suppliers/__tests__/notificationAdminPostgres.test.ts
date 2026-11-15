@@ -180,6 +180,9 @@ test('PostgreSQL Admin Notification Center: audiences, guests, own-device tests,
       payloads.length = 0; await processNotificationBatch(capture, 25);
       assert.equal(payloads.length, 1); assert.equal(payloads[0].payload.kind, 'announcement'); assert.equal(payloads[0].payload.url, '/earn'); assert.equal(payloads[0].payload.title, 'Current offers');
       assert.equal((await service.inbox('admin', 0, result.eventId))[0].opens, '/earn');
+      const health = await service.health('admin');
+      assert.equal(health.lastTest.templateId, 'operator_test', 'an announcement test is not the phone check (it cannot record a tap)');
+      assert.ok(health.phoneCheckedAt, 'the earlier opened test still counts');
       await assert.rejects(() => service.testToSelf('admin', {requestId: key(), templateId: 'payment_confirmed'}), /announcement template/);
       await assert.rejects(() => service.testToSelf('admin', {requestId: key(), templateId: 'operator_test'}), /valid test/);
       await assert.rejects(() => service.testToSelf('admin', {requestId: key(), destination: '/data'}), /valid test/);

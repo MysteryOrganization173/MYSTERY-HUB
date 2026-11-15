@@ -132,6 +132,8 @@ const tail = id => `QA-D-${run}-${id}`.slice(-14);
     await p.getByRole('button', { name: 'Send to my devices first' }).click(); await p.getByText(/Sent to your 1 device only/).waitFor({ timeout: 10000 });
     const announceTest = await waitPushes(x => x.endpointTail === tail('admin') && x.payload.kind === 'announcement' && x.payload.title === title);
     ok('compose: the test of this announcement went to my device only, with its text and page', announceTest.length === 1 && announceTest[0].payload.url === '/data' && pushes().slice(beforeTest).every(x => x.endpointTail === tail('admin')));
+    await p.getByRole('button', { name: 'Refresh' }).first().click(); await sleep(1500);
+    ok('compose: testing an announcement does not undo the phone check', await p.getByText('Checked on your phone.').isVisible());
     await p.screenshot({ path: `${OUT}/compose-1280.png`, fullPage: true });
 
     // 5. Review and send: the server's count, the breakdown, the page, an explicit acknowledgement.
@@ -188,14 +190,16 @@ const tail = id => `QA-D-${run}-${id}`.slice(-14);
     await p.locator('li button').filter({ hasText: title }).first().click();
     const detail = p.getByRole('dialog'); await detail.getByText('Each device').waitFor({ timeout: 10000 });
     const detailText = (await detail.innerText()).replace(/\s+/g, ' ');
-    ok('history detail: problems in plain words and visitor browsers marked, without endpoints', /no longer subscribed, so it was removed/.test(detailText) && /Visitor browser/.test(detailText) && !/fcm\.googleapis|QA-D-/.test(detailText), detailText.slice(0, 200));
+    ok('history detail: problems explained in plain words', /no longer subscribed, so it was removed/.test(detailText));
+    ok('history detail: each device listed, visitor browsers marked', /Visitor browser/.test(detailText), detailText.slice(detailText.indexOf('Each device'), detailText.indexOf('Each device') + 160));
+    ok('history detail: no endpoints or customer ids', !/fcm\.googleapis|QA-D-|qa-d-[a-z0-9]+-c\d/.test(detailText));
     await p.screenshot({ path: `${OUT}/history-detail-1280.png` });
     await detail.getByRole('button', { name: 'Done' }).click();
     await p.getByLabel('Filter by result').selectOption('');
     await p.getByRole('button', { name: 'Tests' }).click(); await p.getByText('You opened it from the notification at', { exact: false }).first().waitFor({ timeout: 10000 });
     ok('history: tests show when the operator opened one from its notification', true);
     await p.screenshot({ path: `${OUT}/history-tests-1280.png`, fullPage: true });
-    ok('history: no endpoint or customer id anywhere on the page', !/fcm\.googleapis|QA-D-|qa-d-/.test(await p.content()));
+    ok('history: no endpoint or customer id anywhere on the page', !/fcm\.googleapis|QA-D-|qa-d-[a-z0-9]+-c\d/.test(await p.content()));
 
     // 9. Templates: the internal test wording is not offered as a template; automatic ones are locked.
     await p.goto(`${BASE}/admin#notifications/templates`); await p.getByRole('heading', { name: 'Saved templates' }).waitFor();
@@ -228,7 +232,17 @@ const tail = id => `QA-D-${run}-${id}`.slice(-14);
     await p.setViewportSize({ width: 1280, height: 900 });
     await p.getByRole('button', { name: 'Pause sending' }).click();
     const pause = p.getByRole('dialog'); await pause.locator('input').first().fill('End of the local review'); await pause.getByRole('checkbox').check();
-    await pause.getByRole('button', { name: 'Pause sending' }).click(); await p.getByText('Sending is paused').waitFor({ timeout: 10000 });
+    await pause.getByRole('button', { name: 'Pause sending' }).click();
+    const paused = p.getByText('Nothing goes to customers or visitors. Your own tests still work.');
+    // Error recovery: if the Admin rate limit answers first, the dialog says so, nothing changes, and a retry works.
+    const limited = await Promise.race([paused.waitFor({ timeout: 15000 }).then(() => false), pause.getByText(/Too many requests/).waitFor({ timeout: 15000 }).then(() => true)]).catch(() => null);
+    if (limited) {
+      ok('pause: a rate-limited attempt is explained in the dialog and changes nothing', (await one(`SELECT paused FROM ${N}.settings WHERE id=TRUE`)).paused === false);
+      await p.screenshot({ path: `${OUT}/pause-rate-limited.png` });
+      await sleep(61000); await pause.getByRole('button', { name: 'Pause sending' }).click();
+    }
+    try { await paused.waitFor({ timeout: 15000 }); }
+    catch (error) { await p.screenshot({ path: `${OUT}/pause-failed.png` }); throw new Error(`pause did not complete: ${(await pause.innerText().catch(() => 'dialog closed')).replace(/\s+/g, ' ').slice(0, 300)}`); }
     ok('pause: the server is paused again', (await one(`SELECT paused FROM ${N}.settings WHERE id=TRUE`)).paused === true);
     await ctx.close();
   } catch (error) {

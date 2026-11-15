@@ -257,11 +257,14 @@ export class NotificationService {
     (SELECT COUNT(*)::int FROM ${n}.events e WHERE e.expanded_at IS NULL AND NOT e.operator_test AND e.created_at>NOW()-interval '24 hours' AND EXISTS(SELECT 1 FROM live WHERE live.user_id=e.user_id)) AS "waitingEvents",
     (SELECT COALESCE(jsonb_object_agg(x.state,x.n),'{}'::jsonb) FROM (SELECT state,COUNT(*)::int n FROM ${n}.deliveries WHERE updated_at>NOW()-interval '7 days' GROUP BY state) x) AS "deliveries7Days",
     (SELECT last_code FROM ${n}.deliveries WHERE state IN ('failed','invalid','retry') AND last_code IS NOT NULL AND updated_at>NOW()-interval '7 days' GROUP BY last_code ORDER BY COUNT(*) DESC,last_code LIMIT 1) AS "commonProblem"`,[actor||null])).rows[0];
+  // The phone check is the viewer's latest plain test (an announcement test opens its page, so it cannot record a
+  // tap) and when they last opened any test from its notification within the 30 days the resume rule accepts.
   const lastTest=actor?(await db().query(`SELECT e.id,e.created_at AS "createdAt",e.opened_at AS "openedAt",e.template_id AS "templateId",
    (SELECT COALESCE(jsonb_object_agg(x.state,x.n),'{}'::jsonb) FROM (SELECT state,COUNT(*)::int n FROM ${n}.deliveries WHERE event_id=e.id GROUP BY state) x) AS states
-   FROM ${n}.events e WHERE e.operator_test AND e.user_id=$1 ORDER BY e.created_at DESC,e.id DESC LIMIT 1`,[actor])).rows[0]||null:null;
+   FROM ${n}.events e WHERE e.operator_test AND e.template_id='operator_test' AND e.user_id=$1 ORDER BY e.created_at DESC,e.id DESC LIMIT 1`,[actor])).rows[0]||null:null;
+  const phoneCheckedAt=actor?(await db().query(`SELECT MAX(opened_at) AS at FROM ${n}.events WHERE operator_test AND user_id=$1 AND opened_at>NOW()-interval '30 days'`,[actor])).rows[0].at??null:null;
   const c=pushConfiguration();
-  return {configuration:{enabled:this.config().enabled,valid:c.valid,switchOn:process.env.WEB_PUSH_ENABLED==='true',guestNews:guestNewsEnabled()},deliverySemantics:'provider acceptance only; display/viewing unconfirmed',...facts,lastTest};
+  return {configuration:{enabled:this.config().enabled,valid:c.valid,switchOn:process.env.WEB_PUSH_ENABLED==='true',guestNews:guestNewsEnabled()},deliverySemantics:'provider acceptance only; display/viewing unconfirmed',...facts,lastTest,phoneCheckedAt};
  }
  /**
   * The operator's own test, to their own signed-in devices only (taken from the session, never from input). It works

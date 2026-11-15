@@ -19,7 +19,7 @@ import {notificationPage} from '../../../src/components/auth/AccountControls.js'
 const health = (over: Record<string, unknown> = {}) => ({
   configuration: {enabled: true, valid: true, switchOn: true, guestNews: false}, paused: true, devices: 4, pending: 0,
   liveDevices: 3, liveAccounts: 2, signedOutDevices: 1, announcementCustomers: 1, announcementDevices: 2, guestBrowsers: 0, ownDevices: 1, waitingEvents: 2,
-  deliveries7Days: {provider_accepted: 5, invalid: 1}, commonProblem: 'endpoint_expired', lastTest: null, ...over,
+  deliveries7Days: {provider_accepted: 5, invalid: 1}, commonProblem: 'endpoint_expired', lastTest: null, phoneCheckedAt: null, ...over,
 });
 const overview = (h: any): NotificationOverview => ({subscribedDevices: h.devices, marketingConsented: 1, sendsLast7Days: 0, failedLast7Days: 0, sendingEnabled: h.configuration.enabled, paused: h.paused,
   worker: {running: true, lastCompletedAt: '2026-11-15T10:00:00Z', lastErrorAt: null, lastResult: 'paused_or_disabled'}, readiness: notificationReadiness(h)});
@@ -32,7 +32,7 @@ test('readiness speaks plainly: paused, devices versus accounts, waiting updates
   assert.match(page, /Push keys are set up/); assert.match(page, /The sending switch is on/);
   assert.match(page, /Sending is paused/); assert.match(page, /Your own tests still work/);
   assert.match(page, /3 devices on 2 accounts can receive/); assert.match(page, /1 more device is registered but signed out/);
-  assert.match(page, /1 customer chose news and offers/); assert.match(page, /2 devices between them/);
+  assert.match(page, /1 customer chose news and offers/); assert.match(page, /2 devices registered in all/);
   assert.match(page, /News for visitors without an account is off/);
   assert.match(page, /2 order updates are waiting/);
   assert.match(page, /Last 7 days: 5 accepted · 1 expired/); assert.match(page, /no longer subscribed, so it was removed/);
@@ -46,9 +46,13 @@ test('resume needs a phone check first; a test needs the operator’s own device
   assert.match(text(unverified), /Available after you check a test on your phone/);
   const waiting = text(render(health({lastTest: {id: 'x', createdAt: '2026-11-15T10:00:00Z', openedAt: null, states: {provider_accepted: 1}}})));
   assert.match(waiting, /accepted by the push service for 1 device/); assert.match(waiting, /Waiting for you to tap it on your phone/);
-  const verified = render(health({lastTest: {id: 'x', createdAt: '2026-11-15T10:00:00Z', openedAt: '2026-11-15T10:01:00Z', states: {provider_accepted: 1}}}));
-  assert.match(text(verified), /Checked on your phone/);
+  const verified = render(health({lastTest: {id: 'x', createdAt: '2026-11-15T10:00:00Z', openedAt: '2026-11-15T10:01:00Z', states: {provider_accepted: 1}}, phoneCheckedAt: '2026-11-15T10:01:00Z'}));
+  assert.match(text(verified), /Checked on your phone/); assert.doesNotMatch(text(verified), /Waiting for you to tap/);
   assert.doesNotMatch(verified, /<button[^>]*disabled=""[^>]*>[^<]*(<[^>]+>)*Resume sending/, 'resume is available after the check');
+  // A newer test not yet tapped does not undo an earlier check within 30 days (the server's rule too).
+  const newer = render(health({lastTest: {id: 'y', createdAt: '2026-11-15T11:00:00Z', openedAt: null, states: {provider_accepted: 1}}, phoneCheckedAt: '2026-11-15T10:01:00Z'}));
+  assert.match(text(newer), /Checked on your phone/); assert.match(text(newer), /Your latest test was sent .* Waiting for you to tap it on your phone/);
+  assert.doesNotMatch(newer, /<button[^>]*disabled=""[^>]*>[^<]*(<[^>]+>)*Resume sending/);
   const noPhone = text(render(health({ownDevices: 0})));
   assert.match(noPhone, /No phone is registered to your account yet/);
   const unconfigured = render(health({configuration: {enabled: false, valid: false, switchOn: false, guestNews: false}}));
@@ -60,7 +64,7 @@ test('resume needs a phone check first; a test needs the operator’s own device
 
 test('readiness carries no key material, only booleans and counts', () => {
   const r = notificationReadiness(health({configuration: {enabled: true, valid: true, switchOn: true, guestNews: true, publicKey: 'BPUBLIC', privateKey: 'SECRET'}}));
-  assert.deepEqual(Object.keys(r).sort(), ['announcementCustomers', 'announcementDevices', 'commonProblem', 'guestBrowsers', 'guestNews', 'keysValid', 'last7Days', 'lastTest', 'liveAccounts', 'liveDevices', 'ownDevices', 'signedOutDevices', 'switchOn', 'waitingEvents']);
+  assert.deepEqual(Object.keys(r).sort(), ['announcementCustomers', 'announcementDevices', 'commonProblem', 'guestBrowsers', 'guestNews', 'keysValid', 'last7Days', 'lastTest', 'liveAccounts', 'liveDevices', 'ownDevices', 'phoneCheckedAt', 'signedOutDevices', 'switchOn', 'waitingEvents']);
   assert.doesNotMatch(JSON.stringify(r), /BPUBLIC|SECRET/);
 });
 

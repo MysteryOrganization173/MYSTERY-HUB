@@ -46,7 +46,9 @@ export function AdminNotificationReadiness({ token, client, overview, onChanged 
 
   const paused = overview.paused !== false;
   const configured = r.keysValid && r.switchOn && overview.sendingEnabled === true;
-  const verified = Boolean(r.lastTest?.openedAt);
+  // Mirrors the server's resume rule for this operator: a test opened from its notification in the last 30 days.
+  const verified = Boolean(r.phoneCheckedAt);
+  const newerTestWaiting = Boolean(r.lastTest && !r.lastTest.openedAt && (!r.phoneCheckedAt || r.lastTest.createdAt > r.phoneCheckedAt));
   const worker = overview.worker;
   const workerFailing = Boolean(worker?.lastErrorAt && (!worker.lastCompletedAt || worker.lastErrorAt > worker.lastCompletedAt));
   const last7 = r.last7Days, problems = (last7.failed ?? 0) + (last7.invalid ?? 0);
@@ -116,9 +118,9 @@ export function AdminNotificationReadiness({ token, client, overview, onChanged 
 
         <div className="space-y-3 self-start rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
           <p className="flex items-center gap-2 font-semibold text-white"><Smartphone className="h-4 w-4 text-[#00c365]" aria-hidden />Check it on your phone</p>
-          {!r.lastTest ? <p className="text-sm text-slate-300">Not checked on a phone yet. Send a test to your own devices, then tap it on your phone.</p>
-            : verified ? <p className="text-sm text-emerald-200">Checked on your phone. You opened the test from its notification at {time(r.lastTest.openedAt)}.</p>
-            : <p className="text-sm text-amber-100">Test sent {time(r.lastTest.createdAt)}{r.lastTest.states.accepted ? `, accepted by the push service for ${plural(r.lastTest.states.accepted, 'device')}` : ''}. Waiting for you to tap it on your phone.</p>}
+          {verified && <p className="text-sm text-emerald-200">Checked on your phone. You opened a test from its notification at {time(r.phoneCheckedAt)}.</p>}
+          {newerTestWaiting && r.lastTest ? <p className="text-sm text-amber-100">{verified ? 'Your latest test was sent' : 'Test sent'} {time(r.lastTest.createdAt)}{r.lastTest.states.accepted ? `, accepted by the push service for ${plural(r.lastTest.states.accepted, 'device')}` : ''}. Waiting for you to tap it on your phone.</p>
+            : !verified && <p className="text-sm text-slate-300">Not checked on a phone yet. Send a test to your own devices, then tap it on your phone.</p>}
           <p className="text-xs text-slate-400">Only your own signed-in devices receive it: “Test notification” after you sign in, with generic text on the lock screen, like an order update.</p>
           <AdminButton variant={verified ? 'secondary' : 'primary'} className="w-full" disabled={Boolean(testBlocked) || testing || !client.testSelf} busy={testing} onClick={() => void sendTest()}>
             <Smartphone className="h-4 w-4" />Send a test to my devices

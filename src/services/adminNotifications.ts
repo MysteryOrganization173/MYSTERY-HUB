@@ -102,6 +102,8 @@ export interface NotificationReadiness {
   last7Days: Partial<Record<NotificationDeliveryState, number>>;
   commonProblem: string | null;
   lastTest: { id: string; createdAt: string; openedAt: string | null; states: Partial<Record<NotificationDeliveryState, number>> } | null;
+  /** When the viewer last opened a test from its notification (last 30 days): the phone check that allows resuming. */
+  phoneCheckedAt: string | null;
 }
 
 export interface NotificationOverview {
@@ -220,13 +222,22 @@ export function notificationReadiness(h:any):NotificationReadiness{
  return {keysValid:!!h.configuration?.valid,switchOn:!!h.configuration?.switchOn,guestNews:!!h.configuration?.guestNews,liveDevices:num(h.liveDevices),liveAccounts:num(h.liveAccounts),signedOutDevices:num(h.signedOutDevices),
   announcementCustomers:num(h.announcementCustomers),announcementDevices:num(h.announcementDevices),guestBrowsers:num(h.guestBrowsers),ownDevices:num(h.ownDevices),waitingEvents:num(h.waitingEvents),
   last7Days:Object.fromEntries(Object.entries(mapStates(h.deliveries7Days)).filter(([,v])=>v>0)),commonProblem:h.commonProblem?problem(h.commonProblem):null,
-  lastTest:h.lastTest?{id:h.lastTest.id,createdAt:h.lastTest.createdAt,openedAt:h.lastTest.openedAt??null,states:Object.fromEntries(Object.entries(mapStates(h.lastTest.states)).filter(([,v])=>v>0))}:null};
+  lastTest:h.lastTest?{id:h.lastTest.id,createdAt:h.lastTest.createdAt,openedAt:h.lastTest.openedAt??null,states:Object.fromEntries(Object.entries(mapStates(h.lastTest.states)).filter(([,v])=>v>0))}:null,
+  phoneCheckedAt:h.phoneCheckedAt??null};
 }
 const failure=(e:unknown)=>e instanceof Error?e.message:'The server did not answer. Nothing was changed.';
+// The overview and the audience counts load together; they share one status read while it is in flight. A read
+// that has finished is never reused, so a reload right after pause, resume or a send shows the new state.
+let healthRead:{token:string;value:Promise<any>}|null=null;
+function readHealth(token:string){
+ if(healthRead&&healthRead.token===token)return healthRead.value;
+ const value=request(token,'health');healthRead={token,value};
+ const done=()=>{if(healthRead?.value===value)healthRead=null;};value.then(done,done);return value;
+}
 export const httpAdminNotificationsClient:AdminNotificationsClient={
  available:true,
- async overview(token){const h=await request(token,'health');return {subscribedDevices:h.devices,marketingConsented:h.marketingConsented??null,sendsLast7Days:h.eventsLast7Days??null,failedLast7Days:h.failedLast7Days??null,sendingEnabled:h.configuration.enabled,paused:h.paused,savedEvents:h.savedEvents,queuedDeliveries:h.pending,providerAccepted:h.providerAccepted,deliveryAttempts:h.deliveryAttempts,worker:h.worker,readiness:notificationReadiness(h)};},
- async audiences(token){const h=await request(token,'health');const r=notificationReadiness(h);const off='Guest news is off (WEB_PUSH_GUEST_NEWS), so visitors without an account cannot receive announcements.';
+ async overview(token){const h=await readHealth(token);return {subscribedDevices:h.devices,marketingConsented:h.marketingConsented??null,sendsLast7Days:h.eventsLast7Days??null,failedLast7Days:h.failedLast7Days??null,sendingEnabled:h.configuration.enabled,paused:h.paused,savedEvents:h.savedEvents,queuedDeliveries:h.pending,providerAccepted:h.providerAccepted,deliveryAttempts:h.deliveryAttempts,worker:h.worker,readiness:notificationReadiness(h)};},
+ async audiences(token){const h=await readHealth(token);const r=notificationReadiness(h);const off='Guest news is off (WEB_PUSH_GUEST_NEWS), so visitors without an account cannot receive announcements.';
   return [
    {id:'marketing',kind:'members',label:'Customers who chose news and offers',description:'Signed-in customers who turned on news and offers. Each of their registered devices receives it.',eligibleCount:r.announcementDevices,people:r.announcementCustomers,available:true,marketingConsentOnly:true,allowedCategories:['marketing'],consentNote:'Only customers who chose news and offers. Order-update permission is never enough.'},
    {id:'guests',kind:'guests',label:'Visitors who chose news',description:'Browsers without an account that turned on news and offers.',eligibleCount:r.guestBrowsers,people:null,available:r.guestNews,unavailableReason:r.guestNews?undefined:off,marketingConsentOnly:true,allowedCategories:['marketing'],consentNote:'Only browsers that chose news. Each browser counts once.'},
