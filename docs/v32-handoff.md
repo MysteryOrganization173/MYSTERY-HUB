@@ -35,6 +35,7 @@ See [Results Checkers procedure](results-checkers-v1.md) and [Admin V6 definitio
 Central source: `src/config/business.ts`.
 
 - Support **0594521108**, international **+233594521108**, call `tel:+233594521108`, [WhatsApp support](https://wa.me/233594521108).
+  - Superseded Nov 2026 (PR #118): WhatsApp support is temporarily 024 283 6323 and SMS 059 206 6298; calls stay on 059 452 1108. `src/config/business.ts` is the source of truth.
 - Email preserved: aryeeteyemmanuel852@gmail.com.
 - [WhatsApp announcements](https://whatsapp.com/channel/0029VbBt1MGC6ZvlDJ8Biz3l) and [Telegram announcements](https://t.me/mysteryhubapp) appear together in the shared footer. Telegram is not a support bot.
 - Remaining old-number strings are synthetic customer fixtures/input examples, not official support links; customer and website-owner contacts were preserved.

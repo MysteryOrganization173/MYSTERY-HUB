@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, ArrowRight, Check, MessageCircle, RefreshCw, RotateCcw, Smartphone, Sparkles, Wifi } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Check, MessageCircle, MessageSquareText, RefreshCw, RotateCcw, Smartphone, Sparkles, Wifi } from 'lucide-react';
 import type { AuthenticatedCustomerOrderDetails } from '../../../../server/types/orders';
 import type { MarketplaceProduct, NetworkId } from '../../../types';
 import { GREETINGS_COMING_SOON, type GreetingsEntry, type SeasonPhase, type SeasonStatus } from '../../../../shared/seasonal';
@@ -99,7 +99,10 @@ function OrderSpotlight({ order, track, reorder }: { order: AuthenticatedCustome
       <div className="xm-order-actions">
         {again && <button className="mh-button" onClick={() => reorder(again.mode, again.network)}><RotateCcw className="size-4" aria-hidden="true" />Buy again</button>}
         <button className={again || tone === 'attention' ? 'mh-button-secondary' : 'mh-button'} onClick={track}>Track Order</button>
-        {tone === 'attention' && <a className="xm-support" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" aria-hidden="true" />WhatsApp support</a>}
+        {tone === 'attention' && <>
+          <a className="xm-support" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" aria-hidden="true" />WhatsApp support</a>
+          <a className="xm-support" href={BUSINESS_CONFIG.contact.smsLink}><MessageSquareText className="size-4" aria-hidden="true" />SMS {BUSINESS_CONFIG.contact.supportSmsDisplay}</a>
+        </>}
       </div>
     </section>
   );
@@ -253,6 +256,7 @@ export function ChristmasMemberView({ name, greeting, orders, loading, error, wa
             <div className="xm-help-actions">
               <button className="xm-help-ai" onClick={assistant}><Sparkles className="size-4" aria-hidden="true" />Ask Mystery AI</button>
               <a className="xm-help-wa" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" aria-hidden="true" />WhatsApp support</a>
+              <a className="xm-help-wa" href={BUSINESS_CONFIG.contact.smsLink}><MessageSquareText className="size-4" aria-hidden="true" />SMS {BUSINESS_CONFIG.contact.supportSmsDisplay}</a>
             </div>
           </section>
           <GreetingsPreview newYear={!christmas} headingId="xm-greet-title" entry={greetings} />
