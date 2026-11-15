@@ -1,4 +1,5 @@
 /** Reviewed backend HTTP integration. Pending clients remain injectable offline fallbacks only; production uses the live adapters below. */
+import { ANNOUNCEMENT_DESTINATIONS, type AnnouncementDestination } from '../../shared/notifications';
 export interface DeviceSubscriptionStatus { subscribed: boolean }
 
 export interface NotificationPreferences {
@@ -11,7 +12,10 @@ export interface NotificationPreferences {
   version: string;
 }
 
-export interface NotificationInboxEntry { id: string; createdAt: string; title: string; body: string; destination: '/orders' | '/app' }
+/** `opens` is the approved page an announcement opens (news only); order updates open Orders. */
+export interface NotificationInboxEntry { id: string; createdAt: string; title: string; body: string; destination: '/orders' | '/app'; opens?: AnnouncementPage }
+export type AnnouncementPage = AnnouncementDestination;
+const announcementPage = (value: unknown): AnnouncementPage | undefined => ANNOUNCEMENT_DESTINATIONS.includes(value as AnnouncementPage) ? value as AnnouncementPage : undefined;
 
 /** One explicit first-party choice, recorded on the server per purpose with the version of the words shown. */
 export interface NotificationConsent { purposes: ('transactional' | 'marketing')[]; copyVersion: string }
@@ -57,13 +61,13 @@ export const httpCustomerNotificationsClient:CustomerNotificationsClient={
  async preferences(token){return preferences(await request(token,'preferences'));},
  async savePreferences(token,input){try{const p=await request(token,'preferences','PUT',{transactional:input.transactional,marketing:input.promotional,...(input.source?{source:input.source}:{})});return {ok:true,value:preferences(p)};}catch(e){return {ok:false,message:(e as Error).message};}},
  async inbox(token,offset=0,signal){const r=await notificationHttp(token,'notifications/inbox?offset='+offset,'GET',undefined,signal);if(r.success!==true||!Array.isArray(r.items))throw Error('Your notifications could not be loaded.');
-  return r.items.filter((i:any)=>typeof i?.id==='string'&&typeof i.title==='string'&&typeof i.body==='string'&&['/orders','/app'].includes(i.destination)).map((i:any)=>({id:i.id,createdAt:String(i.createdAt),title:i.title,body:i.body,destination:i.destination}));}
+  return r.items.filter((i:any)=>typeof i?.id==='string'&&typeof i.title==='string'&&typeof i.body==='string'&&['/orders','/app'].includes(i.destination)).map((i:any)=>({id:i.id,createdAt:String(i.createdAt),title:i.title,body:i.body,destination:i.destination,...(announcementPage(i.opens)?{opens:announcementPage(i.opens)}:{})}));}
 };
 export async function readNotificationInbox(token:string,id:string,signal?:AbortSignal){
  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))throw Error('Invalid notification link.');
  const result=await notificationHttp(token,'notifications/inbox/'+encodeURIComponent(id),'GET',undefined,signal);
  if(!result.notification||!['/orders','/app'].includes(result.notification.destination))throw Error('Invalid notification destination.');
- return result.notification as {title:string;body:string;destination:'/orders'|'/app'};
+ return {...result.notification,opens:announcementPage(result.notification.opens)} as {title:string;body:string;destination:'/orders'|'/app';opens?:AnnouncementPage};
 }
 
 /**

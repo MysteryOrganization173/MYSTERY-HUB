@@ -71,6 +71,30 @@ INSERT INTO mysteryhub_notifications.templates(id,title,body,category,locked) VA
  ('new_service','Discover services','Explore the services currently available in {{appName}}.','marketing',FALSE),
  ('special_offer','Current offers','View current offers in {{appName}}. Terms and eligibility apply.','marketing',FALSE)
  ON CONFLICT DO NOTHING;
+-- 3.4-D: announcements to consenting guest browsers, an allowlisted destination, and the operator's own test.
+ALTER TABLE mysteryhub_notifications.events ALTER COLUMN user_id DROP NOT NULL;
+ALTER TABLE mysteryhub_notifications.events ADD COLUMN IF NOT EXISTS guest_device_id UUID;
+ALTER TABLE mysteryhub_notifications.events ADD COLUMN IF NOT EXISTS destination VARCHAR(40);
+DO $$ BEGIN IF NOT EXISTS(SELECT FROM pg_constraint WHERE conname='notification_event_subject') THEN
+ ALTER TABLE mysteryhub_notifications.events ADD CONSTRAINT notification_event_subject CHECK(user_id IS NOT NULL OR guest_device_id IS NOT NULL); END IF; END $$;
+ALTER TABLE mysteryhub_notifications.deliveries ALTER COLUMN user_id DROP NOT NULL;
+ALTER TABLE mysteryhub_notifications.deliveries ADD COLUMN IF NOT EXISTS guest_device_id UUID REFERENCES mysteryhub_notifications.guest_devices(id) ON DELETE SET NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS notification_guest_delivery_once ON mysteryhub_notifications.deliveries(event_id,guest_device_id) WHERE guest_device_id IS NOT NULL;
+ALTER TABLE mysteryhub_notifications.audiences ADD COLUMN IF NOT EXISTS guest_device_ids UUID[] NOT NULL DEFAULT '{}';
+ALTER TABLE mysteryhub_notifications.audiences ADD COLUMN IF NOT EXISTS audience_kind VARCHAR(20) NOT NULL DEFAULT 'members';
+ALTER TABLE mysteryhub_notifications.audiences ADD COLUMN IF NOT EXISTS destination VARCHAR(40);
+-- Announcements are grouped by campaign for history; an operator's own test is marked and records when it was opened.
+ALTER TABLE mysteryhub_notifications.events ADD COLUMN IF NOT EXISTS campaign_id UUID REFERENCES mysteryhub_notifications.campaigns(id);
+ALTER TABLE mysteryhub_notifications.events ADD COLUMN IF NOT EXISTS operator_test BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE mysteryhub_notifications.events ADD COLUMN IF NOT EXISTS opened_at TIMESTAMPTZ;
+UPDATE mysteryhub_notifications.events e SET campaign_id=k.id FROM mysteryhub_notifications.campaigns k
+ WHERE e.campaign_id IS NULL AND left(e.event_key,9)='campaign:' AND substring(e.event_key from 10 for 36)=k.id::text;
+CREATE INDEX IF NOT EXISTS notification_events_campaign ON mysteryhub_notifications.events(campaign_id) WHERE campaign_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS notification_events_tests ON mysteryhub_notifications.events(created_at DESC) WHERE operator_test;
+CREATE INDEX IF NOT EXISTS notification_deliveries_event ON mysteryhub_notifications.deliveries(event_id);
+INSERT INTO mysteryhub_notifications.templates(id,title,body,category,locked) VALUES
+ ('operator_test','Test notification','This is a test from {{appName}} Admin. No action is needed.','transactional',TRUE)
+ ON CONFLICT DO NOTHING;
 CREATE INDEX IF NOT EXISTS notifications_ready ON mysteryhub_notifications.deliveries(next_at) WHERE state IN ('queued','retry');
 CREATE INDEX IF NOT EXISTS notifications_user_time ON mysteryhub_notifications.events(user_id,created_at DESC);
 CREATE OR REPLACE FUNCTION mysteryhub_notifications.snapshot_template() RETURNS trigger LANGUAGE plpgsql AS $$
