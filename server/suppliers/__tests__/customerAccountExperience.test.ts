@@ -43,7 +43,7 @@ test('3.4.1: signup shows the email openly as recommended, with its purpose, and
   const email = input(html, 'auth-email');
   assert.match(html, /for="auth-email"/);
   assert.match(html, /Email address <span[^>]*>\(recommended\)<\/span>/);
-  assert.match(html, /id="auth-email-help"[^>]*>For payment receipts and easier future checkouts\.</);
+  assert.match(html, /id="auth-email-help"[^>]*>For payment receipts and easier future checkouts\. You can also sign in with it\.</, 'it is also a sign-in detail, and says so');
   assert.match(email, /aria-describedby="auth-email-help"/);
   assert.match(email, /type="email"/);
   assert.match(email, /autoComplete="email"/i);

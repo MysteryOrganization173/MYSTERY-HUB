@@ -144,9 +144,10 @@ describe('Member Home & Logged-In Experience', () => {
     );
     // 3.4.1: Home is the logo and the Home link (header from 1280px, bottom nav on phones), so the account menu
     // carries the account itself instead of a second Home.
-    assert.ok(
-      navbarCode.includes("handleNavClick('home')"),
-      'Home stays one tap away'
+    assert.match(
+      navbarCode,
+      /<div id="account-navigation"[\s\S]*My Orders[\s\S]*My Account[\s\S]*Sign Out[\s\S]*\{\/\* The one menu button below 1280px/,
+      'the account dropdown carries the account: orders, My Account and Sign Out'
     );
     assert.ok(
       navbarCode.includes('My Orders'),

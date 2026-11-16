@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { defaultReceiptEmail } from '../../utils/receiptEmail';
 import './resultsCheckers.css';
 import { AlertCircle, Check, CheckCircle2, Clock3, Copy, GraduationCap, KeyRound, Loader2, Lock, MessageCircle, Minus, Plus, ReceiptText, ShieldCheck } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -99,7 +100,7 @@ const CheckerSession: React.FC = () => {
   useEffect(() => { alive.current = true; return () => { alive.current = false; receiptAbort.current?.abort(); }; }, []);
 
   useEffect(() => { let on = true; getCheckerConfig().then(c => { if (on) setConfig(c); }).catch(() => { if (on) setConfigFailed(true); }); return () => { on = false; }; }, []);
-  useEffect(() => { if (user) { setEmail(e => e || user.email || ''); setPhone(p => p || user.phone || ''); } }, [user]);
+  useEffect(() => { if (user) { setEmail(e => e || defaultReceiptEmail(user)); setPhone(p => p || user.phone || ''); } }, [user]);
 
   const loadReceipt = useCallback(async (reference: string) => {
     if (!sessionToken) return;

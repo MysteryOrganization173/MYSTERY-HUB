@@ -2,7 +2,7 @@ import { OrderShield } from './OrderShield';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { dataOrderPresentation, dataRecipientDisplay } from '../../utils/dataPurchasePresentation';
 import { afaStatusLabel } from '../../../shared/afa';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS } from '../../data/bundles';
 import { BUSINESS_CONFIG } from '../../config/business';
@@ -29,7 +29,7 @@ export const OrderStatusModal: React.FC = () => {
     sessionToken,
     openAuth,
   } = useApp();
-  const { buyAgain, pending: buyAgainPending } = useBuyAgain();
+  const { buyAgain, pending: buyAgainPending, cancel: cancelBuyAgain } = useBuyAgain();
 
   const [copied, setCopied] = useState(false);
   // Shown so customers on weak connections know whether the status they see is current.
@@ -38,6 +38,10 @@ export const OrderStatusModal: React.FC = () => {
 
   // Authoritative reference: Real backend public order reference takes precedence
   const lookupReference = activeOrder?.publicReference || activeOrder?.id;
+  // Closing the sheet, or showing another order, abandons a Buy again lookup still in flight.
+  const shownReference = useRef<string | null>(null);
+  shownReference.current = isStatusModalOpen ? lookupReference ?? null : null;
+  useEffect(() => () => cancelBuyAgain(), [isStatusModalOpen, lookupReference, cancelBuyAgain]);
 
   // Poll server for status updates if order is pending or in-progress
   useEffect(() => { setLastChecked(null); setCheckFailed(false); }, [lookupReference]);
@@ -480,14 +484,21 @@ export const OrderStatusModal: React.FC = () => {
             </button>
             <button
               onClick={() => {
-                if (smartBuyAgain) { void buyAgain(activeOrder.publicReference!, { beforeOpen: closeOrderStatus }); return; }
+                if (smartBuyAgain) {
+                  const reference = activeOrder.publicReference!;
+                  const mode = activeOrder.serviceType === 'airtime' ? 'airtime' : activeOrder.serviceType === 'instant_bundle' ? 'instant' : 'data';
+                  void buyAgain(reference, { beforeOpen: closeOrderStatus, stillWanted: () => shownReference.current === reference, notMine: { mode, network: activeOrder.network } });
+                  return;
+                }
                 closeOrderStatus();
                 if (activeOrder.serviceType === 'results_checker') { window.location.assign(`/results-checkers?order=${encodeURIComponent(activeOrder.publicReference || activeOrder.id)}`); return; }
                 setActivePage(isAfa ? 'home' : 'data');
               }}
               className="mh-button"
+              disabled={Boolean(smartBuyAgain && buyAgainPending)}
+              aria-busy={smartBuyAgain && buyAgainPending ? true : undefined}
             >
-              <span>{activeOrder.serviceType === 'results_checker' ? 'Open your receipt' : isAfa ? 'Back to Home' : tone === 'success' ? (buyAgainPending ? 'Checking…' : 'Buy again') : 'Done'}</span>
+              <span>{activeOrder.serviceType === 'results_checker' ? 'Open your receipt' : isAfa ? 'Back to Home' : tone === 'success' ? (smartBuyAgain && buyAgainPending ? 'Checking…' : 'Buy again') : 'Done'}</span>
             </button>
           </div>
 

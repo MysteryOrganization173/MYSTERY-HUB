@@ -931,6 +931,15 @@ export class OrdersStore {
   /**
    * Find order by public_reference or payment_reference or id
    */
+  /** 3.4.1: one of this account's own orders, named only by its public reference (never a payment reference or id). */
+  static async findAccountOrderByReference(userId: string, reference: string): Promise<OrderRecord | null> {
+    if (!userId || !reference) return null;
+    const pool = getPool();
+    if (pool) return ((await pool.query('SELECT * FROM orders WHERE public_reference = $1 AND user_id = $2 LIMIT 1;', [reference, userId])).rows[0] as OrderRecord) ?? null;
+    const order = devMemoryStore.get(`pubref:${reference}`);
+    return order && order.user_id === userId && order.public_reference === reference ? order : null;
+  }
+
   static async findOrder(ref: string, client?: PoolClient): Promise<OrderRecord | null> {
     if (!ref) return null;
 

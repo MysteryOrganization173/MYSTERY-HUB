@@ -26,12 +26,17 @@ const axe = async (p, selector) => {
 const noOverflow = p => p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
 const shot = (p, name, full = false) => p.screenshot({ path: path.join(OUT, name), fullPage: full });
 
-async function member(name, email) {
-  const phone = '024' + String(Date.now() + Math.floor(Math.random() * 1000)).slice(-7);
-  const res = await fetch(BASE + '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, identifier: phone, phone, email, password: 'Synthetic#Member-341', rememberMe: true }) });
-  const body = await res.json();
-  if (!body.token) throw new Error('register failed ' + JSON.stringify(body).slice(0, 160));
-  return { token: body.token, user: body.user, phone };
+// Synthetic members are written straight into the disposable database with a review session, so a run never meets
+// the sign-up rate limit. They cannot sign in by password (the stored hash is not a valid password hash). The
+// registration form itself is exercised separately below.
+async function member(name, email = null) {
+  const id = 'usr_qa341_' + crypto.randomUUID().slice(0, 12), at = new Date().toISOString();
+  const local = '024' + String(Date.now() + Math.floor(Math.random() * 100000)).slice(-7), phone = '+233' + local.slice(1);
+  await db.query(`INSERT INTO users (id,name,email,phone,password_hash,role,status,created_at,updated_at) VALUES ($1,$2,$3,$4,'synthetic-no-password','customer','active',$5,$5)`, [id, name, email, phone, at]);
+  const token = 'qa341-' + crypto.randomBytes(24).toString('hex');
+  await db.query(`INSERT INTO sessions (id,user_id,token_hash,expires_at) VALUES ($1,$2,$3,NOW() + interval '1 day')`, ['ses_qa341_' + crypto.randomUUID().slice(0, 12), id, crypto.createHash('sha256').update(token).digest('hex')]);
+  const user = { id, name, email, phone, role: 'customer', status: 'active', createdAt: at, lastLoginAt: null, mustChangePassword: false, passwordChangedAt: null, receiptEmail: null };
+  return { token, user, phone: local };
 }
 async function order(m, o) {
   const id = 'ord_qa341_' + crypto.randomUUID().slice(0, 10), ref = 'MH-QA341' + crypto.randomUUID().slice(0, 6).toUpperCase(), at = new Date(Date.now() - (o.ageMs || 60_000)).toISOString();
@@ -120,7 +125,8 @@ const visibleTriggers = p => p.evaluate(() => [...document.querySelectorAll('hea
 
     // 3. My Account: a sheet of short sections; forms open in place; the receipt email is separate from sign-in.
     for (const [w, h] of [[390, 844], [1280, 800]]) {
-      const ctx = await context(b, { width: w, height: h }, ama, { scale: 2 }), p = await ctx.newPage();
+      // Phones get overlay scrollbars, as on a real phone (desktop Chromium keeps a scrollbar gutter while locked).
+      const ctx = await context(b, { width: w, height: h }, ama, { scale: 2, options: w < 640 ? { isMobile: true, hasTouch: true } : {} }), p = await ctx.newPage();
       await p.goto(BASE + '/'); await settle(p);
       if (w < 1280) { await p.locator('header .mh-menu-trigger').click(); await sleep(300); await p.locator('#mobile-menu').getByRole('button', { name: 'My Account' }).click(); }
       else { await p.locator('header [aria-controls="account-navigation"]').click(); await sleep(200); await p.locator('#account-navigation').getByRole('button', { name: 'My Account' }).click(); }
@@ -210,12 +216,34 @@ const visibleTriggers = p => p.evaluate(() => [...document.querySelectorAll('hea
       ok('checkout: "Remember this email for future receipts" is offered, unticked', await remember.isVisible() && !(await remember.isChecked()));
       await shot(p, 'buy-again-checkout-390.png');
       await remember.check();
-      await p.locator('#checkout-phone').scrollIntoViewIfNeeded();
+      // A payment attempt the server does not accept (blocked here) remembers nothing.
+      const initialized = []; p.on('request', r => { if (/\/api\/payments\/initialize/.test(r.url())) initialized.push(r.postDataJSON()); });
       await p.getByRole('button', { name: /^Pay GH₵/ }).click(); await sleep(1500);
-      const row = (await db.query('SELECT email, receipt_email FROM users WHERE id=$1', [kojo.user.id])).rows[0];
-      ok('checkout: the ticked receipt email is saved to the account, not as a sign-in email', row.receipt_email === 'kojo.receipts@example.test' && row.email === null, JSON.stringify(row));
-      ok('checkout: the payment request carried the typed receipt email (blocked locally)', ctx.initializeCalls === 1, ctx.initializeCalls);
+      let row = (await db.query('SELECT email, receipt_email FROM users WHERE id=$1', [kojo.user.id])).rows[0];
+      ok('checkout: a payment attempt that never reached an order remembers nothing', row.receipt_email === null && row.email === null, JSON.stringify(row));
+      ok('checkout: the payment request carried the typed receipt email', initialized.length === 1 && initialized[0]?.customerEmail === 'kojo.receipts@example.test', JSON.stringify(initialized[0] || {}).slice(0, 120));
       await ctx.close();
+      // When the server creates the order, the ticked address is remembered, separately from sign-in. The order
+      // response is SIMULATED in the browser (no access code, so no payment window opens and nothing is charged).
+      const abena = await member('Abena Synthetic');
+      await order(abena, { productId: 'mtn-2gb', name: 'MTN 2GB', size: '2GB' });
+      const ctxA = await context(b, { width: 390, height: 844 }, abena), a = await ctxA.newPage();
+      await ctxA.unroute('**/api/payments/initialize');
+      await ctxA.route('**/api/payments/initialize', r => { ctxA.initializeCalls++; return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, orderRef: 'MH-QA341-SIMULATED', reference: 'MH_QA341_SIMULATED' }) }); });
+      await a.goto(BASE + '/'); await settle(a);
+      await a.getByRole('button', { name: 'Buy again' }).first().click(); await a.waitForSelector('#checkout-phone', { timeout: 8000 }).catch(() => {}); await sleep(1500);
+      await a.getByPlaceholder('you@example.com').fill('abena.receipts@example.test');
+      await a.getByLabel(/Remember this email for future receipts/).check();
+      await a.getByPlaceholder('you@example.com').fill('');
+      ok('checkout: the Remember box disappears and unticks when the address is cleared', !(await a.getByLabel(/Remember this email for future receipts/).isVisible().catch(() => false)));
+      await a.getByPlaceholder('you@example.com').fill('abena.receipts@example.test');
+      ok('checkout: it comes back unticked', !(await a.getByLabel(/Remember this email for future receipts/).isChecked()));
+      await a.getByLabel(/Remember this email for future receipts/).check();
+      await a.getByRole('button', { name: /^Pay GH₵/ }).click(); await sleep(1800);
+      row = (await db.query('SELECT email, receipt_email FROM users WHERE id=$1', [abena.user.id])).rows[0];
+      ok('checkout: once the order exists, the ticked receipt email is saved, not as a sign-in email', row.receipt_email === 'abena.receipts@example.test' && row.email === null, JSON.stringify(row));
+      ok('checkout: one payment request, from the Pay tap only', ctxA.initializeCalls === 1, ctxA.initializeCalls);
+      await ctxA.close();
 
       // Order status sheet → Buy again; airtime; discontinued; instant; another customer's order.
       const ctx2 = await context(b, { width: 390, height: 844 }, kojo), q = await ctx2.newPage();
@@ -247,6 +275,21 @@ const visibleTriggers = p => p.evaluate(() => [...document.querySelectorAll('hea
       ok('a failed order offers no Buy again', await p3.getByRole('button', { name: 'Buy again' }).count() === 0);
       await c3.close();
       const theirs = await fetch(`${BASE}/api/account/orders/${dataRef}/reorder`, { headers: { Authorization: 'Bearer ' + kojo.token } });
+      // Signed in, but tracking an order that isn't this account's: Buy again quietly opens that service's catalogue.
+      {
+        const ctx4 = await context(b, { width: 390, height: 844 }, kojo), r4 = await ctx4.newPage();
+        await r4.goto(BASE + '/orders'); await settle(r4);
+        await r4.getByRole('button', { name: /Track another order/ }).click();
+        await r4.getByLabel('Order reference').fill(dataRef);
+        await r4.getByLabel('Order reference').press('Enter'); await sleep(1800);
+        const again = r4.getByRole('button', { name: 'Buy again' }).last();
+        const shown = await again.isVisible().catch(() => false);
+        if (shown) { await again.click(); await sleep(1800); }
+        ok('tracking another customer’s order: Buy again opens the catalogue quietly, with no “not found” message and no checkout',
+          shown && /\/data/.test(r4.url()) && !(await r4.locator('#checkout-phone').isVisible().catch(() => false)) && !(await r4.getByText('We couldn’t find that order in your account').isVisible().catch(() => false)), `shown ${shown} url ${r4.url()}`);
+        ok('tracking another customer’s order: no payment started', ctx4.initializeCalls === 0);
+        await ctx4.close();
+      }
       ok('another customer’s order reads as not found', theirs.status === 404, theirs.status);
     }
   } catch (error) {

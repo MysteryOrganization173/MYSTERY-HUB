@@ -56,10 +56,15 @@ export const Navbar: React.FC = () => {
     if (!mobileMenuOpen) return;
     const desktop = window.matchMedia('(min-width: 1280px)');
     const close = () => setMobileMenuOpen(false);
+    // Back closes it (above) and returns focus to the button that opened it.
+    const onBack = () => menuTrigger.current?.focus();
     const onWidth = () => { if (desktop.matches) close(); };
     desktop.addEventListener('change', onWidth);
     window.addEventListener('popstate', close);
-    return () => { desktop.removeEventListener('change', onWidth); window.removeEventListener('popstate', close); };
+    window.addEventListener('popstate', onBack);
+    // Also marked on the root element, for browsers without :has() (the bottom bar steps aside either way).
+    document.documentElement.classList.add('mh-menu-open');
+    return () => { desktop.removeEventListener('change', onWidth); window.removeEventListener('popstate', close); window.removeEventListener('popstate', onBack); document.documentElement.classList.remove('mh-menu-open'); };
   }, [mobileMenuOpen]);
   // The account dropdown belongs to the desktop header only; below 1280px its trigger is hidden, so it closes too.
   useEffect(() => {

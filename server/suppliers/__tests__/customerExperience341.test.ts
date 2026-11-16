@@ -185,9 +185,9 @@ test('Buy again opens a checkout review and never initializes a payment by itsel
   assert.match(hook, /getReorderOnServer\(asked, reference, controller\.signal\)/);
   assert.match(hook, /openCheckout\(action\.bundle, \{ recipientPhone: action\.recipientPhone \}\)/);
   assert.doesNotMatch(hook, /initialize|walletCheckout|payments\//);
-  assert.match(hook, /token\.current !== asked/, 'an answer for a previous account is dropped');
+  assert.match(hook, /token\.current === asked/, 'an answer for a previous account is dropped');
   for (const view of ['src/components/home/MemberHomeView.tsx', 'src/seasonal/christmas/member/ChristmasMemberView.tsx']) assert.match(source(view), /buyAgainButton\(order, ?buyAgain/);
-  assert.match(source('src/components/checkout/OrderStatusModal.tsx'), /buyAgain\(activeOrder\.publicReference!, \{ beforeOpen: closeOrderStatus \}\)/);
+  assert.match(source('src/components/checkout/OrderStatusModal.tsx'), /void buyAgain\(reference, \{ beforeOpen: closeOrderStatus, /);
   // The review still fetches its own server quote and keeps Pay unavailable until it arrives.
   assert.match(source('src/components/checkout/CheckoutModal.tsx'), /commercialRequest\('commercial\/quote\/'\+encodeURIComponent\(checkoutBundle\.id\)/);
 });
@@ -235,7 +235,8 @@ test('safe profiles carry the receipt email; checkout prefers it, then the sign-
   const checkout = source('src/components/checkout/CheckoutModal.tsx');
   assert.match(checkout, /Remember this email for future receipts/);
   assert.match(checkout, /setRememberReceipt\(false\);\n/, 'unchecked by default on every open');
-  assert.match(checkout, /saveReceiptEmailOnServer\(token,email\)/);
+  assert.match(checkout, /saveReceiptEmailOnServer\(chosen\.token,chosen\.email\)/);
+  assert.match(checkout, /checkpoint\(orderRef\);\n\s*if\(!active\(\)\)return;\n\s*commitRememberedReceipt\(\);/, 'remembered only once the order exists');
   assert.doesNotMatch(checkout, /updateProfileOnServer/, 'checkout never edits sign-in details');
   assert.match(checkout, /customerEmail: receiptEmail \|\| user\?\.email \|\| undefined/, 'the order uses the typed address');
 });
@@ -257,8 +258,15 @@ test('one menu button below desktop, one compact account dropdown on desktop, ne
   assert.equal((nav.match(/Sign Out/g) || []).length, 2, 'one Sign Out in the phone menu and one in the desktop dropdown');
   assert.equal((nav.match(/<ShareAppButton /g) || []).length, 2);
   for (const label of ['My Orders', 'Wallet', 'My Business', 'Earn', 'Website Builder', 'Marketplace', 'More Services', 'My Account', 'Help & FAQs', 'Ask Mystery AI']) assert.ok(nav.includes(`'${label}'`) || nav.includes(`>${label}<`), label);
-  assert.match(nav, /wide: true/, 'bottom-nav pages appear in the menu only where the bottom nav is hidden');
+  // Pages the bottom bar shows appear in the menu only from 768px, where the bottom bar is hidden.
+  for (const key of ['home', 'data', 'earn', 'orders']) assert.match(nav, new RegExp(`\\{ key: '${key}', label: '[^']+', Icon: \\w+, onSelect: \\(\\) => handleNavClick\\('${key}'\\), current: activePage === '${key}', wide: true`), key);
   assert.match(nav, /entry\.wide \? 'hidden md:block' : undefined/);
+  // Website Builder stays at every width on purpose: it opens the design gallery, while the bottom bar's Website
+  // takes an owner to My Business.
+  assert.match(nav, /\{ key: 'website', label: 'Website Builder', Icon: Globe, onSelect: openDesigns, current: activePage === 'website', href: WEBSITE_DESIGNS_PATH \}/);
+  assert.match(nav, /document\.documentElement\.classList\.add\('mh-menu-open'\)/, 'a class fallback where :has() is missing');
+  assert.match(source('src/index.css'), /html\.mh-menu-open \.mh-bottom-nav \{ visibility: hidden; \}/);
+  assert.match(nav, /const onBack = \(\) => menuTrigger\.current\?\.focus\(\);/, 'Back returns focus to the menu button');
   assert.match(nav, /aria-current=\{current \? 'page' : undefined\}/);
   assert.match(nav, /useEffect\(\(\) => \{ setMobileMenuOpen\(false\); setAccountDropdownOpen\(false\); \}, \[user\?\.id\]\)/, 'signing in or out closes menus');
   assert.match(source('src/index.css'), /\.mh-app:has\(\.mh-mobile-menu\) \.mh-bottom-nav \{ visibility: hidden; \}/);
@@ -275,5 +283,34 @@ test('My Account is one sheet of short sections with forms opened in place, keep
   assert.match(source('src/components/auth/AccountControls.tsx'), /if \(user\?\.mustChangePassword\) return <SecurityDialog title="Create a new password" mandatory><PasswordForm forced \/><\/SecurityDialog>;/);
   assert.match(source('src/components/auth/AccountControls.tsx'), /<MyAccountHub key=\{user\.id\}/, 'switching accounts remounts the sheet');
   assert.match(source('src/components/pwa/NotificationsEntry.tsx'), /openAccount\('notifications'\)/);
+  // A save answered after sign-out or an account switch never puts the old profile back on screen.
+  assert.equal((hub.match(/if \(!sameSession\(asked\)\) return;/g) || []).length, 2);
+  assert.match(hub, /window\.addEventListener\('popstate', closeAccount\)/, 'Back closes the sheet');
   assert.match(source('src/components/auth/SecurityDialog.tsx'), /layout\?: 'dialog' \| 'sheet'/);
+});
+
+test('the reorder route looks orders up by owner and public reference only', async () => {
+  const mine = await OrdersStore.createOrder(order());
+  assert.equal((await OrdersStore.findAccountOrderByReference('ama', mine.public_reference))?.id, mine.id);
+  assert.equal(await OrdersStore.findAccountOrderByReference('kofi', mine.public_reference), null);
+  assert.equal(await OrdersStore.findAccountOrderByReference('ama', mine.payment_reference), null);
+  assert.equal(await OrdersStore.findAccountOrderByReference('ama', mine.id), null);
+  assert.match(source('server/db/ordersStore.ts'), /SELECT \* FROM orders WHERE public_reference = \$1 AND user_id = \$2 LIMIT 1;/);
+  assert.match(source('server/routes/api.ts'), /OrdersStore\.findAccountOrderByReference\(req\.user!\.id, reference\)/);
+});
+
+test('Buy again can be cancelled, re-checks that it is still wanted, and is quiet for an order that is not the account’s', () => {
+  const hook = source('src/hooks/useBuyAgain.ts');
+  assert.match(hook, /const current = \(\) => !controller\.signal\.aborted && token\.current === asked && \(options\.stillWanted\?\.\(\) \?\? true\);/);
+  assert.match(hook, /if \(options\.notMine\) openDataPage\(options\.notMine\.mode, options\.notMine\.network \?\? 'all'\);/);
+  const sheet = source('src/components/checkout/OrderStatusModal.tsx');
+  assert.match(sheet, /useEffect\(\(\) => \(\) => cancelBuyAgain\(\), \[isStatusModalOpen, lookupReference, cancelBuyAgain\]\);/);
+  assert.match(sheet, /stillWanted: \(\) => shownReference\.current === reference/);
+  assert.match(sheet, /disabled=\{Boolean\(smartBuyAgain && buyAgainPending\)\}/);
+});
+
+test('every checkout that asks for a receipt email starts from the remembered one', () => {
+  for (const file of ['src/components/marketplace/MarketplaceCheckoutModal.tsx', 'src/components/services/AfaRegistrationPage.tsx', 'src/components/checkers/ResultsCheckersPage.tsx', 'src/components/checkout/CheckoutModal.tsx']) {
+    assert.match(source(file), /defaultReceiptEmail\(user\)/, file);
+  }
 });

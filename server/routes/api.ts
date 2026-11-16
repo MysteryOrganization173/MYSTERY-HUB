@@ -1487,9 +1487,9 @@ apiRouter.get('/account/orders/:reference/reorder', requireAuth, reorderLimit, a
   try {
     const reference = String(req.params.reference || '');
     if (!/^[A-Za-z0-9_-]{4,64}$/.test(reference)) { notFound(); return; }
-    const order = await OrdersStore.findOrder(reference);
     // Only the public reference names an order here (never a payment reference or internal id), and only its owner may ask.
-    if (!order || order.public_reference !== reference || !order.user_id || order.user_id !== req.user!.id) { notFound(); return; }
+    const order = await OrdersStore.findAccountOrderByReference(req.user!.id, reference);
+    if (!order || order.public_reference !== reference || order.user_id !== req.user!.id) { notFound(); return; }
     res.json({ success: true, reorder: await resolveReorder(order) });
   } catch {
     console.error('Reorder lookup unavailable');

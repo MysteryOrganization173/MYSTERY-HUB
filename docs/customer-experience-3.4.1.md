@@ -13,12 +13,14 @@ Two releases. This file records what changed, why, and what stays the same. Rele
   - For members the button carries their initial, so it reads as the account menu.
   - The menu runs top to bottom: the member's name and phone, four account shortcuts (My Orders, Wallet, My Business, Earn), Explore, then Account & help (My Account, Help & FAQs, Ask Mystery AI, Share, Sign Out).
   - Pages the bottom bar already shows (Home, Data & Airtime, and for visitors Earn and Track an order) appear in the menu only from 768px, where the bottom bar is hidden.
+  - Two deliberate exceptions: My Orders and Earn stay among the account shortcuts, as the brief lists them; and Website Builder stays in Explore at every width, because it opens the design gallery while the bottom bar's Website takes an owner to My Business.
   - Visitors get Explore, Help (with Notifications for this browser), then Login and Sign Up.
 - **From 1280px:** the full header links stay, with a compact account dropdown: My Orders, Mystery Wallet, My Business, Website Builder (the design gallery), Mystery Earn, My Account, Share and Sign Out.
   - It closes when the window narrows below 1280px.
 - **Behaviour kept:**
   - the page lock and inert background while the menu is open;
   - Escape closes it and returns focus to the button, and so do tapping outside and Back;
+  - on browsers without `:has()`, a class on the root element hides the bottom bar instead;
   - it closes when the window grows to desktop;
   - the current page is announced (`aria-current`);
   - the December shell hooks (`.mh-menu-trigger`, `.mh-mobile-menu-panel`, `.mh-menu-link`, `.mh-menu-ai`, `.mh-menu-auth`, the `menu-header` and `logo-hat` slots) still apply.
@@ -45,9 +47,12 @@ Two releases. This file records what changed, why, and what stays the same. Rele
   - the forced new-password flow and its own dialog;
   - switching accounts remounts the sheet.
 - The footer's Notifications entry opens My Account with the Notifications section already open.
+- The phone's Back closes the sheet.
+- A save that comes back after the customer signed out or switched account is ignored, so the old profile never reappears.
 
 ### Registration email
-- The email field is shown openly: **Email address (recommended)**, with "For payment receipts and easier future checkouts."
+- The email field is shown openly: **Email address (recommended)**, with "For payment receipts and easier future checkouts. You can also sign in with it."
+  - The second sentence is there because this address is also a sign-in detail; a receipts-only address is the receipt email below.
 - It stays optional; registration without it works as before.
 
 ### Receipt email
@@ -59,8 +64,10 @@ Two releases. This file records what changed, why, and what stays the same. Rele
   - It starts with the remembered receipt email, then the sign-in email.
   - The receipt address can still be changed for each order.
   - For a signed-in customer typing a new address, an unticked **Remember this email for future receipts** box appears.
-  - When ticked, the address is saved alongside the payment, never instead of it. The order always uses the typed address.
+  - When ticked, the address is saved only once the server has created the order. A rejected or unanswered attempt remembers nothing. The order always uses the typed address.
+  - Clearing or changing the address back hides and unticks the box.
   - If saving fails, the customer is told and the payment is unaffected.
+- **Other checkouts:** Marketplace, AFA registration and Results Checkers start from the same address. Airtime and Instant, which show no receipt field, send it to Paystack the way they sent the sign-in email before.
 - **My Account** shows the receipt email under Personal details with Change and Remove, and says it isn't used to sign in.
 - **What does not change:** Paystack initialization, verification and amounts. Checkout never edits sign-in details.
 
@@ -81,6 +88,13 @@ Two releases. This file records what changed, why, and what stays the same. Rele
   - Payment initialization re-prices and re-checks everything, so all checkout protections apply as before: recipient validation, the network warning, the active MTN order rule, payment recovery and idempotency. Nothing is charged by tapping Buy again.
   - When the product cannot be repeated (retired, switched off, out of stock, Flexi, service down, or an unreadable amount), one sentence explains why and the right catalogue opens on that network.
 - **Where it appears:** the member home (standard and December) and the order status sheet. On the order status sheet it is for signed-in customers only; visitors keep the plain catalogue link.
+  - Closing the sheet, or opening another order, cancels a lookup still in flight; the button is disabled while it checks.
+  - An order the server does not know as the account's (bought before signing in, or tracked by reference) quietly opens that service's catalogue, as Buy again always did.
+  - The lookup reads the order by owner and public reference only (`WHERE public_reference = $1 AND user_id = $2`).
+
+### Independent review
+- A separate reviewer found no high-severity issue. It raised one low–medium finding (a stale profile after a fast sign-out), five low findings and five notes.
+- All were addressed as described above. The menu exceptions are deliberate and documented.
 
 ### Evidence (local, synthetic data)
 - `server/suppliers/__tests__/customerExperience341.test.ts`: the reorder service and route, the receipt email, the client mapping, the menu and the sheet.

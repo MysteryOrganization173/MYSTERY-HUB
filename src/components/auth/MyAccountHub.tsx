@@ -15,6 +15,17 @@ const primary = `${accountButton} !border-[#00c365] !bg-[#00c365] !text-black`;
 const quiet = 'min-h-11 rounded-xl px-3 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50';
 const memberSince = (iso: string) => { const date = new Date(iso); return Number.isFinite(date.getTime()) ? date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : ''; };
 
+/**
+ * A save answered after the customer signed out (or switched account) must not put the old profile back on screen:
+ * apply it only while the same session is still signed in.
+ */
+function useSameSession() {
+  const { sessionToken } = useApp();
+  const current = useRef(sessionToken);
+  current.current = sessionToken;
+  return (asked: string | null) => current.current === asked;
+}
+
 /** Opens a form in place: focus goes into it when it opens and back to its button when it closes. */
 function useInlineForm() {
   const [open, setOpen] = useState(false);
@@ -44,7 +55,7 @@ function Row({ label, value, note }: { label: string; value: React.ReactNode; no
 
 function PersonalDetails() {
   const { user, sessionToken, updateUserProfile } = useApp();
-  const form = useInlineForm();
+  const form = useInlineForm(), sameSession = useSameSession();
   const [name, setName] = useState(user!.name), [email, setEmail] = useState(user!.email ?? ''), [phone, setPhone] = useState(user!.phone ?? '');
   const [currentPassword, setPassword] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false), [done, setDone] = useState('');
   const identifiersChanged = email.trim().toLowerCase() !== (user!.email ?? '') || phone.trim() !== (user!.phone ?? '');
@@ -60,10 +71,12 @@ function PersonalDetails() {
     {!form.open && <button ref={form.toggle} type="button" aria-expanded={false} aria-controls={formId} className={`${accountButton} mt-3 w-full sm:w-auto`} onClick={() => { reset(); setDone(''); form.setOpen(true); }}>Edit details</button>}
     {form.open && <form id={formId} className="space-y-4" onSubmit={async event => {
       event.preventDefault(); setBusy(true); setError('');
+      const asked = sessionToken;
       try {
-        const result = await updateProfileOnServer(sessionToken!, { name, email, phone, ...(identifiersChanged ? { currentPassword } : {}) });
+        const result = await updateProfileOnServer(asked!, { name, email, phone, ...(identifiersChanged ? { currentPassword } : {}) });
+        if (!sameSession(asked)) return;
         updateUserProfile(result.user); setPassword(''); setDone('Your details are saved.'); form.setOpen(false);
-      } catch (err) { setError(err instanceof Error ? err.message : 'Could not save your details.'); } finally { setBusy(false); }
+      } catch (err) { if (sameSession(asked)) setError(err instanceof Error ? err.message : 'Could not save your details.'); } finally { setBusy(false); }
     }}>
       <label className="block space-y-1 text-sm">Name<input ref={form.field} required minLength={2} maxLength={128} className={accountInput} value={name} onChange={e => setName(e.target.value)} autoComplete="name" /></label>
       <label className="block space-y-1 text-sm">Phone (sign-in)<input type="tel" inputMode="tel" maxLength={32} className={accountInput} value={phone} onChange={e => setPhone(e.target.value)} autoComplete="tel" /></label>
@@ -83,14 +96,22 @@ function PersonalDetails() {
 /** A remembered receipt contact, separate from sign-in: no password, and it never changes how the customer signs in. */
 function ReceiptEmail() {
   const { user, sessionToken, updateUserProfile } = useApp();
-  const form = useInlineForm();
+  const form = useInlineForm(), sameSession = useSameSession();
   const [value, setValue] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false), [done, setDone] = useState('');
   const formId = useId();
   const saved = user!.receiptEmail;
   const save = async (email: string | null) => {
     setBusy(true); setError('');
-    try { const result = await saveReceiptEmailOnServer(sessionToken!, email); updateUserProfile(result.user); setDone(email ? 'Receipts will go to this email.' : 'Removed. Receipts go to your sign-in email, or the one you enter at checkout.'); form.setOpen(false); }
-    catch (err) { setError(err instanceof Error ? err.message : 'Could not save the receipt email.'); }
+    const asked = sessionToken;
+    try {
+      const result = await saveReceiptEmailOnServer(asked!, email);
+      if (!sameSession(asked)) return;
+      updateUserProfile(result.user); setDone(email ? 'Receipts will go to this email.' : 'Removed. Receipts go to your sign-in email, or the one you enter at checkout.');
+      if (form.open) form.setOpen(false);
+      // Remove leaves no button where focus was: keep it on the receipt email's own button.
+      else window.setTimeout(() => form.toggle.current?.focus(), 0);
+    }
+    catch (err) { if (sameSession(asked)) setError(err instanceof Error ? err.message : 'Could not save the receipt email.'); }
     finally { setBusy(false); }
   };
   return <div className="mt-4 rounded-xl border border-slate-800 bg-[#0b1116] p-3">
@@ -194,6 +215,8 @@ function Rewards() {
 
 export function MyAccountHub({ notifications }: { notifications: React.ReactNode }) {
   const { user, closeAccount, accountSection } = useApp();
+  // The phone's Back closes the sheet, as it closes the menu.
+  useEffect(() => { window.addEventListener('popstate', closeAccount); return () => window.removeEventListener('popstate', closeAccount); }, [closeAccount]);
   const initial = user!.name.trim().charAt(0).toUpperCase() || 'M';
   const secondary = user!.phone ? formatGhanaPhone(user!.phone) : user!.email || '';
   return <SecurityDialog title="My Account" onClose={closeAccount} layout="sheet">

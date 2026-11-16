@@ -44,7 +44,7 @@ export function AuthFields({ signup, values, changes, busy, error, recover }: {
       <input id="auth-email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} maxLength={128}
         className={inputClass} value={values.email} onChange={e => changes.email(e.target.value)}
         aria-invalid={invalid} aria-describedby={'auth-email-help' + (error ? ' auth-error' : '')} placeholder="you@example.com" />
-      <span id="auth-email-help" className="block text-xs font-normal text-slate-400 mt-1">For payment receipts and easier future checkouts.</span>
+      <span id="auth-email-help" className="block text-xs font-normal text-slate-400 mt-1">For payment receipts and easier future checkouts. You can also sign in with it.</span>
     </label>}
     <div>
       <div className="flex items-center justify-between gap-2">
