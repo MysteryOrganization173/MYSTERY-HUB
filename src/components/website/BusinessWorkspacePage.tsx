@@ -262,7 +262,11 @@ export const BusinessWorkspacePage: React.FC = () => {
         <li><a href={WEBSITE_DESIGNS_PATH} onClick={event => { event.preventDefault(); leaveBusiness(WEBSITE_DESIGNS_PATH); }}><Compass size={18} aria-hidden="true" /><span>Explore designs</span></a></li>
       </ul>
       <ul className="bw-menu-list" data-quiet aria-label="Account">
-        <li><button type="button" onClick={() => { closeMenu(); openAccount(); }}><UserRound size={18} aria-hidden="true" /><span>My account<small>Profile, password and sign out</small></span></button></li>
+        <li><button type="button" onClick={() => {
+          // The menu leaves history with Back; My Account opens once that step has landed, so it is not closed by it.
+          if (menuEntry()) { const open = () => { window.removeEventListener('popstate', open); openAccount(); }; window.addEventListener('popstate', open); }
+          closeMenu(); if (!menuEntry()) openAccount();
+        }}><UserRound size={18} aria-hidden="true" /><span>My account<small>Profile, password and sign out</small></span></button></li>
         <li><a href="/" onClick={event => { event.preventDefault(); leaveBusiness('/'); }}><House size={18} aria-hidden="true" /><span>Back to Mystery Hub<small>Buy data, airtime and more as a customer</small></span></a></li>
       </ul>
     </WorkspaceMenu>}

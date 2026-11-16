@@ -126,7 +126,8 @@ function ReceiptEmail() {
     {done && !form.open && <p role="status" className="mt-2 text-sm text-emerald-300">{done}</p>}
     {!form.open && <div className="mt-2 flex flex-wrap gap-1">
       <button ref={form.toggle} type="button" aria-expanded={false} aria-controls={formId} className={quiet} onClick={() => { setValue(saved ?? ''); setError(''); setDone(''); form.setOpen(true); }}>{saved ? 'Change' : 'Add a receipt email'}</button>
-      {saved && <button type="button" disabled={busy} className={quiet} onClick={() => { void save(null); }}>Remove</button>}
+      {/* aria-disabled, not disabled: a disabled button would drop focus to the page while it saves. */}
+      {saved && <button type="button" aria-disabled={busy || undefined} className={quiet} onClick={() => { if (!busy) void save(null); }}>Remove</button>}
     </div>}
     {error && !form.open && <p role="alert" className="mt-2 text-sm text-rose-300">{error}</p>}
     {form.open && <form id={formId} className="mt-3 space-y-3" onSubmit={event => { event.preventDefault(); void save(value.trim() || null); }}>
@@ -215,8 +216,17 @@ function Rewards() {
 
 export function MyAccountHub({ notifications }: { notifications: React.ReactNode }) {
   const { user, closeAccount, accountSection } = useApp();
-  // The phone's Back closes the sheet, as it closes the menu.
-  useEffect(() => { window.addEventListener('popstate', closeAccount); return () => window.removeEventListener('popstate', closeAccount); }, [closeAccount]);
+  // The phone's Back closes the sheet and only the sheet: it gets its own history entry at the same address, so Back
+  // pops that entry and the page underneath stays put. Closing any other way removes the entry again.
+  const close = useRef(closeAccount);
+  close.current = closeAccount;
+  useEffect(() => {
+    const own = () => Boolean(window.history.state?.mhAccount);
+    if (!own()) window.history.pushState({ page: window.history.state?.page, mhAccount: true }, '', window.location.pathname + window.location.search + window.location.hash);
+    const onPop = () => { if (!own()) close.current(); };
+    window.addEventListener('popstate', onPop);
+    return () => { window.removeEventListener('popstate', onPop); if (own()) window.history.back(); };
+  }, []);
   const initial = user!.name.trim().charAt(0).toUpperCase() || 'M';
   const secondary = user!.phone ? formatGhanaPhone(user!.phone) : user!.email || '';
   return <SecurityDialog title="My Account" onClose={closeAccount} layout="sheet">

@@ -285,7 +285,12 @@ test('My Account is one sheet of short sections with forms opened in place, keep
   assert.match(source('src/components/pwa/NotificationsEntry.tsx'), /openAccount\('notifications'\)/);
   // A save answered after sign-out or an account switch never puts the old profile back on screen.
   assert.equal((hub.match(/if \(!sameSession\(asked\)\) return;/g) || []).length, 2);
-  assert.match(hub, /window\.addEventListener\('popstate', closeAccount\)/, 'Back closes the sheet');
+  // Back closes the sheet through its own history entry, so the page underneath stays put and an earlier Back in
+  // flight (My Business's More sheet) cannot close it.
+  assert.match(hub, /window\.history\.pushState\(\{ page: window\.history\.state\?\.page, mhAccount: true \}/);
+  assert.match(hub, /const onPop = \(\) => \{ if \(!own\(\)\) close\.current\(\); \};/);
+  assert.match(hub, /if \(own\(\)\) window\.history\.back\(\);/, 'closing another way removes the entry');
+  assert.match(source('src/components/website/BusinessWorkspacePage.tsx'), /if \(menuEntry\(\)\) \{ const open = \(\) => \{ window\.removeEventListener\('popstate', open\); openAccount\(\); \}; window\.addEventListener\('popstate', open\); \}/);
   assert.match(source('src/components/auth/SecurityDialog.tsx'), /layout\?: 'dialog' \| 'sheet'/);
 });
 
@@ -306,7 +311,7 @@ test('Buy again can be cancelled, re-checks that it is still wanted, and is quie
   const sheet = source('src/components/checkout/OrderStatusModal.tsx');
   assert.match(sheet, /useEffect\(\(\) => \(\) => cancelBuyAgain\(\), \[isStatusModalOpen, lookupReference, cancelBuyAgain\]\);/);
   assert.match(sheet, /stillWanted: \(\) => shownReference\.current === reference/);
-  assert.match(sheet, /disabled=\{Boolean\(smartBuyAgain && buyAgainPending\)\}/);
+  assert.match(sheet, /aria-disabled=\{smartBuyAgain && buyAgainPending \? true : undefined\}/, 'aria-disabled keeps focus on the button while it checks');
 });
 
 test('every checkout that asks for a receipt email starts from the remembered one', () => {

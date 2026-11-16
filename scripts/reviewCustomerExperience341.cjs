@@ -173,6 +173,33 @@ const visibleTriggers = p => p.evaluate(() => [...document.querySelectorAll('hea
       await ctx.close();
     }
 
+    // 3b. Back closes My Account and only My Account; My Business › More › My account keeps it open.
+    {
+      const ctx = await context(b, { width: 390, height: 844 }, ama, { options: { isMobile: true, hasTouch: true } }), p = await ctx.newPage();
+      await p.goto(BASE + '/data'); await settle(p);
+      await p.locator('header .mh-menu-trigger').click(); await sleep(300);
+      await p.locator('#mobile-menu').getByRole('button', { name: 'My Account' }).click(); await sleep(600);
+      await p.goBack(); await sleep(700);
+      ok('account: Back closes the sheet and leaves the page where it was', !(await p.getByRole('dialog', { name: 'My Account' }).isVisible().catch(() => false)) && /\/data$/.test(new URL(p.url()).pathname), p.url());
+      await p.locator('header .mh-menu-trigger').click(); await sleep(300);
+      await p.locator('#mobile-menu').getByRole('button', { name: 'My Account' }).click(); await sleep(600);
+      await p.getByRole('button', { name: 'Close My Account' }).click(); await sleep(600);
+      ok('account: closing with × removes its history entry and stays on the page', (await p.evaluate(() => history.state?.mhAccount)) !== true && /\/data$/.test(new URL(p.url()).pathname), p.url());
+      await ctx.close();
+      const owner = await member('Owner Synthetic');
+      const site = await fetch(BASE + '/api/websites', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + owner.token }, body: JSON.stringify({ templateId: 'tmpl-start-blank', name: 'Synthetic Data Shop' }) });
+      ok('setup: a synthetic website for My Business', site.status === 201 || site.status === 200, site.status);
+      const c2 = await context(b, { width: 390, height: 844 }, owner, { options: { isMobile: true, hasTouch: true } }), q = await c2.newPage();
+      await q.goto(BASE + '/my-business'); await settle(q); await sleep(1200);
+      const more = q.getByRole('button', { name: /^More/ });
+      if (await more.isVisible().catch(() => false)) {
+        await more.click(); await sleep(500);
+        await q.locator('dialog.bw-drawer').getByRole('button', { name: /My account/ }).click(); await sleep(1200);
+        ok('My Business › More › My account opens the account sheet and keeps it open', await q.getByRole('dialog', { name: 'My Account' }).isVisible().catch(() => false));
+      } else ok('My Business › More › My account opens the account sheet and keeps it open', false, 'More button not shown');
+      await c2.close();
+    }
+
     // 4. Registration: the email is visible, recommended and optional.
     {
       const ctx = await context(b, { width: 390, height: 844 }, null, { scale: 2 }), p = await ctx.newPage();

@@ -928,9 +928,6 @@ export class OrdersStore {
     return map;
   }
 
-  /**
-   * Find order by public_reference or payment_reference or id
-   */
   /** 3.4.1: one of this account's own orders, named only by its public reference (never a payment reference or id). */
   static async findAccountOrderByReference(userId: string, reference: string): Promise<OrderRecord | null> {
     if (!userId || !reference) return null;
@@ -940,6 +937,9 @@ export class OrdersStore {
     return order && order.user_id === userId && order.public_reference === reference ? order : null;
   }
 
+  /**
+   * Find order by public_reference or payment_reference or id
+   */
   static async findOrder(ref: string, client?: PoolClient): Promise<OrderRecord | null> {
     if (!ref) return null;
 

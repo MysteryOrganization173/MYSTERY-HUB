@@ -495,7 +495,7 @@ export const OrderStatusModal: React.FC = () => {
                 setActivePage(isAfa ? 'home' : 'data');
               }}
               className="mh-button"
-              disabled={Boolean(smartBuyAgain && buyAgainPending)}
+              aria-disabled={smartBuyAgain && buyAgainPending ? true : undefined}
               aria-busy={smartBuyAgain && buyAgainPending ? true : undefined}
             >
               <span>{activeOrder.serviceType === 'results_checker' ? 'Open your receipt' : isAfa ? 'Back to Home' : tone === 'success' ? (smartBuyAgain && buyAgainPending ? 'Checking…' : 'Buy again') : 'Done'}</span>
