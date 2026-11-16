@@ -21,6 +21,7 @@ beforeEach(()=>{
   if(sql==='SELECT wallet_minor::float8 AS wallet_minor,restricted FROM finance_accounts WHERE user_id=$1')return {rows:[{...state.account}]};
   if(sql.startsWith('UPDATE finance_accounts SET wallet_minor')){state.account.wallet_minor=args[0];return {rows:[]};}
   if(sql.startsWith('UPDATE finance_accounts SET restricted')){state.account.restricted=sql.includes('TRUE');return {rows:[]};}
+  if(sql==='SELECT * FROM finance_operations WHERE user_id=$1 AND idempotency_key=$2 LIMIT 1')return {rows:structuredClone(state.operations.filter((o:any)=>o.user_id===args[0]&&o.idempotency_key===args[1]).slice(0,1))};
   if(sql.startsWith('SELECT * FROM finance_operations'))return {rows:structuredClone(state.operations.filter((x:any)=>sql.includes('WHERE id=')?x.id===args[0]:x.user_id===args[0]))};
   if(sql.startsWith('INSERT INTO finance_operations')){const names=['id','user_id','kind','idempotency_key','state','amount_minor','payload','created_at'];const row=Object.fromEntries(names.map((k,n)=>[k,k==='payload'?JSON.parse(args[n]):args[n]]));row.updated_at=row.created_at;state.operations.push(row);return {rows:[]};}
   if(sql.startsWith('UPDATE finance_operations')){Object.assign(state.operations.find((x:any)=>x.id===args[3]),{state:args[0],payload:JSON.parse(args[1]),updated_at:args[2]});return {rows:[]};}
