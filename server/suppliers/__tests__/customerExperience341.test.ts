@@ -287,9 +287,11 @@ test('My Account is one sheet of short sections with forms opened in place, keep
   assert.equal((hub.match(/if \(!sameSession\(asked\)\) return;/g) || []).length, 2);
   // Back closes the sheet through its own history entry, so the page underneath stays put and an earlier Back in
   // flight (My Business's More sheet) cannot close it.
-  assert.match(hub, /window\.history\.pushState\(\{ page: window\.history\.state\?\.page, mhAccount: true \}/);
-  assert.match(hub, /const onPop = \(\) => \{ if \(!own\(\)\) close\.current\(\); \};/);
-  assert.match(hub, /if \(own\(\)\) window\.history\.back\(\);/, 'closing another way removes the entry');
+  assert.match(hub, /useOverlayHistory\('mhAccount', closeAccount\);/);
+  const history = source('src/utils/overlayHistory.ts');
+  assert.match(history, /win\.history\.pushState\(\{ page: win\.history\.state\?\.page, \[key\]: mark \}/);
+  assert.match(history, /const onPop = \(\) => \{ if \(!ours\(\)\) onBack\(\); \};/);
+  assert.match(history, /if \(ours\(\)\) win\.history\.back\(\);/, 'closing another way removes the entry');
   assert.match(source('src/components/website/BusinessWorkspacePage.tsx'), /if \(menuEntry\(\)\) \{ const open = \(\) => \{ window\.removeEventListener\('popstate', open\); openAccount\(\); \}; window\.addEventListener\('popstate', open\); \}/);
   assert.match(source('src/components/auth/SecurityDialog.tsx'), /layout\?: 'dialog' \| 'sheet'/);
 });

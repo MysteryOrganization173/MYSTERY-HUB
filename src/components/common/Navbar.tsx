@@ -11,6 +11,7 @@ import { openMarketplaceAt } from '../../utils/marketplaceBrowse';
 import { openServicesAt } from '../../utils/serviceDirectory';
 import { formatGhanaPhone } from '../../utils/checkoutRecovery';
 import { openNotificationSettings } from '../pwa/NotificationsEntry';
+import { openNotificationCenter, useNotificationCenterOpen } from '../notifications/NotificationCenter';
 import {
   Search,
   ShoppingBag,
@@ -35,7 +36,7 @@ import {
 } from 'lucide-react';
 
 /** One entry in the phone and tablet menu. `wide` entries repeat a bottom-nav page, so they appear only from 768px, where the bottom nav is hidden. */
-interface MenuEntry { key: string; label: string; Icon: LucideIcon; onSelect: () => void; current?: boolean; wide?: boolean; badge?: string; className?: string; href?: string }
+interface MenuEntry { key: string; label: string; Icon: LucideIcon; onSelect: () => void; current?: boolean; wide?: boolean; className?: string; href?: string }
 
 export const Navbar: React.FC = () => {
   const { activePage, setActivePage, openAuth, openMysteryAi, user, logoutUser, openAccount, sessionToken } = useApp();
@@ -43,6 +44,7 @@ export const Navbar: React.FC = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
+  const centerOpen = useNotificationCenterOpen();
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const accountTrigger = useRef<HTMLButtonElement>(null);
@@ -299,6 +301,11 @@ export const Navbar: React.FC = () => {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00c365]" />
             </span>
           </button>
+
+          {/* 3.4.1: the Notification Center, for members at every width. No count: nothing here knows what was read. */}
+          {user && <button type="button" onClick={() => { closeMenus(); setSearchOpen(false); openNotificationCenter(); }} aria-haspopup="dialog" aria-expanded={centerOpen}
+            className="min-h-11 min-w-11 flex items-center justify-center rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365]"
+            aria-label="Notifications" title="Notifications"><Bell className="w-[18px] h-[18px]" aria-hidden="true" /></button>}
 
           {/* Desktop account dropdown (from 1280px). Below that, the single menu button carries the account. */}
           {user ? (

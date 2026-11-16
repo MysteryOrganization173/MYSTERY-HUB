@@ -5,6 +5,7 @@ import { updateProfileOnServer, revokeOwnSessionsOnServer, getMyReferralSummary,
 import { SecurityDialog, accountInput, accountButton } from './SecurityDialog';
 import { PasswordForm } from './PasswordForm';
 import { formatGhanaPhone } from '../../utils/checkoutRecovery';
+import { afterOverlayHistory, useOverlayHistory } from '../../utils/overlayHistory';
 
 /**
  * 3.4.1 My Account: one calm place for the customer's own details. Every section starts as a short summary, and each
@@ -210,23 +211,14 @@ function Rewards() {
         <dd className="mt-1 text-base text-white">{memberSince(user!.createdAt)}</dd>
       </div>
     </dl>
-    <button type="button" className={`${accountButton} mt-3 w-full sm:w-auto`} onClick={() => { closeAccount(); setActivePage('earn'); }}>Open Mystery Earn</button>
+    <button type="button" className={`${accountButton} mt-3 w-full sm:w-auto`} onClick={() => { closeAccount(); afterOverlayHistory('mhAccount', () => setActivePage('earn')); }}>Open Mystery Earn</button>
   </>;
 }
 
 export function MyAccountHub({ notifications }: { notifications: React.ReactNode }) {
   const { user, closeAccount, accountSection } = useApp();
-  // The phone's Back closes the sheet and only the sheet: it gets its own history entry at the same address, so Back
-  // pops that entry and the page underneath stays put. Closing any other way removes the entry again.
-  const close = useRef(closeAccount);
-  close.current = closeAccount;
-  useEffect(() => {
-    const own = () => Boolean(window.history.state?.mhAccount);
-    if (!own()) window.history.pushState({ page: window.history.state?.page, mhAccount: true }, '', window.location.pathname + window.location.search + window.location.hash);
-    const onPop = () => { if (!own()) close.current(); };
-    window.addEventListener('popstate', onPop);
-    return () => { window.removeEventListener('popstate', onPop); if (own()) window.history.back(); };
-  }, []);
+  // The phone's Back closes the sheet and only the sheet (its own history entry; see overlayHistory).
+  useOverlayHistory('mhAccount', closeAccount);
   const initial = user!.name.trim().charAt(0).toUpperCase() || 'M';
   const secondary = user!.phone ? formatGhanaPhone(user!.phone) : user!.email || '';
   return <SecurityDialog title="My Account" onClose={closeAccount} layout="sheet">

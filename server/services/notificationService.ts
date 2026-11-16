@@ -180,13 +180,17 @@ export class NotificationService {
  static async revoke(userId:string,id:string){requireUuid(id);await db().query(`DELETE FROM ${NOTIFICATIONS}.devices WHERE id=$1 AND user_id=$2`,[id,userId]);return {success:true};}
  static async devices(userId:string,token:string){return (await db().query(`SELECT d.id,d.endpoint_hash,d.created_at,d.updated_at,(s.token_hash=$2 AND s.expires_at>NOW()) AS current_session FROM ${NOTIFICATIONS}.devices d JOIN sessions s ON s.id=d.session_id WHERE d.user_id=$1 ORDER BY d.updated_at DESC LIMIT 10`,[userId,hashSessionToken(token)])).rows;}
  static async inbox(userId:string,offset=0,id?:string,open?:unknown){if(id)requireUuid(id);
-  const rows=(await db().query(`SELECT e.id,e.created_at,e.order_id,e.label,e.template_snapshot,e.destination FROM ${NOTIFICATIONS}.events e WHERE e.user_id=$1 AND ($2::uuid IS NULL OR e.id=$2) ORDER BY e.created_at DESC,e.id DESC LIMIT 25 OFFSET $3`,[userId,id||null,offset])).rows;
+  // 3.4.1: an order update names the account's own order by its public reference (the join is limited to this
+  // account's orders), so the Notification Center can open it; the category is the kind of message, never a read state.
+  const rows=(await db().query(`SELECT e.id,e.created_at,e.order_id,e.label,e.template_snapshot,e.destination,o.public_reference AS order_reference FROM ${NOTIFICATIONS}.events e LEFT JOIN orders o ON o.id=e.order_id AND o.user_id=$1 WHERE e.user_id=$1 AND ($2::uuid IS NULL OR e.id=$2) ORDER BY e.created_at DESC,e.id DESC LIMIT 25 OFFSET $3`,[userId,id||null,offset])).rows;
   if(id&&!rows.length)throw new FinanceError('Notification not found.',404);
   // Opening the operator's own test from its notification is the evidence that the whole path works on a device. It
   // counts only with the open token that travelled inside that encrypted push, so a link or an id alone proves nothing.
   // Only tests are marked this way; customer notifications are never tracked as opened.
   if(id&&typeof open==='string'&&testOpenTokenMatches(id,open))await db().query(`UPDATE ${NOTIFICATIONS}.events SET opened_at=NOW() WHERE id=$1 AND user_id=$2 AND operator_test AND opened_at IS NULL`,[id,userId]);
   return rows.map(r=>({id:r.id,createdAt:r.created_at,...renderTemplate(r.template_snapshot,r.label),destination:r.order_id?'/orders' as const:'/app' as const,
+   category:r.order_id?'orders' as const:r.template_snapshot?.category==='marketing'?'announcements' as const:'account' as const,
+   ...(r.order_id&&r.order_reference?{orderReference:String(r.order_reference)}:{}),
    ...(r.template_snapshot?.category==='marketing'?{opens:announcementPage(r.destination)}:{})}));
  }
  /** The operator's test wording is internal (used only by "Send a test"), so it is not listed among templates. */

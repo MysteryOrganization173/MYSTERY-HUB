@@ -21,6 +21,7 @@ import { lazyPage } from './utils/lazyPage';
 import { AppLaunchLayer } from './components/pwa/AppLaunchLayer';
 import { InvitationLayer } from './components/pwa/InvitationLayer';
 import { NotificationsEntryHost } from './components/pwa/NotificationsEntry';
+import { NotificationCenterHost } from './components/notifications/NotificationCenter';
 import {GrowthTracker} from './components/common/GrowthTracker';
 import { SeasonProvider, seasonShellAttributes, useSeason } from './seasonal/SeasonProvider';
 import { SeasonalFooter, SeasonalShellLayer } from './seasonal/Seasonal';
@@ -75,6 +76,9 @@ const AppContent: React.FC = () => {
         <WebsiteEditorPage />
         <AuthModal />
         <AccountControls />
+        {/* 3.4.1: My Account links to the Notification Center, so it opens wherever My Account does. Without the
+            order sheet here, an order update opens My Orders with that order. */}
+        <NotificationCenterHost ordersOnPage />
         <ToastContainer />
       </div>
     );
@@ -87,6 +91,9 @@ const AppContent: React.FC = () => {
         <SEOHead />
         <AdminPage />
         <AccountControls />
+        {/* 3.4.1: My Account links to the Notification Center, so it opens wherever My Account does. Without the
+            order sheet here, an order update opens My Orders with that order. */}
+        <NotificationCenterHost ordersOnPage />
         <ToastContainer />
       </>
     );
@@ -107,6 +114,9 @@ const AppContent: React.FC = () => {
         {templatePreviewNeeded && <TemplatePreviewModal />}
         <AuthModal />
         <AccountControls />
+        {/* 3.4.1: My Account links to the Notification Center, so it opens wherever My Account does. Without the
+            order sheet here, an order update opens My Orders with that order. */}
+        <NotificationCenterHost ordersOnPage />
         <ToastContainer />
       </div>
     );
@@ -158,6 +168,7 @@ const AppContent: React.FC = () => {
       <AppLaunchLayer />
       <InvitationLayer />
       <NotificationsEntryHost />
+      <NotificationCenterHost />
     </div>
   );
 };
