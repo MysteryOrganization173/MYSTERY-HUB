@@ -36,7 +36,11 @@ export class FinanceTx {
     if(!this.client) return [...this.state!.operations].reverse().filter(x=>x.user_id===this.userId);
     return (await this.client.query('SELECT * FROM finance_operations WHERE user_id=$1 ORDER BY created_at DESC',[this.userId])).rows.map(normalizeOperation);
   }
-  async find(key:string) {return (await this.operations()).find(x=>x.idempotency_key===key);}
+  async find(key:string):Promise<FinanceOperation|undefined> {
+    if(!this.client)return (await this.operations()).find(x=>x.idempotency_key===key);
+    const row=(await this.client.query('SELECT * FROM finance_operations WHERE user_id=$1 AND idempotency_key=$2 LIMIT 1',[this.userId,key])).rows[0];
+    return row ? normalizeOperation(row) : undefined;
+  }
   async create(kind:string,key:string,amount:number,payload:Record<string,any>,state='completed') {
     if(!/^[a-zA-Z0-9:_-]{1,128}$/.test(key)) throw new FinanceError('Invalid operation key.');
     const row:FinanceOperation={id:`fin_${randomUUID()}`,user_id:this.userId,kind,idempotency_key:key,state,amount_minor:amount,payload,created_at:new Date().toISOString(),updated_at:new Date().toISOString()};

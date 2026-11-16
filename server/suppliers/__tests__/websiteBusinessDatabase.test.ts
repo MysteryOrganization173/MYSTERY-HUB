@@ -24,6 +24,7 @@ beforeEach(()=>{
     if(sql.startsWith('SELECT id FROM website_sites'))return {rows:[{id:state.site.id}]};
     if(sql.startsWith('SELECT value FROM finance_config'))return {rows:state.config[values[0]]?[{value:structuredClone(state.config[values[0]])}]:[]};
     if(sql.startsWith('INSERT INTO finance_config')){state.config[values[0]]=JSON.parse(values[1]);return {rows:[]};}
+    if(sql==='SELECT * FROM finance_operations WHERE user_id=$1 AND idempotency_key=$2 LIMIT 1')return {rows:structuredClone(state.operations.filter((o:any)=>o.user_id===values[0]&&o.idempotency_key===values[1]).slice(0,1))};
     if(sql.startsWith('SELECT * FROM finance_operations'))return {rows:structuredClone(state.operations.filter((o:any)=>o.user_id===values[0]))};
     if(sql.startsWith('INSERT INTO finance_operations')){const keys=['id','user_id','kind','idempotency_key','state','amount_minor','payload','created_at'];const row=Object.fromEntries(keys.map((k,index)=>[k,k==='payload'?JSON.parse(values[index]):values[index]]));row.updated_at=row.created_at;state.operations.push(row);return {rows:[]};}
     if(sql.startsWith('UPDATE finance_operations')){Object.assign(state.operations.find((o:any)=>o.id===values[3]),{state:values[0],payload:JSON.parse(values[1]),updated_at:values[2]});return {rows:[]};}
