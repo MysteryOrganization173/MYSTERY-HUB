@@ -77,7 +77,8 @@ function GuestNotificationsSheet({ onClose }: { onClose: () => void }) {
     loading: { icon: <Loader2 className="h-5 w-5 animate-spin text-slate-300" aria-hidden />, title: 'Checking this browser…', body: '' },
     working: { icon: <Loader2 className="h-5 w-5 animate-spin text-slate-300" aria-hidden />, title: 'One moment…', body: 'Keep this window open.' },
     on: { icon: <BellRing className="h-5 w-5 text-emerald-300" aria-hidden />, title: 'News and offers are on', body: 'This browser gets Mystery Hub service news and occasional offers.' },
-    off: { icon: <BellOff className="h-5 w-5 text-slate-300" aria-hidden />, title: 'Notifications are off', body: offer },
+    // 3.4.1: the same words as every other "Allow Notifications" place.
+    off: { icon: <BellRing className="h-5 w-5 text-[#44df95]" aria-hidden />, title: notificationCopy({ audience: 'guest', offers: true }).title, body: offer },
     blocked: { icon: <BellOff className="h-5 w-5 text-slate-300" aria-hidden />, title: 'Notifications are blocked', body: 'This browser is blocking notifications from Mystery Hub. Allow them in its site settings, then come back here.' },
     unsupported: { icon: <BellOff className="h-5 w-5 text-slate-300" aria-hidden />, title: 'Notifications aren’t available here', body: 'This browser can’t receive Mystery Hub notifications right now.' },
     guests_off: { icon: <BellOff className="h-5 w-5 text-slate-300" aria-hidden />, title: 'Not available without an account yet', body: 'Mystery Hub news for visitors without an account is coming. Sign in to get updates about your orders.' },

@@ -1,4 +1,4 @@
-import type {CustomerNotificationsClient, GuestNotificationsClient, NotificationConsent} from '../services/customerNotifications';
+import type {CustomerNotificationsClient, GuestNotificationsClient, NotificationConsent, NotificationPreferences} from '../services/customerNotifications';
 import {notificationPermissionState} from './notifications';
 import {hasPushSubscription, pushSupported, readGuestDeviceState, readServerDeviceState, subscribeGuestDevice, subscribeThisDevice} from './push';
 import {marketingPromptAnswered, notificationInviteResting, type Snooze} from './launchPolicy';
@@ -28,6 +28,16 @@ export function inviteConsent(invite: NotificationInvite): NotificationConsent {
     : { purposes: ['transactional'], copyVersion: NOTIFICATION_COPY_VERSION + '-orders' };
 }
 
+/**
+ * What a member's "Allow Notifications" offers, wherever it is shown (invitation, My Account, Notification Center):
+ * order updates, plus service news and offers unless they turned those off before. A withdrawn "no" to offers is
+ * never revived by allowing notifications; offers come back only through the News and offers switch.
+ */
+export function memberInvite(preferences: Pick<NotificationPreferences, 'promotional' | 'marketingOptedOut'>, accountId?: string): NotificationInvite {
+  const declinedBefore = preferences.marketingOptedOut === true || (!preferences.promotional && !!accountId && marketingPromptAnswered(accountId));
+  return { audience: 'member', offers: !declinedBefore };
+}
+
 /** Read-only assessment: never asks permission, subscribes or writes consent. */
 export async function notificationInviteOpportunity(client: CustomerNotificationsClient, guest: GuestNotificationsClient,
   options: { token: string | null; accountId?: string; isCustomer?: boolean; signal: AbortSignal; snooze: Snooze; now: number; environment?: Environment }): Promise<NotificationInvite | null> {
@@ -48,8 +58,7 @@ export async function notificationInviteOpportunity(client: CustomerNotification
     const preferences = await client.preferences(options.token);
     current(options.signal);
     // An earlier "no" to offers (on the server, or the old separate offers question on this device) is kept.
-    const declinedBefore = preferences.marketingOptedOut === true || (!preferences.promotional && !!options.accountId && marketingPromptAnswered(options.accountId));
-    return { audience: 'member', offers: !declinedBefore };
+    return memberInvite(preferences, options.accountId);
   }
   if (!config.guests) return null;
   const state = await readGuestDeviceState(guest, options.environment);

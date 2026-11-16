@@ -90,7 +90,7 @@ const setPaused = paused => db.query(`UPDATE ${N}.settings SET paused=$1 WHERE i
       ok('footer › Notifications (guest): the sheet shows this browser is on', await sheet.getByText('News and offers are on').isVisible().catch(() => false));
       await sheet.screenshot({ path: `${OUT}/guest-sheet-on-1280.png` });
       await sheet.getByRole('button', { name: 'Turn off for this browser' }).click();
-      await sheet.getByText('Notifications are off').waitFor({ timeout: 8000 }).catch(() => {});
+      await sheet.getByText('Stay updated.').waitFor({ timeout: 8000 }).catch(() => {});
       const after = (await db.query(`SELECT COUNT(*)::int AS c FROM ${N}.guest_devices WHERE id=$1`, [row.id])).rows[0].c;
       const last = (await db.query(`SELECT granted,source FROM ${N}.consents WHERE guest_device_id=$1 ORDER BY seq DESC LIMIT 1`, [row.id])).rows[0];
       ok('guest: Turn off deletes the registration and records the withdrawal', after === 0 && last.granted === false && last.source === 'guest_unsubscribe' && !(await p.evaluate(() => localStorage.getItem('mh_guest_notifications'))), JSON.stringify({ after, last }));
@@ -124,8 +124,8 @@ const setPaused = paused => db.query(`UPDATE ${N}.settings SET paused=$1 WHERE i
       const account = p.getByRole('dialog', { name: 'My Account' });
       await account.getByText('Notifications are on').waitFor({ timeout: 8000 }).catch(() => {});
       ok('footer › Notifications (member): My Account shows this device is on', await account.getByText('Notifications are on').isVisible().catch(() => false));
-      await account.getByText('Recent notifications').scrollIntoViewIfNeeded();
-      ok('member: recent notifications show an honest empty state', await account.getByText('Nothing yet. Order updates and any news you chose will appear here.').isVisible().catch(() => false));
+      // 3.4.1: recent notifications live in the Notification Center; My Account links to it.
+      ok('member: My Account links to recent notifications instead of listing them', await account.getByRole('button', { name: /See recent notifications/ }).isVisible().catch(() => false) && !(await account.getByText('Recent notifications', { exact: true }).isVisible().catch(() => false)));
       await account.getByRole('switch').nth(1).click(); await sleep(1200);
       const regrant = (await db.query(`SELECT granted,source FROM ${N}.consents WHERE user_id=$1 AND purpose='marketing' ORDER BY seq DESC LIMIT 1`, [userId])).rows[0];
       ok('member: switching News and offers back on in My Account records the customer’s own grant', regrant && regrant.granted === true && regrant.source === 'account_settings', JSON.stringify(regrant));

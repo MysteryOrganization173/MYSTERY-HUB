@@ -4,6 +4,8 @@ import { SecurityDialog } from './SecurityDialog';
 import { NotificationSettings } from './NotificationSettings';
 import { PasswordForm } from './PasswordForm';
 import { MyAccountHub } from './MyAccountHub';
+import { openNotificationCenter } from '../notifications/NotificationCenter';
+import { afterOverlayHistory } from '../../utils/overlayHistory';
 import {readNotificationInbox} from '../../services/customerNotifications';
 import type { ActivePage } from '../../types';
 
@@ -29,6 +31,7 @@ export function AccountControls() {
   if (user?.mustChangePassword) return <SecurityDialog title="Create a new password" mandatory><PasswordForm forced /></SecurityDialog>;
   if (isAuthChecking) return <SecurityDialog title="Checking your session" mandatory><p>Please wait…</p></SecurityDialog>;
   if (!user || !isAccountOpen) return null;
-  // 3.4.1: My Account is a sheet of short sections; notification settings live in its Notifications section.
-  return <MyAccountHub key={user.id} notifications={<NotificationSettings key={sessionToken!} token={sessionToken!} onOpenNotification={destination => { closeAccount(); setActivePage(notificationPage(destination)); }} />} />;
+  // 3.4.1: My Account is a sheet of short sections; notification settings live in its Notifications section, and
+  // recent notifications in the Notification Center (the bell), reached from here in one tap.
+  return <MyAccountHub key={user.id} notifications={<NotificationSettings key={sessionToken!} token={sessionToken!} accountId={user.id} embedded onShowRecent={() => { closeAccount(); afterOverlayHistory('mhAccount', openNotificationCenter); }} />} />;
 }

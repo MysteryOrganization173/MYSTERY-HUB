@@ -12,8 +12,12 @@ export interface NotificationPreferences {
   version: string;
 }
 
-/** `opens` is the approved page an announcement opens (news only); order updates open Orders. */
-export interface NotificationInboxEntry { id: string; createdAt: string; title: string; body: string; destination: '/orders' | '/app'; opens?: AnnouncementPage }
+/**
+ * `opens` is the approved page an announcement opens (news only); order updates open that order (`orderReference`,
+ * the account's own order) or Orders. `category` is the kind of message (3.4.1), never a read or delivery state.
+ */
+export type NotificationCategory = 'orders' | 'announcements' | 'account';
+export interface NotificationInboxEntry { id: string; createdAt: string; title: string; body: string; destination: '/orders' | '/app'; opens?: AnnouncementPage; category: NotificationCategory; orderReference?: string }
 export type AnnouncementPage = AnnouncementDestination;
 const announcementPage = (value: unknown): AnnouncementPage | undefined => ANNOUNCEMENT_DESTINATIONS.includes(value as AnnouncementPage) ? value as AnnouncementPage : undefined;
 
@@ -61,7 +65,10 @@ export const httpCustomerNotificationsClient:CustomerNotificationsClient={
  async preferences(token){return preferences(await request(token,'preferences'));},
  async savePreferences(token,input){try{const p=await request(token,'preferences','PUT',{transactional:input.transactional,marketing:input.promotional,...(input.source?{source:input.source}:{})});return {ok:true,value:preferences(p)};}catch(e){return {ok:false,message:(e as Error).message};}},
  async inbox(token,offset=0,signal){const r=await notificationHttp(token,'notifications/inbox?offset='+offset,'GET',undefined,signal);if(r.success!==true||!Array.isArray(r.items))throw Error('Your notifications could not be loaded.');
-  return r.items.filter((i:any)=>typeof i?.id==='string'&&typeof i.title==='string'&&typeof i.body==='string'&&['/orders','/app'].includes(i.destination)).map((i:any)=>({id:i.id,createdAt:String(i.createdAt),title:i.title,body:i.body,destination:i.destination,...(announcementPage(i.opens)?{opens:announcementPage(i.opens)}:{})}));}
+  return r.items.filter((i:any)=>typeof i?.id==='string'&&typeof i.title==='string'&&typeof i.body==='string'&&['/orders','/app'].includes(i.destination)).map((i:any)=>({id:i.id,createdAt:String(i.createdAt),title:i.title,body:i.body,destination:i.destination,
+   category:(['orders','announcements','account'].includes(i.category)?i.category:i.destination==='/orders'?'orders':announcementPage(i.opens)?'announcements':'account') as NotificationCategory,
+   ...(i.destination==='/orders'&&typeof i.orderReference==='string'&&/^[A-Za-z0-9_-]{4,64}$/.test(i.orderReference)?{orderReference:i.orderReference}:{}),
+   ...(announcementPage(i.opens)?{opens:announcementPage(i.opens)}:{})}));}
 };
 export async function readNotificationInbox(token:string,id:string,signal?:AbortSignal,open?:string|null){
  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))throw Error('Invalid notification link.');

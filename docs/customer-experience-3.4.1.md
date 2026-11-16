@@ -1,7 +1,6 @@
 # Mystery Hub 3.4.1: customer experience polish and unified notifications
 
-Two releases. This file records what changed, why, and what stays the same. Release 2 (Notification Center and one
-"Allow Notifications" experience) is added below when it ships.
+Two releases. This file records what changed, why, and what stays the same.
 
 ## Release 1: navigation, My Account, registration and receipt email, Smart Buy Again
 
@@ -100,3 +99,62 @@ Two releases. This file records what changed, why, and what stays the same. Rele
 - `server/suppliers/__tests__/customerExperience341.test.ts`: the reorder service and route, the receipt email, the client mapping, the menu and the sheet.
 - `scripts/reviewCustomerExperience341.cjs`: browser acceptance at 320, 360 (short), 390, 430, 768, 1280 and 1440, plus the installed app and the December shell. It covers My Account, registration, the receipt email and Buy Again for every service.
   - It blocks the payment request, and fails if Buy Again sends one by itself.
+
+## Release 2: Notification Center, one "Allow Notifications", settings polish
+
+### The bell and the Notification Center
+- **Members** get a bell in the header at every width. It carries no number or dot: nothing in Mystery Hub knows whether a phone showed a message or anyone read it, so nothing is counted.
+- **The Notification Center** is full screen on phones and a panel under the header from 640px.
+  - It lists the account's own notifications, newest first: title, message, kind (Order update, Announcement or Account) and time.
+  - It has a loading state, an empty state ("No notifications yet"), an error state with Try again, and Show older in pages of 25.
+- **Opening a row:**
+  - an order update opens that order, found in the account's own order list;
+  - an announcement opens its approved page;
+  - account messages open nothing.
+- **Closing:** Escape, ×, outside tap and Back close it. Focus returns to the bell, and signing out closes it.
+- **Notification settings** at the bottom opens My Account at Notifications.
+- **Server:** the inbox now says what kind each row is and, for order updates, names the order's public reference. The join is limited to the account's own orders. There is no new table and no read state.
+- **Visitors** get no bell and no inbox. Their menu and footer keep the browser-news sheet, available only while visitor news is switched on.
+
+### One "Allow Notifications"
+- **Where:** the same card appears in the Notification Center and in My Account, wherever this device is not registered yet. The invitation keeps its own card with the same words.
+- **The words:**
+  - "Stay updated."
+  - "Get order updates, service news and occasional offers."
+  - Allow Notifications, with Not now in the center.
+  - A member who said no to offers before is offered order updates only ("Get updates about your orders on this device.").
+- **One tap does exactly what the invitation does:**
+  - asks the browser;
+  - registers the device;
+  - records consent for the purposes the sentence names, with the same copy version (`invite-3.4-1`) and source.
+- **Offers are never revived:** allowing notifications never turns news and offers back on after a "no". The server enforces this too; only the News and offers switch turns them back on.
+- **Other behaviour:**
+  - Browser permission alone is never treated as "on"; "on" appears only after the server confirms.
+  - Not now rests the invitation the same way as in the invitation.
+  - A registration that was interrupted (permission granted, no device on the server) shows the same card, and finishing it records the same consent.
+  - While the operator has paused sending, the card says so ("If you turn them on, this device gets them once sending resumes") and promises no date.
+
+### Settings polish (My Account › Notifications)
+- **In plain words:**
+  - on, with "Turn off for this device";
+  - not on yet, with the shared card;
+  - blocked, with directions for this browser or, in the iPhone Home Screen app, for Settings;
+  - not available here;
+  - the iPhone Safari tab, with the Home Screen path;
+  - "We couldn’t check notifications right now", with Try again, when the server cannot be reached.
+- **Unchanged:** the two switches (order updates; news and offers) and the SMS choices.
+- **The recent feed moved:** it is now in the Notification Center. My Account links to it ("See recent notifications"), and the center links back.
+- **Account switching and sign-out** reset everything to the new account. The section heading is not repeated inside the account sheet.
+
+### Evidence (local, synthetic data)
+- `server/suppliers/__tests__/notificationCenter341.test.ts`: times, targets, inbox parsing, the member offer rule, the shared card's words and consent path, settings and the bell.
+- `notificationsPostgres`: the inbox names only the account's own orders.
+- `scripts/reviewNotificationCenter341.cjs`, at 320–1440:
+  - visitors have no bell;
+  - members' bell and center, with every state;
+  - rows open the right place;
+  - Allow from the center and from My Account, with the consent rows checked in the database;
+  - offers stay off after a "no";
+  - paused and blocked;
+  - sign-out.
+  - The browser permission and the push subscription are simulated; nothing leaves the machine.

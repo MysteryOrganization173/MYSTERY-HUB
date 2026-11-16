@@ -47,7 +47,7 @@ the Home Screen and open it from there, because Safari tabs cannot receive web n
 
 **A. Register the phone**
 1. On the phone, open mysterybundlehub.com and sign in with the founder's Admin account.
-2. Open My Account › Notifications and turn on notifications for this device. Allow them when the browser asks.
+2. Tap the bell (or My Account › Notifications) and choose **Allow Notifications** on the "Stay updated." card. Allow them when the browser asks.
 3. Expected: the device shows as on, confirmed by the server. Browser permission alone is never treated as "on".
 
 **B. Plain test (receipt, tap, inbox ownership)**

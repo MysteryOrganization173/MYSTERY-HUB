@@ -109,6 +109,21 @@ test('PostgreSQL transactional notification lifecycle and operational security',
   await make('refund-order','refunded',true);assert.equal((await pool!.query(`SELECT COUNT(*) FROM ${n}.events WHERE order_id='refund-order' AND template_id='refund_update'`)).rows[0].count,'0');
   await pool!.query("UPDATE orders SET resolution_json=$1 WHERE id='refund-order'",[JSON.stringify({stage:'resolved',outcome:'paystack_refund',verifiedAt:new Date().toISOString()})]);assert.equal((await pool!.query(`SELECT COUNT(*) FROM ${n}.events WHERE order_id='refund-order' AND template_id='refund_update'`)).rows[0].count,'1');
  });
+ await t.test('3.4.1 inbox: each row says what kind of message it is and names only the account\'s own order',async()=>{
+  await make('inbox-own-341','paid',true);
+  const mine=(await service.inbox('buyer1')).filter((i:any)=>i.destination==='/orders');
+  assert.ok(mine.length>0);
+  for(const item of mine as any[]){assert.equal(item.category,'orders');assert.ok(typeof item.orderReference==='string');}
+  assert.ok((mine as any[]).some(i=>i.orderReference==='inbox-own-341'),'the new order update names its public reference');
+  // An event whose order belongs to someone else (never expected) names no reference: the join is limited to the account.
+  await make('inbox-other-341','paid',true,'buyer2');
+  await pool!.query(`UPDATE ${n}.events SET user_id='buyer1' WHERE order_id='inbox-other-341'`);
+  const crossed=(await service.inbox('buyer1')).find((i:any)=>i.orderReference==='inbox-other-341');
+  assert.equal(crossed,undefined);
+  await pool!.query(`DELETE FROM ${n}.deliveries WHERE event_id IN (SELECT id FROM ${n}.events WHERE order_id='inbox-other-341')`);
+  await pool!.query(`DELETE FROM ${n}.events WHERE order_id='inbox-other-341'`);
+  for(const item of await service.inbox('buyer1') as any[])assert.ok(['orders','announcements','account'].includes(item.category));
+ });
  await t.test('private table access and account inbox isolation hold through actual HTTP',async()=>{
   await control.query("DO $$ BEGIN IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon; END IF; END $$;");await pool!.query(NOTIFICATION_SCHEMA);const c=await pool!.connect();try{await c.query('SET ROLE anon');await assert.rejects(()=>c.query(`SELECT * FROM ${n}.devices`),/permission denied/);}finally{await c.query('RESET ROLE');c.release();}
   const app=express();app.use(express.json());app.use('/notifications',notificationRouter);app.use('/admin',adminNotificationRouter);const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));

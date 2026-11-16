@@ -205,7 +205,7 @@ How consent is recorded:
 - **Wording:** device-neutral ("this device", not "this phone"), because computers get notifications too.
 - **iPhone and iPad Safari tabs:** they see "Use the Home Screen app" with the exact steps, instead of a dead end.
 - **Paused:** a registered device while sending is paused shows that nothing is being sent right now.
-- **Recent notifications:** this account's own server history, newest first, up to 10.
+- **Recent notifications:** this account's own server history, newest first, up to 10. (3.4.1: moved to the Notification Center behind the header bell; see `docs/customer-experience-3.4.1.md`.)
   - Each item shows an "Order update" or "News" label, a time, a title and a body, and opens Orders or Home.
   - Loading, empty and error-with-retry states are shown.
   - It never claims a notification was displayed or read.
