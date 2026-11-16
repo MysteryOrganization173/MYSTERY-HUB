@@ -5,7 +5,7 @@ import { updateProfileOnServer, revokeOwnSessionsOnServer, getMyReferralSummary,
 import { SecurityDialog, accountInput, accountButton } from './SecurityDialog';
 import { PasswordForm } from './PasswordForm';
 import { formatGhanaPhone } from '../../utils/checkoutRecovery';
-import { useOverlayHistory } from '../../utils/overlayHistory';
+import { afterOverlayHistory, useOverlayHistory } from '../../utils/overlayHistory';
 
 /**
  * 3.4.1 My Account: one calm place for the customer's own details. Every section starts as a short summary, and each
@@ -211,7 +211,7 @@ function Rewards() {
         <dd className="mt-1 text-base text-white">{memberSince(user!.createdAt)}</dd>
       </div>
     </dl>
-    <button type="button" className={`${accountButton} mt-3 w-full sm:w-auto`} onClick={() => { closeAccount(); setActivePage('earn'); }}>Open Mystery Earn</button>
+    <button type="button" className={`${accountButton} mt-3 w-full sm:w-auto`} onClick={() => { closeAccount(); afterOverlayHistory('mhAccount', () => setActivePage('earn')); }}>Open Mystery Earn</button>
   </>;
 }
 

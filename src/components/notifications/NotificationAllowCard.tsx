@@ -3,6 +3,7 @@ import { BellOff, BellRing, CheckCircle2, Loader2 } from 'lucide-react';
 import { activateNotificationInvite, memberInvite } from '../../pwa/notificationOnboarding';
 import { NOTIFICATION_ACTIONS, NOTIFICATION_RESULT, notificationCopy } from '../../pwa/invitationCopy';
 import { httpCustomerNotificationsClient, httpGuestNotificationsClient, type CustomerNotificationsClient, type GuestNotificationsClient, type NotificationPreferences } from '../../services/customerNotifications';
+import { PAUSED_NOTE } from '../../pwa/push';
 
 /** Shown under the card while the operator has paused sending: honest, and promises nothing about timing. */
 export const PAUSED_ALLOW_NOTE = 'Mystery Hub isn’t sending notifications right now. If you turn them on, this device gets them once sending resumes.';
@@ -25,6 +26,9 @@ export function NotificationAllowCard({ token, accountId, preferences, paused, o
   const [offersOff, setOffersOff] = useState<'no' | 'saving' | 'off' | 'failed'>('no');
   const request = useRef<AbortController | null>(null);
   useEffect(() => { request.current = new AbortController(); return () => request.current?.abort(); }, []);
+  // The Allow button is replaced by the result: move focus to the result so it is announced and not lost.
+  const resultBox = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (step === 'registered' || step === 'denied' || step === 'error') resultBox.current?.focus(); }, [step]);
 
   const allow = async () => {
     const signal = request.current?.signal;
@@ -49,14 +53,14 @@ export function NotificationAllowCard({ token, accountId, preferences, paused, o
 
   if (step === 'registered' || step === 'denied' || step === 'error') {
     const result = NOTIFICATION_RESULT[step];
-    return <div role="status" className={`rounded-2xl border p-4 ${step === 'registered' ? 'border-emerald-500/30 bg-emerald-500/[0.06]' : 'border-amber-500/30 bg-amber-500/[0.05]'}`}>
+    return <div ref={resultBox} tabIndex={-1} role="status" className={`rounded-2xl border p-4 outline-none ${step === 'registered' ? 'border-emerald-500/30 bg-emerald-500/[0.06]' : 'border-amber-500/30 bg-amber-500/[0.05]'}`}>
       <div className="flex gap-3">
         {step === 'registered' ? <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-300" aria-hidden /> : <BellOff className="mt-0.5 size-5 shrink-0 text-amber-200" aria-hidden />}
         <div className="min-w-0 space-y-1">
           <p className="font-semibold text-white">{result.title}</p>
           <p className="text-sm text-slate-300">{offersOff === 'off' ? `${result.text} Offers are off.` : result.text}</p>
           {step === 'error' && reason && <p className="text-sm text-slate-300">{reason}</p>}
-          {step === 'registered' && paused && <p className="text-sm text-amber-200">{PAUSED_ALLOW_NOTE}</p>}
+          {step === 'registered' && paused && <p className="text-sm text-amber-200">{PAUSED_NOTE}</p>}
         </div>
       </div>
       {step === 'error' && <button type="button" className="mh-button mt-3 w-full" onClick={() => { void allow(); }}>Try again</button>}

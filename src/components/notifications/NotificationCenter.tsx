@@ -64,6 +64,7 @@ export function NotificationCenter({ token, accountId, client = httpCustomerNoti
     try {
       const next = await client.inbox(token, items.length, alive.current.signal);
       if (alive.current.signal.aborted) return;
+      focusRow.current = items.length; // the first older row takes focus from Show older
       setItems(current => mergeInboxPage(current ?? [], next)); setMore(next.length >= INBOX_PAGE ? 'idle' : 'done');
     } catch { if (!alive.current.signal.aborted) setMore('error'); }
   };
@@ -87,14 +88,22 @@ export function NotificationCenter({ token, accountId, client = httpCustomerNoti
     return () => controller.abort();
   }, [client, token]);
 
-  const notNow = () => { recordDismissal(STORAGE_KEYS.notificationOptIn); setDevice(d => ({ ...d, show: false })); };
+  // Focus never drops to the page when the control that had it goes away.
+  const listArea = useRef<HTMLDivElement>(null), focusRow = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusRow.current === null || !items) return;
+    const row = listArea.current?.querySelectorAll('li')[focusRow.current]?.querySelector<HTMLElement>('button');
+    (row ?? listArea.current)?.focus(); focusRow.current = null;
+  }, [items]);
+  const notNow = () => { recordDismissal(STORAGE_KEYS.notificationOptIn); setDevice(d => ({ ...d, show: false })); window.setTimeout(() => listArea.current?.focus(), 0); };
   const settings = () => { closeNotificationCenter(); afterOverlayHistory('mhNotifications', () => openAccount('notifications')); };
 
   const openItem = async (item: NotificationInboxEntry) => {
     const target = notificationTarget(item);
     if (target.kind === 'none' || opening) return;
-    if (target.kind === 'page') { closeNotificationCenter(); setActivePage(target.page); return; }
-    if (target.kind === 'orders') { closeNotificationCenter(); setActivePage('orders'); return; }
+    // A page change waits until the center's own history entry is gone, so Back never meets a stray entry.
+    if (target.kind === 'page') { const page = target.page; closeNotificationCenter(); afterOverlayHistory('mhNotifications', () => setActivePage(page)); return; }
+    if (target.kind === 'orders') { closeNotificationCenter(); afterOverlayHistory('mhNotifications', () => setActivePage('orders')); return; }
     // The order is opened from the account's own order list, never from the notification's text.
     setOpening(item.id);
     try {
@@ -102,7 +111,7 @@ export function NotificationCenter({ token, accountId, client = httpCustomerNoti
       if (alive.current.signal.aborted) return;
       const order = result.orders?.find(o => o.public_reference === target.reference);
       closeNotificationCenter();
-      if (order) openOrderStatus(memberTrackingOrder(order)); else setActivePage('orders');
+      if (order) openOrderStatus(memberTrackingOrder(order)); else afterOverlayHistory('mhNotifications', () => setActivePage('orders'));
     } catch {
       if (!alive.current.signal.aborted) showToast('We couldn’t open that order right now. It is in My Orders.', 'info');
     } finally { if (!alive.current.signal.aborted) setOpening(null); }
@@ -113,6 +122,7 @@ export function NotificationCenter({ token, accountId, client = httpCustomerNoti
       {device.show && <NotificationAllowCard token={token} accountId={accountId} preferences={device.preferences} paused={device.paused} onNotNow={notNow} />}
       {device.blocked && <p className="flex items-start gap-2 rounded-xl border border-slate-800 bg-slate-900/40 p-3 text-sm text-slate-300"><BellOff className="mt-0.5 size-4 shrink-0" aria-hidden />This browser blocks notifications from Mystery Hub, so they won’t pop up here. You can still read them below.</p>}
 
+      <div ref={listArea} tabIndex={-1} aria-label="Your notifications" className="space-y-4 outline-none">
       {!items && !error && <div role="status" aria-label="Loading notifications" className="space-y-2">
         {[0, 1, 2].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-slate-800/60" aria-hidden="true" />)}
         <span className="sr-only">Loading notifications…</span>
@@ -150,6 +160,7 @@ export function NotificationCenter({ token, accountId, client = httpCustomerNoti
         <button type="button" className="mh-button-secondary" disabled={more === 'loading'} onClick={() => { void loadMore(); }}>{more === 'loading' ? 'Loading…' : more === 'error' ? 'Try again' : 'Show older'}</button>
         {more === 'error' && <p role="alert" className="mt-2 text-sm text-slate-300">Older notifications couldn’t be loaded.</p>}
       </div>}
+      </div>
 
       <button type="button" onClick={settings} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-800 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/10">
         <Settings2 className="size-4" aria-hidden />Notification settings

@@ -76,6 +76,8 @@ const AppContent: React.FC = () => {
         <WebsiteEditorPage />
         <AuthModal />
         <AccountControls />
+        {/* 3.4.1: My Account links to the Notification Center, so it opens wherever My Account does. */}
+        <NotificationCenterHost />
         <ToastContainer />
       </div>
     );
@@ -88,6 +90,8 @@ const AppContent: React.FC = () => {
         <SEOHead />
         <AdminPage />
         <AccountControls />
+        {/* 3.4.1: My Account links to the Notification Center, so it opens wherever My Account does. */}
+        <NotificationCenterHost />
         <ToastContainer />
       </>
     );
@@ -108,6 +112,8 @@ const AppContent: React.FC = () => {
         {templatePreviewNeeded && <TemplatePreviewModal />}
         <AuthModal />
         <AccountControls />
+        {/* 3.4.1: My Account links to the Notification Center, so it opens wherever My Account does. */}
+        <NotificationCenterHost />
         <ToastContainer />
       </div>
     );

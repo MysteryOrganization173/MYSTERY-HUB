@@ -111,10 +111,12 @@ Two releases. This file records what changed, why, and what stays the same.
   - an order update opens that order, found in the account's own order list;
   - an announcement opens its approved page;
   - account messages open nothing.
-- **Closing:** Escape, ×, outside tap and Back close it. Focus returns to the bell, and signing out closes it.
+- **Closing:** Escape, ×, a tap outside the panel and Back close it. Focus returns to the bell, and signing out closes it.
+- **Where it opens:** on every screen that has My Account (the main site, My Business, the website editor and Admin).
+- **Back:** a row that opens a page waits until the center has left history, so Back never meets a stray entry.
 - **Notification settings** at the bottom opens My Account at Notifications.
 - **Server:** the inbox now says what kind each row is and, for order updates, names the order's public reference. The join is limited to the account's own orders. There is no new table and no read state.
-- **Visitors** get no bell and no inbox. Their menu and footer keep the browser-news sheet, available only while visitor news is switched on.
+- **Visitors** get no bell and no inbox. Their menu and footer keep the browser-news sheet. While visitor news is switched off, the sheet says it is not available without an account yet.
 
 ### One "Allow Notifications"
 - **Where:** the same card appears in the Notification Center and in My Account, wherever this device is not registered yet. The invitation keeps its own card with the same words.

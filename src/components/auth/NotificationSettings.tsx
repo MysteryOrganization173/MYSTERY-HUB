@@ -38,6 +38,9 @@ export function NotificationSettings({ token, client = httpCustomerNotifications
   const [saving, setSaving] = useState<keyof Pick<NotificationPreferences, 'transactional' | 'promotional'> | null>(null);
   const alive = useRef(true);
   useEffect(() => {alive.current=true;return () => { alive.current = false; };}, []);
+  // When the card is replaced by "Notifications are on", focus moves to that status rather than to the page.
+  const statusCard = useRef<HTMLDivElement>(null), focusStatus = useRef(false);
+  useEffect(() => { if (focusStatus.current && server === 'subscribed') { focusStatus.current = false; statusCard.current?.focus(); } }, [server]);
 
   useEffect(() => {
     if (!client.available) return;
@@ -88,11 +91,14 @@ export function NotificationSettings({ token, client = httpCustomerNotifications
               <button type="button" className="mt-1 min-h-11 font-semibold text-emerald-300" onClick={() => setAttempt(a => a + 1)}>Try again</button>
             </div>
           </div>
+        : allowable && !prefs && !prefsError
+        // The card waits for the account's choices, so its sentence never changes under the customer's finger.
+        ? <p role="status" className="text-sm text-slate-400">Checking this device…</p>
         : allowable
         ? <NotificationAllowCard token={token} accountId={accountId} preferences={prefs} paused={paused} client={client}
-            onRegistered={() => { setPermission('granted'); setServer('subscribed'); setLocal('idle'); void client.preferences(token).then(p => { if (alive.current) setPrefs(p); }, () => {}); }} />
+            onRegistered={() => { focusStatus.current = true; setPermission('granted'); setServer('subscribed'); setLocal('idle'); void client.preferences(token).then(p => { if (alive.current) setPrefs(p); }, () => {}); }} />
         : <>
-          <div role="status" className={`flex gap-3 rounded-2xl border p-3.5 ${state === 'active' ? 'border-emerald-500/30 bg-emerald-500/5' : state === 'disabled' ? 'border-amber-500/30 bg-amber-500/5' : 'border-slate-700 bg-slate-900/40'}`}>
+          <div ref={statusCard} tabIndex={-1} role="status" className={`flex gap-3 rounded-2xl border p-3.5 outline-none ${state === 'active' ? 'border-emerald-500/30 bg-emerald-500/5' : state === 'disabled' ? 'border-amber-500/30 bg-amber-500/5' : 'border-slate-700 bg-slate-900/40'}`}>
             {busy ? <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-slate-300" aria-hidden /> : state === 'unavailable' && iosTab ? <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-slate-300" aria-hidden /> : <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${state === 'active' ? 'text-emerald-300' : 'text-slate-300'}`} aria-hidden />}
             <div className="min-w-0 space-y-1">
               <p className="font-semibold text-white">{copy.title}</p>

@@ -135,7 +135,31 @@ const setPaused = paused => db.query(`UPDATE ${N}.settings SET paused=$1 WHERE i
       await bell(p).click(); await sleep(1300);
       await center(p).getByRole('button', { name: /Announcement/ }).first().click(); await sleep(1500);
       ok('an announcement opens its approved page (Data)', new URL(p.url()).pathname === '/data' && !(await center(p).isVisible().catch(() => false)), p.url());
+      await p.goBack(); await sleep(800);
+      ok('Back from that page returns to the page before, with no stray entry left by the center', new URL(p.url()).pathname === '/' && (await p.evaluate(() => history.state?.mhNotifications)) == null, JSON.stringify(await p.evaluate(() => history.state)));
       await ctx.close();
+    }
+
+    // 3b. A press outside the panel closes it (desktop); My Business › My account › See recent notifications opens it.
+    {
+      const ctx = await context(b, { width: 1280, height: 800 }, kwesi), p = await ctx.newPage();
+      await p.goto(BASE + '/'); await settle(p);
+      await bell(p).click(); await sleep(1000);
+      await p.mouse.click(200, 500); await sleep(500);
+      ok('desktop: a press outside the panel closes it and focus returns to the bell', !(await center(p).isVisible().catch(() => false)) && await bell(p).evaluate(el => el === document.activeElement));
+      await ctx.close();
+      const owner = await member('Owner Synthetic');
+      const site = await fetch(BASE + '/api/websites', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + owner.token }, body: JSON.stringify({ templateId: 'tmpl-start-blank', name: 'Synthetic Data Shop' }) });
+      ok('setup: a synthetic website for My Business', site.status === 201 || site.status === 200, site.status);
+      const c2 = await context(b, { width: 390, height: 844 }, owner, { mobile: true }), q = await c2.newPage();
+      await q.goto(BASE + '/my-business'); await settle(q); await sleep(800);
+      await q.getByRole('button', { name: /^More/ }).click(); await sleep(500);
+      await q.locator('dialog.bw-drawer').getByRole('button', { name: /My account/ }).click(); await sleep(1200);
+      const account = q.getByRole('dialog', { name: 'My Account' });
+      await account.getByRole('button', { name: 'Notification settings' }).click(); await sleep(1200);
+      await account.getByRole('button', { name: /See recent notifications/ }).click(); await sleep(1800);
+      ok('My Business › My account › See recent notifications opens the Notification Center', await center(q).isVisible().catch(() => false) && !(await account.isVisible().catch(() => false)));
+      await c2.close();
     }
 
     // 4. Empty, error with retry, and older pages.

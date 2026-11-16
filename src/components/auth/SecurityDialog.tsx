@@ -39,7 +39,9 @@ export function SecurityDialog({ title, children, onClose, mandatory = false, wi
     return () => { dialog.removeEventListener('keydown', onKey); release(); previous?.focus(); };
   }, [mandatory]);
   const sheet = layout === 'sheet' || layout === 'panel', panel = layout === 'panel';
-  return <div className={panel ? 'fixed inset-0 z-[100] flex items-stretch sm:items-start justify-center sm:justify-end bg-black/85 sm:bg-black/50 p-0 sm:pt-[4.5rem] sm:pr-4 sm:pl-4' : sheet ? 'fixed inset-0 z-[100] flex items-stretch sm:items-center justify-center bg-black/85 p-0 sm:p-5' : 'fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-3 sm:p-5'}>
+  // The panel sits over a visible page, so a press outside it closes it (the other layouts keep their behaviour).
+  const outside = panel && !mandatory && onClose ? (event: React.PointerEvent<HTMLDivElement>) => { if (event.target === event.currentTarget) closeRef.current?.(); } : undefined;
+  return <div onPointerDown={outside} className={panel ? 'fixed inset-0 z-[100] flex items-stretch sm:items-start justify-center sm:justify-end bg-black/85 sm:bg-black/50 p-0 sm:pt-[4.5rem] sm:pr-4 sm:pl-4' : sheet ? 'fixed inset-0 z-[100] flex items-stretch sm:items-center justify-center bg-black/85 p-0 sm:p-5' : 'fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-3 sm:p-5'}>
     <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} data-dialog-variant={variant} data-dialog-layout={layout}
       className={panel
         ? 'relative w-full min-w-0 sm:w-[26rem] h-[100dvh] sm:h-auto max-h-[100dvh] sm:max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain sm:rounded-2xl sm:border border-slate-700 bg-[#0f171d] px-4 sm:px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] sm:pb-5 text-slate-100 shadow-2xl'

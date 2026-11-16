@@ -289,9 +289,9 @@ test('My Account is one sheet of short sections with forms opened in place, keep
   // flight (My Business's More sheet) cannot close it.
   assert.match(hub, /useOverlayHistory\('mhAccount', closeAccount\);/);
   const history = source('src/utils/overlayHistory.ts');
-  assert.match(history, /window\.history\.pushState\(\{ page: window\.history\.state\?\.page, \[key\]: true \}/);
-  assert.match(history, /const onPop = \(\) => \{ if \(!top\(key\)\) back\.current\(\); \};/);
-  assert.match(history, /if \(top\(key\)\) window\.history\.back\(\);/, 'closing another way removes the entry');
+  assert.match(history, /win\.history\.pushState\(\{ page: win\.history\.state\?\.page, \[key\]: mark \}/);
+  assert.match(history, /const onPop = \(\) => \{ if \(!ours\(\)\) onBack\(\); \};/);
+  assert.match(history, /if \(ours\(\)\) win\.history\.back\(\);/, 'closing another way removes the entry');
   assert.match(source('src/components/website/BusinessWorkspacePage.tsx'), /if \(menuEntry\(\)\) \{ const open = \(\) => \{ window\.removeEventListener\('popstate', open\); openAccount\(\); \}; window\.addEventListener\('popstate', open\); \}/);
   assert.match(source('src/components/auth/SecurityDialog.tsx'), /layout\?: 'dialog' \| 'sheet'/);
 });
