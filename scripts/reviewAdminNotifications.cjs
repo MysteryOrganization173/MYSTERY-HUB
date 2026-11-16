@@ -203,7 +203,7 @@ const tail = id => `QA-D-${run}-${id}`.slice(-14);
       && !!(await one(`SELECT 1 AS x FROM ${N}.consents WHERE source='guest_endpoint_expired' AND created_at>NOW()-interval '5 minutes'`)));
 
     // 8. History: grouped, filtered, explained per device, never an endpoint.
-    await p.goto(`${BASE}/admin#notifications/history`); await p.getByRole('button', { name: 'Announcements' }).waitFor();
+    await p.goto(`${BASE}/admin#notifications/history`); await p.getByRole('button', { name: 'Announcements', exact: true }).waitFor();
     await p.getByText(title).first().waitFor({ timeout: 15000 });
     await p.screenshot({ path: `${OUT}/history-1280.png`, fullPage: true });
     await p.getByLabel('Filter by result').selectOption('invalid');
