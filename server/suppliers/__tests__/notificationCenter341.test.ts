@@ -194,6 +194,6 @@ test('every screen with My Account can open the Notification Center', () => {
   const center = source('src/components/notifications/NotificationCenter.tsx');
   assert.match(center, /afterOverlayHistory\('mhNotifications', \(\) => setActivePage\(page\)\)/, 'a page opens after the center left history');
   assert.match(source('src/components/auth/MyAccountHub.tsx'), /afterOverlayHistory\('mhAccount', \(\) => setActivePage\('earn'\)\)/);
-  assert.match(source('src/components/auth/SecurityDialog.tsx'), /const outside = panel && !mandatory && onClose \?/, 'a press outside the panel closes it');
+  assert.match(source('src/components/auth/SecurityDialog.tsx'), /if \(pressedOutside\.current && event\.target === event\.currentTarget\) closeRef\.current\?\.\(\);/, 'a press outside the panel closes it');
   assert.match(source('src/components/auth/NotificationSettings.tsx'), /allowable && !prefs && !prefsError/, 'the card waits for the account’s choices');
 });
