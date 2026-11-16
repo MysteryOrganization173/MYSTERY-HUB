@@ -149,6 +149,7 @@ const setPaused = paused => db.query(`UPDATE ${N}.settings SET paused=$1 WHERE i
       ok('desktop: a press outside the panel closes it and focus returns to the bell', !(await center(p).isVisible().catch(() => false)) && await bell(p).evaluate(el => el === document.activeElement));
       await ctx.close();
       const owner = await member('Owner Synthetic');
+      const ownerRef = await deliveredOrder(owner);
       const site = await fetch(BASE + '/api/websites', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + owner.token }, body: JSON.stringify({ templateId: 'tmpl-start-blank', name: 'Synthetic Data Shop' }) });
       ok('setup: a synthetic website for My Business', site.status === 201 || site.status === 200, site.status);
       const c2 = await context(b, { width: 390, height: 844 }, owner, { mobile: true }), q = await c2.newPage();
@@ -159,6 +160,9 @@ const setPaused = paused => db.query(`UPDATE ${N}.settings SET paused=$1 WHERE i
       await account.getByRole('button', { name: 'Notification settings' }).click(); await sleep(1200);
       await account.getByRole('button', { name: /See recent notifications/ }).click(); await sleep(1800);
       ok('My Business › My account › See recent notifications opens the Notification Center', await center(q).isVisible().catch(() => false) && !(await account.isVisible().catch(() => false)));
+      // My Business has no order sheet of its own: an order update opens My Orders with that order.
+      await center(q).getByRole('button', { name: /Order update/ }).first().click(); await sleep(2500);
+      ok('My Business: an order update opens My Orders with that order', new URL(q.url()).pathname === '/orders' && await q.getByText(ownerRef).first().isVisible().catch(() => false), q.url());
       await c2.close();
     }
 

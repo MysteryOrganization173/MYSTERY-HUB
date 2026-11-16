@@ -21,12 +21,16 @@ export const closeNotificationCenter = () => { open = false; emit(); };
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
 export const useNotificationCenterOpen = () => useSyncExternalStore(subscribe, () => open, () => false);
 
-export function NotificationCenterHost() {
+/**
+ * `ordersOnPage`: in layouts without the order sheet (My Business, the editor, Admin), an order update opens My Orders
+ * with that order's sheet, instead of a sheet that has nowhere to appear.
+ */
+export function NotificationCenterHost({ ordersOnPage = false }: { ordersOnPage?: boolean }) {
   const isOpen = useNotificationCenterOpen();
   const { user, sessionToken } = useApp();
   // Signing out or switching account never leaves the previous account's notifications on screen.
   useEffect(() => { closeNotificationCenter(); }, [user?.id]);
-  return isOpen && user && sessionToken ? <NotificationCenter key={user.id} token={sessionToken} accountId={user.id} /> : null;
+  return isOpen && user && sessionToken ? <NotificationCenter key={user.id} token={sessionToken} accountId={user.id} ordersOnPage={ordersOnPage} /> : null;
 }
 
 const ICONS = { orders: ReceiptText, announcements: Megaphone, account: ShieldCheck } as const;
@@ -37,7 +41,7 @@ const ICONS = { orders: ReceiptText, announcements: Megaphone, account: ShieldCh
  * announcement opens its approved page. While this device is not registered, the same "Allow Notifications" card as
  * everywhere else is offered at the top.
  */
-export function NotificationCenter({ token, accountId, client = httpCustomerNotificationsClient }: { token: string; accountId: string; client?: CustomerNotificationsClient }) {
+export function NotificationCenter({ token, accountId, ordersOnPage = false, client = httpCustomerNotificationsClient }: { token: string; accountId: string; ordersOnPage?: boolean; client?: CustomerNotificationsClient }) {
   const { setActivePage, openOrderStatus, openAccount, showToast } = useApp();
   useOverlayHistory('mhNotifications', closeNotificationCenter);
   const [items, setItems] = useState<NotificationInboxEntry[] | null>(null);
@@ -111,7 +115,8 @@ export function NotificationCenter({ token, accountId, client = httpCustomerNoti
       if (alive.current.signal.aborted) return;
       const order = result.orders?.find(o => o.public_reference === target.reference);
       closeNotificationCenter();
-      if (order) openOrderStatus(memberTrackingOrder(order)); else afterOverlayHistory('mhNotifications', () => setActivePage('orders'));
+      if (order && !ordersOnPage) openOrderStatus(memberTrackingOrder(order));
+      else afterOverlayHistory('mhNotifications', () => { setActivePage('orders'); if (order) openOrderStatus(memberTrackingOrder(order)); });
     } catch {
       if (!alive.current.signal.aborted) showToast('We couldn’t open that order right now. It is in My Orders.', 'info');
     } finally { if (!alive.current.signal.aborted) setOpening(null); }
@@ -122,7 +127,7 @@ export function NotificationCenter({ token, accountId, client = httpCustomerNoti
       {device.show && <NotificationAllowCard token={token} accountId={accountId} preferences={device.preferences} paused={device.paused} onNotNow={notNow} />}
       {device.blocked && <p className="flex items-start gap-2 rounded-xl border border-slate-800 bg-slate-900/40 p-3 text-sm text-slate-300"><BellOff className="mt-0.5 size-4 shrink-0" aria-hidden />This browser blocks notifications from Mystery Hub, so they won’t pop up here. You can still read them below.</p>}
 
-      <div ref={listArea} tabIndex={-1} aria-label="Your notifications" className="space-y-4 outline-none">
+      <div ref={listArea} tabIndex={-1} role="region" aria-label="Your notifications" className="space-y-4 outline-none">
       {!items && !error && <div role="status" aria-label="Loading notifications" className="space-y-2">
         {[0, 1, 2].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-slate-800/60" aria-hidden="true" />)}
         <span className="sr-only">Loading notifications…</span>

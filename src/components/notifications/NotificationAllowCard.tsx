@@ -27,7 +27,7 @@ export function NotificationAllowCard({ token, accountId, preferences, paused, o
   const request = useRef<AbortController | null>(null);
   useEffect(() => { request.current = new AbortController(); return () => request.current?.abort(); }, []);
   // The Allow button is replaced by the result: move focus to the result so it is announced and not lost.
-  const resultBox = useRef<HTMLDivElement>(null);
+  const resultBox = useRef<HTMLDivElement>(null), inviteBox = useRef<HTMLDivElement>(null);
   useEffect(() => { if (step === 'registered' || step === 'denied' || step === 'error') resultBox.current?.focus(); }, [step]);
 
   const allow = async () => {
@@ -63,14 +63,14 @@ export function NotificationAllowCard({ token, accountId, preferences, paused, o
           {step === 'registered' && paused && <p className="text-sm text-amber-200">{PAUSED_NOTE}</p>}
         </div>
       </div>
-      {step === 'error' && <button type="button" className="mh-button mt-3 w-full" onClick={() => { void allow(); }}>Try again</button>}
+      {step === 'error' && <button type="button" className="mh-button mt-3 w-full" onClick={() => { void allow(); window.setTimeout(() => inviteBox.current?.focus(), 0); }}>Try again</button>}
       {step === 'registered' && invite.offers && offersOff !== 'off' && <button type="button" className="mt-2 min-h-11 w-full rounded-xl text-sm font-semibold text-emerald-300 hover:bg-emerald-500/10" disabled={offersOff === 'saving'} onClick={() => { void ordersOnly(); }}>{offersOff === 'saving' ? 'Saving…' : NOTIFICATION_ACTIONS.ordersOnly}</button>}
       {offersOff === 'failed' && <p className="mt-2 text-sm text-rose-300" role="alert">That didn’t save. You can turn offers off with the News and offers switch.</p>}
     </div>;
   }
 
   const copy = notificationCopy(invite);
-  return <div className="rounded-2xl border border-emerald-500/25 bg-[radial-gradient(120%_120%_at_0%_0%,rgba(0,195,101,0.12),transparent_60%)] p-4">
+  return <div ref={inviteBox} tabIndex={-1} role="group" aria-label="Turn on notifications" className="outline-none rounded-2xl border border-emerald-500/25 bg-[radial-gradient(120%_120%_at_0%_0%,rgba(0,195,101,0.12),transparent_60%)] p-4">
     <div className="flex gap-3">
       <BellRing className="mt-0.5 size-5 shrink-0 text-[#44df95]" aria-hidden />
       <div className="min-w-0 space-y-1">

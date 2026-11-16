@@ -136,6 +136,7 @@ function fakeWindow() {
     history: {
       get state() { return entries[index]; },
       pushState(state: any) { entries.splice(index + 1); entries.push(state); index++; },
+      replaceState(state: any) { entries[index] = state; },
       back() { pending.push(() => { if (index > 0) { index--; for (const l of [...listeners]) l(); } }); },
     },
     location: { pathname: '/', search: '', hash: '' },
@@ -184,13 +185,22 @@ test('history: switching sheets or pages waits for the closing sheet to leave hi
   // No entry on top: runs at once. A lost Back: runs after the fallback.
   let ran = 0; afterOverlayHistory('mhAccount', () => ran++, h.win as any); assert.equal(ran, 1, 'the entry on top is the center’s, so nothing to wait for');
   const g = fakeWindow(); let soon = 0; afterOverlayHistory('mhNotifications', () => soon++, g.win as any); assert.equal(soon, 1);
-  const lost = fakeWindow(); lost.win.history.pushState({ mhNotifications: 'x' }); let late = 0;
-  afterOverlayHistory('mhNotifications', () => late++, lost.win as any); assert.equal(late, 0); lost.elapse(); assert.equal(late, 1, 'never stuck waiting');
+  const lost = fakeWindow(); lost.win.history.pushState({ page: 'home', mhNotifications: 'x' }); let late = 0;
+  afterOverlayHistory('mhNotifications', () => late++, lost.win as any); assert.equal(late, 0); lost.elapse();
+  assert.equal(late, 1, 'never stuck waiting');
+  assert.equal(lost.win.history.state.mhNotifications, undefined, 'the marker is removed before carrying on, so no later Back is mistaken for it');
+  // A slow Back (after the first second) still wins: nothing runs while the entry is on top.
+  const slow = fakeWindow(); const exitSlow = enterOverlay('mhNotifications', () => {}, slow.win as any); let opened = 0;
+  afterOverlayHistory('mhNotifications', () => opened++, slow.win as any); exitSlow();
+  assert.equal(opened, 0);
+  slow.settle(); assert.equal(opened, 1, 'it runs once the Back lands');
 });
 
 test('every screen with My Account can open the Notification Center', () => {
   const app = source('src/App.tsx');
-  assert.equal((app.match(/<AccountControls \/>/g) || []).length, (app.match(/<NotificationCenterHost \/>/g) || []).length);
+  assert.equal((app.match(/<AccountControls \/>/g) || []).length, (app.match(/<NotificationCenterHost( ordersOnPage)? \/>/g) || []).length);
+  assert.equal((app.match(/<NotificationCenterHost ordersOnPage \/>/g) || []).length, 3, 'layouts without the order sheet send order rows to My Orders');
+  assert.match(source('src/components/notifications/NotificationCenter.tsx'), /afterOverlayHistory\('mhNotifications', \(\) => \{ setActivePage\('orders'\); if \(order\) openOrderStatus\(memberTrackingOrder\(order\)\); \}\);/);
   const center = source('src/components/notifications/NotificationCenter.tsx');
   assert.match(center, /afterOverlayHistory\('mhNotifications', \(\) => setActivePage\(page\)\)/, 'a page opens after the center left history');
   assert.match(source('src/components/auth/MyAccountHub.tsx'), /afterOverlayHistory\('mhAccount', \(\) => setActivePage\('earn'\)\)/);

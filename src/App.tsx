@@ -76,8 +76,9 @@ const AppContent: React.FC = () => {
         <WebsiteEditorPage />
         <AuthModal />
         <AccountControls />
-        {/* 3.4.1: My Account links to the Notification Center, so it opens wherever My Account does. */}
-        <NotificationCenterHost />
+        {/* 3.4.1: My Account links to the Notification Center, so it opens wherever My Account does. Without the
+            order sheet here, an order update opens My Orders with that order. */}
+        <NotificationCenterHost ordersOnPage />
         <ToastContainer />
       </div>
     );
@@ -90,8 +91,9 @@ const AppContent: React.FC = () => {
         <SEOHead />
         <AdminPage />
         <AccountControls />
-        {/* 3.4.1: My Account links to the Notification Center, so it opens wherever My Account does. */}
-        <NotificationCenterHost />
+        {/* 3.4.1: My Account links to the Notification Center, so it opens wherever My Account does. Without the
+            order sheet here, an order update opens My Orders with that order. */}
+        <NotificationCenterHost ordersOnPage />
         <ToastContainer />
       </>
     );
@@ -112,8 +114,9 @@ const AppContent: React.FC = () => {
         {templatePreviewNeeded && <TemplatePreviewModal />}
         <AuthModal />
         <AccountControls />
-        {/* 3.4.1: My Account links to the Notification Center, so it opens wherever My Account does. */}
-        <NotificationCenterHost />
+        {/* 3.4.1: My Account links to the Notification Center, so it opens wherever My Account does. Without the
+            order sheet here, an order update opens My Orders with that order. */}
+        <NotificationCenterHost ordersOnPage />
         <ToastContainer />
       </div>
     );
