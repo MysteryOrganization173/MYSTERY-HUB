@@ -25,7 +25,8 @@ import { NetworkId } from '../../types';
 import { GHANA_NETWORKS, detectGhanaNetwork } from '../../data/bundles';
 import { usePaystack } from '../../hooks/usePaystack';
 import { BUSINESS_CONFIG } from '../../config/business';
-import { lookupOrderOnServer, cancelPaymentOnServer, getInstantBundlesOnServer, getInstantFlexiQuote, type InstantFlexiQuote } from '../../services/apiClient';
+import { lookupOrderOnServer, cancelPaymentOnServer, getInstantBundlesOnServer, getInstantFlexiQuote, saveReceiptEmailOnServer, type InstantFlexiQuote } from '../../services/apiClient';
+import { RECEIPT_EMAIL_PATTERN, canRememberReceiptEmail, defaultReceiptEmail } from '../../utils/receiptEmail';
 import { smoothScrollToElement } from '../../utils/scroll';
 import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
@@ -56,12 +57,19 @@ export const CheckoutModal: React.FC = () => {
     openOrderStatus,
     openDataPage,
     sessionToken,
+    updateUserProfile,
+    showToast,
   } = useApp();
   const { initializeServerPayment, isInitializing, loadingPhase } = usePaystack(`${sessionToken||'guest'}:${isCheckoutOpen}:${checkoutBundle?.id||''}`);
 
   const [phone, setPhone] = useState('');
   const [receiptEmail,setReceiptEmail]=useState('');
   const [editingReceipt,setEditingReceipt]=useState(false);
+  // 3.4.1: remembering a receipt email is an explicit choice, saved to the account separately from sign-in details.
+  const [rememberReceipt,setRememberReceipt]=useState(false);
+  // The choice is taken when Pay is pressed and saved only once the server has created the order.
+  const rememberOnOrder=useRef<{token:string;email:string}|null>(null);
+  const currentToken=useRef(sessionToken);currentToken.current=sessionToken;
   const [commercial,setCommercial]=useState<any>(null);
   const [quoteError,setQuoteError]=useState('');
   const [quoteRefresh,setQuoteRefresh]=useState(0);
@@ -147,8 +155,9 @@ export const CheckoutModal: React.FC = () => {
   useEffect(() => {
     let active=true;
     if (isCheckoutOpen && checkoutBundle) {
-      setReceiptEmail(user?.email||'');
-      setEditingReceipt(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user?.email || ''));
+      setReceiptEmail(defaultReceiptEmail(user));
+      setEditingReceipt(!RECEIPT_EMAIL_PATTERN.test(defaultReceiptEmail(user)));
+      setRememberReceipt(false);rememberOnOrder.current=null;
       let saved=null;try{saved=readDirectAttempt(sessionStorage,directScope);}catch{}
       const regular=!(checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data')&&!checkoutBundle.id.startsWith('instant-')&&!checkoutBundle.id.startsWith('airtime-');
       if(!regular)saved=null;
@@ -355,6 +364,7 @@ export const CheckoutModal: React.FC = () => {
         // Kept on this device so a customer who leaves for the MoMo prompt can check it later.
         checkpoint(orderRef);
         if(!active())return;
+        commitRememberedReceipt();
         knownReference.current=orderRef;setAttemptRef(orderRef);
         savePendingCheckout({ orderRef, label: `${currentNetwork.name} ${productLabel}`, network: checkoutBundle.network, startedAt: new Date().toISOString() });
       },
@@ -424,6 +434,18 @@ export const CheckoutModal: React.FC = () => {
     }
   };
 
+  // Saved alongside the payment, never instead of it: only after the server created the order (a rejected or
+  // unanswered attempt remembers nothing), and the order itself always uses the typed address.
+  const rememberChoice=()=>isRegularData&&rememberReceipt&&sessionToken&&canRememberReceiptEmail(user,receiptEmail)?{token:sessionToken,email:receiptEmail.trim().toLowerCase()}:null;
+  const commitRememberedReceipt=()=>{
+    const chosen=rememberOnOrder.current;rememberOnOrder.current=null;
+    if(!chosen||currentToken.current!==chosen.token)return;
+    setRememberReceipt(false);
+    saveReceiptEmailOnServer(chosen.token,chosen.email)
+      .then(result=>{if(currentToken.current===chosen.token)updateUserProfile(result.user);})
+      .catch(()=>{if(currentToken.current===chosen.token)showToast('We couldn’t remember this email for next time. Your payment isn’t affected.','info');});
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submissionPending.current || isInitializing || walletBusy || recoveryLocked.current || preflightIssue) return;
@@ -431,7 +453,8 @@ export const CheckoutModal: React.FC = () => {
       setPhoneError(ghanaPhoneDigits(phone).length ? 'Enter all 10 digits of the Ghana number, like 024 123 4567.' : 'Enter the recipient’s Ghana phone number before paying.');
       phoneInputRef.current?.focus(); return;
     }
-    if(isRegularData&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(receiptEmail.trim())){setServerError('Enter a valid receipt email before paying.');return;}
+    if(isRegularData&&!RECEIPT_EMAIL_PATTERN.test(receiptEmail.trim())){setServerError('Enter a valid receipt email before paying.');return;}
+    rememberOnOrder.current=rememberChoice();
     if(paymentMethod!=='wallet'){submissionPending.current=true;try{await submitPayment();}finally{submissionPending.current=false;}return;}
     if(walletBusy||!sessionToken)return;
     if(isRegularData&&!commercial){setServerError('Refresh the current price before paying.');return;}
@@ -443,6 +466,7 @@ export const CheckoutModal: React.FC = () => {
       const fingerprint=JSON.stringify(body);if(walletRequest.current?.fingerprint!==fingerprint)walletRequest.current={fingerprint,id:crypto.randomUUID()};
       const result=await walletCheckout(sessionToken,'payments/initialize',{...body,requestId:walletRequest.current!.id,...(isRegularData&&commercial?{expectedTotalMinor:commercial.totalMinor,expectedRegularMinor:commercial.regularMinor,expectedStandardMinor:commercial.standardMinor,pricingRevision:commercial.pricingRevision,promotionRevision:commercial.promotionRevision}:{})});
       if(generation!==attemptGeneration.current)return;
+      commitRememberedReceipt();
       const newOrder=createOrder({...checkoutBundle,priceGhc:result.amountPesewas/100},phone.trim(),'wallet',result.reference,result.orderRef);
       closeCheckout();openOrderStatus(newOrder);
     }catch(error){
@@ -829,7 +853,13 @@ export const CheckoutModal: React.FC = () => {
           {!isInstantBundle&&<fieldset disabled={walletBusy||isInitializing||recoveryOnly||!!attemptRef}><WalletPaymentChoice amountMinor={Math.round(totalAmount*100)} value={paymentMethod} onChange={setPaymentMethod}/></fieldset>}
 
           {isRegularData&&<div className="text-xs text-slate-400">
-            {editingReceipt ? <label className="block text-sm font-semibold text-slate-100">Receipt email<span className="block text-xs font-normal text-slate-400 mt-0.5">Paystack sends your payment receipt here.</span><input type="email" inputMode="email" autoComplete="email" value={receiptEmail} onChange={e=>{if(recoveryLocked.current||knownReference.current)return;setReceiptEmail(e.target.value);directRequest.current=crypto.randomUUID();}} maxLength={128} placeholder="you@example.com" className="w-full mt-2 min-h-12 px-3.5 rounded-xl bg-[#0a0e12] border border-slate-700 text-base font-normal text-white placeholder:text-slate-600 focus:outline-none focus:border-[#00c365]" disabled={walletBusy||isInitializing||recoveryOnly||!!attemptRef} required/></label> : <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-800 px-3"><span className="min-w-0 break-all">Receipt to <span className="text-slate-200">{receiptEmail}</span></span><button type="button" disabled={walletBusy||isInitializing||recoveryOnly||!!attemptRef} onClick={()=>setEditingReceipt(true)} className="shrink-0 min-h-11 px-1 text-emerald-400 font-semibold">Change</button></div>}
+            {editingReceipt ? <div>
+              <label className="block text-sm font-semibold text-slate-100">Receipt email<span className="block text-xs font-normal text-slate-400 mt-0.5">Paystack sends your payment receipt here.</span><input type="email" inputMode="email" autoComplete="email" value={receiptEmail} onChange={e=>{if(recoveryLocked.current||knownReference.current)return;setReceiptEmail(e.target.value);if(!canRememberReceiptEmail(user,e.target.value))setRememberReceipt(false);directRequest.current=crypto.randomUUID();}} maxLength={128} placeholder="you@example.com" className="w-full mt-2 min-h-12 px-3.5 rounded-xl bg-[#0a0e12] border border-slate-700 text-base font-normal text-white placeholder:text-slate-600 focus:outline-none focus:border-[#00c365]" disabled={walletBusy||isInitializing||recoveryOnly||!!attemptRef} required/></label>
+              {canRememberReceiptEmail(user,receiptEmail)&&<label className="mt-2 flex items-start gap-3 min-h-11 py-1 text-sm text-slate-200">
+                <input type="checkbox" checked={rememberReceipt} onChange={e=>setRememberReceipt(e.target.checked)} disabled={walletBusy||isInitializing||recoveryOnly||!!attemptRef} className="mt-0.5 size-5 shrink-0 accent-[#00c365]"/>
+                <span>Remember this email for future receipts<span className="block text-xs text-slate-400 mt-0.5">Saved to your account for receipts only. It doesn’t change how you sign in.</span></span>
+              </label>}
+            </div> : <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-800 px-3"><span className="min-w-0 break-all">Receipt to <span className="text-slate-200">{receiptEmail}</span></span><button type="button" disabled={walletBusy||isInitializing||recoveryOnly||!!attemptRef} onClick={()=>setEditingReceipt(true)} className="shrink-0 min-h-11 px-1 text-emerald-400 font-semibold">Change</button></div>}
             {commercial?.offer.state==='phone_required'&&<p className="mt-2">Add your phone in Account to check your Welcome Offer.</p>}
             {!commercial&&<div role="status" className="mt-2 flex flex-wrap items-center gap-2">{quoteError?<span className="text-amber-300">{quoteError}</span>:<span className="inline-flex items-center gap-1.5"><RefreshCw className="w-3.5 h-3.5 animate-spin" />Loading current price…</span>}{quoteError&&<button type="button" onClick={()=>setQuoteRefresh(x=>x+1)} className="rounded-lg border border-slate-600 px-3 min-h-11 text-emerald-400">Retry</button>}</div>}
           </div>}

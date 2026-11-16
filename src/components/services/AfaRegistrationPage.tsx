@@ -1,4 +1,5 @@
 import { WalletPaymentChoice } from '../finance/WalletPaymentChoice';
+import { defaultReceiptEmail } from '../../utils/receiptEmail';
 import { walletCheckout } from '../../services/financeApi';
 import { getStoredReferralCode,getOrGenerateVisitorKey } from '../../utils/referralCapture';
 import React, { useState, useEffect, useId } from 'react';
@@ -136,7 +137,7 @@ export const AfaRegistrationPage: React.FC = () => {
   }, []);
   useEffect(() => {
     // Identity stays in form memory and is cleared on account change, including logout.
-    setFormData({ ...initialFormData, fullName:user?.name || '', mtnNumber:user?.phone ? formatGhanaPhone(user.phone) : '', customerEmail:user?.email || '' });
+    setFormData({ ...initialFormData, fullName:user?.name || '', mtnNumber:user?.phone ? formatGhanaPhone(user.phone) : '', customerEmail:defaultReceiptEmail(user) });
     setFormErrors({});
   }, [user?.id]);
   useEffect(() => {

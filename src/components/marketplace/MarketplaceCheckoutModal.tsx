@@ -1,4 +1,5 @@
 import { FULFILMENT_LABELS, FULFILMENT_MODES, FulfilmentMode } from '../../../shared/marketplacePolicy';
+import { defaultReceiptEmail } from '../../utils/receiptEmail';
 import { purchasableOptions, initialMarketplaceOption } from '../../../shared/marketplaceVariants';
 import { MARKETPLACE_LIMITS } from '../../../shared/marketplaceLimits';
 import { useMarketplaceDialog } from './useMarketplaceDialog';
@@ -88,7 +89,8 @@ export const MarketplaceCheckoutModal: React.FC<MarketplaceCheckoutModalProps> =
   // Customer Contact Form
   const [customerName, setCustomerName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
-  const [email, setEmail] = useState(user?.email || '');
+  // The receipt address the customer chose to remember, else their sign-in email (3.4.1).
+  const [email, setEmail] = useState(defaultReceiptEmail(user));
 
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);

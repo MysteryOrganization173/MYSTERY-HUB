@@ -9,6 +9,8 @@ import { WEBSITE_DESIGNS_PATH } from '../../utils/businessWorkspace';
 import { ActivePage } from '../../types';
 import { openMarketplaceAt } from '../../utils/marketplaceBrowse';
 import { openServicesAt } from '../../utils/serviceDirectory';
+import { formatGhanaPhone } from '../../utils/checkoutRecovery';
+import { openNotificationSettings } from '../pwa/NotificationsEntry';
 import {
   Search,
   ShoppingBag,
@@ -19,14 +21,21 @@ import {
   ChevronDown,
   Home,
   Globe,
-  Sparkles,
-  Clock,
-  ExternalLink,
+  Wifi,
   Gift,
   Wallet,
   MessageCircle,
   Briefcase,
+  ReceiptText,
+  LayoutGrid,
+  Info,
+  CircleHelp,
+  Bell,
+  type LucideIcon,
 } from 'lucide-react';
+
+/** One entry in the phone and tablet menu. `wide` entries repeat a bottom-nav page, so they appear only from 768px, where the bottom nav is hidden. */
+interface MenuEntry { key: string; label: string; Icon: LucideIcon; onSelect: () => void; current?: boolean; wide?: boolean; badge?: string; className?: string; href?: string }
 
 export const Navbar: React.FC = () => {
   const { activePage, setActivePage, openAuth, openMysteryAi, user, logoutUser, openAccount, sessionToken } = useApp();
@@ -47,11 +56,28 @@ export const Navbar: React.FC = () => {
     if (!mobileMenuOpen) return;
     const desktop = window.matchMedia('(min-width: 1280px)');
     const close = () => setMobileMenuOpen(false);
+    // Back closes it (above) and returns focus to the button that opened it.
+    const onBack = () => menuTrigger.current?.focus();
     const onWidth = () => { if (desktop.matches) close(); };
     desktop.addEventListener('change', onWidth);
     window.addEventListener('popstate', close);
-    return () => { desktop.removeEventListener('change', onWidth); window.removeEventListener('popstate', close); };
+    window.addEventListener('popstate', onBack);
+    // Also marked on the root element, for browsers without :has() (the bottom bar steps aside either way).
+    document.documentElement.classList.add('mh-menu-open');
+    return () => { desktop.removeEventListener('change', onWidth); window.removeEventListener('popstate', close); window.removeEventListener('popstate', onBack); document.documentElement.classList.remove('mh-menu-open'); };
   }, [mobileMenuOpen]);
+  // The account dropdown belongs to the desktop header only; below 1280px its trigger is hidden, so it closes too.
+  useEffect(() => {
+    if (!accountDropdownOpen) return;
+    const desktop = window.matchMedia('(min-width: 1280px)');
+    const close = () => setAccountDropdownOpen(false);
+    const onWidth = () => { if (!desktop.matches) close(); };
+    desktop.addEventListener('change', onWidth);
+    window.addEventListener('popstate', close);
+    return () => { desktop.removeEventListener('change', onWidth); window.removeEventListener('popstate', close); };
+  }, [accountDropdownOpen]);
+  // Signing in or out swaps the menu's contents; never leave one open across that change.
+  useEffect(() => { setMobileMenuOpen(false); setAccountDropdownOpen(false); }, [user?.id]);
 
   const navLinks: { id: ActivePage; label: string }[] = [
     { id: 'home', label: 'Home' },
@@ -87,6 +113,7 @@ export const Navbar: React.FC = () => {
     };
   }, []);
 
+  const closeMenus = () => { setMobileMenuOpen(false); setAccountDropdownOpen(false); };
   const handleNavClick = (pageId: ActivePage) => {
     // V7.2.1: an owner's Website is My Business (the Builder redirects too; this skips that step).
     setActivePage(pageId === 'website' && ownerHasWebsite(sessionToken) ? 'business' : pageId);
@@ -101,6 +128,8 @@ export const Navbar: React.FC = () => {
     setMobileMenuOpen(false);
     setAccountDropdownOpen(false);
   };
+  // My Account is a dialog: focus returns to the visible menu trigger when it closes.
+  const showAccount = (trigger: React.RefObject<HTMLButtonElement | null>) => { trigger.current?.focus(); closeMenus(); openAccount(); };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,7 +158,51 @@ export const Navbar: React.FC = () => {
 
   const userFirstName = user?.name ? user.name.split(' ')[0] : 'Member';
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'M';
-  const userSubtext = user?.email || user?.phone || '';
+  // The secondary line identifies the account: the phone reads as a local number, otherwise the email.
+  const userSubtext = user?.phone ? formatGhanaPhone(user.phone) : user?.email || '';
+  const isCurrent = (id: ActivePage) => activePage === id || (id === 'website' && activePage === 'business') || (id === 'marketplace' && activePage === 'creative');
+
+  // Phone and tablet menu. Shortcuts first for members; pages the bottom nav already shows appear only from 768px.
+  const shortcuts: MenuEntry[] = user ? [
+    { key: 'orders', label: 'My Orders', Icon: ReceiptText, onSelect: () => handleNavClick('orders'), current: activePage === 'orders' },
+    { key: 'wallet', label: 'Wallet', Icon: Wallet, onSelect: () => handleNavClick('wallet'), current: activePage === 'wallet' },
+    { key: 'business', label: 'My Business', Icon: Briefcase, onSelect: () => handleNavClick('business'), current: activePage === 'business' },
+    { key: 'earn', label: 'Earn', Icon: Gift, onSelect: () => handleNavClick('earn'), current: activePage === 'earn' },
+  ] : [];
+  const explore: MenuEntry[] = [
+    { key: 'home', label: 'Home', Icon: Home, onSelect: () => handleNavClick('home'), current: activePage === 'home', wide: true, href: ROUTE_PATH_MAP.home },
+    { key: 'data', label: 'Data & Airtime', Icon: Wifi, onSelect: () => handleNavClick('data'), current: activePage === 'data', wide: true, href: ROUTE_PATH_MAP.data },
+    user
+      ? { key: 'website', label: 'Website Builder', Icon: Globe, onSelect: openDesigns, current: activePage === 'website', href: WEBSITE_DESIGNS_PATH }
+      : { key: 'website', label: 'Website Builder', Icon: Globe, onSelect: () => handleNavClick('website'), current: isCurrent('website'), href: ROUTE_PATH_MAP.website },
+    { key: 'marketplace', label: 'Marketplace', Icon: ShoppingBag, onSelect: () => handleNavClick('marketplace'), current: isCurrent('marketplace'), href: ROUTE_PATH_MAP.marketplace },
+    { key: 'services', label: 'More Services', Icon: LayoutGrid, onSelect: () => handleNavClick('services'), current: activePage === 'services', href: ROUTE_PATH_MAP.services },
+    ...(!user ? [
+      { key: 'earn', label: 'Mystery Earn', Icon: Gift, onSelect: () => handleNavClick('earn'), current: activePage === 'earn', wide: true, href: ROUTE_PATH_MAP.earn },
+      { key: 'orders', label: 'Track an order', Icon: ReceiptText, onSelect: () => handleNavClick('orders'), current: activePage === 'orders', wide: true, href: ROUTE_PATH_MAP.orders },
+    ] : []),
+    { key: 'about', label: 'About', Icon: Info, onSelect: () => handleNavClick('about'), current: activePage === 'about', href: ROUTE_PATH_MAP.about },
+  ];
+  const help: MenuEntry[] = [
+    ...(user ? [{ key: 'account', label: 'My Account', Icon: UserIcon, onSelect: () => showAccount(menuTrigger) }] : []),
+    { key: 'help', label: 'Help & FAQs', Icon: CircleHelp, onSelect: () => handleNavClick('help'), current: activePage === 'help', href: ROUTE_PATH_MAP.help },
+    { key: 'ai', label: 'Ask Mystery AI', Icon: MessageCircle, onSelect: () => { setMobileMenuOpen(false); openMysteryAi(); }, className: 'mh-menu-ai' },
+    // Visitors manage news for this browser here; members manage notifications in My Account.
+    ...(!user ? [{ key: 'notifications', label: 'Notifications', Icon: Bell, onSelect: () => { setMobileMenuOpen(false); openNotificationSettings(); } }] : []),
+  ];
+  const renderEntry = (entry: MenuEntry) => {
+    const { current } = entry;
+    const className = `mh-menu-link ${entry.className || ''} flex items-center gap-3 w-full min-h-11 px-3 rounded-xl text-left text-sm font-medium transition-colors cursor-pointer ${
+      current ? 'bg-[#00c365]/10 text-[#00c365] font-semibold' : 'text-slate-200 hover:bg-slate-900 hover:text-white'
+    }`;
+    const body = <><entry.Icon className="w-4 h-4 shrink-0" aria-hidden="true" /><span className="min-w-0 flex-1 truncate">{entry.label}</span></>;
+    return <li key={entry.key} className={entry.wide ? 'hidden md:block' : undefined}>
+      {entry.href
+        ? <a href={entry.href} onClick={(e) => { e.preventDefault(); entry.onSelect(); }} aria-current={current ? 'page' : undefined} className={className}>{body}</a>
+        : <button type="button" onClick={entry.onSelect} className={className}>{body}</button>}
+    </li>;
+  };
+  const groupHeading = 'px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400';
 
   return (
     <header ref={headerRef} className="sticky top-0 z-40 bg-[#0a0e11]/90 backdrop-blur-md border-b border-slate-800/80">
@@ -150,9 +223,9 @@ export const Navbar: React.FC = () => {
         </a>
 
         {/* Zone 2: Navigation Links (Desktop) */}
-        <nav className="hidden xl:flex items-center gap-3 text-xs font-medium text-slate-300">
+        <nav aria-label="Main" className="hidden xl:flex items-center gap-3 text-xs font-medium text-slate-300">
           {navLinks.map((link) => {
-            const isActive = activePage === link.id || (link.id === 'website' && activePage === 'business') || (link.id === 'marketplace' && activePage === 'creative');
+            const current = isCurrent(link.id);
             return (
               <a
                 key={link.id}
@@ -161,13 +234,13 @@ export const Navbar: React.FC = () => {
                   e.preventDefault();
                   handleNavClick(link.id);
                 }}
-                aria-current={isActive?'page':undefined}
+                aria-current={current ? 'page' : undefined}
                 className={`transition-colors min-h-11 flex items-center relative whitespace-nowrap cursor-pointer ${
-                  isActive ? 'text-white font-semibold' : 'text-slate-300 hover:text-white'
+                  current ? 'text-white font-semibold' : 'text-slate-300 hover:text-white'
                 }`}
               >
                 {link.label}
-                {isActive && (
+                {current && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#00c365] rounded-full shadow-[0_0_8px_rgba(0,195,101,0.6)]" />
                 )}
               </a>
@@ -176,7 +249,7 @@ export const Navbar: React.FC = () => {
         </nav>
 
         {/* Zone 3: Actions & Auth */}
-        <div className="flex items-center gap-0.5 sm:gap-3">
+        <div className="flex items-center gap-0.5 sm:gap-2">
           {/* Quick Search Toggle */}
           <div className="relative min-w-11">
             {searchOpen ? (
@@ -201,7 +274,7 @@ export const Navbar: React.FC = () => {
               </form>
             ) : (
               <button
-                onClick={() => setSearchOpen(true)}
+                onClick={() => { closeMenus(); setSearchOpen(true); }}
                 className="min-h-11 min-w-11 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
                 title="Search Mystery Hub"
                 aria-label="Search"
@@ -211,118 +284,73 @@ export const Navbar: React.FC = () => {
             )}
           </div>
 
-          {user&&<button onClick={()=>handleNavClick('wallet')} className="hidden sm:flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800" aria-label="Mystery Wallet" title="Mystery Wallet"><Wallet className="w-4 h-4"/></button>}
+          {/* Labelled shortcuts from 768px; on phones the menu and bottom nav carry them. */}
+          {user&&<button onClick={()=>handleNavClick('wallet')} className="hidden md:flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800" aria-label="Mystery Wallet" title="Mystery Wallet"><Wallet className="w-4 h-4"/></button>}
           <button type="button" onClick={() => openMysteryAi()} className="hidden md:flex min-h-11 min-w-11 items-center justify-center text-slate-300 hover:text-[#00c365] hover:bg-slate-800/60 rounded-lg" aria-label="Open Mystery AI Assistant" title="Ask Mystery AI"><MessageCircle className="w-4 h-4" /></button>
           {/* Mystery Earn Shortcut */}
           <button
             onClick={() => handleNavClick('earn')}
-            className="hidden sm:flex relative min-w-11 min-h-11 items-center justify-center text-slate-400 hover:text-[#00c365] hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
+            className="hidden md:flex relative min-w-11 min-h-11 items-center justify-center text-slate-400 hover:text-[#00c365] hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
             title="Mystery Earn"
             aria-label="Mystery Earn"
           >
             <Gift className="w-4 h-4 text-[#00c365]" />
             <span className="absolute top-1.5 right-1.5 flex h-2 w-2" aria-hidden="true">
-
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00c365]" />
             </span>
           </button>
 
-          {/* Auth Controls */}
+          {/* Desktop account dropdown (from 1280px). Below that, the single menu button carries the account. */}
           {user ? (
-            <div className="relative" ref={dropdownRef}>
+            <div className="relative hidden xl:block" ref={dropdownRef}>
               <button
                 ref={accountTrigger}
                 aria-label="Account navigation" aria-controls="account-navigation"
                 onClick={() => {setMobileMenuOpen(false);setAccountDropdownOpen(!accountDropdownOpen);}}
-                className="min-h-11 min-w-11 flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 rounded-xl text-xs text-slate-200 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#00c365]"
+                className="min-h-11 min-w-11 flex items-center justify-center gap-2 px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 rounded-xl text-xs text-slate-200 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#00c365]"
                 aria-expanded={accountDropdownOpen}
               >
-                <div className="w-5 h-5 rounded-full bg-[#00c365]/20 text-[#00c365] flex items-center justify-center font-bold text-[10px]">
+                <div className="w-5 h-5 rounded-full bg-[#00c365]/20 text-[#00c365] flex items-center justify-center font-bold text-[10px]" aria-hidden="true">
                   {userInitial}
                 </div>
-                <span className="hidden sm:inline font-medium truncate max-w-[110px]">{userFirstName}</span>
-                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${accountDropdownOpen ? 'rotate-180' : ''}`} />
+                <span className="font-medium truncate max-w-[110px]">{userFirstName}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${accountDropdownOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
               </button>
 
-              {/* Account Dropdown Menu */}
+              {/* Account Dropdown Menu: the account itself. Site pages are in the header links beside it. */}
               {accountDropdownOpen && (
-                <div id="account-navigation" role="region" aria-label="Account shortcuts" className="absolute right-0 mt-2 w-56 max-h-[calc(100dvh-5rem)] overflow-auto rounded-2xl bg-[#0f151b] border border-slate-700/80 shadow-2xl py-2 z-50 text-xs text-slate-200 animate-in fade-in zoom-in-95 duration-150">
-                  {/* User Profile Header */}
-                  <div className="px-3.5 py-2.5 border-b border-slate-800 space-y-0.5">
-                    <p className="font-bold text-white text-xs truncate">{user.name}</p>
-                    {userSubtext && <p className="text-[11px] text-slate-400 truncate">{userSubtext}</p>}
+                <div id="account-navigation" role="region" aria-label="Account shortcuts" className="absolute right-0 mt-2 w-64 max-h-[calc(100dvh-5rem)] overflow-auto rounded-2xl bg-[#0f151b] border border-slate-700/80 shadow-2xl py-2 z-50 text-sm text-slate-200 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-3">
+                    <span className="w-9 h-9 rounded-full bg-[#00c365]/20 text-[#00c365] flex items-center justify-center font-bold text-sm shrink-0" aria-hidden="true">{userInitial}</span>
+                    <div className="min-w-0">
+                      <p className="font-bold text-white text-sm truncate">{user.name}</p>
+                      {userSubtext && <p className="text-xs text-slate-400 truncate">{userSubtext}</p>}
+                    </div>
                   </div>
-
-                  <button onClick={()=>handleNavClick('wallet')} className="w-full min-h-11 text-left px-3.5 flex items-center gap-2.5 hover:bg-slate-800"><Wallet className="w-4 h-4"/>Mystery Wallet</button>
-                  {/* Navigation Shortcuts */}
-                  <div className="py-1">
-                    <button
-                      onClick={() => handleNavClick('home')}
-                      className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <Home className="w-3.5 h-3.5 text-[#00c365]" />
-                      <span>My Home</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleNavClick('orders')}
-                      className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <Clock className="w-3.5 h-3.5 text-sky-400" />
-                      <span>My Orders</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleNavClick('business')}
-                      className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <Briefcase className="w-3.5 h-3.5 text-emerald-300" />
-                      <span>My Business</span>
-                    </button>
-
-                    <button
-                      onClick={openDesigns}
-                      className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <Globe className="w-3.5 h-3.5 text-purple-400" />
-                      <span>Website Builder</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleNavClick('marketplace')}
-                      className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Marketplace</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleNavClick('earn')}
-                      className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800/80 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Gift className="w-3.5 h-3.5 text-[#00c365]" />
-                        <span>Mystery Earn</span>
-                      </div>
-                      <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 bg-[#00c365]/10 text-[#00c365] rounded border border-[#00c365]/20">
-                        LIVE
-                      </span>
-                    </button>
-                  </div>
-
-                  <button onClick={() => { accountTrigger.current?.focus(); setAccountDropdownOpen(false); openAccount(); }} className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2"><UserIcon className="w-4 h-4" />My Account</button>
-                  <a href="/help" onClick={event => { event.preventDefault(); handleNavClick('help'); }} className="w-full min-h-11 px-3.5 flex items-center gap-2 hover:bg-slate-800"><MessageCircle className="w-4 h-4" />Help &amp; FAQs</a>
-                  <ShareAppButton onDone={() => setAccountDropdownOpen(false)} className="w-full min-h-11 text-left px-3.5 flex items-center gap-2 hover:bg-slate-800 cursor-pointer" />
-                  {/* Sign Out */}
+                  <ul className="py-1">
+                    <li><button onClick={() => handleNavClick('orders')} aria-current={activePage === 'orders' ? 'page' : undefined} className="w-full min-h-11 text-left px-4 flex items-center gap-3 hover:bg-slate-800/80 hover:text-white aria-[current=page]:text-[#00c365]"><ReceiptText className="w-4 h-4 text-sky-400" aria-hidden="true" />My Orders</button></li>
+                    <li><button onClick={() => handleNavClick('wallet')} aria-current={activePage === 'wallet' ? 'page' : undefined} className="w-full min-h-11 text-left px-4 flex items-center gap-3 hover:bg-slate-800/80 hover:text-white aria-[current=page]:text-[#00c365]"><Wallet className="w-4 h-4 text-slate-300" aria-hidden="true" />Mystery Wallet</button></li>
+                    <li><button onClick={() => handleNavClick('business')} aria-current={activePage === 'business' ? 'page' : undefined} className="w-full min-h-11 text-left px-4 flex items-center gap-3 hover:bg-slate-800/80 hover:text-white aria-[current=page]:text-[#00c365]"><Briefcase className="w-4 h-4 text-emerald-300" aria-hidden="true" />My Business</button></li>
+                    {/* The header link takes owners to My Business; this opens the design gallery itself. */}
+                    <li><button onClick={openDesigns} className="w-full min-h-11 text-left px-4 flex items-center gap-3 hover:bg-slate-800/80 hover:text-white"><Globe className="w-4 h-4 text-purple-400" aria-hidden="true" />Website Builder</button></li>
+                    <li><button onClick={() => handleNavClick('earn')} aria-current={activePage === 'earn' ? 'page' : undefined} className="w-full min-h-11 text-left px-4 flex items-center justify-between gap-3 hover:bg-slate-800/80 hover:text-white aria-[current=page]:text-[#00c365]">
+                      <span className="flex items-center gap-3"><Gift className="w-4 h-4 text-[#00c365]" aria-hidden="true" />Mystery Earn</span>
+                      <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 bg-[#00c365]/10 text-[#00c365] rounded border border-[#00c365]/20">Live</span>
+                    </button></li>
+                  </ul>
+                  <ul className="py-1 border-t border-slate-800">
+                    <li><button onClick={() => showAccount(accountTrigger)} className="w-full min-h-11 text-left px-4 flex items-center gap-3 hover:bg-slate-800"><UserIcon className="w-4 h-4" aria-hidden="true" />My Account</button></li>
+                    <li><ShareAppButton onDone={() => setAccountDropdownOpen(false)} className="w-full min-h-11 text-left px-4 flex items-center gap-3 hover:bg-slate-800 cursor-pointer" /></li>
+                  </ul>
                   <div className="pt-1 border-t border-slate-800">
                     <button
                       onClick={() => {
                         setAccountDropdownOpen(false);
                         logoutUser();
                       }}
-                      className="w-full min-h-11 text-left px-3.5 py-2 hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 flex items-center gap-2.5 transition-colors cursor-pointer"
+                      className="w-full min-h-11 text-left px-4 hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 flex items-center gap-3 transition-colors cursor-pointer"
                     >
-                      <LogOut className="w-3.5 h-3.5" />
+                      <LogOut className="w-4 h-4" aria-hidden="true" />
                       <span>Sign Out</span>
                     </button>
                   </div>
@@ -333,7 +361,7 @@ export const Navbar: React.FC = () => {
             <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 onClick={() => openAuth('login')}
-                className="mh-login hidden sm:inline-flex px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white transition-colors cursor-pointer"
+                className="mh-login hidden sm:inline-flex min-h-11 items-center px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white transition-colors cursor-pointer"
               >
                 Login
               </button>
@@ -346,118 +374,103 @@ export const Navbar: React.FC = () => {
             </div>
           )}
 
-          {/* Mobile Menu Hamburger */}
+          {/* The one menu button below 1280px. For members it carries their initial, so it reads as the account menu. */}
           <button
             ref={menuTrigger}
-            onClick={() => {setAccountDropdownOpen(false);setMobileMenuOpen(!mobileMenuOpen);}}
+            onClick={() => {setAccountDropdownOpen(false);setSearchOpen(false);setMobileMenuOpen(!mobileMenuOpen);}}
             aria-expanded={mobileMenuOpen} aria-controls="mobile-menu"
-            className="mh-menu-trigger xl:hidden min-w-11 min-h-11 flex items-center justify-center p-2 text-slate-400 hover:text-white rounded-lg focus:outline-none cursor-pointer"
-            aria-label="Toggle menu"
+            className={`mh-menu-trigger xl:hidden min-w-11 min-h-11 flex items-center justify-center gap-1.5 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] cursor-pointer ${
+              user ? 'pl-1.5 pr-2 bg-slate-900/90 border border-slate-800 text-slate-200 hover:border-slate-700' : 'p-2 text-slate-400 hover:text-white'
+            }`}
+            aria-label={user ? (mobileMenuOpen ? 'Close account menu' : 'Open account menu') : (mobileMenuOpen ? 'Close menu' : 'Open menu')}
           >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {user && <span className="w-6 h-6 rounded-full bg-[#00c365]/20 text-[#00c365] flex items-center justify-center font-bold text-[11px]" aria-hidden="true">{userInitial}</span>}
+            {mobileMenuOpen ? <X className="w-5 h-5" aria-hidden="true" /> : <Menu className="w-5 h-5" aria-hidden="true" />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Dropdown Menu Drawer */}
+      {/* Phone and tablet menu: one place for the account and the site. */}
       {mobileMenuOpen && (
         <div className="mh-mobile-menu xl:hidden">
-        <div id="mobile-menu" className="mh-mobile-menu-panel bg-[#0c1116] border-b border-slate-800 px-4 pt-3 pb-5 space-y-3">
+        <nav id="mobile-menu" aria-label={user ? 'Account and site menu' : 'Site menu'} className="mh-mobile-menu-panel bg-[#0c1116] border-b border-slate-800 px-4 pt-3 pb-5">
           <SeasonalShell slot="menu-header" />
-          {user && (
-            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-[#00c365]/20 text-[#00c365] flex items-center justify-center font-bold text-xs shrink-0">
-                  {userInitial}
+          <div className="mx-auto max-w-2xl space-y-4">
+            {user && (
+              <>
+                <div className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                  <span className="w-10 h-10 rounded-full bg-[#00c365]/20 text-[#00c365] flex items-center justify-center font-bold text-sm shrink-0" aria-hidden="true">{userInitial}</span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm text-white truncate">{user.name}</p>
+                    {userSubtext && <p className="text-xs text-slate-400 truncate">{userSubtext}</p>}
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="font-bold text-xs text-white truncate">{user.name}</p>
-                  {userSubtext && <p className="text-[11px] text-slate-400 truncate">{userSubtext}</p>}
-                </div>
+                <ul aria-label="Your account" className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {shortcuts.map(entry => (
+                    <li key={entry.key}>
+                      <button type="button" onClick={entry.onSelect} aria-current={entry.current ? 'page' : undefined}
+                        className={`flex items-center gap-2.5 w-full min-h-12 px-3 rounded-xl border text-left text-sm font-semibold transition-colors cursor-pointer ${entry.current ? 'border-[#00c365]/40 bg-[#00c365]/10 text-[#00c365]' : 'border-slate-800 bg-slate-900/60 text-slate-100 hover:border-slate-700 hover:bg-slate-900'}`}>
+                        <entry.Icon className="w-4 h-4 shrink-0" aria-hidden="true" /><span className="truncate">{entry.label}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <section aria-labelledby="menu-explore">
+                <h2 id="menu-explore" className={groupHeading}>Explore</h2>
+                <ul className="space-y-0.5">{explore.map(renderEntry)}</ul>
+              </section>
+              <section aria-labelledby="menu-help">
+                <h2 id="menu-help" className={groupHeading}>{user ? 'Account & help' : 'Help'}</h2>
+                <ul className="space-y-0.5">
+                  {help.map(renderEntry)}
+                  <li><ShareAppButton onDone={() => setMobileMenuOpen(false)} className="mh-menu-link flex items-center gap-3 w-full min-h-11 px-3 rounded-xl text-sm font-medium text-slate-200 hover:bg-slate-900 cursor-pointer" /></li>
+                  {user && (
+                    <li className="pt-1 mt-1 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          logoutUser();
+                        }}
+                        className="flex items-center gap-3 w-full min-h-11 px-3 rounded-xl text-left text-sm font-medium text-rose-300 hover:bg-rose-500/10 cursor-pointer"
+                      >
+                        <LogOut className="w-4 h-4" aria-hidden="true" />Sign Out
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              </section>
+            </div>
+
+            {!user && (
+              <div className="mh-menu-auth pt-3 border-t border-slate-800 flex gap-2">
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    openAuth('login');
+                  }}
+                  className="mh-login flex-1 min-h-11 text-center text-sm font-medium text-slate-200 bg-slate-900 rounded-xl cursor-pointer"
+                >
+                  Login
+                </button>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    openAuth('signup');
+                  }}
+                  className="mh-signup flex-1 min-h-11 text-center text-sm font-semibold text-black bg-[#00c365] rounded-xl cursor-pointer"
+                >
+                  Sign Up
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  logoutUser();
-                }}
-                className="px-2.5 py-1 text-[11px] text-rose-400 border border-rose-500/30 bg-rose-500/10 rounded-lg shrink-0 cursor-pointer"
-              >
-                Sign Out
-              </button>
-            </div>
-          )}
-
-          <div className="space-y-1">
-            <button type="button" onClick={() => { setMobileMenuOpen(false); openMysteryAi(); }} className="mh-menu-ai flex items-center gap-2 min-h-11 px-3 rounded-xl text-sm text-slate-300 hover:bg-slate-900" aria-label="Open Mystery AI Assistant"><MessageCircle className="w-4 h-4" />Help · Mystery AI</button>
-            {user && <a href="/wallet" onClick={(e) => { e.preventDefault(); handleNavClick('wallet'); }} className="flex items-center gap-2 min-h-11 px-3 rounded-xl text-sm text-slate-300 hover:bg-slate-900"><Wallet className="w-4 h-4" />Mystery Wallet</a>}
-            {navLinks.map((link) => {
-              const current = activePage === link.id || (link.id === 'website' && activePage === 'business') || (link.id === 'marketplace' && activePage === 'creative');
-              return (
-              <a
-                key={link.id}
-                href={ROUTE_PATH_MAP[link.id]}
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleNavClick(link.id);
-                }}
-                aria-current={current ? 'page' : undefined}
-                className={`mh-menu-link block w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  current
-                    ? 'bg-[#00c365]/10 text-[#00c365] font-semibold'
-                    : 'text-slate-300 hover:bg-slate-900 hover:text-white'
-                }`}
-              >
-                {link.label}
-              </a>
-              );
-            })}
-
-            <a
-              href={ROUTE_PATH_MAP['earn']}
-              onClick={(e) => {
-                e.preventDefault();
-                handleNavClick('earn');
-              }}
-              aria-current={activePage === 'earn' ? 'page' : undefined}
-              className={`mh-menu-link flex items-center justify-between w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                activePage === 'earn'
-                  ? 'bg-[#00c365]/10 text-[#00c365] font-semibold'
-                  : 'text-slate-300 hover:bg-slate-900 hover:text-white'
-              }`}
-            >
-              <span>Mystery Earn</span>
-              <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 bg-[#00c365]/10 text-[#00c365] rounded border border-[#00c365]/20">
-                LIVE
-              </span>
-            </a>
+            )}
           </div>
-
-          <ShareAppButton onDone={() => setMobileMenuOpen(false)} className="flex items-center gap-2 w-full min-h-11 px-3 rounded-xl text-sm text-slate-300 hover:bg-slate-900 cursor-pointer" />
-
-          {!user && (
-            <div className="mh-menu-auth pt-2 border-t border-slate-800 flex gap-2">
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  openAuth('login');
-                }}
-                className="mh-login flex-1 py-2 text-center text-xs font-medium text-slate-300 bg-slate-900 rounded-xl cursor-pointer"
-              >
-                Login
-              </button>
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  openAuth('signup');
-                }}
-                className="mh-signup flex-1 py-2 text-center text-xs font-semibold text-black bg-[#00c365] rounded-xl cursor-pointer"
-              >
-                Sign Up
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="mh-mobile-menu-scrim" aria-hidden="true" onClick={() => setMobileMenuOpen(false)} />
+        </nav>
+        <div className="mh-mobile-menu-scrim" aria-hidden="true" onClick={() => { setMobileMenuOpen(false); menuTrigger.current?.focus(); }} />
         </div>
       )}
     </header>

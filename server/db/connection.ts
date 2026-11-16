@@ -411,6 +411,8 @@ export async function initDatabase(): Promise<void> {
     const orderMigrations = [
       { name: 'users.must_change_password', sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;` },
       { name: 'users.password_changed_at', sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ NULL;` },
+      // 3.4.1: remembered receipt email. A contact for payment receipts only; sign-in never reads it.
+      { name: 'users.receipt_email', sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS receipt_email VARCHAR(254) NULL;` },
       {
         name: 'orders.user_id',
         sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL;`,

@@ -25,7 +25,7 @@ const subscribe = (listener: () => void) => { listeners.add(listener); return ()
 export function NotificationsEntryHost() {
   const isOpen = useSyncExternalStore(subscribe, () => open, () => false);
   const { user, openAccount } = useApp();
-  useEffect(() => { if (isOpen && user) { closeNotificationSettings(); openAccount(); } }, [isOpen, user, openAccount]);
+  useEffect(() => { if (isOpen && user) { closeNotificationSettings(); openAccount('notifications'); } }, [isOpen, user, openAccount]);
   return isOpen && !user ? <GuestNotificationsSheet onClose={closeNotificationSettings} /> : null;
 }
 

@@ -10,6 +10,7 @@ import {SeasonalMemberHome} from '../../seasonal/Seasonal';
 import {memberGreeting,memberTrackingOrder} from '../../utils/memberHomePresentation';
 import {withoutDeletedWebsites} from '../../utils/websiteDeletion';
 import {primeOwnerWebsites} from '../../hooks/useOwnerWebsites';
+import {useBuyAgain} from '../../hooks/useBuyAgain';
 
 function MemberDashboard(){
   const {user,sessionToken,openDataPage,setActivePage,openOrderStatus,openMysteryAi}=useApp();
@@ -34,7 +35,8 @@ function MemberDashboard(){
     }).catch(()=>{}),600);
     return()=>{active=false;window.clearTimeout(timer);};
   },[sessionToken]);
-  const view:MemberHomeViewProps={name:user?.name.trim().split(/\s+/)[0]||'Member',greeting:memberGreeting(new Date().getHours()),orders,loading,error,retry:()=>setRetry(x=>x+1),track:o=>openOrderStatus(memberTrackingOrder(o)),wallet:<HomeWalletSummary compact/>,promotion:<InstallAppPromo variant="compact"/>,website,assistant:()=>openMysteryAi(),actions:{data:network=>openDataPage('data',network),airtime:network=>openDataPage('airtime',network),website:()=>setActivePage(website&&website.state!=='none'?'business':'website'),earn:()=>setActivePage('earn'),orders:()=>setActivePage('orders'),marketplace:()=>setActivePage('marketplace'),afa:()=>setActivePage('afa'),services:()=>setActivePage('services')}};
+  const {buyAgain,pending}=useBuyAgain();
+  const view:MemberHomeViewProps={buyAgain:{run:o=>{void buyAgain(o.public_reference);},pending},name:user?.name.trim().split(/\s+/)[0]||'Member',greeting:memberGreeting(new Date().getHours()),orders,loading,error,retry:()=>setRetry(x=>x+1),track:o=>openOrderStatus(memberTrackingOrder(o)),wallet:<HomeWalletSummary compact/>,promotion:<InstallAppPromo variant="compact"/>,website,assistant:()=>openMysteryAi(),actions:{data:network=>openDataPage('data',network),airtime:network=>openDataPage('airtime',network),website:()=>setActivePage(website&&website.state!=='none'?'business':'website'),earn:()=>setActivePage('earn'),orders:()=>setActivePage('orders'),marketplace:()=>setActivePage('marketplace'),afa:()=>setActivePage('afa'),services:()=>setActivePage('services')}};
   // While a season applies, the same account data is presented by the season's own member homepage (lazy, with
   // this ordinary view as its fallback); otherwise the ordinary view, exactly as before.
   return <SeasonalMemberHome view={view} fallback={<MemberHomeView {...view}/>}/>;

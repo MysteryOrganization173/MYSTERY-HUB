@@ -11,21 +11,22 @@ import * as presentation from '../../../src/utils/dataPurchasePresentation';
 import * as quotePresentation from '../../../src/utils/directQuotePresentation';
 import * as money from '../../../shared/money';
 import * as bundles from '../../../src/data/bundles';
+import * as receiptEmail from '../../../src/utils/receiptEmail';
 import {BUSINESS_CONFIG} from '../../../src/config/business';
 const compiled=transformSync(readFileSync('src/components/checkout/CheckoutModal.tsx','utf8'),{loader:'tsx',format:'cjs'}).code;
 function harness(){
- const cells:any[]=[],effects:Array<()=>void>=[],values=new Map<string,string>(),payments:any[]=[];let cursor=0,closes=0,opened=0;
+ const cells:any[]=[],effects:Array<()=>void>=[],values=new Map<string,string>(),payments:any[]=[],remembered:any[]=[];let cursor=0,closes=0,opened=0;
  const storage={getItem:(key:string)=>values.get(key)||null,setItem:(key:string,value:string)=>values.set(key,value),removeItem:(key:string)=>values.delete(key)};
  let lookup:(ref:string)=>Promise<any>=async()=>({success:false});
  const context:any={isCheckoutOpen:true,checkoutBundle:{id:'mtn-1gb',network:'mtn',serviceType:'data',dataAmount:'1GB',priceGhc:5.49,validity:'30 days'},user:{id:'a',email:'fixture@example.test',phone:'0241234567'},sessionToken:'a-token',closeCheckout:()=>closes++,openOrderStatus:()=>opened++,createOrder:()=>({}),openDataPage:()=>{}};
  const react:any={createElement:(type:any,props:any,...children:any[])=>({type,props:{...props,children}}),useState:(initial:any)=>{const i=cursor++;if(!(i in cells))cells[i]=typeof initial==='function'?initial():initial;return [cells[i],(v:any)=>cells[i]=typeof v==='function'?v(cells[i]):v];},useRef:(initial:any)=>{const i=cursor++;return cells[i]??(cells[i]={current:initial});},useEffect:(fn:any,deps:any[]=[])=>{const i=cursor++,old=cells[i];if(!old||deps.some((d,j)=>!Object.is(d,old.deps[j])))effects.push(()=>{old?.cleanup?.();cells[i]={deps,cleanup:fn()};});}};
- const modules:any={react,'../../../shared/checkoutFailure':failure,'../../utils/directCheckoutAttempt':attempts,'../../utils/checkoutRecovery':{...recovery,savePendingCheckout:()=>{},clearPendingCheckout:()=>{}},'../../utils/dataPurchasePresentation':presentation,'../../utils/directQuotePresentation':quotePresentation,'../../../shared/money':money,'../../context/AppContext':{useApp:()=>context},'../../hooks/usePaystack':{usePaystack:()=>({initializeServerPayment:async(o:any)=>{payments.push(o);},isInitializing:false,loadingPhase:'idle'})},'../../hooks/useDialogFocus':{useDialogFocus:()=>({current:null})},'../../hooks/useVisualViewport':{useVisualViewport:()=>({height:850,top:0})},'../../services/commercialApi':{commercialRequest:async()=>({regularMinor:549,totalMinor:549,discountMinor:0,pricingRevision:'fixture',promotionRevision:'fixture',offer:{state:'eligible'}})},'../../services/apiClient':{lookupOrderOnServer:(ref:string)=>lookup(ref),cancelPaymentOnServer:async()=>{},getInstantFlexiQuote:async()=>({}),getInstantBundlesOnServer:async()=>({success:true,available:false,products:[]})},'../../data/bundles':bundles,'../../config/business':{BUSINESS_CONFIG},'../../utils/scroll':{smoothScrollToElement:()=>{}},'../../utils/instantBundleUtils':{getInstantBundlePresentation:()=>null},'../../components/common/NetworkBrandBadge':{},'../common/NetworkBrandBadge':{NetworkBrandBadge:()=>null},'../finance/WalletPaymentChoice':{WalletPaymentChoice:()=>null},'../../services/financeApi':{walletCheckout:()=>{throw Error('Wallet not used');}},'../../utils/referralCapture':{},'lucide-react':new Proxy({},{get:()=>()=>null})};
+ const modules:any={react,'../../../shared/checkoutFailure':failure,'../../utils/directCheckoutAttempt':attempts,'../../utils/checkoutRecovery':{...recovery,savePendingCheckout:()=>{},clearPendingCheckout:()=>{}},'../../utils/dataPurchasePresentation':presentation,'../../utils/directQuotePresentation':quotePresentation,'../../../shared/money':money,'../../context/AppContext':{useApp:()=>context},'../../hooks/usePaystack':{usePaystack:()=>({initializeServerPayment:async(o:any)=>{payments.push(o);},isInitializing:false,loadingPhase:'idle'})},'../../hooks/useDialogFocus':{useDialogFocus:()=>({current:null})},'../../hooks/useVisualViewport':{useVisualViewport:()=>({height:850,top:0})},'../../services/commercialApi':{commercialRequest:async()=>({regularMinor:549,totalMinor:549,discountMinor:0,pricingRevision:'fixture',promotionRevision:'fixture',offer:{state:'eligible'}})},'../../services/apiClient':{lookupOrderOnServer:(ref:string)=>lookup(ref),cancelPaymentOnServer:async()=>{},getInstantFlexiQuote:async()=>({}),getInstantBundlesOnServer:async()=>({success:true,available:false,products:[]}),saveReceiptEmailOnServer:async(token:string,email:string)=>{remembered.push({token,email});return {success:true,user:{id:'a',email:null,receiptEmail:email}};}},'../../utils/receiptEmail':receiptEmail,'../../data/bundles':bundles,'../../config/business':{BUSINESS_CONFIG},'../../utils/scroll':{smoothScrollToElement:()=>{}},'../../utils/instantBundleUtils':{getInstantBundlePresentation:()=>null},'../../components/common/NetworkBrandBadge':{},'../common/NetworkBrandBadge':{NetworkBrandBadge:()=>null},'../finance/WalletPaymentChoice':{WalletPaymentChoice:()=>null},'../../services/financeApi':{walletCheckout:()=>{throw Error('Wallet not used');}},'../../utils/referralCapture':{},'lucide-react':new Proxy({},{get:()=>()=>null})};
  const module={exports:{} as any};runInNewContext(compiled,{module,exports:module.exports,require:(name:string)=>{assert.ok(modules[name],name);return modules[name];},crypto:{randomUUID},sessionStorage:storage,setTimeout:()=>0,clearTimeout:()=>{}});
  const render=()=>{cursor=0;const tree=module.exports.CheckoutModal();while(effects.length)effects.shift()!();return tree;};
  const nodes=(t:any):any[]=>!t||typeof t!=='object'?[]:Array.isArray(t)?t.flatMap(nodes):[t,...nodes(t.props?.children)];
  const find=(predicate:(n:any)=>boolean)=>nodes(render()).find(predicate);
  const submit=()=>find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
- return {context,values,payments,storage,render,find,submit,setLookup:(fn:typeof lookup)=>lookup=fn,counts:()=>({closes,opened})};
+ return {context,values,payments,remembered,storage,render,find,submit,setLookup:(fn:typeof lookup)=>lookup=fn,counts:()=>({closes,opened})};
 }
 const tick=()=>new Promise(r=>setImmediate(r));
 test('direct denial requires recipient change and delayed old rejection cannot unlock a newer request',async()=>{
@@ -47,4 +48,40 @@ test('delayed status response cannot unlock another account recovery checkpoint'
  const button=h.find(n=>n.type==='button'&&n.props.onClick?.name==='checkPaymentStatus');assert.ok(button);const pending=button.props.onClick();
  attempts.saveDirectAttempt(h.storage,attempts.directAttemptKey('b'),{requestId:randomUUID(),productId:'mtn-1gb'});h.context.user={id:'b',email:'b@example.test',phone:'0242222222'};h.context.sessionToken='b-token';h.render();await tick();
  finish({success:true,order:{status:'paid',manual_review:false}});await pending;h.render();await h.submit();assert.equal(h.payments.length,1);assert.ok(attempts.readDirectAttempt(h.storage,attempts.directAttemptKey('b')));assert.deepEqual(h.counts(),{closes:0,opened:0});
+});
+
+// 3.4.1: "Remember this email for future receipts" is saved only once the server has created the order.
+async function rememberHarness(){
+ const h=harness();h.context.user={id:'a',email:null,phone:'0241234567',receiptEmail:null};h.context.updateUserProfile=()=>{};h.context.showToast=()=>{};
+ h.render();await tick();
+ h.find(n=>n.type==='input'&&n.props.type==='email').props.onChange({target:{value:'receipts@example.test'}});h.render();
+ const box=h.find(n=>n.type==='input'&&n.props.type==='checkbox');assert.ok(box,'Remember is offered for a new address');assert.equal(box.props.checked,false,'unticked at first');
+ box.props.onChange({target:{checked:true}});h.render();
+ await h.submit();await tick();
+ assert.equal(h.payments.length,1);assert.equal(h.payments[0].customerEmail,'receipts@example.test','the order uses the typed address');
+ return h;
+}
+test('remember: nothing is saved when the payment attempt is rejected before an order exists',async()=>{
+ const h=await rememberHarness();
+ h.payments[0].onError(Object.assign(new Error('Active order'),{checkout:failure.preflightFailure('ACTIVE_MTN_ORDER')}));await tick();
+ assert.deepEqual(h.remembered,[]);
+});
+test('remember: saved once, to the account, when the server creates the order',async()=>{
+ const h=await rememberHarness();
+ assert.deepEqual(h.remembered,[],'not at the Pay tap');
+ h.payments[0].onOrderCreated('MH-REMEMBER-1');await tick();
+ assert.deepEqual(h.remembered,[{token:'a-token',email:'receipts@example.test'}]);
+ h.payments[0].onOrderCreated('MH-REMEMBER-1');await tick();
+ assert.equal(h.remembered.length,1,'never twice');
+});
+test('remember: clearing the address hides and unticks the box',async()=>{
+ const h=harness();h.context.user={id:'a',email:null,phone:'0241234567',receiptEmail:null};h.context.updateUserProfile=()=>{};h.context.showToast=()=>{};
+ h.render();await tick();
+ const email=()=>h.find(n=>n.type==='input'&&n.props.type==='email');
+ email().props.onChange({target:{value:'receipts@example.test'}});h.render();
+ h.find(n=>n.type==='input'&&n.props.type==='checkbox').props.onChange({target:{checked:true}});h.render();
+ email().props.onChange({target:{value:''}});h.render();
+ assert.equal(h.find(n=>n.type==='input'&&n.props.type==='checkbox'),undefined);
+ email().props.onChange({target:{value:'receipts@example.test'}});h.render();
+ assert.equal(h.find(n=>n.type==='input'&&n.props.type==='checkbox').props.checked,false);
 });

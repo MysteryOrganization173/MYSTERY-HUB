@@ -17,14 +17,23 @@ export interface MemberHomeViewProps {
   website?:MemberWebsiteSummary;
   /** Reserved slot under the first actions for one compact, dismissible prompt (for example a future app-install card). */
   promotion?:React.ReactNode;
+  /** 3.4.1 Smart Buy Again: the server finds today's version of the order's product, then its review opens (never a payment). */
+  buyAgain?:{run:(order:AuthenticatedCustomerOrderDetails)=>void;pending:string|null};
+}
+
+/** The Buy again button: the server confirms the product first, so the button says when it is checking. */
+export function buyAgainButton(order:AuthenticatedCustomerOrderDetails,buyAgain:MemberHomeViewProps['buyAgain'],fallback:()=>void){
+  const checking=buyAgain?.pending===order.public_reference;
+  return {checking,disabled:Boolean(buyAgain?.pending),onClick:buyAgain?()=>buyAgain.run(order):fallback,label:checking?'Checking…':'Buy again'};
 }
 
 // Exported so the seasonal member homepage presents exactly the same networks, titles and website states.
 export const NETWORKS:{id:NetworkId;label:string;color:string}[]=[{id:'mtn',label:'MTN',color:'#ffcc00'},{id:'telecel',label:'Telecel',color:'#e4002b'},{id:'airteltigo',label:'AirtelTigo',color:'#3d8bff'}];
 export const orderTitle=(o:AuthenticatedCustomerOrderDetails)=>o.product_name_snapshot||o.bundle_size_snapshot||'Your order';
 
-function OrderSpotlight({order,track,reorder}:{order:AuthenticatedCustomerOrderDetails;track:()=>void;reorder:(mode:'data'|'airtime',network:NetworkId)=>void}) {
+function OrderSpotlight({order,track,reorder,buyAgain}:{order:AuthenticatedCustomerOrderDetails;track:()=>void;reorder:(mode:'data'|'airtime',network:NetworkId)=>void;buyAgain?:MemberHomeViewProps['buyAgain']}) {
   const tone=memberOrderTone(order),steps=memberOrderSteps(order),again=memberReorder(order);
+  const button=again?buyAgainButton(order,buyAgain,()=>reorder(again.mode,again.network)):null;
   const heading=tone==='attention'?'Needs attention':tone==='active'?'Order to follow':'Latest order';
   return <section aria-labelledby="member-order-heading" className={`member-order member-order-${tone}`}>
     <div className="member-order-head">
@@ -38,7 +47,7 @@ function OrderSpotlight({order,track,reorder}:{order:AuthenticatedCustomerOrderD
     {steps&&<ol className="member-steps" aria-label="Order progress">{steps.map(step=><li key={step.label} className={step.done?'is-done':''}><span aria-hidden="true"/>{step.label}<span className="sr-only">{step.done?': complete':': not yet'}</span></li>)}</ol>}
     {tone!=='done'&&<p className="member-order-next">{memberOrderNext(order)}</p>}
     <div className="member-order-actions">
-      {again&&<button className="mh-button" onClick={()=>reorder(again.mode,again.network)}><RotateCcw className="size-4" aria-hidden="true"/>Buy again</button>}
+      {button&&<button className="mh-button" onClick={button.onClick} disabled={button.disabled} aria-busy={button.checking||undefined}><RotateCcw className={`size-4${button.checking?' animate-spin':''}`} aria-hidden="true"/>{button.label}</button>}
       <button className={again||tone==='attention'?'mh-button-secondary':'mh-button'} onClick={track}>Track Order</button>
       {tone==='attention'&&<><a className="member-text-link" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" aria-hidden="true"/>WhatsApp support</a><a className="member-text-link" href={BUSINESS_CONFIG.contact.smsLink}><MessageSquareText className="size-4" aria-hidden="true"/>SMS {BUSINESS_CONFIG.contact.supportSmsDisplay}</a></>}
     </div>
@@ -62,7 +71,7 @@ export function websiteCard(website:MemberWebsiteSummary|undefined) {
   return {title:'Website Builder',desc:'Create or manage your free website',tag:'Free plan',label:undefined};
 }
 
-export function MemberHomeView({name,greeting,orders,loading,error,wallet,retry,track,actions,assistant,website,promotion}:MemberHomeViewProps) {
+export function MemberHomeView({name,greeting,orders,loading,error,wallet,retry,track,actions,assistant,website,promotion,buyAgain}:MemberHomeViewProps) {
   const {latest,recent,prioritizesActive}=memberOrderSelection(orders);
   const tone=!loading&&!error&&latest?memberOrderTone(latest):null;
   // A purchase that needs the customer, or is still moving, comes before new buying.
@@ -72,7 +81,7 @@ export function MemberHomeView({name,greeting,orders,loading,error,wallet,retry,
   const site=websiteCard(website);
   const spotlight=loading?<section aria-label="Latest order" className="member-order member-order-loading"><p role="status">Loading your orders…</p><span className="member-skeleton" aria-hidden="true"/><span className="member-skeleton is-short" aria-hidden="true"/></section>
     :error?<section aria-label="Latest order" className="member-order"><p role="alert" className="member-order-error">Your orders are unavailable right now.</p><div className="member-order-actions"><button className="mh-button-secondary" onClick={retry}>Try again</button><button className="member-text-link" onClick={actions.orders}>Open My Orders<ArrowRight className="size-4" aria-hidden="true"/></button></div></section>
-    :latest?<OrderSpotlight order={latest} track={()=>track(latest)} reorder={reorder}/>
+    :latest?<OrderSpotlight order={latest} track={()=>track(latest)} reorder={reorder} buyAgain={buyAgain}/>
     :<FirstPurchase data={actions.data} airtime={()=>actions.airtime()}/>;
   const services=[
     {id:'website',title:site.title,desc:site.desc,tag:site.tag,label:site.label,Icon:Globe,action:actions.website},

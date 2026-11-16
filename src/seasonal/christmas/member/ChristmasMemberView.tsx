@@ -6,7 +6,7 @@ import { GREETINGS_COMING_SOON, type GreetingsEntry, type SeasonPhase, type Seas
 import { formatGhs } from '../../../../shared/money';
 import { BUSINESS_CONFIG } from '../../../config/business';
 import { memberOrderLabel, memberOrderNext, memberOrderSelection, memberOrderSteps, memberOrderTone, memberReorder } from '../../../utils/memberHomePresentation';
-import { NETWORKS, orderTitle, websiteCard, type MemberHomeViewProps } from '../../../components/home/MemberHomeView';
+import { NETWORKS, buyAgainButton, orderTitle, websiteCard, type MemberHomeViewProps } from '../../../components/home/MemberHomeView';
 import { ProductPhoto } from '../../../components/marketplace/MarketplaceMedia';
 import { categoryIconKey } from '../../../utils/marketplaceBrowse';
 import { isChristmasTime, seasonCountdown } from '../copy';
@@ -78,8 +78,9 @@ const giftLook = (status: SeasonStatus): GiftLook => status.phase === 'christmas
 /** A press on the gift plays once; a tap while it is still playing is ignored rather than restarting it. */
 const giftPress = (e: React.PointerEvent<HTMLElement>) => { if (!e.currentTarget.hasAttribute('data-press')) press(e); };
 
-function OrderSpotlight({ order, track, reorder }: { order: AuthenticatedCustomerOrderDetails; track: () => void; reorder: (mode: 'data' | 'airtime', network: NetworkId) => void }) {
+function OrderSpotlight({ order, track, reorder, buyAgain }: { order: AuthenticatedCustomerOrderDetails; track: () => void; reorder: (mode: 'data' | 'airtime', network: NetworkId) => void; buyAgain?: MemberHomeViewProps['buyAgain'] }) {
   const tone = memberOrderTone(order), steps = memberOrderSteps(order), again = memberReorder(order), net = network(order.network), when = orderWhen(order.created_at);
+  const button = again ? buyAgainButton(order, buyAgain, () => reorder(again.mode, again.network)) : null;
   const heading = tone === 'attention' ? 'Needs attention' : tone === 'active' ? 'Order to follow' : 'Latest order';
   return (
     <section aria-labelledby="xm-order-heading" className={`xm-order is-${tone}`}>
@@ -97,7 +98,7 @@ function OrderSpotlight({ order, track, reorder }: { order: AuthenticatedCustome
       {steps && <ol className="xm-steps" aria-label="Order progress">{steps.map(step => <li key={step.label} className={step.done ? 'is-done' : ''}><span aria-hidden="true" />{step.label}<span className="sr-only">{step.done ? ': complete' : ': not yet'}</span></li>)}</ol>}
       {tone !== 'done' && <p className="xm-order-next">{memberOrderNext(order)}</p>}
       <div className="xm-order-actions">
-        {again && <button className="mh-button" onClick={() => reorder(again.mode, again.network)}><RotateCcw className="size-4" aria-hidden="true" />Buy again</button>}
+        {button && <button className="mh-button" onClick={button.onClick} disabled={button.disabled} aria-busy={button.checking || undefined}><RotateCcw className={`size-4${button.checking ? ' animate-spin' : ''}`} aria-hidden="true" />{button.label}</button>}
         <button className={again || tone === 'attention' ? 'mh-button-secondary' : 'mh-button'} onClick={track}>Track Order</button>
         {tone === 'attention' && <>
           <a className="xm-support" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" aria-hidden="true" />WhatsApp support</a>
@@ -122,7 +123,7 @@ function FirstPurchase({ data, airtime }: { data: (network?: NetworkId) => void;
 
 const SITE_ACTION = { none: 'Start building', draft: 'Continue editing', published: 'Manage website', unknown: 'Open Website Builder' } as const;
 
-export function ChristmasMemberView({ name, greeting, orders, loading, error, wallet, retry, track, actions, assistant, website, promotion, status, welcome, market, greetings = GREETINGS_COMING_SOON, rootRef }: ChristmasMemberViewProps) {
+export function ChristmasMemberView({ name, greeting, orders, loading, error, wallet, retry, track, actions, assistant, website, promotion, buyAgain, status, welcome, market, greetings = GREETINGS_COMING_SOON, rootRef }: ChristmasMemberViewProps) {
   const christmas = isChristmasTime(status);
   const { big, small } = seasonCountdown(status);
   const { latest, recent, prioritizesActive } = memberOrderSelection(orders);
@@ -139,7 +140,7 @@ export function ChristmasMemberView({ name, greeting, orders, loading, error, wa
     : error
       ? <section aria-label="Latest order" className="xm-order is-error"><p role="alert" className="xm-order-error"><RefreshCw className="size-4" aria-hidden="true" />Your orders are unavailable right now.</p><div className="xm-order-actions"><button className="mh-button-secondary" onClick={retry}>Try again</button><button className="xm-text-link" onClick={actions.orders}>Open My Orders<ArrowRight className="size-4" aria-hidden="true" /></button></div></section>
       : latest
-        ? <OrderSpotlight order={latest} track={() => track(latest)} reorder={reorder} />
+        ? <OrderSpotlight order={latest} track={() => track(latest)} reorder={reorder} buyAgain={buyAgain} />
         : <FirstPurchase data={actions.data} airtime={() => actions.airtime()} />;
 
   return (

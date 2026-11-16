@@ -42,6 +42,9 @@ interface ToastMessage {
   key?: string;
 }
 
+/** Sections My Account can open at. */
+export type AccountSection = 'notifications';
+
 interface AppContextType {
   activePage: ActivePage;
   /** pushHistory false: the caller already set the address (e.g. /website-builder/designs). */
@@ -89,7 +92,9 @@ interface AppContextType {
   loginUser: (profile: SafeUserProfile, token: string, rememberMe?: boolean) => void;
   logoutUser: () => void;
   isAccountOpen: boolean;
-  openAccount: () => void;
+  /** 3.4.1: optionally open My Account at one section (for example from the Notifications entry). */
+  openAccount: (section?: AccountSection) => void;
+  accountSection: AccountSection | null;
   closeAccount: () => void;
   updateUserProfile: (profile: SafeUserProfile) => void;
   replaceAuthSession: (profile: SafeUserProfile, token: string) => void;
@@ -175,6 +180,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAccountOpen, setAccountOpen] = useState(false);
+  const [accountSection, setAccountSection] = useState<AccountSection | null>(null);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authBootstrap] = useState(readAuthBootstrap);
   const [sessionToken, setSessionToken] = useState<string | null>(authBootstrap.token);
@@ -508,8 +514,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     clearLocalAuth();
     showToast('Signed out.', 'info', 'auth');
   };
-  const openAccount = () => { if (user) setAccountOpen(true); else openAuth('login'); };
-  const closeAccount = () => setAccountOpen(false);
+  const openAccount = (section?: AccountSection) => { if (user) { setAccountSection(section ?? null); setAccountOpen(true); } else openAuth('login'); };
+  const closeAccount = () => { setAccountOpen(false); setAccountSection(null); };
 
   const openTemplatePreview = useCallback((template: WebsiteTemplate) => {
     setSelectedTemplatePreview(template);
@@ -568,7 +574,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthChecking,
         loginUser,
         logoutUser,
-        isAccountOpen, openAccount, closeAccount, updateUserProfile, replaceAuthSession,
+        isAccountOpen, openAccount, accountSection, closeAccount, updateUserProfile, replaceAuthSession,
         activeEditorSite,
         editorLaunch,
         openWebsiteEditor,

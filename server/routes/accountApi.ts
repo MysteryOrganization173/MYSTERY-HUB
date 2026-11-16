@@ -1,11 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/authMiddleware.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
-import { AccountError, changeAccountPassword, updateAccountProfile, revokeAccountSessions } from '../services/accountSecurity.js';
+import { AccountError, changeAccountPassword, updateAccountProfile, revokeAccountSessions, setAccountReceiptEmail } from '../services/accountSecurity.js';
 
 export const accountRouter = Router();
 
 const securityLimit = createRateLimiter({ windowMs: 15 * 60_000, max: 10, key: req => `account:${req.user!.id}` });
+// A receipt contact is not a security change; it keeps its own, more generous limit.
+const contactLimit = createRateLimiter({ windowMs: 15 * 60_000, max: 20, key: req => `account-contact:${req.user!.id}` });
 export function accountFailure(res: Response, error: unknown) {
   if (error instanceof AccountError) res.status(error.status).json({ error: error.message, code: error.code });
   else res.status(500).json({ error: 'Could not complete the account action. Please try again.' });
@@ -19,6 +21,11 @@ accountRouter.post('/change-password', requireAuth, securityLimit, async (req: R
 accountRouter.patch('/profile', requireAuth, securityLimit, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try { res.json(await updateAccountProfile(req.user!.id, req.body ?? {}, { token: req.sessionToken! })); }
+  catch (error) { accountFailure(res, error); }
+});
+accountRouter.put('/receipt-email', requireAuth, contactLimit, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try { res.json(await setAccountReceiptEmail(req.user!.id, req.body ?? {}, { token: req.sessionToken! })); }
   catch (error) { accountFailure(res, error); }
 });
 accountRouter.post('/logout-all', requireAuth, securityLimit, async (req, res) => {

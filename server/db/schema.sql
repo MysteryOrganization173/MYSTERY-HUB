@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS users (
 -- Non-destructive upgrade for existing accounts. Password hashes are unchanged.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ NULL;
+-- 3.4.1: where payment receipts go when the customer chose to remember one. Never a sign-in identifier.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS receipt_email VARCHAR(254) NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique 
 ON users (LOWER(email)) WHERE email IS NOT NULL AND email != '';

@@ -355,6 +355,22 @@ export async function getMeOnServer(token: string): Promise<{ success: boolean; 
   return data;
 }
 
+/**
+ * 3.4.1 Smart Buy Again: what one of the signed-in customer's own orders can be bought as today. Read-only; it never
+ * creates an order or a payment. Another customer's order answers 404.
+ */
+export async function getReorderOnServer(token: string, reference: string, signal?: AbortSignal): Promise<import('../../server/services/reorderService').ReorderAnswer> {
+  const response = await fetch(`${API_BASE_URL}/api/account/orders/${encodeURIComponent(reference)}/reorder`, {
+    method: 'GET', cache: 'no-store', signal, headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data?.reorder) {
+    if (response.status === 401) window.dispatchEvent(new CustomEvent('mystery-auth-invalid', { detail: { token } }));
+    throw Object.assign(new Error(data?.error || 'We couldn’t check this order right now.'), { status: response.status });
+  }
+  return data.reorder;
+}
+
 export async function getAccountOrdersOnServer(
   token: string,
   limit?: number
@@ -1525,6 +1541,8 @@ async function accountRequest<T>(token: string, path: string, method: string, bo
 export const changePasswordOnServer = (token: string, body: { currentPassword?: string; newPassword: string }) => accountRequest<AuthSessionResponse>(token, 'auth/change-password', 'POST', body);
 export const updateProfileOnServer = (token: string, body: ProfileUpdateRequest) => accountRequest<{ success: boolean; user: SafeUserProfile }>(token, 'auth/profile', 'PATCH', body);
 export const revokeOwnSessionsOnServer = (token: string) => accountRequest<{ success: boolean }>(token, 'auth/logout-all', 'POST', {});
+/** 3.4.1: remember (or, with null, forget) the receipt email. Separate from the sign-in email; no password needed. */
+export const saveReceiptEmailOnServer = (token: string, email: string | null) => accountRequest<{ success: boolean; user: SafeUserProfile }>(token, 'auth/receipt-email', 'PUT', { email });
 export const resetAdminCustomerPassword = (token: string, id: string) => accountRequest<{ success: boolean; temporaryPassword: string; user: SafeUserProfile }>(token, 'admin/users/' + encodeURIComponent(id) + '/reset-password', 'POST', { confirm: true });
 export const revokeAdminCustomerSessions = (token: string, id: string) => accountRequest<{ success: boolean }>(token, 'admin/users/' + encodeURIComponent(id) + '/revoke-sessions', 'POST', { confirm: true });
 export const updateAdminCustomerProfile = (token: string, id: string, body: ProfileUpdateRequest) => accountRequest<{ success: boolean; user: SafeUserProfile }>(token, 'admin/users/' + encodeURIComponent(id) + '/profile', 'PATCH', body);

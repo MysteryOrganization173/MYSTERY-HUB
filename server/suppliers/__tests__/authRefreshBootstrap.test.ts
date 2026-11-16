@@ -7,7 +7,7 @@ import { AppProvider, useApp } from '../../../src/context/AppContext';
 import { AccountControls } from '../../../src/components/auth/AccountControls';
 import { readAuthBootstrap, SESSION_TOKEN_STORAGE_KEY as tokenKey, USER_PROFILE_STORAGE_KEY as userKey } from '../../../src/utils/authStorage';
 
-const profile = { id: 'customer', name: 'Cached Customer', email: 'customer@example.com', phone: null, role: 'customer', status: 'active', createdAt: '2026-01-01T00:00:00Z', lastLoginAt: null, mustChangePassword: false, passwordChangedAt: null };
+const profile = { id: 'customer', name: 'Cached Customer', email: 'customer@example.com', phone: null, role: 'customer', status: 'active', createdAt: '2026-01-01T00:00:00Z', lastLoginAt: null, mustChangePassword: false, passwordChangedAt: null, receiptEmail: null };
 const original = Object.fromEntries(['window', 'localStorage', 'sessionStorage'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
 function storage() { const values = new Map<string, string>(); return { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) }; }
 let persistent: ReturnType<typeof storage>, session: ReturnType<typeof storage>;

@@ -45,10 +45,11 @@ test('Instant cards state conditions and the fee before the tap, and take no pho
 });
 
 test('a Flexi amount the catalogue did not price never carries the catalogue fee', () => {
-  const catalog = source('src/components/data/InstantBundlesCatalog.tsx');
-  assert.match(catalog, /catalogPriced = !product.isFlexi \|\| finalPrice === product.retailPriceGhc/);
-  assert.match(catalog, /serviceFeeGhc: catalogPriced \? product.paymentProcessingFeeGhc : undefined/);
-  assert.match(catalog, /openCheckout\(convertedBundle\)/);
+  // 3.4.1: the conversion moved to a shared helper so Buy Again opens exactly the same checkout.
+  assert.match(source('src/components/data/InstantBundlesCatalog.tsx'), /openCheckout\(instantBundleToCheckout\(product, options\)\)/);
+  const helper = source('src/utils/instantBundleCheckout.ts');
+  assert.match(helper, /catalogPriced = !product.isFlexi \|\| finalPrice === product.retailPriceGhc/);
+  assert.match(helper, /serviceFeeGhc: catalogPriced \? product.paymentProcessingFeeGhc : undefined/);
 });
 
 test('Airtime validates inline, keeps its zero-fee quote and hands the number to checkout', () => {

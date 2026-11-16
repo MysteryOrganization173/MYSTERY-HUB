@@ -63,6 +63,16 @@ export class AuthStore {
     return user;
   }
   static adminDevUsers() { return [...devUsersStore.values()]; }
+  /** 3.4.1: only the receipt contact changes; name, sign-in email, phone and password are never written here. */
+  static async saveReceiptEmail(id: string, email: string | null, client?: PoolClient): Promise<UserRecord | null> {
+    const updatedAt = new Date().toISOString();
+    if (client) return (await client.query('UPDATE users SET receipt_email=$2, updated_at=$3 WHERE id=$1 RETURNING *;', [id, email, updatedAt])).rows[0] ?? null;
+    const user = devUsersStore.get(id);
+    if (!user) return null;
+    const saved = { ...user, receipt_email: email, updated_at: updatedAt };
+    devUsersStore.set(id, saved);
+    return saved;
+  }
   /**
    * Create a new user record
    */
@@ -259,7 +269,8 @@ export class AuthStore {
                u.id as u_id, u.name as u_name, u.email as u_email, u.phone as u_phone,
                u.password_hash as u_password_hash, u.role as u_role, u.status as u_status,
                u.created_at as u_created_at, u.updated_at as u_updated_at, u.last_login_at as u_last_login_at,
-               u.must_change_password as u_must_change_password, u.password_changed_at as u_password_changed_at
+               u.must_change_password as u_must_change_password, u.password_changed_at as u_password_changed_at,
+               u.receipt_email as u_receipt_email
         FROM sessions s
         JOIN users u ON s.user_id = u.id
         WHERE s.token_hash = $1 AND s.expires_at > $2
@@ -291,6 +302,7 @@ export class AuthStore {
         last_login_at: row.u_last_login_at,
         must_change_password: row.u_must_change_password === true,
         password_changed_at: row.u_password_changed_at,
+        receipt_email: row.u_receipt_email ?? null,
       };
 
       return { session, user };
