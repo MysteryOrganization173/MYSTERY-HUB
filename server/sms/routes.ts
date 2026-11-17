@@ -1,3 +1,4 @@
+import {buyingPatterns} from './buyingPatterns.js';
 import {publishAutomaticTemplate} from './templatePublishing.js';
 import {SmsPermissions} from './permissions.js';
 import {Router} from 'express';
@@ -19,6 +20,8 @@ export function createSmsAdminRouter(deps:{draft?:typeof draftSms}={}){const sms
 smsAdminRouter.post('/permissions/preview',handler(req=>SmsPermissions.preview(req.user.id,req.body)));
 smsAdminRouter.post('/permissions/confirm',handler(req=>SmsPermissions.confirm(req.user.id,req.body)));
 smsAdminRouter.get('/permissions',handler(req=>SmsPermissions.history(Number(req.query.page||1))));
+smsAdminRouter.get('/buying-patterns',handler(()=>buyingPatterns()));
+smsAdminRouter.get('/audit',handler(()=>smsTransaction(async c=>({rows:(await c.query("SELECT id,action,entity_type,entity_id,metadata_safe_json,created_at FROM public.admin_audit_log WHERE left(action,4)='sms_' ORDER BY created_at DESC,id DESC LIMIT 50")).rows}))));
 smsAdminRouter.get('/readiness',handler(async()=>({...await SmsService.readiness(),worker:smsWorkerHealth})));
 smsAdminRouter.post('/verify-signing',createRateLimiter({windowMs:60000,max:3,key:req=>req.user!.id}),handler(()=>SmsService.verifySigning(),true));
 smsAdminRouter.post('/balance',createRateLimiter({windowMs:60000,max:3,key:req=>req.user!.id}),handler(()=>SmsService.balance(),true));

@@ -8,7 +8,7 @@ export function withSmsRuntime(c=arkeselConfig()) {
   return {protocol:'sms-experience-v2',bootId,instance:process.env.RENDER_INSTANCE_ID||null,commit:process.env.RENDER_GIT_COMMIT||null,
     observedAt:new Date().toISOString(),enabled:c.enabled,auto:c.auto,worker:c.worker,
     sandbox:c.sandbox,testOnly:c.testOnly,liveApproved:process.env.ARKESEL_LIVE_APPROVED==='true',
-    sender:c.sender,approved:c.approved,sendAllowed:c.sendAllowed,signingConfigured:!!c.secret,
+    sender:c.sender,approved:c.approved,sendAllowed:c.sendAllowed,signingConfigured:!!c.secret,writingAssistantConfigured:!!process.env.GEMINI_API_KEY,
     dailyCredits:c.daily,autoDailyCredits:c.autoDaily,lowCredits:c.lowCredits};
 }
 export async function recordSmsRuntime() {

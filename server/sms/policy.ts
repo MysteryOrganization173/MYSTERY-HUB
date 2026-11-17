@@ -1,3 +1,7 @@
+import {buyingPatterns} from './buyingPatterns.js';
+import {SMS_BUYING_GROUPS} from '../../shared/smsStudio.js';
+import {studioTemplates} from './studio.js';
+import {SMS_STUDIO_TEMPLATES,smsChannelMention} from '../../shared/smsStudio.js';
 import type {PoolClient} from 'pg';
 import {createHash} from 'node:crypto';
 import {FinanceError} from '../db/financeStore.js';
@@ -50,17 +54,25 @@ export async function orderRecipients(c:PoolClient,orderId:string,templateId:str
  return {body,recipients:allowed};
 }
 export async function resolveAudience(c:PoolClient,input:any){
- strict(input,['filters','selected','numbers','purpose','body','templateId','templateVersion','orderId','channelUrl','channelConfirmed']);
+ strict(input,['filters','selected','numbers','purpose','body','templateId','templateVersion','orderId','channelUrl','channelConfirmed','claimConfirmed','claimEvidence','buyingGroup']);
  const purpose=input.purpose as SmsPurpose;if(!['transactional','operational','marketing'].includes(purpose))throw new FinanceError('Choose a message purpose.');
- const template=input.templateId?(await c.query('SELECT * FROM mysteryhub_sms.templates WHERE id=$1 AND enabled=true',[input.templateId])).rows[0]:null;
+ const savedTemplate=input.templateId?(await c.query('SELECT * FROM mysteryhub_sms.templates WHERE id=$1',[input.templateId])).rows[0]:null;
+ const template=input.templateId?studioTemplates(savedTemplate?[savedTemplate]:[]).find(t=>t.id===input.templateId&&t.enabled!==false):null;
  if(input.templateId&&(!template||template.version!==input.templateVersion))throw new FinanceError('Template changed. Reload and review.',409);
  if(purpose==='transactional'){if(!template?.locked||typeof input.orderId!=='string'||input.orderId.length>64)throw new FinanceError('Transactional messages require one genuine order and a locked approved template.');const result=await orderRecipients(c,input.orderId,template.id);return {...result,purpose,templateVersion:template.version,summary:{matched:result.recipients.length,unique:result.recipients.length,duplicates:0,invalid:0,excluded:0,resellerOrdersExcluded:0}};}
  if(template?.locked||template&&template.purpose!==purpose)throw new FinanceError('This template does not match the selected purpose.');
- const channel=template?.id==='channel_notice';const channelUrl=channel?validateChannelUrl(input.channelUrl,input.channelConfirmed):'';
- const body=renderSms(safeMessage(input.body||template?.body),{site:'https://mysterybundlehub.com',channel_url:channelUrl});if(purpose==='operational'&&/discount|promo.?code|special offer|giveaway|payment confirmed|refund completed|guaranteed delivery/i.test(body))throw new FinanceError('Promotional or financial claims cannot be sent as a generic operational notice.');if(channel&&(!body.includes(channelUrl)||(body.match(/https?:\/\/[^\s]+/gi)||[]).some(url=>url.replace(/[.,;!]$/,'')!==channelUrl)))throw new FinanceError('The announcement must contain the confirmed channel URL and no conflicting links.');if(!channel&&purpose==='operational'&&/join.{0,30}channel/i.test(body))throw new FinanceError('Use the dedicated channel relocation template and confirm its URL.');const filters=contactFilters(input.filters||{});if(filters.permission==='service_notice_review')throw new FinanceError('Clear the legacy service-notice filter and use SMS permission review.');const data=await ContactHubStore.query(filters,new Date(),c,true);
+ const channel=template?.id==='channel_notice',usesChannel=channel||smsChannelMention(String(input.body||template?.body||''));const channelUrl=usesChannel?validateChannelUrl(input.channelUrl,input.channelConfirmed):'';
+ if((SMS_STUDIO_TEMPLATES.find(t=>t.id===template?.id&&'requiresPerformanceEvidence' in t)||/instant|express|moving fast|fast delivery/i.test(String(input.body||template?.body||'')))&& (input.claimConfirmed!==true||typeof input.claimEvidence!=='string'||input.claimEvidence.trim().length<12||input.claimEvidence.length>300))throw new FinanceError('Confirm current service performance and record concise evidence for this announcement.');
+ const body=renderSms(safeMessage(input.body||template?.body),{site:'https://mysterybundlehub.com',channel_url:channelUrl});if(purpose==='operational'&&/discount|promo.?code|special offer|giveaway|\boffers\b|need data|Friday Mystery Drop|payment confirmed|refund completed|guaranteed delivery/i.test(body))throw new FinanceError('Promotional or financial claims cannot be sent as a generic operational notice.');if(usesChannel&&((body.match(/(?:https?:\/\/)?(?:www\.)?whatsapp\.com\/channel\/[^\s]+/gi)||[]).some(url=>url.replace(/[.,;!]$/,'')!==channelUrl)||!body.includes(channelUrl)||(body.match(/https?:\/\/[^\s]+/gi)||[]).some(url=>url.replace(/[.,;!]$/,'')!==channelUrl)))throw new FinanceError('The announcement must contain the confirmed channel URL and no conflicting links.');if(!channel&&purpose==='operational'&&/join.{0,30}channel/i.test(body))throw new FinanceError('Use the dedicated channel relocation template and confirm its URL.');const filters=contactFilters(input.filters||{});if(filters.permission==='service_notice_review')throw new FinanceError('Clear the legacy service-notice filter and use SMS permission review.');const data=await ContactHubStore.query(filters,new Date(),c,true);
  if(data.total>10000)throw new FinanceError('Narrow this audience below10000 records.',413);
  let rows=data.rows;
  if(input.selected!==undefined){if(!Array.isArray(input.selected)||!input.selected.length||input.selected.length>100||input.selected.some((s:any)=>typeof s?.id!=='string'||typeof s?.source!=='string'))throw new FinanceError('Select up to100 existing contacts.');rows=rows.filter(r=>input.selected.some((s:any)=>s.source===r.source&&s.id===r.id));if(rows.length!==input.selected.length)throw new FinanceError('Selected contacts changed. Refresh before review.',409);}
+ if(input.buyingGroup!==undefined){
+  if(typeof input.buyingGroup!=='string'||!Object.hasOwn(SMS_BUYING_GROUPS,input.buyingGroup)||filters.source!=='registered')throw new FinanceError('Choose a valid direct-account buying-pattern group.');
+  const current=await buyingPatterns(c),eligible=new Set(current.customers.filter(r=>r.group===input.buyingGroup).map(r=>r.id));
+  rows=rows.filter(r=>r.source==='registered'&&eligible.has(r.id));
+  if(input.selected&&rows.length!==input.selected.length)throw new FinanceError('Buying-pattern audience changed. Refresh the group and review again.',409);
+ }
  if(input.numbers!==undefined){if(!Array.isArray(input.numbers)||input.numbers.length>100||input.numbers.some((n:any)=>!canonicalGhanaPhone(n)))throw new FinanceError('Enter up to100 valid Ghana numbers.');const phones=[...new Set(input.numbers.map(canonicalGhanaPhone))];rows=rows.filter(r=>phones.includes(r.phone));for(const phone of phones)if(!rows.some(r=>r.phone===phone)&&arkeselConfig().testNumbers.includes(phone as string))rows.push({phone,id:phone,source:'test'} as any);}
  const accountData=await ContactHubStore.query(contactFilters({source:'registered'}),new Date(),c,true);if(accountData.total>10000)throw new FinanceError('Account permission evidence exceeds safe preparation limits.',413);
  const accounts=new Map(accountData.rows.filter(a=>a.phone&&a.status==='active'&&a.purchases>0&&a.smsPermission!=='sms_unsubscribed').map(a=>[a.phone,a]));
@@ -69,7 +81,7 @@ export async function resolveAudience(c:PoolClient,input:any){
  // from the narrower relationship map used to choose an intended buyer.
  const allAccountIds=new Map<string,string[]>();for(const a of accountData.rows)if(a.phone)allAccountIds.set(a.phone,[...(allAccountIds.get(a.phone)||[]),a.id]);
  const targets=rows.filter(r=>r.phone).flatMap(r=>(allAccountIds.get(r.phone!)||[null]).map(userId=>({phone:r.phone!,userId})));
- const reasons=new Map<string,string>();const blocked=await suppressedNumbers(c,targets,purpose,channel||purpose==='marketing',reasons);const recorded=await permissionEvidence(c,rows.flatMap(r=>r.phone?[r.phone]:[]),purpose);for(const r of [...accountData.rows,...rows])if(r.phone&&r.smsPermission==='sms_unsubscribed'){blocked.add(r.phone);reasons.set(r.phone,'smsOptOut');}
+ const reasons=new Map<string,string>();const blocked=await suppressedNumbers(c,targets,purpose,usesChannel||purpose==='marketing',reasons);const recorded=await permissionEvidence(c,rows.flatMap(r=>r.phone?[r.phone]:[]),purpose);for(const r of [...accountData.rows,...rows])if(r.phone&&r.smsPermission==='sms_unsubscribed'){blocked.add(r.phone);reasons.set(r.phone,'smsOptOut');}
  const recipients:Recipient[]=[];let excluded=0,invalid=0,duplicates=0;let permissionExcluded=0,optOutExcluded=0,relationshipExcluded=0,testExcluded=0;const seen=new Set<string>();
  for(const r of rows){if(!r.phone){invalid++;continue;}if(seen.has(r.phone)){duplicates++;continue;}seen.add(r.phone);
   const account=accounts.get(r.phone),test=(r.source as string)==='test';
