@@ -181,3 +181,45 @@ payer-phone loss. SQL/memory parity and changed-phone/suppression tests cover th
 repairs. Actual feature query timings under concurrent local test load were about
 457ms filtered and395ms export on10000 added synthetic orders, below the existing
 5s statement timeout; these are not production latency guarantees.
+
+## Current-main compatibility follow-up (17 November 2026)
+
+The core Phase 1 release was already merged in PR #124 (feature 0c7ec00, merge
+cd9a4f1). Subsequent separately authorized SMS releases installed consent and
+purpose-evidence tables. Contact recovery now reads their latest explicit withdrawals
+when present. It adds no schema dependency, grant, sender activation or provider call.
+
+`ContactRow.smsRestrictions` lists transactional, operational and/or marketing
+withdrawals independently of the legacy waitlist classification. Account withdrawals
+follow a changed contact number and every direct relationship sharing that number.
+Latest phone/user/purpose consent and latest phone/purpose attestation retain their
+separate authority; a grant in one source cannot erase another source's denial.
+Only transactional/operational restrictions block manual support preparation; a
+marketing-only restriction remains visible without relabeling service communication.
+Administrative records, profiles and exports retain all otherwise eligible contacts.
+Suppressed filters include purpose restrictions; CSV and profiles show their purpose.
+Changed evidence invalidates an export preview. Optional-table absence is supported;
+unexpected permission/query errors fail the request rather than returning unchecked
+contacts. SQL and synthetic derivation share the same restrictions contract.
+
+The manual composer describes preparation accurately without asserting that the
+separate SMS provider is disconnected. This Contact Hub tool approves no marketing
+audience; purpose registration and existing provider capabilities remain in their
+separate workspace. No existing SMS state, environment, credentials, campaigns,
+customer/financial record or reseller ownership is changed by this follow-up.
+
+Current-main follow-up verification: focused unit/API31 passed, native PostgreSQL17
+10 passed (including SQL/memory/source/export/privacy and optional SMS withdrawal
+compatibility), full regression3563 passed/0 failed/59 optional skips (3622 total).
+TypeScript/build/diff checks passed. Real Chromium interactions and independently
+reviewed screenshots passed at360/390/430/768/1280px, synthetic records only.
+Independent reviewer also ran32 supplemental assertions and13 named V2/withdrawal
+tests, with overlap; these are not additive totals. Review caught phone-specific
+withdrawal propagation and narrow selector clipping, both corrected and rechecked.
+No unresolved critical/high finding. Actual synthetic feature query plans with10000
+extra orders were204ms filtered/221ms export; no production performance claim.
+
+Read-only aggregate observation at2026-11-17 22:40:53 UTC:888 stored orders,83
+non-null storefront snapshots,0 missing-snapshot store payment references,0
+guest-payer evidence rows. Existing SMS consent/permission tables are installed.
+Counts are diagnostic only, never constants or exported customer data.

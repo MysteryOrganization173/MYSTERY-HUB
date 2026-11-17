@@ -4,6 +4,7 @@ import {AuthStore} from './authStore.js';
 import {OrdersStore} from './ordersStore.js';
 import {WaitlistStore} from './waitlistStore.js';
 import {FinanceError} from './financeStore.js';
+import {contactWithdrawalSql} from '../services/contactHubSuppression.js';
 import {canonicalGhanaPhone} from '../utils/phone.js';
 import {CONTACT_BASIS,CONTACT_EXPORT_LIMIT,deriveContacts,matchesContact,sortContacts,contactSale,directContactOrder} from '../services/contactHubPolicy.js';
 import type {ContactFilters,ContactRow,ContactList} from '../../shared/contactHub.js';
@@ -19,7 +20,7 @@ export const CONTACT_SALE_SQL=`${DIRECT_CONTACT_SQL} AND o.payment_status='succe
  AND COALESCE(o.marketplace_status,'') NOT IN ('refund_pending','refunded','cancelled')
  AND NOT EXISTS(SELECT 1 FROM order_test_fixtures t WHERE t.order_id=o.id)
  AND NOT EXISTS(SELECT 1 FROM finance_operations x WHERE x.kind='refund' AND x.state='completed' AND x.payload->>'orderId'=o.id)`;
-const CTE=`WITH scope AS MATERIALIZED (SELECT o.*,(${DIRECT_CONTACT_SQL}) AS direct FROM orders o WHERE NOT EXISTS(SELECT 1 FROM order_test_fixtures t WHERE t.order_id=o.id)),
+const contactCte=(withdrawals:string)=>`WITH sms_withdrawals AS MATERIALIZED (${withdrawals}), scope AS MATERIALIZED (SELECT o.*,(${DIRECT_CONTACT_SQL}) AS direct FROM orders o WHERE NOT EXISTS(SELECT 1 FROM order_test_fixtures t WHERE t.order_id=o.id)),
  eligible AS MATERIALIZED (SELECT o.* FROM scope o WHERE ${CONTACT_SALE_SQL}),
  stream AS (
  SELECT 'registered'::text AS source,user_id AS id,amount,delivered_at,network,COALESCE(service_type,'data') AS service,'registered_account'::text AS provenance FROM eligible WHERE user_id IS NOT NULL
@@ -35,14 +36,14 @@ const CTE=`WITH scope AS MATERIALIZED (SELECT o.*,(${DIRECT_CONTACT_SQL}) AS dir
  UNION ALL (SELECT DISTINCT ON(e.buyer_key,mystery_canonical_phone(e.payer_phone)) e.buyer_key||'|'||mystery_canonical_phone(e.payer_phone),'payer',e.payer_name,NULL,mystery_canonical_phone(e.payer_phone),mystery_canonical_phone(e.payer_phone),'not_applicable',NULL,FALSE,ARRAY['verified_guest_payer'],ARRAY[]::text[] FROM eligible o JOIN admin_guest_buyer_evidence e ON e.order_id=o.id WHERE o.user_id IS NULL AND mystery_canonical_phone(e.payer_phone) IS NOT NULL ORDER BY e.buyer_key,mystery_canonical_phone(e.payer_phone),e.created_at,e.order_id)
  ), number_sources AS (SELECT phone,ARRAY_AGG(DISTINCT label ORDER BY label) AS provenance FROM identities i CROSS JOIN unnest(i.provenance) label WHERE phone IS NOT NULL AND source<>'guest' GROUP BY phone),
  all_identities AS (SELECT i.*,NULL::text[] AS "searchAliases" FROM identities i UNION ALL SELECT n.phone,'directory',NULL,NULL,n.phone,n.phone,'not_applicable',NULL,FALSE,n.provenance,ARRAY(SELECT i.id FROM identities i WHERE i.source='registered' AND i.phone=n.phone ORDER BY i.id),ARRAY(SELECT v FROM identities x CROSS JOIN LATERAL unnest(ARRAY[x.name,x.email,x."rawPhone"]) v WHERE x.phone=n.phone AND v IS NOT NULL ORDER BY v) FROM number_sources n),
- base AS (SELECT i.*,COALESCE(m.n,0) AS purchases,COALESCE(m.spending,0) AS "spendingMinor",m.first_at AS "firstAt",m.last_at AS "lastAt",COALESCE(m.networks,ARRAY[]::text[]) AS networks,COALESCE(m.services,ARRAY[]::text[]) AS services,
+ base AS (SELECT i.*,ARRAY(SELECT DISTINCT w.purpose FROM sms_withdrawals w WHERE w.phone=i.phone OR w.user_id IS NOT NULL AND (i.source='registered' AND i.id=w.user_id OR EXISTS(SELECT 1 FROM identities owner WHERE owner.source='registered' AND owner.id=w.user_id AND owner.phone=i.phone)) ORDER BY w.purpose) AS "smsRestrictions",COALESCE(m.n,0) AS purchases,COALESCE(m.spending,0) AS "spendingMinor",m.first_at AS "firstAt",m.last_at AS "lastAt",COALESCE(m.networks,ARRAY[]::text[]) AS networks,COALESCE(m.services,ARRAY[]::text[]) AS services,
  CASE WHEN EXISTS(SELECT 1 FROM waitlist w WHERE w.channel='sms' AND w.status='unsubscribed' AND (i.source='registered' AND w.user_id=i.id OR i.source='directory' AND EXISTS(SELECT 1 FROM identities owner WHERE owner.source='registered' AND owner.phone=i.phone AND owner.id=w.user_id) OR i.phone IS NOT NULL AND mystery_canonical_phone(COALESCE(NULLIF(w.contact_normalized,''),w.contact))=i.phone)) THEN 'sms_unsubscribed' ELSE 'unknown' END AS "smsPermission"
  FROM all_identities i LEFT JOIN metrics m ON m.source=CASE WHEN i.source='directory' THEN 'recipient' ELSE i.source END AND m.id=i.id),
  phone_counts AS (SELECT phone,COUNT(*)::int AS n FROM identities WHERE source<>'guest' GROUP BY phone),
  threshold AS (SELECT percentile_disc(0.9) WITHIN GROUP(ORDER BY "spendingMinor") AS value FROM base WHERE source='registered' AND purchases>0),
  enriched AS (SELECT b.*,CASE WHEN "lastAt" IS NULL THEN NULL ELSE FLOOR(EXTRACT(EPOCH FROM ($1::timestamptz-"lastAt"))/86400)::int END AS "daysInactive",
  CASE WHEN purchases>0 THEN ROUND("spendingMinor"/purchases) ELSE NULL END AS "averageMinor",
- source='registered' AND status='active' AND phone IS NOT NULL AND purchases>0 AND "smsPermission"='unknown' AND NOT "supportRestricted" AND NOT EXISTS(SELECT 1 FROM base other WHERE other.phone=b.phone AND (other."supportRestricted" OR other."smsPermission"='sms_unsubscribed')) AS "supportReviewEligible",
+ source='registered' AND status='active' AND phone IS NOT NULL AND purchases>0 AND "smsPermission"='unknown' AND NOT "supportRestricted" AND NOT ("smsRestrictions" && ARRAY['transactional','operational']::text[]) AND NOT EXISTS(SELECT 1 FROM base other WHERE other.phone=b.phone AND (other."supportRestricted" OR other."smsPermission"='sms_unsubscribed')) AS "supportReviewEligible",
  CASE WHEN source<>'registered' THEN ARRAY[]::text[] ELSE ARRAY_REMOVE(ARRAY[CASE WHEN purchases>=2 THEN 'repeat' END,CASE WHEN purchases>=5 THEN 'frequent' END,CASE WHEN purchases>0 AND "spendingMinor">=(SELECT value FROM threshold) THEN 'high_value' END,CASE WHEN purchases>=2 AND "lastAt"<=$1::timestamptz-interval '30 days' THEN 'formerly_active' END],NULL) END AS vip,
  CASE WHEN phone IS NULL THEN 0 ELSE (SELECT n FROM phone_counts x WHERE x.phone=b.phone) END AS "sharedPhoneRecords",
  CASE WHEN source<>'registered' THEN CASE WHEN source='payer' THEN 'Verified direct guest payer' ELSE 'Direct recipient activity' END WHEN purchases=0 THEN 'No completed purchases' WHEN purchases=1 THEN 'One-time buyer' ELSE 'Repeat buyer' END AS segment FROM base b)`;
@@ -58,8 +59,8 @@ function conditions(f:ContactFilters,values:unknown[],id?:string){
  if(f.phone==='valid')where.push('phone IS NOT NULL');
  if(f.phone==='missing')where.push(`COALESCE(trim("rawPhone"),'')=''`);
  if(f.phone==='invalid')where.push(`phone IS NULL AND COALESCE(trim("rawPhone"),'')<>''`);
- if(f.permission==='unknown')where.push(`"smsPermission"='unknown'`);
- if(f.permission==='suppressed')where.push(`"smsPermission"='sms_unsubscribed'`);
+ if(f.permission==='unknown')where.push(`"smsPermission"='unknown' AND cardinality("smsRestrictions")=0`);
+ if(f.permission==='suppressed')where.push(`("smsPermission"='sms_unsubscribed' OR cardinality("smsRestrictions")>0)`);
  if(f.permission==='service_notice_review')where.push('"supportReviewEligible"');
  const simple:Record<string,string>={no_purchases:'purchases=0',one_time:'purchases=1',repeat:'purchases>=2',frequent:'purchases>=5',high_value:`'high_value'=ANY(vip)`,formerly_active:`'formerly_active'=ANY(vip)`};
  if(simple[f.segment])where.push(simple[f.segment]);
@@ -83,6 +84,7 @@ async function devStoreOrderIds(){
 export class ContactHubStore {
  static async query(f:ContactFilters,now:Date,client?:PoolClient,exportAll=false,id?:string):Promise<ContactList>{
   if(client){const values:unknown[]=[now.toISOString()],where=conditions(f,values,id);values.push(exportAll?CONTACT_EXPORT_LIMIT+1:f.limit,exportAll||id?0:(f.page-1)*f.limit);const limit='$'+(values.length-1),offset='$'+values.length,order=sortSql(f.sort);
+   const CTE=contactCte(await contactWithdrawalSql(client));
    const q=`${CTE}, filtered AS (SELECT * FROM enriched WHERE ${where}), paged AS(SELECT * FROM filtered ORDER BY ${order} LIMIT ${limit} OFFSET ${offset})
     SELECT COALESCE((SELECT jsonb_agg(to_jsonb(p) ORDER BY ${order}) FROM paged p),'[]'::jsonb) AS rows,(SELECT COUNT(*)::int FROM filtered) AS total,
     (SELECT jsonb_build_object('registered',COUNT(*),'buyers',COUNT(*) FILTER(WHERE purchases>0),'oneTime',COUNT(*) FILTER(WHERE purchases=1),'repeat',COUNT(*) FILTER(WHERE purchases>=2),'inactive',COUNT(*) FILTER(WHERE "daysInactive">=${Number(f.inactiveDays)}),'usablePhones',COUNT(*) FILTER(WHERE phone IS NOT NULL)) FROM enriched WHERE source='registered') AS summary,(SELECT jsonb_build_object('guestInvalidDeliveries',(SELECT COUNT(*) FROM eligible WHERE mystery_canonical_phone(recipient_phone) IS NULL),'resellerOrdersExcluded',(SELECT COUNT(*) FROM scope WHERE NOT direct))) AS quality`;
@@ -96,7 +98,7 @@ export class ContactHubStore {
   return {rows:exportAll?filtered.slice(0,CONTACT_EXPORT_LIMIT+1):filtered.slice(id?0:(f.page-1)*f.limit,id?1:f.page*f.limit),total:filtered.length,page:f.page,totalPages:Math.max(1,Math.ceil(filtered.length/f.limit)),summary:{registered:registered.length,buyers:registered.filter(r=>r.purchases).length,oneTime:registered.filter(r=>r.purchases===1).length,repeat:registered.filter(r=>r.purchases>=2).length,inactive:registered.filter(r=>r.daysInactive!==null&&r.daysInactive>=f.inactiveDays).length,usablePhones:registered.filter(r=>r.phone).length},quality:{guestInvalidDeliveries:OrdersStore.adminDevOrders().filter(o=>directContactOrder(o,storeOrderIds)&&contactSale(o,+now)&&!refunded.has(o.id)&&!canonicalGhanaPhone(o.recipient_phone)).length,resellerOrdersExcluded:OrdersStore.adminDevOrders().filter(o=>!directContactOrder(o,storeOrderIds)).length},observedAt:now.toISOString(),basis:CONTACT_BASIS};
  }
  static async relationships(phone:string,now:Date,client?:PoolClient){
-  if(client){const r=await client.query(`${CTE} SELECT id,source,COALESCE(name,source) AS label FROM enriched WHERE source IN ('registered','payer','recipient','guest') AND phone=$2 ORDER BY source,id LIMIT 100`,[now.toISOString(),phone]);return r.rows;}
+  if(client){const CTE=contactCte(await contactWithdrawalSql(client));const r=await client.query(`${CTE} SELECT id,source,COALESCE(name,source) AS label FROM enriched WHERE source IN ('registered','payer','recipient','guest') AND phone=$2 ORDER BY source,id LIMIT 100`,[now.toISOString(),phone]);return r.rows;}
   const rows:ContactRow[]=[];for(const source of ['registered','recipient','guest','payer'] as const){const result=await this.query({...(await import('../../shared/contactHub.js')).DEFAULT_CONTACT_FILTERS,source,q:phone,limit:100},now);rows.push(...result.rows.filter(r=>r.phone===phone));}return rows.sort((a,b)=>a.source.localeCompare(b.source)||a.id.localeCompare(b.id)).slice(0,100).map(r=>({id:r.id,source:r.source,label:r.name||r.source}));
  }
  static async history(source:ContactRow['source'],id:string,page:number,now:Date,client?:PoolClient){

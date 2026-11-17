@@ -14,7 +14,7 @@ export interface ContactRow {
  id:string; source:ContactSource; provenance:string[]; accountIds:string[]; searchAliases?:string[]; name:string|null; phone:string|null; rawPhone:string|null; email:string|null;
  status:string; registeredAt:string|null; purchases:number; spendingMinor:number; firstAt:string|null; lastAt:string|null;
  daysInactive:number|null; averageMinor:number|null; networks:string[]; services:string[];
- smsPermission:'unknown'|'sms_unsubscribed'; supportRestricted:boolean; supportReviewEligible:boolean;
+ smsPermission:'unknown'|'sms_unsubscribed'; smsRestrictions?:('transactional'|'operational'|'marketing')[]; supportRestricted:boolean; supportReviewEligible:boolean;
  vip:string[]; segment:string; sharedPhoneRecords:number;
 }
 export interface ContactList {rows:ContactRow[]; total:number; page:number; totalPages:number; summary:{registered:number;buyers:number;oneTime:number;repeat:number;inactive:number;usablePhones:number}; observedAt:string; basis:string[]; quality?:{guestInvalidDeliveries:number;resellerOrdersExcluded:number}}

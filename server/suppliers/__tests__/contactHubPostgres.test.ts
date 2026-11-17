@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {test,mock} from 'node:test';
 import pg from 'pg';
+import {readFileSync} from 'node:fs';
+import {randomUUID} from 'node:crypto';
 import {getPool,initDatabase} from '../../db/connection.js';
 import {assertSafeTestDatabase} from '../../utils/environment.js';
 import {AuthStore} from '../../db/authStore.js';
@@ -92,6 +94,39 @@ test('native Contact Hub aggregates, permissions, complete exports and audit iso
    assert.equal((await ContactHubService.profile({source:'directory',id:'+233599990002'})).contact.smsPermission,'sms_unsubscribed');
    for(const [i,phone] of ['0599990030','0599990031'].entries()){const order=contactOrder(null,2,{recipient_phone:'0599990060'});await seed(order);await pool.query("INSERT INTO admin_guest_buyer_evidence(order_id,buyer_key,payer_name,payer_phone,account_id,evidence,actor_id,request_id,input_hash) VALUES($1,'user:changed-phone','Changed payer',$2,NULL,'Synthetic verified historical phone','staff',$1,$1)",[order.id,phone]);const detail=await ContactHubService.profile({source:'payer',id:'user:changed-phone|+233'+phone.slice(1)});assert.equal(detail.contact.purchases,1);assert.equal(detail.orders.length,1);}
    const f={source:'registered'},expired=(await import('../../services/contactHubService.js')).contactExportPreview([],0,'administrative',contactFilters(f),Date.now()-900001);await assert.rejects(()=>ContactHubService.export('staff',{filters:f,purpose:'administrative',format:'txt',confirmed:true,expectedRevision:expired.revision}),/expired/);
+  });
+  await t.test('existing optional SMS withdrawals constrain manual support without removing recovery contacts',async()=>{
+   await pool.query(readFileSync('server/db/smsCommunicationsV1.sql','utf8'));
+   const phone='+233599990070',oldPhone='+233599990071';
+   const users=[contactUser('withdrawal-buyer',{phone}),contactUser('withdrawal-shared',{phone:null})];
+   for(const u of users)await AuthStore.createUser({id:u.id,name:u.name,email:u.email,phone:u.phone,passwordHash:'fixture',role:'customer'});
+   // An existing shared-number legacy account must not bypass another identity's withdrawal.
+   await pool.query('ALTER TABLE users DISABLE TRIGGER users_phone_identity_guard');
+   try{await pool.query('UPDATE users SET phone=$1 WHERE id=$2',['0'+phone.slice(4),users[1].id]);}finally{await pool.query('ALTER TABLE users ENABLE TRIGGER users_phone_identity_guard');}
+   const orders=[contactOrder(users[0].id,1,{recipient_phone:phone}),contactOrder(users[1].id,1,{recipient_phone:phone}),contactOrder(null,1,{recipient_phone:phone})];
+   for(const o of orders)await seed(o);
+   const filters={q:phone},preview=await ContactHubService.preview({filters,purpose:'administrative'});
+   await pool.query("INSERT INTO mysteryhub_sms.consents(user_id,phone,purpose,granted,source) VALUES($1,$2,'transactional',false,'account_sms_settings')",[users[0].id,oldPhone]);
+   await assert.rejects(()=>ContactHubService.export('staff',{filters,purpose:'administrative',format:'txt',confirmed:true,expectedRevision:preview.revision}),/changed/);
+   const sql=await contactTransaction(false,c=>ContactHubStore.query(contactFilters(filters),contactNow,c,true));
+   const memory=deriveContacts(users.map(u=>({...u,phone})),orders,[],contactNow,{smsWithdrawals:[{phone:oldPhone,user_id:users[0].id,purpose:'transactional'}]});
+   for(const source of ['registered','recipient','guest','directory']){
+    const expected=memory.filter(r=>r.source===source);const actual=await contactTransaction(false,c=>ContactHubStore.query(contactFilters({source:source==='directory'?'all':source,q:phone}),contactNow,c,true));
+    assert.equal(actual.total,expected.length);for(const r of actual.rows){assert.deepEqual(r.smsRestrictions,['transactional']);assert.equal(r.supportReviewEligible,false);}
+   }
+   assert.equal(sql.total,1);const fresh=await ContactHubService.preview({filters,purpose:'administrative'});assert.equal(fresh.uniqueNumbers,1);
+   assert.equal((await ContactHubService.export('staff',{filters,purpose:'administrative',format:'txt',confirmed:true,expectedRevision:fresh.revision})).content,phone);
+   await pool.query("INSERT INTO mysteryhub_sms.consents(user_id,phone,purpose,granted,source) VALUES($1,$2,'transactional',true,'account_sms_settings'),($1,$2,'marketing',false,'account_sms_settings')",[users[0].id,phone]);
+   let buyer=(await ContactHubService.profile({source:'registered',id:users[0].id})).contact;assert.deepEqual(buyer.smsRestrictions,['marketing']);assert.equal(buyer.supportReviewEligible,true);
+   await pool.query(readFileSync('server/db/smsPermissionsV2.sql','utf8'));
+   const record=async(granted:boolean)=>pool.query("INSERT INTO mysteryhub_sms.permission_records(phone,purpose,granted,source,evidence,obtained_at,actor_id,request_id,review_id,input_hash) VALUES($1,'operational',$2,'admin_recorded','Synthetic permission fixture',now(),'staff',$3,$4,'synthetic')",[phone,granted,randomUUID(),randomUUID()]);
+   await record(false);buyer=(await ContactHubService.profile({source:'registered',id:users[0].id})).contact;assert.deepEqual(buyer.smsRestrictions,['marketing','operational']);assert.equal(buyer.supportReviewEligible,false);
+   assert.equal((await ContactHubService.list({source:'registered',q:phone,permission:'service_notice_review'})).total,0);
+   await record(true);buyer=(await ContactHubService.profile({source:'registered',id:users[0].id})).contact;assert.deepEqual(buyer.smsRestrictions,['marketing']);assert.equal(buyer.supportReviewEligible,true);
+   assert.equal((await ContactHubService.list({source:'registered',q:phone,permission:'suppressed'})).total,2);
+   assert.equal((await ContactHubService.preview({filters:{source:'registered',q:phone},purpose:'marketing'})).uniqueNumbers,0);
+   const settings=(await pool.query('SELECT paused,auto_enabled FROM mysteryhub_sms.settings')).rows[0];assert.deepEqual(settings,{paused:true,auto_enabled:false});
+   assert.equal((await pool.query('SELECT count(*)::int AS n FROM mysteryhub_sms.messages')).rows[0].n,0);
   });
   const counts=(await pool.query('SELECT (SELECT COUNT(*)::int FROM finance_ledger) AS ledger,(SELECT COUNT(*)::int FROM order_resolution_events) AS resolutions')).rows[0];assert.equal(counts.ledger,0);assert.equal(counts.resolutions,0);
  }finally{mock.restoreAll();await getPool()?.end();await observer.end();delete process.env.DATABASE_URL;delete process.env.MYSTERY_TEST_DATABASE_OPT_IN;}
