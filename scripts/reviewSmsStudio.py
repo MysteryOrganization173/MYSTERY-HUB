@@ -1,0 +1,125 @@
+"""Real Chromium + React/API; synthetic loopback DB and injected Gemini, no provider calls."""
+import os, subprocess, shutil, json, select, time, re
+from pathlib import Path
+from playwright.sync_api import sync_playwright, expect
+root=Path(__file__).resolve().parent.parent
+os.chdir(root)
+out=Path('/tmp/sms-browser');out.mkdir(exist_ok=True)
+subprocess.run(['node','--input-type=module','-e',"import{build}from'esbuild';await build({entryPoints:['server/suppliers/__tests__/fixtures/sms.browser.tsx'],bundle:true,format:'esm',outfile:'/tmp/sms-browser/fixture.js',define:{'import.meta.env':'{}'}});"],check=True)
+shutil.copy(next(Path('dist/assets').glob('index-*.css')),out/'style.css')
+(out/'index.html').write_text('<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><div id="root"></div><script type="module" src="/fixture.js"></script>')
+env={**os.environ,'NODE_ENV':'test','DATABASE_SSL':'false','MYSTERY_TEST_DATABASE_OPT_IN':'true'}
+assert env.get('DATABASE_URL','')=='postgresql://app_owner:local-owner-only@127.0.0.1:55434/mystery_sms_browser_test'
+server=subprocess.Popen(['node','--import','tsx','scripts/smsPreviewServer.ts'],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+try:
+ deadline=time.time()+35;port=None
+ while time.time()<deadline:
+  assert select.select([server.stdout],[],[],10)[0], 'Preview server did not start'
+  line=server.stdout.readline()
+  if not line:raise RuntimeError(server.stderr.read()[-1500:])
+  if line.startswith('{"port":'):port=json.loads(line)['port'];break
+ assert port
+ origin=f'http://127.0.0.1:{port}'
+ with sync_playwright() as p:
+  browser=p.chromium.launch(executable_path='/usr/bin/chromium',args=['--no-sandbox'])
+  for width in [360,390,430,768,1280]:
+   context=browser.new_context(viewport={'width':width,'height':1000},permissions=['clipboard-read','clipboard-write'])
+   page=context.new_page();page.on('dialog',lambda dialog:dialog.accept())
+   page.route('**/*',lambda route:route.continue_() if route.request.url.startswith(origin) else route.abort())
+   errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
+   def section(name):
+    button=page.get_by_role('button',name=name,exact=True)
+    if not button.is_visible():page.get_by_text('More tools',exact=True).click()
+    button.click()
+   def screenshot(name):
+    expect(page.get_by_text('Loading SMS evidence…',exact=True)).not_to_be_visible()
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), f'overflow {width} {name}'
+    assert page.locator('[data-sms-template]').evaluate_all('(cards)=>cards.every(c=>{const r=c.getBoundingClientRect(),p=c.parentElement.getBoundingClientRect();return r.right<=p.right+1&&r.left>=p.left-1})'), f'clipped template card {width}'
+    page.screenshot(path=str(out/f'{width}-{name}.png'),full_page=True,animations='disabled')
+   reset=context.request.put(origin+'/api/sms/preferences',headers={'Authorization':'Bearer token-sms-browser-customer'},data={'marketing':False,'transactional':True,'confirmed':True})
+   assert reset.status==200
+   page.goto(origin)
+   page.get_by_role('combobox',name='Contact source').select_option('registered')
+   page.get_by_role('button',name='Prepare SMS audience').click()
+   expect(page.get_by_role('heading',name='Communications Studio',exact=True)).to_be_visible()
+   page.get_by_role('textbox',name='Editable SMS message').fill('A current customer support notice for review.')
+   page.get_by_role('button',name='Draft campaign ideas').click()
+   expect(page.get_by_role('button',name='Use and edit this proposal')).to_be_visible()
+   page.get_by_role('button',name='Use and edit this proposal').click()
+   expect(page.get_by_role('textbox',name='Editable SMS message')).to_contain_text('Explore current services')
+   expect(page.get_by_role('combobox',name='Message purpose')).to_have_value('marketing')
+   screenshot('compose')
+   page.get_by_role('button',name='Review audience and credits').click()
+   dialog=page.get_by_role('dialog')
+   expect(dialog.get_by_text('0 eligible unique numbers',exact=False)).to_be_visible()
+   dialog.get_by_role('button',name='Close',exact=True).click()
+   grant=context.request.put(origin+'/api/sms/preferences',headers={'Authorization':'Bearer token-sms-browser-customer'},data={'marketing':True,'transactional':True,'confirmed':True});assert grant.status==200
+   page.get_by_role('button',name='Review audience and credits').click();dialog=page.get_by_role('dialog')
+   expect(dialog.get_by_text('1 eligible unique numbers',exact=False)).to_be_visible()
+   expect(dialog.get_by_role('button',name='Send approved SMS')).to_be_disabled()
+   screenshot('review')
+   dialog.get_by_role('checkbox',name=re.compile('I reviewed purpose')).check()
+   dialog.get_by_role('button',name='Save prepared draft (no sending)').click()
+   expect(page.get_by_text('Prepared draft saved. Nothing was sent.',exact=True)).to_be_visible()
+   page.get_by_role('textbox',name='Editable SMS message').fill('A revised customer support notice.')
+   page.get_by_role('button',name='Review audience and credits').click()
+   dialog=page.get_by_role('dialog');expect(dialog.get_by_role('checkbox',name=re.compile('I reviewed purpose'))).not_to_be_checked()
+   dialog.get_by_role('button',name='Close',exact=True).click()
+   section('Templates')
+   page.get_by_role('textbox',name='Find a template').fill('Friday')
+   expect(page.get_by_text('Friday Mystery Drop',exact=False).first).to_be_visible()
+   screenshot('templates')
+   page.get_by_role('textbox',name='Find a template').fill('Customer comeback')
+   page.get_by_role('button',name='Use template',exact=True).click()
+   expect(page.get_by_role('textbox',name='Editable SMS message')).to_contain_text("It's been a while")
+   page.get_by_role('combobox',name='SMS template').select_option('')
+   page.get_by_role('textbox',name='Editable SMS message').fill('My own reviewed campaign message. No preset required.')
+   expect(page.get_by_role('textbox',name='Editable SMS message')).to_have_value('My own reviewed campaign message. No preset required.')
+   section('Campaigns & Audiences')
+   expect(page.get_by_role('heading',name='Buying patterns & campaign planning')).to_be_visible()
+   expect(page.get_by_text('Planning only. Recurring reminders are off.',exact=True)).to_be_visible()
+   page.get_by_role('combobox',name='Planning rhythm').select_option('fortnightly')
+   screenshot('patterns')
+   section('Campaign History')
+   expect(page.get_by_role('button',name='View message outcomes').first).to_be_visible()
+   page.get_by_role('button',name='View message outcomes').first.click()
+   page.get_by_role('button',name='Inspect message').first.click()
+   expect(page.get_by_role('dialog').get_by_text('Explore current services',exact=False)).to_be_visible()
+   page.get_by_role('dialog').get_by_role('button',name='Close',exact=True).click()
+   section('Automatic Messages')
+   expect(page.get_by_role('button',name='Enable selected automatic updates')).to_be_disabled()
+   delivered=page.get_by_role('checkbox',name='Order delivered',exact=True);delivered.uncheck()
+   page.get_by_role('button',name='Save selected policy').click();expect(delivered).not_to_be_checked()
+   delivered.check();page.get_by_role('button',name='Save selected policy').click();expect(delivered).to_be_checked()
+   screenshot('automatic')
+   section('SMS Permissions')
+   expect(page.get_by_role('button',name='Review permission registration')).to_be_visible()
+   page.get_by_label('Permission obtained date').fill('2026-11-01T12:00')
+   page.get_by_role('textbox',name='Permission evidence').fill('Synthetic prior permission from an earlier support conversation')
+   page.get_by_role('button',name='Review permission registration').click()
+   expect(page.get_by_text('eligible unique numbers',exact=False).first).to_be_visible()
+   page.get_by_role('checkbox',name=re.compile('I attest')).check()
+   page.get_by_role('button',name='Confirm permission records').click()
+   expect(page.get_by_text('Permission records saved',exact=False)).to_be_visible()
+   section('Overview')
+   page.get_by_role('button',name='Official channel announcement',exact=True).click()
+   expect(page.get_by_role('textbox',name='Official channel URL')).to_have_value('https://whatsapp.com/channel/0029Vb97gokADTOKgN8Nzr0s')
+   page.get_by_role('checkbox',name=re.compile('I verified this is')).check()
+   page.get_by_role('button',name='Review audience and credits').click()
+   expect(page.get_by_role('dialog').get_by_text('https://whatsapp.com/channel/0029Vb97gokADTOKgN8Nzr0s',exact=False).first).to_be_visible()
+   page.get_by_role('dialog').get_by_role('button',name='Close',exact=True).click()
+   section('Audit History');expect(page.get_by_role('heading',name='SMS audit history')).to_be_visible()
+   page.get_by_role('button',name='Customer SMS settings',exact=True).click()
+   checkbox=page.get_by_role('checkbox',name='I choose occasional Mystery Hub SMS news and offers');checkbox.click()
+   expect(page.get_by_text('SMS choice saved. This does not send a message.',exact=True)).to_be_visible()
+   page.get_by_role('button',name='SMS Center',exact=True).click()
+   page.evaluate('window.__smsFixture.logout()')
+   expect(page.get_by_text('Signed out',exact=False)).to_be_visible()
+   assert not errors, errors
+   print(width,'passed: real studio/API, AI proposals, custom copy, reviewed draft, library, patterns, policy, channel, permissions, audit, reports, logout and overflow',flush=True)
+   context.close()
+  browser.close()
+finally:
+ server.terminate()
+ try:server.wait(timeout=10)
+ except subprocess.TimeoutExpired:server.kill()

@@ -37,6 +37,7 @@ jobs:
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_contact_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_sms_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_sms_experience_test
+          createdb -h 127.0.0.1 -U postgres -O app_owner mystery_sms_studio_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_sms_v2_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_rls_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_monitor_test
@@ -131,3 +132,8 @@ jobs:
         env:
           MYSTERY_SMS_EXPERIENCE_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_sms_experience_test
         run: node --import tsx --test server/suppliers/__tests__/smsExperienceV2Postgres.test.ts
+
+      - name: Verify SMS studio audience evidence and versioned manual templates
+        env:
+          MYSTERY_SMS_STUDIO_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_sms_studio_test
+        run: node --import tsx --test server/suppliers/__tests__/smsStudio.test.ts server/suppliers/__tests__/smsStudioPostgres.test.ts

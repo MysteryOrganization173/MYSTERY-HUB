@@ -1,6 +1,7 @@
+import {SMS_STUDIO_TEMPLATES} from './smsStudio.js';
 export type SmsPurpose='transactional'|'operational'|'marketing';
 export type SmsState='draft'|'queued'|'submission_started'|'accepted'|'delivered'|'not_delivered'|'expired'|'prohibited'|'failed'|'uncertain'|'cancelled';
-export const SMS_PRESETS=[
+export const SMS_LEGACY_PRESETS=[
  {id:'payment_confirmed',title:'Order Payment Confirmed',purpose:'transactional',locked:true,body:'Mystery Hub: Payment verified for {{network}} {{bundle}} order {{reference}}. Delivery is separate. Track at {{site}}/track-order.'},
  {id:'order_processing',title:'Order Received / Processing',purpose:'transactional',locked:true,body:'Mystery Hub: Supplier acceptance is recorded for order {{reference}}. Track current progress at {{site}}/track-order.'},
  {id:'order_delivered',title:'Order Delivered',purpose:'transactional',locked:true,body:'Mystery Hub: Order {{reference}} is marked delivered by the recorded fulfillment evidence. Need help? {{site}}/help'},
@@ -19,3 +20,5 @@ export const SMS_PRESETS=[
  {id:'custom',title:'General Custom Message',purpose:'marketing',locked:false,body:'Write your reviewed message here.'}
 ] as const;
 export const SMS_AI_MODES=['grammar','professional','friendly','urgent','shorten','clearer','alternatives','brief','cta','segments'] as const;
+
+export const SMS_PRESETS=[...SMS_LEGACY_PRESETS.filter(t=>t.locked||t.id==='channel_notice'),...SMS_STUDIO_TEMPLATES.map(t=>({...t,locked:false as const}))];
