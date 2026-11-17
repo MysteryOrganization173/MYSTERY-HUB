@@ -17,7 +17,7 @@ try:
    context=browser.new_context(viewport={'width':width,'height':900},permissions=['clipboard-read','clipboard-write'],accept_downloads=True)
    page=context.new_page();page.route('**/*',lambda route:route.continue_() if route.request.url.startswith(origin) else route.abort())
    page.goto(f'{origin}/?width={width}');expect(page.get_by_role('heading',name='Audience & Contacts')).to_be_visible();expect(page.get_by_role('button',name='Inspect contact').first).to_be_visible()
-   source_box=page.get_by_role('combobox',name='Contact source').bounding_box();sort_box=page.get_by_role('combobox',name='Sort',exact=True).bounding_box();assert source_box['x']+source_box['width']<=sort_box['x']+1,'Source and sort must not overlap'
+   source_box=page.get_by_role('combobox',name='Contact source').bounding_box();sort_box=page.get_by_role('combobox',name='Sort',exact=True).bounding_box();assert source_box['x']+source_box['width']<=sort_box['x']+1 or source_box['y']+source_box['height']<=sort_box['y']+1,'Source and sort must not overlap'
    page.screenshot(path=str(out/f'{width}-directory.png'));assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
    search0=page.get_by_role('textbox',name='Search name, phone or email');search0.fill('0599990002');expect(page.get_by_role('button',name='Inspect contact')).to_have_count(1)
    page.get_by_role('button',name='Inspect contact').click();expect(page.get_by_role('dialog').get_by_text('Registered-Order Recipient',exact=False).first).to_be_visible();page.get_by_role('dialog').get_by_role('button',name='Close',exact=True).click()
@@ -35,10 +35,23 @@ try:
    dialog.get_by_role('textbox',name='Editable message').fill('Revised operational draft');expect(dialog.get_by_role('checkbox',name=re.compile('I reviewed this as'))).not_to_be_checked();expect(dialog.get_by_role('link',name='Open phone SMS composer')).to_have_count(0)
    dialog.get_by_role('combobox',name='Message purpose').select_option('channel');expect(dialog.get_by_role('button',name='Copy message')).to_be_disabled();expect(dialog.get_by_role('link',name='Open phone SMS composer')).to_have_count(0)
    dialog.get_by_role('button',name='Close',exact=True).click()
+   # API edge fixture for later-installed purpose withdrawals; native SQL suite verifies derivation.
+   def restricted_profile(route):
+    response=route.fetch();data=response.json();data['contact']['smsRestrictions']=['operational'];data['contact']['supportReviewEligible']=False
+    route.fulfill(response=response,json=data)
+   page.route('**/api/admin/contacts/profile',restricted_profile)
+   page.get_by_role('button',name='Inspect contact').click();dialog=page.get_by_role('dialog')
+   expect(dialog.get_by_text('SMS purpose restrictions',exact=True)).to_be_visible();expect(dialog.get_by_text('Operational',exact=True)).to_be_visible()
+   dialog.get_by_role('button',name='Prepare SMS').click();dialog=page.get_by_role('dialog')
+   expect(dialog.get_by_text('Recorded SMS restrictions:',exact=False)).to_be_visible();expect(dialog.get_by_text('Manual preparation only.',exact=False)).to_be_visible()
+   dialog.get_by_role('checkbox',name=re.compile('I reviewed this as')).check();expect(dialog.get_by_role('link',name='Open phone SMS composer')).to_have_count(0)
+   page.screenshot(path=str(out/f'{width}-restricted-composer.png'));assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+   dialog.get_by_role('button',name='Close',exact=True).click();page.unroute('**/api/admin/contacts/profile')
    page.get_by_role('button',name='Clear filters').click();page.get_by_role('combobox',name='Contact source').select_option('registered');page.get_by_role('button',name='One-Time Buyers',exact=True).click();expect(page.get_by_role('button',name='One-Time Buyers',exact=True)).to_have_attribute('aria-pressed','true')
    page.get_by_role('button',name='Inactive Buyers',exact=True).click();expect(page.get_by_role('button',name='Inactive Buyers',exact=True)).to_have_attribute('aria-pressed','true')
    page.get_by_role('button',name='Clear filters').click();page.get_by_role('combobox',name='Contact source').select_option('registered');page.get_by_role('combobox',name='Sort',exact=True).select_option('spending');expect(page.get_by_role('heading',name='frequent',exact=True)).to_be_visible();page.get_by_role('combobox',name='Sort',exact=True).select_option('last')
    page.get_by_role('button',name='Export audience').click();dialog=page.get_by_role('dialog');dialog.get_by_role('button',name='Preview full audience').click();expect(dialog.get_by_text('Unique usable numbers',exact=True)).to_be_visible();dialog.get_by_role('checkbox',name=re.compile('I reviewed this source')).check()
+   page.screenshot(path=str(out/f'{width}-export.png'));assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
    with page.expect_download() as d:dialog.get_by_role('button',name='Download CSV').click()
    csv=d.value;csv.save_as(out/f'{width}-synthetic.csv');assert 'Classification' in Path(csv.path()).read_text(encoding='utf-8-sig')
    with page.expect_download() as d:dialog.get_by_role('button',name='Download TXT').click()
