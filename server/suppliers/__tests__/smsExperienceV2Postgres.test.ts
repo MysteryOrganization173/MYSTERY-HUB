@@ -1,3 +1,5 @@
+import {observeSmsSender} from '../../sms/providerDiagnostics.js';
+import {arkeselConfig,senderFingerprint} from '../../sms/arkesel.js';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
@@ -75,10 +77,10 @@ test('SMS experience V2 native lifecycle, recipients and release policy',{skip:!
     });
     await t.test('expanding an active policy cannot backfill previously delivered orders',async()=>{
       await clear();let r=await SmsService.readiness();await SmsService.settings('v2-admin',{paused:false,autoEnabled:true,recipientUpdates:false,autoTypes:['order_processing'],expectedRevision:r.settingsRevision,confirmed:true});
-      const old=await fresh({status:'delivered',delivered_at:new Date().toISOString()});await expandSmsEvents();assert.equal((await count(old.id)).length,0);
+      const old=await fresh();await db.query("UPDATE orders SET status='delivered',delivered_at=clock_timestamp() WHERE id=$1",[old.id]);await expandSmsEvents();assert.equal((await count(old.id)).length,0);
       r=await SmsService.readiness();await SmsService.settings('v2-admin',{paused:false,autoEnabled:true,recipientUpdates:false,autoTypes:['order_processing','order_delivered'],expectedRevision:r.settingsRevision,confirmed:true});
       await expandSmsEvents();assert.equal((await count(old.id)).length,0);
-      await new Promise(resolve=>setTimeout(resolve,3));const next=await fresh({status:'delivered',delivered_at:new Date().toISOString()});await expandSmsEvents();assert.equal((await count(next.id,'order_delivered')).length,1);await clear();
+      await new Promise(resolve=>setTimeout(resolve,3));const next=await fresh();await db.query("UPDATE orders SET status='delivered',delivered_at=clock_timestamp() WHERE id=$1",[next.id]);await expandSmsEvents();assert.equal((await count(next.id,'order_delivered')).length,1);await clear();
     });
     await t.test('approved wording publishing versions copy; arbitrary factual edits are rejected',async()=>{
       const old=(await db.query("SELECT version FROM mysteryhub_sms.templates WHERE id='order_processing'")).rows[0].version;
@@ -89,6 +91,18 @@ test('SMS experience V2 native lifecycle, recipients and release policy',{skip:!
     });
     await t.test('runtime observation contains only safe actual gates, no key, secret or test contacts',()=>{
       const value=JSON.stringify(withSmsRuntime());assert.ok(!value.includes('synthetic-only'));assert.ok(!value.includes('testNumbers'));assert.equal(withSmsRuntime().auto,true);
+    });
+    await t.test('confirmed sender rejection blocks before claim markers and cannot be bypassed by resume',async()=>{
+      await clear();const o=await fresh();await expandSmsEvents();const before=(await db.query('SELECT count(*)::int n FROM mysteryhub_sms.attempts')).rows[0].n;
+      const config=arkeselConfig();await db.query("UPDATE mysteryhub_sms.settings SET balance=COALESCE(balance,'{}'::jsonb)||jsonb_build_object('_providerSender',$1::jsonb)",[JSON.stringify({sender:config.sender,sourceFingerprint:senderFingerprint(config),status:'pending',documentsRequired:false})]);
+      assert.equal(await claimSms(10000),null);let reads=0;assert.equal((await smsTick({...api,balance:async()=>{reads++;return api.balance();}})).providerBlocked,true);assert.equal(reads,0);
+      assert.equal((await db.query('SELECT count(*)::int n FROM mysteryhub_sms.attempts')).rows[0].n,before);assert.equal((await count(o.id))[0].network_started_at,null);
+      const r=await SmsService.readiness();assert.equal(r.sendReady,false);await assert.rejects(()=>SmsService.settings('v2-admin',{paused:false,autoEnabled:true,recipientUpdates:false,autoTypes:r.autoTypes,expectedRevision:r.settingsRevision,confirmed:true}),/sender approval/);
+      const status={sender:config.sender,sourceFingerprint:senderFingerprint(config),status:'pending',documentsRequired:false,checkedAt:new Date().toISOString()};
+      await observeSmsSender({senderStatus:async()=>status} as any);let settings=(await db.query('SELECT * FROM mysteryhub_sms.settings')).rows[0];assert.equal(settings.paused,true);assert.equal(settings.auto_enabled,false);assert.equal(settings.balance._providerIncidentAudit[0].databaseActor,'app_owner');assert.equal((await count(o.id))[0].state,'cancelled');
+      await observeSmsSender({senderStatus:async()=>({...status,status:'unverified',reason:'PROVIDER'})} as any);settings=(await db.query('SELECT * FROM mysteryhub_sms.settings')).rows[0];assert.equal(settings.balance._providerSender.status,'pending');assert.equal(settings.paused,true);
+      await observeSmsSender({senderStatus:async()=>({...status,status:'approved'})} as any);settings=(await db.query('SELECT * FROM mysteryhub_sms.settings')).rows[0];assert.equal(settings.balance._providerSender.status,'approved');assert.equal(settings.auto_enabled,false);assert.equal(settings.paused,true);
+
     });
     assert.equal((await db.query('SELECT count(*)::int AS n FROM finance_ledger')).rows[0].n,0);
   }finally{await db.end();for(const k of Object.keys(process.env))if(!(k in saved))delete process.env[k];Object.assign(process.env,saved);}
