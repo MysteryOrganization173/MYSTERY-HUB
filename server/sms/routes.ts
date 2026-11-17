@@ -1,3 +1,4 @@
+import {publishAutomaticTemplate} from './templatePublishing.js';
 import {SmsPermissions} from './permissions.js';
 import {Router} from 'express';
 import {requireAdmin,requireAuth} from '../middleware/authMiddleware.js';
@@ -29,6 +30,7 @@ smsAdminRouter.post('/campaigns/:id/cancel',handler(req=>SmsService.cancel(req.u
 smsAdminRouter.post('/history',handler(req=>SmsService.history(req.body)));
 smsAdminRouter.get('/messages/:id',handler(req=>SmsService.details(req.params.id)));
 smsAdminRouter.post('/messages/:id/reconcile',handler(req=>SmsService.reports(req.params.id),true));
+smsAdminRouter.post('/automatic-templates',handler(req=>publishAutomaticTemplate(req.user.id,req.body)));
 smsAdminRouter.post('/templates',handler(req=>SmsService.templates(req.user.id,req.body)));
 smsAdminRouter.get('/templates/:id/history',handler(async req=>{if(typeof req.params.id!=='string'||req.params.id.length>64)throw new FinanceError('Invalid template.');return smsTransaction(async c=>({rows:(await c.query('SELECT version,snapshot,created_at FROM mysteryhub_sms.template_versions WHERE template_id=$1 ORDER BY version DESC LIMIT 50',[req.params.id])).rows}));}));
 smsAdminRouter.post('/retention',handler(req=>{strict(req.body,['confirmed']);if(req.body.confirmed!==true)throw new FinanceError('Confirm the documented retention operation.');return SmsService.prune(req.user.id);}));
