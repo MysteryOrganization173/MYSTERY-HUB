@@ -1,5 +1,8 @@
 # Arkesel SMS Communications V1
 
+SMS V2 supersedes permission/push coupling, Admin prior-consent registration and
+report-poll ordering below. See [SMS V2 repair](sms-communications-v2.md).
+
 ## Release scope and current state
 
 Starts from main cd9a4f1c3cfb43f6b35e4cd3903c185e4da51acb; integrates subsequent

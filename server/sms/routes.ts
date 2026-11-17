@@ -1,3 +1,4 @@
+import {SmsPermissions} from './permissions.js';
 import {Router} from 'express';
 import {requireAdmin,requireAuth} from '../middleware/authMiddleware.js';
 import {createRateLimiter} from '../middleware/rateLimiter.js';
@@ -10,12 +11,16 @@ import {ArkeselError,verifyArkeselCallback,normalizeStatus,providerId,arkeselCon
 import {smsTransaction} from './store.js';
 import {strict} from './policy.js';
 import {canonicalGhanaPhone} from '../utils/phone.js';
-const handler=(fn:(req:any)=>Promise<unknown>)=>async(req:any,res:any)=>{try{res.json(await fn(req));}catch(e){res.status(e instanceof FinanceError?e.status:e instanceof ArkeselError&&e.code==='AUTH'?401:503).json({error:e instanceof FinanceError?e.message:'SMS service unavailable. No sending success is confirmed.'});}};
+const providerErrors:Record<string,string>={AUTH:'Arkesel rejected API authentication. Check the private backend configuration.',CREDIT:'Arkesel reports insufficient SMS credits.',GATEWAY:'Arkesel rejected messaging permission or sender configuration.',CONFIGURATION:'SMS provider configuration or the approved sending mode is incomplete.',VALIDATION:'Arkesel could not validate the request.',RATE_LIMIT:'Arkesel is temporarily rate limited. Wait before checking again.',PROVIDER:'Arkesel could not provide a valid response.',UNCERTAIN:'Provider acceptance is uncertain. Do not resubmit this message.'};
+const handler=(fn:(req:any)=>Promise<unknown>,provider=false)=>async(req:any,res:any)=>{try{res.json(await fn(req));}catch(e){if(provider&&e instanceof ArkeselError){res.status(e.code==='RATE_LIMIT'?429:502).json({error:providerErrors[e.code],providerCode:e.code});return;}res.status(e instanceof FinanceError?e.status:e instanceof ArkeselError&&e.code==='AUTH'?401:503).json({error:e instanceof FinanceError?e.message:'SMS service unavailable. No sending success is confirmed.'});}};
 const privateResponse=(_req:any,res:any,next:any)=>{res.set({'Cache-Control':'private, no-store','Pragma':'no-cache','X-Content-Type-Options':'nosniff'});next();};
 export function createSmsAdminRouter(deps:{draft?:typeof draftSms}={}){const smsAdminRouter=Router();smsAdminRouter.use(requireAdmin,privateResponse,createRateLimiter({windowMs:60000,max:45,key:req=>req.user!.id}));
+smsAdminRouter.post('/permissions/preview',handler(req=>SmsPermissions.preview(req.user.id,req.body)));
+smsAdminRouter.post('/permissions/confirm',handler(req=>SmsPermissions.confirm(req.user.id,req.body)));
+smsAdminRouter.get('/permissions',handler(req=>SmsPermissions.history(Number(req.query.page||1))));
 smsAdminRouter.get('/readiness',handler(async()=>({...await SmsService.readiness(),worker:smsWorkerHealth})));
-smsAdminRouter.post('/verify-signing',createRateLimiter({windowMs:60000,max:3,key:req=>req.user!.id}),handler(()=>SmsService.verifySigning()));
-smsAdminRouter.post('/balance',createRateLimiter({windowMs:60000,max:3,key:req=>req.user!.id}),handler(()=>SmsService.balance()));
+smsAdminRouter.post('/verify-signing',createRateLimiter({windowMs:60000,max:3,key:req=>req.user!.id}),handler(()=>SmsService.verifySigning(),true));
+smsAdminRouter.post('/balance',createRateLimiter({windowMs:60000,max:3,key:req=>req.user!.id}),handler(()=>SmsService.balance(),true));
 smsAdminRouter.put('/settings',handler(req=>SmsService.settings(req.user.id,req.body)));
 smsAdminRouter.post('/preview',handler(req=>SmsService.preview(req.user.id,req.body)));
 smsAdminRouter.post('/campaigns',createRateLimiter({windowMs:60000,max:6,enforceInTests:true,key:req=>req.user!.id}),handler(req=>SmsService.campaign(req.user.id,req.sessionToken,req.body)));
@@ -23,7 +28,7 @@ smsAdminRouter.get('/campaigns',handler(async req=>{const page=Number(req.query.
 smsAdminRouter.post('/campaigns/:id/cancel',handler(req=>SmsService.cancel(req.user.id,req.params.id)));
 smsAdminRouter.post('/history',handler(req=>SmsService.history(req.body)));
 smsAdminRouter.get('/messages/:id',handler(req=>SmsService.details(req.params.id)));
-smsAdminRouter.post('/messages/:id/reconcile',handler(req=>SmsService.reports(req.params.id)));
+smsAdminRouter.post('/messages/:id/reconcile',handler(req=>SmsService.reports(req.params.id),true));
 smsAdminRouter.post('/templates',handler(req=>SmsService.templates(req.user.id,req.body)));
 smsAdminRouter.get('/templates/:id/history',handler(async req=>{if(typeof req.params.id!=='string'||req.params.id.length>64)throw new FinanceError('Invalid template.');return smsTransaction(async c=>({rows:(await c.query('SELECT version,snapshot,created_at FROM mysteryhub_sms.template_versions WHERE template_id=$1 ORDER BY version DESC LIMIT 50',[req.params.id])).rows}));}));
 smsAdminRouter.post('/retention',handler(req=>{strict(req.body,['confirmed']);if(req.body.confirmed!==true)throw new FinanceError('Confirm the documented retention operation.');return SmsService.prune(req.user.id);}));

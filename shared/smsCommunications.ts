@@ -11,6 +11,7 @@ export const SMS_PRESETS=[
  {id:'support',title:'Official Support Contact Changed',purpose:'operational',locked:false,body:'Mystery Hub Update: Visit {{site}}/help for our current official support contacts. Thank you for your patience.'},
  {id:'maintenance',title:'Service Maintenance / Outage',purpose:'operational',locked:false,body:'Mystery Hub service notice: Please check {{site}}/help for current verified service information.'},
  {id:'restored',title:'Service Restored',purpose:'operational',locked:false,body:'Mystery Hub service update: Check current availability on {{site}}. Support is available at {{site}}/help.'},
+ {id:'channel_notice',title:'Official WhatsApp Channel Announcement',purpose:'operational',locked:false,body:'MYSTERY HUB: We are still active! Our official contact channel has moved. Follow the new WhatsApp Channel for service updates and important announcements: {{channel_url}}'},
  {id:'channel',title:'New Official WhatsApp Channel',purpose:'marketing',locked:false,body:'Mystery Hub announcements: Visit {{site}} for our verified official community channels.'},
  {id:'welcome',title:'Welcome / First Purchase',purpose:'marketing',locked:false,body:'Welcome to Mystery Hub. Explore our current services at {{site}}. Thank you for choosing us.'},
  {id:'return',title:'Customer Return Reminder',purpose:'marketing',locked:false,body:'Hello from Mystery Hub. Explore current services at {{site}} whenever you need them.'},
