@@ -131,7 +131,7 @@ jobs:
       - name: Verify SMS V2 transactional experience and new-order policy
         env:
           MYSTERY_SMS_EXPERIENCE_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_sms_experience_test
-        run: node --import tsx --test server/suppliers/__tests__/smsExperienceV2Postgres.test.ts
+        run: node --import tsx --test server/suppliers/__tests__/smsExperienceV2Postgres.test.ts server/suppliers/__tests__/smsProviderDiagnostics.test.ts
 
       - name: Verify SMS studio audience evidence and versioned manual templates
         env:
