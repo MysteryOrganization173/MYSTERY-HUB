@@ -36,6 +36,7 @@ jobs:
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_routing_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_contact_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_sms_test
+          createdb -h 127.0.0.1 -U postgres -O app_owner mystery_sms_experience_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_sms_v2_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_rls_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_monitor_test
@@ -125,3 +126,8 @@ jobs:
         env:
           MYSTERY_SMS_V2_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_sms_v2_test
         run: node --import tsx --test server/suppliers/__tests__/smsPermissionsV2.test.ts
+
+      - name: Verify SMS V2 transactional experience and new-order policy
+        env:
+          MYSTERY_SMS_EXPERIENCE_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_sms_experience_test
+        run: node --import tsx --test server/suppliers/__tests__/smsExperienceV2Postgres.test.ts

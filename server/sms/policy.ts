@@ -6,6 +6,7 @@ import {contactFilters} from '../services/contactHubPolicy.js';
 import {canonicalGhanaPhone} from '../utils/phone.js';
 import {SMS_PRESETS,type SmsPurpose} from '../../shared/smsCommunications.js';
 import {smsEstimate} from '../../src/utils/manualSms.js';
+import {processingEvidence,deliveredEvidence,attentionEvidence,transactionalMessage} from './transactional.js';
 import {permissionEvidence} from './permissions.js';
 import {arkeselConfig,canonicalCallback} from './arkesel.js';
 export const digest=(v:unknown)=>createHash('sha256').update(canonicalCallback(v)).digest('hex');
@@ -36,17 +37,17 @@ export async function orderRecipients(c:PoolClient,orderId:string,templateId:str
  orderId=o.id;let id=templateId;
  if(templateId==='refund_update'){id=o.resolution_json?.stage==='resolved'&&o.resolution_json?.verifiedAt?'refund_completed':'refund_initiated';}
  const t=SMS_PRESETS.find(t=>t.id===id&&t.locked);if(!t)throw new FinanceError('Choose an approved order template.');
- if(id==='order_processing'&&(!['submitted','processing'].includes(o.status)||!o.supplier_order_id||!validTime(o.submitted_at)||+new Date(o.submitted_at)<+new Date(o.paid_at)||o.manual_review))throw new FinanceError('Supplier acceptance is not established.',409);
- if(id==='order_delivered'&&(o.status!=='delivered'||!validTime(o.delivered_at)||+new Date(o.delivered_at)<+new Date(o.paid_at)||o.manual_review||!o.supplier_order_id&&!(o.service_type==='marketplace'&&o.marketplace_status==='completed')))throw new FinanceError('Delivery evidence is unavailable.',409);
- if(id==='delivery_attention'&&!o.manual_review&&!['failed','refund_pending','cancelled','expired'].includes(o.status))throw new FinanceError('Order attention evidence is unavailable.',409);
+ if(id==='order_processing'&&!processingEvidence(o))throw new FinanceError('Supplier acceptance is not established.',409);
+ if(id==='order_delivered'&&!deliveredEvidence(o))throw new FinanceError('Delivery evidence is unavailable.',409);
+ if(id==='delivery_attention'&&!attentionEvidence(o))throw new FinanceError('Order attention evidence is unavailable.',409);
  if(id.startsWith('refund_')&&(!['paystack_refund','wallet_refund'].includes(o.resolution_json?.outcome)||id==='refund_completed'&&(o.resolution_json?.stage!=='resolved'||!validTime(o.resolution_json?.verifiedAt))||id==='refund_initiated'&&o.resolution_json?.stage!=='refund_pending'))throw new FinanceError('The requested refund state is not verified.',409);
  const recipients:Recipient[]=[];
  if(o.user_id){const u=(await c.query("SELECT id,phone FROM users WHERE id=$1 AND role='customer' AND status='active' AND NOT must_change_password",[o.user_id])).rows[0],phone=canonicalGhanaPhone(u?.phone);if(phone)recipients.push({phone,userId:u.id,orderId,role:'buyer',templateId:id});}
- else {const e=(await c.query('SELECT payer_phone FROM admin_guest_buyer_evidence WHERE order_id=$1',[orderId])).rows[0],phone=canonicalGhanaPhone(e?.payer_phone);if(phone)recipients.push({phone,userId:null,orderId,role:'buyer',templateId:id});}
- // Recipient notifications never contain payment/refund details; explicit policy permits delivery/attention only.
- if(allowRecipient&&['order_delivered','delivery_attention'].includes(id)){const phone=canonicalGhanaPhone(o.recipient_phone);if(phone&&!recipients.some(r=>r.phone===phone))recipients.push({phone,userId:null,orderId,role:'recipient',templateId:id});}
- const allowed=[];for(const r of recipients){const optin=!automatic||r.role!=='buyer'||!(await suppressedNumbers(c,[r],'transactional',true)).has(r.phone);if((!arkeselConfig().enabled||!arkeselConfig().testOnly||arkeselConfig().testNumbers.includes(r.phone))&&optin&&!await suppressed(c,r.phone,r.userId,'transactional'))allowed.push(r);}
- return {body:renderSms(t.body,{reference:o.public_reference,network:o.network,bundle:o.bundle_size_snapshot,site:'https://mysterybundlehub.com'}),recipients:allowed};
+ else if(['order_processing','order_delivered','delivery_attention'].includes(id)){const phone=canonicalGhanaPhone(o.recipient_phone);if(phone)recipients.push({phone,userId:null,orderId,role:'recipient',templateId:id});}
+ // Routine registered notifications are buyer-only. Guest status copy is neutral.
+ const allowed=[];for(const r of recipients){if((!arkeselConfig().enabled||!arkeselConfig().testOnly||arkeselConfig().testNumbers.includes(r.phone))&&!await suppressed(c,r.phone,r.userId,'transactional'))allowed.push(r);}
+ const body=['order_processing','order_delivered','delivery_attention'].includes(id)?await transactionalMessage(c,o,id as any,!o.user_id):renderSms(t.body,{reference:o.public_reference,network:o.network,bundle:o.bundle_size_snapshot,site:'https://mysterybundlehub.com'});
+ return {body,recipients:allowed};
 }
 export async function resolveAudience(c:PoolClient,input:any){
  strict(input,['filters','selected','numbers','purpose','body','templateId','templateVersion','orderId','channelUrl','channelConfirmed']);
