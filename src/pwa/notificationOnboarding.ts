@@ -105,5 +105,7 @@ export async function activateNotificationInvite(client: CustomerNotificationsCl
   if (result.server === 'subscribed' || result.permission === 'denied') choiceListeners.forEach(listener => listener(result.server === 'subscribed' ? 'registered' : 'denied'));
   current(options.signal);
   if (result.server === 'subscribed') return { step: 'registered' };
-  return { step: result.permission === 'denied' ? 'denied' : result.permission === 'default' ? 'dismissed' : 'error', message: result.message };
+  // "Dismissed" (which rests the invitation) only when the browser really asked and the person closed its question.
+  // Anything else that stopped short (a network failure, an unavailable worker) is an error with Try again.
+  return { step: result.permission === 'denied' ? 'denied' : result.permission === 'default' && result.asked ? 'dismissed' : 'error', message: result.message };
 }

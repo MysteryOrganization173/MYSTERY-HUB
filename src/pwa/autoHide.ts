@@ -5,11 +5,12 @@ import { NOTIFICATION_TIMING } from './invitations';
  *
  * The clock runs only while nothing holds it:
  * - `hover` and `focus` (inside the card) and `hidden` (the tab is in the background) hold it while they last;
+ * - `keyboard` (someone moving by keyboard) holds it until focus has been inside the card and left again;
  * - `interacted` (a tap or click inside the card) holds it for good.
  * When the last hold ends, at least `resumeMinMs` remains, so the card never vanishes the moment a pointer or focus
  * leaves it. After Allow the card is in its working or result state, where this clock is not running at all.
  */
-export type AutoHideHold = 'hover' | 'focus' | 'hidden' | 'interacted';
+export type AutoHideHold = 'hover' | 'focus' | 'hidden' | 'keyboard' | 'interacted';
 export interface AutoHideClock { now(): number; setTimeout(fn: () => void, ms: number): unknown; clearTimeout(id: unknown): void }
 
 export function createAutoHide(onExpire: () => void, clock: AutoHideClock, {

@@ -8,6 +8,11 @@ import { isCoarsePointer } from '../../pwa/appEnvironment';
 import {trackGrowth} from '../../utils/growthAnalytics';
 import './pwa.css';
 
+const onScreen = (element: HTMLElement) => {
+  const box = element.getBoundingClientRect();
+  return box.bottom > 0 && box.right > 0 && box.top < window.innerHeight && box.left < window.innerWidth;
+};
+
 /** iPhone and iPad: Share → Add to Home Screen. Shared by the page card and the floating invitation. */
 export const AppleInstallSteps: React.FC<{ id: string }> = ({ id }) => (
   <ol id={id} className="mh-install-steps">
@@ -35,14 +40,18 @@ export const InstallAppPromo: React.FC<{ variant?: 'section' | 'compact'; classN
   useEffect(() => { if (mode !== 'hidden') setShownMode(mode); }, [mode]);
   const offering = mode !== 'hidden' && progress === 'idle';
   const sectionRef = useRef<HTMLElement | null>(null);
-  useEffect(() => (offering ? registerInlineOffer(offerId) : undefined), [offering, offerId]);
-  // Without an observer it simply counts as on screen (the conservative answer).
+  // Registered with where it really is right now (measured), then kept current by an observer, so a card below the
+  // fold never knocks a floating card off while the observer's first report is on its way. Without an observer it
+  // simply counts as on screen (the conservative answer).
   useEffect(() => {
+    if (!offering) return;
     const section = sectionRef.current;
-    if (!offering || !section || typeof IntersectionObserver === 'undefined') return;
+    const observe = Boolean(section) && typeof IntersectionObserver !== 'undefined';
+    const release = registerInlineOffer(offerId, observe ? onScreen(section!) : true);
+    if (!observe) return release;
     const observer = new IntersectionObserver(entries => { for (const entry of entries) setInlineOfferInView(offerId, entry.isIntersecting); });
-    observer.observe(section);
-    return () => observer.disconnect();
+    observer.observe(section!);
+    return () => { observer.disconnect(); release(); };
   }, [offering, offerId]);
 
   const visible = mode !== 'hidden' || (progress !== 'idle' && shownMode !== 'hidden');

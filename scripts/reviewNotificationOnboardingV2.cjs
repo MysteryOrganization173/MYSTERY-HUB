@@ -126,7 +126,11 @@ const nothingFor = async (p, ms) => { await sleep(ms); return (await card(p).cou
       if (channel) await t3.getByRole('button', { name: 'Maybe later' }).click();
       await t3.close();
       const t4 = await ctx.newPage(); await t4.goto(BASE + '/'); await t4.waitForLoadState('load');
-      ok('the next visit: notifications lead again (no starvation either way)', await waitCard(t4, 9000) && (await card(t4).locator('h2').textContent()) === 'Stay updated.');
+      ok('straight after that Channel card, another tab gets no notification card (30-minute gap)', await nothingFor(t4, 8000));
+      await t4.evaluate(() => { const seen = JSON.parse(localStorage.getItem('mh_invitation_seen') || '{}'); seen.channel = Date.now() - 31 * 60_000; localStorage.setItem('mh_invitation_seen', JSON.stringify(seen)); });
+      await t4.close();
+      const t5 = await ctx.newPage(); await t5.goto(BASE + '/'); await t5.waitForLoadState('load');
+      ok('the next visit: notifications lead again (no starvation either way)', await waitCard(t5, 9000) && (await card(t5).locator('h2').textContent()) === 'Stay updated.');
       await ctx.close();
     }
     // 2. Hover holds it; leaving the card gives at least four more seconds.
@@ -142,6 +146,23 @@ const nothingFor = async (p, ms) => { await sleep(ms); return (await card(p).cou
       await p.mouse.move(10, 10); const left = Date.now();
       const gone = await waitGone(p, 9000); const after = Date.now() - left;
       ok('hover: once the pointer moves away, at least four more seconds before it leaves', gone && after >= 3800 && after <= 6500, `${after} ms`);
+      await ctx.close();
+    }
+    // 2b. Moving by keyboard holds it until focus has been inside the card and left again.
+    {
+      const ctx = await context(b, {}, { storage: FOLLOWING }); const p = await ctx.newPage();
+      await p.goto(BASE + '/help');
+      ok('keyboard: the card appears', await waitCard(p, 11000));
+      await p.keyboard.press('Tab'); await sleep(16000);
+      ok('keyboard: someone moving by Tab is not raced to the end of the page (still there after 16 s)', (await card(p).count()) === 1);
+      const note = await p.locator('p[role="status"][aria-live="polite"]').first().textContent();
+      ok('screen-reader note names the permanent entry', /for a few seconds\. Notifications in the footer is always there\./.test(note || ''), note);
+      await card(p).getByRole('button', { name: 'Not now' }).focus();
+      await p.evaluate(() => document.getElementById('main-content')?.focus());
+      const left = Date.now();
+      // Tab was pressed right after it appeared, so nearly all of its 12 seconds remain once focus has left it.
+      const gone = await waitGone(p, 15000);
+      ok('keyboard: after visiting the card and leaving it, the rest of its time runs (at least four seconds)', gone && Date.now() - left >= 3800, `${Date.now() - left} ms`);
       await ctx.close();
     }
     // 3. Keyboard focus inside holds it; a tap holds it for good; "Not now" rests three days; an old record does not.

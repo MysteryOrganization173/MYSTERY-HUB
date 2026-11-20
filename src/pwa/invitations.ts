@@ -62,6 +62,8 @@ export const SETTLE_MS = 2_000;
  * - resumeMinMs: after hover or focus leaves the card, at least this much time remains before it leaves.
  * - exitMs: the length of the gentle exit (none with reduced motion).
  * - ignoredRestMs: a card left alone does not return for this long, in any tab.
+ * - afterOtherMs: no notification card this soon after an Install or Channel card in another tab (not in the installed
+ *   app, whose first use right after installing is the moment notifications are for).
  * - snoozeDays: "Not now", the close button or closing the browser's own question rest it this many days.
  *   There is no permanent suppression and no strike count.
  */
@@ -71,6 +73,7 @@ export const NOTIFICATION_TIMING = {
   resumeMinMs: 4_000,
   exitMs: 200,
   ignoredRestMs: 12 * 60 * 60 * 1000,
+  afterOtherMs: 30 * 60 * 1000,
   snoozeDays: 3,
 } as const;
 export const CALM_PAGES: readonly string[] = ['home', 'data', 'services', 'marketplace', 'creative', 'about', 'help', 'earn', 'website'];
@@ -105,13 +108,17 @@ export function engaged(session: InvitationSession) {
  * The session and browser-wide limits for one kind. Notifications have their own snooze (launchPolicy): they share
  * the visit (one at a time, one per visit, nothing after a dismissal) but not the marketing 12-hour gap or "seen"
  * rests. A notification card that was shown and left alone rests 12 hours, so a new tab or a quick return never shows
- * it again straight away. The welcome sheet leaves room only for notifications.
+ * it again straight away, and it never follows an Install or Channel card from another tab within half an hour
+ * (except in the installed app). The welcome sheet leaves room only for notifications.
  */
-export function sessionAllows(kind: InvitationKind, session: InvitationSession, seen: SeenMap, now: number) {
+export function sessionAllows(kind: InvitationKind, session: InvitationSession, seen: SeenMap, now: number, { installedApp = false }: { installedApp?: boolean } = {}) {
   if (session.shown || session.dismissed) return false;
   if (session.welcome && kind !== 'notifications') return false;
-  if (kind === 'notifications') return !valid(seen.notifications, now) || now - seen.notifications >= NOTIFICATION_TIMING.ignoredRestMs;
   const times = [seen.install, seen.channel].filter((time): time is number => valid(time, now));
+  if (kind === 'notifications') {
+    if (valid(seen.notifications, now) && now - seen.notifications < NOTIFICATION_TIMING.ignoredRestMs) return false;
+    return installedApp || !times.length || now - Math.max(...times) >= NOTIFICATION_TIMING.afterOtherMs;
+  }
   if (times.length && now - Math.max(...times) < INVITATION_GAP_MS) return false;
   const own = seen[kind];
   return !valid(own, now) || now - own >= SEEN_REST_DAYS[kind] * DAY;
@@ -265,9 +272,9 @@ export const invitationOnScreen = () => onScreen;
 export const inlineOfferVisible = () => inlineOffers.size > 0;
 /** An in-page install card is on screen right now: no floating card may sit beside it, notifications included. */
 export const inlineOfferInView = () => [...inlineOffers.values()].some(Boolean);
-/** Registers an offering in-page card. It counts as on screen until the page reports otherwise (no observer: always). */
-export function registerInlineOffer(id: string) {
-  inlineOffers.set(id, true);
+/** Registers an offering in-page card, with whether it is on screen now (unknown: on screen, the safe answer). */
+export function registerInlineOffer(id: string, inView = true) {
+  inlineOffers.set(id, inView);
   notify();
   return () => { if (inlineOffers.delete(id)) notify(); };
 }
@@ -292,10 +299,10 @@ export function noteNotificationsYield(now = Date.now()) {
 }
 
 /** Claims the screen for the first kind whose rules allow it now, and remembers it was shown. */
-export function claimInvitation(kinds: InvitationKind[], now = Date.now()): InvitationKind | null {
+export function claimInvitation(kinds: InvitationKind[], now = Date.now(), options: { installedApp?: boolean } = {}): InvitationKind | null {
   if (onScreen) return null;
   const session = readSession(), seen = readSeen();
-  const kind = kinds.find(candidate => sessionAllows(candidate, session, seen, now)) || null;
+  const kind = kinds.find(candidate => sessionAllows(candidate, session, seen, now, options)) || null;
   if (!kind) return null;
   onScreen = kind;
   writeSession({ ...session, shown: kind });

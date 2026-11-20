@@ -26,6 +26,7 @@ The design and approved copy are unchanged.
 | `resumeMinMs` 4 s | After hover or focus leaves the card, at least this much time remains. |
 | `exitMs` 200 ms | The gentle exit. There is none with reduced motion: the card simply goes. |
 | `ignoredRestMs` 12 h | A card left alone does not return for this long, in any tab. |
+| `afterOtherMs` 30 min | No notification card this soon after an Install or Channel card in another tab. The installed app is exempt: its first use right after installing is the moment notifications are for. |
 | `snoozeDays` 3 | Applies to "Not now", the close button, Escape, and closing the browser's own question. |
 
 Install and the Channel keep their own rules: engagement (a second page, about 25 s of use or a verified purchase),
@@ -44,7 +45,10 @@ was not touched.
 **The settle clock:**
 - It starts when the page becomes calm, and restarts only when the page changes or the calm is interrupted.
 - Re-renders reschedule the single timer without restarting the clock.
-- One read-only eligibility check runs per account (or visitor) per page life. It is cancelled on sign-in, sign-out or an account switch.
+- One read-only eligibility check runs per account (or visitor) per page life, once a calm page is open.
+  - When the account changes (sign-in, sign-out, a switch), the next calm page cancels the old check and starts a new one.
+  - Results for a previous account are never used: they are keyed to the account and its session.
+  - No check runs at all when the card cannot appear in this visit: already shown or answered, resting, snoozed, or too soon after another card.
 - It runs again only if the browser permission changed in the meantime (another tab, site settings).
 
 ## Ignored versus dismissed
@@ -63,7 +67,12 @@ was not touched.
 - the pointer resting on the card;
 - keyboard focus inside it;
 - a hidden tab;
+- moving by keyboard (Tab or F6) on the page, until focus has been inside the card and left again;
 - any tap or click inside it, which holds it for good.
+
+Reaching the card during its 200 ms exit (a tap, a click or focus) stops the exit.
+
+The screen-reader note says the card is there "for a few seconds", and that Notifications in the footer is always there.
 
 After Allow the card is working, then shows its result. None of those states leaves by itself:
 - **Working:** the browser's question, then registration. Only switching account closes it; a dialog, page change, typing or scroll do not.
@@ -88,7 +97,16 @@ Permission, subscription, registration, provider acceptance and display are neve
 the server confirms the device.
 
 - **Registered:** a device the server confirms is never invited again. This is checked against the server, not local memory.
-- **Repair:** if the browser allows notifications but the device is not registered (or holds a subscription the server does not know), one tap registers it with no new browser question.
+- **Repair:** if the browser allows notifications but the device is not registered, one tap registers it with no new browser question.
+  - Members are also offered this when the browser holds a subscription the server does not know.
+  - Visitors are not: a subscription there may belong to an account, so they use the footer's Notifications sheet.
+- **A failed tap is never a "no":**
+  - "Dismissed" (the three-day rest) is recorded only when the browser really asked and the person closed its question.
+  - A network or service failure shows "Notifications aren't on yet." with Try again.
+- **The browser's question follows the tap directly:**
+  - The key comes from the configuration the assessment just read (kept for 10 minutes), so there is no network wait. This matters for browsers that only ask right after a tap.
+  - A disabled service still never leads to a permission request.
+- **Focus:** pressing Allow from the keyboard moves focus to the result's first button.
 - **Blocked:**
   - The browser's "Block" is final: no invitation, and no repeated request.
   - My Account (members) and the footer's Notifications sheet (visitors) give short directions.

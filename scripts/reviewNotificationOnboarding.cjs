@@ -49,12 +49,17 @@ const context = async (b, opts = {}, answer = 'granted') => {
   await simulatePush(ctx, answer);
   return ctx;
 };
-const engage = async (p, second = '/services') => { await p.goto(BASE + '/'); await settle(p); await p.goto(BASE + second); await settle(p); };
+// V2: no engagement is needed any more; the card appears on the first page about five seconds after it settles, and
+// moving to a second page would close it for the visit. So "engage" now just opens the landing page.
+const engage = async p => { await p.goto(BASE + '/'); await settle(p); };
+// Signs up from Orders, where no suggestion ever appears (V2 would otherwise show the visitor's card on a calm page
+// within five seconds, and that visit's one invitation would be used before the member exists).
 const signUp = async (p, name) => {
-  await p.goto(BASE + '/'); await settle(p);
+  await p.goto(BASE + '/orders'); await settle(p);
   await p.locator('header .mh-signup').first().click(); await p.waitForSelector('#auth-name');
   await p.fill('#auth-name', name); await p.fill('#auth-identifier', '024' + String(Date.now()).slice(-7)); await p.fill('#auth-password', 'Synthetic#Member-34');
-  await p.locator('form button[type="submit"]').click(); await sleep(2500);
+  await p.locator('form:has(#auth-name) button[type="submit"]').click();
+  await p.waitForFunction(() => localStorage.getItem('mystery_hub_session_token'), null, { timeout: 15000 }).catch(() => {}); await sleep(500);
   return (await db.query('SELECT id FROM users WHERE name=$1 ORDER BY created_at DESC LIMIT 1', [name])).rows[0]?.id;
 };
 const setPaused = paused => db.query(`UPDATE ${N}.settings SET paused=$1 WHERE id=TRUE`, [paused]);
@@ -69,7 +74,7 @@ const setPaused = paused => db.query(`UPDATE ${N}.settings SET paused=$1 WHERE i
     {
       const ctx = await context(b); const p = await ctx.newPage();
       await engage(p);
-      ok('guest: an invitation appears after engagement', await waitCard(p));
+      ok('guest: an invitation appears on the first page (V2: no engagement needed)', await waitCard(p));
       const c = await card(p).evaluate(el => ({ h: el.querySelector('h2').textContent, t: el.querySelector('p').textContent, buttons: [...el.querySelectorAll('button')].map(x => x.textContent.trim() || x.getAttribute('aria-label')), note: el.querySelector('.mh-invite-note')?.textContent }));
       ok('guest copy: Stay updated. / news and occasional offers (no order updates) / Allow Notifications · Not now', c.h === 'Stay updated.' && c.t === 'Get Mystery Hub service news and occasional offers.' && c.buttons.includes('Allow Notifications') && c.buttons.includes('Not now') && /turn them off anytime/.test(c.note || ''), JSON.stringify(c));
       const v = await axe(p, 'aside.mh-invite'); if (v) ok('axe: notification invitation (serious/critical)', v.length === 0, v.join(', '));

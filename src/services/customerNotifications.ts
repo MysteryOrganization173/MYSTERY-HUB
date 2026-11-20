@@ -54,10 +54,15 @@ import {notificationHttp} from './notificationHttp';
 async function endpointHash(endpoint:string){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(endpoint));return Array.from(new Uint8Array(bytes),v=>v.toString(16).padStart(2,'0')).join('');}
 const request=(token:string,path:string,method='GET',body?:unknown)=>notificationHttp(token,'notifications/'+path,method,body);
 const preferences=(p:any):NotificationPreferences=>{if(typeof p.transactional!=='boolean'||typeof p.marketing!=='boolean')throw Error('Invalid notification preferences. Refresh before changing them.');return {transactional:p.transactional,promotional:p.marketing,marketingOptedOut:p.marketingOptedOut===true,version:''};}; // Atomic last-write-wins PUTs, not versioned templates.
+let knownKey:{key:string;at:number}|null=null;
+const KNOWN_KEY_MS=10*60_000;
 export const httpCustomerNotificationsClient:CustomerNotificationsClient={
  available:true,
- configuration:()=>notificationHttp(null,'notifications/config'),
- async publicKey(){const c=await this.configuration!();if(!c.enabled||!c.publicKey)throw Error('Real phone alerts are disabled pending verified push configuration. Your notification choices remain available.');return c.publicKey;},
+ async configuration(){const c=await notificationHttp(null,'notifications/config');knownKey=c&&c.enabled&&c.publicKey?{key:c.publicKey,at:Date.now()}:null;return c;},
+ // V2: a key confirmed by a recent configuration read (the invitation's own assessment) is used at once, so the tap
+ // reaches the browser's permission question without a network wait. Otherwise the configuration is read first,
+ // and a disabled service still never leads to a permission request.
+ async publicKey(){if(knownKey&&Date.now()-knownKey.at<KNOWN_KEY_MS)return knownKey.key;const c=await this.configuration!();if(!c.enabled||!c.publicKey)throw Error('Real phone alerts are disabled pending verified push configuration. Your notification choices remain available.');return c.publicKey;},
  async deviceStatus(token,endpoint){const hash=await endpointHash(endpoint);const {devices}=await request(token,'subscriptions');return {subscribed:devices.some((d:any)=>d.endpoint_hash===hash&&d.current_session===true)};},
  async register(token,subscription,consent){try{const r=await request(token,'subscriptions','PUT',consent?{subscription,consent}:{subscription});if(r.success!==true||!r.deviceId)throw Error('Device registration was not confirmed.');
   return {ok:true,value:r.preferences&&typeof r.preferences.transactional==='boolean'&&typeof r.preferences.marketing==='boolean'?{transactional:r.preferences.transactional,promotional:r.preferences.marketing}:undefined};}catch(e){return {ok:false,message:(e as Error).message};}},

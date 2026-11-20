@@ -315,7 +315,7 @@ test('15–16: a registered device is never asked again; a blocked browser is re
   } finally { stop(); }
   const layer = read('src/components/pwa/InvitationLayer.tsx');
   assert.match(layer, /useEffect\(\(\) => onNotificationChoice\(\(\) => setNotifyDone\(true\)\), \[\]\);/);
-  assert.match(layer, /notifications: Boolean\(notifyInvite\) && !notifyDone && sessionAllows\('notifications', session, seen, now\),/);
+  assert.match(layer, /notifications: Boolean\(notifyInvite\) && !notifyDone && !notificationInviteResting\(readSnooze\(STORAGE_KEYS\.notificationOptIn\), now\) && sessionAllows\('notifications', session, seen, now, \{ installedApp \}\),/);
   assert.match(layer, /notificationPermissionState\(\) !== invite\.permission/, 'a permission changed in another tab is assessed again');
 });
 
@@ -403,4 +403,65 @@ test('25: the card stays a small, nonblocking strip on narrow phones, and reduce
   assert.match(css, /@media \(max-height: 640px\) and \(max-width: 767px\)/, 'short Android screens get a tighter card');
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ \.mh-invite, \.mh-invite-leaving \{ animation: none; \} \}/);
   assert.match(read('src/components/pwa/InvitationLayer.tsx'), /window\.matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches/, 'with reduced motion it simply goes');
+});
+
+// ── Independent review fixes ──────────────────────────────────────────────────────────────────────────────────
+
+test('review H1: a failure before the browser asks is an error with Try again, never a "Not now"', async () => {
+  const offline = device();
+  offline.client.publicKey = async () => { throw new Error('Network down'); };
+  const result = await activateNotificationInvite(offline.client, offline.guest, { audience: 'member', offers: true }, offline.options('token'));
+  assert.equal(result.step, 'error', 'not dismissed: no three-day snooze for a yes that never reached the browser');
+  assert.equal(offline.asks(), 0, 'a service that cannot answer never leads to a permission request');
+  const guestOffline = device();
+  guestOffline.client.publicKey = async () => { throw new Error('Network down'); };
+  assert.equal((await activateNotificationInvite(guestOffline.client, guestOffline.guest, { audience: 'guest', offers: true }, guestOffline.options(null))).step, 'error');
+  const closed = device({ answer: 'default' });
+  assert.equal((await activateNotificationInvite(closed.client, closed.guest, { audience: 'member', offers: true }, closed.options('token'))).step, 'dismissed', 'only a browser question that was really asked and closed is "dismissed"');
+  // The HTTP client answers the key at once from the configuration the assessment just read, so the browser's
+  // question follows the tap without a network wait.
+  const client = read('src/services/customerNotifications.ts');
+  assert.match(client, /async publicKey\(\)\{if\(knownKey&&Date\.now\(\)-knownKey\.at<KNOWN_KEY_MS\)return knownKey\.key;/);
+  assert.match(client, /knownKey=c&&c\.enabled&&c\.publicKey\?\{key:c\.publicKey,at:Date\.now\(\)\}:null;/, 'a disabled configuration forgets the key');
+});
+
+test('review M1: "Not now" given elsewhere (Notification Center, another tab) stops the floating card at once', () => {
+  const layer = read('src/components/pwa/InvitationLayer.tsx');
+  assert.match(layer, /const order = latest\.order\.filter\(kind => kind !== 'notifications' \|\| !notificationInviteResting\(readSnooze\(STORAGE_KEYS\.notificationOptIn\), Date\.now\(\)\)\);/, 're-read when the timer fires');
+  assert.match(read('src/components/notifications/NotificationCenter.tsx'), /const notNow = \(\) => \{ recordDismissal\(STORAGE_KEYS\.notificationOptIn\);/, 'the Notification Center writes the same snooze');
+});
+
+test('review M2: an in-page install card registered below the fold never counts as on screen', () => withBrowser(() => {
+  const release = registerInlineOffer('below-fold', false);
+  assert.equal(inlineOfferVisible(), true, 'still the page’s install suggestion');
+  assert.equal(inlineOfferInView(), false, 'but not on screen, so a floating notification card is not knocked off');
+  release();
+  assert.match(read('src/components/pwa/InstallAppPromo.tsx'), /registerInlineOffer\(offerId, observe \? onScreen\(section!\) : true\)/);
+}));
+
+test('review M3 and L1: keyboard users get the time they need; the exit can always be stopped; focus is kept after Allow', () => {
+  const clock = fakeClock(); let gone = false;
+  const auto = createAutoHide(() => { gone = true; }, clock);
+  auto.start(); clock.advance(2_000); auto.hold('keyboard'); clock.advance(10 * 60_000);
+  assert.equal(gone, false, 'someone moving by keyboard is not raced to the end of the page');
+  auto.hold('focus'); auto.release('focus'); auto.release('keyboard');
+  clock.advance(NOTIFICATION_TIMING.resumeMinMs + 6_000); assert.equal(gone, true, 'after visiting the card and leaving it, the usual time');
+  const layer = read('src/components/pwa/InvitationLayer.tsx');
+  assert.match(layer, /notifications: 'Suggestion: turn on Mystery Hub notifications, at the end of the page for a few seconds\. Notifications in the footer is always there\.',/);
+  assert.match(layer, /const keydown = \(event: KeyboardEvent\) => \{ if \(!visited && \(event\.key === 'Tab' \|\| event\.key === 'F6'\)\) auto\.hold\('keyboard'\); \};/);
+  assert.match(layer, /const focusIn = \(\) => \{ auto\.hold\('focus'\); cancelExit\(\); \};/);
+  assert.match(layer, /card\.addEventListener\('click', cancelExit\);/);
+  assert.match(layer, /return \(\) => \{\n\s+auto\.stop\(\);\n\s+cancelExit\(\);/, 'leaving the first state stops a pending exit');
+  assert.match(layer, /focusResult\.current = Boolean\(cardRef\.current\?\.contains\(document\.activeElement\)\);/);
+  assert.match(layer, /style=\{leaving \? \{ animationDuration: `\$\{NOTIFICATION_TIMING\.exitMs\}ms` \} : undefined\}/, 'the exit length comes from the timing constants');
+});
+
+test('review L2–L3: no assessment when the card cannot appear; no notification card right after another tab’s card', () => {
+  const layer = read('src/components/pwa/InvitationLayer.tsx');
+  assert.match(layer, /if \(notificationInviteResting\(snooze, at\) \|\| !sessionAllows\('notifications', readSession\(\), readSeen\(\), at, \{ installedApp \}\)\) \{ setNotifyAssessed\(key\); return; \}/);
+  assert.equal(NOTIFICATION_TIMING.afterOtherMs, 30 * 60_000);
+  assert.equal(sessionAllows('notifications', NEW_SESSION, { channel: now - 5 * 60_000 }, now), false, 'a Channel card in another tab five minutes ago');
+  assert.equal(sessionAllows('notifications', NEW_SESSION, { channel: now - 31 * 60_000 }, now), true);
+  assert.equal(sessionAllows('notifications', NEW_SESSION, { install: now - 60_000 }, now, { installedApp: true }), true, 'the installed app’s first use right after installing');
+  assert.equal(sessionAllows('notifications', NEW_SESSION, { channel: now + 900 * DAY }, now), true, 'a far-future record never blocks');
 });

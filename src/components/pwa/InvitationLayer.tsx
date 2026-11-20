@@ -7,7 +7,7 @@ import { activateNotificationInvite, notificationInviteOpportunity, onNotificati
 import { notificationPermissionState } from '../../pwa/notifications';
 import { createAutoHide, windowClock } from '../../pwa/autoHide';
 import { httpCustomerNotificationsClient, httpGuestNotificationsClient } from '../../services/customerNotifications';
-import { readSnooze, recordDismissal, STORAGE_KEYS } from '../../pwa/launchPolicy';
+import { notificationInviteResting, readSnooze, recordDismissal, STORAGE_KEYS } from '../../pwa/launchPolicy';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { BrandMark } from '../common/BrandLogo';
 import { useAppInstall } from '../../pwa/useAppInstall';
@@ -20,7 +20,7 @@ import {
 } from '../../pwa/invitations';
 import { trackGrowth } from '../../utils/growthAnalytics';
 import { GROWTH_PAGES, type GrowthPage } from '../../../shared/growthAnalytics';
-import { isCoarsePointer } from '../../pwa/appEnvironment';
+import { isCoarsePointer, isInstalledApp } from '../../pwa/appEnvironment';
 import { AppleInstallSteps } from './InstallAppPromo';
 import { appBusy, isFormEntry } from './invitationBusy';
 import './pwa.css';
@@ -34,7 +34,8 @@ const growthPage = (page: string): GrowthPage => (GROWTH_PAGES.includes(page as 
 
 const ANNOUNCEMENTS: Record<InvitationKind, string> = {
   install: 'Suggestion: install Mystery Hub. Find it at the end of the page.',
-  notifications: 'Suggestion: turn on Mystery Hub notifications. Find it at the end of the page.',
+  // It leaves by itself after a few seconds, so the note also names the entry that is always there.
+  notifications: 'Suggestion: turn on Mystery Hub notifications, at the end of the page for a few seconds. Notifications in the footer is always there.',
   channel: 'Suggestion: follow the Mystery Hub WhatsApp Channel. Find it at the end of the page.',
 };
 
@@ -85,6 +86,7 @@ export const InvitationLayer: React.FC = () => {
   const inlineOffer = useSyncExternalStore(subscribeInvitations, inlineOfferVisible, () => false);
   const inlineInView = useSyncExternalStore(subscribeInvitations, inlineOfferInView, () => false);
   const installState = useAppInstall();
+  const [installedApp] = useState(() => isInstalledApp());
   const { loaded, tabVisible, typing } = usePageState();
   const [shown, setShown] = useState<{ kind: InvitationKind; page: string } | null>(null);
   const shownRef = useRef<InvitationKind | null>(null);
@@ -162,9 +164,13 @@ export const InvitationLayer: React.FC = () => {
     setNotifyInvite(null);
     setNotifyDone(false);
     const key = accountKey;
+    // Nothing to ask the server when the card cannot appear in this visit anyway (already shown or answered, resting,
+    // or snoozed): the other suggestions are not held up, and no request is made on every page load.
+    const snooze = readSnooze(STORAGE_KEYS.notificationOptIn), at = Date.now();
+    if (notificationInviteResting(snooze, at) || !sessionAllows('notifications', readSession(), readSeen(), at, { installedApp })) { setNotifyAssessed(key); return; }
     void notificationInviteOpportunity(httpCustomerNotificationsClient, httpGuestNotificationsClient, {
       token: sessionToken || null, accountId: user?.id, isCustomer: user ? user.role === 'customer' : undefined,
-      signal: controller.signal, snooze: readSnooze(STORAGE_KEYS.notificationOptIn), now: Date.now(),
+      signal: controller.signal, snooze, now: at,
     }).then(invite => { if (!controller.signal.aborted) { setNotifyInvite(invite); setNotifyAssessed(key); } },
       () => { if (!controller.signal.aborted) setNotifyAssessed(key); });
   }, [accountKey, isAuthChecking, onCalmPage, reassess]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -178,7 +184,8 @@ export const InvitationLayer: React.FC = () => {
   const channelAllowed = channelInviteAllowed(readChannelInvite(), now) && sessionAllows('channel', session, seen, now);
   const memberPurchase = session.purchase && notifyInvite?.audience === 'member';
   const plan = assessed ? invitationPlan({
-    notifications: Boolean(notifyInvite) && !notifyDone && sessionAllows('notifications', session, seen, now),
+    // The snooze is read again here: "Not now" given elsewhere (the Notification Center, another tab) counts at once.
+    notifications: Boolean(notifyInvite) && !notifyDone && !notificationInviteResting(readSnooze(STORAGE_KEYS.notificationOptIn), now) && sessionAllows('notifications', session, seen, now, { installedApp }),
     // An in-page install card is that page's suggestion: the floating Install and Channel cards stay off its page.
     install: installAllowed && !inlineOffer, channel: channelAllowed && !inlineOffer,
     othersWaiting: installAllowed || channelAllowed,
@@ -209,7 +216,8 @@ export const InvitationLayer: React.FC = () => {
         setReassess(n => n + 1);
         return;
       }
-      const kind = claimInvitation(latest.order);
+      const order = latest.order.filter(kind => kind !== 'notifications' || !notificationInviteResting(readSnooze(STORAGE_KEYS.notificationOptIn), Date.now()));
+      const kind = claimInvitation(order, Date.now(), { installedApp });
       if (!kind) return;
       shownRef.current = kind;
       setShown({ kind, page: activePage });
@@ -251,6 +259,7 @@ function InvitationCard({ cardRef, titleId, icon, title, text, closeLabel, onClo
   onClose: () => void; status?: boolean; leaving?: boolean; children: React.ReactNode;
 }) {
   return <aside ref={cardRef} aria-labelledby={titleId} role={status ? 'status' : undefined} className={leaving ? 'mh-invite mh-invite-leaving' : 'mh-invite'}
+    style={leaving ? { animationDuration: `${NOTIFICATION_TIMING.exitMs}ms` } : undefined}
     onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }}>
     <button type="button" className="mh-invite-close mh-compact-control" onClick={onClose} aria-label={closeLabel}><X className="size-4" aria-hidden="true" /></button>
     <div className="mh-invite-head">
@@ -336,18 +345,22 @@ function NotificationInvitation({ cardRef, onStage, invite, token, onClose }: {
     }, windowClock);
     const enter = (event: PointerEvent) => { if (event.pointerType !== 'touch') auto.hold('hover'); };
     const leave = (event: PointerEvent) => { if (event.pointerType !== 'touch') auto.release('hover'); };
-    // A tap during the exit keeps the card: whatever was tapped still works, and nothing underneath gets the tap.
-    const down = () => {
-      auto.hold('interacted');
-      if (leaveTimer.current !== null) { window.clearTimeout(leaveTimer.current); leaveTimer.current = null; setLeaving(false); }
-    };
-    const focusIn = () => auto.hold('focus');
-    const focusOut = (event: FocusEvent) => { if (!card.contains(event.relatedTarget as Node | null)) auto.release('focus'); };
+    // Reaching the card during its exit keeps it: whatever was pressed still works, and nothing underneath gets it.
+    const cancelExit = () => { if (leaveTimer.current !== null) { window.clearTimeout(leaveTimer.current); leaveTimer.current = null; setLeaving(false); } };
+    const down = () => { auto.hold('interacted'); cancelExit(); };
+    // Keyboard users may need longer than 12 seconds to reach the end of the page: once they move by keyboard, the card
+    // waits until focus has been inside it and left again.
+    let visited = false;
+    const keydown = (event: KeyboardEvent) => { if (!visited && (event.key === 'Tab' || event.key === 'F6')) auto.hold('keyboard'); };
+    const focusIn = () => { auto.hold('focus'); cancelExit(); };
+    const focusOut = (event: FocusEvent) => { if (card.contains(event.relatedTarget as Node | null)) return; visited = true; auto.release('focus'); auto.release('keyboard'); };
     const visibility = () => { if (document.visibilityState === 'hidden') auto.hold('hidden'); else auto.release('hidden'); };
     card.addEventListener('pointerenter', enter);
     card.addEventListener('pointerleave', leave);
     card.addEventListener('pointerdown', down);
+    card.addEventListener('click', cancelExit);
     card.addEventListener('focusin', focusIn);
+    document.addEventListener('keydown', keydown);
     card.addEventListener('focusout', focusOut);
     document.addEventListener('visibilitychange', visibility);
     if (card.contains(document.activeElement)) auto.hold('focus');
@@ -356,6 +369,9 @@ function NotificationInvitation({ cardRef, onStage, invite, token, onClose }: {
     auto.start();
     return () => {
       auto.stop();
+      cancelExit();
+      document.removeEventListener('keydown', keydown);
+      card.removeEventListener('click', cancelExit);
       card.removeEventListener('pointerenter', enter);
       card.removeEventListener('pointerleave', leave);
       card.removeEventListener('pointerdown', down);
@@ -367,9 +383,17 @@ function NotificationInvitation({ cardRef, onStage, invite, token, onClose }: {
 
   // "Not now" (or closing) rests it three days, every time; there is no permanent "no". The browser's "Block" is final.
   const notNow = () => { if (step === 'working') return; recordDismissal(STORAGE_KEYS.notificationOptIn); onClose('dismissed'); };
+  // Someone who pressed Allow from the keyboard keeps their place: focus moves to the result's first button.
+  const focusResult = useRef(false);
+  useEffect(() => {
+    if (step === 'invite' || step === 'working' || !focusResult.current) return;
+    focusResult.current = false;
+    cardRef.current?.querySelector<HTMLElement>('.mh-invite-actions button')?.focus({ preventScroll: true });
+  }, [step, cardRef]);
   const allow = async () => {
     const signal = request.current?.signal;
     if (step === 'working' || !signal || signal.aborted) return;
+    focusResult.current = Boolean(cardRef.current?.contains(document.activeElement));
     setStep('working');
     try {
       const result = await activateNotificationInvite(httpCustomerNotificationsClient, httpGuestNotificationsClient, invite, { token, signal });

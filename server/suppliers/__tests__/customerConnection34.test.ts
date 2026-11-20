@@ -65,7 +65,10 @@ test('one unsolicited invitation per visit, none after a dismissal, none within 
   assert.equal(sessionAllows('channel', s, { channel: now - 13 * DAY }, now), false, 'the Channel rests two weeks after being ignored');
   assert.equal(sessionAllows('channel', s, { channel: now + 400 * DAY }, now), true, 'a timestamp far in the future (changed clock) never locks');
   // Installed-app first use: notifications have their own snooze; marketing gaps and rests never block them.
-  assert.equal(sessionAllows('notifications', s, { install: now - 60_000, channel: now - 60_000, notifications: now - DAY }, now), true);
+  // V2: not within half an hour of another kind's card from another tab (the installed app's first use is exempt).
+  assert.equal(sessionAllows('notifications', s, { install: now - 31 * 60_000, channel: now - 31 * 60_000, notifications: now - DAY }, now), true);
+  assert.equal(sessionAllows('notifications', s, { install: now - 60_000, notifications: now - DAY }, now), false);
+  assert.equal(sessionAllows('notifications', s, { install: now - 60_000, notifications: now - DAY }, now, { installedApp: true }), true);
   assert.equal(sessionAllows('notifications', { ...s, shown: 'notifications' }, {}, now), false, 'one notification card per visit (it pauses for dialogs instead)');
   assert.equal(sessionAllows('notifications', { ...s, shown: 'channel' }, {}, now), false, 'but never after another invitation in the same visit');
   assert.equal(sessionAllows('notifications', { ...s, dismissed: true }, {}, now), false);
