@@ -3,7 +3,7 @@ import {smsPublicRouter} from '../../sms/routes.js';
 import assert from 'node:assert/strict';import {test,mock} from 'node:test';import {readFileSync} from 'node:fs';import {randomUUID,createHmac} from 'node:crypto';import pg from 'pg';
 import {getPool,initDatabase} from '../../db/connection.js';import {assertSafeTestDatabase} from '../../utils/environment.js';import {AuthStore} from '../../db/authStore.js';import {OrdersStore} from '../../db/ordersStore.js';
 import {AdminAuditStore} from '../../db/adminAuditStore.js';
-import {SmsService,applyReport} from '../../sms/service.js';import {smsInstalled,smsTransaction} from '../../sms/store.js';import {smsTick,claimSms,expandSmsEvents,startSmsWorker,persistSmsOutcome} from '../../sms/worker.js';import {ArkeselClient,arkeselConfig,canonicalCallback,signingFingerprint} from '../../sms/arkesel.js';import {resolveAudience,digest,suppressed,suppressedNumbers} from '../../sms/policy.js';
+import {SmsService,applyReport} from '../../sms/service.js';import {smsInstalled,smsTransaction} from '../../sms/store.js';import {smsTick,claimSms,expandSmsEvents,startSmsWorker,persistSmsOutcome,reconcileSms} from '../../sms/worker.js';import {ArkeselClient,arkeselConfig,canonicalCallback,signingFingerprint} from '../../sms/arkesel.js';import {resolveAudience,digest,suppressed,suppressedNumbers} from '../../sms/policy.js';
 import {contactUser,contactOrder} from './fixtures/contactHub.js';
 const url=process.env.MYSTERY_SMS_POSTGRES_URL;
 test('native SMS storage, approvals, event capture, crash boundaries and financial isolation',{skip:!url},async t=>{
@@ -91,9 +91,31 @@ test('native SMS storage, approvals, event capture, crash boundaries and financi
    const provider=randomUUID();await db.query("INSERT INTO mysteryhub_sms.messages(event_key,purpose,origin,recipient,body,sender,sandbox,state,provider_id,estimated_segments) VALUES($1,'operational','manual','+233591234567','Signed callback fixture','MYSTERY HUB',true,'accepted',$2,1)",[randomUUID(),provider]);
    const app=express();app.use('/sms',smsPublicRouter);const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));const base='http://127.0.0.1:'+(server.address() as any).port+'/sms/arkesel/callback';
    const call=async(query:Record<string,string>,ts=Math.floor(Date.now()/1000),webhookId=randomUUID())=>{const signature=createHmac('sha256',process.env.ARKESEL_WEBHOOK_SECRET!).update(String(ts)+'.'+canonicalCallback(query)).digest('hex');return fetch(base+'?'+new URLSearchParams(query),{headers:{'X-Arkesel-Webhook-Timestamp':String(ts),'X-Arkesel-Webhook-Signature':'v1='+signature,'X-Arkesel-Webhook-Id':webhookId}});};
-   try{const ts=Math.floor(Date.now()/1000);assert.equal((await call({sms_id:provider,status:'FUTURE_UNDOCUMENTED'},ts)).status,200);let m=(await db.query('SELECT * FROM mysteryhub_sms.messages WHERE provider_id=$1',[provider])).rows[0];assert.equal(m.state,'uncertain');assert.equal(m.provider_status,'UNKNOWN');assert.equal((await call({sms_id:provider,status:'QUEUED'},ts-1)).status,200);assert.equal((await db.query('SELECT state FROM mysteryhub_sms.messages WHERE provider_id=$1',[provider])).rows[0].state,'uncertain');
+   try{const ts=Math.floor(Date.now()/1000);
+    assert.equal((await call({sms_id:provider,status:'SUBMITTED'},ts-2)).status,200);
+    assert.equal((await call({sms_id:provider,status:'FUTURE_UNDOCUMENTED'},ts)).status,200);
+    let m=(await db.query('SELECT * FROM mysteryhub_sms.messages WHERE provider_id=$1',[provider])).rows[0];
+    assert.equal(m.state,'accepted');assert.equal(m.provider_status,'SUBMITTED');assert.equal(m.error_code,'UNKNOWN_PROVIDER_STATUS');
+    assert.equal((await call({sms_id:provider,status:'QUEUED'},ts-3)).status,200);
+    assert.equal((await db.query('SELECT provider_status FROM mysteryhub_sms.messages WHERE provider_id=$1',[provider])).rows[0].provider_status,'SUBMITTED');
     const q={sms_id:provider,status:'DELIVERED'};assert.equal((await call(q,ts)).status,200);assert.equal((await (await call(q,ts)).json()).duplicate,true);assert.equal((await call(q,ts-301)).status,401);assert.equal((await call({...q,recipient:'0241234567'},ts)).status,409);m=(await db.query('SELECT * FROM mysteryhub_sms.messages WHERE provider_id=$1',[provider])).rows[0];assert.equal(m.state,'delivered');
+    assert.equal((await call({sms_id:provider,status:'FUTURE_UNDOCUMENTED'},ts+1)).status,200);
+    m=(await db.query('SELECT * FROM mysteryhub_sms.messages WHERE provider_id=$1',[provider])).rows[0];
+    assert.equal(m.state,'delivered');assert.equal(m.provider_status,'DELIVERED');assert.equal(m.error_code,'UNKNOWN_PROVIDER_STATUS');assert.equal(Number(m.last_observed),ts);
    }finally{await new Promise<void>(r=>server.close(()=>r()));}
+  });
+  await t.test('a malformed recipient cannot change its message or block other valid batch reports',async()=>{
+   const invalid=randomUUID(),valid=randomUUID();
+   for(const provider of [invalid,valid])await db.query(
+    "INSERT INTO mysteryhub_sms.messages(event_key,purpose,origin,recipient,body,sender,sandbox,state,provider_id,estimated_segments,updated_at) VALUES($1,'operational','manual','+233591234567','Report fixture','MYSTERY HUB',true,'accepted',$2,1,now()-interval '1 day')",
+    [randomUUID(),provider]);
+   const api=new ArkeselClient(arkeselConfig,async()=>Response.json({status:'success',data:{
+    [invalid]:{recipient:'not a phone',status:'DELIVERED'},[valid]:{recipient:'233591234567',status:'DELIVERED'},
+   }}));
+   await reconcileSms(api);
+   const states=(await db.query('SELECT provider_id,state FROM mysteryhub_sms.messages WHERE provider_id=ANY($1::text[])',[[invalid,valid]])).rows;
+   assert.equal(states.find(row=>row.provider_id===invalid)?.state,'accepted');
+   assert.equal(states.find(row=>row.provider_id===valid)?.state,'delivered');
   });
   await t.test('template versions, stale edits and purpose mismatches require another review',async()=>{
    const id='custom-'+randomUUID();await SmsService.templates(admin,{id,title:'Reusable fixture',body:'A safe generic service update.',purpose:'operational',enabled:true});const p=await SmsService.preview(admin,{...previewInput,templateId:id,templateVersion:1});await SmsService.templates(admin,{id,title:'Reusable fixture',body:'A revised generic service update.',purpose:'operational',enabled:true,expectedVersion:1});await assert.rejects(()=>SmsService.campaign(admin,'sms-fixture-session',{previewId:p.id,requestId:randomUUID(),confirmed:true,queue:false}),/Template changed/);await assert.rejects(()=>SmsService.templates(admin,{id,title:'Stale',body:'Stale generic copy.',purpose:'operational',enabled:true,expectedVersion:1}),/changed/);assert.equal((await db.query('SELECT count(*)::int AS n FROM mysteryhub_sms.template_versions WHERE template_id=$1',[id])).rows[0].n,2);

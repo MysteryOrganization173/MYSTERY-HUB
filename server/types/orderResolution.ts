@@ -6,6 +6,6 @@ export interface OrderResolution {
   manual?:{outcome:ManualResolutionOutcome;reason:string;evidence:string;method?:string;reference?:string;actor:string;at:string};
   refundId?:string; providerStatus?:string; verifiedAt?:string; lastAttemptAt?:string;
   lastError?:string; lastActor:string; updatedAt:string;
-  supplierEvidence?:{status:'failed'|'refund_pending'|'refunded'|'uncertain';note:string;actor:string;at:string};
+  supplierEvidence?:{status:'failed'|'refund_pending'|'refunded'|'uncertain';note:string;reference?:string;actor:string;at:string};
 }
 export interface OrderResolutionEvent {id:string;order_id:string;request_id:string;input_hash:string;action:string;actor_id:string;created_at:string;result:OrderResolution}

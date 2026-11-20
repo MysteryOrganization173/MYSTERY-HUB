@@ -49,7 +49,10 @@ export class ArkeselClient {
  async webhookConfiguration(){const configuration=this.config();const r=await this.request('/api/v2/webhooks/secret');if(typeof r.data?.configured!=='boolean')throw new ArkeselError('PROVIDER');const secret=r.data.secret,local=configuration.secret;if(r.data.configured&&(typeof secret!=='string'||secret.length<16||secret.length>256))throw new ArkeselError('PROVIDER');const a=Buffer.from(typeof secret==='string'?secret:''),b=Buffer.from(local);return {configurationFingerprint:signingFingerprint(configuration),configured:r.data.configured,matchesLocalSecret:!!local&&a.length===b.length&&timingSafeEqual(a,b),checkedAt:new Date(this.now()).toISOString()};}
  async reports(ids:string[]){if(!ids.length||ids.length>100||ids.some(id=>!providerId(id)))throw new ArkeselError('VALIDATION');const r=await this.request('/api/v2/sms/message-reports','POST',{msg_ids:ids});return ids.map(id=>this.report(id,r.data?.[id]));}
  async detail(id:string){if(!providerId(id))throw new ArkeselError('VALIDATION');const r=await this.request('/api/v2/sms/'+encodeURIComponent(id));if(r.data?.ID!==id)throw new ArkeselError('PROVIDER');return this.report(id,r.data);}
- private report(id:string,d:any){const phone=canonicalGhanaPhone(d?.recipient);return {id,phone,status:normalizeStatus(d?.status),segments:Number.isSafeInteger(d?.message_count)&&d.message_count>0?d.message_count:null};}
+ private report(id:string,d:any){
+  const phone=d?.recipient===undefined ? null : canonicalGhanaPhone(d.recipient)||'INVALID';
+  return {id,phone,status:normalizeStatus(d?.status),segments:Number.isSafeInteger(d?.message_count)&&d.message_count>0?d.message_count:null};
+ }
 }
 /** Matches the official PHP JSON_UNESCAPED_SLASHES recipe, including escaped UTF16 units. */
 export function canonicalCallback(value:unknown):string {
@@ -68,8 +71,17 @@ export function verifyArkeselCallback(query:unknown,headers:{timestamp?:unknown;
 export function validationFields(payload:any){
  const allowed=['sender','message','recipients','callback_url','sandbox','use_case','scheduled_date'];
  const fields=new Set<string>();
- if(payload?.errors&&typeof payload.errors==='object')for(const key of Object.keys(payload.errors)){const base=key.split('.')[0];if(allowed.includes(base))fields.add(base);}
- const message=typeof payload?.message==='string'?payload.message:'';
- for(const field of allowed)if(new RegExp('\\b'+field.replace('_','[ _]')+'\\b','i').test(message))fields.add(field);
+ if(payload?.errors&&typeof payload.errors==='object'&&!Array.isArray(payload.errors)){
+  for(const key of Object.keys(payload.errors)){
+   const match=/^([a-z_]+)(?:\.\d+)?$/.exec(key);
+   if(match&&allowed.includes(match[1]))fields.add(match[1]);
+  }
+ }
+ // Arkesel v2.4.0 documents a required-field sentence without an errors object.
+ // Generic prose such as "SMS message rejected" provides no field evidence.
+ const required=typeof payload?.message==='string'
+  ? /^The ([a-z_]+) field is required\.$/i.exec(payload.message.trim())
+  : null;
+ if(required&&allowed.includes(required[1].toLowerCase()))fields.add(required[1].toLowerCase());
  return [...fields].sort();
 }

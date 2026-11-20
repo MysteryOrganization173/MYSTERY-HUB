@@ -28,6 +28,7 @@ export function useLeadAlerts(token: string) {
     let active = true;
     let busy = false;
     let again = false;
+    let paidRevision = 0;
     let denied = false;
     let lastStarted = -Infinity;
     let previous: LeadSummary | null = null;
@@ -35,13 +36,14 @@ export function useLeadAlerts(token: string) {
     setState(initialState(token));
 
     const load = async (manual = false) => {
-      if (!active || denied || document.visibilityState === 'hidden') return;
+      if (!active || denied || (!manual && document.visibilityState === 'hidden')) return;
       if (busy) {
         again ||= manual;
         return;
       }
       if (!manual && Date.now() - lastStarted < POLL_MS) return;
       busy = true;
+      const revision = paidRevision;
       lastStarted = Date.now();
       setState(s => ({ ...s, refreshing: true }));
       const signal = AbortSignal.any([c.signal, AbortSignal.timeout(10000)]);
@@ -57,14 +59,16 @@ export function useLeadAlerts(token: string) {
         return;
       }
       const data = leads.status === 'fulfilled' && leads.value?.ultra && leads.value.marketplace ? leads.value : null;
-      const orders = paid.status === 'fulfilled' && Array.isArray(paid.value?.orders) ? paid.value : null;
+      const currentPaid = revision === paidRevision;
+      const orders = currentPaid && paid.status === 'fulfilled' && Array.isArray(paid.value?.orders) &&
+        Number.isSafeInteger(paid.value.total) && paid.value.total >= paid.value.orders.length ? paid.value : null;
       const last = previous;
       if (data) previous = data;
       setState(s => ({
         token, data: data ?? s.data, orders: orders ?? s.orders,
         loading: false, refreshing: false, denied: false,
         error: data ? '' : 'Enquiry check failed.',
-        orderError: orders ? '' : 'Paid-order check failed.',
+        orderError: !currentPaid ? s.orderError : orders ? '' : 'Paid-order check failed.',
         fresh: data ? updateFreshLeads(last, data, s.fresh) : [],
       }));
       busy = false;
@@ -73,7 +77,7 @@ export function useLeadAlerts(token: string) {
         void load(true);
       }
     };
-    const manual = () => { void load(true); };
+    const manual = () => { paidRevision++; void load(true); };
     const passive = () => { void load(); };
     refresh.current = manual;
     passive();

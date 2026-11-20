@@ -13,6 +13,14 @@ let inflight: { token: string; promise: Promise<{ metrics: AdminOverviewMetrics;
 const listeners = new Set<() => void>();
 let generation=0;
 
+export function invalidateAdminOverview(token: string) {
+  if (cached?.token === token) cached = null;
+  if (inflight?.token === token) {
+    generation++;
+    inflight = null;
+  }
+}
+
 export function loadAdminOverview(token: string, force = false): Promise<{ metrics: AdminOverviewMetrics; at: number }> {
   if (!force && cached && cached.token === token && Date.now() - cached.at < OVERVIEW_TTL_MS) return Promise.resolve({ metrics: cached.metrics, at: cached.at });
   if (!force && inflight && inflight.token === token) return inflight.promise;

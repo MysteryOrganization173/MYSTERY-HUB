@@ -39,14 +39,36 @@ export async function smsTick(api=new ArkeselClient()){
  const m=await claimSms(balance.smsCredits);if(!m)return {idle:true};
  let state='uncertain',id:string|null=null,code:string|null=null,attempted=false;
  try{if(!await revalidate(m)){state='cancelled';code='REVIEW_OR_PERMISSION_CHANGED';}else{attempted=true;const result=(await api.send(m.body,[m.recipient]))[0];state=result.state==='accepted'?'accepted':result.state==='rejected'?'failed':'uncertain';id=result.id;code=result.state==='uncertain'?'ACCEPTANCE_UNKNOWN':result.state==='rejected'?'INVALID_RECIPIENT':null;}}
- catch(error){state=!attempted?'cancelled':error instanceof ArkeselError&&!error.uncertain?'failed':'uncertain';code=error instanceof ArkeselError?error.code+(error.details?.fields.length?':'+error.details.fields.join(','):''):'OUTCOME_UNKNOWN';}
+ catch(error){
+  state=!attempted?'cancelled':error instanceof ArkeselError&&!error.uncertain?'failed':'uncertain';
+  if(error instanceof ArkeselError){
+   const fields=error.details?.fields;
+   code=error.code==='VALIDATION'&&fields?.length ? 'VALIDATION_FIELD:'+fields.join(',') : error.code;
+  }else code='OUTCOME_UNKNOWN';
+ }
  await persistSmsOutcome(m,state,id,code);
  return {processed:true,state};
 }
 export function startSmsWorker(){void recordSmsRuntime();const observation=setInterval(()=>void recordSmsRuntime(),30000);observation.unref();if(!arkeselConfig().worker||!arkeselConfig().sendAllowed){void disableStoredSmsPolicy();return ()=>clearInterval(observation);}let busy=false,stopped=false,next=0,nextReports=0,nextPrune=0,nextSenderCheck=0;const api=new ArkeselClient();smsWorkerHealth.running=true;
  const timer=setInterval(async()=>{if(busy||stopped||Date.now()<next)return;busy=true;try{if(Date.now()>nextSenderCheck){await observeSmsSender(api);nextSenderCheck=Date.now()+600000;}await smsTick(api);if(Date.now()>nextPrune){await SmsService.prune();nextPrune=Date.now()+3600000;}if(Date.now()>nextReports){await reconcileSms(api);nextReports=Date.now()+60000;}smsWorkerHealth.lastTick=new Date().toISOString();smsWorkerHealth.lastCode=null;next=Date.now()+5000;}catch{smsWorkerHealth.lastCode='SMS_WORKER_UNAVAILABLE';next=Date.now()+60000;}finally{busy=false;}},5000);timer.unref();return ()=>{stopped=true;clearInterval(observation);clearInterval(timer);smsWorkerHealth.running=false;};}
 export async function reconcileSms(api=new ArkeselClient()){
- if(!await smsInstalled())return;const rows=await smsTransaction(async c=>(await c.query("WITH selected AS (SELECT id FROM mysteryhub_sms.messages WHERE NOT redacted AND provider_id IS NOT NULL AND state IN ('accepted','uncertain') ORDER BY updated_at,id LIMIT 20 FOR UPDATE SKIP LOCKED) UPDATE mysteryhub_sms.messages m SET updated_at=now() FROM selected s WHERE m.id=s.id RETURNING m.provider_id,m.recipient")).rows);if(!rows.length)return;const reports=await api.reports(rows.map(r=>r.provider_id));await smsTransaction(async c=>{for(const r of reports)await applyReport(c,r.id,r.status,Math.floor(Date.now()/1000),{digest:digest(['poll',r.id,r.status,r.segments]),phone:r.phone,segments:r.segments});});
+ if(!await smsInstalled())return;
+ const rows=await smsTransaction(async c=>(await c.query<{provider_id:string;recipient:string}>(
+  "WITH selected AS (SELECT id FROM mysteryhub_sms.messages WHERE NOT redacted AND provider_id IS NOT NULL AND state IN ('accepted','uncertain') ORDER BY updated_at,id LIMIT 20 FOR UPDATE SKIP LOCKED) UPDATE mysteryhub_sms.messages m SET updated_at=now() FROM selected s WHERE m.id=s.id RETURNING m.provider_id,m.recipient"
+ )).rows);
+ if(!rows.length)return;
+ const recipients=new Map(rows.map(row=>[row.provider_id,row.recipient]));
+ const reports=await api.reports([...recipients.keys()]);
+ const observed=Math.floor(Date.now()/1000);
+ await smsTransaction(async c=>{
+  for(const report of reports){
+   const recipient=recipients.get(report.id);
+   if(!recipient||(report.phone&&report.phone!==recipient))continue;
+   await applyReport(c,report.id,report.status,observed,{
+    digest:digest(['poll',report.id,report.status,report.segments]),phone:report.phone,segments:report.segments,
+   });
+  }
+ });
 }
 
 async function disableStoredSmsPolicy(){try{if(!await smsInstalled())return;await smsTransaction(async c=>{await c.query("UPDATE mysteryhub_sms.settings SET auto_enabled=false,paused=true,revision=revision+1 WHERE auto_enabled=true OR paused=false");await c.query("UPDATE mysteryhub_sms.messages SET state='cancelled',error_code='SERVER_SMS_DISABLED' WHERE origin='automatic' AND state='queued'");});}catch{/* No schema/configuration dependency can prevent application startup. */}}

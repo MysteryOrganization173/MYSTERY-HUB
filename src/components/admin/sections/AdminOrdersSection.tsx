@@ -62,7 +62,11 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
   const pageSize = 20;
   const requests = useRef(createAdminRequestScope()).current;
   requests.setContext(sessionToken);
-  useEffect(() => () => requests.invalidate(), [requests, sessionToken]);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; requests.invalidate(); };
+  }, [requests, sessionToken]);
   const actionPending = useRef(false);
   const [isActing, setIsActing] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -463,8 +467,18 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
           onRefreshSupplier={() => void handleRefreshSupplierStatus(selectedOrder.public_reference)}
           updatingStatus={isUpdatingStatus}
           onMarketplaceStep={step => void handleUpdateOrderStatus(selectedOrder, step)}
-          onResolutionUpdated={updated => { if (selectedOrderRef.current?.id === updated.id) { requests.invalidate('detail'); setIsLoadingDetail(false); setSelected({ ...selectedOrderRef.current, ...updated }); afterAction(); } }}
-          recordKeeping={<AdminOrderRecordKeeping key={selectedOrder.public_reference} token={sessionToken} reference={selectedOrder.public_reference} client={recordClient}
+          onResolutionUpdated={updated => {
+            if (mounted.current) {
+              if (selectedOrderRef.current?.id === updated.id) {
+                requests.invalidate('detail');
+                setIsLoadingDetail(false);
+                setSelected({ ...selectedOrderRef.current, ...updated });
+              }
+              void refreshList.current();
+            }
+            onChanged?.();
+          }}
+          recordKeeping={<AdminOrderRecordKeeping key={`${selectedOrder.public_reference}:${selectedOrder.resolution?.version ?? 0}`} token={sessionToken} reference={selectedOrder.public_reference} client={recordClient}
             paused={isActing || isLoadingDetail || Boolean(detailError)}
             onArchivedChange={() => afterAction()}
             onDeleted={reference => { closeOrderDrawer(); setListNotice(`Test record ${reference} was permanently deleted.`); afterAction(); }} />}

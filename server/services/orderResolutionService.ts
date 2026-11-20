@@ -30,11 +30,15 @@ export class OrderResolutionService {
      manual={outcome:input.manualOutcome as ManualResolutionOutcome,reason:note,evidence:evidenceText(input.evidence,'documented evidence'),actor:adminId,at:''};
      if(manual.outcome==='external_compensation'){manual.method=evidenceText(input.method,'the compensation method',2,80);manual.reference=evidenceText(input.reference,'the external transaction/reference',3,160);}
      if(input.refundId!==undefined||input.evidenceStatus!==undefined)throw new FinanceError('Do not mix manual attestation with provider refund actions.');
-   }else if(['manualOutcome','evidence','method','reference'].some(key=>input[key]!==undefined))throw new FinanceError('Manual evidence requires the manual resolution action.');
+   }else if(['manualOutcome','evidence','method'].some(key=>input[key]!==undefined)||input.reference!==undefined&&action!=='supplier_evidence')throw new FinanceError('Choose the resolution action that matches this evidence.');
+   const supplierEvidenceReference=action==='supplier_evidence'&&input.reference!==undefined
+     ? evidenceText(input.reference,'the original supplier support or transaction reference',3,160)
+     : undefined;
    const initial=await OrdersStore.findOrder(reference);if(!initial)throw new FinanceError('Order not found.',404);
    const hash=createHash('sha256').update(JSON.stringify(Object.keys(input).sort().map(key=>[key,input[key]]))).digest('hex');
    const previous=await OrderResolutionStore.request(initial.id,input.requestId);
    if(previous){if(previous.input_hash!==hash||previous.actor_id!==adminId)throw new FinanceError('Resolution request changed.',409);return this.details(reference);}
+   if(manual?.outcome==='manual_fulfillment')manual.reference=evidenceText(input.reference,'the manual delivery receipt or support reference',3,160);
    if(initial.payment_status!=='success'||!initial.paid_at||initial.currency!=='GHS'||!Number.isSafeInteger(initial.amount)||initial.amount<=0)throw new FinanceError('Only verified paid orders are eligible.',409);
    if(!['failed','refund_pending','refunded','cancelled','expired'].includes(initial.status))throw new FinanceError('Await the authoritative supplier outcome; do not refund an active/delivered order here.',409);
    if(action==='refund_wallet'&&(initial.payment_provider!=='wallet'||!initial.user_id))throw new FinanceError('Paystack-to-Wallet compensation is disabled. Refund the original payment method.',409);
@@ -72,7 +76,7 @@ export class OrderResolutionService {
      }
      if(action==='supplier_evidence'){
        if(!['failed','refund_pending','refunded','uncertain'].includes(String(input.evidenceStatus)))throw new FinanceError('Select a documented supplier outcome.');
-       resolution.supplierEvidence={status:input.evidenceStatus as any,note,actor:adminId,at:now};
+       resolution.supplierEvidence={status:input.evidenceStatus as any,note,actor:adminId,at:now,...(supplierEvidenceReference?{reference:supplierEvidenceReference}:{})};
      }
      if(action==='verify_external'){
        resolution.lastAttemptAt=now;

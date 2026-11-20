@@ -22,7 +22,7 @@ import {leadAlertLabel, leadDestination} from '../../../shared/leadOperations';
 import { AdminOperationsAlerts } from './sections/AdminOperationsAlerts';
 import { AdminSheet } from './ui/AdminUi';
 import { BrandLogo } from '../common/BrandLogo';
-import { useAdminSignals } from './adminSignals';
+import { invalidateAdminOverview, useAdminSignals } from './adminSignals';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -171,9 +171,10 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
   const signals = useAdminSignals(token, signalRefresh);
   const leads = useLeadAlerts(token);
   const refreshOrderSignals = useCallback(() => {
+    invalidateAdminOverview(token);
     leads.refresh();
     onSignalsChanged();
-  }, [leads.refresh, onSignalsChanged]);
+  }, [token, leads.refresh, onSignalsChanged]);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const alertTrigger = useRef<HTMLButtonElement>(null);
   const restoreAlertFocus = useRef(false);
@@ -183,12 +184,12 @@ function AdminWorkspace({ token, adminId, adminLabel, activeTab, param, navigate
       alertTrigger.current?.focus();
     }
   }, [alertsOpen]);
-  const paidCount = !leads.orderError ? leads.orders?.total : undefined;
+  const paidCount = leads.denied ? undefined : leads.orders?.total;
   const hasEnquiryAlerts = !leads.error && leads.data &&
     [leads.data.ultra, leads.data.marketplace].some(source => source.new > 0 || source.overdue > 0);
   const hasAlerts = !leads.denied && Boolean(paidCount || hasEnquiryAlerts || (signals.supplierAlert && !signals.supplierUnavailable));
   const badges: Partial<Record<AdminTab, { count: number | null; tone: 'warning' | 'danger' | 'info'; label: string }>> = {
-    orders: paidCount ? { count: paidCount, tone: 'warning', label: `${paidCount} paid orders need attention` } : undefined,
+    orders: paidCount ? { count: paidCount, tone: 'warning', label: `${paidCount} paid orders need attention${leads.orderError ? ' at the last successful check' : ''}` } : undefined,
     marketplace: !leads.error && leads.data?.marketplace.new ? { count: leads.data.marketplace.new, tone: 'info', label: `${leads.data.marketplace.new} new Marketplace and Creative Studio enquiries` } : undefined,
     websites: !leads.error && leads.data?.ultra.new ? { count: leads.data.ultra.new, tone: 'info', label: `${leads.data.ultra.new} new Ultra enquiries` } : undefined,
     finance: !leads.denied && signals.pendingWithdrawals ? { count: signals.pendingWithdrawals, tone: 'warning', label: `${signals.pendingWithdrawals} waiting withdrawal requests in the latest 50` } : undefined,
