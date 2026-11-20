@@ -73,7 +73,7 @@ test('legacy timeout needs original supplier evidence and a separate manual reme
  assert.equal((await alerts()).total,2);
  const blocked=await resolve(input(order));
  assert.equal(blocked.status,409);
- assert.match((await blocked.json()).error,/original supplier attempt timed out/);
+ assert.match((await blocked.json()).error,/original supplier outcome is unconfirmed/);
  assert.equal((await alerts()).total,2);
  const recorded=await resolve({
   action:'supplier_evidence',confirmed:true,requestId:randomUUID(),

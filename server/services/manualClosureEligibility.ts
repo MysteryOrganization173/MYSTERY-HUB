@@ -42,7 +42,7 @@ export function manualClosureBlock(order:Pick<OrderRecord,'resolution_json'|'sta
        'timestamp' in parsed&&typeof parsed.timestamp==='string'&&Number.isFinite(Date.parse(parsed.timestamp))){
       return evidenceConfirmed&&typeof evidence.reference==='string'&&evidence.reference.trim().length>=3
         ? null
-        : 'The original supplier attempt timed out. Confirm its failure or supplier refund, then save the supplier support or transaction reference under Record Supplier Evidence.';
+        : 'The original supplier outcome is unconfirmed. Confirm its failure or supplier refund, then save the supplier support or transaction reference under Record Supplier Evidence.';
     }
     if(!['failed','refund_pending','refunded','rejected','cancelled','expired'].includes(status))
       return 'Supplier evidence is active, completed or unverifiable. Refresh the original supplier identifier or reconcile with the supplier before manual closure.';
