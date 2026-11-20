@@ -1,9 +1,9 @@
-import React, { useEffect, useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { CheckCircle2, Download, Share, SquarePlus, X } from 'lucide-react';
 import { BrandMark } from '../common/BrandLogo';
 import { useAppInstall } from '../../pwa/useAppInstall';
 import { installCopy, installProgressCopy } from '../../pwa/invitationCopy';
-import { noteDismissal, noteInvitationAnswered, registerInlineOffer } from '../../pwa/invitations';
+import { noteDismissal, noteInvitationAnswered, registerInlineOffer, setInlineOfferInView } from '../../pwa/invitations';
 import { isCoarsePointer } from '../../pwa/appEnvironment';
 import {trackGrowth} from '../../utils/growthAnalytics';
 import './pwa.css';
@@ -20,8 +20,10 @@ export const AppleInstallSteps: React.FC<{ id: string }> = ({ id }) => (
 /**
  * The install card inside a page. Shown only where installing can actually work: Chromium browsers that offer
  * their install dialog, and iPhone/iPad Safari (Add to Home Screen steps). Hidden inside the installed app, after a
- * dismissal, while an accepted install is pending, and everywhere else. While it is on the page, the floating
- * invitations stay away, and its "Not now" ends suggestions for the rest of the visit.
+ * dismissal, while an accepted install is pending, and everywhere else. While it is on the page, the floating Install
+ * and Channel cards stay away from that page, and while it is on screen no floating card at all sits beside it (the
+ * notification card waits, or steps aside when this card scrolls into view). Its "Not now" ends suggestions for the
+ * rest of the visit.
  */
 export const InstallAppPromo: React.FC<{ variant?: 'section' | 'compact'; className?: string }> = ({ variant = 'section', className = '' }) => {
   const { mode, progress, install, dismiss, stepsSeen } = useAppInstall();
@@ -32,7 +34,16 @@ export const InstallAppPromo: React.FC<{ variant?: 'section' | 'compact'; classN
   const titleId = useId(), stepsId = useId(), offerId = useId();
   useEffect(() => { if (mode !== 'hidden') setShownMode(mode); }, [mode]);
   const offering = mode !== 'hidden' && progress === 'idle';
+  const sectionRef = useRef<HTMLElement | null>(null);
   useEffect(() => (offering ? registerInlineOffer(offerId) : undefined), [offering, offerId]);
+  // Without an observer it simply counts as on screen (the conservative answer).
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!offering || !section || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(entries => { for (const entry of entries) setInlineOfferInView(offerId, entry.isIntersecting); });
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, [offering, offerId]);
 
   const visible = mode !== 'hidden' || (progress !== 'idle' && shownMode !== 'hidden');
   if (!visible) return null;
@@ -53,7 +64,7 @@ export const InstallAppPromo: React.FC<{ variant?: 'section' | 'compact'; classN
   }
 
   const copy = installCopy(phone);
-  return <section aria-labelledby={titleId} className={`mh-install-promo mh-install-promo-${variant} ${className}`}>
+  return <section ref={sectionRef} aria-labelledby={titleId} className={`mh-install-promo mh-install-promo-${variant} ${className}`}>
     <button type="button" className="mh-install-close mh-compact-control" onClick={close} aria-label="Hide the app suggestion">
       <X className="size-4" aria-hidden="true" />
     </button>

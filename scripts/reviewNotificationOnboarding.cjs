@@ -1,4 +1,4 @@
-// LOCAL ONLY. Mystery Hub 3.4-C browser acceptance: one notification invitation, the browser permission, server
+// LOCAL ONLY. Mystery Hub 3.4-C browser acceptance (paused check updated for Notification Onboarding V2): one notification invitation, the browser permission, server
 // registration with purpose-specific consent, one honest result; guest news on/off; account settings and history.
 // Drives a local production build (default http://localhost:3111) started with SYNTHETIC local push keys against a
 // disposable database. Chromium automation cannot reach a real push service, so PushManager.subscribe is SIMULATED
@@ -170,14 +170,15 @@ const setPaused = paused => db.query(`UPDATE ${N}.settings SET paused=$1 WHERE i
       } else ok('a notification invitation for the refusal check', false, 'none appeared');
       await ctx.close();
     }
-    // 5. Paused by the operator: nobody is invited to notifications that would not arrive.
+    // 5. Paused by the operator (V2): registering still works, so the invitation is shown and says so, with no date.
     {
       await setPaused(true);
       const ctx = await context(b); const p = await ctx.newPage();
       await engage(p);
-      const shown = await waitCard(p, 7000);
+      const shown = await waitCard(p, 9000);
       const h = shown ? await card(p).locator('h2').textContent() : '';
-      ok('paused: no notification invitation (a different suggestion may appear)', h !== 'Stay updated.', h);
+      const notes = shown ? await card(p).locator('.mh-invite-note').allTextContents() : [];
+      ok('paused (V2): the invitation still appears and says "Notifications will arrive once sending resumes."', h === 'Stay updated.' && notes.includes('Notifications will arrive once sending resumes.'), JSON.stringify({ h, notes }));
       await ctx.close();
       await setPaused(false);
     }

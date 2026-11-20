@@ -2,6 +2,8 @@
  * Installable app: when Mystery Hub may suggest something. Every suggestion is one tap to dismiss, and every
  * dismissal is remembered on this device so nobody is asked again and again.
  */
+import { NOTIFICATION_TIMING } from './invitations';
+
 const DAY = 24 * 60 * 60 * 1000;
 
 export type Snooze = { count: number; lastAt: number | null };
@@ -18,9 +20,11 @@ export const STORAGE_KEYS = {
 /** Install card: "Not now" (or closing the browser dialog) hides it for 30 days; after the third time, for good. */
 export const INSTALL_PROMO_REST_DAYS = 30;
 export const INSTALL_PROMO_MAX_DISMISSALS = 3;
-/** Notification card: asked at most twice, three weeks apart. The browser's own answer is always final. */
-export const NOTIFICATION_REST_DAYS = 21;
-export const NOTIFICATION_MAX_DISMISSALS = 2;
+/**
+ * Notification card (V2): "Not now" rests it for NOTIFICATION_TIMING.snoozeDays (3), every time, with no strike count
+ * and no permanent suppression. The browser's own "Block" is always final. Timings live in pwa/invitations.
+ */
+export const NOTIFICATION_REST_DAYS = NOTIFICATION_TIMING.snoozeDays;
 /** Welcome sheet: once per app launch, and not for a week after someone chooses to browse as a guest. */
 export const WELCOME_GUEST_REST_DAYS = 7;
 
@@ -47,15 +51,18 @@ export function showWelcomeSheet({ installed, signedIn, authChecking, path, show
   return guestChosenAt === null || now - guestChosenAt >= WELCOME_GUEST_REST_DAYS * DAY;
 }
 
-/** The notification invitation rests three weeks after "Not now" and stops after the second; the browser's answer is final. */
-export const notificationInviteResting = (snooze: Snooze, now: number) => resting(snooze, NOTIFICATION_REST_DAYS, NOTIFICATION_MAX_DISMISSALS, now);
-
-export function showNotificationOptIn({ installed, signedIn, permission, registered, snooze, now }: {
-  installed: boolean; signedIn: boolean; permission: string; registered?: boolean; snooze: Snooze; now: number;
-}) {
-  if (!installed || !signedIn || !(permission === 'default' || permission === 'granted' && registered === false)) return false;
-  return !resting(snooze, NOTIFICATION_REST_DAYS, NOTIFICATION_MAX_DISMISSALS, now);
+/**
+ * The notification invitation rests three days after "Not now" (or closing it, or closing the browser's question).
+ * It reads records written by the old rule too: the strike count is ignored, so a record that reached the old
+ * two-strike limit is not suppressed. Only the time of the last answer counts. A time far in the future (a changed
+ * clock) is ignored rather than locking the card away; one up to a day ahead still rests from that time.
+ */
+export function notificationInviteResting(snooze: Snooze, now: number) {
+  const at = snooze.lastAt;
+  if (at === null || !Number.isFinite(at) || at <= 0 || at > now + DAY) return false;
+  return now - at < NOTIFICATION_REST_DAYS * DAY;
 }
+
 
 type Store = Pick<Storage, 'getItem' | 'setItem'>;
 const local = (): Store | null => { try { return window.localStorage; } catch { return null; } };

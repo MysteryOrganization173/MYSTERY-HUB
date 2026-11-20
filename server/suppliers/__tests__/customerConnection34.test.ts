@@ -182,7 +182,7 @@ test('the welcome slot is released only after the sheet has been open, and insta
   assert.match(layer, /const busy = appBusy\(app\);/);
   assert.doesNotMatch(layer, /InstalledNotificationOnboarding/, '3.4-C: the coordinated invitation layer offers notifications');
   const invitations = read('src/components/pwa/InvitationLayer.tsx');
-  assert.match(invitations, /notificationsFirst/, 'first use in the installed app and after a member purchase');
+  assert.match(invitations, /lead: memberPurchase \|\| notificationsLead\(session, seen, now\)/, 'V2: notifications lead (always after a member purchase), taking turns with Install and the Channel');
   assert.match(invitations, /recordDismissal\(STORAGE_KEYS\.notificationOptIn\); onClose\('dismissed'\)/);
   const inline = read('src/components/pwa/InstallAppPromo.tsx');
   assert.match(inline, /noteInvitationAnswered\('install'\); void install\(\);/);
