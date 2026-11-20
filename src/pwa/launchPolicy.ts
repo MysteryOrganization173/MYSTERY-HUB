@@ -57,6 +57,11 @@ export function showWelcomeSheet({ installed, signedIn, authChecking, path, show
  * two-strike limit is not suppressed. Only the time of the last answer counts. A time far in the future (a changed
  * clock) is ignored rather than locking the card away; one up to a day ahead still rests from that time.
  */
+/** When the current "Not now" rest ends, or null if it is not resting. */
+export function notificationSnoozeEnds(snooze: Snooze, now: number) {
+  return notificationInviteResting(snooze, now) ? snooze.lastAt! + NOTIFICATION_REST_DAYS * DAY : null;
+}
+
 export function notificationInviteResting(snooze: Snooze, now: number) {
   const at = snooze.lastAt;
   if (at === null || !Number.isFinite(at) || at <= 0 || at > now + DAY) return false;

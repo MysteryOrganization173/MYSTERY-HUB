@@ -7,12 +7,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import {
-  calmPage, claimInvitation, DAY, engaged, inlineOfferInView, inlineOfferVisible, invitationOnScreen, invitationPlan,
+  calmPage, claimInvitation, DAY, engaged, inlineOfferInView, inlineOfferVisible, invitationOnScreen, invitationPlan, notificationRestEnds,
   INVITATION_KEYS, NEW_SESSION, noteDismissal, noteNotificationsYield, notificationsLead, NOTIFICATION_TIMING,
   noteView, readSeen, readSession, registerInlineOffer, releaseInvitation, resetInvitationsForTest, sessionAllows,
   setInlineOfferInView, SETTLE_MS,
 } from '../../../src/pwa/invitations.js';
-import { installPromoMode, notificationInviteResting, NO_SNOOZE, readSnooze, recordDismissal, STORAGE_KEYS } from '../../../src/pwa/launchPolicy.js';
+import { installPromoMode, notificationInviteResting, notificationSnoozeEnds, NO_SNOOZE, readSnooze, recordDismissal, STORAGE_KEYS } from '../../../src/pwa/launchPolicy.js';
 import { createAutoHide, type AutoHideClock } from '../../../src/pwa/autoHide.js';
 import { activateNotificationInvite, inviteConsent, notificationInviteOpportunity, onNotificationChoice } from '../../../src/pwa/notificationOnboarding.js';
 import { NOTIFICATION_ACTIONS, notificationCopy, notificationNote, PAUSED_INVITE_NOTE } from '../../../src/pwa/invitationCopy.js';
@@ -458,10 +458,27 @@ test('review M3 and L1: keyboard users get the time they need; the exit can alwa
 
 test('review L2–L3: no assessment when the card cannot appear; no notification card right after another tab’s card', () => {
   const layer = read('src/components/pwa/InvitationLayer.tsx');
-  assert.match(layer, /if \(notificationInviteResting\(snooze, at\) \|\| !sessionAllows\('notifications', readSession\(\), readSeen\(\), at, \{ installedApp \}\)\) \{ setNotifyAssessed\(key\); return; \}/);
+  assert.match(layer, /if \(restEnds > at \|\| !sessionAllows\('notifications', visit, readSeen\(\), at, \{ installedApp \}\)\) \{\n\s+setNotifyAssessed\(key\);/);
   assert.equal(NOTIFICATION_TIMING.afterOtherMs, 30 * 60_000);
   assert.equal(sessionAllows('notifications', NEW_SESSION, { channel: now - 5 * 60_000 }, now), false, 'a Channel card in another tab five minutes ago');
   assert.equal(sessionAllows('notifications', NEW_SESSION, { channel: now - 31 * 60_000 }, now), true);
   assert.equal(sessionAllows('notifications', NEW_SESSION, { install: now - 60_000 }, now, { installedApp: true }), true, 'the installed app’s first use right after installing');
   assert.equal(sessionAllows('notifications', NEW_SESSION, { channel: now + 900 * DAY }, now), true, 'a far-future record never blocks');
+});
+
+test('verification N1–N3: a short key memory, rests that end on an open page are looked at again, typed-in fields keep focus', () => {
+  const client = read('src/services/customerNotifications.ts');
+  assert.match(client, /const KNOWN_KEY_MS=60_000;/, 'the key from the assessment is trusted for one minute');
+  assert.match(client, /catch\(e\)\{knownKey=null;throw e;\}/, 'a failed configuration read forgets it');
+  assert.equal(notificationRestEnds({}, now), null);
+  assert.equal(notificationRestEnds({ notifications: now - HOUR }, now), now - HOUR + NOTIFICATION_TIMING.ignoredRestMs);
+  assert.equal(notificationRestEnds({ channel: now - 10 * 60_000 }, now), now + 20 * 60_000, 'the half-hour gap');
+  assert.equal(notificationRestEnds({ channel: now - 10 * 60_000 }, now, { installedApp: true }), null);
+  assert.equal(notificationRestEnds({ notifications: now - 13 * HOUR, install: now - 40 * 60_000 }, now), null, 'nothing running');
+  assert.equal(notificationSnoozeEnds({ count: 1, lastAt: now - DAY }, now), now + 2 * DAY);
+  assert.equal(notificationSnoozeEnds({ count: 2, lastAt: now - 4 * DAY }, now), null);
+  const layer = read('src/components/pwa/InvitationLayer.tsx');
+  assert.match(layer, /if \(visit\.shown \|\| visit\.dismissed\) \{ setNotifyAssessed\(key\); return; \}/, 'only this visit\'s answer ends it for the page');
+  assert.match(layer, /if \(restEnds > at\) lookAgain\.current = window\.setTimeout\(\(\) => \{ lookAgain\.current = null; assessment\.current = null; setReassess\(n => n \+ 1\); \}/, 'a rest that ends while the page is open is looked at again');
+  assert.match(layer, /if \(active && active !== document\.body && !cardRef\.current\?\.contains\(active\)\) return;/, 'focus taken elsewhere is left alone');
 });

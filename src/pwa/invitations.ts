@@ -124,6 +124,18 @@ export function sessionAllows(kind: InvitationKind, session: InvitationSession, 
   return !valid(own, now) || now - own >= SEEN_REST_DAYS[kind] * DAY;
 }
 
+/**
+ * When the notification card's time-based rests in this browser end (the 12-hour rest after being shown, and the
+ * half-hour gap after another tab's card), or null if none is running now. Used to look again at that moment.
+ */
+export function notificationRestEnds(seen: SeenMap, now: number, { installedApp = false }: { installedApp?: boolean } = {}): number | null {
+  const ends: number[] = [];
+  if (valid(seen.notifications, now) && now - seen.notifications < NOTIFICATION_TIMING.ignoredRestMs) ends.push(seen.notifications + NOTIFICATION_TIMING.ignoredRestMs);
+  const others = [seen.install, seen.channel].filter((at): at is number => valid(at, now));
+  if (!installedApp && others.length && now - Math.max(...others) < NOTIFICATION_TIMING.afterOtherMs) ends.push(Math.max(...others) + NOTIFICATION_TIMING.afterOtherMs);
+  return ends.length ? Math.max(...ends) : null;
+}
+
 export function channelInviteAllowed(state: ChannelInviteState, now: number) {
   if (state.following || state.later >= CHANNEL_MAX_LATER) return false;
   if (state.later > 0 && valid(state.laterAt, now)) {

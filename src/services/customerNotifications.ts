@@ -55,13 +55,14 @@ async function endpointHash(endpoint:string){const bytes=await crypto.subtle.dig
 const request=(token:string,path:string,method='GET',body?:unknown)=>notificationHttp(token,'notifications/'+path,method,body);
 const preferences=(p:any):NotificationPreferences=>{if(typeof p.transactional!=='boolean'||typeof p.marketing!=='boolean')throw Error('Invalid notification preferences. Refresh before changing them.');return {transactional:p.transactional,promotional:p.marketing,marketingOptedOut:p.marketingOptedOut===true,version:''};}; // Atomic last-write-wins PUTs, not versioned templates.
 let knownKey:{key:string;at:number}|null=null;
-const KNOWN_KEY_MS=10*60_000;
+const KNOWN_KEY_MS=60_000;
 export const httpCustomerNotificationsClient:CustomerNotificationsClient={
  available:true,
- async configuration(){const c=await notificationHttp(null,'notifications/config');knownKey=c&&c.enabled&&c.publicKey?{key:c.publicKey,at:Date.now()}:null;return c;},
- // V2: a key confirmed by a recent configuration read (the invitation's own assessment) is used at once, so the tap
- // reaches the browser's permission question without a network wait. Otherwise the configuration is read first,
- // and a disabled service still never leads to a permission request.
+ async configuration(){let c;try{c=await notificationHttp(null,'notifications/config');}catch(e){knownKey=null;throw e;}knownKey=c&&c.enabled&&c.publicKey?{key:c.publicKey,at:Date.now()}:null;return c;},
+ // V2: a key confirmed by a configuration read in the last minute (the invitation's own assessment) is used at once,
+ // so the tap reaches the browser's permission question without a network wait. Otherwise the configuration is read
+ // first, so a service known to be off never leads to a permission request (and the server refuses registrations
+ // while it is off in any case).
  async publicKey(){if(knownKey&&Date.now()-knownKey.at<KNOWN_KEY_MS)return knownKey.key;const c=await this.configuration!();if(!c.enabled||!c.publicKey)throw Error('Real phone alerts are disabled pending verified push configuration. Your notification choices remain available.');return c.publicKey;},
  async deviceStatus(token,endpoint){const hash=await endpointHash(endpoint);const {devices}=await request(token,'subscriptions');return {subscribed:devices.some((d:any)=>d.endpoint_hash===hash&&d.current_session===true)};},
  async register(token,subscription,consent){try{const r=await request(token,'subscriptions','PUT',consent?{subscription,consent}:{subscription});if(r.success!==true||!r.deviceId)throw Error('Device registration was not confirmed.');

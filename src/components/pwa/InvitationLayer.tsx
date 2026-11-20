@@ -7,14 +7,14 @@ import { activateNotificationInvite, notificationInviteOpportunity, onNotificati
 import { notificationPermissionState } from '../../pwa/notifications';
 import { createAutoHide, windowClock } from '../../pwa/autoHide';
 import { httpCustomerNotificationsClient, httpGuestNotificationsClient } from '../../services/customerNotifications';
-import { notificationInviteResting, readSnooze, recordDismissal, STORAGE_KEYS } from '../../pwa/launchPolicy';
+import { notificationInviteResting, notificationSnoozeEnds, readSnooze, recordDismissal, STORAGE_KEYS } from '../../pwa/launchPolicy';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { BrandMark } from '../common/BrandLogo';
 import { useAppInstall } from '../../pwa/useAppInstall';
 import { openOverlayCount, subscribeOverlays } from '../../utils/overlayStack';
 import {
   calmPage, channelInviteAllowed, claimInvitation, engaged, inlineOfferInView, inlineOfferVisible, invitationOnScreen,
-  invitationPlan, noteActive, noteDismissal, noteNotificationsYield, notePurchase, notificationsLead, noteView,
+  invitationPlan, noteActive, noteDismissal, noteNotificationsYield, notePurchase, notificationRestEnds, notificationsLead, noteView,
   NOTIFICATION_TIMING, readChannelInvite, readSeen, readSession, recordChannelFollowing, recordChannelLater,
   recordChannelOpened, releaseInvitation, sessionAllows, subscribeInvitations, type InvitationKind,
 } from '../../pwa/invitations';
@@ -152,6 +152,7 @@ export const InvitationLayer: React.FC = () => {
   const [notifyDone, setNotifyDone] = useState(false);
   const [reassess, setReassess] = useState(0);
   const assessment = useRef<{ key: string; controller: AbortController } | null>(null);
+  const lookAgain = useRef<number | null>(null);
   const accountKey = sessionToken && user ? `member:${user.id}:${sessionToken}` : 'guest';
   const onCalmPage = calmPage(activePage, typeof window === 'undefined' ? '' : window.location.search);
   useEffect(() => onNotificationChoice(() => setNotifyDone(true)), []);
@@ -164,17 +165,25 @@ export const InvitationLayer: React.FC = () => {
     setNotifyInvite(null);
     setNotifyDone(false);
     const key = accountKey;
-    // Nothing to ask the server when the card cannot appear in this visit anyway (already shown or answered, resting,
-    // or snoozed): the other suggestions are not held up, and no request is made on every page load.
-    const snooze = readSnooze(STORAGE_KEYS.notificationOptIn), at = Date.now();
-    if (notificationInviteResting(snooze, at) || !sessionAllows('notifications', readSession(), readSeen(), at, { installedApp })) { setNotifyAssessed(key); return; }
+    // Nothing to ask the server when the card cannot appear now anyway: already shown or answered in this visit, or
+    // resting (snoozed, the 12-hour rest, the half-hour gap). The other suggestions are not held up, and no request is
+    // made on every page load. A rest that ends while the page is open is looked at again at that moment.
+    if (lookAgain.current !== null) { window.clearTimeout(lookAgain.current); lookAgain.current = null; }
+    const snooze = readSnooze(STORAGE_KEYS.notificationOptIn), at = Date.now(), visit = readSession();
+    if (visit.shown || visit.dismissed) { setNotifyAssessed(key); return; }
+    const restEnds = Math.max(notificationSnoozeEnds(snooze, at) ?? 0, notificationRestEnds(readSeen(), at, { installedApp }) ?? 0);
+    if (restEnds > at || !sessionAllows('notifications', visit, readSeen(), at, { installedApp })) {
+      setNotifyAssessed(key);
+      if (restEnds > at) lookAgain.current = window.setTimeout(() => { lookAgain.current = null; assessment.current = null; setReassess(n => n + 1); }, Math.min(restEnds - at + 1_000, 2_147_000_000));
+      return;
+    }
     void notificationInviteOpportunity(httpCustomerNotificationsClient, httpGuestNotificationsClient, {
       token: sessionToken || null, accountId: user?.id, isCustomer: user ? user.role === 'customer' : undefined,
       signal: controller.signal, snooze, now: at,
     }).then(invite => { if (!controller.signal.aborted) { setNotifyInvite(invite); setNotifyAssessed(key); } },
       () => { if (!controller.signal.aborted) setNotifyAssessed(key); });
   }, [accountKey, isAuthChecking, onCalmPage, reassess]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => assessment.current?.controller.abort(), []);
+  useEffect(() => () => { assessment.current?.controller.abort(); if (lookAgain.current !== null) window.clearTimeout(lookAgain.current); }, []);
 
   // What may appear here, in which order and after how long (pure rules in pwa/invitations).
   const installOffer = installState.mode !== 'hidden' && installState.progress === 'idle';
@@ -388,6 +397,9 @@ function NotificationInvitation({ cardRef, onStage, invite, token, onClose }: {
   useEffect(() => {
     if (step === 'invite' || step === 'working' || !focusResult.current) return;
     focusResult.current = false;
+    // Only if focus was not taken elsewhere meanwhile (someone typing in a search box keeps their place).
+    const active = document.activeElement;
+    if (active && active !== document.body && !cardRef.current?.contains(active)) return;
     cardRef.current?.querySelector<HTMLElement>('.mh-invite-actions button')?.focus({ preventScroll: true });
   }, [step, cardRef]);
   const allow = async () => {

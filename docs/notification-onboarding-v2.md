@@ -49,6 +49,7 @@ was not touched.
   - When the account changes (sign-in, sign-out, a switch), the next calm page cancels the old check and starts a new one.
   - Results for a previous account are never used: they are keyed to the account and its session.
   - No check runs at all when the card cannot appear in this visit: already shown or answered, resting, snoozed, or too soon after another card.
+  - A rest that ends while the page stays open is looked at again at that moment.
 - It runs again only if the browser permission changed in the meantime (another tab, site settings).
 
 ## Ignored versus dismissed
@@ -104,9 +105,9 @@ the server confirms the device.
   - "Dismissed" (the three-day rest) is recorded only when the browser really asked and the person closed its question.
   - A network or service failure shows "Notifications aren't on yet." with Try again.
 - **The browser's question follows the tap directly:**
-  - The key comes from the configuration the assessment just read (kept for 10 minutes), so there is no network wait. This matters for browsers that only ask right after a tap.
-  - A disabled service still never leads to a permission request.
-- **Focus:** pressing Allow from the keyboard moves focus to the result's first button.
+  - The key comes from the configuration the assessment just read (kept for one minute, and forgotten if a read fails), so there is no network wait. This matters for browsers that only ask right after a tap.
+  - Otherwise the configuration is read first, so a service known to be off never leads to a permission request. The server refuses registrations while it is off in any case.
+- **Focus:** pressing Allow from the keyboard moves focus to the result's first button, unless focus was taken elsewhere in the meantime.
 - **Blocked:**
   - The browser's "Block" is final: no invitation, and no repeated request.
   - My Account (members) and the footer's Notifications sheet (visitors) give short directions.
