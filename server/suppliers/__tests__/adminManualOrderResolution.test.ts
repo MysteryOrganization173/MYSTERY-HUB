@@ -8,6 +8,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import React from 'react';
 import {OrdersStore} from '../../db/ordersStore';
 import {OrderResolutionStore} from '../../db/orderResolutionStore';
+import {orderManagementEligibility} from '../../services/orderManagementPolicy';
 import {OrderResolutionService as Service} from '../../services/orderResolutionService';
 import {FinanceStore} from '../../db/financeStore';
 import {FinanceService} from '../../services/financeService';
@@ -41,11 +42,14 @@ for(const resolution of [
  {stage:'under_review',lastAttemptAt:new Date().toISOString(),lastError:'Provider timeout'},
  {stage:'under_review',outcome:'paystack_refund',refundId:'123',providerStatus:'failed'},
  {stage:'resolved',outcome:'wallet_refund'},
+ {stage:'under_review',verifiedAt:new Date().toISOString()},
 ] as const)test('manual closure rejects existing incompatible customer refund '+JSON.stringify(resolution),async()=>{const o=await create({resolution_json:{version:1,lastActor:'admin',updatedAt:new Date().toISOString(),...resolution}});await assert.rejects(()=>act(o),/refund|resolved/);assert.equal((await OrderResolutionStore.history(o.id)).length,0);});
 for(const extra of [
  {status:'processing'}, {status:'queued'}, {status:'delivered'}, {status:'refunded'},
  {payment_status:'pending',paid_at:null}, {failure_reason:'supplier_submission_uncertain'},
  {supplier_response:'{"status":"processing"}'}, {supplier_response:'{"status":"delivered"}'},
+ {supplier_response:'{"status":"delivered","data":{"status":"failed"}}'},
+ {supplier_response:'{"status":"processing","data":{"status":"failed"}}'},
  {supplier_response:'{"status":"unknown"}'}, {supplier_response:'invalid'},
  {supplier_order_id:'known',supplier_response:null},
 ] as Partial<OrderRecord>[])test('unsupported/uncertain order cannot close '+JSON.stringify(extra),async()=>{const o=await create(extra);await assert.rejects(()=>act(o));assert.deepEqual(await OrdersStore.findOrder(o.id),o);});
@@ -57,7 +61,7 @@ test('authorized route supports manual resolution using current revision contrac
 
 test('nested supplier failure under a successful API envelope permits documented manual closure',async()=>{const o=await act(await create({supplier_response:JSON.stringify({status:'success',data:{status:'failed'}})}));assert.equal(o.resolution_json?.stage,'resolved');});
 
-test('legacy timeout needs original supplier evidence and a separate manual remedy receipt', async () => {
+test('a documented customer remedy and original supplier investigation close independently', async () => {
  const time=new Date().toISOString();
  const order=await create({
   status:'failed',supplier_order_id:null,submitted_at:null,manual_review:false,
@@ -71,30 +75,60 @@ test('legacy timeout needs original supplier evidence and a separate manual reme
  const alerts=async()=>(await (await fetch(base+'/api/admin/alerts/paid-orders',{headers})).json()).data;
  const resolve=async(body:Record<string,unknown>)=>fetch(base+'/api/admin/orders/'+order.id+'/resolution',{method:'POST',headers,body:JSON.stringify(body)});
  assert.equal((await alerts()).total,2);
- const blocked=await resolve(input(order));
- assert.equal(blocked.status,409);
- assert.match((await blocked.json()).error,/original supplier outcome is unconfirmed/);
+ const investigation=()=>OrdersStore.searchOrdersAdmin({status:'supplier_review'});
+ assert.equal((await resolve(input(order,{reference:undefined}))).status,400);
+ assert.equal((await resolve(input(order,{reference:'N/A'}))).status,400);
+ assert.equal((await resolve(input(order,{manualOutcome:'external_compensation',method:'Cash'}))).status,409);
  assert.equal((await alerts()).total,2);
- const recorded=await resolve({
-  action:'supplier_evidence',confirmed:true,requestId:randomUUID(),
-  expectedUpdatedAt:order.updated_at,expectedVersion:2,evidenceStatus:'refunded',
-  note:'Supplier support independently confirmed the original timed-out attempt was refunded.',
-  reference:'SYNTHETIC-SUPPLIER-CASE',
- });
- assert.equal(recorded.status,200);
- const current=(await OrdersStore.findOrder(order.id))!;
- assert.equal((await resolve(input(current,{reference:undefined}))).status,400);
- assert.equal((await alerts()).total,2);
- assert.equal((await resolve(input(current))).status,200);
+ const body=input(order);
+ assert.equal((await resolve(body)).status,200);
+ assert.equal((await resolve(body)).status,200);
  const after=(await OrdersStore.findOrder(order.id))!;
  assert.equal(after.resolution_json?.stage,'resolved');
+ assert.equal(after.resolution_json?.supplierInvestigation,'open');
  assert.equal(after.resolution_json?.manual?.reference,'SYNTHETIC-DELIVERY-123');
- assert.equal(after.resolution_json?.supplierEvidence?.reference,'SYNTHETIC-SUPPLIER-CASE');
+ assert.deepEqual(after.resolution_json?.supplierEvidence,order.resolution_json?.supplierEvidence);
+ assert.equal((await investigation()).orders[0].id,order.id);
+ assert.equal(orderManagementEligibility(after,false,false).archive,false);
+ assert.equal(toSafePublicOrder(after).customer_resolution,'manual_fulfillment');
+ assert.doesNotMatch(JSON.stringify(toSafePublicOrder(after)),/supplierInvestigation|SYNTHETIC-DELIVERY/);
  for(const key of ['status','paid_at','payment_status','amount','supplier_response','supplier_order_id','delivered_at'] as const) assert.equal(after[key],order[key]);
  const snapshot=await alerts();
  assert.equal(snapshot.total,1);
  assert.equal(snapshot.orders[0].reference,other.public_reference);
+ const evidenceBody={
+  action:'supplier_evidence',confirmed:true,requestId:randomUUID(),
+  expectedUpdatedAt:after.updated_at,expectedVersion:3,evidenceStatus:'refunded',
+  note:'Supplier support confirmed the original credit and staff checked for a duplicate charge.',
+  reference:'SYNTHETIC-SUPPLIER-CASE',
+ };
+ assert.equal((await resolve({...evidenceBody,reference:undefined})).status,409);
+ assert.equal((await resolve({...evidenceBody,evidenceStatus:'uncertain'})).status,409);
+ assert.equal((await investigation()).total,1);
+ const forbidden=await fetch(base+'/api/admin/orders/'+order.id+'/resolution',{
+  method:'POST',headers:{...headers,Authorization:'Bearer buyer-token'},body:JSON.stringify(evidenceBody),
+ });
+ assert.equal(forbidden.status,403);
+ assert.equal((await resolve(evidenceBody)).status,200);
+ const settled=(await OrdersStore.findOrder(order.id))!;
+ assert.equal(settled.resolution_json?.supplierInvestigation,'closed');
+ assert.equal(settled.resolution_json?.supplierEvidence?.status,'refunded');
+ assert.equal(settled.resolution_json?.supplierEvidence?.reference,'SYNTHETIC-SUPPLIER-CASE');
+ assert.deepEqual(settled.resolution_json?.manual,after.resolution_json?.manual);
+ assert.equal(settled.status,order.status);
+ assert.equal(settled.delivered_at,order.delivered_at);
+ assert.equal(orderManagementEligibility(settled,false,false).archive,true);
+ assert.equal((await investigation()).total,0);
+ assert.equal((await alerts()).total,1);
  assert.equal((await OrderResolutionStore.history(order.id)).length,2);
  assert.equal((await FinanceStore.adminOperations()).length,0);
  assert.equal(providerCalls,0);
+});
+
+test('concurrent attestations can settle an explicitly uncertain failed order only once',async()=>{
+ const o=await create({status:'failed',supplier_order_id:null,submitted_at:null,supplier_response:null,failure_reason:'supplier_submission_uncertain'});
+ const out=await Promise.allSettled([act(o),act(o)]);
+ assert.equal(out.filter(r=>r.status==='fulfilled').length,1);
+ assert.equal((await OrdersStore.findOrder(o.id))?.resolution_json?.supplierInvestigation,'open');
+ assert.equal((await OrderResolutionStore.history(o.id)).length,1);
 });

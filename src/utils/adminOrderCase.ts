@@ -21,7 +21,8 @@ export interface AdminOrderCaseInput {
   submitted_at?: string | null;
   created_at?: string;
   marketplace_status?: string | null;
-  resolution?: { stage?: string; outcome?: string; refundId?: string; manual?: { outcome?: string } | null; updatedAt?: string } | null;
+  resolution?: { stage?: string; outcome?: string; refundId?: string; supplierInvestigation?: string;
+    manual?: { outcome?: string; at?: string } | null; updatedAt?: string } | null;
 }
 
 export type OrderCaseKey =
@@ -83,6 +84,10 @@ export function describeOrderCase(order: AdminOrderCaseInput): OrderCase {
   }
 
   if (resolution?.stage === 'resolved') {
+    if (resolution.outcome === 'manual_fulfillment' && resolution.supplierInvestigation === 'open')
+      return make('resolved_manual_fulfilment', 'Customer manually fulfilled · supplier review open', 'warning',
+        'The customer remedy is recorded. The original supplier attempt still needs reconciliation.',
+        'Use Supplier investigations to document the original outcome and address any duplicate charge or delivery.');
     if (resolution.outcome === 'manual_fulfillment') return make('resolved_manual_fulfilment', 'Resolved · fulfilled outside Mystery Hub', 'info', 'An operator recorded that the customer received the service through another legitimate channel, with evidence.', 'No action needed. The original payment and supplier facts are kept unchanged for audit.');
     if (resolution.outcome === 'external_compensation') return make('resolved_compensated', 'Resolved · compensated externally', 'info', 'An operator recorded an external remedy (for example a MoMo transfer) with its reference.', 'No action needed. This is operator-attested, not a verified provider refund.');
     if(!['paystack_refund','wallet_refund'].includes(resolution.outcome||''))return make('failed_remedy_open','Resolution needs review','warning','The recorded resolution does not identify a verified refund or documented remedy.','Review the resolution evidence before describing this order as refunded.');
@@ -128,23 +133,29 @@ export function orderTimeline(order: AdminOrderCaseInput & { updated_at?: string
   const delivered = kase.key === 'delivered';
   const resolved = kase.key.startsWith('resolved_');
   const dispatched = Boolean(order.supplier_order_id || order.submitted_at);
+  const manual = ['resolved_manual_fulfilment', 'resolved_compensated'].includes(kase.key);
   const steps: OrderTimelineStep[] = [
     { label: 'Order created', at: order.created_at, state: 'done' },
     { label: order.payment_provider==='complimentary'?'Complimentary authorization':order.payment_provider==='admin_external'?'External collection recorded':paid ? 'Payment confirmed' : 'Payment', at: order.paid_at||(['complimentary','admin_external'].includes(order.payment_provider||'')?order.created_at:null), state: paid||['complimentary','admin_external'].includes(order.payment_provider||'') ? 'done' : 'current' },
   ];
   if (order.service_type !== 'marketplace') steps.push({ label: uncertain ? 'Supplier submission uncertain' : dispatched ? 'Sent to supplier' : 'Supplier acceptance not recorded', at: order.submitted_at, state: uncertain ? 'current' : dispatched ? 'done' : paid && !resolved && !delivered ? 'current' : 'pending' });
   steps.push({ label: delivered ? 'Delivered' : uncertain ? 'Delivery not confirmed' : failed ? 'Not delivered' : 'Delivery', at: order.delivered_at, state: delivered ? 'done' : failed ? 'failed' : (uncertain || dispatched) && paid && !resolved ? 'current' : 'pending' });
-  if (uncertain) steps.push({ label: 'Supplier reconciliation', at: null, state: 'current' });
-  if (failed || resolved) steps.push({ label: resolved ? kase.label.replace('Resolved · ', 'Resolved: ') : 'Customer remedy', at: resolved ? order.resolution?.updatedAt ?? null : null, state: resolved ? 'done' : 'current' });
+  if (uncertain || order.resolution?.supplierInvestigation==='open') steps.push({ label: 'Supplier reconciliation', at: null, state: 'current' });
+  if (failed || resolved) steps.push({
+    label: kase.key==='resolved_manual_fulfilment'?'Customer manually fulfilled':resolved?kase.label.replace('Resolved · ', 'Resolved: '):'Customer remedy',
+    at: resolved ? (manual ? order.resolution?.manual?.at : null) ?? order.resolution?.updatedAt ?? null : null,
+    state: resolved ? 'done' : 'current',
+  });
   return steps;
 }
 
-/** Operator lenses over the existing server filters (no new query semantics). */
+/** Operator lenses over the existing server search. */
 export const ORDER_LENSES = [
   { id: 'active', label: 'Active orders', params: {} },
   { id: 'all', label: 'All attempts', params: {status:'all',archived:'include'} },
   { id: 'confirmed', label: 'Confirmed payments', params: {status:'all',paymentView:'confirmed',archived:'include'} },
   { id: 'needs_attention', label: 'Needs attention', params: { status: 'needs_attention' } },
+  { id: 'supplier_review', label: 'Supplier investigations', params: { status: 'supplier_review' } },
   { id: 'awaiting_payment', label: 'Payment Not Completed', params: { paymentView: 'not_completed', status: 'all', archived:'include' } },
   { id: 'paid', label: 'Paid · not dispatched', params: { status: 'paid' } },
   { id: 'queued', label: 'Claimed / queued', params: { status: 'queued' } },

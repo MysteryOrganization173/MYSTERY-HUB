@@ -1608,6 +1608,8 @@ export class OrdersStore {
 
       if (params.status === 'needs_attention') {
         conditions.push(`COALESCE(resolution_json->>'stage','') <> 'resolved' AND (manual_review = TRUE OR (failure_reason = 'supplier_submission_uncertain' AND status IN ('paid', 'queued', 'submitted', 'processing')) OR status = 'refund_pending' OR (payment_status = 'success' AND status IN ('failed','cancelled','expired','refunded') AND COALESCE(resolution_json->>'stage','') <> 'resolved')) AND (payment_status = 'success' OR failure_reason IS NULL OR (LOWER(failure_reason) NOT LIKE 'prelaunch%' AND LOWER(failure_reason) NOT LIKE 'pre-launch%'))`);
+      } else if (params.status === 'supplier_review') {
+        conditions.push("resolution_json->>'supplierInvestigation' = 'open'");
       } else if (params.status === 'with_supplier') {
         conditions.push(`status IN ('submitted','processing')`);
       } else if (params.status === 'abandoned') {
@@ -1703,6 +1705,8 @@ export class OrdersStore {
             (o.payment_status === 'success' && ['failed','cancelled','expired','refunded'].includes(o.status))) &&
           (o.payment_status==='success'||!o.failure_reason || (!o.failure_reason.toLowerCase().startsWith('prelaunch') && !o.failure_reason.toLowerCase().startsWith('pre-launch')))
       );
+    } else if (params.status === 'supplier_review') {
+      all = all.filter(o=>o.resolution_json?.supplierInvestigation==='open');
     } else if (params.status === 'with_supplier') {
       all = all.filter(o=>['submitted','processing'].includes(o.status));
     } else if (params.status === 'abandoned') {

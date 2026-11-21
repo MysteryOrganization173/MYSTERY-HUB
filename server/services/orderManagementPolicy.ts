@@ -14,7 +14,8 @@ export const unpaidFailedAttemptSql = `(status='failed' AND payment_status IN ('
 
 export function orderManagementEligibility(o:OrderRecord,registeredTest:boolean,linked:boolean,now=Date.now()) {
   const active=['paid','queued','submitted','processing','refund_pending'].includes(o.status);
-  const unresolved=o.manual_review || o.failure_reason==='supplier_submission_uncertain'
+  const unresolved=o.manual_review || o.resolution_json?.supplierInvestigation==='open'
+    || o.failure_reason==='supplier_submission_uncertain' && o.resolution_json?.supplierInvestigation!=='closed'
     || o.payment_status==='success' && !['delivered','refunded'].includes(o.status) && o.resolution_json?.stage!=='resolved'
     || o.status==='refunded' && o.resolution_json?.stage!=='resolved';
   const stalePending=o.status==='pending_payment' && now-new Date(o.created_at).getTime()>=86_400_000;
