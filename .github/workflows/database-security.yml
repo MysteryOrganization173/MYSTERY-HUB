@@ -143,3 +143,25 @@ jobs:
         env:
           MYSTERY_EFFICIENCY_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_efficiency_test
         run: NODE_ENV=test node --import tsx --test server/suppliers/__tests__/databaseEfficiencyPostgres.test.ts
+
+      - name: Rehearse the full standby restore and reverse migration with PostgreSQL 17
+        env:
+          MYSTERY_PORTABILITY_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mh_source_test
+          PGPASSWORD: local-test-only
+          TMPDIR: /tmp
+        run: |
+          for db in mh_source_test mh_target_test mh_reverse_test mh_blocked_test mh_failed_test; do
+            createdb -h 127.0.0.1 -U postgres -O app_owner "$db"
+          done
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE mh_locale_test OWNER app_owner TEMPLATE template0 ENCODING 'UTF8' LOCALE_PROVIDER icu ICU_LOCALE 'en-US'"
+          tools="$(mktemp -d)"
+          cat > "$tools/pgtool" <<'SH'
+          #!/usr/bin/env bash
+          set -eu
+          exec docker run --rm --network host --user "$(id -u):$(id -g)" -v /tmp:/tmp \
+            -e PGAPPNAME -e PGHOST -e PGPORT -e PGDATABASE -e PGUSER -e PGPASSWORD -e PGCONNECT_TIMEOUT -e PGSSLMODE \
+            --entrypoint "/usr/lib/postgresql/17/bin/${0##*/}" postgres:17 "$@"
+          SH
+          chmod 700 "$tools/pgtool"
+          for tool in pg_dump pg_restore psql; do ln -s pgtool "$tools/$tool"; done
+          PATH="$tools:$PATH" node --import tsx scripts/runTests.ts server/suppliers/__tests__/databaseStandby.test.ts
