@@ -5,7 +5,7 @@ import {readFileSync, readdirSync, statSync} from 'node:fs';
 import path from 'node:path';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {installPromoMode, showNotificationOptIn, showWelcomeSheet, readSnooze, recordDismissal, NO_SNOOZE, INSTALL_PROMO_MAX_DISMISSALS} from '../../../src/pwa/launchPolicy.js';
+import {installPromoMode, notificationInviteResting, showWelcomeSheet, readSnooze, recordDismissal, NO_SNOOZE, INSTALL_PROMO_MAX_DISMISSALS} from '../../../src/pwa/launchPolicy.js';
 import {isInstalledApp, supportsAppleHomeScreen, supportsInstallPrompt} from '../../../src/pwa/appEnvironment.js';
 import {notificationPermissionState, requestNotificationPermission} from '../../../src/pwa/notifications.js';
 import {captureInstallPrompt, hasInstallPrompt, promptInstall, subscribeInstallPrompt, isPlatformPage, INSTALLED_AT_KEY} from '../../../src/pwa/installPrompt.js';
@@ -50,15 +50,12 @@ test('installed-app welcome: signed-out launches of the start page only, never o
   assert.equal(showWelcomeSheet({...base, guestChosenAt: now - 8 * DAY}), true);
 });
 
-test('notification card: installed app, signed in, permission not yet asked, and not after "Not now" twice', () => {
-  const base = {installed: true, signedIn: true, permission: 'default', snooze: NO_SNOOZE, now};
-  assert.equal(showNotificationOptIn(base), true);
-  for (const permission of ['granted', 'denied', 'unsupported', 'unavailable']) assert.equal(showNotificationOptIn({...base, permission}), false, permission);
-  assert.equal(showNotificationOptIn({...base, signedIn: false}), false);
-  assert.equal(showNotificationOptIn({...base, installed: false}), false, 'browser tabs are never asked');
-  assert.equal(showNotificationOptIn({...base, snooze: {count: 1, lastAt: now - 3 * DAY}}), false);
-  assert.equal(showNotificationOptIn({...base, snooze: {count: 1, lastAt: now - 22 * DAY}}), true);
-  assert.equal(showNotificationOptIn({...base, snooze: {count: 2, lastAt: now - 300 * DAY}}), false);
+test('notification card (V2): "Not now" rests three days every time, with no strike limit (permission and device are assessed in notificationOnboarding)', () => {
+  assert.equal(notificationInviteResting(NO_SNOOZE, now), false);
+  assert.equal(notificationInviteResting({count: 1, lastAt: now - 2 * DAY}, now), true);
+  assert.equal(notificationInviteResting({count: 1, lastAt: now - 3 * DAY}, now), false);
+  assert.equal(notificationInviteResting({count: 2, lastAt: now - 300 * DAY}, now), false, 'an old two-strike record is not permanent any more');
+  assert.equal(notificationInviteResting({count: 7, lastAt: now - 4 * DAY}, now), false, 'no strike count at all');
 });
 
 test('installed detection and install paths come from feature detection', () => {

@@ -43,32 +43,36 @@ function setup(o: Setup = {}) {
   const options = (token: string | null, extra: object = {}) => ({ token, accountId: token ? 'buyer-1' : undefined, isCustomer: token ? true : undefined, signal: new AbortController().signal, snooze: NO_SNOOZE, now: Date.now(), environment: env, ...extra });
   return { env, client, guest, calls, options, asks: () => asks, registered };
 }
+/** V2: the assessment also says how to present the card (paused, repair) and the permission it saw. */
+const fresh = { paused: false, repair: false, permission: 'default' } as const;
 const memory = () => { const map = new Map<string, string>(); return { getItem: (k: string) => map.get(k) ?? null, setItem: (k: string, v: string) => void map.set(k, v), removeItem: (k: string) => void map.delete(k) }; };
 
 test('the assessment is read-only: it never asks permission, and disabled, blocked or resting contexts offer nothing', async () => {
   const s = setup();
-  assert.deepEqual(await notificationInviteOpportunity(s.client, s.guest, s.options('token')), { audience: 'member', offers: true });
+  assert.deepEqual(await notificationInviteOpportunity(s.client, s.guest, s.options('token')), { audience: 'member', offers: true, ...fresh });
   assert.equal(s.asks(), 0, 'no permission request without a tap');
   assert.equal(s.calls.register.length + s.calls.guestRegister.length, 0, 'no registration without a tap');
   assert.equal(await notificationInviteOpportunity(setup({ enabled: false }).client, s.guest, s.options('token')), null, 'sending not configured: nothing offered');
-  assert.equal(await notificationInviteOpportunity(setup({ paused: true }).client, s.guest, s.options('token')), null, 'sending paused by the operator: nobody is invited to something that will not arrive');
+  // V2: the server accepts registrations while the operator has sending paused, so the card is shown and says so.
+  assert.deepEqual(await notificationInviteOpportunity(setup({ paused: true }).client, s.guest, s.options('token')), { audience: 'member', offers: true, ...fresh, paused: true }, 'paused: still invited, presented as paused');
   const blocked = setup({ permission: 'denied' });
   assert.equal(await notificationInviteOpportunity(blocked.client, blocked.guest, blocked.options('token')), null, 'a blocked browser is never asked');
   const store = memory(); recordDismissal(STORAGE_KEYS.notificationOptIn, Date.now(), store); recordDismissal(STORAGE_KEYS.notificationOptIn, Date.now(), store);
-  assert.equal(await notificationInviteOpportunity(s.client, s.guest, s.options('token', { snooze: { count: 2, lastAt: Date.now() } })), null, 'two answers of "Not now" are final');
+  assert.equal(await notificationInviteOpportunity(s.client, s.guest, s.options('token', { snooze: { count: 1, lastAt: Date.now() - 60_000 } })), null, '"Not now" rests it three days');
+  assert.deepEqual(await notificationInviteOpportunity(s.client, s.guest, s.options('token', { snooze: { count: 2, lastAt: Date.now() - 4 * 86_400_000 } })), { audience: 'member', offers: true, ...fresh }, 'V2: an old two-strike record is not final any more');
   const unsupported = setup(); delete unsupported.env.PushManager;
   assert.equal(await notificationInviteOpportunity(unsupported.client, unsupported.guest, unsupported.options('token')), null, 'no push support (e.g. an iPhone Safari tab): nothing impossible is offered');
 });
 
 test('members: offers are part of the one choice unless they declined them before; staff and registered devices get nothing', async () => {
   const optedOut = setup({ optedOut: true });
-  assert.deepEqual(await notificationInviteOpportunity(optedOut.client, optedOut.guest, optedOut.options('token')), { audience: 'member', offers: false });
+  assert.deepEqual(await notificationInviteOpportunity(optedOut.client, optedOut.guest, optedOut.options('token')), { audience: 'member', offers: false, ...fresh });
   const previous = (globalThis as { window?: unknown }).window;
   (globalThis as { window?: unknown }).window = { localStorage: memory() };
   try {
     markMarketingPromptAnswered('buyer-1');
     const legacy = setup();
-    assert.deepEqual(await notificationInviteOpportunity(legacy.client, legacy.guest, legacy.options('token')), { audience: 'member', offers: false }, 'an answer to the old separate offers question is kept');
+    assert.deepEqual(await notificationInviteOpportunity(legacy.client, legacy.guest, legacy.options('token')), { audience: 'member', offers: false, ...fresh }, 'an answer to the old separate offers question is kept');
   } finally { (globalThis as { window?: unknown }).window = previous; }
   const staff = setup();
   assert.equal(await notificationInviteOpportunity(staff.client, staff.guest, staff.options('token', { isCustomer: false })), null);
@@ -106,7 +110,7 @@ test('the browser answer decides: blocked stays blocked, a closed prompt changes
 test('guests: news and occasional offers only, recorded as marketing consent; order updates are never offered to guests', async () => {
   const s = setup();
   const invite = await notificationInviteOpportunity(s.client, s.guest, s.options(null));
-  assert.deepEqual(invite, { audience: 'guest', offers: true });
+  assert.deepEqual(invite, { audience: 'guest', offers: true, ...fresh });
   assert.deepEqual(await activateNotificationInvite(s.client, s.guest, invite!, s.options(null)), { step: 'registered' });
   assert.deepEqual(s.calls.guestRegister, [{ purposes: ['marketing'], copyVersion: NOTIFICATION_COPY_VERSION + '-guest' }]);
   assert.equal(s.calls.register.length, 0, 'no account registration for a guest');

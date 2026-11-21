@@ -1,4 +1,4 @@
-// LOCAL ONLY. Mystery Hub 3.4-C browser acceptance: one notification invitation, the browser permission, server
+// LOCAL ONLY. Mystery Hub 3.4-C browser acceptance (paused check updated for Notification Onboarding V2): one notification invitation, the browser permission, server
 // registration with purpose-specific consent, one honest result; guest news on/off; account settings and history.
 // Drives a local production build (default http://localhost:3111) started with SYNTHETIC local push keys against a
 // disposable database. Chromium automation cannot reach a real push service, so PushManager.subscribe is SIMULATED
@@ -49,12 +49,17 @@ const context = async (b, opts = {}, answer = 'granted') => {
   await simulatePush(ctx, answer);
   return ctx;
 };
-const engage = async (p, second = '/services') => { await p.goto(BASE + '/'); await settle(p); await p.goto(BASE + second); await settle(p); };
+// V2: no engagement is needed any more; the card appears on the first page about five seconds after it settles, and
+// moving to a second page would close it for the visit. So "engage" now just opens the landing page.
+const engage = async p => { await p.goto(BASE + '/'); await settle(p); };
+// Signs up from Orders, where no suggestion ever appears (V2 would otherwise show the visitor's card on a calm page
+// within five seconds, and that visit's one invitation would be used before the member exists).
 const signUp = async (p, name) => {
-  await p.goto(BASE + '/'); await settle(p);
+  await p.goto(BASE + '/orders'); await settle(p);
   await p.locator('header .mh-signup').first().click(); await p.waitForSelector('#auth-name');
   await p.fill('#auth-name', name); await p.fill('#auth-identifier', '024' + String(Date.now()).slice(-7)); await p.fill('#auth-password', 'Synthetic#Member-34');
-  await p.locator('form button[type="submit"]').click(); await sleep(2500);
+  await p.locator('form:has(#auth-name) button[type="submit"]').click();
+  await p.waitForFunction(() => localStorage.getItem('mystery_hub_session_token'), null, { timeout: 15000 }).catch(() => {}); await sleep(500);
   return (await db.query('SELECT id FROM users WHERE name=$1 ORDER BY created_at DESC LIMIT 1', [name])).rows[0]?.id;
 };
 const setPaused = paused => db.query(`UPDATE ${N}.settings SET paused=$1 WHERE id=TRUE`, [paused]);
@@ -69,7 +74,7 @@ const setPaused = paused => db.query(`UPDATE ${N}.settings SET paused=$1 WHERE i
     {
       const ctx = await context(b); const p = await ctx.newPage();
       await engage(p);
-      ok('guest: an invitation appears after engagement', await waitCard(p));
+      ok('guest: an invitation appears on the first page (V2: no engagement needed)', await waitCard(p));
       const c = await card(p).evaluate(el => ({ h: el.querySelector('h2').textContent, t: el.querySelector('p').textContent, buttons: [...el.querySelectorAll('button')].map(x => x.textContent.trim() || x.getAttribute('aria-label')), note: el.querySelector('.mh-invite-note')?.textContent }));
       ok('guest copy: Stay updated. / news and occasional offers (no order updates) / Allow Notifications · Not now', c.h === 'Stay updated.' && c.t === 'Get Mystery Hub service news and occasional offers.' && c.buttons.includes('Allow Notifications') && c.buttons.includes('Not now') && /turn them off anytime/.test(c.note || ''), JSON.stringify(c));
       const v = await axe(p, 'aside.mh-invite'); if (v) ok('axe: notification invitation (serious/critical)', v.length === 0, v.join(', '));
@@ -170,14 +175,15 @@ const setPaused = paused => db.query(`UPDATE ${N}.settings SET paused=$1 WHERE i
       } else ok('a notification invitation for the refusal check', false, 'none appeared');
       await ctx.close();
     }
-    // 5. Paused by the operator: nobody is invited to notifications that would not arrive.
+    // 5. Paused by the operator (V2): registering still works, so the invitation is shown and says so, with no date.
     {
       await setPaused(true);
       const ctx = await context(b); const p = await ctx.newPage();
       await engage(p);
-      const shown = await waitCard(p, 7000);
+      const shown = await waitCard(p, 9000);
       const h = shown ? await card(p).locator('h2').textContent() : '';
-      ok('paused: no notification invitation (a different suggestion may appear)', h !== 'Stay updated.', h);
+      const notes = shown ? await card(p).locator('.mh-invite-note').allTextContents() : [];
+      ok('paused (V2): the invitation still appears and says "Notifications will arrive once sending resumes."', h === 'Stay updated.' && notes.includes('Notifications will arrive once sending resumes.'), JSON.stringify({ h, notes }));
       await ctx.close();
       await setPaused(false);
     }

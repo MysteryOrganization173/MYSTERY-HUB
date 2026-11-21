@@ -17,12 +17,12 @@ Each rule is a pure, tested function.
 | On screen | One at a time. The installed app's welcome sheet also claims the screen. |
 | Never over | Any dialog, sheet or menu (tracked by the shared overlay stack), checkout, receipt or order status, sign-in, account, password change, the assistant, template preview, Marketplace enquiry or waitlist. |
 | Pages | Only calm browsing pages: Home, Data, Services, Marketplace, Creative, About, Help, Earn and Website.<br>Never on Orders (recovery and critical status), Wallet, AFA or Results Checker, `/app`, Admin, the editor or My Business.<br>Never after a Paystack return (`?reference=` / `?trxref=`).<br>Greetings and published business websites never load the app shell, so nothing can appear there. |
-| Timing | Only after real engagement: a second page in the visit, about 25 s of active use, or a verified purchase (a `direct_checkout` receipt in `processing` or `delivered`, created within the last hour, tolerating a phone clock up to 10 minutes behind the server) once its receipt has been closed. Tracking an older order does not count. Each page must also settle for 2 s, so rapid navigation never triggers one. |
+| Timing | *Notifications: superseded by [Onboarding V2](notification-onboarding-v2.md) (about 5 s after a calm page settles, no engagement needed).* Install and Channel: only after real engagement: a second page in the visit, about 25 s of active use, or a verified purchase (a `direct_checkout` receipt in `processing` or `delivered`, created within the last hour, tolerating a phone clock up to 10 minutes behind the server) once its receipt has been closed. Tracking an older order does not count. Each page must also settle for 2 s, so rapid navigation never triggers one. |
 | Frequency | At most one unsolicited invitation per browsing session (kept in `sessionStorage`, so Back and refresh do not show another), and none at all after any dismissal in that session.<br>No two within 12 hours in the same browser, across tabs.<br>An invitation that was shown and ignored rests (install 7 days, Channel 14). |
 | Step aside | A dialog opening, a page change or a scroll of 1.5 screens closes it for the rest of the visit, so it never becomes a permanent strip at the bottom of a small phone. |
 | Inline cards | The install card inside a page (Home, the member home, the December home) counts as that page's suggestion. Floating invitations stay away while it is visible. Acting on it (Install App, or opening the iPhone steps) uses the visit's one invitation; its "Not now" ends suggestions for the visit. |
 | Welcome sheet | It is an account entry, not marketing. It keeps install and Channel invitations out of that visit; first-use notifications may still follow sign-in. |
-| Installed-app notifications | A contextual first-use invitation with its own snooze (21 days, two answers). It shares the visit rules: one at a time, never after another invitation or a dismissal in the visit. It is not held back by the marketing 12-hour gap or "seen" rests, so installing from a browser suggestion never blocks the app's first-use card. While a dialog or sheet is open it pauses (stays mounted, hidden), so a brief interruption does not use up its one showing. |
+| Installed-app notifications | *Superseded by [Onboarding V2](notification-onboarding-v2.md): every browser, 3-day snooze with no strike limit, 12-hour rest after being ignored, turn-taking with Install and the Channel.* Originally: a contextual first-use invitation with its own snooze (21 days, two answers). It shares the visit rules: one at a time, never after another invitation or a dismissal in the visit. It is not held back by the marketing 12-hour gap or "seen" rests, so installing from a browser suggestion never blocks the app's first-use card. While a dialog or sheet is open it pauses (stays mounted, hidden), so a brief interruption does not use up its one showing. |
 | Storage failure | Corrupt or blocked storage reads as "nothing remembered". The session falls back to memory for the life of the page. |
 
 **Accessibility:**
@@ -144,12 +144,12 @@ The ordinary footer returns unchanged in structure when the season ends. Neither
   - Installing comes first elsewhere; the Channel comes last.
   - The coordinator waits for the read-only eligibility check, so a quick Channel card never takes the visit's slot from it.
 - **Never offered:**
-  - while the operator has sending paused (`/api/notifications/config` now reports `paused`);
+  - ~~while the operator has sending paused~~ (V2: shown while paused, with "Notifications will arrive once sending resumes."; registration is accepted while paused);
   - in a browser that blocked notifications or cannot receive Web Push;
   - to staff;
   - on a device the server already confirmed;
   - as guest news over a browser that already holds an account's subscription.
-- "Not now" rests three weeks and stops after the second time. The browser's own answer is final.
+- "Not now" rests three weeks and stops after the second time. *V2: three days, every time, no permanent stop.* The browser's own answer is final.
 
 ### Consent and Ghana's direct-marketing rule
 Ghana's Data Protection Act, 2012 (Act 843) requires a data subject's prior consent before their data is used for direct marketing, and lets them require the marketing to stop.
