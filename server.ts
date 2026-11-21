@@ -22,6 +22,7 @@ import { bootstrapAdminAccount } from './server/services/adminBootstrap.js';
 import { OrdersStore } from './server/db/ordersStore.js';
 import { FulfilmentService } from './server/services/fulfilmentService.js';
 import { createPublicHtmlRouter } from './server/routes/publicHtml.js';
+import { databaseMode, mountDatabaseMode, requireRestoredDatabase } from './server/services/databaseReadiness.js';
 
 loadApplicationEnvironment();
 
@@ -30,9 +31,9 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const database = databaseMode(process.env);
 
 app.use(corsMiddleware);
-app.use(campaignShortRouter);
 
 // Root-level health check endpoint for monitoring & Render checks
 app.get('/health', (_req, res) => {
@@ -41,6 +42,9 @@ app.get('/health', (_req, res) => {
     service: 'mysteryhub-api',
   });
 });
+
+mountDatabaseMode(app, database);
+app.use(campaignShortRouter);
 
 // Paystack Webhook endpoint requires raw body for HMAC signature verification
 app.post(
@@ -106,6 +110,11 @@ app.use('/api/mystery-ai/feedback', mysteryAiFeedbackRouter);
 
 // Setup Vite in development or static serving in production
 async function startServer() {
+  if (database.maintenance) {
+    app.listen(PORT, () => console.log('Mystery Hub is running in database maintenance mode.'));
+    return;
+  }
+  await requireRestoredDatabase(database.expectedName);
   await initDatabase();
   await bootstrapAdminAccount();
   const stopSms=startSmsWorker();

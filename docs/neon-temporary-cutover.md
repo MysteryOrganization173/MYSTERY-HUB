@@ -1,61 +1,78 @@
-# Emergency Neon standby: controlled PostgreSQL provider switch
+# Temporary PostgreSQL standby and return runbook
 
-Status (November 21, 2026): **PREPARATION ONLY. NOT A LIVE CUTOVER.** This document does not authorize deploying a new connection string.
+## Verified baseline on November 21, 2026
 
-## Verified infrastructure
+Supabase production is project `fcvydpuuwbciuulrvizk`, database `postgres`. Neon Free standby is project `patient-term-85828320`, branch `br-wild-boat-bji8j9fu`, PostgreSQL 17, AWS London. The original `mysteryhub_staging` database is empty. A separate ICU candidate `mysteryhub_standby_icu` has been prepared on that branch for the first rehearsal. The production backend was running on one auto-deployed Render instance in Frankfurt. This PR leaves its existing connection selected.
 
-- Supabase production project: `fcvydpuuwbciuulrvizk`, active/healthy on Free. Its organization is at risk of a Fair Use Policy restriction **November 23, 2026**, not December 23.
-- Neon Free project: `patient-term-85828320` ("Mystery Hub Emergency Standby"), region `aws-eu-west-2`; database `mysteryhub_staging` on branch `main`. Verified reachable November 21 but **no application tables or customer data yet**.
-- Production uses one server-side `pg.Pool` in `server/db/connection.ts` sourced from `DATABASE_URL`. It is already provider-neutral PostgreSQL. **Do not rewrite checkout, supplier handling, auth, or admin for provider switching.**
-- Source application footprint when inspected: **38 public tables, 31 private-schema tables, 15 application triggers, 12 functions**. These are application resources, separate from Supabase-owned internal schemas.
-- Source database has live order, customer, session, SMS, notification, referral, website, finance, and webhook records. App-owned tables have relationships and transaction invariants. **Never copy only orders/users or finance balances.**
+Production inventory was 69 application tables across seven schemas. It included 227 indexes, 15 application triggers, 12 routines and three sequences. All application tables had owner-based RLS and no custom policies. The production branch started at commit `4215ea82c02a950445edf8bddf18e79b71e6d578`. The application uses Express authentication and its own stored sessions. It does not need Supabase-managed Auth, Storage, Realtime, Vault, or other platform schemas. The activity logs, webhook and order references, customer accounts and sessions, finance ledger and accounts, referrals, catalogue, website records, SMS, notification, AI and operations records are all in scope. Paystack recovery uses the existing persisted payment references and financial idempotency keys.
 
-## Invariants
+The source returned no duplicate order or payment references, duplicate finance idempotency keys, Wallet balance drift, or Wallet entries without an account. These were aggregate read-only checks. Production used UTF-8 with ICU `en-US` version `153.121`. The original Neon database used the PostgreSQL builtin `C.UTF-8` locale, and the available Neon `en-US` ICU collation reported `153.120`. The original database therefore fails the clone's locale gate. A separately named ICU database is required. A version difference between otherwise matching ICU locales must pass the ordering and case conversion comparison over existing sign-in keys and public slugs, then application smoke tests.
 
-1. **Exactly one writable authoritative database at any time.** No dual-write, per-request fallback, automatic retry against the old provider, or mixed order/payment state.
-2. Copy **all application-owned database schemas and data**, not the whole Supabase platform. Include `public` and all schemas matching `mysteryhub_*`, plus triggers/functions, indexes, constraints, sequences, and required roles or safe replacements. Exclude Supabase internal `auth`, `storage`, `realtime`, `vault`, etc. only after dependency audit.
-3. Do not change Paystack webhook endpoints, vendor API settings, frontend code, or Cloudinary asset storage merely to change database host.
-4. No real payments, supplier submissions, SMS, refunds, or withdrawals during dry runs. Disable checkout before a write freeze if necessary.
-5. Do not put any database password, `pg_dump` archive, customer records, or raw connection URI in a Git commit, issue, logs, or chat.
-6. Existing production `initDatabase()` automatically creates/migrates tables on startup. **Never boot it against the empty standby.** A successful server boot is not evidence of data restoration.
-7. A rollback after Neon accepts writes requires a **new full Neon-to-Supabase data migration**. Simply reverting `DATABASE_URL` would lose all orders/payments created during Neon operation.
+**The real application copy is pending.** The connected tools inspected both databases but did not supply a direct Supabase login or a verified, current archive. The cloud runner's direct TCP probe to Supabase timed out. The PostgreSQL rehearsal uses synthetic local data. A Supabase restriction starting November 23 can leave no source available for a fresh dump. Take a verified rehearsal backup while source access still works.
 
-## Stage A: build and test standby with no production changes
+## Rehearse with an isolated target
 
-1. Take a locally controlled, encrypted custom-format PostgreSQL snapshot from Supabase using a direct connection where available. Use `pg_dump` with `--format=custom --no-owner --no-acl --schema=public --schema='mysteryhub_*'`, excluding provider-owned schemas. Confirm that every application-owned schema was included. Retain the source archive securely.
-2. Inspect archive contents with `pg_restore --list`. Check dependencies on extensions, owner roles, ACLs, functions, triggers, and schema references before import.
-3. Restore into the **empty Neon `mysteryhub_staging`** using a **direct, TLS-protected** connection, not a transaction pooler, and `pg_restore --no-owner --no-acl`. For any errors, fix role/extension incompatibilities and repeat in an isolated disposable Neon database or branch; never run a destructive restore over production.
-4. Compare inventory and aggregate counts with:
-   `MYSTERY_SOURCE_DATABASE_URL=... MYSTERY_STANDBY_DATABASE_URL=... node scripts/db-standby-preflight.mjs`
-   Export both variables securely in your local environment; never paste URLs into command history or Git. The tool only reads metadata and counts. **Before final cutover, freeze writes or count differences will be expected.**
-5. Verify detailed table definitions, constraints, sequences, indexes, triggers, functions, required role privileges, and targeted checksums/IDs. Aggregate counts alone cannot establish correctness. Check session/login handling, order reference lookup, idempotency, paid/refunded states, and ledger reconciliation without triggering real provider actions.
-6. Smoke-test the application using a separate nonproduction backend instance with the Neon URL and **all supplier/payment/SMS outbound side effects disabled**; validate on staging. Do not expose the staging backend to public traffic.
+1. Use an operator-controlled machine with Node and PostgreSQL **17** client tools `pg_dump`, `pg_restore` and `psql`, network access to both direct endpoints, and the existing database login for each endpoint. Use the source project and Neon project's Connect panels. Source direct IPv6 or connectivity restrictions must be handled on a network where the direct connection works. The script does not use the HTTP database API or a session or transaction pooler for backups. Both connections verify TLS hostname and certificate. Supply the project CA through `MYSTERY_SOURCE_CA_FILE` or `MYSTERY_STANDBY_CA_FILE` if the system trust store does not contain it.
+2. Use a fresh empty Neon database on the verified project and branch, owned by the intended Render database role. Use a distinct name beginning with `mysteryhub_standby_`. Create it from `template0` with UTF-8 and ICU `en-US`. Example SQL for the Neon administrator, with the actual owner substituted if different:
 
-## Stage B: controlled one-way cutover ONLY after Stage A passes
+   ```sql
+   CREATE DATABASE mysteryhub_standby_icu
+     OWNER mysteryhub_staging_owner TEMPLATE template0
+     ENCODING 'UTF8' LOCALE_PROVIDER icu ICU_LOCALE 'en-US';
+   ```
 
-1. Announce a short maintenance window and prevent **new checkout/payment initialization**. Stop/complete in-flight transactions; reconcile recorded Paystack payments and supplier deliveries. Pause all writers: live API, scheduled reconciliation, SMS and push workers, and inbound webhooks (verify replay/retry and recovery).
-2. Take a **new final full app-owned dump after the freeze**, then restore it into a clean standby state. Do not trust an earlier testing snapshot. Verify all table counts, high-water marks, payment references, ledger sums, constraints, and provider event IDs against the frozen source.
-3. Stop the old backend instance and wait for its workers and connections to finish. Change **only the backend's** `DATABASE_URL` secret to the Neon **pooled application** connection. Keep `NODE_ENV=production`; do not let in-memory fallback handle real orders.
-4. Deploy **one backend writer**. Verify boot/migration success, DB readiness, login, read-only order tracking, admin order lookup, and finance reporting before reopening checkout.
-5. Re-enable incoming webhooks and workers after verification; run controlled reconciliation. Watch duplicate webhook events, retries, SMS side effects, and payment idempotency. Only then reopen checkout.
-6. Keep the Supabase database intact and read-only from the application. Do not delete it. Retain encrypted backups and a rollback plan.
+   For this rehearsal, the candidate already exists. Verify its name, locale, emptiness and intended owner using a direct connection before running the clone. The current `mysteryhub_staging` database can remain intact. The clone never drops existing objects or restores into a populated application namespace. If either database has an unexpected app schema, object dependency, policy, extension-dependent object, stale locale, or access rule, investigate before proceeding.
 
-## Stage C: December 8 return to Supabase
+3. From the checked-out release revision, install dependencies with `npm ci`. Set the archive directory on a private encrypted volume outside Git. Create it with mode `0700`. Load existing credentials through a local secret manager or silent prompts. Avoid entering the values in shell history or chat. An example with Bash reads the values without printing them.
 
-- **Never treat this as a connection-string toggle alone.** After the first Neon-side write, Supabase is stale.
-- When Supabase's allowance refills, freeze Neon-side writes and repeat the verified full data transfer **Neon -> Supabase**, restoring into a safely isolated replacement or clean validated destination. Compare keys, ledgers, counts, references, functions, constraints, and recovery state. Only then point the backend back to Supabase.
-- The December 8 reset is when restrictions may lift, with possible delay; it does **not** prove Free-plan sustainability. Measure two complete *normal-load production days after returning to Supabase*, and compare to the 5 GB / cycle budget. Prefer a safety margin of roughly 100–120 MB per day, not just the ~161–167 MB mathematical maximum.
-- November 22 is the first complete UTC day after the November 21 optimization. November 21's partial usage cannot establish a daily rate. Compare the documented November 17–20 baseline (~300–400 MB per day) only with full days at comparable customer load.
-- If the post-fix rate remains above target, do not repeatedly migrate databases to avoid billing. Continue reducing redundant reads/workers or choose infrastructure that the real business revenue supports.
+   ```bash
+   set +x
+   export MYSTERY_STANDBY_ARCHIVE_DIR=/path/to/private/encrypted/standby
+   read -rs -p 'Supabase direct connection URL: ' MYSTERY_SOURCE_DATABASE_URL
+   printf '\n'
+   read -rs -p 'Neon direct connection URL: ' MYSTERY_STANDBY_DATABASE_URL
+   printf '\n'
+   export MYSTERY_SOURCE_DATABASE_URL MYSTERY_STANDBY_DATABASE_URL
+   node scripts/db-standby-clone.mjs
+   unset MYSTERY_SOURCE_DATABASE_URL MYSTERY_STANDBY_DATABASE_URL
+   ```
 
-## Cost and operational cautions
+4. The clone saves a custom-format archive under the private directory, then restores SQL with `ON_ERROR_STOP` in one transaction. The snapshot used for the archive also supplies the source content checks. A restore error rolls back the application schema. Existing private roles and objects on the source are preserved there. The destination uses the verified owner and backend-only RLS model. The script removes public and client grants and validates the destination's effective permissions. The comparison covers every row, named constraints, indexes, triggers, functions, column structure, sequence state, and financial invariants. Output contains table and object names and statuses. Keep the archive encrypted with a retention policy. Generated plain SQL is temporary and should be removed from the encrypted volume if an operator interrupts a run.
+5. A successful comparison means archive parity at the captured snapshot. It does not mean automatic promotion. PostgreSQL sequences are outside MVCC, so a rehearsal on the moving source can detect differences even with the exported snapshot. A failed comparison leaves a restored target isolated for investigation. Use a fresh destination for another attempt. Final validation requires frozen writers.
+6. Verify an isolated candidate with no provider secrets and an outbound rule denying payment, supplier, SMS and push calls. Use a synthetic PostgreSQL rehearsal account for sign-in, session and ownership checks. On a real-data copy, an authorized operator can compare known existing login, session, order and Admin properties privately. Favor read-only checks for real copied data. Never expose the staging API or copy it into a frontend build. Check one instance with the exact runtime role and TLS connection path, and confirm the notified queues and holds are preserved. Any uncertain paid or supplier state stays held until investigated with the provider.
 
-- Neon is also on a **Free** plan, with compute and network limits and scale-to-zero behavior. Monitor its quotas daily. It is not unlimited bandwidth.
-- Cross-region latency (Render service region vs Neon `aws-eu-west-2`) may differ; check production-like timings.
-- The source and standby are both PostgreSQL 17, but this does not guarantee matching extensions, roles, privileges, or behavior.
-- Arkesel automatic SMS troubleshooting is a separate pending supplier issue. Do not claim its HTTP 422 issue is resolved or enable live send tests without approval.
-- If the final migration cannot be verified before November 23, prioritise **safe checkout suspension** over untested migration. No live sale should proceed if its payment and order record may diverge.
+Run the repeatable final comparison from the same secure environment with both URLs exported.
 
-## Rollback trigger
+```bash
+node scripts/db-standby-preflight.mjs
+```
 
-If post-cutover login, payments, order tracking, financial balance calculations, or webhook idempotency fail, immediately disable checkout and stop writers. Investigate and restore from a known-good encrypted snapshot; if Neon has already accepted writes, export and reconcile those writes before returning to Supabase. Do not switch URLs first and reconcile later.
+Exit status 0 means parity passed. Status 2 indicates count, content, structure, sequence, locale behavior or financial parity failed. Status 1 indicates a connection, input, program or permission error. The CLI never changes the application's `DATABASE_URL`. Use the active source and the fresh intended destination when comparing.
+
+## Supabase to Neon during an approved maintenance window
+
+1. Verify the candidate rehearsal, the current source's availability, the Neon quota headroom, the release revision, and access to both provider dashboards. Record secure checkpoints for initialized payment references, open provider submissions and uncertain outcomes. Where an independent ingress gate exists, stop new checkout admission and allow existing handlers and provider calls to finish. Otherwise the maintenance rollout and verified old-instance shutdown below establish the admission freeze. Paystack delivery relies on the existing authenticated callbacks and reconciliation. Check its retry and verification facilities for the planned outage. Preserve each recent payable reference. Do not rely on the provider repeating every kind of webhook.
+2. Put the Render API into maintenance with `DATABASE_MAINTENANCE=true` and `DATABASE_EXPECTED_NAME=postgres`, keeping its URL on Supabase. The guarded runtime requires a matching database name and a URL explicitly configured with `sslmode=verify-full`. Validate the existing authenticated Supabase runtime path and trust chain before the window. If a custom CA is needed, mount it as a Render secret file and refer to its path. Deploy only the approved revision. The maintenance process serves `/health` and `/ready`, and responds with 503 to app calls, including webhooks. It skips schema initialization, admin bootstrap, and all background jobs.
+3. Wait for Render to show the old deployment is deactivated, including any connection draining or SIGTERM grace period. Check that the old source connections, jobs and in-flight provider or financial work have ended and that every other writer is frozen. The new maintenance HTTP response alone does not prove the old worker stopped. Confirm any remaining provider ambiguity can be reconciled without a dispatch retry. If the source is restricted before a current recoverable snapshot exists, keep checkout closed and recover the missing authoritative state before a switch.
+4. While all writers are stopped, take a **fresh** full snapshot into another empty, verified ICU Neon database. Run the independent parity command against the frozen source and destination. Compare secure pending payment and supplier reference checkpoints with the provider dashboards. Keep the earlier backup and preserve the source.
+5. Keep Render in maintenance and change its only database URL to the **verified Neon candidate database**, changing `DATABASE_EXPECTED_NAME` to that exact name in the same update. A five-connection pool is sufficient to start the test. For the app, use the verified pooled URL when its path and database are supported. Use the direct application URL with the same TLS verification if required. Confirm one maintenance instance is live. Probe `/ready` once and check that maintenance requests receive 503. Reconfirm Neon connectivity, role, locale, restored snapshot and sufficient quota. `/ready` checks database identity, restored account and paid data, core schema/RLS and writable mode. Full parity remains a separate gate.
+6. Only after the authorized operator accepts these checks, decide to reopen the API and remove `DATABASE_MAINTENANCE`. Keep `DATABASE_EXPECTED_NAME`. The startup gate checks the restored database before normal initialization. Treat the first **normal startup** on Neon as the transfer of authority. Startup and recovery can write before the first customer request. Confirm login, read-only tracking, Admin summaries and background worker health promptly. Reconcile preserved Paystack references with current provider truth and existing idempotency protections. Never replay raw unsigned payloads or resubmit an uncertain supplier order.
+7. Keep the old Supabase database isolated from application writes. Record snapshot and authority-transfer times, release revision, and a secured backup location. A URL-only rollback is safe only before any Neon write, including startup and maintenance operator writes. After that point, suspend checkout and perform the verified reverse procedure.
+
+## Neon to Supabase after the allowance resets
+
+1. Confirm the reset, Supabase availability and headroom independently on or after December 8. Validate the direct connection and the exact runtime pool or direct connection to a new, distinctly named `mysteryhub_return_*` database. The live Supabase owner reported `CREATEDB` during inspection. Recheck that an isolated destination and runtime route are supported before reserving the window. Use UTF-8, ICU `en-US` and the intended backend owner. Preserve the old Supabase `postgres` database and the authoritative Neon database.
+2. Repeat maintenance and writer-drain checks on Neon. Reconcile in-flight operations and hold uncertain submissions. Swap the script's source and destination inputs, with the direct Neon source and the new direct Supabase return database. Take a new complete archive from the frozen Neon writer. Restore and run parity. The tool refuses reverse restores into the original `postgres` database.
+3. Validate constraints, sequences, Wallet, references, open holds, and the isolated Supabase role and TLS path. In maintenance, point the one Render service at the verified return database and set its expected name. After `/ready`, reconciliation, and the operator's authorized reopening decision, start the single writer there. Preserve protected recovery copies on both sides. Keep checkout closed if verification or provider recovery fails. There is no scheduled move on December 8.
+
+[Paystack webhook delivery behavior](https://paystack.com/docs/payments/webhooks/)
+
+## Free-plan risk and follow-through
+
+Official Neon documentation lists 1 GB storage per project, 100 CU-hours per project per month, 5 GB public network transfer, and a fixed five-minute inactivity suspension on Free. The standby compute reports a fixed 0.25 CU. At that size, 100 CU-hours buys 400 continuously active hours. November 23 to December 8 is roughly 360 hours or 90 CU-hours if charged to one allowance period. Earlier activation, prior usage or more compute can consume the remaining margin. Existing SMS and push schedules and three-minute reconciliation may prevent idle suspension during operation. Use the Neon console's actual allowance period and consumption. The provider's published cold wake is usually a few hundred milliseconds. Check Frankfurt-to-London latency and connectivity under comparable traffic before promotion. The candidate reports 112 PostgreSQL connections with four reserved. The existing backend pool remains capped at five connections per instance. Check the exact endpoint's limits again before activation.
+
+At 300–400 MB/day, a 15-day window consumes 4.5–6 GB before transfer overhead and can exceed Neon's network allowance. Supabase and Neon meters are different. Monitor both on complete UTC days at similar load. November 21's partial Supabase reading cannot establish a full-day rate. PR #138 is already deployed and the true billed reduction is pending. The next full days support a comparison against November 17–20. After returning, aim for 100–120 MB/day, leaving room below the 161–167 MB/day mathematical allowance. Keep the service on Free and retain a protected recovery archive outside both providers. If either provider becomes unavailable before an authoritative verified copy exists, preserve the data and keep checkout in maintenance.
+
+Arkesel automatic HTTP 422 troubleshooting remains a separate provider investigation. This release changes no SMS template, recipient, supplier routing, payment rules, Wallet behavior or automatic send settings.
+
+[Neon plans and allowances](https://neon.com/docs/introduction/plans) · [Neon compute suspension](https://neon.com/docs/introduction/scale-to-zero) · [PR #138 audit](database-egress-p0.md)
