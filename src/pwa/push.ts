@@ -89,15 +89,19 @@ export async function readServerDeviceState(client: CustomerNotificationsClient,
  * subscription with the server and then asks the server to confirm it. Anything short of that confirmation is
  * reported as not subscribed, and a subscription the server refused is removed from the browser again.
  */
-export async function subscribeThisDevice(client: CustomerNotificationsClient, token: string, win: PushEnv | undefined = env(), signal?: AbortSignal, consent?: NotificationConsent): Promise<{ server: ServerDeviceState; permission: NotificationPermissionState; message?: string; preferences?: { transactional: boolean; promotional: boolean } }> {
+export async function subscribeThisDevice(client: CustomerNotificationsClient, token: string, win: PushEnv | undefined = env(), signal?: AbortSignal, consent?: NotificationConsent): Promise<{ server: ServerDeviceState; permission: NotificationPermissionState; asked?: boolean; message?: string; preferences?: { transactional: boolean; promotional: boolean } }> {
   const current = () => { if (signal?.aborted) throw new Error('Alert setup cancelled.'); };
   current();
   if(!client.available||!pushSupported(win))return {server:'unknown',permission:notificationPermissionState(win as never),message:'Phone alerts are available only in the Mystery Hub app context.'};
+  // The key first, so a disabled service never leads to a permission request. The HTTP client answers at once with
+  // the key its recent configuration read confirmed, so the browser's question still follows the tap directly.
   let publicKey:string;try{publicKey=await client.publicKey(token);}catch(e){return {server:'error',permission:notificationPermissionState(win as never),message:(e as Error).message};}
   current();
+  // `asked`: the browser really asked this time (only then can "default" mean the person closed its question).
+  const asked = notificationPermissionState(win as never) === 'default';
   const permission = await requestNotificationPermission(win as never);
   current();
-  if (permission !== 'granted') return { server: 'unknown', permission };
+  if (permission !== 'granted') return { server: 'unknown', permission, asked };
   const manager = await pushManager(win,true).catch(() => null);
   current();
   if (!manager) return { server: 'error', permission, message: 'Alerts are not ready on this device yet.' };
@@ -160,15 +164,16 @@ export async function readGuestDeviceState(guest: GuestNotificationsClient, win:
 }
 
 /** Call only from a tap: permission, then subscription, then server registration, then server confirmation. */
-export async function subscribeGuestDevice(client: CustomerNotificationsClient, guest: GuestNotificationsClient, consent: NotificationConsent, win: PushEnv | undefined = env(), signal?: AbortSignal): Promise<{ server: ServerDeviceState; permission: NotificationPermissionState; message?: string }> {
+export async function subscribeGuestDevice(client: CustomerNotificationsClient, guest: GuestNotificationsClient, consent: NotificationConsent, win: PushEnv | undefined = env(), signal?: AbortSignal): Promise<{ server: ServerDeviceState; permission: NotificationPermissionState; asked?: boolean; message?: string }> {
   const current = () => { if (signal?.aborted) throw new Error('Alert setup cancelled.'); };
   current();
   if (!client.available || !pushSupported(win)) return { server: 'unknown', permission: notificationPermissionState(win as never) };
   let publicKey: string; try { publicKey = await client.publicKey(''); } catch (e) { return { server: 'error', permission: notificationPermissionState(win as never), message: (e as Error).message }; }
   current();
+  const asked = notificationPermissionState(win as never) === 'default';
   const permission = await requestNotificationPermission(win as never);
   current();
-  if (permission !== 'granted') return { server: 'unknown', permission };
+  if (permission !== 'granted') return { server: 'unknown', permission, asked };
   const manager = await pushManager(win, true).catch(() => null);
   current();
   if (!manager) return { server: 'error', permission, message: 'Notifications are not ready in this browser yet.' };

@@ -62,7 +62,7 @@ test('one rule everywhere: a member who said no to offers is offered order updat
   assert.deepEqual(memberInvite({ promotional: true }), { audience: 'member', offers: true });
   assert.deepEqual(inviteConsent(memberInvite({ promotional: false, marketingOptedOut: true })).purposes, ['transactional']);
   assert.deepEqual(inviteConsent(memberInvite({ promotional: false })).purposes, ['transactional', 'marketing']);
-  assert.match(source('src/pwa/notificationOnboarding.ts'), /return memberInvite\(preferences, options\.accountId\);/, 'the invitation uses the same rule');
+  assert.match(source('src/pwa/notificationOnboarding.ts'), /return \{ \.\.\.memberInvite\(preferences, options\.accountId\), \.\.\.presentation \};/, 'the invitation uses the same rule');
 });
 
 test('the inline card says exactly what the invitation says, with Allow Notifications and Not now', () => {

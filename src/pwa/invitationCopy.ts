@@ -44,6 +44,12 @@ export function notificationCopy(invite: { audience: 'member' | 'guest'; offers:
     : { title: 'Stay updated.', text: 'Get updates about your orders on this device.' };
 }
 export const NOTIFICATION_ACTIONS = { allow: 'Allow Notifications', later: 'Not now', note: 'You can turn them off anytime.', ordersOnly: 'Order updates only' } as const;
+/** V2: the browser already allows notifications but this device is not registered yet: one tap, no new prompt. */
+export const NOTIFICATION_REPAIR_NOTE = 'Your browser already allows them.';
+/** V2: the operator paused sending, and registering still works. Promises no date and never says they are arriving. */
+export const PAUSED_INVITE_NOTE = 'Notifications will arrive once sending resumes.';
+/** The quiet line under the invitation's actions. */
+export const notificationNote = (invite: { repair?: boolean }) => (invite.repair ? `${NOTIFICATION_REPAIR_NOTE} ${NOTIFICATION_ACTIONS.note}` : NOTIFICATION_ACTIONS.note);
 /** One state after the tap, shown only for what really happened. "On" appears only after server confirmation. */
 export const NOTIFICATION_RESULT = {
   registered: { title: 'You’re all set.', text: 'Notifications are on for this device.' },

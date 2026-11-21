@@ -10,10 +10,15 @@
  * - Only on calm browsing pages. Never on orders (recovery and critical status), Wallet, the AFA and Results
  *   Checker payment pages, Admin, the editor, My Business or /app (which explains installing by itself). Greetings
  *   and published business websites never load this layer at all.
- * - Only after real engagement: a second page, about half a minute of active use, or a verified purchase whose
- *   receipt has been closed.
- * - At most one unsolicited invitation per browsing session, none after any dismissal in that session, and none
- *   within 12 hours of another one in this browser (other tabs included).
+ * - Install and Channel only after real engagement: a second page, about half a minute of active use, or a verified
+ *   purchase whose receipt has been closed. Notifications (V2) need no engagement: about five seconds after a calm
+ *   page settles is enough, so a first-time visitor can see the card on the page they landed on.
+ * - At most one unsolicited invitation per browsing session, none after any dismissal in that session. Install and
+ *   Channel keep a 12-hour gap between them in this browser (other tabs included); a notification card left alone
+ *   rests 12 hours (other tabs included) before it may return on a later visit.
+ * - Notifications lead whenever they are eligible, but take turns: if the last suggestion shown in this browser was
+ *   the notification card and Install or the Channel is waiting, the next visit is theirs, then notifications lead
+ *   again. Neither side can starve the other.
  * - Each invitation keeps its own memory. Install keeps its 30-day / three-strikes rule. The Channel rests 30 days
  *   after "Maybe later", 60 after the second and stops after the third; "Already following" stops it in this
  *   browser; opening the Channel is only a click (never proof of a follow), so it rests for 90 days.
@@ -21,6 +26,7 @@
  *   record falls back to memory, so the rules still hold for the life of the page.
  */
 export type InvitationKind = 'install' | 'channel' | 'notifications';
+export type SeenSlot = InvitationKind | 'yield';
 type Slot = InvitationKind | 'welcome';
 type Store = Pick<Storage, 'getItem' | 'setItem'>;
 
@@ -49,14 +55,38 @@ export const ENGAGED_VIEWS = 2;
 export const ENGAGED_ACTIVE_MS = 25_000;
 /** A page must settle before an invitation appears, so a quick tap through pages never triggers one. */
 export const SETTLE_MS = 2_000;
+/**
+ * Notification onboarding V2: every timing in one place.
+ * - settleMs: the calm page must stay calm this long before the card appears (no engagement needed).
+ * - autoHideMs: an untouched card leaves this long after it became visible, as "ignored" (never a dismissal).
+ * - resumeMinMs: after hover or focus leaves the card, at least this much time remains before it leaves.
+ * - exitMs: the length of the gentle exit (none with reduced motion).
+ * - ignoredRestMs: a card left alone does not return for this long, in any tab.
+ * - afterOtherMs: no notification card this soon after an Install or Channel card in another tab (not in the installed
+ *   app, whose first use right after installing is the moment notifications are for).
+ * - snoozeDays: "Not now", the close button or closing the browser's own question rest it this many days.
+ *   There is no permanent suppression and no strike count.
+ */
+export const NOTIFICATION_TIMING = {
+  settleMs: 5_000,
+  autoHideMs: 12_000,
+  resumeMinMs: 4_000,
+  exitMs: 200,
+  ignoredRestMs: 12 * 60 * 60 * 1000,
+  afterOtherMs: 30 * 60 * 1000,
+  snoozeDays: 3,
+} as const;
 export const CALM_PAGES: readonly string[] = ['home', 'data', 'services', 'marketplace', 'creative', 'about', 'help', 'earn', 'website'];
 
 export interface InvitationSession {
   views: number; lastPage: string | null; activeMs: number; purchase: boolean;
   shown: InvitationKind | null; dismissed: boolean; welcome: boolean;
+  /** This visit is Install's or the Channel's turn: the notification card yields to them (decided once per visit). */
+  yielded: boolean;
 }
-export const NEW_SESSION: InvitationSession = { views: 0, lastPage: null, activeMs: 0, purchase: false, shown: null, dismissed: false, welcome: false };
-export type SeenMap = Partial<Record<InvitationKind, number>>;
+export const NEW_SESSION: InvitationSession = { views: 0, lastPage: null, activeMs: 0, purchase: false, shown: null, dismissed: false, welcome: false, yielded: false };
+/** When each kind was last shown in this browser; `yield` is when the notification card last gave a visit away. */
+export type SeenMap = Partial<Record<SeenSlot, number>>;
 export interface ChannelInviteState { later: number; laterAt: number | null; following: boolean; openedAt: number | null }
 export const NO_CHANNEL_STATE: ChannelInviteState = { later: 0, laterAt: null, following: false, openedAt: null };
 
@@ -75,18 +105,35 @@ export function engaged(session: InvitationSession) {
 }
 
 /**
- * The session and browser-wide limits for one kind. Notifications are a contextual first-use invitation with their
- * own snooze: they share the visit (one at a time, one per visit, nothing after a dismissal) but not the 12-hour gap
- * or the "seen" rests of the marketing invitations. The welcome sheet leaves room only for notifications.
+ * The session and browser-wide limits for one kind. Notifications have their own snooze (launchPolicy): they share
+ * the visit (one at a time, one per visit, nothing after a dismissal) but not the marketing 12-hour gap or "seen"
+ * rests. A notification card that was shown and left alone rests 12 hours, so a new tab or a quick return never shows
+ * it again straight away, and it never follows an Install or Channel card from another tab within half an hour
+ * (except in the installed app). The welcome sheet leaves room only for notifications.
  */
-export function sessionAllows(kind: InvitationKind, session: InvitationSession, seen: SeenMap, now: number) {
+export function sessionAllows(kind: InvitationKind, session: InvitationSession, seen: SeenMap, now: number, { installedApp = false }: { installedApp?: boolean } = {}) {
   if (session.shown || session.dismissed) return false;
   if (session.welcome && kind !== 'notifications') return false;
-  if (kind === 'notifications') return true;
   const times = [seen.install, seen.channel].filter((time): time is number => valid(time, now));
+  if (kind === 'notifications') {
+    if (valid(seen.notifications, now) && now - seen.notifications < NOTIFICATION_TIMING.ignoredRestMs) return false;
+    return installedApp || !times.length || now - Math.max(...times) >= NOTIFICATION_TIMING.afterOtherMs;
+  }
   if (times.length && now - Math.max(...times) < INVITATION_GAP_MS) return false;
   const own = seen[kind];
   return !valid(own, now) || now - own >= SEEN_REST_DAYS[kind] * DAY;
+}
+
+/**
+ * When the notification card's time-based rests in this browser end (the 12-hour rest after being shown, and the
+ * half-hour gap after another tab's card), or null if none is running now. Used to look again at that moment.
+ */
+export function notificationRestEnds(seen: SeenMap, now: number, { installedApp = false }: { installedApp?: boolean } = {}): number | null {
+  const ends: number[] = [];
+  if (valid(seen.notifications, now) && now - seen.notifications < NOTIFICATION_TIMING.ignoredRestMs) ends.push(seen.notifications + NOTIFICATION_TIMING.ignoredRestMs);
+  const others = [seen.install, seen.channel].filter((at): at is number => valid(at, now));
+  if (!installedApp && others.length && now - Math.max(...others) < NOTIFICATION_TIMING.afterOtherMs) ends.push(Math.max(...others) + NOTIFICATION_TIMING.afterOtherMs);
+  return ends.length ? Math.max(...ends) : null;
 }
 
 export function channelInviteAllowed(state: ChannelInviteState, now: number) {
@@ -110,6 +157,45 @@ export function invitationOrder({ install, channel }: { install: boolean; channe
   return [...(install ? ['install' as const] : []), ...(channel ? ['channel' as const] : [])];
 }
 
+/**
+ * Whether the notification card leads this visit. It leads unless it was the last suggestion shown in this browser
+ * and nothing else has had a visit since (shown, or offered a turn), or this visit was already given away.
+ */
+export function notificationsLead(session: InvitationSession, seen: SeenMap, now: number) {
+  if (session.yielded) return false;
+  if (!valid(seen.notifications, now)) return true;
+  const since = [seen.install, seen.channel, seen.yield].filter((at): at is number => valid(at, now));
+  return since.some(at => at >= seen.notifications!);
+}
+
+export interface InvitationPlan {
+  /** The kinds to try, in order, when the timer fires; empty means nothing is due on this page yet. */
+  order: InvitationKind[];
+  /** How long the calm page must settle first. */
+  delayMs: number;
+  /** This visit is the others' turn: record it, so the next visit goes back to notifications. */
+  yieldTurn: boolean;
+}
+
+/**
+ * What may appear on a calm page now, and after how long.
+ * - `notifications`: the card is eligible (an unregistered device that can register) and allowed this visit.
+ * - `install`, `channel`: that floating card is possible on this page now (offered here, no in-page install card,
+ *   and allowed by its own session and browser rules).
+ * - `othersWaiting`: Install or the Channel could have a turn somewhere in this visit (an in-page install card
+ *   counts: it is Install's suggestion on its page).
+ * Install and the Channel need engagement; notifications need only the 5-second settle. On the others' turn the
+ * notification card stays away for the visit, so it never takes a turn it gave away; if neither of the others is
+ * possible at all, notifications lead anyway.
+ */
+export function invitationPlan({ notifications, install, channel, othersWaiting, engaged, lead }: {
+  notifications: boolean; install: boolean; channel: boolean; othersWaiting: boolean; engaged: boolean; lead: boolean;
+}): InvitationPlan {
+  const ready = engaged ? invitationOrder({ install, channel }) : [];
+  if (notifications && (lead || !othersWaiting)) return { order: ['notifications', ...ready], delayMs: NOTIFICATION_TIMING.settleMs, yieldTurn: false };
+  return { order: ready, delayMs: SETTLE_MS, yieldTurn: notifications };
+}
+
 // ── Storage (safe failure) ───────────────────────────────────────────────────────────────────────────────────
 
 const local = (): Store | null => { try { return window.localStorage; } catch { return null; } };
@@ -130,7 +216,7 @@ export function readSession(store: Store | null = tab()): InvitationSession {
   return {
     views: count(raw.views), lastPage: typeof raw.lastPage === 'string' ? raw.lastPage : null, activeMs: count(raw.activeMs),
     purchase: raw.purchase === true, shown: kinds.includes(raw.shown as InvitationKind) ? raw.shown as InvitationKind : null,
-    dismissed: raw.dismissed === true, welcome: raw.welcome === true,
+    dismissed: raw.dismissed === true, welcome: raw.welcome === true, yielded: raw.yielded === true,
   };
 }
 export function writeSession(next: InvitationSession, store: Store | null = tab()) {
@@ -148,7 +234,7 @@ const updateSession = (patch: (session: InvitationSession) => Partial<Invitation
 export function readSeen(store: Store | null = local()): SeenMap {
   const raw = readJson(INVITATION_KEYS.seen, store) as Record<string, unknown> | null;
   const seen: SeenMap = {};
-  if (raw && typeof raw === 'object') for (const kind of ['install', 'channel', 'notifications'] as const) { const at = time(raw[kind]); if (at) seen[kind] = at; }
+  if (raw && typeof raw === 'object') for (const kind of ['install', 'channel', 'notifications', 'yield'] as const) { const at = time(raw[kind]); if (at) seen[kind] = at; }
   return seen;
 }
 
@@ -181,7 +267,8 @@ export function readTime(key: string, store: Store | null = local()): number | n
 // ── Coordinator (one per page) ───────────────────────────────────────────────────────────────────────────────
 
 let onScreen: Slot | null = null;
-const inlineOffers = new Set<string>();
+// In-page install cards: registered while they offer, and whether each is on screen right now.
+const inlineOffers = new Map<string, boolean>();
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach(listener => listener());
 
@@ -190,12 +277,23 @@ export function subscribeInvitations(listener: () => void) {
   return () => { listeners.delete(listener); };
 }
 export const invitationOnScreen = () => onScreen;
-/** An install card inside the page is showing an offer: floating invitations stay away from that page. */
+/**
+ * An install card inside the page is offering: it is that page's install and marketing suggestion, so the floating
+ * Install and Channel cards stay away from the page while it is there.
+ */
 export const inlineOfferVisible = () => inlineOffers.size > 0;
-export function registerInlineOffer(id: string) {
-  inlineOffers.add(id);
+/** An in-page install card is on screen right now: no floating card may sit beside it, notifications included. */
+export const inlineOfferInView = () => [...inlineOffers.values()].some(Boolean);
+/** Registers an offering in-page card, with whether it is on screen now (unknown: on screen, the safe answer). */
+export function registerInlineOffer(id: string, inView = true) {
+  inlineOffers.set(id, inView);
   notify();
   return () => { if (inlineOffers.delete(id)) notify(); };
+}
+export function setInlineOfferInView(id: string, inView: boolean) {
+  if (!inlineOffers.has(id) || inlineOffers.get(id) === inView) return;
+  inlineOffers.set(id, inView);
+  notify();
 }
 
 export const noteView = (page: string) => { updateSession(session => (session.lastPage === page ? {} : { views: session.views + 1, lastPage: page })); };
@@ -205,12 +303,18 @@ export const notePurchase = () => { updateSession(() => ({ purchase: true })); }
 export const noteDismissal = () => { updateSession(() => ({ dismissed: true })); };
 /** Someone acted on an in-page suggestion (for example Install App on the Home card): that was this visit's one. */
 export const noteInvitationAnswered = (kind: InvitationKind) => { updateSession(session => (session.shown ? {} : { shown: kind })); };
+/** This visit is Install's or the Channel's turn: remembered for the visit, and in this browser for the next one. */
+export function noteNotificationsYield(now = Date.now()) {
+  if (readSession().yielded) return;
+  updateSession(() => ({ yielded: true }));
+  writeJson(INVITATION_KEYS.seen, { ...readSeen(), yield: now }, local());
+}
 
 /** Claims the screen for the first kind whose rules allow it now, and remembers it was shown. */
-export function claimInvitation(kinds: InvitationKind[], now = Date.now()): InvitationKind | null {
+export function claimInvitation(kinds: InvitationKind[], now = Date.now(), options: { installedApp?: boolean } = {}): InvitationKind | null {
   if (onScreen) return null;
   const session = readSession(), seen = readSeen();
-  const kind = kinds.find(candidate => sessionAllows(candidate, session, seen, now)) || null;
+  const kind = kinds.find(candidate => sessionAllows(candidate, session, seen, now, options)) || null;
   if (!kind) return null;
   onScreen = kind;
   writeSession({ ...session, shown: kind });
