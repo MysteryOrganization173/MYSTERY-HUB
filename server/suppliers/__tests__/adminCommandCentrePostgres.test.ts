@@ -51,6 +51,7 @@ test('isolated PostgreSQL Admin alerts use the real private queues and sessions'
     });
 
     const app = express();
+    app.use(express.json());
     app.use('/api/admin', adminRouter);
     server = app.listen(0, '127.0.0.1');
     await new Promise<void>(resolve => server!.once('listening', resolve));
@@ -61,7 +62,7 @@ test('isolated PostgreSQL Admin alerts use the real private queues and sessions'
     const paid = () => read('alerts/paid-orders', 'admin');
 
     await t.test('customer, expired and anonymous sessions cannot read either source', async () => {
-      for (const path of ['leads', 'alerts/paid-orders']) {
+      for (const path of ['leads', 'alerts/paid-orders', 'orders?status=supplier_review&readOnly=true']) {
         for (const [token, status] of [[undefined, 401], ['expired', 401], ['customer', 403]] as const) {
           const response = await read(path, token);
           assert.equal(response.status, status);
@@ -118,6 +119,50 @@ test('isolated PostgreSQL Admin alerts use the real private queues and sessions'
       assert.deepEqual(await snapshot(), before);
       const { rows: [privileges] } = await observer.query("SELECT has_table_privilege('anon','orders','SELECT') orders,has_table_privilege('authenticated','marketplace_inquiries','SELECT') enquiries");
       assert.deepEqual(privileges, { orders: false, enquiries: false });
+    });
+    await t.test('manual remedy leaves an independent supplier investigation without changing business facts', async () => {
+      const original = await create('SPLIT', {
+        status:'failed', submitted_at:null, failure_reason:'Pre-launch fixture',
+        supplier_response:JSON.stringify({reason:'Synthetic ambiguous result',isTimeout:true,timestamp:new Date(now).toISOString()}),
+      });
+      const before = (await OrdersStore.findOrder(original.id))!;
+      const financial = async () => ({
+        operations:(await observer.query('SELECT * FROM finance_operations ORDER BY id')).rows,
+        ledger:(await observer.query('SELECT * FROM finance_ledger ORDER BY id')).rows,
+      });
+      const money = await financial();
+      const post = async (body:Record<string,unknown>) => fetch(`http://127.0.0.1:${address.port}/api/admin/orders/${original.public_reference}/resolution`, {
+        method:'POST', headers:{Authorization:'Bearer synthetic-admin','Content-Type':'application/json'}, body:JSON.stringify(body),
+      });
+      const manual = {
+        action:'resolve_manual',manualOutcome:'manual_fulfillment',confirmed:true,requestId:'split-native-remedy',
+        expectedUpdatedAt:new Date(before.updated_at).toISOString(),expectedVersion:0,
+        note:'Synthetic operator verified independent customer fulfillment',evidence:'Synthetic receipt checked',reference:'SYNTHETIC-REMEDY',
+      };
+      const alertsBefore=(await (await paid()).json()).data.total;
+      const submitted = await Promise.all([post(manual),post({...manual,requestId:'split-native-remedy-second'})]);
+      assert.deepEqual(submitted.map(r=>r.status).sort(),[200,409]);
+      const queue = () => read('orders?status=supplier_review&readOnly=true','admin').then(r=>r.json());
+      const open = await queue();
+      assert.equal(open.orders.length,1);
+      assert.equal(open.orders[0].resolution.supplierInvestigation,'open');
+      assert.equal((await (await paid()).json()).data.total,alertsBefore-1);
+      const evidence={
+        action:'supplier_evidence',evidenceStatus:'delivered',confirmed:true,requestId:'split-native-evidence',
+        expectedUpdatedAt:open.orders[0].updated_at,expectedVersion:1,
+        note:'Synthetic supplier confirmed delivery and staff reconciled duplicate service',reference:'SYNTHETIC-SUPPORT',
+      };
+      assert.equal((await post(evidence)).status,200);
+      assert.equal((await queue()).orders.length,0);
+      const closed = (await OrdersStore.findOrder(original.id))!;
+      assert.deepEqual(closed.resolution_json?.manual,open.orders[0].resolution.manual);
+      assert.equal(closed.resolution_json?.supplierInvestigation,'closed');
+      assert.equal(closed.resolution_json?.supplierEvidence?.status,'delivered');
+      for(const field of ['status','payment_reference','payment_status','amount','supplier_order_id','supplier_response','submitted_at','delivered_at'] as const)
+        assert.deepEqual(closed[field],before[field]);
+      assert.deepEqual(await financial(),money);
+      const audit = (await observer.query('SELECT action,metadata_safe_json::jsonb AS metadata FROM admin_audit_log WHERE entity_id=$1 ORDER BY created_at,id',[closed.id])).rows;
+      assert.deepEqual(audit.map(row=>row.metadata.supplier_investigation).sort(),['closed','open']);
     });
   } finally {
     server?.closeAllConnections();

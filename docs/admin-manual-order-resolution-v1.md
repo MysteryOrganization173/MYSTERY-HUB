@@ -2,11 +2,19 @@
 
 Extends the existing Admin Orders resolution endpoint with `resolve_manual` and three typed outcomes:
 
-- `manual_fulfillment`: operator confirms service completed through another legitimate channel; resolves the customer case without claiming the original supplier delivered.
+- `manual_fulfillment`: operator confirms service completed through another legitimate channel and records its receipt or support reference. The fulfillment state continues to describe the original supplier attempt.
 - `external_compensation`: operator confirms an actual external remedy with method and transaction/reference evidence; resolves the case as operator-attested, never `refund_confirmed` or Paystack-verified.
 - `supplier_failed_pending_remedy`: records failure evidence, keeps the paid customer case under review and in Needs Attention, even if its review flag is removed.
 
 All require verified payment, an eligible stopped order, an operational reason, evidence, explicit confirmation and the existing revision/request-ID contract. Actor/time are server recorded. Existing or attempted customer refund evidence, delivered/refunded orders, active/unknown supplier responses and uncertain supplier acceptance block closure. A nested supplier failure is read from the provider response data envelope before its API transport status.
+
+For failed orders with a recorded uncertain submission and no supplier identifier or submission timestamp, a verified independent delivery can resolve the customer case while the supplier investigation stays open. This also covers the legacy pre-launch failure reason when the application uncertainty marker survives. The marker's `isTimeout` flag represents several ambiguous outcomes.
+
+Under **Resolve Manually**, use the independent delivery receipt or support reference and explain how the remedy was verified. The customer case leaves Needs Attention. The original uncertainty and previous evidence remain visible under **Orders → Supplier investigations**, also linked from Operations alerts. Open investigations cannot be archived. This exception applies to manual fulfillment only and preserves the existing blocks for active or completed supplier evidence and existing customer refunds.
+
+When supplier support confirms the original outcome and staff reconcile any duplicate charge or service, use **Close supplier investigation** with the original supplier reference and evidence. This records supplier failure, supplier credit to Mystery Hub, or original supplier delivery in the existing audit and evidence history. It does not change the order status, set a supplier delivery timestamp, adjust the ledger, or replace the customer remedy. A supplier credit is distinct from a customer refund.
+
+A confirmed resolution refreshes the order list, dashboard count and archive eligibility. If the alert refresh fails, the last successful count is still shown with its freshness warning.
 
 Order/payment/supplier facts remain unchanged. Only resolution JSON, its timestamp/review flag, append-only history and administrative audit are written together under the existing row lock. No Wallet, Paystack, supplier, rewards, Welcome Offer, Store Earnings or pricing operation is initiated. There is intentionally no reopen action: this pass does not overturn completed remedies. Incompatible cases require evidence reconciliation through the existing workflow, not an override.
 

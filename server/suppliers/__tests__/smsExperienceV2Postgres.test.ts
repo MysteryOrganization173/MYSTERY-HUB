@@ -1,5 +1,5 @@
 import {observeSmsSender} from '../../sms/providerDiagnostics.js';
-import {arkeselConfig,senderFingerprint} from '../../sms/arkesel.js';
+import {ArkeselClient,arkeselConfig,senderFingerprint} from '../../sms/arkesel.js';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
@@ -39,6 +39,49 @@ test('SMS experience V2 native lifecycle, recipients and release policy',{skip:!
       assert.equal(rows.length,1);assert.equal(rows[0].recipient,'+233591234567');assert.equal(rows[0].context.templateId,'order_processing');assert.match(rows[0].body,/Your 1GB Telecel.*processing/);assert.equal(smsEstimate(rows[0].body).segments,1);
       await smsTick(api);assert.equal(sends,1);assert.deepEqual(submitted[0].phones,['+233591234567']);
       await db.query("UPDATE orders SET status='delivered',delivered_at=now() WHERE id=$1",[o.id]);await expandSmsEvents();await smsTick(api);await expandSmsEvents();assert.equal((await count(o.id)).length,2);assert.match(submitted[1].body,/delivered successfully/);assert.equal(sends,2);
+    });
+    await t.test('automatic SMS matches the v2 send contract with the configured sender, and stores the accepted ID', async()=>{
+      await clear();
+      const o=await fresh();
+      const id=randomUUID();
+      let posts=0;
+      const gateway=new ArkeselClient(arkeselConfig,async(url,request)=>{
+        assert.equal(url,'https://sms.arkesel.com/api/v2/sms/send');
+        assert.equal(request?.method,'POST');
+        assert.equal(new Headers(request?.headers).get('api-key'),'synthetic-only');
+        const body=JSON.parse(String(request?.body));
+        const [intent]=await count(o.id);
+        assert.equal(intent.state,'submission_started');
+        assert.deepEqual(body,{sender:'MYSTERY HUB',message:intent.body,recipients:['233591234567'],sandbox:true,callback_url:'https://mysteryhub-api.onrender.com/api/sms/arkesel/callback'});
+        assert.equal(smsEstimate(body.message).encoding,'GSM-7');
+        posts++;
+        return Response.json({status:'success',data:[{recipient:'233591234567',id}]});
+      });
+      const mocked={balance:api.balance,send:gateway.send.bind(gateway)} as ArkeselClient;
+      await smsTick(mocked);
+      await smsTick(mocked);
+      assert.equal(posts,1);
+      const [sent]=await count(o.id);
+      assert.equal(sent.state,'accepted');
+      assert.equal(sent.provider_id,id);
+    });
+    await t.test('422 details are stored without provider prose or retries',async()=>{
+      await clear();
+      const o=await fresh();
+      let posts=0;
+      const gateway=new ArkeselClient(arkeselConfig,async()=>{
+        posts++;
+        return Response.json({status:'error',errors:{message:['PRIVATE MESSAGE']}},{status:422});
+      });
+      const mocked={balance:api.balance,send:gateway.send.bind(gateway)} as ArkeselClient;
+      await smsTick(mocked);
+      await smsTick(mocked);
+      assert.equal(posts,1);
+      const [failed]=await count(o.id);
+      assert.equal(failed.state,'failed');assert.equal(failed.provider_id,null);
+      assert.equal(failed.error_code,'VALIDATION_FIELD:message');
+      const [attempt]=(await db.query('SELECT error_code FROM mysteryhub_sms.attempts WHERE message_id=$1',[failed.id])).rows;
+      assert.equal(attempt.error_code,'VALIDATION_FIELD:message');
     });
     await t.test('guest uses existing recipient only with neutral one-segment wording and no payer evidence',async()=>{
       await clear();const o=await fresh({user_id:null});await expandSmsEvents();const rows=await count(o.id);assert.equal(rows.length,1);assert.equal(rows[0].recipient,'+233241234567');assert.match(rows[0].body,/^A /);assert.match(rows[0].body,/notify this number/);assert.equal(smsEstimate(rows[0].body).segments,1);const c=await db.connect();try{assert.equal((await orderRecipients(c,o.id,'payment_confirmed',false,false)).recipients.length,0);}finally{c.release();}

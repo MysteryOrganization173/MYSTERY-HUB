@@ -49,7 +49,10 @@ export function AdminOperationsAlerts({ alerts, supplier, navigate }: {
         </button>
       </li>)}</ul>}
       {alerts.orders && alerts.orders.total > orders.length && <p className="text-xs text-slate-400">Showing {orders.length} paid cases, with critical cases first.</p>}
-      <AdminButton variant="ghost" onClick={() => navigate('orders', 'needs_attention')}>Open full attention queue</AdminButton>
+      <div className="flex flex-wrap gap-2">
+        <AdminButton variant="ghost" onClick={() => navigate('orders', 'needs_attention')}>Open full attention queue</AdminButton>
+        <AdminButton variant="ghost" onClick={() => navigate('orders', 'supplier_review')}>Open supplier investigations</AdminButton>
+      </div>
     </section>
     <section aria-label="Business enquiries" className="border-t border-slate-800 pt-4">
       <div className="flex flex-wrap items-center justify-between gap-2">

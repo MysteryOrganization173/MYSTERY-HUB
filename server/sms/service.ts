@@ -21,7 +21,9 @@ export async function applyReport(c:any,id:string,status:string,observed:number,
  const state=({DELIVERED:'delivered',NOT_DELIVERED:'not_delivered',EXPIRED:'expired',PROHIBITED:'prohibited',SUBMITTED:'accepted',QUEUED:'accepted'} as Record<string,string>)[status];
  const terminal=['delivered','not_delivered','expired','prohibited'].includes(m.state);
  if(observed>=Number(m.last_observed)&&state&&(!terminal||state===m.state))await c.query('UPDATE mysteryhub_sms.messages SET state=$2,provider_status=$3,last_observed=$4,reported_segments=COALESCE($5,reported_segments),error_code=NULL,updated_at=now() WHERE id=$1',[m.id,state,status,observed,event.segments||null]);
- else if(!state&&observed>=Number(m.last_observed))await c.query("UPDATE mysteryhub_sms.messages SET state=CASE WHEN state IN ('delivered','not_delivered','expired','prohibited') THEN state ELSE 'uncertain' END,provider_status=CASE WHEN state IN ('delivered','not_delivered','expired','prohibited') THEN provider_status ELSE 'UNKNOWN' END,last_observed=GREATEST(last_observed,$2),error_code='UNKNOWN_PROVIDER_STATUS',updated_at=now() WHERE id=$1",[m.id,observed]);
+ // An unknown observation adds evidence for investigation without superseding
+ // known acceptance/delivery or moving the watermark for recognized statuses.
+ else if(!state&&observed>=Number(m.last_observed))await c.query("UPDATE mysteryhub_sms.messages SET error_code=CASE WHEN error_code='CONFLICTING_TERMINAL_REPORT' THEN error_code ELSE 'UNKNOWN_PROVIDER_STATUS' END,updated_at=now() WHERE id=$1",[m.id]);
  else if(terminal&&state&&['delivered','not_delivered','expired','prohibited'].includes(state)&&state!==m.state&&observed>=Number(m.last_observed))await c.query("UPDATE mysteryhub_sms.messages SET error_code='CONFLICTING_TERMINAL_REPORT',updated_at=now() WHERE id=$1",[m.id]);
  return {recorded:true};
 }

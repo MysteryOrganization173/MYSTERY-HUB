@@ -8,6 +8,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import React from 'react';
 import {OrdersStore} from '../../db/ordersStore';
 import {OrderResolutionStore} from '../../db/orderResolutionStore';
+import {orderManagementEligibility} from '../../services/orderManagementPolicy';
 import {OrderResolutionService as Service} from '../../services/orderResolutionService';
 import {FinanceStore} from '../../db/financeStore';
 import {FinanceService} from '../../services/financeService';
@@ -23,7 +24,7 @@ let server:Server,base:string,providerCalls=0;
 const refund=PaystackServerService.fetchRefund,tx=PaystackServerService.fetchRefundTransaction;
 const fixture=(extra:Partial<OrderRecord>={}):OrderRecord=>{const id='manual-'+randomUUID(),now=new Date().toISOString();return {id,user_id:'buyer',public_reference:id,customer_name:'Synthetic',customer_email:'fixture@example.test',customer_phone:'0241111111',recipient_phone:'0241111111',network:'mtn',service_type:'data',product_id:'mtn-1gb',product_name_snapshot:'Data',bundle_size_snapshot:'1GB',amount:549,currency:'GHS',status:'refund_pending',payment_provider:'paystack',payment_reference:'payment-'+id,payment_status:'success',supplier_provider:'success_biz_hub',supplier_order_id:'supplier-'+id,supplier_response:'{"status":"refund_pending"}',supplier_cost_minor:400,supplier_offer_ref:'fixture',supplier_last_checked_at:null,failure_reason:'supplier_delivery_failed',manual_review:true,created_at:now,updated_at:now,paid_at:now,submitted_at:now,delivered_at:null,...extra};};
 const create=async(extra:Partial<OrderRecord>={})=>{const o=fixture(extra);await OrdersStore.createOrder(o);return o;};
-const input=(o:OrderRecord,extra:Record<string,unknown>={})=>({action:'resolve_manual',manualOutcome:'manual_fulfillment',confirmed:true,requestId:randomUUID(),expectedUpdatedAt:o.updated_at,expectedVersion:o.resolution_json?.version||0,note:'Founder confirmed legitimate customer remedy',evidence:'Private operational evidence checked by operator',...extra});
+const input=(o:OrderRecord,extra:Record<string,unknown>={})=>({action:'resolve_manual',manualOutcome:'manual_fulfillment',reference:'SYNTHETIC-DELIVERY-123',confirmed:true,requestId:randomUUID(),expectedUpdatedAt:o.updated_at,expectedVersion:o.resolution_json?.version||0,note:'Founder confirmed legitimate customer remedy',evidence:'Private operational evidence checked by operator',...extra});
 const act=async(o:OrderRecord,extra:Record<string,unknown>={})=>{await Service.action(o.id,'admin',input(o,extra));return (await OrdersStore.findOrder(o.id))!;};
 before(async()=>{assert.equal(process.env.NODE_ENV,'test');assert.equal(process.env.DATABASE_URL,undefined);const app=express();app.use(express.json());app.use('/api/admin',adminRouter);server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});base='http://127.0.0.1:'+(server.address() as AddressInfo).port;});
 after(async()=>{PaystackServerService.fetchRefund=refund;PaystackServerService.fetchRefundTransaction=tx;await new Promise<void>(resolve=>server.close(()=>resolve()));});
@@ -41,11 +42,14 @@ for(const resolution of [
  {stage:'under_review',lastAttemptAt:new Date().toISOString(),lastError:'Provider timeout'},
  {stage:'under_review',outcome:'paystack_refund',refundId:'123',providerStatus:'failed'},
  {stage:'resolved',outcome:'wallet_refund'},
+ {stage:'under_review',verifiedAt:new Date().toISOString()},
 ] as const)test('manual closure rejects existing incompatible customer refund '+JSON.stringify(resolution),async()=>{const o=await create({resolution_json:{version:1,lastActor:'admin',updatedAt:new Date().toISOString(),...resolution}});await assert.rejects(()=>act(o),/refund|resolved/);assert.equal((await OrderResolutionStore.history(o.id)).length,0);});
 for(const extra of [
  {status:'processing'}, {status:'queued'}, {status:'delivered'}, {status:'refunded'},
  {payment_status:'pending',paid_at:null}, {failure_reason:'supplier_submission_uncertain'},
  {supplier_response:'{"status":"processing"}'}, {supplier_response:'{"status":"delivered"}'},
+ {supplier_response:'{"status":"delivered","data":{"status":"failed"}}'},
+ {supplier_response:'{"status":"processing","data":{"status":"failed"}}'},
  {supplier_response:'{"status":"unknown"}'}, {supplier_response:'invalid'},
  {supplier_order_id:'known',supplier_response:null},
 ] as Partial<OrderRecord>[])test('unsupported/uncertain order cannot close '+JSON.stringify(extra),async()=>{const o=await create(extra);await assert.rejects(()=>act(o));assert.deepEqual(await OrdersStore.findOrder(o.id),o);});
@@ -56,3 +60,76 @@ for(const token of ['', 'buyer-token'])test('manual action is admin-only '+token
 test('authorized route supports manual resolution using current revision contract',async()=>{const o=await create();const res=await fetch(base+'/api/admin/orders/'+o.id+'/resolution',{method:'POST',headers:{Authorization:'Bearer admin-token','Content-Type':'application/json'},body:JSON.stringify(input(o))});assert.equal(res.status,200);assert.equal((await res.json()).order.resolution.outcome,'manual_fulfillment');});
 
 test('nested supplier failure under a successful API envelope permits documented manual closure',async()=>{const o=await act(await create({supplier_response:JSON.stringify({status:'success',data:{status:'failed'}})}));assert.equal(o.resolution_json?.stage,'resolved');});
+
+test('a documented customer remedy and original supplier investigation close independently', async () => {
+ const time=new Date().toISOString();
+ const order=await create({
+  status:'failed',supplier_order_id:null,submitted_at:null,manual_review:false,
+  failure_reason:'Pre-launch test order closed by administrator.',
+  supplier_response:JSON.stringify({reason:'Synthetic timeout',isTimeout:true,timestamp:time}),
+  resolution_json:{version:2,stage:'under_review',lastActor:'admin',updatedAt:time,
+   supplierEvidence:{status:'refunded',note:'Delivered',actor:'admin',at:time}},
+ });
+ const other=await create({status:'failed'});
+ const headers={Authorization:'Bearer admin-token','Content-Type':'application/json'};
+ const alerts=async()=>(await (await fetch(base+'/api/admin/alerts/paid-orders',{headers})).json()).data;
+ const resolve=async(body:Record<string,unknown>)=>fetch(base+'/api/admin/orders/'+order.id+'/resolution',{method:'POST',headers,body:JSON.stringify(body)});
+ assert.equal((await alerts()).total,2);
+ const investigation=()=>OrdersStore.searchOrdersAdmin({status:'supplier_review'});
+ assert.equal((await resolve(input(order,{reference:undefined}))).status,400);
+ assert.equal((await resolve(input(order,{reference:'N/A'}))).status,400);
+ assert.equal((await resolve(input(order,{manualOutcome:'external_compensation',method:'Cash'}))).status,409);
+ assert.equal((await alerts()).total,2);
+ const body=input(order);
+ assert.equal((await resolve(body)).status,200);
+ assert.equal((await resolve(body)).status,200);
+ const after=(await OrdersStore.findOrder(order.id))!;
+ assert.equal(after.resolution_json?.stage,'resolved');
+ assert.equal(after.resolution_json?.supplierInvestigation,'open');
+ assert.equal(after.resolution_json?.manual?.reference,'SYNTHETIC-DELIVERY-123');
+ assert.deepEqual(after.resolution_json?.supplierEvidence,order.resolution_json?.supplierEvidence);
+ assert.equal((await investigation()).orders[0].id,order.id);
+ assert.equal(orderManagementEligibility(after,false,false).archive,false);
+ assert.equal(toSafePublicOrder(after).customer_resolution,'manual_fulfillment');
+ assert.doesNotMatch(JSON.stringify(toSafePublicOrder(after)),/supplierInvestigation|SYNTHETIC-DELIVERY/);
+ for(const key of ['status','paid_at','payment_status','amount','supplier_response','supplier_order_id','delivered_at'] as const) assert.equal(after[key],order[key]);
+ const snapshot=await alerts();
+ assert.equal(snapshot.total,1);
+ assert.equal(snapshot.orders[0].reference,other.public_reference);
+ const evidenceBody={
+  action:'supplier_evidence',confirmed:true,requestId:randomUUID(),
+  expectedUpdatedAt:after.updated_at,expectedVersion:3,evidenceStatus:'refunded',
+  note:'Supplier support confirmed the original credit and staff checked for a duplicate charge.',
+  reference:'SYNTHETIC-SUPPLIER-CASE',
+ };
+ assert.equal((await resolve({...evidenceBody,reference:undefined})).status,409);
+ assert.equal((await resolve({...evidenceBody,evidenceStatus:'uncertain'})).status,409);
+ assert.equal((await resolve({...evidenceBody,evidenceStatus:['refunded']})).status,400);
+ assert.equal((await investigation()).total,1);
+ const forbidden=await fetch(base+'/api/admin/orders/'+order.id+'/resolution',{
+  method:'POST',headers:{...headers,Authorization:'Bearer buyer-token'},body:JSON.stringify(evidenceBody),
+ });
+ assert.equal(forbidden.status,403);
+ assert.equal((await resolve(evidenceBody)).status,200);
+ const settled=(await OrdersStore.findOrder(order.id))!;
+ assert.equal(settled.resolution_json?.supplierInvestigation,'closed');
+ assert.equal(settled.resolution_json?.supplierEvidence?.status,'refunded');
+ assert.equal(settled.resolution_json?.supplierEvidence?.reference,'SYNTHETIC-SUPPLIER-CASE');
+ assert.deepEqual(settled.resolution_json?.manual,after.resolution_json?.manual);
+ assert.equal(settled.status,order.status);
+ assert.equal(settled.delivered_at,order.delivered_at);
+ assert.equal(orderManagementEligibility(settled,false,false).archive,true);
+ assert.equal((await investigation()).total,0);
+ assert.equal((await alerts()).total,1);
+ assert.equal((await OrderResolutionStore.history(order.id)).length,2);
+ assert.equal((await FinanceStore.adminOperations()).length,0);
+ assert.equal(providerCalls,0);
+});
+
+test('concurrent attestations can settle an explicitly uncertain failed order only once',async()=>{
+ const o=await create({status:'failed',supplier_order_id:null,submitted_at:null,supplier_response:null,failure_reason:'supplier_submission_uncertain'});
+ const out=await Promise.allSettled([act(o),act(o)]);
+ assert.equal(out.filter(r=>r.status==='fulfilled').length,1);
+ assert.equal((await OrdersStore.findOrder(o.id))?.resolution_json?.supplierInvestigation,'open');
+ assert.equal((await OrderResolutionStore.history(o.id)).length,1);
+});

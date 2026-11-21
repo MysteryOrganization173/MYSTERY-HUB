@@ -20,3 +20,13 @@ test('422 errors retain field names only, preserve failure semantics and never r
  await assert.rejects(()=>api.send('Synthetic message',['+233591234567']),(e:any)=>{assert.equal(e.code,'VALIDATION');assert.equal(e.uncertain,false);assert.deepEqual(e.details,{httpStatus:422,fields:['recipients','sender']});assert.ok(!JSON.stringify(e).includes('PRIVATE'));assert.ok(!JSON.stringify(e).includes('233591234567'));return true;});assert.equal(calls,1);
  assert.deepEqual(validationFields({errors:{'callback_url':['PRIVATE'],message:['PRIVATE'],token:['PRIVATE']}}),['callback_url','message']);
 });
+test('generic 422 message prose cannot impersonate a field error', async () => {
+ const api = new ArkeselClient(config, async () => json({
+  status:'error', message:'Your SMS message was rejected. Review the sender and recipient.',
+ },422));
+ await assert.rejects(() => api.send('Synthetic message',['+233591234567']), {
+  code:'VALIDATION', uncertain:false, details:{httpStatus:422,fields:[]},
+ });
+ assert.deepEqual(validationFields({message:'The message field is required.'}), ['message']);
+ assert.deepEqual(validationFields({errors:{'sender.private@example.test':'PRIVATE'}}), []);
+});

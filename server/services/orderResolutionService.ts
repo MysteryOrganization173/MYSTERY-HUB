@@ -7,13 +7,19 @@ import {FinanceService} from './financeService.js';
 import {PaystackServerService} from './paystackService.js';
 import {toAdminOrderDetails} from '../types/orders.js';
 import type {ManualResolutionOutcome,OrderResolution} from '../types/orderResolution.js';
-import {manualClosureBlock} from './manualClosureEligibility.js';
+import {keepsSupplierInvestigationOpen,manualClosureBlock} from './manualClosureEligibility.js';
 const allowed=['begin_review','supplier_evidence','verify_external','refund_wallet','resolve_manual'];
 const manualOutcomes:ManualResolutionOutcome[]=['manual_fulfillment','external_compensation','supplier_failed_pending_remedy'];
 function evidenceText(value:unknown,label:string,min=5,max=1000){
  const text=typeof value==='string'?value.trim():'';
  if(text.length<min||text.length>max||/[<>\x00-\x1f]|sk_(?:live|test)_|Bearer\s/i.test(text))throw new FinanceError(`Provide ${label} (${min}–${max} characters), without secrets.`);
  return text;
+}
+function referenceEvidence(value:unknown,label:string){
+ const reference=evidenceText(value,label,3,160);
+ if(/^(?:n\/?a|unknown|none|not available|pending|-+|0+)$/i.test(reference))
+   throw new FinanceError(`Provide ${label} from the evidence you checked.`);
+ return reference;
 }
 export class OrderResolutionService {
  static async details(reference:string){const order=await OrdersStore.findOrder(reference);if(!order)throw new FinanceError('Order not found.',404);return {order:toAdminOrderDetails(order),manualClosureBlock:manualClosureBlock(order),history:await OrderResolutionStore.history(order.id)};}
@@ -30,11 +36,15 @@ export class OrderResolutionService {
      manual={outcome:input.manualOutcome as ManualResolutionOutcome,reason:note,evidence:evidenceText(input.evidence,'documented evidence'),actor:adminId,at:''};
      if(manual.outcome==='external_compensation'){manual.method=evidenceText(input.method,'the compensation method',2,80);manual.reference=evidenceText(input.reference,'the external transaction/reference',3,160);}
      if(input.refundId!==undefined||input.evidenceStatus!==undefined)throw new FinanceError('Do not mix manual attestation with provider refund actions.');
-   }else if(['manualOutcome','evidence','method','reference'].some(key=>input[key]!==undefined))throw new FinanceError('Manual evidence requires the manual resolution action.');
+   }else if(['manualOutcome','evidence','method'].some(key=>input[key]!==undefined)||input.reference!==undefined&&action!=='supplier_evidence')throw new FinanceError('Choose the resolution action that matches this evidence.');
+   const supplierEvidenceReference=action==='supplier_evidence'&&input.reference!==undefined
+     ? referenceEvidence(input.reference,'the original supplier support or transaction reference')
+     : undefined;
    const initial=await OrdersStore.findOrder(reference);if(!initial)throw new FinanceError('Order not found.',404);
    const hash=createHash('sha256').update(JSON.stringify(Object.keys(input).sort().map(key=>[key,input[key]]))).digest('hex');
    const previous=await OrderResolutionStore.request(initial.id,input.requestId);
    if(previous){if(previous.input_hash!==hash||previous.actor_id!==adminId)throw new FinanceError('Resolution request changed.',409);return this.details(reference);}
+   if(manual?.outcome==='manual_fulfillment')manual.reference=referenceEvidence(input.reference,'the manual delivery receipt or support reference');
    if(initial.payment_status!=='success'||!initial.paid_at||initial.currency!=='GHS'||!Number.isSafeInteger(initial.amount)||initial.amount<=0)throw new FinanceError('Only verified paid orders are eligible.',409);
    if(!['failed','refund_pending','refunded','cancelled','expired'].includes(initial.status))throw new FinanceError('Await the authoritative supplier outcome; do not refund an active/delivered order here.',409);
    if(action==='refund_wallet'&&(initial.payment_provider!=='wallet'||!initial.user_id))throw new FinanceError('Paystack-to-Wallet compensation is disabled. Refund the original payment method.',409);
@@ -56,23 +66,32 @@ export class OrderResolutionService {
      const order=await OrdersStore.findOrder(initial.id,client);if(!order)throw new FinanceError('Order not found.',404);
      const old=await OrderResolutionStore.request(order.id,input.requestId as string,client);if(old){if(old.input_hash!==hash||old.actor_id!==adminId)throw new FinanceError('Resolution request changed.',409);return toAdminOrderDetails(order);}
      if(new Date(order.updated_at).toISOString()!==new Date(input.expectedUpdatedAt as string).toISOString()||(order.resolution_json?.version||0)!==input.expectedVersion)throw new FinanceError('Order changed. Reload its details before acting.',409);
-     if(order.resolution_json?.stage==='resolved'||!['failed','refund_pending','refunded','cancelled','expired'].includes(order.status))throw new FinanceError('This case is already resolved or its supplier outcome changed.',409);
+     const supplierOnly=action==='supplier_evidence'&&order.resolution_json?.stage==='resolved'&&
+       order.resolution_json.outcome==='manual_fulfillment'&&order.resolution_json.supplierInvestigation==='open';
+     if(!supplierOnly&&(order.resolution_json?.stage==='resolved'||!['failed','refund_pending','refunded','cancelled','expired'].includes(order.status)))throw new FinanceError('This customer case is already resolved or its supplier outcome changed.',409);
      if(order.payment_status!=='success'||!order.paid_at||order.payment_reference!==initial.payment_reference||order.amount!==initial.amount||order.currency!==initial.currency||order.payment_provider!==initial.payment_provider||order.user_id!==initial.user_id)throw new FinanceError('Payment identity changed.',409);
      const now=new Date().toISOString();const resolution:OrderResolution={...(order.resolution_json||{}),version:(order.resolution_json?.version||0)+1,stage:order.resolution_json?.stage||'under_review',lastActor:adminId,updatedAt:now};
      if(manual){
        // A linked/attempted customer refund cannot be replaced with an operator attestation.
-       if(resolution.outcome||resolution.refundId||resolution.lastAttemptAt||resolution.providerStatus||resolution.stage==='refund_pending'||order.status==='refunded'||order.delivered_at)throw new FinanceError('Reconcile the existing customer refund or delivery evidence first; manual resolution cannot replace it.',409);
+       if(resolution.outcome||resolution.refundId||resolution.lastAttemptAt||resolution.providerStatus||resolution.verifiedAt||resolution.stage==='refund_pending'||order.status==='refunded'||order.delivered_at)throw new FinanceError('Reconcile the existing customer refund or delivery evidence first; manual resolution cannot replace it.',409);
        if(manual.outcome!=='supplier_failed_pending_remedy'){
-         const blocked=manualClosureBlock(order);if(blocked)throw new FinanceError(blocked,409);
+         const blocked=manualClosureBlock(order,manual.outcome);if(blocked)throw new FinanceError(blocked,409);
        }
        resolution.manual={...manual,at:now};
        resolution.stage=manual.outcome==='supplier_failed_pending_remedy'?'under_review':'resolved';
        if(resolution.stage==='resolved')resolution.outcome=manual.outcome as 'manual_fulfillment'|'external_compensation';
        else resolution.supplierEvidence={status:'failed',note:manual.evidence,actor:adminId,at:now};
+       if(manual.outcome==='manual_fulfillment'&&keepsSupplierInvestigationOpen(order))resolution.supplierInvestigation='open';
      }
      if(action==='supplier_evidence'){
-       if(!['failed','refund_pending','refunded','uncertain'].includes(String(input.evidenceStatus)))throw new FinanceError('Select a documented supplier outcome.');
-       resolution.supplierEvidence={status:input.evidenceStatus as any,note,actor:adminId,at:now};
+       const evidenceStatus=input.evidenceStatus;
+       if(typeof evidenceStatus!=='string')throw new FinanceError('Select a documented supplier outcome.');
+       if(supplierOnly){
+         if(!supplierEvidenceReference||!['failed','refunded','delivered'].includes(evidenceStatus)||input.refundId!==undefined)
+           throw new FinanceError('Select the final original supplier outcome and give a verified reference. Explain how any duplicate charge or delivery was reconciled.',409);
+         resolution.supplierInvestigation='closed';
+       }else if(!['failed','refund_pending','refunded','uncertain'].includes(evidenceStatus))throw new FinanceError('Select a documented supplier outcome.');
+       resolution.supplierEvidence={status:evidenceStatus as NonNullable<OrderResolution['supplierEvidence']>['status'],note,actor:adminId,at:now,...(supplierEvidenceReference?{reference:supplierEvidenceReference}:{})};
      }
      if(action==='verify_external'){
        resolution.lastAttemptAt=now;
@@ -86,17 +105,37 @@ export class OrderResolutionService {
        resolution.stage='resolved';resolution.outcome='wallet_refund';resolution.amountMinor=order.amount;resolution.paymentReference=order.payment_reference;resolution.verifiedAt=now;
      }
      let current=order;
-     if(resolution.stage==='resolved'&&!manual){
+     if(resolution.stage==='resolved'&&(action==='verify_external'||action==='refund_wallet')){
        current=(await OrdersStore.updateOrderStatus(order.id,'refunded',undefined,undefined,undefined,{client,afterCommit:effects,authoritativeCustomerRefund:true}))!;
        current={...current,manual_review:false};
      }
      if(manual)current={...order,manual_review:resolution.stage!=='resolved'};
      // Refund ID uniqueness, order state and append-only history/audit commit together.
      await OrderResolutionStore.append({order_id:order.id,request_id:input.requestId as string,input_hash:hash,action,actor_id:adminId,result:resolution},client);
-     await AdminAuditStore.record({adminUserId:adminId,action:'order_resolution_'+action,entityType:'order',entityId:order.id,metadata:{stage:resolution.stage,amount_minor:resolution.amountMinor||null,refund_id:resolution.refundId||null,reason:note}},client);
+     await AdminAuditStore.record({adminUserId:adminId,action:'order_resolution_'+action,entityType:'order',entityId:order.id,metadata:{stage:resolution.stage,amount_minor:resolution.amountMinor||null,refund_id:resolution.refundId||null,reason:note,...(resolution.supplierInvestigation?{supplier_investigation:resolution.supplierInvestigation}:{})}},client);
      return toAdminOrderDetails(await OrdersStore.persistResolution(current,resolution,client));
    });
    for(const effect of effects)try{await effect();}catch{console.warn('[Order resolution] Durable refund requires downstream reconciliation.');}
-   return {order:result,history:await OrderResolutionStore.history(initial.id),message:manual?(result.resolution?.stage==='resolved'?'Manually resolved by operator attestation. Original payment and supplier facts are unchanged.':'Supplier failure evidence saved. Customer remedy remains open.'):unavailable?'Verification unavailable; refund remains unconfirmed.':result.resolution?.stage==='resolved'?(result.resolution.outcome==='paystack_refund'?'Paystack refund processed and case resolved; customer account visibility may take time.':'Original Wallet refund confirmed and case resolved.'):'Resolution evidence saved; customer refund is not yet confirmed.'};
+   let message:string;
+   if(manual){
+     message=result.resolution?.supplierInvestigation==='open'
+       ? 'Customer fulfillment recorded. The original supplier investigation is open in Orders → Supplier investigations.'
+       : result.resolution?.stage==='resolved'
+         ? 'Manually resolved by operator attestation. Original payment and supplier facts are unchanged.'
+         : 'Supplier failure evidence saved. Customer remedy remains open.';
+   }else if(action==='supplier_evidence'){
+     message=result.resolution?.supplierInvestigation==='closed'
+       ? 'Original supplier investigation closed with operator evidence. The customer remedy record is unchanged.'
+       : 'Supplier evidence saved. Customer remedy remains open.';
+   }else if(unavailable){
+     message='Verification unavailable; refund remains unconfirmed.';
+   }else if(result.resolution?.stage==='resolved'){
+     message=result.resolution.outcome==='paystack_refund'
+       ? 'Paystack refund processed and case resolved; customer account visibility may take time.'
+       : 'Original Wallet refund confirmed and case resolved.';
+   }else{
+     message='Resolution evidence saved; customer refund is not yet confirmed.';
+   }
+   return {order:result,history:await OrderResolutionStore.history(initial.id),message};
  }
 }

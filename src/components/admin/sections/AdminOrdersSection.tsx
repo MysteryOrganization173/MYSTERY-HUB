@@ -62,7 +62,11 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
   const pageSize = 20;
   const requests = useRef(createAdminRequestScope()).current;
   requests.setContext(sessionToken);
-  useEffect(() => () => requests.invalidate(), [requests, sessionToken]);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; requests.invalidate(); };
+  }, [requests, sessionToken]);
   const actionPending = useRef(false);
   const [isActing, setIsActing] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -353,6 +357,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
           {manualReviewFilter && <span>Review: {manualReviewFilter === 'true' ? 'flagged' : 'not flagged'}</span>}
           {(searchTerm || activeFilterCount > 0 || lens !== 'active') && <AdminButton variant="ghost" onClick={() => { clearFilters(); setSearchTerm(''); setDebouncedSearch(''); setLens('active'); }}>Reset view</AdminButton>}
         </div>
+        {lens === 'supplier_review' && <p className="text-xs text-slate-400">The customer received a documented remedy. Check the original supplier attempt and any duplicate charge or service.</p>}
         {lens === 'needs_attention' && <p className="text-xs text-slate-400">Needs Attention covers all dates: flagged orders, uncertain supplier submissions, refunds in progress and paid orders that failed without a recorded customer remedy. Resolved cases leave this list but stay searchable.</p>}
         {lens === 'active' && <p className="text-xs text-slate-500">{debouncedSearch ? 'Searching all order states, including cancelled and expired attempts. Any additional filters still apply.' : 'Active orders hide abandoned checkouts. Searching here includes all order states.'}</p>}
       </div>
@@ -363,7 +368,7 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
       {error && <AdminError title={ordersData ? 'Refresh failed · showing last loaded orders' : 'Orders could not load'} message={error} onRetry={() => void fetchOrders()} />}
       {isSearching && !isLoading && <p role="status" className="text-sm text-slate-400">Updating the selected results…</p>}
       {(isLoading || (!ordersData && !error)) ? <AdminLoading label="Loading orders…" /> : !ordersData || ordersData.orders.length === 0 ? (
-        <AdminEmpty title={error ? 'Current orders unavailable' : lens === 'needs_attention' ? 'No orders need attention' : 'No orders found'}>
+        <AdminEmpty title={error ? 'Current orders unavailable' : lens === 'needs_attention' ? 'No orders need attention' : lens === 'supplier_review' ? 'No open supplier investigations' : 'No orders found'}>
           {error ? 'The current results could not be verified. Try refreshing again.' : lens === 'needs_attention' ? 'No actionable orders match these filters in the last successful check. Normal processing is not a failure.' : 'Nothing matches this search and filter. Try another lens or clear the filters.'}
         </AdminEmpty>
       ) : (
@@ -463,8 +468,18 @@ export const AdminOrdersSection: React.FC<AdminOrdersSectionProps> = ({ sessionT
           onRefreshSupplier={() => void handleRefreshSupplierStatus(selectedOrder.public_reference)}
           updatingStatus={isUpdatingStatus}
           onMarketplaceStep={step => void handleUpdateOrderStatus(selectedOrder, step)}
-          onResolutionUpdated={updated => { if (selectedOrderRef.current?.id === updated.id) { requests.invalidate('detail'); setIsLoadingDetail(false); setSelected({ ...selectedOrderRef.current, ...updated }); afterAction(); } }}
-          recordKeeping={<AdminOrderRecordKeeping key={selectedOrder.public_reference} token={sessionToken} reference={selectedOrder.public_reference} client={recordClient}
+          onResolutionUpdated={updated => {
+            if (mounted.current) {
+              if (selectedOrderRef.current?.id === updated.id) {
+                requests.invalidate('detail');
+                setIsLoadingDetail(false);
+                setSelected({ ...selectedOrderRef.current, ...updated });
+              }
+              void refreshList.current();
+            }
+            onChanged?.();
+          }}
+          recordKeeping={<AdminOrderRecordKeeping key={`${selectedOrder.public_reference}:${selectedOrder.resolution?.version ?? 0}`} token={sessionToken} reference={selectedOrder.public_reference} client={recordClient}
             paused={isActing || isLoadingDetail || Boolean(detailError)}
             onArchivedChange={() => afterAction()}
             onDeleted={reference => { closeOrderDrawer(); setListNotice(`Test record ${reference} was permanently deleted.`); afterAction(); }} />}
