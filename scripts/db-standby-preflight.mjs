@@ -55,7 +55,7 @@ async function inspect(url) {
   await client.connect();
   try {
     await client.query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
-    const summary = (await client.query('SELECT current_database() AS database, current_setting(\'server_version\') AS version')).rows[0];
+    const summary = (await client.query("SELECT current_database() AS database, current_setting('server_version') AS version")).rows[0];
     const inventory = (await client.query(INVENTORY_SQL)).rows;
     const shapes = (await client.query(SHAPES_SQL)).rows[0];
     const tables = {};
@@ -110,6 +110,6 @@ async function main() {
 }
 
 main().catch(error => {
-  console.error('Read-only standby preflight failed: ' + error.message.replace(/postgres(?:ql)?:\\/\\/[^\\s]+/ig,'[redacted database URL]'));
+  console.error('Read-only standby preflight failed (' + (typeof error.code === 'string' ? error.code : 'connection or schema error') + '). No database URL is shown.');
   process.exitCode=1;
 });
