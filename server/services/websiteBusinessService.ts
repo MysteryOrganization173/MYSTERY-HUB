@@ -234,9 +234,22 @@ export class WebsiteBusinessService {
   }
   static async recoverEffects() {
     const db=getPool();
-    const orders:OrderRecord[]=db?(await db.query<OrderRecord>(`SELECT o.* FROM orders o LEFT JOIN finance_operations f ON f.kind='store_sale' AND f.payload->>'orderId'=o.id
-      WHERE o.store_context IS NOT NULL AND o.payment_status='success' AND (o.status='paid' OR f.id IS NULL OR (f.state IN ('pending','available','manual_review') AND o.status IN ('delivered','failed','refunded','cancelled')))
-      ORDER BY o.updated_at LIMIT 50`)).rows:OrdersStore.adminDevOrders().filter(o=>o.store_context&&o.payment_status==='success');
+    // Use the same owner/key as syncOrder. A delivered sale whose earnings
+    // are already available has no transition to apply and must not fill the batch.
+    const orders:OrderRecord[]=db?(await db.query<OrderRecord>(`
+      SELECT o.* FROM orders o
+      LEFT JOIN finance_operations f
+        ON f.user_id=o.store_context->>'ownerId' AND f.idempotency_key='store-sale:'||o.id
+      WHERE o.store_context IS NOT NULL AND o.payment_status='success'
+        AND (o.status='paid' OR f.id IS NULL OR (
+          f.state IN ('pending','available','manual_review')
+          AND o.status IN ('delivered','failed','refunded','cancelled')
+          AND (
+            (COALESCE(o.manual_review,false) AND o.supplier_order_id IS NOT NULL)
+            OR (NOT COALESCE(o.manual_review,false) AND (o.status<>'delivered' OR f.state='pending'))
+          )
+        ))
+      ORDER BY o.updated_at,o.id LIMIT 50`)).rows:OrdersStore.adminDevOrders().filter(o=>o.store_context&&o.payment_status==='success');
     for(const order of orders){try{if(order.manual_review&&order.supplier_order_id)await FulfilmentService.refreshOrderStatusIfDue(order,true);await this.syncOrder(order);if(order.status==='paid')await FulfilmentService.processPaidOrder(order.payment_reference,order.paid_at!,'Managed store recovery');}catch{ /* Durable order remains eligible on the next pass. */ }}
   }
   static safeStoreOrder(o:OrderRecord) {return {id:o.id,reference:o.public_reference,createdAt:o.created_at,network:o.network,bundle:o.bundle_size_snapshot,recipient:maskOrderRecipient(o.recipient_phone),retailMinor:o.amount,earningMinor:o.store_context!.earningMinor,status:o.status,manualReview:!!o.manual_review,paid:o.payment_status==='success',snapshot:o.store_context};}

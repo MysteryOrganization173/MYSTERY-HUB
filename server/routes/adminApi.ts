@@ -4,7 +4,7 @@ import {orderManagementRouter} from './orderManagementApi.js';
 import {salesCollector} from '../services/salesReliability.js';
 import { OrderResolutionService } from '../services/orderResolutionService.js';
 import {adminOperationsRouter} from './adminOperationsApi.js';
-import {adminPeriod,financialReport,reportingOrders} from '../services/adminReporting.js';
+import {adminPeriod,financialReport,reportingFinancialOrders} from '../services/adminReporting.js';
 import { FinanceError } from '../db/financeStore.js';
 import { adminCommercialRouter } from './commercialApi.js';
 import { AfaStore } from '../db/afaStore.js';
@@ -132,7 +132,7 @@ adminRouter.get('/overview', async (req: Request, res: Response) => {
       OrdersStore.getOverviewMetrics(),
       AuthStore.countCustomers(),
       WaitlistStore.getWaitlistGroupedStats(),
-      reportingOrders(),
+      reportingFinancialOrders(),
     ]);
     const allMoney=financialReport(reportOrders,adminPeriod({period:'all'}));
     const todayMoney=financialReport(reportOrders,adminPeriod({period:'today'}));

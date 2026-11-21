@@ -10,7 +10,7 @@ import {SMS_AUTO_EVENTS} from '../../shared/smsTransactional.js';
 export async function expandSmsEvents() {
   const config=arkeselConfig();if(!config.auto)return;
   return smsTransaction(async c=>{
-    const s=(await c.query('SELECT * FROM mysteryhub_sms.settings WHERE id=true FOR SHARE')).rows[0];
+    const s=(await c.query('SELECT paused,auto_enabled,cutoff,auto_types FROM mysteryhub_sms.settings WHERE id=true FOR SHARE')).rows[0];
     if(s.paused||!s.auto_enabled||!s.cutoff)return;
     for(const stage of SMS_AUTO_EVENTS) {
       if(!s.auto_types.includes(stage))continue;

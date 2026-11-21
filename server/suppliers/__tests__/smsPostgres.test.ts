@@ -39,6 +39,30 @@ test('native SMS storage, approvals, event capture, crash boundaries and financi
   await db.query('UPDATE mysteryhub_sms.settings SET balance=$1,last_balance_at=now() WHERE id=true',[JSON.stringify({smsCredits:10000,mainBalance:'GHS 0.00',_configFingerprint:signingFingerprint()})]);
   let readiness=await SmsService.readiness();await SmsService.settings(admin,{paused:false,autoEnabled:false,recipientUpdates:false,autoTypes:['order_processing','order_delivered','delivery_attention'],expectedRevision:readiness.settingsRevision,confirmed:true});
   const queue=async(body='Reviewed operational fixture',purpose='operational')=>{const p=await SmsService.preview(admin,{...previewInput,body,purpose});const r=await SmsService.campaign(admin,'sms-fixture-session',{previewId:p.id,requestId:randomUUID(),confirmed:true,queue:true});return (await db.query('SELECT * FROM mysteryhub_sms.messages WHERE campaign_id=$1',[r.id])).rows[0];};
+  await t.test('idle SMS skips claims and repeated credit calls, then sends new work on the next tick',async()=>{
+   let credits=0;
+   const idle={...api,balance:async()=>{credits++;return api.balance();}};
+   const before=(await db.query('SELECT count(*)::int n FROM mysteryhub_sms.attempts')).rows[0].n;
+   assert.deepEqual(await smsTick(idle),{idle:true});
+   assert.deepEqual(await smsTick(idle),{idle:true});
+   assert.equal(credits,0);
+   assert.equal((await db.query('SELECT count(*)::int n FROM mysteryhub_sms.attempts')).rows[0].n,before);
+   await db.query("UPDATE mysteryhub_sms.settings SET last_balance_at=now()-interval '2 minutes' WHERE id");
+   assert.deepEqual(await smsTick(idle),{idle:true});
+   assert.equal(credits,1);
+   const m=await queue('New work after idle');
+   let sends=0;
+   await smsTick({...idle,send:async(_text:string,phones:string[])=>{
+    sends++;
+    return phones.map(phone=>({phone,id:randomUUID(),state:'accepted'}));
+   }});
+   assert.equal(credits,2);
+   assert.equal(sends,1);
+   assert.equal((await db.query('SELECT state FROM mysteryhub_sms.messages WHERE id=$1',[m.id])).rows[0].state,'accepted');
+   await db.query('DELETE FROM mysteryhub_sms.attempts WHERE message_id=$1',[m.id]);
+   await db.query('DELETE FROM mysteryhub_sms.messages WHERE id=$1',[m.id]);
+   await db.query('DELETE FROM mysteryhub_sms.campaigns WHERE id=$1',[m.campaign_id]);
+  });
   await t.test('live verification is bound to both key and secret; configuration changes block settings, queue and claim',async()=>{
    const previous={...process.env};let queued:string|undefined;
    try{

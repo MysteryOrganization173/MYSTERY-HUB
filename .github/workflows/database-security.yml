@@ -44,6 +44,7 @@ jobs:
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_admin_website_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_finance_reconciliation_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_finance_lookup_test
+          createdb -h 127.0.0.1 -U postgres -O app_owner mystery_efficiency_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_shield_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_creative_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_experiences_test
@@ -137,3 +138,8 @@ jobs:
         env:
           MYSTERY_SMS_STUDIO_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_sms_studio_test
         run: node --import tsx --test server/suppliers/__tests__/smsStudio.test.ts server/suppliers/__tests__/smsStudioPostgres.test.ts
+
+      - name: Verify bounded recovery, idle notification reads and report parity
+        env:
+          MYSTERY_EFFICIENCY_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_efficiency_test
+        run: NODE_ENV=test node --import tsx --test server/suppliers/__tests__/databaseEfficiencyPostgres.test.ts

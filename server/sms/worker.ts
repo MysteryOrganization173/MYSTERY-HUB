@@ -17,14 +17,14 @@ export async function claimSms(credits:number){return smsTransaction(async c=>{
  await c.query("UPDATE mysteryhub_sms.messages SET state='cancelled',error_code='QUEUE_REVIEW_EXPIRED' WHERE state='queued' AND created_at<now()-interval '24 hours'");
  await c.query("UPDATE mysteryhub_sms.messages SET state='uncertain',error_code='PROCESS_INTERRUPTED',updated_at=now() WHERE state='submission_started' AND lease_until<now()");
  await c.query("UPDATE mysteryhub_sms.attempts SET state='uncertain',error_code='PROCESS_INTERRUPTED',finished_at=now() WHERE message_id IN (SELECT id FROM mysteryhub_sms.messages WHERE state='uncertain' AND error_code='PROCESS_INTERRUPTED') AND finished_at IS NULL");
- const config=arkeselConfig(),s=(await c.query('SELECT * FROM mysteryhub_sms.settings WHERE id=true FOR SHARE')).rows[0];if(!config.sendAllowed||s.paused||senderBlocked(s.balance?._providerSender,config)||!config.sandbox&&s.signing_fingerprint!==signingFingerprint(config))return null;
+ const config=arkeselConfig(),s=(await c.query("SELECT paused,auto_enabled,signing_fingerprint,balance->'_providerSender' AS sender_evidence FROM mysteryhub_sms.settings WHERE id=true FOR SHARE")).rows[0];if(!config.sendAllowed||s.paused||senderBlocked(s.sender_evidence,config)||!config.sandbox&&s.signing_fingerprint!==signingFingerprint(config))return null;
  const m=(await c.query("SELECT * FROM mysteryhub_sms.messages WHERE state='queued' AND sandbox=$1 ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED",[config.sandbox])).rows[0];if(!m)return null;
  const use=(await c.query(`SELECT COALESCE(SUM(estimated_segments) FILTER(WHERE network_started_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'),0)::int AS total,COALESCE(SUM(estimated_segments) FILTER(WHERE origin='automatic' AND network_started_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'),0)::int AS auto,COALESCE(SUM(estimated_segments) FILTER(WHERE network_started_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' OR state IN ('submission_started','uncertain','accepted')),0)::int AS floor_reserve,count(*) FILTER(WHERE network_started_at>now()-interval '1 minute')::int AS recent FROM mysteryhub_sms.messages WHERE sandbox=$1 AND network_started_at IS NOT NULL`,[config.sandbox])).rows[0];
  if(!config.daily||!config.autoDaily||use.total+m.estimated_segments>config.daily||m.origin==='automatic'&&use.auto+m.estimated_segments>config.autoDaily||use.recent>=10||credits-use.floor_reserve<m.estimated_segments+config.lowCredits)return null;
  if(m.origin==='automatic'&&(!config.auto||!s.auto_enabled)){await c.query("UPDATE mysteryhub_sms.messages SET state='cancelled',error_code='AUTO_DISABLED' WHERE id=$1",[m.id]);return null;}
  const lease=randomUUID();await c.query("UPDATE mysteryhub_sms.messages SET state='submission_started',network_started_at=now(),claim=$2,lease_until=now()+interval '90 seconds',updated_at=now() WHERE id=$1",[m.id,lease]);await c.query("INSERT INTO mysteryhub_sms.attempts(id,message_id,state) VALUES($1,$2,'submission_started')",[lease,m.id]);return {...m,claim:lease};
  });}
-async function revalidate(m:any){return smsTransaction(async c=>{const config=arkeselConfig(),s=(await c.query('SELECT * FROM mysteryhub_sms.settings WHERE id=true')).rows[0];if(!config.sendAllowed||config.sandbox!==m.sandbox||config.sender!==m.sender||s.paused||senderBlocked(s.balance?._providerSender,config)||!config.sandbox&&s.signing_fingerprint!==signingFingerprint(config))return false;
+async function revalidate(m:any){return smsTransaction(async c=>{const config=arkeselConfig(),s=(await c.query("SELECT paused,auto_enabled,auto_types,cutoff,recipient_updates,signing_fingerprint,balance->'_providerSender' AS sender_evidence FROM mysteryhub_sms.settings WHERE id=true")).rows[0];if(!config.sendAllowed||config.sandbox!==m.sandbox||config.sender!==m.sender||s.paused||senderBlocked(s.sender_evidence,config)||!config.sandbox&&s.signing_fingerprint!==signingFingerprint(config))return false;
  const current=(await c.query("SELECT state,claim FROM mysteryhub_sms.messages WHERE id=$1",[m.id])).rows[0];if(current?.state!=='submission_started'||current.claim!==m.claim)return false;
  if(m.origin==='manual'){
   const campaign=(await c.query("SELECT ca.*,p.input AS audience_input FROM mysteryhub_sms.campaigns ca JOIN mysteryhub_sms.previews p ON p.id=ca.preview_id JOIN sessions se ON se.token_hash=ca.session_hash AND se.expires_at>now() JOIN users u ON u.id=ca.actor_id AND u.id=se.user_id WHERE ca.id=$1 AND ca.state='queued' AND u.role='admin' AND u.status='active' AND NOT u.must_change_password",[m.campaign_id])).rows[0];if(!campaign)return false;
@@ -34,8 +34,30 @@ async function revalidate(m:any){return smsTransaction(async c=>{const config=ar
  });}
 export async function smsTick(api=new ArkeselClient()){
  const config=arkeselConfig();if(!config.sendAllowed||!config.worker||!await smsInstalled())return {disabled:true};
- const db=getPool()!;const settings=(await db.query('SELECT paused,balance FROM mysteryhub_sms.settings WHERE id=true')).rows[0];if(senderBlocked(settings?.balance?._providerSender,config))return {providerBlocked:true};const paused=settings?.paused!==false;if(paused)return {paused:true};await expandSmsEvents();await db.query('UPDATE mysteryhub_sms.settings SET heartbeat=now() WHERE id=true');
- const fingerprint=signingFingerprint(config),balance=await api.balance();if(fingerprint!==signingFingerprint())return {configurationChanged:true};await db.query("UPDATE mysteryhub_sms.settings SET balance=COALESCE(balance,'{}'::jsonb)||$1::jsonb,last_balance_at=now() WHERE id=true",[JSON.stringify({...balance,_configFingerprint:fingerprint})]);
+ const db=getPool()!;
+ const settings=(await db.query("SELECT paused,balance->'_providerSender' AS sender_evidence FROM mysteryhub_sms.settings WHERE id=true")).rows[0];
+ if(senderBlocked(settings?.sender_evidence,config))return {providerBlocked:true};
+ if(settings?.paused!==false)return {paused:true};
+ await expandSmsEvents();
+ const fingerprint=signingFingerprint(config);
+ const {rows:[tick]}=await db.query(`
+  UPDATE mysteryhub_sms.settings SET heartbeat=now() WHERE id=true
+  RETURNING (
+    EXISTS(SELECT 1 FROM mysteryhub_sms.messages WHERE state='queued'
+      AND (sandbox=$1 OR origin='automatic' OR created_at<now()-interval '24 hours'))
+    OR EXISTS(SELECT 1 FROM mysteryhub_sms.messages WHERE state='submission_started' AND lease_until<now())
+    OR EXISTS(SELECT 1 FROM mysteryhub_sms.attempts a JOIN mysteryhub_sms.messages m ON m.id=a.message_id
+      WHERE a.finished_at IS NULL AND m.state='uncertain' AND m.error_code='PROCESS_INTERRUPTED')
+  ) AS has_work,
+  COALESCE(last_balance_at>now()-interval '1 minute' AND balance->>'_configFingerprint'=$2,false) AS fresh_idle_balance
+ `,[config.sandbox,fingerprint]);
+ // The probe is a hint, never a claim or a permission check. Keep the
+ // existing tick and fresh provider credits for every potentially active send.
+ if(!tick||(!tick.has_work&&tick.fresh_idle_balance))return {idle:true};
+ const balance=await api.balance();
+ if(fingerprint!==signingFingerprint())return {configurationChanged:true};
+ await db.query("UPDATE mysteryhub_sms.settings SET balance=COALESCE(balance,'{}'::jsonb)||$1::jsonb,last_balance_at=now() WHERE id=true",[JSON.stringify({...balance,_configFingerprint:fingerprint})]);
+ if(!tick.has_work)return {idle:true};
  const m=await claimSms(balance.smsCredits);if(!m)return {idle:true};
  let state='uncertain',id:string|null=null,code:string|null=null,attempted=false;
  try{if(!await revalidate(m)){state='cancelled';code='REVIEW_OR_PERMISSION_CHANGED';}else{attempted=true;const result=(await api.send(m.body,[m.recipient]))[0];state=result.state==='accepted'?'accepted':result.state==='rejected'?'failed':'uncertain';id=result.id;code=result.state==='uncertain'?'ACCEPTANCE_UNKNOWN':result.state==='rejected'?'INVALID_RECIPIENT':null;}}
