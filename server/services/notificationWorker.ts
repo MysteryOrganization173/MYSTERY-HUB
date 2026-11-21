@@ -21,10 +21,13 @@ export async function expandNotificationEvents(){
   }return events.length;
  });
 }
+const dueDelivery = "q.state IN ('queued','retry') AND q.next_at<=NOW() AND (q.lease_until IS NULL OR q.lease_until<NOW())";
+const operatorTest = `EXISTS(SELECT 1 FROM ${n}.events e WHERE e.id=q.event_id AND e.operator_test)`;
+
 /** While sending is paused only the operator's own tests are claimed; nothing for customers or guests moves. */
 async function claim(testsOnly:boolean){return notificationTransaction(async c=>{
- const lease=randomUUID();const row=(await c.query(`SELECT q.* FROM ${n}.deliveries q WHERE q.state IN ('queued','retry') AND q.next_at<=NOW() AND (q.lease_until IS NULL OR q.lease_until<NOW())
-  AND (NOT $1::boolean OR EXISTS(SELECT 1 FROM ${n}.events e WHERE e.id=q.event_id AND e.operator_test)) ORDER BY q.next_at,q.id LIMIT 1 FOR UPDATE OF q SKIP LOCKED`,[testsOnly])).rows[0];if(!row)return null;
+ const lease=randomUUID();const row=(await c.query(`SELECT q.* FROM ${n}.deliveries q WHERE ${dueDelivery}
+  AND (NOT $1::boolean OR ${operatorTest}) ORDER BY q.next_at,q.id LIMIT 1 FOR UPDATE OF q SKIP LOCKED`,[testsOnly])).rows[0];if(!row)return null;
  const updated=(await c.query(`UPDATE ${n}.deliveries SET attempts=attempts+1,lease=$2,lease_until=NOW()+interval '60 seconds',updated_at=NOW() WHERE id=$1 RETURNING *`,[row.id,lease])).rows[0];
  await c.query(`INSERT INTO ${n}.attempts(id,delivery_id,attempt) VALUES($1,$2,$3)`,[randomUUID(),updated.id,updated.attempts]);return updated;
 });}
@@ -56,13 +59,26 @@ async function requeue(job:any){await notificationTransaction(async c=>{
  if(!back.rowCount)await c.query(`UPDATE ${n}.deliveries SET lease=NULL,lease_until=NULL WHERE id=$1 AND lease=$2`,[job.id,job.lease]);
 });}
 export async function processNotificationBatch(sender:Sender=send,max=10){
- if(!pushConfiguration().enabled||!getPool())return {processed:0,disabled:true};
- // Retention runs even while sending is paused: expired guest registrations never outlive their 180 days.
- await pruneExpiredGuests().catch(()=>0);
+ if(!pushConfiguration().enabled)return {processed:0,disabled:true};
+ const db=getPool();
+ if(!db)return {processed:0,disabled:true};
+ // One snapshot avoids opening transactions on empty ticks. Real work still
+ // goes through the same locked expansion/claim and live consent checks.
+ const {rows:[ready]}=await db.query(`
+   WITH policy AS (SELECT COALESCE((SELECT paused FROM ${n}.settings WHERE id=TRUE),true) AS paused)
+   SELECT paused,
+     EXISTS(SELECT 1 FROM ${n}.guest_devices WHERE expires_at<NOW()) AS has_expired_guests,
+     NOT paused AND EXISTS(SELECT 1 FROM ${n}.events WHERE expanded_at IS NULL) AS expand,
+     EXISTS(SELECT 1 FROM ${n}.deliveries q WHERE ${dueDelivery} AND (NOT paused OR ${operatorTest})) AS has_delivery
+   FROM policy
+ `);
+ if(ready.has_expired_guests)await pruneExpiredGuests().catch(()=>0);
  // Paused: no order update or announcement is expanded or sent; only the operator's own tests move.
- const pausedNow=async()=>(await getPool()!.query(`SELECT paused FROM ${n}.settings WHERE id=TRUE`)).rows[0]?.paused!==false;
- const paused=await pausedNow();
- if(!paused)await expandNotificationEvents();let processed=0;
+ const pausedNow=async()=>(await db.query(`SELECT paused FROM ${n}.settings WHERE id=TRUE`)).rows[0]?.paused!==false;
+ const paused=ready.paused;
+ const expanded=ready.expand?await expandNotificationEvents():0;
+ if(!ready.has_delivery&&!expanded)return {processed:0,disabled:paused};
+ let processed=0;
  for(let i=0;i<Math.max(1,Math.min(max,25));i++){
   // A pause that lands while a batch is running holds the rest of it: nothing more is claimed for customers.
   if(!paused&&i>0&&await pausedNow())break;
