@@ -84,12 +84,14 @@ export class OrderResolutionService {
        if(manual.outcome==='manual_fulfillment'&&keepsSupplierInvestigationOpen(order))resolution.supplierInvestigation='open';
      }
      if(action==='supplier_evidence'){
+       const evidenceStatus=input.evidenceStatus;
+       if(typeof evidenceStatus!=='string')throw new FinanceError('Select a documented supplier outcome.');
        if(supplierOnly){
-         if(!supplierEvidenceReference||!['failed','refunded','delivered'].includes(String(input.evidenceStatus))||input.refundId!==undefined)
+         if(!supplierEvidenceReference||!['failed','refunded','delivered'].includes(evidenceStatus)||input.refundId!==undefined)
            throw new FinanceError('Select the final original supplier outcome and give a verified reference. Explain how any duplicate charge or delivery was reconciled.',409);
          resolution.supplierInvestigation='closed';
-       }else if(!['failed','refund_pending','refunded','uncertain'].includes(String(input.evidenceStatus)))throw new FinanceError('Select a documented supplier outcome.');
-       resolution.supplierEvidence={status:input.evidenceStatus as any,note,actor:adminId,at:now,...(supplierEvidenceReference?{reference:supplierEvidenceReference}:{})};
+       }else if(!['failed','refund_pending','refunded','uncertain'].includes(evidenceStatus))throw new FinanceError('Select a documented supplier outcome.');
+       resolution.supplierEvidence={status:evidenceStatus as NonNullable<OrderResolution['supplierEvidence']>['status'],note,actor:adminId,at:now,...(supplierEvidenceReference?{reference:supplierEvidenceReference}:{})};
      }
      if(action==='verify_external'){
        resolution.lastAttemptAt=now;

@@ -104,6 +104,7 @@ test('a documented customer remedy and original supplier investigation close ind
  };
  assert.equal((await resolve({...evidenceBody,reference:undefined})).status,409);
  assert.equal((await resolve({...evidenceBody,evidenceStatus:'uncertain'})).status,409);
+ assert.equal((await resolve({...evidenceBody,evidenceStatus:['refunded']})).status,400);
  assert.equal((await investigation()).total,1);
  const forbidden=await fetch(base+'/api/admin/orders/'+order.id+'/resolution',{
   method:'POST',headers:{...headers,Authorization:'Bearer buyer-token'},body:JSON.stringify(evidenceBody),
