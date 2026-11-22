@@ -4,8 +4,8 @@ import { lstatSync, mkdtempSync, realpathSync, rmSync, writeFileSync, renameSync
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
-  SCOPE, StandbyError, appSchema, beginSnapshot, compareSnapshots, connect, displayError,
-  inspectSnapshot, migrationEndpoints, permissionsCheck, compatibleLocale, databaseMetadata,
+  StandbyError, appSchema, beginSnapshot, compareSnapshots, connect, displayError,
+  inspectSnapshot, migrationEndpoints, permissionsCheck, compatibleLocale, databaseMetadata, verifySessionSource,
 } from './db-standby-preflight.mjs';
 
 function workspace() {
@@ -28,15 +28,38 @@ function workspace() {
 }
 
 function run(tool,args,cfg,stage) {
+  const tls=!cfg.local || Boolean(cfg.caFile);
   const env={
     PATH:process.env.PATH, LANG:'C', PGAPPNAME:'mysteryhub-standby-clone',
     PGHOST:cfg.host, PGPORT:String(cfg.port), PGDATABASE:cfg.database, PGUSER:cfg.user, PGPASSWORD:cfg.password,
-    PGCONNECT_TIMEOUT:'12', PGSSLMODE:cfg.local?'disable':'verify-full',
-    ...(cfg.local?{}:{PGSSLROOTCERT:cfg.caFile||'system',PGCHANNELBINDING:cfg.channelBinding?'require':'prefer'}),
+    PGCONNECT_TIMEOUT:'12', PGSSLMODE:tls?'verify-full':'disable',
+    ...(tls?{PGSSLROOTCERT:cfg.caFile||'system',PGCHANNELBINDING:cfg.channelBinding?'require':'prefer'}:{}),
   };
   const child=spawnSync(tool,args,{env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:4*1024*1024,timeout:300000});
   if (child.error || child.status!==0) throw new StandbyError(stage+' failed. Tool output is suppressed; the authorized operator can inspect the isolated target before retrying.');
   return child.stdout;
+}
+
+function checkClient(tool,cfg) {
+  if (!/PostgreSQL\) 17\./.test(run(tool,['--version'],cfg,'PostgreSQL 17 client check'))) {
+    throw new StandbyError('Use the PostgreSQL 17 client tools for rehearsals and backups.');
+  }
+}
+
+async function probeSnapshot() {
+  const {source}=migrationEndpoints();
+  checkClient('pg_dump',source);
+  const client=await connect(source);
+  try {
+    await beginSnapshot(client);
+    await verifySessionSource(client,source);
+    const {rows:[{snapshot}]}=await client.query('SELECT pg_export_snapshot() AS snapshot');
+    // A second authenticated client imports the snapshot. This dumps only
+    // one table's definition, with no rows, archive, or destination connection.
+    run('pg_dump',['--no-password','--schema-only','--table=public.users','--lock-wait-timeout=5s',
+      '--snapshot='+snapshot,'--file=/dev/null'],source,'Read-only exported snapshot test');
+    console.log('PostgreSQL 17 pg_dump imported the source snapshot. No application rows were copied.');
+  } finally { await client.end(); }
 }
 
 const emptyGuard = name => `
@@ -85,17 +108,15 @@ $privileges$;
 
 export async function cloneStandby() {
   const {source,target}=migrationEndpoints(process.env,true);
-  for (const tool of ['pg_dump','pg_restore','psql']) {
-    if (!/PostgreSQL\) 17\./.test(run(tool,['--version'],target,'PostgreSQL 17 client check'))) {
-      throw new StandbyError('Use the PostgreSQL 17 client tools for rehearsals and backups.');
-    }
-  }
+  for (const tool of ['pg_dump','pg_restore','psql']) checkClient(tool,target);
   const dir=workspace();
   const dump=path.join(dir,'application.dump'), partial=path.join(dir,'application.partial'), toc=path.join(dir,'restore.list'), restore=path.join(dir,'restore.sql');
   const before=path.join(dir,'guard.sql'), after=path.join(dir,'protect.sql');
   const client=await connect(source);
   let sourceOpen=true;
   try {
+    await beginSnapshot(client);
+    await verifySessionSource(client,source);
     // Run the emptiness and identity guard before taking a potentially expensive snapshot.
     writeFileSync(before,emptyGuard(target.database));
     const empty=await connect(target);
@@ -106,7 +127,6 @@ export async function cloneStandby() {
     } finally { await empty.end(); }
     // The definitive check takes the same advisory lock again inside the atomic restore.
     run('psql',['-X','--no-password','--single-transaction','--set=ON_ERROR_STOP=1','--file='+before],target,'Empty destination verification');
-    await beginSnapshot(client);
     const reference=await inspectSnapshot(client);
     if (!compareSnapshots(reference,reference).ok) throw new StandbyError('Source has missing application data or inconsistent financial invariants.');
     const {rows:[{snapshot}]}=await client.query('SELECT pg_export_snapshot() AS snapshot');
@@ -137,4 +157,11 @@ export async function cloneStandby() {
   }
 }
 
-if (process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) cloneStandby().catch(displayError);
+async function main() {
+  const args=process.argv.slice(2);
+  if (!args.length) await cloneStandby();
+  else if (args.length===1 && args[0]==='--probe-source') await probeSnapshot();
+  else throw new StandbyError('Use --probe-source for a read-only snapshot test or no arguments for the isolated clone.');
+}
+
+if (process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) main().catch(displayError);
