@@ -3,8 +3,14 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import pg from 'pg';
 
-export const SUPABASE_HOST = 'db.fcvydpuuwbciuulrvizk.supabase.co';
+const SUPABASE_PROJECT = 'fcvydpuuwbciuulrvizk';
+export const SUPABASE_HOST = 'db.'+SUPABASE_PROJECT+'.supabase.co';
+const SUPABASE_POOLER_USER = 'postgres.'+SUPABASE_PROJECT;
+// Obtained over the project-scoped Supabase connector, independent of the supplied URL.
+const SUPABASE_CLUSTER_DIGEST = '092565c4989c4a590efd89e3647e8523adec970118aa956b45aedebe26925905';
 export const NEON_HOST = 'ep-nameless-fire-bjc901fm.c-3.eu-west-2.aws.neon.tech';
+export const NEON_STANDBY_DATABASE = 'mysteryhub_standby_icu';
+const sharedPooler = /^[a-z0-9-]+\.pooler\.supabase\.com$/;
 export const SCOPE = {
   public: `admin_assisted_orders admin_assisted_quotes admin_audit_log admin_giveaway_awards admin_giveaway_rounds admin_guest_buyer_evidence
     afa_registrations analytics_events finance_accounts finance_config finance_ledger finance_operations growth_campaign_links growth_campaign_spend
@@ -24,44 +30,59 @@ const fail = message => { throw new StandbyError(message); };
 export const ident = name => '"' + name.replaceAll('"', '""') + '"';
 const qualified = (schema, name) => ident(schema) + '.' + ident(name);
 
-export function databaseConfig(raw, caFile, env) {
+export function databaseConfig(raw, caFile, env, sessionSource = false) {
   let url;
   try { url = new URL(raw); } catch { fail('Provide both PostgreSQL URLs using the dedicated migration variables.'); }
   if (!['postgres:', 'postgresql:'].includes(url.protocol) || url.hash ||
     [...url.searchParams.keys()].some(k => !['sslmode', 'channel_binding'].includes(k) || url.searchParams.getAll(k).length !== 1)) {
-    fail('Use a direct PostgreSQL URL without host, search path, or service overrides.');
+    fail('Use a PostgreSQL connection URL without host, search path, or service overrides.');
   }
   if (url.searchParams.has('sslmode') && !['require', 'verify-full'].includes(url.searchParams.get('sslmode'))) fail('TLS policy must allow verify-full.');
   if (url.searchParams.has('channel_binding') && url.searchParams.get('channel_binding') !== 'require') fail('Invalid channel binding policy.');
   const host = url.hostname.toLowerCase();
   const database = url.pathname.slice(1);
+  const sessionPooler = sharedPooler.test(host);
   const local = env.NODE_ENV === 'test' && env.MYSTERY_STANDBY_TEST === 'true' && host === '127.0.0.1' && /^[a-z0-9_]+_test$/.test(database);
   if ((env.NODE_TEST_CONTEXT || env.NODE_ENV === 'test') && !local) fail('Test processes may only use isolated loopback test databases.');
-  if (!local && (url.port && url.port !== '5432' || ![SUPABASE_HOST, NEON_HOST].includes(host))) fail('Only the verified direct Supabase and Neon hosts are allowed.');
+  if (!local && url.port && url.port !== '5432') fail('Use port 5432. Transaction pooling and alternate ports are prohibited.');
+  if (sessionPooler) {
+    if (!sessionSource || url.port !== '5432' || database !== 'postgres') {
+      fail('The Session Pooler is only supported for the Supabase source database postgres on port 5432.');
+    }
+    if (env.MYSTERY_SUPABASE_SESSION_HOST !== host) {
+      fail('Set MYSTERY_SUPABASE_SESSION_HOST to the exact hostname from the production project’s Supabase Connect → Session pooler configuration.');
+    }
+  } else if (!local && ![SUPABASE_HOST, NEON_HOST].includes(host)) {
+    fail('Only the verified Supabase source and direct Neon endpoint are allowed.');
+  }
   if (!/^[a-z0-9_]{1,63}$/.test(database) || !url.username || (!local && !url.password)) fail('Database name and login are required.');
-  if (decodeURIComponent(url.username).includes('\0') || decodeURIComponent(url.password).includes('\0')) fail('Invalid database login.');
-  return { host, port:Number(url.port || 5432), database, user:decodeURIComponent(url.username),
-    password:decodeURIComponent(url.password), local, caFile, channelBinding:url.searchParams.has('channel_binding') };
+  let user,password;
+  try { user=decodeURIComponent(url.username); password=decodeURIComponent(url.password); }
+  catch { fail('Malformed URL encoding in the database login.'); }
+  if (/[\x00-\x1f\x7f]/.test(user+password)) fail('Invalid database login.');
+  if (sessionPooler && user !== SUPABASE_POOLER_USER) fail('The Session Pooler login must be postgres scoped to the verified Supabase project.');
+  return { host, port:Number(url.port || 5432), database, user,password, local, caFile, sessionPooler,
+    channelBinding:url.searchParams.has('channel_binding') };
 }
 
 export function migrationEndpoints(env = process.env, clone = false) {
-  const source = databaseConfig(env.MYSTERY_SOURCE_DATABASE_URL, env.MYSTERY_SOURCE_CA_FILE, env);
+  const source = databaseConfig(env.MYSTERY_SOURCE_DATABASE_URL, env.MYSTERY_SOURCE_CA_FILE, env, true);
   const target = databaseConfig(env.MYSTERY_STANDBY_DATABASE_URL, env.MYSTERY_STANDBY_CA_FILE, env);
   if (source.host === target.host && source.port === target.port && source.database === target.database) fail('Source and destination identify the same database.');
   if (source.local && target.local) return { source, target };
   const neonName = /^mysteryhub_(staging|standby_[a-z0-9_]+)$/;
   const supabaseReturn = /^mysteryhub_return_[a-z0-9_]+$/;
-  const outbound = source.host === SUPABASE_HOST && (source.database === 'postgres' || supabaseReturn.test(source.database)) &&
-    target.host === NEON_HOST && neonName.test(target.database);
+  const outbound = (source.sessionPooler || source.host === SUPABASE_HOST && (source.database === 'postgres' || supabaseReturn.test(source.database))) &&
+    target.host === NEON_HOST && target.database === NEON_STANDBY_DATABASE;
   const inbound = source.host === NEON_HOST && neonName.test(source.database) && target.host === SUPABASE_HOST && supabaseReturn.test(target.database);
-  if (!outbound && !inbound) fail('Use the verified standby or a distinctly named isolated return database. Restoring over production postgres is prohibited.');
+  if (!outbound && !inbound) fail('Use the pinned Neon standby database or a distinctly named isolated return database. Restoring over production postgres is prohibited.');
   if (clone && target.host === SUPABASE_HOST && target.database === 'postgres') fail('Production database restore is prohibited.');
   return { source, target };
 }
 
 export async function connect(cfg) {
   const { host, port, database, user, password, caFile } = cfg;
-  const ssl = cfg.local ? false : { rejectUnauthorized:true, servername:host, ...(caFile ? {ca:readFileSync(caFile)} : {}) };
+  const ssl = cfg.local && !caFile ? false : { rejectUnauthorized:true, servername:host, ...(caFile ? {ca:readFileSync(caFile)} : {}) };
   const client = new pg.Client({host,port,database,user,password,ssl, enableChannelBinding:true,
     connectionTimeoutMillis:12000, statement_timeout:120000, application_name:'mysteryhub-standby-verify'});
   try { await client.connect(); } catch (error) { await client.end().catch(()=>{}); throw error; }
@@ -72,6 +93,15 @@ export async function beginSnapshot(client) {
   await client.query(`BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
     SET LOCAL row_security=off; SET LOCAL search_path=pg_catalog; SET LOCAL TIME ZONE 'UTC';
     SET LOCAL DateStyle='ISO, YMD'; SET LOCAL IntervalStyle='postgres'; SET LOCAL bytea_output='hex'; SET LOCAL extra_float_digits=3`);
+}
+
+export async function verifySessionSource(client, source) {
+  if (!source.sessionPooler) return;
+  const {rows:[row]}=await client.query(`
+    SELECT current_database()='postgres' AND session_user='postgres'
+      AND encode(sha256(convert_to(system_identifier::text,'UTF8')),'hex')=$1 AS verified
+    FROM pg_catalog.pg_control_system()`,[SUPABASE_CLUSTER_DIGEST]);
+  if (row?.verified!==true) fail('The Session Pooler did not connect to the verified Supabase production cluster.');
 }
 
 export const appSchema = alias => `(${alias}.nspname='public' OR left(${alias}.nspname,11)='mysteryhub_')`;
@@ -316,8 +346,11 @@ export function compareSnapshots(source,target) {
 
 export function displayError(error) {
   // PostgreSQL errors and child output can include DDL literals, passwords or row values.
+  const certificateErrors = ['DEPTH_ZERO_SELF_SIGNED_CERT','SELF_SIGNED_CERT_IN_CHAIN','ERR_TLS_CERT_ALTNAME_INVALID',
+    'UNABLE_TO_VERIFY_LEAF_SIGNATURE','UNABLE_TO_GET_ISSUER_CERT_LOCALLY','CERT_HAS_EXPIRED'];
   const code = typeof error.code === 'string' && /^[A-Z0-9_]{1,24}$/.test(error.code) ? ' ('+error.code+')' : '';
-  console.error(error instanceof StandbyError ? error.message : 'Database verification failed'+code+'. Connection details and database values are suppressed.');
+  if (certificateErrors.includes(error.code)) console.error('Database TLS certificate validation failed. Verify the endpoint hostname and the provider-issued CA.');
+  else console.error(error instanceof StandbyError ? error.message : 'Database verification failed'+code+'. Connection details and database values are suppressed.');
   process.exitCode=1;
 }
 
@@ -328,6 +361,7 @@ async function main() {
     const targetClient = await connect(target);
     try {
       await Promise.all([beginSnapshot(sourceClient),beginSnapshot(targetClient)]);
+      await verifySessionSource(sourceClient,source);
       const result = compareSnapshots(...await Promise.all([inspectSnapshot(sourceClient),inspectSnapshot(targetClient,true)]));
       console.log(JSON.stringify(result,null,2));
       if (!result.ok) process.exitCode=2;

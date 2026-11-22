@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import express from 'express';
 import pg from 'pg';
-import { migrationEndpoints, databaseConfig, canonicalDefinition, NEON_HOST, SUPABASE_HOST } from '../../../scripts/db-standby-preflight.mjs';
+import { migrationEndpoints, databaseConfig, canonicalDefinition, verifySessionSource, NEON_HOST, SUPABASE_HOST } from '../../../scripts/db-standby-preflight.mjs';
 import { databaseMode, mountDatabaseMode, requireRestoredDatabase } from '../../services/databaseReadiness.js';
 import { getPool, initDatabase } from '../../db/connection.js';
 import { AuthStore } from '../../db/authStore.js';
@@ -18,10 +18,10 @@ import { assertSafeTestDatabase } from '../../utils/environment.js';
 import { opsOrder } from './adminOperationsFixtures.js';
 
 const sourceAddress = 'postgresql://operator:synthetic@'+SUPABASE_HOST+'/postgres';
-const neonAddress = 'postgresql://operator:synthetic@'+NEON_HOST+'/mysteryhub_staging?sslmode=require';
+const neonAddress = 'postgresql://operator:synthetic@'+NEON_HOST+'/mysteryhub_standby_icu?sslmode=require';
 
 test('migration accepts only verified direct endpoints and confines the reverse destination', () => {
-  assert.equal(migrationEndpoints({MYSTERY_SOURCE_DATABASE_URL:sourceAddress,MYSTERY_STANDBY_DATABASE_URL:neonAddress}).target.database,'mysteryhub_staging');
+  assert.equal(migrationEndpoints({MYSTERY_SOURCE_DATABASE_URL:sourceAddress,MYSTERY_STANDBY_DATABASE_URL:neonAddress}).target.database,'mysteryhub_standby_icu');
   assert.throws(()=>migrationEndpoints({MYSTERY_SOURCE_DATABASE_URL:neonAddress,MYSTERY_STANDBY_DATABASE_URL:sourceAddress},true),/isolated return/);
   assert.equal(migrationEndpoints({MYSTERY_SOURCE_DATABASE_URL:neonAddress,MYSTERY_STANDBY_DATABASE_URL:sourceAddress.replace('/postgres','/mysteryhub_return_november')},true).target.database,'mysteryhub_return_november');
   assert.throws(()=>migrationEndpoints({MYSTERY_SOURCE_DATABASE_URL:neonAddress,MYSTERY_STANDBY_DATABASE_URL:neonAddress}),/same database/);
@@ -30,6 +30,46 @@ test('migration accepts only verified direct endpoints and confines the reverse 
     assert.throws(()=>databaseConfig(value,undefined,{}),error=>error instanceof Error&&!error.message.includes('synthetic'));
   }
   assert.throws(()=>databaseConfig(sourceAddress,undefined,{NODE_ENV:'test'}),/isolated loopback/);
+});
+
+test('Session Pooler uses the Dashboard-pinned hostname, project login and database on port 5432 only', () => {
+  const host='fixture.pooler.supabase.com';
+  const address='postgresql://postgres.'+SUPABASE_HOST.split('.')[1]+':fixture%40password@'+host+':5432/postgres';
+  const env={MYSTERY_SOURCE_DATABASE_URL:address,MYSTERY_STANDBY_DATABASE_URL:neonAddress,MYSTERY_SUPABASE_SESSION_HOST:host};
+  const {source,target}=migrationEndpoints(env);
+  assert.equal(source.sessionPooler,true);
+  assert.equal(source.password,'fixture@password');
+  assert.equal(target.sessionPooler,false);
+  for(const input of [
+    {...env,MYSTERY_SUPABASE_SESSION_HOST:''},
+    {...env,MYSTERY_SUPABASE_SESSION_HOST:'another.pooler.supabase.com'},
+    {...env,MYSTERY_SOURCE_DATABASE_URL:address.replace(host,'untrusted.example')},
+    {...env,MYSTERY_SOURCE_DATABASE_URL:address.replace('.com','.com.untrusted.example')},
+    {...env,MYSTERY_SOURCE_DATABASE_URL:address.replace('5432','6543')},
+    {...env,MYSTERY_SOURCE_DATABASE_URL:address.replace(':5432','')},
+    {...env,MYSTERY_SOURCE_DATABASE_URL:address.replace('fixture%40password','%GG')},
+    {...env,MYSTERY_SOURCE_DATABASE_URL:address.replace('fixture%40password','%00')},
+    {...env,MYSTERY_SOURCE_DATABASE_URL:address.replace('fixture%40password','')},
+    {...env,MYSTERY_SOURCE_DATABASE_URL:address.replace('postgres.'+SUPABASE_HOST.split('.')[1],'postgres.otherproject')},
+    {...env,MYSTERY_SOURCE_DATABASE_URL:address.replace('/postgres','/postgres2')},
+    {...env,MYSTERY_STANDBY_DATABASE_URL:neonAddress.replace('standby_icu','standby_another')},
+    {...env,MYSTERY_STANDBY_DATABASE_URL:address},
+    {...env,MYSTERY_SOURCE_DATABASE_URL:sourceAddress,MYSTERY_STANDBY_DATABASE_URL:neonAddress.replace('standby_icu','staging')},
+  ]) assert.throws(()=>migrationEndpoints(input),error=>error instanceof Error&&!error.message.includes('fixture%40password'));
+});
+
+test('the pooler backend must independently match the production database, role, and cluster', async () => {
+  const checks:unknown[]=[];
+  const client = {query: async (statement:string, values:string[]) => {
+    checks.push(statement,values.length);
+    return {rows:[{verified:false}]};
+  }};
+  await assert.rejects(()=>verifySessionSource(client,{sessionPooler:true}),/verified Supabase production cluster/);
+  assert.match(String(checks[0]),/current_database\(\)='postgres'.*session_user='postgres'/);
+  assert.match(String(checks[0]),/pg_catalog\.pg_control_system\(\)/);
+  assert.equal(checks[1],1);
+  await verifySessionSource({query:async()=>({rows:[{verified:true}]})},{sessionPooler:true});
+  await verifySessionSource({query:async()=>assert.fail('unexpected query')},{sessionPooler:false});
 });
 
 test('object comparison permits PostgreSQL to move lossless varchar array casts without masking predicate changes', () => {
@@ -78,11 +118,11 @@ test('maintenance refuses HTTP callbacks and checkout while exposing sanitized d
 
 const source=process.env.MYSTERY_PORTABILITY_POSTGRES_URL;
 const prefix = /^\/mh_source_test$/;
-async function runMigration(script:string, from:string, to:string, dir:string) {
+async function runMigration(script:string, from:string, to:string, dir:string, args:string[]=[], sourceCa?:string) {
   const {PATH}=process.env;
-  const proc=spawn(process.execPath, ['scripts/'+script+'.mjs'],{
+  const proc=spawn(process.execPath, ['scripts/'+script+'.mjs',...args],{
     env:{PATH,NODE_ENV:'test',MYSTERY_STANDBY_TEST:'true',MYSTERY_SOURCE_DATABASE_URL:from,
-      MYSTERY_STANDBY_DATABASE_URL:to,MYSTERY_STANDBY_ARCHIVE_DIR:dir},
+      MYSTERY_STANDBY_DATABASE_URL:to,MYSTERY_STANDBY_ARCHIVE_DIR:dir,MYSTERY_SOURCE_CA_FILE:sourceCa},
     stdio:['ignore','pipe','pipe'],
   });
   let stdout='',stderr='';
@@ -140,6 +180,36 @@ test('PostgreSQL 17 archive restores and reverses the complete app, and rejects 
     await src.query("SELECT nextval('mysteryhub_sms.consents_id_seq')");
     await requireRestoredDatabase('mh_source_test');
     await assert.rejects(()=>requireRestoredDatabase('mh_wrong_test'),/has not started/);
+
+    await t.test('pg_dump imports a direct snapshot without writing the destination or creating an archive',async()=>{
+      const probe=await runMigration('db-standby-clone',source!,target,dir,['--probe-source']);
+      assert.equal(probe.code,0,probe.stderr);
+      assert.match(probe.stdout,/imported the source snapshot/);
+      assert.deepEqual(readdirSync(dir),[]);
+      assert.equal((await dest.query("SELECT to_regclass('public.orders') AS existing")).rows[0].existing,null);
+      const invalid=await runMigration('db-standby-clone',source!,target,dir,['--check']);
+      assert.equal(invalid.code,1);
+      assert.match(invalid.stderr,/read-only snapshot test/);
+      assert.deepEqual(readdirSync(dir),[]);
+    });
+
+    const poolerUrl=process.env.MYSTERY_STANDBY_TEST_POOLER_URL;
+    await t.test('Supavisor Session Pooler imports the identical PostgreSQL 17 snapshot over verified TLS', {skip:!poolerUrl},async()=>{
+      assertSafeTestDatabase({NODE_ENV:'test',DATABASE_URL:poolerUrl,MYSTERY_TEST_DATABASE_OPT_IN:'true'});
+      const ca=process.env.MYSTERY_STANDBY_TEST_POOLER_CA;
+      const wrongCa=process.env.MYSTERY_STANDBY_TEST_WRONG_CA;
+      assert.ok(ca&&wrongCa);
+      const bad=await runMigration('db-standby-clone',poolerUrl!,target,dir,['--probe-source'],wrongCa);
+      assert.equal(bad.code,1,bad.stdout);
+      assert.match(bad.stderr,/TLS certificate validation failed/);
+      const probe=await runMigration('db-standby-clone',poolerUrl!,target,dir,['--probe-source'],ca);
+      assert.equal(probe.code,0,probe.stderr);
+      const testTarget=urlFor('mh_pooler_target_test');
+      const result=await runMigration('db-standby-clone',poolerUrl!,testTarget,dir,[],ca);
+      assert.equal(result.code,0,result.stdout+'\n'+result.stderr);
+      assert.match(result.stdout,/PARITY_VERIFIED_CUTOVER_REQUIRES_APPROVAL/);
+      for(const folder of readdirSync(dir)) rmSync(join(dir,folder),{recursive:true,force:true});
+    });
 
     await t.test('empty target stays unready and reports missing application inventory',async()=>{
       const check=await runMigration('db-standby-preflight',source!,target,dir);
