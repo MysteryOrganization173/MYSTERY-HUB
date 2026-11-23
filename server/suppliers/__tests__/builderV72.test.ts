@@ -65,7 +65,7 @@ test('every new style: own composition, same content, tap targets and managed ch
     assert.ok(html.includes(`data-store-style="${style}"`),style);assert.ok(html.includes(markers[style]),style);
     for(const other of Object.values(markers).filter(m=>m!==markers[style]))assert.ok(!html.includes(other),`${style} has no ${other}`);
     for(const target of ['content:tagline','content:aboutText','content:ctaLabel','content:businessName','copy:reseller.secondary'])assert.ok(html.includes(`data-visual-target="${target}"`),`${style} ${target}`);
-    for(const value of ['managed-fixture','id="bundle-catalog"','id="store-help"','Secure checkout by Paystack','Affordable data. Simple delivery.'])assert.ok(html.includes(value),`${style} ${value}`);
+    for(const value of ['managed-fixture','id="bundle-catalog"','id="store-help"','Browse bundles','Affordable data. Simple delivery.'])assert.ok(html.includes(value),`${style} ${value}`);
     assert.equal((html.match(/id="store-hero-title"/g)||[]).length,1,`${style} has one hero heading`);
     assert.equal((html.match(/<h1[ >]/g)||[]).length,1,`${style} keeps one page title`);
     // Compact, like Studio, downloads no banner; Editorial and Signature show it and keep its tap target.

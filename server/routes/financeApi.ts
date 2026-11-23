@@ -1,3 +1,4 @@
+import { PAYMENT_UNAVAILABLE, sharedMerchantCheckoutAvailable } from '../../shared/paymentAvailability.js';
 import { Router } from 'express';
 import { requireAuth, requireAdmin } from '../middleware/authMiddleware.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
@@ -19,7 +20,10 @@ const sensitive=createRateLimiter({windowMs:60_000,max:10});
 export const financeRouter=Router();
 financeRouter.use(requireAuth);
 financeRouter.get('/',handler(req=>FinanceService.summary(req.user.id,Math.min(100000,Math.max(0,Number(req.query.offset)||0)))));
-financeRouter.post('/topups',sensitive,handler(req=>{
+financeRouter.post('/topups',sensitive,(_req,res,next)=>{
+  if (!sharedMerchantCheckoutAvailable('wallet_topup')) { res.setHeader('Cache-Control','no-store').status(503).json(PAYMENT_UNAVAILABLE); return; }
+  next();
+},handler(req=>{
   const origin=(process.env.APP_URL||process.env.FRONTEND_URL||'').replace(/\/$/,'');
   if(!/^https:\/\/[^\s]+$/.test(origin)||!ALLOWED_ORIGINS.includes(origin))throw new FinanceError('Wallet callback origin is not configured.',503);
   return FinanceService.initializeTopup(req.user,req.body,origin);

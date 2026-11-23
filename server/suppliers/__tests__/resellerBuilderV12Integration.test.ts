@@ -1,3 +1,4 @@
+import * as actualPaymentAvailability from '../../../shared/paymentAvailability';
 import * as checkoutFailure from '../../../shared/checkoutFailure';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -10,7 +11,8 @@ import { dataOrderPresentation } from '../../../src/utils/dataPurchasePresentati
 // Execute the actual component's event handlers. Browser checks additionally cover
 // real React effects, native dialog top-layer behavior and responsive rendering.
 const compiled=transformSync(readFileSync('src/components/website/ManagedDataStorefront.tsx','utf8'),{loader:'tsx',format:'cjs'}).code;
-function component(preview=false,siteId='site-a') {
+// Legacy handler tests inject a VM-only commerce fixture. The public release tests use the real policy.
+function component(preview=false,siteId='site-a',legacyHandlerFixture=true) {
   const cells:any[]=[],effects:Array<()=>void>=[],calls={payments:[] as any[],requests:[] as string[],events:[] as string[],storageReads:0};
   const values=new Map<string,string>();let cursor=0;
   const react:any={createElement:(type:any,props:any,...children:any[])=>({type,props:{...props,children}}),
@@ -19,12 +21,12 @@ function component(preview=false,siteId='site-a') {
     useEffect:(fn:any,deps:any[])=>{const i=cursor++,old=cells[i];if(!old||deps.some((d,j)=>!Object.is(d,old.deps[j]))){effects.push(()=>{old?.cleanup?.();cells[i]={deps,cleanup:fn()};});}}
   };
   const tile=()=>null,tabs=()=>null,row=()=>null,colors={accent:'#7c3aed',background:'#07101e',surface:'#0b1220',text:'#fff',mutedText:'#bbb',border:'#566',focus:'#fff'};
-  const modules:any={'../../../shared/checkoutFailure':checkoutFailure,react,'../../utils/websitePreviewCatalog':{websitePreviewCatalog:(rows:any)=>rows||[]},'../../data/templates':{WEBSITE_TEMPLATES:[]},'../../data/bundles':{detectGhanaNetwork:()=>'mtn'},
+  const modules:any={'../../../shared/paymentAvailability':legacyHandlerFixture ? {sharedMerchantCheckoutAvailable:()=>true} : actualPaymentAvailability,'../../../shared/checkoutFailure':checkoutFailure,react,'../../utils/websitePreviewCatalog':{websitePreviewCatalog:(rows:any)=>rows||[]},'../../data/templates':{WEBSITE_TEMPLATES:[]},'../../data/bundles':{detectGhanaNetwork:()=>'mtn'},
     './storefront/ResellerCatalogue':{BundleTile:tile,NetworkTabs:tabs,BundleRow:row,SignalSteps:()=>null,bundleFilters:()=>[{id:'all',label:'All',count:1}],filterBundles:(b:any[])=>b,lowestPrice:(b:any[])=>b.length?Math.min(...b.map(x=>x.priceMinor)):null,sortBundles:(b:any[])=>b,storeNetworkColor:()=>'#ffcc00',storeNetworkName:(n:string)=>n.toUpperCase(),storeNetworksIn:(b:any[])=>[...new Set(b.map(x=>x.network))],networkSummaries:()=>[]},
     '../../utils/websiteBrand':{websiteActionText:()=> '#fff',resolveResellerTheme:()=>colors,resolveStoreTheme:()=>colors},
     '../../utils/templateRendererUtils':{renderTemplateLayout:(_template:any,slots:any)=>({type:'layout',props:slots})},
     '../../hooks/usePaystack':{usePaystack:()=>({loadingPhase:'opening',initializeServerPayment:async(options:any)=>{calls.payments.push(options);}})},
-    '../../services/websiteBusinessApi':{websiteBusinessRequest:async(path:string)=>{calls.requests.push(path);return path.endsWith('/storefront')?{products:[{id:'mtn-1gb',network:'mtn',dataAmount:'1GB',retailMinor:521}]}:{status:'pending_payment',manual_review:false};},trackPublicWebsite:(_id:string,event:string)=>calls.events.push(event)},
+    '../../services/websiteBusinessApi':{websiteBusinessRequest:async(path:string)=>{calls.requests.push(path);return path.endsWith('/storefront')?{checkoutAvailable:true,products:[{id:'mtn-1gb',network:'mtn',dataAmount:'1GB',retailMinor:521}]}:{status:'pending_payment',manual_review:false};},trackPublicWebsite:(_id:string,event:string)=>calls.events.push(event)},
     '../../utils/dataPurchasePresentation':{dataOrderPresentation,dataDeliveryNote:()=> 'Check your recipient.',maskDataRecipient:()=> '024••••000'},'../../../shared/money':{formatGhs:(n:number)=>`GHc${n/100}`},
     '../../utils/storeCheckoutAttempt':{createStoreCheckoutAttempt,readStoreCheckoutRecovery},'../../../server/utils/phone':{isValidGhanaPhoneNumber:(p:string)=>p==='0240000000'}
   };
@@ -97,3 +99,13 @@ test('preview/site changes remount checkout and old callbacks cannot activate th
   assert.equal(attempt.isActive(),false);const before=h.calls.requests.length;attempt.onPaymentReceived('MH-stale');attempt.onCancel('MH-stale');assert.equal(h.calls.requests.length,before);
   const preview=component(true),other=component(false,'site-b');assert.notEqual(h.wrapper.props.key,preview.wrapper.props.key);assert.notEqual(h.wrapper.props.key,other.wrapper.props.key);
 });
+
+ test('real public storefront policy prevents checkout with a stale backend response and keeps historical tracking',async()=>{
+  const published=component(false,'site-readonly',false);published.render();await tick();
+  const row=published.find(n=>n.type===published.row);assert.ok(row);assert.equal(row.props.onChoose,undefined);assert.equal(row.props.action,undefined);
+  assert.equal(published.find(n=>n.type==='dialog'),undefined);assert.equal(published.calls.payments.length,0);
+  published.find(n=>n.props?.['aria-label']==='Order reference').props.onChange({target:{value:'MH-existing-order'}});
+  published.find(n=>n.type==='form').props.onSubmit({preventDefault(){}});published.render();await tick();
+  assert.ok(published.calls.requests.includes('websites/site-readonly/store-orders/MH-existing-order'));
+  assert.equal(published.calls.payments.length,0);published.cleanup();
+ });

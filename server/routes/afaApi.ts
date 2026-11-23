@@ -1,4 +1,5 @@
 import {campaignOrderContext} from '../services/campaignContext.js';
+import { PAYMENT_UNAVAILABLE, sharedMerchantCheckoutAvailable } from '../../shared/paymentAvailability.js';
 import { Router } from 'express';
 import { FinanceService } from '../services/financeService.js';
 import { FinanceStore, FinanceError } from '../db/financeStore.js';
@@ -21,17 +22,22 @@ import type { OrderRecord } from '../types/orders.js';
 export const afaRouter = Router();
 afaRouter.get('/config', async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
+  if (!sharedMerchantCheckoutAvailable('afa')) { res.json({ available:false, enabled:false, retailPriceMinor:null, retailPriceGhc:null, status:'disabled', message:PAYMENT_UNAVAILABLE.error }); return; }
   try { res.json(await AfaService.publicConfig()); }
   catch { res.status(503).json({ available:false, enabled:false, retailPriceMinor:null, retailPriceGhc:null, status:'supplier_error', message:'AFA registration is temporarily unavailable.' }); }
 });
 /** The customer's AFA fee quote (standard price, any applying promotion, total and pricing revision). */
 afaRouter.get('/quote', async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
+  if (!sharedMerchantCheckoutAvailable('afa')) { res.json({ available:false, enabled:false, standardMinor:null, totalMinor:null, pricingRevision:null, retailPriceMinor:null, retailPriceGhc:null, welcomeApplies:false, status:'disabled', message:PAYMENT_UNAVAILABLE.error }); return; }
   try { res.json(await CommercialService.afaQuote()); }
   catch { res.status(503).json({ available:false, enabled:false, standardMinor:null, totalMinor:null, pricingRevision:null, retailPriceMinor:null, retailPriceGhc:null, welcomeApplies:false, status:'supplier_error', message:'AFA registration is temporarily unavailable.' }); }
 });
 const reviewBody=(quote:any)=>({error:'The registration fee changed. Review the new total before paying.',code:'AFA_REVIEW_REQUIRED',quote});
-afaRouter.post('/payments/initialize', requireAuth,campaignOrderContext, createRateLimiter({windowMs:600_000,max:10}), async (req, res) => {
+afaRouter.post('/payments/initialize', requireAuth,(_req,res,next)=>{
+  if (!sharedMerchantCheckoutAvailable('afa')) { res.status(503).json(PAYMENT_UNAVAILABLE); return; }
+  next();
+},campaignOrderContext, createRateLimiter({windowMs:600_000,max:10}), async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   let orderId: string | undefined;
   try {

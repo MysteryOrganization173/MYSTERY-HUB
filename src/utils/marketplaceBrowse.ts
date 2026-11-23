@@ -242,7 +242,7 @@ export function productPath(product: MarketplaceProduct): MarketplacePath {
   return isDirectPurchaseSupported(product) ? 'buy' : 'enquire';
 }
 
-export const PATH_LABELS: Record<MarketplacePath, string> = { buy: 'Buy online', enquire: 'Enquire to order', coming_soon: 'Coming soon' };
+export const PATH_LABELS: Record<MarketplacePath, string> = { buy: 'Buy online', enquire: 'Product enquiries', coming_soon: 'Coming soon' };
 
 /** Lowest authoritative price in pesewas, or null for quote-only / unpriced items. */
 export function productPriceMinor(product: MarketplaceProduct): number | null {

@@ -1,3 +1,4 @@
+import { paymentOrder } from './paymentFixtures.js';
 import assert from 'node:assert/strict';
 import {test,beforeEach,before,after} from 'node:test';
 import {randomUUID,createHmac} from 'node:crypto';
@@ -195,9 +196,10 @@ test('paid welcome order recovers dispatch after a process interruption',async()
 });
 test('Paystack rejection classification preserves conflict/timeout ambiguity',async()=>{
  process.env.PAYSTACK_SECRET_KEY='sk_test_fixture';
+ const order=paymentOrder({customer_email:'fixture@fixture.test',amount:449});await OrdersStore.createOrder(order);
  for(const status of [400,408,409,429,500]){
   globalThis.fetch=async()=>new Response(JSON.stringify({status:false,message:'Fixture rejection'}),{status});
-  const result=await init.call(P,{email:'fixture@fixture.test',amountPesewas:449,reference:'fixture'});assert.equal(result.definitiveFailure,status===400);
+  const result=await init.call(P,{email:'fixture@fixture.test',amountPesewas:449,reference:order.payment_reference});assert.equal(result.definitiveFailure,status===400);
  }
 });
 test('checkout final total and reopened quote cannot reuse stale welcome display',()=>{

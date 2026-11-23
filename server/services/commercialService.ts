@@ -1,3 +1,5 @@
+import { PAYMENT_UNAVAILABLE } from '../../shared/paymentAvailability.js';
+import { isDirectDataCheckout } from './paymentScope.js';
 import { getPool } from '../db/connection.js';
 import {AdminAuditStore} from '../db/adminAuditStore.js';
 import { randomUUID } from 'node:crypto';
@@ -111,6 +113,7 @@ export class CommercialService {
     return result;
   }
   static async initialize(order:OrderRecord,input:Record<string,unknown>) {
+    if (!isDirectDataCheckout(order)) throw new FinanceError(PAYMENT_UNAVAILABLE.error,503);
     if(input.paymentMethod==='wallet')return FinanceService.payOrder(order,input.requestId,undefined,tx=>this.prepare(order,input,tx));
     let saved:OrderRecord,operationId:string|undefined;
     if(order.user_id) {
@@ -122,7 +125,7 @@ export class CommercialService {
         const created=await tx.create('direct_checkout',key,prepared.amount,{orderId:prepared.id,productId:prepared.product_id,recipient:prepared.recipient_phone},'initializing');
         return {order:prepared,created};
       });
-      saved=result.order;if(result.old)return {...saved,checkout:result.old.payload.checkout||null,initializationUncertain:!result.old.payload.checkout};operationId=result.created!.id;
+      saved=result.order;if(result.old && (!saved || result.old.kind !== 'direct_checkout' || !isDirectDataCheckout(saved)))throw requireCheckoutRecovery();if(result.old)return {...saved,checkout:result.old.payload.checkout||null,initializationUncertain:!result.old.payload.checkout};operationId=result.created!.id;
     } else {saved=await this.prepare(order,input).catch(async error=>{if(error instanceof FinanceError){await recoverDirectCheckout(undefined,input,order.product_id,order.recipient_phone,order.customer_email||'');throw rejectPreflight('CHECKOUT_REVIEW_REQUIRED');}throw error;});const created=await createGuestCheckoutOnce(saved,input);saved=created.order;if(!created.result.success)throw rejectPreflight('ACTIVE_MTN_ORDER');}
     try {
     const payment=await PaystackServerService.initializeTransaction({email:saved.customer_email,amountPesewas:saved.amount,reference:saved.payment_reference,metadata:{public_reference:saved.public_reference,network:saved.network,service_type:'data',product_id:saved.product_id,product_name:saved.bundle_size_snapshot}});

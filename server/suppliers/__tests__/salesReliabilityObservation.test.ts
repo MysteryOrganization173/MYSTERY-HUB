@@ -89,13 +89,14 @@ test('monitoring observer failure cannot reject a legitimate checkout',async()=>
   salesCollector.enqueue=()=>{throw Error('Synthetic monitoring failure');};
   assert.equal((await checkout()).status,200);assert.equal(payments,1);assert.equal(calls.length,4);
 });
-test('managed storefront HTTP and shared preflight produce one observation and no duplicate supplier calls',async()=>{
+test('disabled storefront returns before preflight and paid-sale observation',async()=>{
   const original=WebsiteBusinessService.initialize;
-  WebsiteBusinessService.initialize=(async()=>{const preflight=await FulfilmentService.preflightCheck('mtn','2GB','0241234567');assert.ok(preflight.allowed);return {synthetic:true};}) as any;
-  try{
-    assert.equal((await realFetch(base+'/api/websites/synthetic/store-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,200);
-    assert.equal(events.length,1);assert.equal(events[0].service,'data');assert.equal(calls.length,4);assert.equal(payments,0);
-  }finally{WebsiteBusinessService.initialize=original;}
+  WebsiteBusinessService.initialize=async()=>assert.fail('blocked before initializing a store checkout');
+  try {
+    const response=await realFetch(base+'/api/websites/synthetic/store-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    assert.equal(response.status,503);assert.equal((await response.json()).code,'PAYMENT_UNAVAILABLE');
+    assert.equal(events.length,0);assert.equal(calls.length,0);assert.equal(payments,0);
+  } finally {WebsiteBusinessService.initialize=original;}
 });
 test('Uncertain gateway initialization after preflight does not falsely assign its root cause to the supplier or an internal defect',async()=>{
   PaystackServerService.initializeTransaction=async()=>{throw Error('Synthetic internal failure');};

@@ -1,3 +1,4 @@
+import { paymentOrder } from './paymentFixtures.js';
 import assert from 'node:assert/strict';
 import {test,before,after,beforeEach,afterEach} from 'node:test';
 import {readFileSync} from 'node:fs';
@@ -35,7 +36,7 @@ async function request(path:string,method='GET',body?:unknown,token='customer-to
  return originalFetch(base+'/api'+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});
 }
 const pay=(extra:any={},phone=payload.phone)=>request('/afa/payments/initialize','POST',{...payload,phone,consent:true,customerEmail:'receipt@example.com',...extra});
-const quote=async()=>(await request('/afa/quote','GET',undefined,'')).json();
+const quote=()=>C.afaQuote();
 const store=(value:any)=>FinanceStore.transaction('admin',tx=>tx.saveConfig('afa-pricing',value));
 const confirmedCost=(costMinor=1500,confirmedAt='2026-11-20T10:00:00Z')=>({costMinor,evidence:'Synthetic written quote from the AFA supplier, dated 20 Nov 2026',confirmedAt,actorId:'admin'});
 /** Stored directly (as an Admin save would leave it), to exercise the read side on its own. */
@@ -56,13 +57,19 @@ beforeEach(async()=>{
 });
 afterEach(()=>{AfaService.provider=originalProvider;PaystackServerService.initializeTransaction=originalInitialize;PaystackServerService.verifyTransaction=originalVerify;globalThis.fetch=originalFetch;C.now=clock;C.afaPrice=originalPrice;for(const key of Object.keys(process.env))if(!(key in env))delete process.env[key];Object.assign(process.env,env);});
 
-// ───────── Ordinary AFA (the merged default) ─────────
-test('ordinary AFA: the quote is the server setting, and the existing journey is unchanged (no expected fields needed, no snapshot)',async()=>{
- const q=await quote();assert.deepEqual([q.available,q.standardMinor,q.totalMinor,q.pricingRevision,q.welcomeApplies,'campaign' in q],[true,2999,2999,'afa:2999',false,false]);
- assert.equal(q.retailPriceMinor,2999);assert.equal(q.retailPriceGhc,29.99);
- const config=await (await request('/afa/config','GET',undefined,'')).json();assert.deepEqual(Object.keys(config).sort(),['available','enabled','message','retailPriceGhc','retailPriceMinor','status'],'the existing /config contract is untouched');
- const r=await pay({amount:1});assert.equal(r.status,200);const body=await r.json();const order=(await OrdersStore.findOrder(body.orderRef))!;
- assert.equal(order.amount,2999);assert.equal(inits[0].amountPesewas,2999);assert.equal(order.commercial_context??null,null);assert.equal(posts,0);
+async function historicalAfa(phone=payload.phone) {
+ const q=await quote(),now=new Date().toISOString(),normalized=`+233${phone.slice(1)}`;
+ assert.ok(q.campaign&&q.pricingRevision&&q.totalMinor&&q.standardMinor);
+ const order=paymentOrder({user_id:'customer',service_type:'afa',product_id:'afa-registration',recipient_phone:normalized,customer_phone:normalized,
+  payment_reference:`MH_afa_${randomUUID()}`,amount:q.totalMinor,created_at:now,updated_at:now,commercial_context:{regularMinor:q.totalMinor,discountMinor:0,paidMinor:q.totalMinor,pricingRevision:q.pricingRevision,promotionId:null,promotionRevision:null,buyerPhone:null,supplierCostMinor:null,reserveMinor:null,contributionMinor:null,standardMinor:q.standardMinor,priceCampaignId:q.campaign.id,priceCampaignRevision:q.pricingRevision}});
+ await AfaStore.create(order,{...payload,phone});return order;
+}
+test('AFA pricing stays available for internal operations but public purchase and quote never open',async()=>{
+ const q=await quote();assert.deepEqual([q.available,q.standardMinor,q.totalMinor,q.pricingRevision,q.welcomeApplies],[true,2999,2999,'afa:2999',false]);
+ const config=await (await request('/afa/config','GET',undefined,'')).json();assert.deepEqual([config.available,config.retailPriceMinor],[false,null]);
+ const publicQuote=await (await request('/afa/quote','GET',undefined,'')).json();assert.deepEqual([publicQuote.available,publicQuote.totalMinor],[false,null]);
+ const r=await pay();assert.equal(r.status,503);assert.equal((await r.json()).code,'PAYMENT_UNAVAILABLE');
+ assert.equal(OrdersStore.adminDevOrders().length,0);assert.equal(inits.length,0);assert.equal(posts,0);
 });
 test('disabled (shipped) December AFA price: standard price even inside the December dates; Admin shows it blocked',async()=>{
  assert.equal(AFA_PRICING_DEFAULT.enabled,false);assert.equal(AFA_PRICING_DEFAULT.cost,null,'no cost is pre-confirmed (12.00 is history only)');
@@ -71,14 +78,12 @@ test('disabled (shipped) December AFA price: standard price even inside the Dece
 });
 for(const [label,iso,expected] of [['scheduled (30 Nov 23:59:59)','2026-11-30T23:59:59Z',2999],['first second (1 Dec 00:00 Accra)','2026-12-01T00:00:00Z',1999],['last second of 4 Jan','2027-01-04T23:59:59Z',1999],['expired (5 Jan 00:00)','2027-01-05T00:00:00Z',2999]] as const)
  test(`enabled AFA promotion ${label}: ${expected}`,async()=>{await activeConfig();at(iso);const q=await quote();assert.equal(q.totalMinor,expected);assert.equal('campaign' in q,expected===1999);});
-test('active: GH₵29.99 → December Special GH₵19.99, saving GH₵10.00, Paystack charged exactly 1999 after review, immutable snapshot',async()=>{
+test('active AFA promotion pricing and historical order snapshot still reconcile',async()=>{
  await activeConfig();const q=await quote();
- assert.deepEqual([q.standardMinor,q.totalMinor,q.savingMinor,q.campaign.label,q.welcomeApplies],[2999,1999,1000,'December Special',false]);assert.equal(q.pricingRevision,'afa:2999~afa-fixture-v1');
- const r=await pay({expectedTotalMinor:1999,pricingRevision:q.pricingRevision});assert.equal(r.status,200);const body=await r.json();assert.equal(body.amountPesewas,1999);assert.equal(inits[0].amountPesewas,1999);
- const order=(await OrdersStore.findOrder(body.orderRef))!;assert.equal(order.amount,1999);
- assert.deepEqual([order.commercial_context!.standardMinor,order.commercial_context!.regularMinor,order.commercial_context!.discountMinor,order.commercial_context!.paidMinor,order.commercial_context!.promotionId],[2999,1999,0,1999,null]);
+ assert.deepEqual([q.standardMinor,q.totalMinor,q.savingMinor,q.campaign?.label,q.welcomeApplies],[2999,1999,1000,'December Special',false]);
+ assert.equal(q.pricingRevision,'afa:2999~afa-fixture-v1');
+ const order=await historicalAfa();
  assert.deepEqual((toSafePublicOrder(order) as any).commercial_pricing,{regularMinor:1999,discountMinor:0,paidMinor:1999,standardMinor:2999});
- assert.deepEqual(Object.keys(inits[0].metadata).sort(),['product_id','public_reference','service_type'],'no identity or price detail added to Paystack metadata');
 });
 test('unknown or insufficient supplier cost: the promotion never applies, even if stored as enabled',async()=>{
  await activeConfig({cost:null});assert.equal((await quote()).totalMinor,2999);
@@ -93,60 +98,41 @@ test('disabled supplier service: no payment, no AFA headline, and enabling is re
 });
 
 // ───────── Quote and payment protection ─────────
-test('a fee that changed after review is refused with the new quote; nothing is written or charged',async()=>{
- const before=await quote();await activeConfig();
- for(const accepted of [{expectedTotalMinor:2999,pricingRevision:before.pricingRevision},{expectedTotalMinor:2999},{pricingRevision:before.pricingRevision},{}]){
-  const r=await pay(accepted);assert.equal(r.status,409,JSON.stringify(accepted));const body=await r.json();assert.equal(body.code,'AFA_REVIEW_REQUIRED');assert.equal(body.quote.totalMinor,1999);
- }
- assert.equal(OrdersStore.adminDevOrders().length,0);assert.equal(inits.length,0);
- const q=await quote();await store({...AFA_PRICING_DEFAULT,version:'afa-off'});
- const r=await pay({expectedTotalMinor:1999,pricingRevision:q.pricingRevision});assert.equal(r.status,409);assert.equal((await r.json()).quote.totalMinor,2999,'switched off: the customer reviews the higher standard price');
- process.env.AFA_RETAIL_PRICE_MINOR='3199';const changed=await pay({expectedTotalMinor:2999,pricingRevision:'afa:2999'});assert.equal(changed.status,409,'a changed server price is a changed revision');
- assert.equal(afaRequestMatchesQuote({totalMinor:2999,pricingRevision:'afa:2999'},{}),true,'a page from before quotes existed can still pay the standard price');
-});
-test('payment boundary: a fee that changes after the order is written is cancelled before Paystack and the number is released',async()=>{
- await activeConfig();const q=await quote();let calls=0;
- C.afaPrice=(async(...args:any[])=>{const real=await originalPrice.apply(C,args as any);return ++calls===2&&real?{...real,totalMinor:2999,pricingRevision:'afa:2999'}:real;}) as any;
- const r=await pay({expectedTotalMinor:1999,pricingRevision:q.pricingRevision});assert.equal(r.status,409);assert.equal(inits.length,0);
- const [cancelled]=OrdersStore.adminDevOrders();assert.equal(cancelled.status,'cancelled');
- C.afaPrice=originalPrice;const retry=await pay({expectedTotalMinor:1999,pricingRevision:q.pricingRevision});assert.equal(retry.status,200,'the duplicate block was released for an unpaid cancelled order');
-});
-test('Wallet debits exactly the reviewed promotional fee; a change inside the transaction debits nothing',async()=>{
+test('neither stale nor current AFA quotes can start a charge or a Wallet debit',async()=>{
  await activeConfig();const q=await quote();
  await FinanceService.adjustment('admin','customer',{confirmed:true,direction:'credit',amountMinor:5000,requestId:randomUUID(),reason:'Synthetic fixture'});
- let calls=0;C.afaPrice=(async(...args:any[])=>{const real=await originalPrice.apply(C,args as any);return ++calls===2&&real?{...real,pricingRevision:'afa:2999~changed'}:real;}) as any;
- const refused=await pay({paymentMethod:'wallet',requestId:randomUUID(),expectedTotalMinor:1999,pricingRevision:q.pricingRevision});
- assert.equal(refused.status,409);assert.equal((await refused.json()).code,'AFA_REVIEW_REQUIRED');assert.equal((await FinanceService.summary('customer')).walletMinor,5000);assert.equal(OrdersStore.adminDevOrders().length,0);
- C.afaPrice=originalPrice;const requestId=randomUUID(),body={paymentMethod:'wallet',requestId,expectedTotalMinor:1999,pricingRevision:q.pricingRevision};
- const [a,b]=[await (await pay(body)).json(),await (await pay(body)).json()];
- assert.equal(a.amountPesewas,1999);assert.equal(a.orderRef,b.orderRef,'an idempotent retry returns the same order');assert.equal((await FinanceService.summary('customer')).walletMinor,3001,'debited once');
+ for(const fields of [{},{expectedTotalMinor:2999,pricingRevision:'afa:2999'},{expectedTotalMinor:q.totalMinor,pricingRevision:q.pricingRevision}]) {
+  for(const paymentMethod of ['paystack','wallet']){
+   const r=await pay({...fields,paymentMethod,requestId:randomUUID()});assert.equal(r.status,503);assert.equal((await r.json()).code,'PAYMENT_UNAVAILABLE');
+  }
+ }
+ assert.equal((await FinanceService.summary('customer')).walletMinor,5000);
+ assert.equal(OrdersStore.adminDevOrders().length,0);assert.equal(inits.length,0);assert.equal(posts,0);
 });
 test('existing protections hold under the promotion: duplicate registration, verified dispatch once, uncertainty latched',async()=>{
- await activeConfig();const q=await quote(),accepted={expectedTotalMinor:1999,pricingRevision:q.pricingRevision};
- const first=await (await pay(accepted)).json();const dup=await pay(accepted);assert.equal(dup.status,409);assert.match((await dup.json()).error,/active or completed/);
- const order=(await OrdersStore.findOrder(first.orderRef))!;process.env.NODE_ENV='development';
+ await activeConfig();const order=await historicalAfa();await assert.rejects(()=>historicalAfa(),/active or completed/);
+ process.env.NODE_ENV='development';
  await Promise.all([FulfilmentService.processPaidOrder(order.payment_reference,new Date().toISOString()),FulfilmentService.processPaidOrder(order.payment_reference,new Date().toISOString())]);
  const done=(await OrdersStore.findOrder(order.id))!;assert.equal(posts,1);assert.equal(done.status,'delivered');assert.equal(done.amount,1999);assert.equal(done.supplier_cost_minor,1500);
- process.env.NODE_ENV='test';const other=await (await pay(accepted,'0549116309')).json();const o2=(await OrdersStore.findOrder(other.orderRef))!;
+ process.env.NODE_ENV='test';const o2=await historicalAfa('0549116309');
  process.env.NODE_ENV='development';AfaService.provider.placeAfaRegistration=async()=>{posts++;throw Object.assign(new Error('private'),{isTimeout:true});};
  await FulfilmentService.processPaidOrder(o2.payment_reference,new Date().toISOString());await AfaService.submit((await OrdersStore.findOrder(o2.id))!);
  const uncertain=(await OrdersStore.findOrder(o2.id))!;assert.equal(posts,2,'never resubmitted');assert.equal(uncertain.manual_review,true);assert.equal(uncertain.amount,1999);
 });
 test('a wrong Paystack amount for a promotional order never dispatches',async()=>{
- await activeConfig();const q=await quote();const body=await (await pay({expectedTotalMinor:1999,pricingRevision:q.pricingRevision})).json();
- paid=2999;process.env.NODE_ENV='development';const order=(await OrdersStore.findOrder(body.orderRef))!;
+ await activeConfig();const order=await historicalAfa();
+ paid=2999;process.env.NODE_ENV='development';
  await request(`/payments/verify/${order.payment_reference}`);assert.equal(posts,0);assert.notEqual((await OrdersStore.findOrder(order.id))!.status,'delivered');
 });
 test('paid orders keep their amount when the promotion later ends or changes',async()=>{
- await activeConfig();const q=await quote();const body=await (await pay({expectedTotalMinor:1999,pricingRevision:q.pricingRevision})).json();
- const before=(await OrdersStore.findOrder(body.orderRef))!;await store({...AFA_PRICING_DEFAULT,version:'later'});at('2027-01-10T00:00:00Z');
- const after=(await OrdersStore.findOrder(body.orderRef))!;assert.equal(after.amount,1999);assert.deepEqual(after.commercial_context,before.commercial_context);
+ await activeConfig();const order=await historicalAfa();
+ const before=(await OrdersStore.findOrder(order.id))!;await store({...AFA_PRICING_DEFAULT,version:'later'});at('2027-01-10T00:00:00Z');
+ const after=(await OrdersStore.findOrder(order.id))!;assert.equal(after.amount,1999);assert.deepEqual(after.commercial_context,before.commercial_context);
 });
 test('the data welcome benefit never applies to AFA',async()=>{
  await activeConfig();assert.equal((await C.quote('mtn-1gb','data-buyer')).offer.state,'eligible','this account would get the data benefit');
- const q=await (await request('/afa/quote','GET',undefined,'data-buyer-token')).json();assert.equal(q.totalMinor,1999);assert.equal(q.welcomeApplies,false);
- const body=await (await pay({expectedTotalMinor:1999,pricingRevision:q.pricingRevision},'0241112222'.replace(/^0/,'0'))).json();
- assert.equal(body.amountPesewas,1999);assert.equal((await C.quote('mtn-1gb','data-buyer')).offer.state,'eligible','AFA did not reserve or consume it');
+ const q=await quote();assert.equal(q.totalMinor,1999);assert.equal(q.welcomeApplies,false);
+ await historicalAfa('0241112222');assert.equal((await C.quote('mtn-1gb','data-buyer')).offer.state,'eligible','AFA did not reserve or consume it');
 });
 
 // ───────── Headline ─────────
@@ -160,7 +146,7 @@ test('"Up to 33%" only while the AFA December price applies and AFA can be bough
  available=false;assert.equal((await C.withAfaHeadline(await C.catalog())).campaign!.maxSavingPercent,14,'AFA unavailable: back to 14%');
  available=true;await FinanceStore.transaction('admin',tx=>tx.saveConfig('direct-campaign',{...DIRECT_CAMPAIGN_DEFAULT,enabled:false,version:'data-off'}));
  const afaOnly=(await C.withAfaHeadline(await C.catalog())).campaign!;assert.equal(afaOnly.maxSavingPercent,33);assert.equal(afaOnly.title,'December Specials');
- const json=await (await request('/commercial/products','GET',undefined,'')).json();assert.equal(json.campaign.maxSavingPercent,33,'served on the public catalogue');
+ const json=await (await request('/commercial/products','GET',undefined,'')).json();assert.equal(json.campaign,undefined,'an AFA-only promotion cannot advertise a purchase on the public catalogue');
 });
 
 // ───────── Admin ─────────

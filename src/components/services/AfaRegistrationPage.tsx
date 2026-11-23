@@ -1,3 +1,5 @@
+import { sharedMerchantCheckoutAvailable } from '../../../shared/paymentAvailability';
+import { BUSINESS_CONFIG } from '../../config/business';
 import { WalletPaymentChoice } from '../finance/WalletPaymentChoice';
 import { defaultReceiptEmail } from '../../utils/receiptEmail';
 import { walletCheckout } from '../../services/financeApi';
@@ -129,6 +131,7 @@ export const AfaRegistrationPage: React.FC = () => {
   const canonicalFields: Record<string, keyof AfaFormData> = {name:'fullName', phone:'mtnNumber', idNumber:'ghanaCardNumber', location:'town',
     dateOfBirth:'dateOfBirth', region:'region', occupation:'occupation', consent:'consent', customerEmail:'customerEmail'};
   useEffect(() => {
+    if (!sharedMerchantCheckoutAvailable('afa')) return;
     let active = true;
     getAfaQuote().then(value => { if (active) setConfig(value); })
       .catch(() => { if (active) setSubmitError('AFA registration is temporarily unavailable.'); })
@@ -155,8 +158,8 @@ export const AfaRegistrationPage: React.FC = () => {
     verifyPaymentOnServer(reference).then(result => {
       if (!active) return;
       if (result.order?.service_type === 'afa') setConfirmedOrder(result.order);
-      else setSubmitError('Payment has not been confirmed. Check My Orders before trying again.');
-    }).catch(() => { if (active) setSubmitError('Payment confirmation is pending. Check My Orders before trying again.'); })
+      else setSubmitError('Payment has not been confirmed. Check My Orders for the latest status.');
+    }).catch(() => { if (active) setSubmitError('Payment confirmation is pending. Check My Orders for the latest status.'); })
       .finally(() => { if (active) { setIsSubmitting(false); setIsVerifying(false); } });
     return () => { active = false; };
   }, []);
@@ -325,7 +328,7 @@ export const AfaRegistrationPage: React.FC = () => {
             </button>
             <button type="button" onClick={() => { setConfirmedOrder(null); setFormData(initialFormData); }}
               className="min-h-12 px-4 rounded-xl bg-[#1a232b] hover:bg-[#222d36] text-slate-200 font-semibold text-sm border border-slate-700 cursor-pointer">
-              Register another number
+              {sharedMerchantCheckoutAvailable('afa') ? 'Register another number' : 'Back to AFA'}
             </button>
           </div>
         </div>
@@ -342,6 +345,21 @@ export const AfaRegistrationPage: React.FC = () => {
       </div>
     );
   }
+
+  if (!sharedMerchantCheckoutAvailable('afa')) return (
+    <div className="max-w-3xl mx-auto px-4 py-6 sm:py-10">
+      <section className="rounded-3xl border border-slate-800 bg-[#0a0f14] p-5 sm:p-8 space-y-4" aria-labelledby="afa-availability">
+        <Seasonal slot="page" page="afa" />
+        <h1 id="afa-availability" className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">MTN AFA registration</h1>
+        <p className="text-slate-300">Online registration is currently unavailable. You can still check a previous registration in My Orders.</p>
+        {submitError && <p role="alert" className="text-sm text-amber-200">{submitError}</p>}
+        <div className="flex flex-wrap gap-3">
+          <button type="button" className="mh-button" onClick={() => setActivePage('orders')}>My Orders</button>
+          <a className="mh-button-secondary" href={BUSINESS_CONFIG.contact.supportWhatsAppUrl} target="_blank" rel="noopener noreferrer">Contact support</a>
+        </div>
+      </section>
+    </div>
+  );
 
   const feeBlock = (
     isPriceLoading ? (

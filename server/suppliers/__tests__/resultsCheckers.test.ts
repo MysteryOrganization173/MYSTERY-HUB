@@ -112,7 +112,9 @@ test('encryption: only the right order and an untampered envelope open', () => {
 });
 
 test('the service stays closed unless every prerequisite is met, and never exposes cost or exact stock', async () => {
-  const open = await (await get('/results-checkers/config', null)).json();
+  const open = await ResultsCheckerService.publicConfig();
+  const publicConfig = await (await get('/results-checkers/config', null)).json();
+  assert.deepEqual([publicConfig.available, publicConfig.products], [false, []]);
   assert.equal(open.available, true);
   assert.deepEqual(open.products.map((p: { priceMinor: number }) => p.priceMinor), [2399, 2499]);
   assert.doesNotMatch(JSON.stringify(open), /1800|costMinor|type-bece|"available":40/);
@@ -125,11 +127,11 @@ test('the service stays closed unless every prerequisite is met, and never expos
     process.env[key] = saved;
   }
   delete process.env.RESULTS_CHECKER_TYPE_ID_BECE;
-  const partly = await (await get('/results-checkers/config', null)).json();
+  const partly = await ResultsCheckerService.publicConfig();
   assert.deepEqual(partly.products.map((p: { available: boolean }) => p.available), [false, true]);
   assert.equal(purchase.mock.callCount(), 0);
   vouchers.mock.mockImplementation(async () => { throw new Error('supplier down'); });
-  assert.equal((await (await get('/results-checkers/config', null)).json()).available, false);
+  assert.equal((await ResultsCheckerService.publicConfig()).available, false);
 });
 
 test('live spending needs a live payment key: test payments cannot reach the real supplier', () => {
@@ -152,26 +154,14 @@ test('live spending needs a live payment key: test payments cannot reach the rea
   } finally { process.env.NODE_ENV = was.env; if (was.key === undefined) delete process.env.PAYSTACK_SECRET_KEY; else process.env.PAYSTACK_SECRET_KEY = was.key; if (was.url === undefined) delete process.env.SUCCESS_BIZ_HUB_BASE_URL; else process.env.SUCCESS_BIZ_HUB_BASE_URL = was.url; }
 });
 
-test('checkout: sign-in required, the server sets the amount, invalid requests and stock problems are refused', async () => {
+test('voucher checkout preserves authentication and refuses all new payments, even with valid price and stock', async () => {
   assert.equal((await post('/results-checkers/payments/initialize', { product: 'bece', qty: 1, customerEmail: 'a@example.test' }, null)).status, 401);
-  for (const [body, field] of [[{ product: 'nope', qty: 1, customerEmail: 'a@example.test' }, 'product'], [{ product: 'bece', qty: 0, customerEmail: 'a@example.test' }, 'qty'], [{ product: 'bece', qty: 6, customerEmail: 'a@example.test' }, 'qty'], [{ product: 'bece', qty: 1.5, customerEmail: 'a@example.test' }, 'qty'], [{ product: 'bece', qty: 1, customerEmail: 'nope' }, 'customerEmail']] as const) {
-    const res = await post('/results-checkers/payments/initialize', body);
-    assert.equal(res.status, 400); assert.equal((await res.json()).field, field);
+  for (const product of ['bece','wassce','unknown']) {
+    const res=await post('/results-checkers/payments/initialize',{product,qty:2,customerEmail:'buyer@example.test',amount:1});
+    assert.equal(res.status,503);assert.equal((await res.json()).code,'PAYMENT_UNAVAILABLE');
   }
-  const good = await post('/results-checkers/payments/initialize', { product: 'wassce', qty: 2, customerEmail: 'buyer@example.test', amount: 1, amountPesewas: 1, priceMinor: 1 });
-  assert.equal(good.status, 200);
-  const started = await good.json();
-  assert.equal(started.amountPesewas, 4998, 'browser amounts are ignored');
-  const order = (await OrdersStore.findOrder(started.reference))!;
-  assert.equal(order.amount, 4998); assert.equal(order.service_type, 'results_checker'); assert.equal(order.status, 'pending_payment'); assert.equal(order.user_id, 'buyer');
-  assert.equal(purchase.mock.callCount(), 0, 'nothing is bought before payment');
-  vouchers.mock.mockImplementation(async () => catalogue({ available: 0 }));
-  const empty = await post('/results-checkers/payments/initialize', { product: 'bece', qty: 1, customerEmail: 'buyer@example.test' });
-  assert.equal(empty.status, 409);
-  vouchers.mock.mockImplementation(async () => catalogue({ priceMinor: '2000' }));
-  assert.equal((await post('/results-checkers/payments/initialize', { product: 'bece', qty: 1, customerEmail: 'buyer@example.test' })).status, 409, 'higher cost: stays unavailable, margin is not silently lowered');
-  // The general checkout cannot be used to reach this product.
-  for (const body of [{ serviceType: 'results_checker', productId: 'x' }, { productId: 'results-checker-bece' }]) assert.equal((await post('/payments/initialize', body, null)).status, 400);
+  for(const body of [{serviceType:'results_checker',productId:'mtn-1gb'},{productId:'results-checker-bece',serviceType:'data'}])assert.equal((await post('/payments/initialize',body,null)).status,503);
+  assert.equal(OrdersStore.adminDevOrders().length,0);assert.equal(purchase.mock.callCount(),0);assert.equal(vouchers.mock.callCount(),0);
 });
 
 test('an unpaid order never reaches the supplier', async () => {

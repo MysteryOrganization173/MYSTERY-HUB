@@ -33,7 +33,7 @@ for(const networks of [['mtn'],['telecel'],['airteltigo'],['mtn','telecel','airt
  for(const p of fresh.products){assert.equal(p.enabled,networks.includes(p.network));if(p.enabled)assert.equal(p.retailMinor,next[p.id].price?Math.round(Number(next[p.id].price)*100):0);}
  // A persisted draft catalogue is not public and cannot collect payment.
  assert.equal((await request(`websites/${s.id}/storefront`,undefined,'')).status,404);
- assert.equal((await request(`websites/${s.id}/store-checkout`,{productId:rows[0].productId,recipientPhone:'0241234567',customerEmail:'fixture@fixture.test',requestId:crypto.randomUUID()},'')).status,404);
+ assert.equal((await request(`websites/${s.id}/store-checkout`,{productId:rows[0].productId,recipientPhone:'0241234567',customerEmail:'fixture@fixture.test',requestId:crypto.randomUUID()},'')).status,503);
  const repeated=await request(`websites/${s.id}/bundles`,{expectedVersion:catalog.version,products:rows},'owner-token','PUT');assert.equal(repeated.status,409);
  assert.deepEqual(bundleSaveRows(fresh.products,sellerDrafts(fresh.products),sellerDrafts(fresh.products)),[]);
 });

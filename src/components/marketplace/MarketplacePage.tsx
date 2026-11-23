@@ -6,7 +6,6 @@ import { MarketplaceProduct } from '../../types';
 import { getPublicMarketplaceProducts, getPublicMarketplaceProductBySlug, getMyReferralSummary } from '../../services/apiClient';
 import { buildReferralUrl } from '../../utils/referralUrl';
 import { getCloudinaryUrl, getCloudinarySrcSet } from '../../utils/cloudinary';
-import { MarketplaceCheckoutModal } from './MarketplaceCheckoutModal';
 import { MarketplaceProductDetailModal } from './MarketplaceProductDetailModal';
 import { MarketplaceCategoryTiles, type BrandRow } from './MarketplaceCategoryTiles';
 import { ProductPhoto } from './MarketplaceMedia';
@@ -58,7 +57,7 @@ export const MarketplacePage: React.FC = () => {
   useEffect(() => { let active = true; marketplaceControlRequest('categories').then(data => { if (active) setCategories(data.categories || []); }).catch(() => {}).finally(() => { if (active) setCategoriesSettled(true); }); return () => { active = false; }; }, []);
 
   // Browsing state lives in the URL so refresh, sharing and Back all keep the customer's place.
-  const [browse, setBrowse] = useState<MarketplaceBrowseState>(() => typeof window === 'undefined' ? DEFAULT_BROWSE_STATE : parseBrowseState(window.location.search));
+  const [browse, setBrowse] = useState<MarketplaceBrowseState>(() => typeof window === 'undefined' ? DEFAULT_BROWSE_STATE : { ...parseBrowseState(window.location.search), buyOnline:false });
   const updateBrowse = useCallback((patch: Partial<MarketplaceBrowseState>) => setBrowse(prev => ({ ...prev, ...patch })), []);
   // Department and brand choices are navigation: each gets a history entry so Back steps out of
   // Dell to the Laptops gallery, then to All. Typing, sorting and refining only replace the URL.
@@ -80,7 +79,7 @@ export const MarketplacePage: React.FC = () => {
   productsRef.current = products;
 
   // Selected Product for Rich Product Detail View (Drill-down experience)
-  const selectedProduct = marketplaceOverlay.kind === 'detail' ? marketplaceOverlay.product : null;
+  const selectedProduct = marketplaceOverlay.kind === 'detail' || marketplaceOverlay.kind === 'checkout' ? marketplaceOverlay.product : null;
   const setSelectedProduct = (product: MarketplaceProduct | null) => product ? openMarketplaceOverlay('detail', product) : dismissMarketplaceOverlay();
   useEffect(() => () => dismissMarketplaceOverlay(), [dismissMarketplaceOverlay]);
 
@@ -92,7 +91,6 @@ export const MarketplacePage: React.FC = () => {
   const [referralCode, setReferralCode] = useState<string>('');
   const shareModalProduct = marketplaceOverlay.kind === 'share' ? marketplaceOverlay.product : null;
   const shareDialogRef = useMarketplaceDialog(!!shareModalProduct, closeMarketplaceOverlay);
-  const checkoutProduct = marketplaceOverlay.kind === 'checkout' ? marketplaceOverlay.product : null;
   const [copiedLink, setCopiedLink] = useState(false);
   const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
 
@@ -174,7 +172,7 @@ export const MarketplacePage: React.FC = () => {
 
   useEffect(() => {
     const onPop = () => {
-      setBrowse(parseBrowseState(window.location.search));
+      setBrowse({ ...parseBrowseState(window.location.search), buyOnline:false });
       const slug = productParamFromUrl();
       const target = slug ? findProduct(productsRef.current, slug.toLowerCase()) : undefined;
       if (target) openMarketplaceOverlay('detail', target); else dismissMarketplaceOverlay();
@@ -429,8 +427,8 @@ export const MarketplacePage: React.FC = () => {
                   Business Essentials
                 </span>
               </h1>
-              <p className="hidden sm:block text-slate-300 text-sm leading-relaxed max-w-md sm:max-w-xl">
-                Buy online where it says so, or send an enquiry and we&apos;ll confirm price and availability in Ghana.
+              <p className="text-slate-300 text-sm leading-relaxed max-w-md sm:max-w-xl">
+                Browse products and ask us about price, availability or delivery. Online checkout is unavailable.
               </p>
             </div>
 
@@ -770,7 +768,6 @@ export const MarketplacePage: React.FC = () => {
           onClose={dismissMarketplaceOverlay}
           initialVariantId={marketplaceOverlay.kind !== 'none' ? marketplaceOverlay.variantId : undefined}
           onVariantChange={id => openMarketplaceOverlay('detail',selectedProduct,id)}
-          onBuyNow={(prod,variantId) => openMarketplaceOverlay('checkout',prod,variantId)}
           onInquire={openMarketplaceInquiry}
           onShareLink={shareProductLink}
           onShare={(prod) => {
@@ -982,20 +979,6 @@ export const MarketplacePage: React.FC = () => {
         </div>
       )}
 
-      {/* =========================================================
-          8. BUY NOW CHECKOUT MODAL
-          ========================================================= */}
-      {checkoutProduct && (
-        <MarketplaceCheckoutModal
-          key={checkoutProduct.id}
-          product={checkoutProduct}
-          referralCode={referralCode}
-          initialVariantId={marketplaceOverlay.kind !== 'none' ? marketplaceOverlay.variantId : undefined}
-          onClose={closeMarketplaceOverlay}
-          onInquire={openMarketplaceInquiry}
-          onVariantChange={id => openMarketplaceOverlay('checkout',checkoutProduct,id)}
-        />
-      )}
     </div>
   );
 };

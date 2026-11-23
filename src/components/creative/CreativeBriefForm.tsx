@@ -16,7 +16,7 @@ const newRequestId = () => (typeof crypto !== 'undefined' && 'randomUUID' in cry
 
 /** The WhatsApp line a customer can send after a request is saved: only the reference and what was asked for, no personal details. */
 export function creativeWhatsAppUrl(reference: string, service: string, order = false) {
-  return `${BUSINESS_CONFIG.contact.supportWhatsAppUrl}?text=${encodeURIComponent(`Hello Mystery Hub, I sent a Creative Studio ${order ? 'order request' : 'brief'} (${reference}) for ${service}.`)}`;
+  return `${BUSINESS_CONFIG.contact.supportWhatsAppUrl}?text=${encodeURIComponent(`Hello Mystery Hub, I sent a Creative Studio ${order ? 'package request' : 'brief'} (${reference}) for ${service}.`)}`;
 }
 
 interface Props {
@@ -121,7 +121,7 @@ export const CreativeBriefForm: React.FC<Props> = ({ service, onService, pkg, ex
       <div className="cs-form cs-sent" role="status" aria-live="polite">
         <div className="cs-sent-icon"><CheckCircle2 size={28} aria-hidden /></div>
         <h3 ref={sentHeading} tabIndex={-1}>{ordering ? 'Order request received' : 'Brief received'}</h3>
-        <p className="cs-form-sub">Mystery Hub has saved your {ordering ? 'order request' : 'brief'} for {sent.service}. Keep this reference:</p>
+        <p className="cs-form-sub">Mystery Hub has saved your {ordering ? 'package request' : 'brief'} for {sent.service}. Keep this reference:</p>
         <p className="cs-ref" aria-label={`Reference ${sent.reference.split('').join(' ')}`}>{sent.reference}</p>
         {price && (
           <dl className="cs-sent-summary">
@@ -300,7 +300,7 @@ export const CreativeBriefForm: React.FC<Props> = ({ service, onService, pkg, ex
         ? 'No payment is taken now. The team confirms your order with you on WhatsApp before any work starts. We use these details only for this request.'
         : 'Sending a brief doesn’t commit you to anything. We use these details to reply about this request.'}</p>
       <button type="submit" className="cs-btn cs-btn-primary cs-submit" disabled={sending}>
-        {sending ? 'Sending…' : status === 'failed' && failure?.retryable ? 'Try sending again' : ordering ? 'Send order request' : 'Send my brief'}
+        {sending ? 'Sending…' : status === 'failed' && failure?.retryable ? 'Try sending again' : ordering ? 'Send project request' : 'Send my brief'}
       </button>
     </form>
   );

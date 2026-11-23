@@ -102,23 +102,23 @@ test('data supplier webhook cannot deliver AFA',async()=>{const order=await save
 test('AFA does not activate wildcard referral reward policies',async()=>assert.equal(await ReferralService.processOrderReward({...fixture('delivered'),referrer_user_id:'referrer'}),null));
 
 test('registration API requires authentication',async()=>assert.equal((await request('/afa/payments/initialize','POST',payload,'')).status,401));
-test('API requires consent before payment',async()=>{assert.equal((await request('/afa/payments/initialize','POST',payload)).status,400);assert.equal(initialization,null);});
+
 test('unavailable supplier blocks payment',async()=>{AfaService.provider.checkAfaAvailable=async()=>({available:false,status:'unavailable'});assert.equal((await checkout()).status,503);assert.equal(initialization,null);});
-test('API rejects oversized body before storing an order',async()=>assert.equal((await request('/afa/payments/initialize','POST',{...payload,consent:true,extra:'x'.repeat(9000)})).status,413));
-test('API ignores browser price and snapshots canonical receipt email',async()=>{const response=await checkout();assert.equal(response.status,200);const result=await response.json(),order=(await OrdersStore.findOrder(result.orderRef))!;assert.equal(order.amount,2500);assert.equal(order.customer_email,'receipt@example.com');assert.equal(initialization.email,'receipt@example.com');assert.equal(initialization.amountPesewas,2500);assert.equal(initialization.callbackUrl,'https://fixture.example/afa');assert.equal(posts,0);});
-test('Paystack and audit metadata contain no Ghana Card or DOB',async()=>{await checkout();assert.deepEqual(Object.keys(initialization.metadata).sort(),['product_id','public_reference','service_type']);const logs=JSON.stringify(await AdminAuditStore.findRecent(50));for(const secret of [payload.idNumber,payload.dateOfBirth]){assert.ok(!JSON.stringify(initialization).includes(secret));assert.ok(!logs.includes(secret));}});
+
+
+
 test('public order and admin details never expose full identity payload',async()=>{const order=await saved();const publicJson=JSON.stringify(toSafePublicOrder(order));const response=await request(`/admin/orders/${order.public_reference}`,'GET',undefined,'admin-token');assert.equal(response.status,200);const data=await response.json(),adminJson=JSON.stringify(data);assert.equal(data.order.afa_registration.maskedIdNumber,'GHA-******234-5');for(const secret of [payload.idNumber,payload.dateOfBirth,'encrypted_payload','authTag']){assert.ok(!publicJson.includes(secret));assert.ok(!adminJson.includes(secret));}});
 test('customer cannot use admin AFA refresh',async()=>{const order=await saved();assert.equal((await request(`/admin/orders/${order.public_reference}/refresh`,'POST',{})).status,403);});
 test('admin refresh uses AFA GET and masked details',async()=>{const order=await saved('queued');await AfaService.applySupplierResult(order,reply('processing'));const response=await request(`/admin/orders/${order.public_reference}/refresh`,'POST',{},'admin-token');assert.equal(response.status,200);assert.equal(gets,1);assert.equal(posts,0);assert.ok((await response.json()).order.afa_registration.sensitivePayloadPurgedAt);});
 test('admin cannot manually invent registered status',async()=>{const order=await saved('queued');assert.equal((await request(`/admin/orders/${order.public_reference}/status`,'PATCH',{status:'delivered'},'admin-token')).status,400);});
-test('generic payment endpoint cannot bypass authenticated AFA validation',async()=>assert.equal((await request('/payments/initialize','POST',{serviceType:'afa',productId:'afa-registration'},'')).status,400));
+test('generic payment endpoint cannot bypass AFA payment isolation',async()=>{const r=await request('/payments/initialize','POST',{productId:'afa-registration',serviceType:'data'});assert.equal(r.status,503);assert.equal((await r.json()).code,'PAYMENT_UNAVAILABLE');assert.equal(initialization,null);});
 test('wrong payment amount never dispatches',async()=>{const order=await saved();liveMockMode();PaystackServerService.verifyTransaction=async reference=>({reference,isVerified:true,status:'success',amountPesewas:1,currency:'GHS'});assert.equal((await request(`/payments/verify/${order.payment_reference}`)).status,400);assert.equal(posts,0);assert.equal((await OrdersStore.findOrder(order.id))!.payment_status,'pending');});
 test('unverified payment never dispatches',async()=>{const order=await saved();liveMockMode();PaystackServerService.verifyTransaction=async reference=>({reference,isVerified:false,status:'pending',amountPesewas:2500,currency:'GHS'});assert.equal((await (await request(`/payments/verify/${order.payment_reference}`)).json()).verified,false);assert.equal(posts,0);});
 test('verified API payment completes AFA once',async()=>{const order=await saved();liveMockMode();assert.equal((await request(`/payments/verify/${order.payment_reference}`)).status,200);await request(`/payments/verify/${order.payment_reference}`);assert.equal(posts,1);});
 test('duplicate signed Paystack webhooks dispatch once',async()=>{const order=await saved();liveMockMode();const body={event:'charge.success',data:{reference:order.payment_reference,status:'success',amount:2500,currency:'GHS'}},rawBody=Buffer.from(JSON.stringify(body)),signature=crypto.createHmac('sha512','sk_live_fixture').update(rawBody).digest('hex');const req={body,rawBody,headers:{'x-paystack-signature':signature}} as any;const res={status(){return this;},json(){return this;}} as any;await Promise.all([handlePaystackWebhook(req,res),handlePaystackWebhook(req,res)]);assert.equal(posts,1);});
 test('customer Orders list includes AFA safely',async()=>{const order=await saved('processing');const response=await request('/orders/my-orders');const json=await response.json();assert.equal(json.orders[0].service_type,'afa');assert.ok(!JSON.stringify(json).includes(payload.idNumber));assert.equal(json.orders[0].public_reference,order.public_reference);});
 test('safe public availability exposes no supplier credentials',async()=>{const json=JSON.stringify(await (await request('/afa/config','GET',undefined,'')).json());assert.ok(!json.includes(process.env.SUCCESS_BIZ_HUB_API_KEY!));assert.ok(!json.includes(process.env.AFA_PII_ENCRYPTION_KEY!));});
-test('initialization failure cancels and purges, without supplier POST',async()=>{PaystackServerService.initializeTransaction=async params=>{initialization=params;return {success:false,reference:params.reference};};assert.equal((await checkout()).status,503);const order=(await OrdersStore.findOrder(initialization.reference))!;assert.equal(order.status,'cancelled');assert.equal((await AfaStore.find(order.id))!.encrypted_payload,null);assert.equal(posts,0);});
+
 
 const source=(file:string)=>readFileSync(new URL('../../../'+file,import.meta.url),'utf8');
 test('public AFA page, auth continuation and memory-only form are wired',()=>{const code=source('src/components/services/AfaRegistrationPage.tsx');assert.match(code,/openAuth\('login'/);assert.match(code,/user.mustChangePassword[\s\S]*openAccount/);assert.doesNotMatch(code,/localStorage|sessionStorage|indexedDB/);assert.match(code,/type="date"/);assert.match(code,/aria-invalid/);assert.match(code,/config\?\.available === true/);assert.match(code,/validateAfaPayload/);assert.match(code,/initializeAfaPayment\(payload, formData.consent, formData.customerEmail, sessionToken, accepted\)/);assert.doesNotMatch(code,/usePaystack|initializeServerPayment|createOrder/);});
@@ -145,7 +145,7 @@ test('unverified admin refund of an uncertain POST is blocked and retains eviden
   const response=await request(`/admin/orders/${order.public_reference}/status`,'PATCH',{status:'refunded'},'admin-token');
   assert.equal(response.status,409);assert.equal((await OrdersStore.findOrder(order.id))!.status,'queued');await AfaStore.reconcileTerminalPayloads();
   assert.ok((await AfaStore.find(order.id))!.encrypted_payload);
-  assert.equal((await checkout()).status,409);assert.equal(initialization,null);assert.equal(posts,0);
+  await assert.rejects(AfaStore.create(fixture(),payload),/active or completed/);assert.equal((await checkout()).status,503);assert.equal(initialization,null);assert.equal(posts,0);
 });
 test('processing supplier registration remains reserved after local refund',async()=>{
   const order=await saved('queued');await AfaStore.claimSubmission(order.id);await AfaService.applySupplierResult(order,reply('processing'));
@@ -183,20 +183,15 @@ for(const mismatch of ['reference','currency'] as const)test(`AFA payment ${mism
 });
 
 // Exercise the browser client against the actual local API, never an external endpoint.
-test('shared AFA client fetches real authoritative config',async()=>{
+test('shared AFA client reports checkout unavailable even when a supplier price is configured',async()=>{
   globalThis.fetch=async(url,options)=>originalFetch(base+new URL(String(url),base).pathname,options);
-  const config=await getAfaConfig();assert.equal(config.available,true);assert.equal(config.retailPriceGhc,25);
-  delete process.env.AFA_RETAIL_PRICE_MINOR;
-  const missing=await getAfaConfig();assert.equal(missing.available,false);assert.equal(missing.retailPriceGhc,null);
+  const config=await getAfaConfig();assert.equal(config.available,false);assert.equal(config.retailPriceGhc,null);
 });
-test('browser AFA checkout contract reaches encrypted order and Paystack receipt',async()=>{
-  let body:any;
-  globalThis.fetch=async(url,options)=>{body=JSON.parse(options!.body as string);return originalFetch(base+new URL(String(url),base).pathname,options);};
-  const result=await initializeAfaPayment(payload,true,'browser-receipt@example.test','customer-token');
+test('browser AFA checkout receives the actual payment restriction without creating or disclosing registration data',async()=>{
+  let body:any;globalThis.fetch=async(url,options)=>{body=JSON.parse(options!.body as string);return originalFetch(base+new URL(String(url),base).pathname,options);};
+  await assert.rejects(initializeAfaPayment(payload,true,'browser-receipt@example.test','customer-token'),(error:any)=>error.status===503);
   assert.deepEqual(body,{...payload,consent:true,customerEmail:'browser-receipt@example.test',referralCode:null,visitorKey:''});
-  const order=(await OrdersStore.findOrder(result.orderRef))!;
-  assert.equal(order.service_type,'afa');assert.equal(order.amount,2500);assert.equal(order.customer_email,'browser-receipt@example.test');
-  assert.equal(initialization.email,'browser-receipt@example.test');assert.deepEqual(await AfaStore.payload(order.id),payload);assert.equal(posts,0);
+  assert.equal(OrdersStore.adminDevOrders().length,0);assert.equal(initialization,null);assert.equal(posts,0);
 });
 test('browser AFA checkout surfaces guest rejection instead of inventing success',async()=>{
   globalThis.fetch=async(url,options)=>originalFetch(base+new URL(String(url),base).pathname,options);
