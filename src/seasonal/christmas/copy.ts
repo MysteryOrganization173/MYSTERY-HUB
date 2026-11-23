@@ -75,3 +75,19 @@ export const SHARE_TEXT = {
 
 /** A warm word for a genuinely confirmed outcome only (a verified payment or a delivered order). */
 export const CONFIRMED_LINE = { christmas: 'Merry Christmas!', newYear: 'Happy New Year!' };
+
+/**
+ * The Data page's seasonal line, one per day of the season, for guests and members alike. Greetings only: the page's
+ * own words keep every price, condition and delivery note unchanged.
+ */
+export const DATA_LINE: Record<SeasonPhase, string> = {
+  before: 'Stay close this Christmas.',
+  'christmas-season': 'Stay close this Christmas.',
+  'christmas-day': 'Merry Christmas. Stay close to the people you love.',
+  'boxing-day': 'Happy Boxing Day. Rest, visit and keep in touch.',
+  'year-end': 'Stay close as the year turns.',
+  'new-years-eve': 'Tonight we welcome 2027 together.',
+  'new-years-day': 'Happy New Year. A bright start to 2027.',
+  'new-year': 'Stay close in the new year.',
+  after: 'Stay close in the new year.',
+};

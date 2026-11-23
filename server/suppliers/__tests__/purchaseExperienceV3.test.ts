@@ -130,7 +130,11 @@ test('size chips are short on screen but fully named for assistive technology', 
 });
 
 test('mode tabs share one active style and only scroll when the list is out of view', () => {
-  assert.match(data, /dataProductMode === 'instant' \? 'bg-\[#00c365\] text-\[#03160c\]'/);
+  // 3.6: one sliding indicator carries the active service, so every tab shares exactly one active style.
+  assert.equal((data.match(/className="mh-ds-modes-thumb"/g) || []).length, 1);
+  assert.match(data, /'--mode': MODE_INDEX\[dataProductMode\]/);
+  assert.equal((data.match(/className=\{modeButton\}/g) || []).length, 3);
+  assert.match(source('src/components/data/dataStore.css'), /\.mh-ds \.mh-ds-mode\[aria-pressed="true"\] \{ color: var\(--ds-accent-ink\); \}/);
   assert.doesNotMatch(data, /bg-amber-400 text-black/);
   assert.match(data, /if \(top < 80 \|\| top > window.innerHeight \* 0.6\) smoothScrollToElement/);
   assert.match(data, /id="instant-bundles-section" ref=\{bundlesSectionRef\} className="scroll-mt-24"/);

@@ -111,7 +111,9 @@ test('receipt timeline only advances from server-derived presentation', () => {
 test('one bundle list on the Data page; rows remain the shared Homepage V2 row', () => {
   assert.doesNotMatch(page, /BundleCard|viewMode/);
   assert.match(page, /<PendingPaymentBanner \/>/);
-  assert.ok(page.indexOf('MTN Network Service Notice') < page.indexOf('<CompactBundleRow'), 'MTN timing shows before the list');
+  // 3.6: the Data page lists its own catalogue tiles; the homepage keeps the shared row below.
+  assert.ok(page.indexOf('<DataBundleTile') > 0, 'the Data page lists bundles as tiles');
+  assert.ok(page.indexOf('MTN Network Service Notice') < page.indexOf('<DataBundleTile'), 'MTN timing shows before the list');
   const bundle = DATA_BUNDLES.find(b => b.id === 'mtn-5gb')!;
   const html = renderToStaticMarkup(React.createElement(CompactBundleRow, {bundle, onBuy() {}}));
   assert.match(html, /role="button"/);

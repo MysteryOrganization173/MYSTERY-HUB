@@ -74,7 +74,7 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({ product, o
   if (product.isFlexi) {
     const presets = [5, 10, 20, 50].filter(value => value >= min && value <= max);
     return (
-      <div data-tapped={tapped} className={`rounded-2xl border bg-[#0e141a] p-3.5 sm:p-4 transition-colors ${flexiOpen ? 'border-[#00c365]/50' : 'border-slate-800/90'} ${isOutOfStock ? 'opacity-60' : ''}`}>
+      <div data-tapped={tapped} data-open={flexiOpen ? '' : undefined} className={`mh-ds-instant rounded-2xl border bg-[#0e141a] p-3.5 sm:p-4 ${flexiOpen ? 'border-[#00c365]/50' : 'border-slate-800/90'} ${isOutOfStock ? 'opacity-60' : ''}`}>
         <div className="flex items-start gap-3">
           <NetworkBrandBadge network={product.network} size="sm" />
           <div className="min-w-0 flex-1">
@@ -132,7 +132,7 @@ export const InstantBundleCard: React.FC<InstantBundleCardProps> = ({ product, o
       aria-label={isOutOfStock
         ? `${info.formattedAmount} ${network.name} ${info.categoryLabel} unavailable`
         : `Buy ${info.formattedAmount} ${network.name} ${info.categoryLabel} for ${ghs(product.retailPriceGhc)}${fee ? ` plus ${ghs(fee)} checkout fee` : ''}`}
-      className={`mh-press group w-full text-left rounded-2xl border bg-[#0e141a] p-3.5 sm:p-4 flex items-center gap-3 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] disabled:cursor-not-allowed ${
+      className={`mh-press mh-ds-instant group w-full text-left rounded-2xl border bg-[#0e141a] p-3.5 sm:p-4 flex items-center gap-3 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00c365] disabled:cursor-not-allowed ${
         isOutOfStock ? 'border-slate-800/70 opacity-60' : 'border-slate-800/90 hover:border-[#00c365]/50 hover:bg-[#111922]'}`}>
       <span className="shrink-0"><NetworkBrandBadge network={product.network} size="sm" /></span>
       <span className="min-w-0 flex-1">

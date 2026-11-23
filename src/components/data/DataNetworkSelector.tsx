@@ -6,14 +6,28 @@ export const DATA_NETWORK_CHOICES = [
   { id: 'airteltigo', label: 'AT', name: 'AirtelTigo', color: '#004b93', ink: '#ffffff' },
   { id: 'telecel', label: 'Telecel', name: 'Telecel', color: '#c90000', ink: '#ffffff' },
 ] as const;
-export function DataNetworkSelector({ value, onChange }: { value: NetworkId | 'all'; onChange: (network: NetworkId | 'all') => void }) {
-  return <div role="group" aria-label="Choose data network" className="grid grid-cols-4 gap-1.5 sm:gap-2 max-w-xl">
-    {DATA_NETWORK_CHOICES.map(network => <button key={network.id} type="button" aria-label={network.name}
-      aria-pressed={value === network.id} onClick={() => onChange(network.id)}
-      className="min-h-11 min-w-0 rounded-xl border px-1.5 sm:px-4 text-xs sm:text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-      style={value === network.id ? { backgroundColor: network.color, color: network.ink, borderColor: network.color }
-        : { backgroundColor: '#101820', color: '#dce4ee', borderColor: '#334155' }}>
-      <span className="hidden min-[360px]:inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle" aria-hidden="true" style={{ backgroundColor: value === network.id ? network.ink : network.color }} />{network.label}
-    </button>)}
+
+/**
+ * One network selector for Data and Instant Bundles. The selected network's colour sits on a single indicator that
+ * slides between the four choices (transform only; still with reduced motion), so the choice reads at a glance.
+ * `counts` (optional) shows how many packages each choice holds, from the catalogue already on the page.
+ */
+export function DataNetworkSelector({ value, onChange, counts }: { value: NetworkId | 'all'; onChange: (network: NetworkId | 'all') => void; counts?: Partial<Record<NetworkId | 'all', number>> }) {
+  const index = Math.max(0, DATA_NETWORK_CHOICES.findIndex(choice => choice.id === value));
+  const selected = DATA_NETWORK_CHOICES[index];
+  return <div role="group" aria-label="Choose data network" className="mh-ds-nets"
+    style={{ '--net-i': index, '--net-color': selected.color, '--net-ink': selected.ink } as React.CSSProperties}>
+    <span className="mh-ds-nets-thumb" aria-hidden="true" />
+    {DATA_NETWORK_CHOICES.map(network => {
+      const on = value === network.id;
+      return <button key={network.id} type="button" aria-label={network.name}
+        aria-pressed={on} onClick={() => onChange(network.id)}
+        className="mh-ds-net min-h-11 min-w-0 px-1.5 sm:px-3 text-xs sm:text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        style={on ? { color: network.ink } : undefined}>
+        <span className="hidden min-[360px]:inline-block mh-ds-net-dot" aria-hidden="true" style={{ backgroundColor: on ? network.ink : network.color }} />
+        <span className="truncate">{network.label}</span>
+        {counts?.[network.id] !== undefined && <span className="mh-ds-net-count hidden sm:inline" aria-hidden="true">{counts[network.id]}</span>}
+      </button>;
+    })}
   </div>;
 }

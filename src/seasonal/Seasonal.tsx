@@ -26,6 +26,9 @@ const ShellFooter = lazy(() => loadShell().then(m => ({ default: m.ChristmasFoot
 /** The signed-in customer's seasonal homepage, also its own chunk. */
 const loadMemberHome = retryOnce(() => import('./christmas/member/ChristmasMemberHome'));
 const ChristmasMemberHome = lazy(loadMemberHome);
+/** The Data page's seasonal appearance (artwork, line and scoped stylesheet), for guests and members alike. */
+const loadDataStore = retryOnce(() => import('./christmas/data/ChristmasDataStore'));
+const ChristmasDataStore = lazy(loadDataStore);
 
 /** If a seasonal chunk cannot load or render, show the ordinary interface instead of an error. */
 class SeasonalBoundary extends React.Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
@@ -76,6 +79,22 @@ export function SeasonalFooter({ fallback }: { fallback: ReactNode }) {
   return <SeasonalBoundary fallback={fallback}><Suspense fallback={fallback}><ShellFooter status={season.status} /></Suspense></SeasonalBoundary>;
 }
 
+/**
+ * The Data page's seasonal look. Unlike the guest page compositions it follows the shared shell rule (`shellActive`):
+ * the same purchasing page is dressed for guests and signed-in customers, so signing in or out never changes it.
+ * - `part="art"`: the illustration beside the title; `fallback` (the ordinary artwork) shows when no season applies
+ *   or if the chunk cannot load or render.
+ * - `part="line"`: the seasonal line above the title; nothing at all when no season applies.
+ */
+export function SeasonalDataStore({ part, fallback = null }: { part: 'art' | 'line'; fallback?: ReactNode }) {
+  const season = useSeason();
+  if (!season.shellActive || season.status.pack !== 'christmas-2026') return <>{fallback}</>;
+  return <SeasonalBoundary fallback={fallback}><Suspense fallback={part === 'art' ? <div className="mh-ds-art-wait" aria-hidden="true" /> : null}><ChristmasDataStore part={part} status={season.status} /></Suspense></SeasonalBoundary>;
+}
+
+/** The Data page root's season attributes (a pure helper, kept beside the season so it is tested on real dates). */
+export { dataStoreSeasonAttributes } from './dataStoreSeason';
+
 /** True while a season is on screen, for the few components that adjust copy or layout around it. */
 export const useSeasonActive = () => useSeason().active;
 
@@ -98,6 +117,8 @@ export function SeasonalShellLayer({ page }: { page?: string }) {
   // The member homepage starts downloading while a returning customer's session is still being checked, and when a
   // guest opens Sign in / Create account, so signing in moves straight to it instead of waiting on a download.
   useEffect(() => { if (season.heldForSignedIn && page === 'home') void loadMemberHome().catch(() => undefined); }, [season.heldForSignedIn, page]);
+  // The Data page's seasonal look is for every visitor, so it starts downloading as soon as the page is opened.
+  useEffect(() => { if (season.shellActive && page === 'data') void loadDataStore().catch(() => undefined); }, [season.shellActive, page]);
   useEffect(() => { if (season.active && isAuthModalOpen) void loadMemberHome().catch(() => undefined); }, [season.active, isAuthModalOpen]);
   if (!season.previewing) return null;
   const date = new Date(season.status.date + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
@@ -109,7 +130,7 @@ export function SeasonalShellLayer({ page }: { page?: string }) {
         <strong>{title}</strong>
         <span> · <span className="mh-season-preview-wide">{PHASE_LABEL[season.status.phase] || season.status.phase}, </span>{date}
           <span className="mh-season-preview-wide">{season.memberActive
-            ? ' · Signed in: your homepage, header and footer show the season; other account pages stay as they are. Only this browser tab sees it.'
+            ? ' · Signed in: your homepage, Data page, header and footer show the season; other account pages stay as they are. Only this browser tab sees it.'
             : ' · Only this browser tab sees it.'}</span></span>
       </p>
       <button type="button" onClick={season.exitPreview}><X className="w-3.5 h-3.5" aria-hidden />Exit preview</button>
