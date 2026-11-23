@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ShieldCheck, Smartphone, Receipt, UserRound } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { formatGhanaPhone, isCompleteGhanaPhone } from '../../utils/checkoutRecovery';
@@ -70,7 +70,9 @@ function JourneyLine() {
 let heroShown = false;
 
 export function DataStoreHero() {
-  const [seen] = useState(() => { const before = heroShown; heroShown = true; return before; });
+  // Read once on mount (a pure initializer, safe under StrictMode); remembered after the panel has been shown.
+  const [seen] = useState(() => heroShown);
+  useEffect(() => { heroShown = true; }, []);
   return (
     <section className="mh-ds-hero" aria-labelledby="data-store-title" data-ds-reveal {...(seen ? { 'data-ds-seen': '' } : {})}>
       <div className="mh-ds-hero-copy">
