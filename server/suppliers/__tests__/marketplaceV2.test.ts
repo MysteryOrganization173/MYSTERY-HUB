@@ -87,7 +87,7 @@ test('detail sheet and card agree on enquiry-only products', () => {
   const detail = html(React.createElement(MarketplaceProductDetailModal, { product: p, onClose: () => {}, onBuyNow: () => {}, onInquire: () => {}, onShare: () => {}, onShareLink: () => {}, formatGhcReward: n => String(n ?? 0) }));
   assert.ok(!detail.includes('Buy Now ('));
   assert.ok(detail.includes('Product enquiries'));
-  assert.ok(detail.includes('No payment is taken'));
+  assert.ok(detail.includes('Online checkout is unavailable'));
   assert.ok(detail.includes('Share product'));
   assert.ok(!detail.includes('Sourced on Request'));
   assert.ok(card(p).includes('Product enquiries'));

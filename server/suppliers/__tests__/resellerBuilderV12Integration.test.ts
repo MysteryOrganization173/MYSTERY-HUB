@@ -64,7 +64,8 @@ test('known managed payment reference wins over any later no-start denial',async
 });
 
 test('V1.2 preview cannot initialize, recover, track or emit checkout analytics',async()=>{
-  const h=component(true);h.render();await tick();h.buy();h.render();
+  const h=component(true);h.render();await tick();
+  assert.equal(h.find(n=>n.type===h.row).props.onChoose,undefined);
   const input=h.find(n=>n.type==='input'&&n.props['aria-label']==='Order reference');input.props.onChange({target:{value:'MH-synthetic'}});
   h.find(n=>n.type==='form').props.onSubmit({preventDefault(){}});await tick();
   assert.deepEqual(h.calls.payments,[]);assert.deepEqual(h.calls.events,[]);assert.equal(h.calls.storageReads,0);
