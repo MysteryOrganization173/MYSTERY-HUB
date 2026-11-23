@@ -139,7 +139,7 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
   const sorted = useMemo(() => [...filteredProducts].sort((a, b) =>
     Number(a.availability === 'out_of_stock') - Number(b.availability === 'out_of_stock')), [filteredProducts]);
   const clearFilters = () => { setSelectedNetwork('all'); setSelectedCategory('all'); setSearchQuery(''); setSearchOpen(false); };
-  const stateCard = 'text-center py-10 px-5 rounded-2xl bg-[#0e141a] border border-slate-800 space-y-3 max-w-md mx-auto';
+  const stateCard = 'mh-ds-panel mh-ds-swap text-center py-10 px-5 rounded-2xl bg-[#0e141a] border border-slate-800 space-y-3 max-w-md mx-auto';
 
   return (
     <section aria-labelledby="instant-title" className="space-y-4">
@@ -157,18 +157,16 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
       {isAvailable && products.length > 0 && (
         <div className="flex items-center gap-2">
           {searchOpen ? (
-            <div className="relative flex-1 min-w-0">
+            <div className="mh-ds-search relative flex-1 min-w-0">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input type="search" value={searchQuery} autoFocus onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label="Search Instant Bundles by size or type" placeholder="Search size or type, e.g. video"
-                className="w-full bg-[#0c1217] border border-slate-700 rounded-xl pl-10 pr-3 min-h-11 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]" />
+                aria-label="Search Instant Bundles by size or type" placeholder="Search size or type, e.g. video" />
             </div>
           ) : (
             <div ref={revealPressedChip} onFocus={revealFocusedChip} role="group" aria-label="Filter by bundle type" className="mh-chip-scroll items-center gap-1.5 min-w-0 flex-1 -ml-4 pl-4 sm:ml-0 sm:pl-0">
               {(['all', ...(presentCategories.length > 1 ? presentCategories : [])] as const).map((catKey) => (
                 <button key={catKey} type="button" aria-pressed={selectedCategory === catKey} onClick={() => setSelectedCategory(catKey)}
-                  className={`mh-press min-h-10 px-3.5 rounded-full text-[13px] font-semibold whitespace-nowrap cursor-pointer shrink-0 border ${
-                    selectedCategory === catKey ? 'bg-white text-[#0b1015] border-white' : 'border-slate-700/80 text-slate-300 hover:text-white hover:border-slate-500'}`}>
+                  className="mh-ds-chip">
                   {catKey === 'all' ? 'All types' : <span className="inline-flex items-center gap-1.5">{React.createElement(INSTANT_CATEGORY_TONE[catKey].icon, { 'aria-hidden': true, className: 'w-3.5 h-3.5 shrink-0' })}{getCategoryFilterLabel(catKey)}</span>}
                 </button>
               ))}
@@ -176,7 +174,7 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
           )}
           <button type="button" onClick={() => { if (searchOpen) setSearchQuery(''); setSearchOpen(!searchOpen); }}
             aria-label={searchOpen ? 'Close search' : 'Search Instant Bundles'} aria-expanded={searchOpen}
-            className="min-w-11 min-h-11 shrink-0 flex items-center justify-center rounded-xl border border-slate-700/80 text-slate-300 hover:text-white hover:border-slate-500 cursor-pointer">
+            className="mh-ds-icon-btn">
             {searchOpen ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
           </button>
         </div>
@@ -185,7 +183,7 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
       {isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5" aria-busy="true" aria-label="Loading Instant Bundles">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-[92px] rounded-2xl bg-[#0e141a] border border-slate-800/80 p-3.5 flex items-center gap-3 animate-pulse motion-reduce:animate-none">
+            <div key={i} className="mh-ds-instant h-[92px] rounded-2xl bg-[#0e141a] border border-slate-800/80 p-3.5 flex items-center gap-3 animate-pulse motion-reduce:animate-none">
               <div className="w-9 h-9 rounded-xl bg-slate-800" />
               <div className="flex-1 space-y-2"><div className="w-16 h-4 rounded bg-slate-800" /><div className="w-28 h-3 rounded bg-slate-800" /></div>
               <div className="w-20 h-9 rounded-xl bg-slate-800" />

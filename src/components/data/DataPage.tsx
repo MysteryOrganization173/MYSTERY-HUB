@@ -10,7 +10,9 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DATA_BUNDLES, GHANA_NETWORKS, detectGhanaNetwork } from '../../data/bundles';
 import { NetworkId, DataBundle } from '../../types';
-import { CompactBundleRow } from './CompactBundleRow';
+import { DataBundleTile, TILE_NETWORK_COLOR } from './DataBundleTile';
+import { DataStoreHero } from './DataStoreHero';
+import './dataStore.css';
 import { PendingPaymentBanner } from '../checkout/PendingPaymentBanner';
 import { InstantBundlesCatalog } from './InstantBundlesCatalog';
 import { smoothScrollToElement, revealPressedChip, revealFocusedChip } from '../../utils/scroll';
@@ -29,8 +31,12 @@ import {
   CheckCircle2,
   Check,
   AlertTriangle,
+  Wifi,
+  BadgeCheck,
+  UserRound,
 } from 'lucide-react';
-import { Seasonal } from '../../seasonal/Seasonal';
+import { useSeason } from '../../seasonal/SeasonProvider';
+import { dataStoreSeasonAttributes } from '../../seasonal/Seasonal';
 
 /** Brings a section into view only when it is not already; the sticky header covers the top 5rem on phones. */
 const revealSection = (element: HTMLElement | null) => {
@@ -40,6 +46,26 @@ const revealSection = (element: HTMLElement | null) => {
 };
 
 const shortNetworkName = (id: NetworkId) => DATA_NETWORK_CHOICES.find(choice => choice.id === id)?.name || id;
+
+const NETWORK_ORDER: NetworkId[] = ['mtn', 'airteltigo', 'telecel'];
+const MODE_INDEX = { data: 0, instant: 1, airtime: 2 } as const;
+/** Catalogue views already shown in this visit: returning to the page does not replay their entrance. */
+const seenCatalogViews = new Set<string>();
+
+/** The tile under the pointer catches a soft light (mouse only; touch has no hover). At most once per frame. */
+let pointerFrame = 0;
+const followPointer = (e: React.PointerEvent<HTMLElement>) => {
+  if (e.pointerType !== 'mouse' || pointerFrame) return;
+  const tile = (e.target as HTMLElement).closest<HTMLElement>('.mh-ds-tile');
+  if (!tile) return;
+  const { clientX, clientY } = e;
+  pointerFrame = requestAnimationFrame(() => {
+    pointerFrame = 0;
+    const box = tile.getBoundingClientRect();
+    tile.style.setProperty('--mx', `${clientX - box.left}px`);
+    tile.style.setProperty('--my', `${clientY - box.top}px`);
+  });
+};
 
 export const DataPage: React.FC = () => {
   const DATA_BUNDLES=useDirectCatalog();
@@ -51,7 +77,9 @@ export const DataPage: React.FC = () => {
     dataNetwork: activeNetwork,
     setDataNetwork: setActiveNetwork,
     setActivePage,
+    user,
   } = useApp();
+  const season = useSeason();
 
   const [sizeFilter, setSizeFilter] = useState<'all' | 'small' | 'medium' | 'large'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -79,6 +107,15 @@ export const DataPage: React.FC = () => {
   const [isCustomAirtime, setIsCustomAirtime] = useState(false);
   const [airtimeErrors, setAirtimeErrors] = useState<{ phone?: string; amount?: string }>({});
   const airtimeTap = useTapFeedback();
+  // A number typed for one account never carries over to the next: signing out or switching account clears it.
+  // (Finishing the sign-in check, or a guest signing in, is the same person, so their typing is kept.)
+  const accountId = user?.id || null;
+  const previousAccount = useRef(accountId);
+  useEffect(() => {
+    if (previousAccount.current && previousAccount.current !== accountId) { setAirtimePhone(''); setAirtimeErrors({}); }
+    previousAccount.current = accountId;
+  }, [accountId]);
+  const accountPhone = user?.phone && isCompleteGhanaPhone(user.phone) ? formatGhanaPhone(user.phone) : '';
 
   // Auto-detect network from phone
   const detectedAirtimeNet = useMemo(() => {
@@ -284,6 +321,22 @@ export const DataPage: React.FC = () => {
     });
   }, [activeNetwork, sizeFilter, searchQuery, DATA_BUNDLES]);
 
+  // How many bundles each network holds (the whole catalogue on the page), shown on the network selector.
+  const networkCounts = useMemo(() => {
+    const counts: Partial<Record<NetworkId | 'all', number>> = { all: DATA_BUNDLES.length };
+    for (const bundle of DATA_BUNDLES) counts[bundle.network] = (counts[bundle.network] || 0) + 1;
+    return counts;
+  }, [DATA_BUNDLES]);
+
+  // All networks: one titled group per network, so a long mixed list stays easy to scan. One network: one grid.
+  const bundleGroups = useMemo(() => activeNetwork === 'all'
+    ? NETWORK_ORDER.map(network => ({ network, bundles: filteredBundles.filter(bundle => bundle.network === network) })).filter(group => group.bundles.length)
+    : [{ network: activeNetwork, bundles: filteredBundles }], [activeNetwork, filteredBundles]);
+
+  const catalogView = `${activeNetwork}|${sizeFilter}`;
+  const [settledViews] = useState(() => new Set(seenCatalogViews));
+  useEffect(() => { seenCatalogViews.add(catalogView); }, [catalogView]);
+
   const handleAirtimeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const faceValue = airtimeFaceValueNum;
@@ -319,24 +372,21 @@ export const DataPage: React.FC = () => {
 
   const mtnNotice = serviceNotices.mtn;
   const atNotice = serviceNotices.airteltigo;
+  const modeButton = 'mh-ds-mode';
 
   return (
-    <div className="py-4 sm:py-8 text-slate-100">
+    <div className="mh-ds py-4 sm:py-8 text-slate-100" {...dataStoreSeasonAttributes(season)}>
       {dataProductMode==='data'&&<WelcomeOfferNotice offer={welcomeOffer}/>}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
         <PendingPaymentBanner />
 
-        <header className="space-y-4">
-          <div>
-            <Seasonal slot="page" page="data" />
-            <p className="text-xs font-semibold text-[#44df95] mb-1">Data & Airtime</p>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Stay connected.</h1>
-            <p className="text-sm text-slate-400 mt-1 max-w-xl">Data, Instant Bundles and airtime for MTN, AirtelTigo and Telecel. Pay with Mobile Money and see the total before you pay.</p>
-          </div>
+        <DataStoreHero mode={dataProductMode} />
 
-          {/* 4 Product Mode Navigation Tabs / Discovery Shortcuts */}
+        <div className="space-y-2.5 sm:space-y-3">
+          {/* 4 Product Mode Navigation Tabs / Discovery Shortcuts: one sliding indicator carries the active service. */}
           <div onFocus={revealFocusedChip} className="mh-chip-scroll items-center gap-2 -mx-4 px-4 sm:mx-0 sm:px-0">
-            <div role="group" aria-label="Choose a service" className="inline-flex shrink-0 rounded-2xl bg-[#0c1217] border border-slate-800 p-1 gap-1">
+            <div role="group" aria-label="Choose a service" className="mh-ds-modes" style={{ '--mode': MODE_INDEX[dataProductMode] } as React.CSSProperties}>
+              <span className="mh-ds-modes-thumb" aria-hidden="true" />
               <button
                 type="button"
                 aria-label="Data Bundles"
@@ -345,11 +395,10 @@ export const DataPage: React.FC = () => {
                   setDataProductMode('data');
                   setTimeout(() => revealSection(bundlesSectionRef.current), 50);
                 }}
-                className={`min-h-11 px-4 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer ${
-                  dataProductMode === 'data' ? 'bg-[#00c365] text-[#03160c]' : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
-                }`}
+                className={modeButton}
               >
-                Data<span className="hidden sm:inline"> Bundles</span>
+                <span><Wifi aria-hidden="true" />Data</span>
+                <small>Bundles</small>
               </button>
               <button
                 type="button"
@@ -359,48 +408,48 @@ export const DataPage: React.FC = () => {
                   setDataProductMode('instant');
                   setTimeout(() => revealSection(bundlesSectionRef.current), 50);
                 }}
-                className={`min-h-11 px-4 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer inline-flex items-center gap-1.5 ${
-                  dataProductMode === 'instant' ? 'bg-[#00c365] text-[#03160c]' : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
-                }`}
+                className={modeButton}
               >
-                <Zap aria-hidden="true" className={`w-3.5 h-3.5 ${dataProductMode === 'instant' ? 'fill-current' : 'text-amber-300'}`} />
-                Instant
+                <span><Zap aria-hidden="true" className={dataProductMode === 'instant' ? 'fill-current' : 'text-amber-300'} />Instant</span>
+                <small>Network packages</small>
               </button>
               <button
                 type="button"
+                aria-label="Airtime"
                 aria-pressed={dataProductMode === 'airtime'}
                 onClick={handleSelectAirtime}
-                className={`min-h-11 px-4 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer ${
-                  dataProductMode === 'airtime' ? 'bg-[#00c365] text-[#03160c]' : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
-                }`}
+                className={modeButton}
               >
-                Airtime
+                <span><Smartphone aria-hidden="true" />Airtime</span>
+                <small>MTN, AT and Telecel</small>
               </button>
             </div>
             <button
               type="button"
               aria-label="AFA Registration"
               onClick={() => setActivePage('afa')}
-              className="min-h-11 px-3.5 rounded-xl text-sm font-semibold whitespace-nowrap cursor-pointer shrink-0 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-600 inline-flex items-center gap-1.5"
+              className="mh-ds-afa"
               title="Register your MTN number for eligible AFA offers"
             >
-              <Smartphone className="w-4 h-4 text-emerald-400" />
+              <BadgeCheck aria-hidden="true" />
               <span>AFA<span className="hidden sm:inline"> Registration</span></span>
             </button>
           </div>
 
           {/* One network selector, backed by the existing AppContext state. */}
-          {dataProductMode === 'data' && <DataNetworkSelector value={activeNetwork} onChange={setActiveNetwork} />}
-        </header>
+          {dataProductMode === 'data' && <DataNetworkSelector value={activeNetwork} onChange={setActiveNetwork} counts={networkCounts} />}
+        </div>
 
         {/* Dynamic Mode: Instant Bundles vs Airtime vs Standard Data */}
         {dataProductMode === 'instant' ? (
           <div id="instant-bundles-section" ref={bundlesSectionRef} className="scroll-mt-24">
-            <InstantBundlesCatalog
-              onSwitchToData={() => setDataProductMode('data')}
-              activeNetwork={activeNetwork}
-              onSelectNetwork={(net) => setActiveNetwork(net)}
-            />
+            <div className="mh-ds-swap">
+              <InstantBundlesCatalog
+                onSwitchToData={() => setDataProductMode('data')}
+                activeNetwork={activeNetwork}
+                onSelectNetwork={(net) => setActiveNetwork(net)}
+              />
+            </div>
           </div>
         ) : dataProductMode === 'airtime' ? (
           /* Airtime: number first, then network and amount, with the total always visible. */
@@ -409,7 +458,7 @@ export const DataPage: React.FC = () => {
             onSubmit={handleAirtimeSubmit}
             noValidate
             aria-labelledby="airtime-title"
-            className="max-w-xl rounded-2xl bg-[#0e141a] border border-slate-800 p-4 sm:p-6 space-y-5 scroll-mt-24"
+            className="mh-ds-panel mh-ds-swap max-w-xl p-4 sm:p-6 space-y-5 scroll-mt-24"
           >
             <div>
               <h2 id="airtime-title" className="text-lg sm:text-xl font-bold text-white tracking-tight">Airtime top-up</h2>
@@ -418,7 +467,15 @@ export const DataPage: React.FC = () => {
 
             {/* Recipient */}
             <div className="space-y-1.5">
-              <label htmlFor="airtime-phone" className="text-sm font-semibold text-slate-200 block">Recipient number</label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="airtime-phone" className="text-sm font-semibold text-slate-200 block">Recipient number</label>
+                {/* Signed in: one tap fills the account's own number. Never filled without asking. */}
+                {accountPhone && formatGhanaPhone(airtimePhone) !== accountPhone && (
+                  <button type="button" className="mh-ds-use-mine" onClick={() => { setAirtimePhone(accountPhone); setAirtimeErrors(prev => ({ ...prev, phone: undefined })); document.getElementById('airtime-phone')?.focus(); }}>
+                    <UserRound className="w-3.5 h-3.5" aria-hidden="true" />Use my number
+                  </button>
+                )}
+              </div>
               <input
                 id="airtime-phone"
                 type="tel"
@@ -457,7 +514,7 @@ export const DataPage: React.FC = () => {
                     <button key={choice.id} type="button" aria-pressed={selected} aria-label={choice.name}
                       onClick={() => setAirtimeNet(choice.id as NetworkId)}
                       className="mh-press min-h-12 rounded-xl border text-sm font-bold cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-                      style={selected ? { backgroundColor: choice.color, color: choice.ink, borderColor: choice.color } : { backgroundColor: '#101820', color: '#dce4ee', borderColor: '#334155' }}>
+                      style={selected ? { backgroundColor: choice.color, color: choice.ink, borderColor: choice.color, boxShadow: `0 10px 22px -14px ${choice.color}` } : { backgroundColor: '#0c1318', color: '#dce4ee', borderColor: '#2b3a46' }}>
                       {choice.name}
                     </button>
                   );
@@ -474,18 +531,18 @@ export const DataPage: React.FC = () => {
                   return (
                     <button key={amt} type="button" aria-pressed={isSelected}
                       onClick={() => { setIsCustomAirtime(false); setAirtimeAmount(amt); setAirtimeErrors(prev => ({ ...prev, amount: undefined })); }}
-                      className={`mh-press min-h-12 rounded-xl border text-base font-bold tabular-nums cursor-pointer ${isSelected ? 'border-white bg-white text-[#0b1015]' : 'border-slate-700 bg-[#090d11] text-slate-200 hover:border-slate-500'}`}>
+                      className="mh-ds-amount">
                       <span className="text-xs font-semibold opacity-70 mr-0.5">GH₵</span>{amt}
                     </button>
                   );
                 })}
                 <button type="button" aria-pressed={isCustomAirtime} onClick={() => { setIsCustomAirtime(true); setAirtimeErrors(prev => ({ ...prev, amount: undefined })); }}
-                  className={`mh-press min-h-12 rounded-xl border text-sm font-bold cursor-pointer ${isCustomAirtime ? 'border-white bg-white text-[#0b1015]' : 'border-slate-700 bg-[#090d11] text-slate-200 hover:border-slate-500'}`}>
+                  className="mh-ds-amount text-sm">
                   Other amount
                 </button>
               </div>
               {isCustomAirtime && (
-                <div className="relative">
+                <div className="relative mh-ds-swap">
                   <span aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">GH₵</span>
                   <input id="airtime-custom" type="text" inputMode="decimal" autoComplete="off" autoFocus
                     aria-label="Airtime amount in cedis" aria-invalid={Boolean(airtimeErrors.amount)}
@@ -499,7 +556,7 @@ export const DataPage: React.FC = () => {
             </fieldset>
 
             {/* Total (the server confirms it when payment starts) */}
-            <div className="rounded-xl bg-[#090d11] border border-slate-800 p-3.5 flex items-end justify-between gap-3">
+            <div className="mh-ds-total p-3.5 flex items-end justify-between gap-3">
               <div className="text-xs text-slate-400 space-y-0.5">
                 <p>{shortNetworkName(airtimeNet)} airtime <span className="text-slate-200 tabular-nums">GH₵{airtimeCalculation.faceValue.toFixed(2)}</span></p>
                 <p>Service fee ({airtimeCalculation.feePercent}%) <span className="text-slate-200 tabular-nums">GH₵{airtimeCalculation.serviceFee.toFixed(2)}</span></p>
@@ -522,11 +579,11 @@ export const DataPage: React.FC = () => {
           </form>
         ) : (
           /* Data Bundles View */
-          <div ref={bundlesSectionRef} className="space-y-4 scroll-mt-24" id="data-bundles-section">
+          <div ref={bundlesSectionRef} className="space-y-3 sm:space-y-4 scroll-mt-24" id="data-bundles-section">
             {/* Filter Bar: size chips, with search one tap away */}
             <div className="flex items-center gap-2">
               {searchOpen ? (
-                <div className="relative flex-1 min-w-0">
+                <div className="mh-ds-search relative flex-1 min-w-0">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="search"
@@ -535,7 +592,6 @@ export const DataPage: React.FC = () => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     aria-label="Search data bundles by size, price or network"
                     placeholder="Search size or price, e.g. 10GB"
-                    className="w-full bg-[#0c1217] border border-slate-700 rounded-xl pl-10 pr-3 min-h-11 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00c365]"
                   />
                 </div>
               ) : (
@@ -552,11 +608,7 @@ export const DataPage: React.FC = () => {
                       aria-label={name}
                       aria-pressed={sizeFilter === id}
                       onClick={() => setSizeFilter(id)}
-                      className={`min-h-10 px-3 rounded-full text-[13px] font-semibold tabular-nums whitespace-nowrap transition-colors cursor-pointer shrink-0 border ${
-                        sizeFilter === id
-                          ? 'bg-white text-[#0b1015] border-white'
-                          : 'border-slate-700/80 text-slate-300 hover:text-white hover:border-slate-500'
-                      }`}
+                      className="mh-ds-chip"
                     >
                       {label}
                     </button>
@@ -571,7 +623,7 @@ export const DataPage: React.FC = () => {
                 }}
                 aria-label={searchOpen ? 'Close search' : 'Search bundles'}
                 aria-expanded={searchOpen}
-                className="min-w-11 min-h-11 shrink-0 flex items-center justify-center rounded-xl border border-slate-700/80 text-slate-300 hover:text-white hover:border-slate-500 cursor-pointer"
+                className="mh-ds-icon-btn"
               >
                 {searchOpen ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
               </button>
@@ -579,7 +631,7 @@ export const DataPage: React.FC = () => {
 
             {/* MTN Network Service Notice (Tasteful, Customer-Friendly, Config-Driven) */}
             {mtnNotice.enabled && (activeNetwork === 'mtn' || activeNetwork === 'all') && (
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3.5 text-xs text-slate-300">
+              <div className="mh-ds-notice rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3.5 text-xs text-slate-300">
                 <details>
                   <summary className="cursor-pointer min-h-11 flex flex-wrap items-center gap-x-2 py-2 list-none [&::-webkit-details-marker]:hidden">
                     <Clock className="w-3.5 h-3.5 text-amber-300 shrink-0" />
@@ -594,26 +646,39 @@ export const DataPage: React.FC = () => {
 
             {/* AirtelTigo Instant Delivery Highlight Notice */}
             {atNotice.enabled && activeNetwork === 'airteltigo' && (
-              <p className="rounded-xl border border-sky-500/20 bg-sky-500/[0.06] px-3.5 py-2.5 text-xs text-sky-100/90 leading-relaxed">
+              <p className="mh-ds-notice rounded-xl border border-sky-500/20 bg-sky-500/[0.06] px-3.5 py-2.5 text-xs text-sky-100/90 leading-relaxed">
                 <strong className="text-white font-semibold">{atNotice.title}</strong> · {atNotice.message}
               </p>
             )}
 
-            {/* Bundles: one list; the whole row opens checkout */}
+            {/* Bundles: tiles grouped by network; the whole tile opens checkout */}
             {filteredBundles.length > 0 ? (
               <>
-                <p className="text-xs text-slate-400" aria-live="polite">
-                  {filteredBundles.length} {filteredBundles.length === 1 ? 'bundle' : 'bundles'}
-                  {activeNetwork !== 'all' ? ` · ${GHANA_NETWORKS[activeNetwork].name}` : ' · all networks'}
+                <p className="mh-ds-count-line" aria-live="polite">
+                  <span><strong>{filteredBundles.length} {filteredBundles.length === 1 ? 'bundle' : 'bundles'}</strong>
+                  {activeNetwork !== 'all' ? ` · ${GHANA_NETWORKS[activeNetwork].name}` : ' · all networks'}</span>
+                  <span>Tap a bundle to review it</span>
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
-                  {filteredBundles.map((bundle) => (
-                    <CompactBundleRow
-                      key={bundle.id}
-                      bundle={bundle}
-                      directWelcomeOffer={welcomeOffer}
-                      onBuy={(b) => openCheckout(b)}
-                    />
+                <div key={catalogView} onPointerMove={followPointer} className={settledViews.has(catalogView) ? 'mh-ds-catalog is-settled' : 'mh-ds-catalog'}>
+                  {bundleGroups.map(group => (
+                    <section key={group.network} className="mh-ds-group" aria-label={activeNetwork === 'all' ? `${GHANA_NETWORKS[group.network].name} bundles` : undefined}>
+                      {activeNetwork === 'all' && (
+                        <h2 className="mh-ds-group-head" style={{ '--net': TILE_NETWORK_COLOR[group.network] } as React.CSSProperties}>
+                          <span className="mh-ds-group-mark" aria-hidden="true" />{GHANA_NETWORKS[group.network].name}<span>{group.bundles.length}</span>
+                        </h2>
+                      )}
+                      <div className="mh-ds-grid">
+                        {group.bundles.map((bundle, index) => (
+                          <DataBundleTile
+                            key={bundle.id}
+                            bundle={bundle}
+                            index={index}
+                            directWelcomeOffer={welcomeOffer}
+                            onBuy={(b) => openCheckout(b)}
+                          />
+                        ))}
+                      </div>
+                    </section>
                   ))}
                 </div>
 
@@ -626,7 +691,7 @@ export const DataPage: React.FC = () => {
                 </div>
               </>
             ) : (
-              <div className="text-center py-14 px-4 bg-[#0f151b] rounded-2xl border border-slate-800 space-y-3">
+              <div className="mh-ds-empty space-y-3">
                 <Search className="w-8 h-8 text-slate-500 mx-auto" />
                 <h3 className="font-bold text-white text-base">No bundles match</h3>
                 <p className="text-sm text-slate-400 max-w-sm mx-auto">
@@ -650,12 +715,12 @@ export const DataPage: React.FC = () => {
         )}
 
         {/* Questions: plain disclosures, one open at a time is up to the customer. */}
-        <section aria-labelledby="data-faq" className="pt-8 border-t border-slate-800/80 space-y-4">
+        <section aria-labelledby="data-faq" className="mh-ds-faq pt-8 border-t border-slate-800/80 space-y-4">
           <div>
             <h2 id="data-faq" className="text-lg sm:text-xl font-bold text-white tracking-tight">Questions before you buy</h2>
             <p className="text-sm text-slate-400 mt-1">Validity, delivery, balance codes and what to do if something goes wrong.</p>
           </div>
-          <div className="rounded-2xl border border-slate-800 bg-[#0d1217] divide-y divide-slate-800/80">
+          <div className="mh-ds-panel divide-y divide-slate-800/80">
             {faqs.map((faq, index) => (
               <details key={faq.id} open={index === 0} className="group/faq">
                 <summary className="list-none [&::-webkit-details-marker]:hidden cursor-pointer min-h-12 px-4 sm:px-5 py-3.5 flex items-center justify-between gap-4 text-sm sm:text-base font-semibold text-white hover:text-[#bff5da]">
@@ -668,13 +733,13 @@ export const DataPage: React.FC = () => {
           </div>
 
           {/* Customer Support Banner */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-[#0d1217] border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="mh-ds-panel p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3 text-left w-full sm:w-auto">
               <div className="w-10 h-10 rounded-xl bg-[#00c365]/10 border border-[#00c365]/30 flex items-center justify-center text-[#00c365] shrink-0">
                 <MessageSquare className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-bold text-sm text-white">Still have questions about an order?</h4>
+                <h3 className="font-bold text-sm text-white">Still have questions about an order?</h3>
                 <p className="text-xs text-slate-400">
                   Track your purchase in Orders, or contact our WhatsApp support team. Mystery AI can help with general service questions.
                 </p>
@@ -685,7 +750,7 @@ export const DataPage: React.FC = () => {
               href={BUSINESS_CONFIG.getGeneralWhatsAppUrl('Hello Mystery Hub, I have a question about a data bundle')}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#00c365] text-black font-bold text-xs hover:bg-[#00b05b] transition-colors cursor-pointer shrink-0"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 min-h-11 rounded-xl bg-[#00c365] text-black font-bold text-xs hover:bg-[#00b05b] transition-colors cursor-pointer shrink-0"
             >
               <Phone className="w-3.5 h-3.5" />
               <span>WhatsApp Customer Support</span>

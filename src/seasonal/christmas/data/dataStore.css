@@ -1,0 +1,151 @@
+/* Mystery Hub 3.6 · the Data page for Christmas and New Year, for guests and signed-in customers alike.
+   Every rule starts with .mh-ds[data-ds-season="christmas"]: the Data page root carries that attribute only while a
+   season applies, so the ordinary Data page returns exactly when it ends (6 January) or if this file never loads.
+   The page's own tokens are re-toned (evergreen velvet, champagne and berry; from 27 December midnight blue, plum,
+   silver and gold). Mystery Green stays the colour of every action. Prices, notices and errors keep their colours.
+   Motion: transform and opacity only; entrances play once per visit; reduced motion holds everything still. */
+
+.mh-ds[data-ds-season="christmas"] {
+  --ds-surface: #0c1a15; --ds-surface-hi: #10241c; --ds-surface-lo: #08130f;
+  --ds-line: #e9b94921; --ds-line-hi: #e9b94947;
+  --ds-hero-a: #133d2d; --ds-hero-b: #0a1712; --ds-hero-line: #e8c46f45; --ds-hero-glow: #e9b94933;
+  --ds-tile-a: #0f231b; --ds-tile-b: #091510;
+  --ds-chip-on: #f7e7c0; --ds-chip-on-ink: #1d1406;
+  --ds-thumb-shadow: #00c36588;
+  --dsx-gold: #e9b949; --dsx-gold-soft: #f3d79a; --dsx-cream: #fff4dc; --dsx-berry: #b3263f;
+  --dsx-ribbon: linear-gradient(90deg, #b98326, #ffeebe 45%, #a87420);
+  --dsx-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --dsx-ease: cubic-bezier(.2, .7, .2, 1);
+}
+.mh-ds[data-ds-season="christmas"][data-ds-look="christmas-day"] { --ds-hero-glow: #f7d27a4d; --ds-hero-a: #164a35; }
+.mh-ds[data-ds-season="christmas"][data-ds-look="new-year"] {
+  --ds-surface: #0d1329; --ds-surface-hi: #131b38; --ds-surface-lo: #090e1f;
+  --ds-line: #c9d1e024; --ds-line-hi: #e7d9b04a;
+  --ds-hero-a: #1d2758; --ds-hero-b: #0a0e21; --ds-hero-line: #e7d9b04d; --ds-hero-glow: #8a5bb042;
+  --ds-tile-a: #111a37; --ds-tile-b: #0a0f23;
+  --ds-chip-on: #f4f1e8; --ds-chip-on-ink: #141a33;
+  --dsx-gold: #e7d9b0; --dsx-gold-soft: #efe4c4; --dsx-berry: #6b3f8f;
+  --dsx-ribbon: linear-gradient(90deg, #8a95a8, #f4f7fb 45%, #9aa6bb);
+}
+
+/* ───────── Title panel: lit for the season ───────── */
+.mh-ds[data-ds-season="christmas"] .mh-ds-hero {
+  padding-top: 30px;
+  background:
+    radial-gradient(70% 90% at 100% 0%, var(--ds-hero-glow), transparent 64%),
+    radial-gradient(60% 80% at 0% 100%, #b3263f2b, transparent 70%),
+    linear-gradient(160deg, var(--ds-hero-a) 0%, var(--ds-hero-b) 72%);
+  box-shadow: inset 0 1px 0 #ffffff12, 0 0 0 1px #00000040, 0 28px 60px -40px #000, 0 0 70px -46px var(--dsx-gold);
+}
+.mh-ds[data-ds-season="christmas"][data-ds-look="new-year"] .mh-ds-hero {
+  background:
+    radial-gradient(70% 90% at 100% 0%, var(--ds-hero-glow), transparent 64%),
+    radial-gradient(60% 80% at 0% 100%, #3b2a6b55, transparent 70%),
+    linear-gradient(160deg, var(--ds-hero-a) 0%, var(--ds-hero-b) 72%);
+}
+/* Instead of the dot screen: a scatter of small warm lights. */
+.mh-ds[data-ds-season="christmas"] .mh-ds-hero::before {
+  background-image:
+    radial-gradient(circle, #f7dc8f 0 1px, transparent 1.6px), radial-gradient(circle, #fff4dc 0 .8px, transparent 1.4px),
+    radial-gradient(circle, #f7dc8f99 0 1.2px, transparent 2px);
+  background-size: 90px 70px, 130px 110px, 170px 150px; background-position: 12px 20px, 60px 44px, 100px 8px; opacity: .55;
+}
+.mh-ds[data-ds-season="christmas"] .mh-ds-eyebrow { color: var(--dsx-gold-soft); }
+.mh-ds[data-ds-season="christmas"] .mh-ds-assure svg, .mh-ds[data-ds-season="christmas"] .mh-ds-journey svg { color: var(--dsx-gold); }
+.mh-ds[data-ds-season="christmas"] .mh-ds-journey { border-color: #e8c46f2e; background: #00000038; }
+@media (min-width: 640px) { .mh-ds[data-ds-season="christmas"] .mh-ds-hero { padding-top: 38px; } }
+
+.mh-ds[data-ds-season="christmas"] .mh-dsx-line { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; margin: 0 0 10px; color: var(--dsx-gold-soft); animation: mh-dsx-rise .6s .1s var(--dsx-ease) both; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-line svg { width: 12px; height: 12px; flex: none; color: var(--dsx-gold); filter: drop-shadow(0 0 6px #f7dc8f99); }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-line em { font: italic 500 clamp(.95rem, 3.6vw, 1.2rem)/1.25 var(--dsx-serif); }
+
+.mh-ds[data-ds-season="christmas"] .mh-dsx-art { display: flex; flex-direction: column; align-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-strand { position: absolute; z-index: 0; left: 0; top: 0; width: 100%; height: 24px; pointer-events: none; overflow: visible; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-phone { display: block; width: 100%; height: auto; overflow: visible; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-tag { font: italic 600 10px var(--dsx-serif); fill: #6f1430; }
+.mh-ds[data-ds-season="christmas"][data-ds-look="new-year"] .mh-dsx-tag { fill: #1d2758; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-count { display: grid; justify-items: center; margin: -4px 0 0; text-align: center; line-height: 1.1; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-count em { font: italic 600 clamp(.95rem, 3.2vw, 1.3rem)/1.1 var(--dsx-serif); color: var(--dsx-gold-soft); }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-count span { font-size: .6875rem; color: #cbbd9c; }
+.mh-ds[data-ds-season="christmas"][data-ds-look="new-year"] .mh-dsx-count span { color: #c3c9da; }
+
+.mh-ds[data-ds-season="christmas"] :is(.mh-dsx-gift, .mh-dsx-bauble, .mh-dsx-spark, .mh-dsx-halo, .mh-dsx-signal path, .mh-dsx-burst g) { transform-box: fill-box; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-gift { transform-origin: 50% 100%; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-bauble { transform-origin: 50% 0; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-halo { transform-origin: 50% 50%; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-spark { transform-origin: 50% 50%; animation: mh-dsx-twinkle 3.4s calc(var(--i) * .55s) ease-in-out 8; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-bulb { animation: mh-dsx-twinkle 4.2s calc(var(--i) * .27s) ease-in-out 7; }
+/* The signal on the screen lights from the centre outward, like a connection being made (then rests lit). */
+.mh-ds[data-ds-season="christmas"] .mh-dsx-signal path { animation: mh-dsx-signal 2.8s calc(var(--i) * -.35s + 1s) ease-in-out 10; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-beam { animation: mh-dsx-glow 4s ease-in-out 7; }
+/* Entrance, once per visit (the title panel carries data-ds-seen when the page is opened again). */
+.mh-ds[data-ds-season="christmas"] .mh-ds-hero:not([data-ds-seen]) .mh-dsx-gift { animation: mh-dsx-arrive .9s .15s cubic-bezier(.34, 1.4, .5, 1) both; }
+.mh-ds[data-ds-season="christmas"] .mh-ds-hero:not([data-ds-seen]) .mh-dsx-bauble { animation: mh-dsx-sway 1.8s calc(.3s + var(--i) * .15s) var(--dsx-ease) both; }
+.mh-ds[data-ds-season="christmas"] .mh-ds-hero:not([data-ds-seen]) .mh-dsx-strand { animation: mh-dsx-on 1s .25s ease-out both; }
+.mh-ds[data-ds-season="christmas"] .mh-ds-hero:not([data-ds-seen]) .mh-dsx-sheen { animation: mh-dsx-sheen 1.4s .9s ease-out both; }
+/* A tap on the illustration: the phone hops, the baubles swing, the sparks flare. Never on a price or a button. */
+.mh-ds[data-ds-season="christmas"] .mh-dsx-art[data-press] .mh-dsx-gift { animation: mh-dsx-hop .8s var(--dsx-ease) both; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-art[data-press] .mh-dsx-bauble { animation: mh-dsx-sway 1.4s calc(var(--i) * .1s) var(--dsx-ease) both; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-art[data-press] .mh-dsx-spark { animation: mh-dsx-flare .9s calc(var(--i) * 50ms) ease-out both; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-art[data-press] .mh-dsx-halo { animation: mh-dsx-halo .9s ease-out both; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-art[data-press] .mh-dsx-sheen { animation: mh-dsx-sheen 1s ease-out both; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-sheen { transform: translateX(-60px) skewX(-14deg); }
+
+/* ───────── Switchers: the green stays, finished with a champagne ring ───────── */
+.mh-ds[data-ds-season="christmas"] .mh-ds-modes-thumb { box-shadow: inset 0 1px 0 #ffffff6b, 0 0 0 1px #e8c46f, 0 0 0 3px #e8c46f1f, 0 12px 24px -12px var(--ds-thumb-shadow); }
+.mh-ds[data-ds-season="christmas"] .mh-ds-nets-thumb { box-shadow: inset 0 1px 0 #ffffff59, 0 0 0 1px #e8c46fb3, 0 10px 24px -12px var(--net-color); }
+.mh-ds[data-ds-season="christmas"] :is(.mh-ds-modes, .mh-ds-nets, .mh-ds-afa) { border-color: #e8c46f33; }
+.mh-ds[data-ds-season="christmas"] .mh-ds-afa svg { color: var(--dsx-gold); }
+
+/* ───────── Tiles: each bundle wrapped with a satin edge ───────── */
+.mh-ds[data-ds-season="christmas"] .mh-ds-tile { box-shadow: inset 0 1px 0 #ffffff0d, 0 16px 34px -26px #000; }
+.mh-ds[data-ds-season="christmas"] .mh-ds-tile-band { height: 3px; opacity: 1; background: linear-gradient(90deg, var(--net) 0 20%, #c99a3a 34%, #ffeebe 58%, #a87420 82%, transparent); }
+.mh-ds[data-ds-season="christmas"][data-ds-look="new-year"] .mh-ds-tile-band { background: linear-gradient(90deg, var(--net) 0 20%, #8a95a8 34%, #f4f7fb 58%, #9aa6bb 82%, transparent); }
+.mh-ds[data-ds-season="christmas"] .mh-ds-tile-light { background: radial-gradient(180px circle at var(--mx, 50%) var(--my, 0%), #f3d79a24, transparent 70%); }
+/* Popular and best-value bundles carry a small bow on their satin edge (gold; a silver star from 27 December). */
+.mh-ds[data-ds-season="christmas"] .mh-ds-tile[data-flag]::after {
+  content: ''; position: absolute; top: -2px; left: 50%; width: 40px; height: 23px; margin-left: -20px; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 34'%3E%3Cpath d='M30 6C24-4 10-4 12 4c1 4 10 4 18 2zM30 6c6-10 20-10 18-2-1 4-10 4-18 2z' fill='%23e9b949'/%3E%3Cpath d='M30 6l-8 22 6-4 2 7 1-25zM30 6l8 22-6-4-2 7-1-25z' fill='%23b98326'/%3E%3Ccircle cx='30' cy='6' r='4' fill='%23f7dc8f'/%3E%3Ccircle cx='28.8' cy='4.8' r='1.2' fill='%23fff' fill-opacity='.6'/%3E%3C/svg%3E") center top / contain no-repeat;
+  filter: drop-shadow(0 2px 2px #0008); transform-origin: 50% 0; transition: transform .4s cubic-bezier(.34, 1.4, .5, 1);
+}
+.mh-ds[data-ds-season="christmas"][data-ds-look="new-year"] .mh-ds-tile[data-flag]::after {
+  top: 2px; width: 16px; height: 16px; margin-left: -8px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10 20 20'%3E%3Cpath d='M0 -10C1 -3 3 -1 10 0C3 1 1 3 0 10C-1 3-3 1-10 0C-3-1-1-3 0-10Z' fill='%23f4f7fb'/%3E%3C/svg%3E");
+}
+@media (hover: hover) {
+  .mh-ds[data-ds-season="christmas"] .mh-ds-tile:hover { border-color: #e8c46f80; box-shadow: inset 0 1px 0 #ffffff12, 0 22px 42px -26px #000, 0 0 30px -18px var(--dsx-gold); }
+  .mh-ds[data-ds-season="christmas"] .mh-ds-tile[data-flag]:hover::after { transform: rotate(-8deg) scale(1.08); }
+  /* One warm sheen passes over the tile as the pointer arrives. */
+  .mh-ds[data-ds-season="christmas"] .mh-ds-tile::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(105deg, transparent 35%, #f7dc8f17 50%, transparent 65%); transform: translateX(-110%); }
+  .mh-ds[data-ds-season="christmas"] .mh-ds-tile:hover::before { animation: mh-dsx-pass 1s var(--dsx-ease) both; }
+}
+.mh-ds[data-ds-season="christmas"] .mh-ds-tile[data-tapped="true"] { box-shadow: 0 0 0 1px #e8c46f99, 0 0 28px -10px var(--dsx-gold); }
+.mh-ds[data-ds-season="christmas"] .mh-ds-tile-net { color: #e9dcc0; }
+.mh-ds[data-ds-season="christmas"] .mh-ds-tile-meta { color: #a99f86; }
+.mh-ds[data-ds-season="christmas"][data-ds-look="new-year"] .mh-ds-tile-meta { color: #a4abc0; }
+.mh-ds[data-ds-season="christmas"] .mh-ds-tile-unit { color: var(--dsx-gold-soft); }
+.mh-ds[data-ds-season="christmas"] .mh-ds-group-head { color: #efe2c3; }
+.mh-ds[data-ds-season="christmas"] .mh-ds-group-head::after { background: linear-gradient(90deg, #e8c46f59, transparent); }
+
+/* ───────── Panels ───────── */
+.mh-ds[data-ds-season="christmas"] .mh-ds-panel { box-shadow: inset 0 2px 0 #b3263fb3, inset 0 1px 0 #ffffff0d; }
+.mh-ds[data-ds-season="christmas"][data-ds-look="new-year"] .mh-ds-panel { box-shadow: inset 0 2px 0 #e7d9b080, inset 0 1px 0 #ffffff0d; }
+.mh-ds[data-ds-season="christmas"] .mh-ds-amount[aria-pressed="true"] { box-shadow: 0 0 0 1px #e8c46f, 0 10px 22px -14px var(--dsx-gold); }
+.mh-ds[data-ds-season="christmas"] .mh-ds-instant { border-color: var(--ds-line); }
+
+@keyframes mh-dsx-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes mh-dsx-on { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mh-dsx-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@keyframes mh-dsx-signal { 0%, 100% { opacity: .35; } 40%, 60% { opacity: 1; } }
+@keyframes mh-dsx-glow { 0%, 100% { opacity: .85; } 50% { opacity: .55; } }
+@keyframes mh-dsx-arrive { from { opacity: 0; transform: translateY(14px) scale(.86) rotate(-5deg); } to { opacity: 1; transform: none; } }
+@keyframes mh-dsx-sway { 0% { transform: rotate(0); } 18% { transform: rotate(11deg); } 40% { transform: rotate(-8deg); } 60% { transform: rotate(5deg); } 80% { transform: rotate(-2deg); } 100% { transform: rotate(0); } }
+@keyframes mh-dsx-hop { 0% { transform: none; } 30% { transform: translateY(-9%) rotate(-3deg) scale(1.02, .98); } 55% { transform: translateY(0) scale(1.03, .97); } 75% { transform: translateY(-2%); } 100% { transform: none; } }
+@keyframes mh-dsx-flare { 0% { opacity: .6; transform: none; } 40% { opacity: 1; transform: scale(1.9) rotate(25deg); } 100% { opacity: .8; transform: none; } }
+@keyframes mh-dsx-halo { 0% { transform: none; } 35% { transform: scale(1.12); } 100% { transform: none; } }
+@keyframes mh-dsx-sheen { from { transform: translateX(-60px) skewX(-14deg); } to { transform: translateX(150px) skewX(-14deg); } }
+@keyframes mh-dsx-pass { from { transform: translateX(-110%); } to { transform: translateX(110%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mh-ds[data-ds-season="christmas"] *, .mh-ds[data-ds-season="christmas"] *::before, .mh-ds[data-ds-season="christmas"] *::after { animation: none !important; transition: none !important; }
+}
