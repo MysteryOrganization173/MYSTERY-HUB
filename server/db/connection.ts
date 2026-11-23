@@ -25,11 +25,13 @@ import { SALES_RELIABILITY_SCHEMA } from './salesReliabilitySchema.js';
 
 import pg from 'pg';
 import { assertSafeTestDatabase } from '../utils/environment.js';
+import { postgresErrorLabel, postgresTlsConfig } from './postgresTls.js';
 
 const { Pool } = pg;
 
 let pool: pg.Pool | null = null;
 let connectionFailed = false;
+let tlsPolicy: ReturnType<typeof postgresTlsConfig>['policy'] | undefined;
 
 export function getPool(): pg.Pool | null {
   // Check before cached-pool reuse and outside the development fallback catch.
@@ -38,10 +40,10 @@ export function getPool(): pg.Pool | null {
   if (pool) return pool;
 
   if (process.env.DATABASE_URL) {
+    const config = postgresTlsConfig(process.env);
     try {
       pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
+        ...config.options,
         // Production uses Supavisor session mode with 15 slots. Leave room for
         // another process during a rolling deploy (2 x 5) and operational access.
         // Excess work must wait in pg's bounded-time acquisition queue instead
@@ -51,18 +53,18 @@ export function getPool(): pg.Pool | null {
         connectionTimeoutMillis: 10000,
       });
 
+      tlsPolicy = config.policy;
       pool.on('error', (err) => {
-        console.error('Unexpected error on idle PostgreSQL client:', err);
+        console.error('[DB] Unexpected error on idle PostgreSQL client'+postgresErrorLabel(err)+'.');
       });
 
       console.log('PostgreSQL database pool initialized.');
     } catch (err) {
       const isProduction = process.env.NODE_ENV === 'production';
-      if (isProduction) {
-        console.error('[DB] FATAL: Failed to initialize PostgreSQL pool in production.');
-        throw err;
+      if (isProduction || config.policy==='verified') {
+        throw new Error('[DB] Failed to initialize the PostgreSQL pool'+postgresErrorLabel(err)+'.');
       }
-      console.warn('Failed to initialize PostgreSQL pool, using development store fallback:', err);
+      console.warn('[DB] Failed to initialize the PostgreSQL pool'+postgresErrorLabel(err)+'. Using development store fallback.');
       pool = null;
     }
   }
@@ -92,12 +94,13 @@ export async function initDatabase(): Promise<void> {
   let client;
   try {
     client = await db.connect();
+    if (tlsPolicy==='verified') console.info('[DB] PostgreSQL certificate and hostname verified.');
+    if (tlsPolicy==='supabase-compatibility') console.info('[DB] Supabase TLS compatibility policy active.');
   } catch (err) {
-    if (isProduction) {
-      console.error('[DB] FATAL: Failed to connect to PostgreSQL database in production environment.');
-      throw err;
+    if (isProduction || tlsPolicy==='verified') {
+      throw new Error('[DB] Failed to connect to PostgreSQL'+postgresErrorLabel(err)+'.');
     }
-    console.warn('[DB] Failed to connect to PostgreSQL database. Falling back to in-memory persistence:', err);
+    console.warn('[DB] Failed to connect to PostgreSQL'+postgresErrorLabel(err)+'. Using development store fallback.');
     connectionFailed = true;
     pool = null;
     return;
