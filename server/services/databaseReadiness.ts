@@ -1,5 +1,6 @@
 import type { Express } from 'express';
 import { getPool } from '../db/connection.js';
+import { postgresTlsConfig } from '../db/postgresTls.js';
 
 type Config = { maintenance: boolean; expectedName: string | undefined };
 
@@ -21,6 +22,7 @@ export function databaseMode(env: NodeJS.ProcessEnv): Config {
       env.DATABASE_SSL==='false')) {
       throw new Error('The verified database switch requires a matching database and verify-full TLS.');
     }
+    if (expectedName) postgresTlsConfig(env);
   }
   return { maintenance: mode==='true', expectedName };
 }

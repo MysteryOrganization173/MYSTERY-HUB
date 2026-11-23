@@ -28,6 +28,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Verify PostgreSQL TLS enforcement and compatibility rollout
+        run: node --import tsx scripts/runTests.ts server/suppliers/__tests__/databaseTls.test.ts
       - name: Create isolated non-superuser owner and API roles
         env:
           PGPASSWORD: local-test-only
