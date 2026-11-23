@@ -52,14 +52,19 @@ const MODE_INDEX = { data: 0, instant: 1, airtime: 2 } as const;
 /** Catalogue views already shown in this visit: returning to the page does not replay their entrance. */
 const seenCatalogViews = new Set<string>();
 
-/** The tile under the pointer catches a soft light (mouse only; touch has no hover). */
+/** The tile under the pointer catches a soft light (mouse only; touch has no hover). At most once per frame. */
+let pointerFrame = 0;
 const followPointer = (e: React.PointerEvent<HTMLElement>) => {
-  if (e.pointerType !== 'mouse') return;
+  if (e.pointerType !== 'mouse' || pointerFrame) return;
   const tile = (e.target as HTMLElement).closest<HTMLElement>('.mh-ds-tile');
   if (!tile) return;
-  const box = tile.getBoundingClientRect();
-  tile.style.setProperty('--mx', `${e.clientX - box.left}px`);
-  tile.style.setProperty('--my', `${e.clientY - box.top}px`);
+  const { clientX, clientY } = e;
+  pointerFrame = requestAnimationFrame(() => {
+    pointerFrame = 0;
+    const box = tile.getBoundingClientRect();
+    tile.style.setProperty('--mx', `${clientX - box.left}px`);
+    tile.style.setProperty('--my', `${clientY - box.top}px`);
+  });
 };
 
 export const DataPage: React.FC = () => {
@@ -103,8 +108,13 @@ export const DataPage: React.FC = () => {
   const [airtimeErrors, setAirtimeErrors] = useState<{ phone?: string; amount?: string }>({});
   const airtimeTap = useTapFeedback();
   // A number typed for one account never carries over to the next: signing out or switching account clears it.
+  // (Finishing the sign-in check, or a guest signing in, is the same person, so their typing is kept.)
   const accountId = user?.id || null;
-  useEffect(() => { setAirtimePhone(''); setAirtimeErrors({}); }, [accountId]);
+  const previousAccount = useRef(accountId);
+  useEffect(() => {
+    if (previousAccount.current && previousAccount.current !== accountId) { setAirtimePhone(''); setAirtimeErrors({}); }
+    previousAccount.current = accountId;
+  }, [accountId]);
   const accountPhone = user?.phone && isCompleteGhanaPhone(user.phone) ? formatGhanaPhone(user.phone) : '';
 
   // Auto-detect network from phone
@@ -370,7 +380,7 @@ export const DataPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
         <PendingPaymentBanner />
 
-        <DataStoreHero />
+        <DataStoreHero mode={dataProductMode} />
 
         <div className="space-y-2.5 sm:space-y-3">
           {/* 4 Product Mode Navigation Tabs / Discovery Shortcuts: one sliding indicator carries the active service. */}
@@ -411,7 +421,7 @@ export const DataPage: React.FC = () => {
                 className={modeButton}
               >
                 <span><Smartphone aria-hidden="true" />Airtime</span>
-                <small>Any Ghana number</small>
+                <small>MTN, AT and Telecel</small>
               </button>
             </div>
             <button
@@ -461,7 +471,7 @@ export const DataPage: React.FC = () => {
                 <label htmlFor="airtime-phone" className="text-sm font-semibold text-slate-200 block">Recipient number</label>
                 {/* Signed in: one tap fills the account's own number. Never filled without asking. */}
                 {accountPhone && formatGhanaPhone(airtimePhone) !== accountPhone && (
-                  <button type="button" className="mh-ds-use-mine" onClick={() => { setAirtimePhone(accountPhone); setAirtimeErrors(prev => ({ ...prev, phone: undefined })); }}>
+                  <button type="button" className="mh-ds-use-mine" onClick={() => { setAirtimePhone(accountPhone); setAirtimeErrors(prev => ({ ...prev, phone: undefined })); document.getElementById('airtime-phone')?.focus(); }}>
                     <UserRound className="w-3.5 h-3.5" aria-hidden="true" />Use my number
                   </button>
                 )}

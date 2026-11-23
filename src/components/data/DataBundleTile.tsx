@@ -42,8 +42,9 @@ export const DataBundleTile: React.FC<DataBundleTileProps> = ({ bundle, onBuy, d
   const [size, unit] = splitDataAmount(bundle.dataAmount);
   const validity = dataValidityLabel(bundle.validity);
   // A comparison figure from the price on the tile itself (never the one-time Welcome Price): cedis per gigabyte.
-  const gigabytes = bundle.dataBytesValue > 0 ? bundle.dataBytesValue / 1024 : 0;
-  const perGb = !welcomePrice && gigabytes >= 1 && unit.toUpperCase() === 'GB' ? `GH₵${(bundle.priceGhc / gigabytes).toFixed(2)} per GB` : '';
+  // Worked out from the size on the tile (the server's own dataAmount), so the two can never disagree.
+  const gigabytes = unit.toUpperCase() === 'GB' ? Number(size.replace(/,/g, '')) : 0;
+  const perGb = !welcomePrice && Number.isFinite(gigabytes) && gigabytes >= 1 ? `GH₵${(bundle.priceGhc / gigabytes).toFixed(2)} per GB` : '';
   const flag = welcomePrice || campaignPrice ? null : bundle.isBestValue ? 'Best value' : bundle.isPopular ? 'Popular' : null;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -68,7 +69,7 @@ export const DataBundleTile: React.FC<DataBundleTileProps> = ({ bundle, onBuy, d
       <span className="mh-ds-tile-light" aria-hidden="true" />
       <span className="mh-ds-tile-top">
         <span className="mh-ds-tile-net"><span className="mh-ds-tile-dot" aria-hidden="true" />{SHORT_NAME[bundle.network]}</span>
-        {flag === 'Best value' ? <span className="mh-ds-tile-flag" aria-label="Best value"><span className="mh-ds-flag-long">Best </span>value</span>
+        {flag === 'Best value' ? <span className="mh-ds-tile-flag"><span className="mh-ds-flag-long">Best </span>value</span>
           : flag ? <span className="mh-ds-tile-flag">{flag}</span> : null}
       </span>
 

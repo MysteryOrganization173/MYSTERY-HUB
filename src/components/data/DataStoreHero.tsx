@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ShieldCheck, Smartphone, Receipt, UserRound } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { formatGhanaPhone, isCompleteGhanaPhone } from '../../utils/checkoutRecovery';
@@ -46,11 +46,17 @@ export const SignalArt = () => (
  * customers see which number checkout starts with and that it can be changed. Nothing here is a default recipient:
  * checkout always shows the number again and lets the customer change it before paying.
  */
-function JourneyLine() {
+export type DataStoreMode = 'data' | 'instant' | 'airtime';
+
+function JourneyLine({ mode }: { mode: DataStoreMode }) {
   const { user, isAuthChecking } = useApp();
   if (isAuthChecking) return <p className="mh-ds-journey" aria-hidden="true">&nbsp;</p>;
+  // Airtime takes its number in the form on this page; Data and Instant take it in checkout. The line says which.
   if (!user) return (
-    <p className="mh-ds-journey"><ShieldCheck aria-hidden="true" /><span><strong>No account needed.</strong> Enter the number and a receipt email at checkout<span className="mh-ds-wide">, then confirm the total before you pay</span>.</span></p>
+    <p className="mh-ds-journey"><ShieldCheck aria-hidden="true" /><span><strong>No account needed.</strong> {mode === 'airtime'
+      ? <>Enter the number below<span className="mh-ds-wide">, then confirm it and the total before you pay</span>.</>
+      : mode === 'instant' ? <>Enter the number at checkout<span className="mh-ds-wide">, then confirm the total before you pay</span>.</>
+      : <>Enter the number and a receipt email at checkout<span className="mh-ds-wide">, then confirm the total before you pay</span>.</>}</span></p>
   );
   const first = (user.name || '').trim().split(/\s+/)[0];
   const phone = user.phone && isCompleteGhanaPhone(user.phone) ? formatGhanaPhone(user.phone) : '';
@@ -59,7 +65,7 @@ function JourneyLine() {
       <UserRound aria-hidden="true" />
       <span>
         <strong>{first ? `Signed in as ${first}.` : 'Signed in.'}</strong>{' '}
-        {phone ? <><span className="mh-ds-wide">Checkout starts with your number</span><span className="mh-ds-narrow">Checkout starts with</span> <span className="mh-ds-journey-phone">{phone}</span><span className="mh-ds-wide">. Change it there to send to someone else.</span><span className="mh-ds-narrow">, which you can change.</span></>
+        {mode === 'airtime' ? 'Airtime goes to the number you enter below.' : phone ? <><span className="mh-ds-wide">Checkout starts with your number</span><span className="mh-ds-narrow">Checkout starts with</span> <span className="mh-ds-journey-phone">{phone}</span><span className="mh-ds-wide">. Change it there to send to someone else.</span><span className="mh-ds-narrow">, which you can change.</span></>
           : 'Enter the number you are buying for at checkout.'}
       </span>
     </p>
@@ -69,12 +75,21 @@ function JourneyLine() {
 /** The title panel settles in once per visit; coming back to the page (or a re-render) never replays it. */
 let heroShown = false;
 
-export function DataStoreHero() {
+export function DataStoreHero({ mode = 'data' }: { mode?: DataStoreMode }) {
   // Read once on mount (a pure initializer, safe under StrictMode); remembered after the panel has been shown.
   const [seen] = useState(() => heroShown);
   useEffect(() => { heroShown = true; }, []);
+  // Ambient artwork motion pauses whenever the panel is off-screen, so scrolling the catalogue never pays for it.
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) el.removeAttribute('data-ds-idle'); else el.setAttribute('data-ds-idle', ''); });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   return (
-    <section className="mh-ds-hero" aria-labelledby="data-store-title" data-ds-reveal {...(seen ? { 'data-ds-seen': '' } : {})}>
+    <section ref={ref} className="mh-ds-hero" aria-labelledby="data-store-title" data-ds-reveal {...(seen ? { 'data-ds-seen': '' } : {})}>
       <div className="mh-ds-hero-copy">
         <SeasonalDataStore part="line" />
         <p className="mh-ds-eyebrow">Data &amp; Airtime</p>
@@ -91,7 +106,7 @@ export function DataStoreHero() {
       <div className="mh-ds-hero-art">
         <SeasonalDataStore part="art" fallback={<SignalArt />} />
       </div>
-      <JourneyLine />
+      <JourneyLine mode={mode} />
     </section>
   );
 }

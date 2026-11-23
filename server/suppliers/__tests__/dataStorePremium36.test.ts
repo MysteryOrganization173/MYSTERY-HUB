@@ -142,6 +142,13 @@ test('motion: transform and opacity only, entrances once, nothing moves under re
   assert.match(page, /const catalogView = `\$\{activeNetwork\}\|\$\{sizeFilter\}`;/);
   assert.match(page, /<div key=\{catalogView\}/);
   assert.match(read('src/components/data/DataStoreHero.tsx'), /let heroShown = false;/);
+  // Ambient motion is finite and pauses off-screen; only a loading skeleton may loop (and only while loading).
+  for (const file of ['src/components/data/dataStore.css', 'src/seasonal/christmas/data/dataStore.css'])
+    for (const line of read(file).split('\n').filter(l => /animation:[^;]*infinite/.test(l))) assert.match(line, /\.animate-pulse \{ animation: mh-ds-skeleton/, `${file}: ${line}`);
+  assert.match(ordinary, /\.mh-ds \.mh-ds-hero\[data-ds-idle\] \* \{ animation-play-state: paused !important; \}/);
+  assert.match(read('src/components/data/DataStoreHero.tsx'), /new IntersectionObserver\(\(\[entry\]\) => \{ if \(entry\.isIntersecting\) el\.removeAttribute\('data-ds-idle'\); else el\.setAttribute\('data-ds-idle', ''\); \}\)/);
+  // A long price is never clipped: Buy wraps under it instead.
+  assert.match(ordinary, /\.mh-ds \.mh-ds-tile-price \{[^}]*min-width: max-content;/);
   // Prices are never animated.
   assert.doesNotMatch(ordinary, /mh-ds-tile-price[^{]*\{[^}]*animation/);
 });
@@ -193,12 +200,16 @@ test('guests and members: the journey line describes checkout, never chooses a r
   assert.match(hero, /Change it there to send to someone else\./);
   assert.match(hero, /which you can change\./);
   assert.match(hero, /Enter the number you are buying for at checkout\./);
+  // Airtime takes its number on the page, so in Airtime mode the line never names a checkout number.
+  assert.match(hero, /mode === 'airtime' \? 'Airtime goes to the number you enter below\.'/);
+  assert.match(page, /<DataStoreHero mode=\{dataProductMode\} \/>/);
+  assert.doesNotMatch(page, /Any Ghana number/);
   // Nothing is shown while the account is still being checked, and nothing is stored.
   assert.match(hero, /if \(isAuthChecking\) return/);
   assert.doesNotMatch(hero, /localStorage|sessionStorage/);
   // Airtime: the account's number is offered, never filled by itself, and cleared when the account changes.
-  assert.match(page, /const accountId = user\?\.id \|\| null;\s+useEffect\(\(\) => \{ setAirtimePhone\(''\); setAirtimeErrors\(\{\}\); \}, \[accountId\]\);/);
-  assert.match(page, /onClick=\{\(\) => \{ setAirtimePhone\(accountPhone\);/);
+  assert.match(page, /if \(previousAccount\.current && previousAccount\.current !== accountId\) \{ setAirtimePhone\(''\); setAirtimeErrors\(\{\}\); \}/);
+  assert.match(page, /onClick=\{\(\) => \{ setAirtimePhone\(accountPhone\);[^\n]*document\.getElementById\('airtime-phone'\)\?\.focus\(\); \}\}/);
   assert.match(page, /useState\(''\);\n/);
 });
 
@@ -218,7 +229,7 @@ function checkout(user: any, initialPhone?: string) {
   render();
   // Effects run after a render and their state lands on the next one, as in React: settle before reading.
   const settled = () => { render(); return render(); };
-  return { render, context, phone: () => nodes(settled()).find(n => n.type === 'input' && n.props.id === 'checkout-phone'), changeButton: () => nodes(settled()).find(n => n.type === 'button' && n.props['aria-label'] === 'Change the recipient number'), label: () => flat(nodes(settled()).find(n => n.type === 'label' && n.props.htmlFor === 'checkout-phone')), help: () => flat(nodes(settled()).find(n => n.props?.id === 'checkout-phone-help')) };
+  return { render, context, phone: () => nodes(settled()).find(n => n.type === 'input' && n.props.id === 'checkout-phone'), changeButton: () => nodes(settled()).find(n => n.type === 'button' && flat(n) === 'Change number' && !n.props['aria-label']), label: () => flat(nodes(settled()).find(n => n.type === 'label' && n.props.htmlFor === 'checkout-phone')), help: () => flat(nodes(settled()).find(n => n.props?.id === 'checkout-phone-help')) };
 }
 
 test('member checkout starts with the account number, says so, and keeps it an ordinary editable field', () => {
@@ -240,6 +251,9 @@ test('an explicitly chosen recipient, a member without a phone and a guest each 
   const chosen = checkout({ id: 'ama', email: 'ama@example.test', phone: '+233241234567' }, '0550001111');
   assert.equal(chosen.phone().props.value, '055 000 1111');
   assert.match(chosen.label(), /the number you chose/);
+  // Airtime's "Use my number" hands checkout the account's own number explicitly: it is still called the account number.
+  const own = checkout({ id: 'ama', email: 'ama@example.test', phone: '+233241234567' }, '024 123 4567');
+  assert.match(own.label(), /your account number/);
   const kofi = checkout({ id: 'kofi', email: null, phone: null });
   assert.equal(kofi.phone().props.value, '');
   assert.doesNotMatch(kofi.label(), /·/);

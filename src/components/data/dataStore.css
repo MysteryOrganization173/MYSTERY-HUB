@@ -65,15 +65,17 @@
 .mh-ds .mh-ds-assure { display: none; }
 .mh-ds .mh-ds-wide { display: none; }
 @media (min-width: 640px) { .mh-ds .mh-ds-narrow { display: none; } }
-@media (max-width: 359px) { .mh-ds .mh-ds-flag-long { display: none; } }
+@media (max-width: 359px) { .mh-ds .mh-ds-flag-long { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
 @media (min-width: 640px) { .mh-ds .mh-ds-wide { display: inline; } }
 .mh-ds .mh-ds-hero-art { grid-area: art; position: static; align-self: center; justify-self: end; width: 92px; margin: -6px -4px -4px 0; }
 .mh-ds .mh-ds-signal { display: block; width: 100%; height: auto; overflow: visible; }
 .mh-ds .mh-ds-signal-rings, .mh-ds .mh-ds-signal-orbit, .mh-ds .mh-ds-signal-core { transform-box: view-box; transform-origin: 170px 150px; }
-.mh-ds .mh-ds-signal-rings { animation: mh-ds-breathe 6s ease-in-out infinite; }
-.mh-ds .mh-ds-signal-orbit { animation: mh-ds-orbit 38s linear infinite; }
+/* Ambient motion is finite (it settles after about half a minute) and pauses while the panel is off-screen. */
+.mh-ds .mh-ds-signal-rings { animation: mh-ds-breathe 6s ease-in-out 5; }
+.mh-ds .mh-ds-signal-orbit { animation: mh-ds-orbit 38s linear 1; }
 .mh-ds .mh-ds-signal-orbit.is-slow { animation-duration: 64s; animation-direction: reverse; }
-.mh-ds .mh-ds-signal-core { animation: mh-ds-core 3.2s ease-in-out infinite; }
+.mh-ds .mh-ds-signal-core { animation: mh-ds-core 3.2s ease-in-out 9; }
+.mh-ds .mh-ds-hero[data-ds-idle] * { animation-play-state: paused !important; }
 .mh-ds .mh-ds-art-wait { width: 100%; aspect-ratio: 240 / 206; }
 
 .mh-ds .mh-ds-journey {
@@ -236,8 +238,10 @@
 .mh-ds .mh-ds-tile-size { display: flex; align-items: baseline; gap: 2px; margin-top: 10px; font-family: var(--ds-heading); font-size: clamp(1.9rem, 9vw, 2.35rem); font-weight: 800; line-height: .95; letter-spacing: -.035em; color: var(--ds-ink); font-variant-numeric: tabular-nums; }
 .mh-ds .mh-ds-tile-unit { font-size: .5em; font-weight: 700; letter-spacing: 0; color: var(--ds-soft); }
 .mh-ds .mh-ds-tile-meta { margin-top: 4px; font-size: .75rem; color: var(--ds-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mh-ds .mh-ds-tile-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 6px; margin-top: auto; padding-top: 12px; }
-.mh-ds .mh-ds-tile-price { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; line-height: 1.1; }
+.mh-ds .mh-ds-tile-foot { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 6px; margin-top: auto; padding-top: 12px; }
+/* A price is never clipped: when a long price and Buy do not fit side by side, Buy moves under it. */
+.mh-ds .mh-ds-tile-price { display: flex; flex-direction: column; flex: 1 1 auto; min-width: max-content; line-height: 1.1; }
+.mh-ds .mh-ds-tile-buy { margin-left: auto; }
 .mh-ds .mh-ds-tile-price del { font-size: .6875rem; color: var(--ds-muted); font-variant-numeric: tabular-nums; }
 .mh-ds .mh-ds-tile-price strong { font-size: 1.05rem; font-weight: 800; letter-spacing: -.02em; color: var(--ds-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .mh-ds .mh-ds-tile-price strong.is-offer { color: var(--ds-offer); }
@@ -283,6 +287,7 @@
 .mh-ds .mh-ds-instant { border-radius: var(--ds-radius); border-color: var(--ds-line); background: linear-gradient(170deg, var(--ds-tile-a), var(--ds-tile-b)); box-shadow: inset 0 1px 0 #ffffff0a; animation: mh-ds-rise .45s var(--ds-ease) backwards; animation-delay: calc(var(--i, 0) * 34ms); transition: transform .26s var(--ds-ease), border-color .2s ease; }
 @media (hover: hover) { .mh-ds button.mh-ds-instant:not(:disabled):hover { transform: translateY(-2px); border-color: #00c36573; } }
 .mh-ds .mh-ds-instant[data-open] { border-color: #00c36580; }
+.mh-ds .mh-ds-instant.animate-pulse { animation: mh-ds-skeleton 1.8s ease-in-out infinite; }
 .mh-ds .mh-ds-instant:focus-visible { outline: 2px solid var(--ds-accent); outline-offset: 2px; }
 
 /* ───────── Motion ───────── */
@@ -292,6 +297,7 @@
 @keyframes mh-ds-breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.035); opacity: .82; } }
 @keyframes mh-ds-orbit { to { transform: rotate(360deg); } }
 @keyframes mh-ds-core { 0%, 100% { opacity: .9; } 50% { opacity: .6; } }
+@keyframes mh-ds-skeleton { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
 @keyframes mh-ds-hero-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .mh-ds [data-ds-reveal] { animation: mh-ds-hero-in .55s var(--ds-ease) backwards; }
 .mh-ds [data-ds-seen] { animation: none; }

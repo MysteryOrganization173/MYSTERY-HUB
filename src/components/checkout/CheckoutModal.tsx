@@ -171,7 +171,8 @@ export const CheckoutModal: React.FC = () => {
       walletRequest.current=null;
       const initial = checkoutInitialPhone !== undefined ? checkoutInitialPhone : (user?.phone || '');
       setPhone(formatGhanaPhone(initial));
-      setRecipientOrigin(checkoutInitialPhone !== undefined ? (checkoutInitialPhone ? 'chosen' : null) : (user?.phone ? 'account' : null));
+      const accountNumber = user?.phone ? formatGhanaPhone(user.phone) : '';
+      setRecipientOrigin(!initial ? null : accountNumber && formatGhanaPhone(initial) === accountNumber ? 'account' : checkoutInitialPhone !== undefined ? 'chosen' : null);
       setPhoneError('');
       setServerError('');
       setActiveMtnConflict(null);
@@ -817,7 +818,7 @@ export const CheckoutModal: React.FC = () => {
               </label>
               {/* A prefilled number is shown as chosen, with one obvious way to change it. It stays an ordinary field. */}
               {recipientOrigin && phoneComplete && !(walletBusy||isInitializing||recoveryOnly||!!attemptRef) && (
-                <button type="button" aria-label="Change the recipient number" onClick={() => { const input = phoneInputRef.current; if (input) { input.focus(); input.select(); } }}
+                <button type="button" onClick={() => { const input = phoneInputRef.current; if (input) { input.focus(); input.select(); } }}
                   className="shrink-0 min-h-9 px-2 -mr-2 rounded-lg text-xs font-semibold text-[#44df95] hover:text-white cursor-pointer">Change number</button>
               )}
             </div>

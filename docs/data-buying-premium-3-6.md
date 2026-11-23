@@ -52,6 +52,7 @@ All motion uses transform and opacity only. `prefers-reduced-motion` stops every
   - On press: a scale-down and the existing tap ring.
   - Prices never move.
 - **Title panel:** settles in once per visit. The ordinary rings breathe slowly.
+- **Ambient artwork motion is finite.** It settles after about half a minute and pauses whenever the title panel is off-screen, so scrolling the catalogue on a budget phone never pays for it.
 - **Season:** baubles sway in, the signal on the phone lights from the centre outward, and the lights twinkle. A tap on the illustration makes the phone hop and the sparks flare.
 - **Search and panels:** search opens with a short scale-in. Mode switches and opened questions fade up.
 
@@ -104,7 +105,7 @@ The MTN delivery notice, the AirtelTigo notice, the FAQ wording and the trust li
   - Two structural pins were updated without weakening them:
     - the MTN notice must still come before the list, now `DataBundleTile`;
     - the mode tabs must share exactly one active style, now one indicator.
-- **Browser QA:** 209 of 209 checks passed, against frontend-only Vite with every `/api` call answered synthetically. Paystack and Wallet initialization were counted and refused, and none happened. The checks covered:
+- **Browser QA:** 216 of 216 checks passed, against frontend-only Vite with every `/api` call answered synthetically. Paystack and Wallet initialization were counted and refused, and none happened. The checks covered:
   - **Layout:**
     - widths 320–1440, with short Android heights (320×568, 360×640, 360×740);
     - guest and member, ordinary and seasonal;
@@ -132,6 +133,28 @@ The MTN delivery notice, the AirtelTigo notice, the FAQ wording and the trust li
     - Exit preview restores the ordinary page in place;
     - the seasonal chunk is never fetched when off;
     - Admin and published sites never carry the Data look.
+
+## Independent review
+
+A separate review agent reviewed the diff. It found no critical issues.
+
+It raised two important issues, both fixed:
+- ambient SVG animations never stopped, which is costly on budget Android phones;
+- the member journey line named a checkout number in Airtime mode.
+
+It also raised minor issues, all fixed except one:
+- focus is now kept after "Use my number";
+- "Use my number" is now labelled as the account number in checkout;
+- "Change number" uses its visible text as its accessible name;
+- the per-GB figure is now worked out from the size shown on the tile;
+- long offer prices wrap instead of clipping;
+- the Instant loading skeleton pulses again;
+- "Best value" now reaches screen readers;
+- the Airtime number is kept when the sign-in check finishes;
+- "Any Ghana number" now reads "MTN, AT and Telecel";
+- the pointer light is updated at most once per frame.
+
+Not changed: on Instant cards, the store's border colour overrides the out-of-stock border. Out-of-stock cards keep their reduced opacity, "Unavailable" label and disabled state.
 
 ## Limits and follow-ups
 
