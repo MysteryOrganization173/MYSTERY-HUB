@@ -4,7 +4,7 @@ The public launch target is December 1, 2026. The baseline is `fedca0ab59bfa69be
 
 ## Ingress qualification
 
-The canonical site serves the Express greeting head and status at `https://mysterybundlehub.com/g/:shareId`. The frontend uses the build's `VITE_API_BASE_URL` through [apiClient](../src/services/apiClient.ts), so the backend can also receive browser calls at the Render API origin. The Render static site is a separate entry path and its SPA fallback has no authority to read greetings. Public responses on the canonical host and Render origins carry edge identifiers. That evidence shows an edge is present. It does not identify the socket peer observed by Express or establish the integrity of the forwarded address at every boundary. [Render's edge architecture](https://render.com/articles/how-render-handles-ddos-attacks) · [Render's forwarding guidance](https://render.com/articles/how-to-proxy-analytics-through-your-own-domain) · [Cloudflare's headers](https://developers.cloudflare.com/fundamentals/reference/http-headers/)
+The canonical site serves the Express greeting head and status at `https://mysterybundlehub.com/g/:shareId`. A read-only browser run on the canonical site called the same-origin `/api/experiences/templates` endpoint. The separate Render static build at `https://mystery-hub.onrender.com` embeds `https://mysteryhub-api.onrender.com` in its [apiClient](../src/services/apiClient.ts) bundle, confirming a direct API-origin path. Its SPA fallback has no authority to read greetings. Public responses on the canonical host and Render origins carry edge identifiers. That evidence shows an edge is present. It does not identify the socket peer observed by Express or establish the integrity of the forwarded address at every boundary. [Render's edge architecture](https://render.com/articles/how-render-handles-ddos-attacks) · [Render's forwarding guidance](https://render.com/articles/how-to-proxy-analytics-through-your-own-domain) · [Cloudflare's headers](https://developers.cloudflare.com/fundamentals/reference/http-headers/)
 
 Set `EXPERIENCES_TRUSTED_PROXY_CIDRS` only from verified infrastructure evidence. Each configured range must be exclusive to proxy hops with a confirmed X-Forwarded-For append or replacement contract for this service. Start with the real TCP peer. The resolver consumes a single X-Forwarded-For header of at most 512 characters and eight values from right to left. It uses the first globally routable address outside the attested proxy suffix. Client-supplied prefixes, `CF-Connecting-IP` and `Forwarded` never establish identity. Reject a missing or untrusted socket, a malformed candidate, duplicate field lines, and a header with no external visitor. Avoid blanket private networks, global Express proxy trust, inferred Cloudflare-only access and positional trust based on a fixed hop count. Cloudflare's visitor headers require an independently verified network boundary. [Cloudflare origin trust guidance](https://developers.cloudflare.com/support/troubleshooting/restoring-visitor-ips/restoring-original-visitor-ips/)
 
@@ -53,12 +53,14 @@ SELECT schemaname,indexname,indexdef FROM pg_indexes
 WHERE indexname IN ('experience_events_period','experience_event_once','experience_created_once');
 SELECT count(*) AS duplicate_created_groups FROM (
  SELECT entity_id FROM public.analytics_events
- WHERE entity_type='experience' AND event_name='experience_greeting_created' AND entity_id IS NOT NULL
+ WHERE event_name='experience_greeting_created' AND entity_id IS NOT NULL
  GROUP BY entity_id HAVING count(*)>1
 ) groups;
 SELECT count(*) AS duplicate_event_groups FROM (
  SELECT event_name,entity_id,visitor_id,session_id FROM public.analytics_events
- WHERE entity_type='experience' AND event_name<>'experience_greeting_created'
+ WHERE event_name IN ('experience_greeting_open','experience_greeting_reveal',
+                      'experience_greeting_remix_started','experience_countdown_open',
+                      'experience_discovery_open','experience_platform_navigation')
    AND entity_id IS NOT NULL AND visitor_id IS NOT NULL AND session_id IS NOT NULL
  GROUP BY event_name,entity_id,visitor_id,session_id HAVING count(*)>1
 ) groups;
@@ -124,7 +126,7 @@ The optimistic delivery scenario below assumes three opens per greeting, each wi
 | 5,000 | 15,000 | 595,000 | 40.3 | 117–293 |
 | 10,000 | 30,000 | 1,190,000 | 80.6 | 234–586 |
 
-The 1,000/day durable successful-creation cap means 5,000–10,000 greetings are multi-day scenarios. Existing caps include 20 successful creates and 240 creation requests per visitor hour, ten reports per visitor day, 60 management requests per visitor hour, 15 local create requests and 240 general local requests per minute per key. The store caps optional analytics at 180 per visitor hour and 10,000/day. Local test timings and response sizes are recorded in the PR. Production region, cold compute, real traffic and checkout p95 are still unmeasured for this workload.
+The 1,000/day durable successful-creation cap means 5,000–10,000 greetings are multi-day scenarios. Existing caps include 20 successful creates and 240 creation requests per visitor hour, ten reports per visitor day, 60 management requests per visitor hour, 15 local create requests and 240 general local requests per minute per key. The store caps optional analytics at 180 per visitor hour and 10,000/day. The native synthetic run measured creation at 7.64 ms p50 and 10.47 ms p95 over eight samples, with a largest recipient JSON of 256 bytes. These figures include the local store workload and exclude WAN latency. Production region, cold compute, real traffic and checkout p95 are still unmeasured for this workload.
 
 Before enabling creation, open Neon Console → project → Usage and record current and available compute, storage and public network transfer for the current allowance period. Check the production branch's endpoint metrics for concurrent connections, active/suspended compute, CPU and read/write latency and compare with comparable serving periods. Monitor Render's separate checkout/tracking p95, error rates, pool acquisition failures and Experiences 429/503 rates without logging visitor addresses. Check baselines before, during and after the controlled test. Pause creation if margin is inadequate, checkout is affected or expected per-visitor isolation fails. The estimates cannot establish free-plan headroom. [Neon plans and billing](https://neon.com/docs/introduction/plans)
 
