@@ -1,3 +1,5 @@
+import { PAYMENT_UNAVAILABLE, sharedMerchantCheckoutAvailable } from '../../shared/paymentAvailability.js';
+import { isMainTelecomOrder } from './paymentScope.js';
 import { randomUUID } from 'node:crypto';
 import { FinanceStore, FinanceTx, FinanceError, type FinanceOperation } from '../db/financeStore.js';
 import { moneyMinor, percentMinor, MAX_MONEY_MINOR } from '../../shared/money.js';
@@ -21,6 +23,7 @@ export class FinanceService {
     return FinanceStore.read(userId,async tx=>{const account=await tx.account();const earn=await tx.earn();return {walletMinor:account.wallet_minor,restricted:account.restricted,earn,settings:await this.config(tx),ledger:(await tx.ledger()).filter(x=>x.bucket==='wallet').slice(offset,offset+25),withdrawals:(await tx.operations()).filter(x=>x.kind==='withdrawal'&&x.payload.source!=='store').slice(offset,offset+25).map(maskWithdrawal),topups:(await tx.operations()).filter(x=>x.kind==='topup').slice(0,10).map(x=>({id:x.id,amountMinor:x.amount_minor,state:x.state,reference:x.payload.reference,createdAt:x.created_at})),achievements:await this.achievementProgress(tx)};});
   }
   static async initializeTopup(user:UserRecord,input:Record<string,unknown>,origin:string) {
+    if (!sharedMerchantCheckoutAvailable('wallet_topup')) throw new FinanceError(PAYMENT_UNAVAILABLE.error,503);
     if(process.env.NODE_ENV==='production'&&!process.env.PAYSTACK_SECRET_KEY?.trim().startsWith('sk_live_'))throw new FinanceError('Live Wallet funding is unavailable.',503);
     const amount=moneyMinor(input.amountMinor), key=`topup:${operationKey(input.requestId)}`;
     if(!user.email||!/^\S+@\S+\.\S+$/.test(user.email))throw new FinanceError('Add a valid email to My Account before funding Wallet.');
@@ -88,12 +91,13 @@ export class FinanceService {
   }
   static async payOrder(order:OrderRecord,requestId:unknown,create?:(tx:FinanceTx,paid:OrderRecord)=>Promise<void>,prepare?:(tx:FinanceTx)=>Promise<OrderRecord>) {
     moneyMinor(order.amount);if(order.currency!=='GHS')throw new FinanceError('Invalid currency.');
-    if(!order.user_id||!['data','airtime','afa'].includes(order.service_type||''))throw new FinanceError('Wallet is available for signed-in Data, Airtime and AFA purchases.');
+    if (!isMainTelecomOrder(order)) throw new FinanceError(PAYMENT_UNAVAILABLE.error,503);
+    if(!order.user_id||!['data','airtime'].includes(order.service_type||''))throw new FinanceError('Wallet is available for signed-in regular Data and Airtime purchases.');
     const key=`purchase:${operationKey(requestId)}`;
     const paid=await FinanceStore.transaction(order.user_id,async tx=>{
       const old=await tx.find(key);if(old){if(old.payload.productId!==order.product_id||old.payload.recipient!==order.recipient_phone||old.amount_minor!==order.amount||old.payload.service!==order.service_type)throw new FinanceError('Checkout request details changed.',409);return (await OrdersStore.findOrder(old.payload.orderId,tx.client))!;}
       if(prepare)order=await prepare(tx);
-      const account=await tx.account();if(account.restricted||account.wallet_minor<order.amount)throw new FinanceError('Insufficient Wallet balance. Add Money or use Paystack.',409);
+      const account=await tx.account();if(account.restricted||account.wallet_minor<order.amount)throw new FinanceError('Insufficient Wallet balance. Choose Mobile Money to continue.',409);
       const record={...order,payment_provider:'wallet' as const,payment_reference:`MH_WALLET_ORDER_${randomUUID()}`,status:'paid' as const,payment_status:'success' as const,paid_at:new Date().toISOString()};
       const row=await tx.create('purchase',key,order.amount,{orderId:order.id,productId:order.product_id,recipient:order.recipient_phone,service:order.service_type});
       // Debit and durable order are committed together; provider dispatch is strictly after commit.

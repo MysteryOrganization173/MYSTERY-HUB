@@ -99,14 +99,14 @@ test('Data Store styles present bundles differently: cards for Horizon, Market, 
   assert.doesNotMatch(STORE_STYLE_CSS,/url\(|@import|expression|javascript:/i);
 });
 
-test('every style uses one bundle component and one checkout; the gallery shows the same Buy layout at example prices',()=>{
+test('every style uses one bundle component; gallery examples display prices without purchase controls',()=>{
   const managed=source('src/components/website/ManagedDataStorefront.tsx');
   assert.equal(managed.match(/<BundleRow /g)?.length,1);assert.doesNotMatch(managed,/styleVariant|data-store-style/);
   assert.match(source('src/components/website/storefront/ResellerCatalogue.tsx'),/\$\{featured \? ' is-featured' : ''\}/);
   const html=render('tmpl-data-reseller');
   assert.ok(html.includes('aria-label="Example: MTN'),'gallery bundles announce themselves as examples');
   assert.ok(html.includes('Example bundles and prices'));
-  assert.match(html,/class="store-row has-action"/);
+  assert.match(html,/<div[^>]*class="store-row is-read-only"/);assert.doesNotMatch(html,/<button[^>]*class="store-row/);
 });
 
 test('signed-out My Business describes every kind of website, not only Data Stores',()=>{

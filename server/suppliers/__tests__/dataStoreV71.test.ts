@@ -75,7 +75,7 @@ test('each new style has its own composition but the same content, tap targets a
     assert.ok(html.includes(`data-store-style="${style}"`),style);assert.ok(html.includes(markers[style]),style);
     for(const other of Object.values(markers).filter(m=>m!==markers[style]))assert.ok(!html.includes(`class="${other}`),`${style} has no ${other}`);
     for(const target of ['content:tagline','content:aboutText','content:ctaLabel','content:businessName','content:logoUrl','copy:reseller.secondary'])assert.ok(html.includes(`data-visual-target="${target}"`),`${style} ${target}`);
-    for(const value of ['managed-fixture','id="bundle-catalog"','id="store-help"','Secure checkout by Paystack','Affordable data. Simple delivery.'])assert.ok(html.includes(value),`${style} ${value}`);
+    for(const value of ['managed-fixture','id="bundle-catalog"','id="store-help"','Browse bundles','Affordable data. Simple delivery.'])assert.ok(html.includes(value),`${style} ${value}`);
     assert.equal(html.includes('content:heroImage'),style!=='studio',`${style} banner tap target`);
     // Studio downloads no banner at all.
     assert.equal(html.includes(STARTER.split('/upload/')[1]),style!=='studio',`${style} banner image`);
@@ -90,7 +90,7 @@ test('Horizon and Market respect the owner focus point and description; Classic 
 
 test('gallery demo shows Market (V7.4) with labelled example prices and the new starter wording',()=>{
   const html=renderToStaticMarkup(renderTemplateLayout(data));
-  assert.ok(html.includes('data-store-style="market"'));assert.ok(html.includes('Example store'));assert.ok(html.includes('Buy data in a few taps.'));
+  assert.ok(html.includes('data-store-style="market"'));assert.ok(html.includes('Example store'));assert.ok(html.includes('Browse data bundles'));
 });
 
 test('wording ideas: short, plain and truthful: no prices, numbers, speed, guarantees, reviews or AI claims',()=>{
@@ -139,7 +139,7 @@ test('money boundaries unchanged: server products and prices, the same payment c
   assert.match(store,/priceMinor:p\.retailMinor/,'only server retail prices');
   assert.match(store,/const pick=\(b:StoreBundle\)=>choose\(toBundle\(b\)\)/);
   assert.match(store,/store:\{siteId,requestId:requestId\.current!,expectedMinor:Math\.round\(selected\.priceGhc\*100\)\}/);
-  assert.match(store,/if\(preview\)\{setError\('Preview only\./,'drafts never start checkout');
+  assert.match(store,/const checkoutAvailable=!preview && sharedMerchantCheckoutAvailable/,'drafts never start checkout');
   for(const file of ['src/components/website/storefront/storeStyles.ts','src/config/websiteStyleVariants.ts','src/components/website/editor/WebsiteStoreLook.tsx','src/components/website/StoreShareKit.tsx'])
     assert.doesNotMatch(source(file),/js\.paystack|usePaystack|initializeServerPayment|store-checkout|wholesale|retailMinor|reserveBps/i,file);
 });

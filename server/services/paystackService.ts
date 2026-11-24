@@ -5,6 +5,8 @@
  */
 
 import crypto from 'node:crypto';
+import { PAYMENT_UNAVAILABLE } from '../../shared/paymentAvailability.js';
+import { isSharedMerchantOrder } from './paymentScope.js';
 
 export interface PaystackInitializeParams {
   email: string;
@@ -51,6 +53,17 @@ export class PaystackServerService {
    * Initializes a Paystack transaction from the server
    */
   static async initializeTransaction(params: PaystackInitializeParams): Promise<PaystackInitializeResult> {
+    // Authorize the persisted checkout, never the caller's service label or Paystack metadata.
+    const { OrdersStore } = await import('../db/ordersStore.js');
+    const order = await OrdersStore.findOrder(params.reference);
+    if (!order || !isSharedMerchantOrder(order) || order.payment_reference !== params.reference ||
+        order.status !== 'pending_payment' || order.payment_status !== 'pending' || order.paid_at ||
+        order.currency !== 'GHS' || order.customer_email !== params.email ||
+        !Number.isSafeInteger(params.amountPesewas) || params.amountPesewas <= 0 || order.amount !== params.amountPesewas ||
+        (params.metadata?.service_type !== undefined && params.metadata.service_type !== order.service_type) ||
+        params.metadata?.purpose !== undefined) {
+      return { success: false, reference: params.reference, definitiveFailure: true, error: PAYMENT_UNAVAILABLE.error };
+    }
     const secretKey = this.getSecretKey();
     const isProd = process.env.NODE_ENV === 'production';
 

@@ -137,11 +137,11 @@ test('the storefront is image-led, honest about drafts and payment, and keeps on
   const form = readFileSync('src/components/creative/CreativeBriefForm.tsx', 'utf8');
   // Draft prices and the closed checkout are said plainly where prices and the order button appear.
   assert.match(page, /Draft prices\./);
-  assert.match(page, /Online payment isn’t open yet/);
+  assert.match(page, /Online payment is unavailable/);
   assert.match(sheet, /Draft price/);
   assert.match(sheet, /No payment is taken in the next step/);
   assert.match(form, /No payment is taken now/);
-  assert.match(form, /Send order request/);
+  assert.match(form, /Send project request/);
   assert.doesNotMatch(page + sheet + form, /Buy now|Pay now|Add to cart|Checkout now/i);
   // The sheet is a real modal dialog, Back closes it, and the order form survives going back to the details.
   assert.match(sheet, /showModal\(\)/);

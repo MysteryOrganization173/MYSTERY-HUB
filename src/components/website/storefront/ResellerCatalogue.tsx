@@ -122,10 +122,11 @@ export function filterBundles(bundles: StoreBundle[], filter: BundleFilter, pinn
 }
 
 /** A compact bundle row: size, validity and per-GB on the left, the total price on the right. */
-export function BundleRow({ bundle, theme, onChoose, selected = false, featured = false, action, example = false }: { bundle: StoreBundle; theme: StoreTheme; onChoose: (bundle: StoreBundle) => void; selected?: boolean; featured?: boolean; action?: string; example?: boolean }) {
+export function BundleRow({ bundle, theme, onChoose, selected = false, featured = false, action, example = false }: { bundle: StoreBundle; theme: StoreTheme; onChoose?: (bundle: StoreBundle) => void; selected?: boolean; featured?: boolean; action?: string; example?: boolean }) {
   const perGb = pricePerGb(bundle), price = formatGhs(bundle.priceMinor);
   // The class only lets a style give the owner's featured bundles more room; it never changes what is on sale.
-  return <button type="button" className={`store-row${action ? ' has-action' : ''}${featured ? ' is-featured' : ''}`} aria-pressed={selected} onClick={() => onChoose(bundle)}
+  const Row = onChoose ? 'button' : 'div';
+  return <Row type={onChoose ? 'button' : undefined} className={`store-row${action ? ' has-action' : ''}${featured ? ' is-featured' : ''}${onChoose ? '' : ' is-read-only'}`} aria-pressed={onChoose ? selected : undefined} onClick={onChoose ? () => onChoose(bundle) : undefined}
     aria-label={`${example ? 'Example: ' : action ? `${action} ` : ''}${storeNetworkName(bundle.network)} ${bundle.dataAmount}${bundle.validity ? `, ${bundle.validity}` : ''}, ${price}${featured ? ', featured by the store' : ''}`}
     style={{ backgroundColor: theme.surface, borderColor: selected ? theme.accent : theme.hairline || theme.border, color: theme.surfaceText, '--store-network': storeNetworkColor(bundle.network) } as React.CSSProperties}>
     <span className="store-row-size site-display">{bundle.dataAmount}</span>
@@ -135,17 +136,16 @@ export function BundleRow({ bundle, theme, onChoose, selected = false, featured 
     </span>
     <strong className="store-row-price">{price}</strong>
     {action && <span aria-hidden="true" className="store-row-cta" style={{ backgroundColor: theme.accent, color: websiteActionText(theme.accent) }}>{action}</span>}
-  </button>;
+  </Row>;
 }
 
-/** How buying works, in the order it happens. No delivery times or guarantees are promised here. */
-export function HowBuyingWorks({theme, managed}: {theme: StoreTheme; managed: boolean}) {
+/** The storefront keeps catalogue and historical order status available. */
+export function StorefrontSteps({theme, tracking}: {theme: StoreTheme; tracking: boolean}) {
   const steps = [
-    ['Choose a bundle', 'Pick the network, then tap the bundle you want. The price shown is the total.'],
-    ['Enter the number and pay', managed ? 'Type the number that should receive the data, confirm its network, then pay in the secure Paystack window.' : 'Type the number that should receive the data, confirm its network, then pay securely.'],
-    ['Track your order', managed ? 'Your order reference appears on this page after you pay. Copy it to check the status at any time.' : 'Keep your order reference so the store can check your order.'],
+    ['Browse bundles', 'Choose a network to see the listed bundles and prices.'],
+    ...(tracking ? [['Track an existing order', 'Use the order reference from your original purchase to check its status.']] : []),
   ];
-  return <ol className="store-steps" aria-label="How buying works">
+  return <ol className="store-steps" aria-label="Using this store">
     {steps.map(([title, text], index) => <li key={title}>
       <span aria-hidden="true" className="store-step-number site-display" style={{backgroundColor: theme.accent, color: websiteActionText(theme.accent)}}>{index + 1}</span>
       <span><strong>{title}</strong><small style={{color: theme.surfaceMutedText}}>{text}</small></span>
@@ -275,6 +275,7 @@ export const RESELLER_STORE_CSS = `
 .store-chips button{flex:0 0 auto;padding:0 12px;min-height:38px!important;border-radius:999px;border:1px solid;font-size:13px;font-weight:600;white-space:nowrap}
 .store-rows{display:grid;gap:8px}
 @media (min-width:720px){.store-rows{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.store-row.is-read-only{cursor:default;transform:none}
 .store-row{position:relative;display:grid;grid-template-columns:72px minmax(0,1fr) auto;cursor:pointer;align-items:center;gap:10px;text-align:left;padding:10px 14px 10px 16px;border:1.5px solid;border-radius:14px;overflow:hidden;transition:border-color .15s ease,transform .15s ease}
 .store-row::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--store-network)}
 .store-row[aria-pressed="true"]{box-shadow:0 0 0 3px color-mix(in srgb,var(--website-accent) 22%,transparent)}

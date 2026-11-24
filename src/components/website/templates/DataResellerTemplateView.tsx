@@ -14,7 +14,7 @@ import { resolveDataResellerHeroImage } from '../../../utils/dataResellerArtwork
 import { DATA_BUNDLES } from '../../../data/bundles';
 import { formatGhs } from '../../../../shared/money';
 import {
-  BundleRow, HowBuyingWorks, NetworkPicker, NetworkTabs, RESELLER_STORE_CSS, STORE_NETWORKS, networkSummaries, sortBundles,
+  BundleRow, StorefrontSteps, NetworkPicker, NetworkTabs, RESELLER_STORE_CSS, STORE_NETWORKS, networkSummaries, sortBundles,
   storeNetworkColor, storeNetworkName, storeNetworksIn, type NetworkSummary, type StoreBundle, type StoreNetwork,
 } from '../storefront/ResellerCatalogue';
 
@@ -60,8 +60,9 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
   const owner = !!template.siteContent;
 
   const businessName = template.demoBusinessName || 'Your data store';
-  const tagline = template.demoHeroTagline || '';
-  const aboutText = template.demoSubtext || '';
+  const tagline = ['Buy data in a few taps.', 'Data bundles, bought in a few taps'].includes(template.demoHeroTagline || '') ? 'Browse data bundles' : template.demoHeroTagline || '';
+  const aboutText = /^(Pick a network, choose a bundle and pay securely|Choose a bundle, enter the number that should receive it and pay securely)\./.test(template.demoSubtext || '')
+    ? 'Explore bundles by network and check the status of previous orders.' : template.demoSubtext || '';
   const location = template.location || '';
   const contact = owner ? template.siteContent?.phone || '' : '';
   const whatsapp = owner ? template.siteContent?.whatsapp || template.siteContent?.phone || '' : template.hoursOrContact || '';
@@ -88,7 +89,6 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
   // An owner's store before its first bundle is on sale: a designed setup area in place of an empty catalogue.
   const setup = owner && (!managedCheckout || managedAvailability === 'setup');
   const [network, setNetwork] = useState<StoreNetwork>('mtn');
-  const [notice, setNotice] = useState('');
   const networks: StoreNetwork[] = managedSummary?.networks.length ? managedSummary.networks : managedCheckout ? [] : storeNetworksIn(examples);
   const fromMinor = managedSummary ? managedSummary.fromMinor : null;
   const picker: NetworkSummary[] = managedSummary?.byNetwork?.length ? managedSummary.byNetwork : !managedCheckout && !owner ? networkSummaries(examples) : [];
@@ -100,10 +100,8 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
     window.open(`https://wa.me/${cleanWhatsappNumber}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   };
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  const pickNetwork = (n: StoreNetwork) => { (managedSummary?.onPickNetwork || setNetwork)(n); setNotice(''); scrollTo('bundle-catalog'); };
-  const primaryLabel = managedCheckout && managedAvailability !== 'available' && managedAvailability !== 'setup'
-    ? managedAvailability === 'loading' ? 'Check Availability' : 'View Availability'
-    : owner ? template.siteContent?.ctaLabel || 'Buy Data' : 'Shop Bundles';
+  const pickNetwork = (n: StoreNetwork) => { (managedSummary?.onPickNetwork || setNetwork)(n); scrollTo('bundle-catalog'); };
+  const primaryLabel = setup ? 'View catalogue setup' : 'Browse bundles';
 
   const line = p.hairline || p.border;
   const surface = { backgroundColor: p.surface, borderColor: line, color: p.surfaceText };
@@ -173,7 +171,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           {(fromMinor !== null || (!managedCheckout && !owner)) && (
             <p className="store-hero-facts" style={{ color: p.mutedText }}>
               {fromMinor !== null && <span>Bundles from <strong style={{ color: p.text }}>{formatGhs(fromMinor)}</strong></span>}
-              {managedSummary && managedSummary.count > 0 && <span><strong style={{ color: p.text }}>{managedSummary.count}</strong> bundle{managedSummary.count === 1 ? '' : 's'} available</span>}
+              {managedSummary && managedSummary.count > 0 && <span><strong style={{ color: p.text }}>{managedSummary.count}</strong> bundle{managedSummary.count === 1 ? '' : 's'} listed</span>}
               {!managedCheckout && !owner && <span>Example store · each owner sets their own bundles and prices</span>}
             </p>
           )}
@@ -205,9 +203,8 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
     </div>
     <ul className="sx-facts" style={{ color: p.mutedText }}>
       {fromMinor !== null && <li>Bundles from <strong style={{ color: p.text }}>{formatGhs(fromMinor)}</strong></li>}
-      {managedSummary && managedSummary.count > 0 && <li><strong style={{ color: p.text }}>{managedSummary.count}</strong> bundle{managedSummary.count === 1 ? '' : 's'} available</li>}
+      {managedSummary && managedSummary.count > 0 && <li><strong style={{ color: p.text }}>{managedSummary.count}</strong> bundle{managedSummary.count === 1 ? '' : 's'} listed</li>}
       {!managedCheckout && !owner && <li>Example store · each owner sets their own bundles and prices</li>}
-      <li className="sx-trust"><ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />Secure checkout by Paystack</li>
       <li className="sx-trust"><ReceiptText className="w-3.5 h-3.5" aria-hidden="true" />Order reference to track</li>
     </ul>
   </div>;
@@ -270,20 +267,20 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             <p className="store-eyebrow" style={{ color: p.accentText }}><span {...copy.edit('catalogueEyebrow')}>{copy.text('catalogueEyebrow')}</span></p>
             <h2 className="site-display" style={{ color: p.text }}><span {...copy.edit('catalogueHeading')}>{copy.text('catalogueHeading')}</span></h2>
           </div>
-          {managedCheckout && <p className="store-note store-head-note" style={{ color: p.mutedText }}>Tap a bundle to buy it. The price shown is the total you pay.</p>}
+          {managedCheckout && <p className="store-note store-head-note" style={{ color: p.mutedText }}>Choose a network to browse its bundles and prices.</p>}
         </div>
         {setup && <StoreSetup theme={p}/>}
         {managedCheckout || (owner ? null : (
           <>
-            <NetworkTabs networks={networks} value={network} onChange={n => { setNetwork(n); setNotice(''); }} bundles={examples} theme={p} />
+            <NetworkTabs networks={networks} value={network} onChange={setNetwork} bundles={examples} theme={p} />
             {/* The same bundle layout and Buy buttons a live Data Store shows, at example prices; the gallery never takes payment. */}
             <div className="store-rows" style={{ marginTop: 14 }}>
               {sortBundles(examples.filter(b => b.network === network)).map(b => (
-                <BundleRow key={b.id} bundle={b} theme={p} action="Buy" example onChoose={() => { if (onCtaClick) onCtaClick(); else setNotice('This is an example store. Bundles and prices appear here once a store owner sets them.'); }} />
+                <BundleRow key={b.id} bundle={b} theme={p} example />
               ))}
             </div>
-            <p className="store-note mt-3" role={notice ? 'status' : undefined} style={{ color: p.mutedText }}>
-              {notice || 'Example bundles and prices. Each store shows the bundles its owner switches on, at the owner’s prices.'}
+            <p className="store-note mt-3" style={{ color: p.mutedText }}>
+              Example bundles and prices. Each store sets its own catalogue and prices.
             </p>
           </>
         ))}
@@ -293,8 +290,8 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
       {/* 5. What happens after payment, in the order it happens. */}
       <section className="store-wrap store-section" aria-labelledby="store-steps-title">
         <div className="store-card store-steps-card" style={surface}>
-          <h2 id="store-steps-title" className="store-eyebrow" style={{ color: p.surfaceMutedText }}><span {...copy.edit('stepsHeading')}>{copy.text('stepsHeading')}</span></h2>
-          <HowBuyingWorks theme={p} managed={!!managedCheckout || !owner} />
+          <h2 id="store-steps-title" className="store-eyebrow" style={{ color: p.surfaceMutedText }}>Using this store</h2>
+          <StorefrontSteps theme={p} tracking={Boolean(managedCheckout)} />
         </div>
       </section>
   </React.Fragment>;
@@ -305,7 +302,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
           <div>
             <h2 id="store-help-title" className="text-xl font-bold site-display" style={{ color: p.surfaceText }}><span {...copy.edit('helpHeading')}>{copy.text('helpHeading')}</span></h2>
             <p className="store-note mt-2" style={{ color: p.surfaceMutedText }}><span {...copy.edit('helpIntro')}>{copy.text('helpIntro')}</span></p>
-            {managedCheckout && whatsapp && <p className="store-note mt-2" style={{ color: p.surfaceMutedText }}>Bundles are bought and paid for on this page. WhatsApp and calls are for questions about an order.</p>}
+            {managedCheckout && whatsapp && <p className="store-note mt-2" style={{ color: p.surfaceMutedText }}>Contact this business with questions about its bundles or a previous order.</p>}
           </div>
           <div className="store-help-actions">
             {whatsapp && <button type="button" data-website-event="whatsapp_click" onClick={handleChatWhatsapp} className="store-secondary bg-[#25D366] text-black" style={{ borderColor: 'transparent' }}><MessageCircle className="w-4 h-4" aria-hidden="true" />WhatsApp</button>}
@@ -340,7 +337,7 @@ export const DataResellerTemplateView: React.FC<TemplateViewProps> = ({ template
             <h3 style={{ color: p.surfaceMutedText }}>Payments &amp; delivery</h3>
             <p className="store-note inline-flex gap-2" style={{ color: p.surfaceMutedText }}>
               <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
-              <span>Payments are processed securely by Paystack. Orders are delivered through Mystery Hub’s managed data service.</span>
+              <span>Mystery Hub provides tracking for orders previously paid through this store.</span>
             </p>
           </div>
         </div>

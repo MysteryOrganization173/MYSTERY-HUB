@@ -1,4 +1,5 @@
 import {campaignOrderContext} from '../services/campaignContext.js';
+import { PAYMENT_UNAVAILABLE, sharedMerchantCheckoutAvailable } from '../../shared/paymentAvailability.js';
 import { commercialRouter } from './commercialApi.js';
 import {observeSalesRequest,salesCheckoutKind,noteSalesFailure,completeSalesPreflight} from '../services/salesReliability.js';
 import { CommercialService } from '../services/commercialService.js';
@@ -215,10 +216,26 @@ apiRouter.get('/instant-bundles', async (_req: Request, res: Response) => {
  * Authoritative price is loaded from the catalog — browser input price is ignored.
  * If fulfillment is enabled, performs supplier preflight checks before taking customer payment.
  */
+function restrictSharedMerchantCheckout(req: Request, res: Response, next: () => void) {
+  const { productId, serviceType } = req.body || {};
+  const productService = typeof productId !== 'string' ? undefined
+    : productId.startsWith('mp_') ? 'marketplace'
+    : productId === 'afa-registration' ? 'afa'
+    : productId.startsWith('results-checker-') ? 'results_checker'
+    : productId.startsWith('instant-') ? 'instant_bundle'
+    : productId === 'airtime' || productId.startsWith('airtime-') ? 'airtime' : undefined;
+  if (!sharedMerchantCheckoutAvailable(productService ?? serviceType ?? 'data') ||
+      (serviceType !== undefined && !sharedMerchantCheckoutAvailable(serviceType)) ||
+      (productService && serviceType !== undefined && productService !== serviceType) ||
+      ['store', 'storeId', 'siteId', 'store_context'].some(key => req.body?.[key] != null)) {
+    res.setHeader('Cache-Control', 'no-store').status(503).json(PAYMENT_UNAVAILABLE);
+    return;
+  }
+  next();
+}
+
 const walletCheckoutLimiter=createRateLimiter({windowMs:60_000,max:10});
-apiRouter.post('/payments/initialize', optionalAuth,campaignOrderContext, (req,res,next)=>req.body?.paymentMethod==='wallet'?walletCheckoutLimiter(req,res,next):next(), observeSalesRequest(salesCheckoutKind), async (req: Request, res: Response) => {
-  if (req.body?.serviceType === 'afa' || req.body?.productId === 'afa-registration') { res.status(400).json({ error: 'Use the authenticated AFA registration checkout.' }); return; }
-  if (req.body?.serviceType === 'results_checker' || (typeof req.body?.productId === 'string' && req.body.productId.startsWith('results-checker-'))) { res.status(400).json({ error: 'Use the results checker page to buy a checker.' }); return; }
+apiRouter.post('/payments/initialize', restrictSharedMerchantCheckout, optionalAuth,campaignOrderContext, (req,res,next)=>req.body?.paymentMethod==='wallet'?walletCheckoutLimiter(req,res,next):next(), observeSalesRequest(salesCheckoutKind), async (req: Request, res: Response) => {
   const reqStart = performance.now();
   try {
     const { productId, recipientPhone, phone: bodyPhone, customerPhone, customerEmail: suppliedCustomerEmail, customerName, serviceType, network: reqNetwork, amount: reqAmount } = req.body || {};
@@ -235,7 +252,7 @@ apiRouter.post('/payments/initialize', optionalAuth,campaignOrderContext, (req,r
 
     if (req.body.paymentMethod === 'wallet') {
       if (!req.user) {res.status(401).json({error:'Sign in to use Mystery Wallet.'});return;}
-      if (isMarketplace || serviceType === 'instant_bundle' || productId.startsWith('instant-')) {res.status(400).json({error:'Wallet supports Data, Airtime and AFA in V1.'});return;}
+      if (isMarketplace || serviceType === 'instant_bundle' || productId.startsWith('instant-')) {res.status(400).json({error:'Wallet supports regular Data and Airtime purchases.'});return;}
       const old = await FinanceStore.transaction(req.user.id,tx=>tx.find('purchase:'+req.body.requestId));
       if (old) {
         const normalized=validateAndNormalizeGhanaPhone(recipientPhone || bodyPhone || customerPhone).normalized;
@@ -1521,7 +1538,7 @@ apiRouter.get('/marketplace/products', async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      products,
+      products: products.map(product => ({...product, purchaseEnabled: sharedMerchantCheckoutAvailable('marketplace') && product.purchaseEnabled})),
     });
   } catch (err) {
     console.error('Public Marketplace Products API error:', err);
@@ -1553,7 +1570,7 @@ apiRouter.get('/marketplace/products/:slug', async (req: Request, res: Response)
 
     res.json({
       success: true,
-      product,
+      product: {...product, purchaseEnabled: sharedMerchantCheckoutAvailable('marketplace') && product.purchaseEnabled},
     });
   } catch (err) {
     console.error('Public Marketplace Product Slug API error:', err);

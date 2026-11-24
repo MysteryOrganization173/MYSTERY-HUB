@@ -1,3 +1,5 @@
+import { paymentOrder } from './paymentFixtures.js';
+import { AfaStore } from '../../db/afaStore.js';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {randomUUID} from 'node:crypto';
@@ -35,13 +37,12 @@ test('native PostgreSQL AFA pricing: reviewed fee, Wallet debit, immutable snaps
   CommercialService.now=()=>new Date('2026-11-13T10:00:00Z');
   for(const [id,role] of [['afa-customer','customer'],['afa-admin','admin']] as const){await AuthStore.createUser({id,name:id,email:`${id}@example.test`,phone:null,passwordHash:'SYNTHETIC',role});await AuthStore.createSession(id,`${id}-token`);}
   const post=(body:any)=>original.fetch(`${base}/afa/payments/initialize`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer afa-customer-token'},body:JSON.stringify({name:'Synthetic AFA Customer',idNumber:'GHA-202501234-5',location:'Accra',region:'Greater Accra',dateOfBirth:'1990-02-12',consent:true,customerEmail:'receipt@example.test',...body})});
-  const quote=async()=>(await original.fetch(`${base}/afa/quote`)).json();
+  const quote=()=>CommercialService.afaQuote();
   const count=async(table:string)=>(await observer.query(`SELECT count(*)::int AS n FROM ${table}`)).rows[0].n;
 
   await t.test('switched off: the standard server price, no snapshot, exactly as before',async()=>{
    const q=await quote();assert.equal(q.totalMinor,2999);assert.equal(q.pricingRevision,'afa:2999');
-   const r=await post({phone:'0249116301'});assert.equal(r.status,200);const body=await r.json();
-   const row=(await observer.query('SELECT amount,commercial_context FROM orders WHERE public_reference=$1',[body.orderRef])).rows[0];assert.equal(row.amount,2999);assert.equal(row.commercial_context,null);
+   const r=await post({phone:'0249116301'});assert.equal(r.status,503);assert.equal((await r.json()).code,'PAYMENT_UNAVAILABLE');assert.equal(await count('orders'),0);
   });
   let version='';
   await t.test('cost confirmation and activation commit with their audit rows under the commercial lock',async()=>{
@@ -53,26 +54,29 @@ test('native PostgreSQL AFA pricing: reviewed fee, Wallet debit, immutable snaps
   });
   await t.test('active: Paystack order at the reviewed 1999 with an immutable snapshot; reconciliation sees no conflict',async()=>{
    CommercialService.now=()=>new Date('2026-12-10T12:00:00Z');const q=await quote();assert.equal(q.totalMinor,1999);
-   const before=inits;const r=await post({phone:'0249116302',expectedTotalMinor:1999,pricingRevision:q.pricingRevision});assert.equal(r.status,200);assert.equal(inits,before+1);
-   const body=await r.json();const row=(await observer.query('SELECT id,amount,commercial_context FROM orders WHERE public_reference=$1',[body.orderRef])).rows[0];
+   const order=paymentOrder({user_id:'afa-customer',service_type:'afa',product_id:'afa-registration',amount:1999,
+    payment_reference:`MH_afa_${randomUUID()}`,recipient_phone:'+233249116302',customer_phone:'+233249116302',
+    commercial_context:{regularMinor:1999,discountMinor:0,paidMinor:1999,pricingRevision:q.pricingRevision!,promotionId:null,promotionRevision:null,buyerPhone:null,supplierCostMinor:null,reserveMinor:null,contributionMinor:null,standardMinor:2999,priceCampaignId:q.campaign!.id,priceCampaignRevision:q.pricingRevision!}});
+   await AfaStore.create(order,{name:'Synthetic AFA Customer',phone:'0249116302',idNumber:'GHA-202501234-5',location:'Accra',region:'Greater Accra',dateOfBirth:'1990-02-12'});
+   const row=(await observer.query('SELECT id,amount,commercial_context FROM orders WHERE public_reference=$1',[order.public_reference])).rows[0];
    assert.equal(row.amount,1999);assert.equal(row.commercial_context.standardMinor,2999);assert.equal(row.commercial_context.priceCampaignRevision,`afa:2999~${version}`);
    await assert.rejects(()=>observer.query("UPDATE orders SET commercial_context=jsonb_set(commercial_context,'{paidMinor}','2999') WHERE id=$1",[row.id]),/immutable/);
-   const report=await FinanceReconciliationStore.report({reference:body.orderRef,filter:'all'});assert.notEqual(report.rows[0].code,'finance_conflict');
+   const report=await FinanceReconciliationStore.report({reference:order.public_reference,filter:'all'});assert.notEqual(report.rows[0].code,'finance_conflict');
    assert.equal((await observer.query('SELECT count(*)::int AS n FROM afa_registrations WHERE order_id=$1 AND encrypted_payload IS NOT NULL',[row.id])).rows[0].n,1,'identity stays encrypted in its own table');
   });
   await t.test('a stale or unreviewed fee writes no order, registration, debit or Paystack call',async()=>{
    const orders=await count('orders'),regs=await count('afa_registrations'),ledger=await count('finance_ledger'),before=inits;
    for(const body of [{phone:'0249116303'},{phone:'0249116303',expectedTotalMinor:2999,pricingRevision:'afa:2999'},{phone:'0249116303',paymentMethod:'wallet',requestId:randomUUID(),expectedTotalMinor:2999,pricingRevision:'afa:2999'}]){
-    const r=await post(body);assert.equal(r.status,409,JSON.stringify(body));assert.equal((await r.json()).code,'AFA_REVIEW_REQUIRED');
+    const r=await post(body);assert.equal(r.status,503,JSON.stringify(body));assert.equal((await r.json()).code,'PAYMENT_UNAVAILABLE');
    }
    assert.deepEqual([await count('orders'),await count('afa_registrations'),await count('finance_ledger'),inits],[orders,regs,ledger,before]);
   });
-  await t.test('Wallet: exactly 1999 debited once, in the same transaction as the order and registration',async()=>{
+  await t.test('Wallet AFA remains blocked with a current quote and sufficient funds',async()=>{
    await FinanceService.adjustment('afa-admin','afa-customer',{confirmed:true,direction:'credit',amountMinor:5000,requestId:randomUUID(),reason:'Synthetic fixture'});
    const q=await quote(),requestId=randomUUID(),body={phone:'0249116304',paymentMethod:'wallet',requestId,expectedTotalMinor:1999,pricingRevision:q.pricingRevision};
-   const a=await (await post(body)).json(),b=await (await post(body)).json();assert.equal(a.amountPesewas,1999);assert.equal(a.orderRef,b.orderRef);
-   assert.equal((await FinanceService.summary('afa-customer')).walletMinor,3001);
-   const debit=(await observer.query("SELECT delta_minor FROM finance_ledger WHERE user_id='afa-customer' AND delta_minor<0")).rows;assert.deepEqual(debit.map((r:any)=>Number(r.delta_minor)),[-1999]);
+   for(let i=0;i<2;i++){const r=await post(body);assert.equal(r.status,503);assert.equal((await r.json()).code,'PAYMENT_UNAVAILABLE');}
+   assert.equal((await FinanceService.summary('afa-customer')).walletMinor,5000);
+   const debit=(await observer.query("SELECT delta_minor FROM finance_ledger WHERE user_id='afa-customer' AND delta_minor<0")).rows;assert.deepEqual(debit.map((r:any)=>Number(r.delta_minor)),[]);
   });
  }finally{
   AfaService.provider=original.provider;PaystackServerService.initializeTransaction=original.init;CommercialService.now=original.now;globalThis.fetch=original.fetch;

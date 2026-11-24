@@ -46,15 +46,15 @@ for (const accent of ['#2563eb','#7c3aed','#00c365','#ffffee']) test(`owner acce
 
 test('managed template uses availability action instead of an empty purchase promise', () => {
   const html=renderToStaticMarkup(React.createElement(DataResellerTemplateView,{template:mixed,managedCheckout:React.createElement('p',null,'Bundles are not available right now.'),managedAvailability:'empty'}));
-  assert.ok(html.includes('View Availability'));
+  assert.ok(html.includes('Browse bundles'));
   assert.ok(!html.includes('<span>Buy Data</span>'));
   assert.ok(html.includes('Synthetic store'));
   assert.ok(html.includes('bg-[#25D366]'));
 });
 
-test('available managed template retains normal Buy Data action and owner branding', () => {
+test('available managed catalogue offers browsing and retains owner branding', () => {
   const html=renderToStaticMarkup(React.createElement(DataResellerTemplateView,{template:mixed,managedCheckout:React.createElement('p',null,'Configured bundles'),managedAvailability:'available'}));
-  assert.ok(html.includes('<span>Buy Data</span>'));
+  assert.ok(html.includes('<span>Browse bundles</span>'));assert.ok(!html.includes('<span>Buy Data</span>'));
   assert.ok(html.includes('background-color:#7c3aed'));
   assert.ok(html.includes('Configured bundles'));
 });

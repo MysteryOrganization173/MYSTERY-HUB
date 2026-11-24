@@ -146,7 +146,7 @@ const FAQ: { q: string; a: string }[] = [
   { q: 'When does the turnaround start?', a: 'From the working day after your order is confirmed and we have your wording, photos and logo. Working days are Monday to Saturday. Express extras shorten the time to your first draft.' },
   { q: 'What do I need to send?', a: 'The exact words, prices and dates for the design, plus any photos and your logo. After you send your order request, we collect files on WhatsApp.' },
   { q: 'How do I pay?', a: CREATIVE_COMMERCE.payments === 'off'
-    ? 'Online payment for Creative Studio is not open yet. Sending an order request costs nothing: the team contacts you on WhatsApp to confirm the package, price and start date first. Secure checkout through Mystery Hub opens once launch prices are confirmed.'
+    ? 'Online payment is unavailable. Send a package request and the team will contact you about the scope, price and start date.'
     : 'You pay securely through Mystery Hub when you place your order. Design starts once payment is confirmed and your brief is complete.' },
   { q: 'Is printing included?', a: 'No. You receive print-ready files where the package says so, and you can take them to any printer.' },
   { q: 'Are the brands in the samples real clients?', a: 'No. Harmattan Table, Indigo Hour and Lonzero are Studio Concepts: fictional brands we designed to show our range. They are not client projects.' },
@@ -280,7 +280,7 @@ export const CreativeStudioPage: React.FC = () => {
             <p className="cs-lead">Every package lists what you get, how long it takes and how many changes are included. Tap one for the details.</p>
           </div>
           {(draft || CREATIVE_COMMERCE.payments === 'off') && (
-            <p className="cs-notice"><Info size={18} aria-hidden /><span>{draft && <><strong>Draft prices.</strong> </>}Online payment isn’t open yet. Send an order request and the team confirms it with you on WhatsApp before you pay anything.</span></p>
+            <p className="cs-notice"><Info size={18} aria-hidden /><span>{draft && <><strong>Draft prices.</strong> </>}Send a project request to discuss the package or ask for a quote. Online payment is unavailable.</span></p>
           )}
           <div className="cs-tabs" id="catalogue-tabs" role="group" aria-label="Show packages by category">
             <button type="button" aria-pressed={category === ''} onClick={() => chooseCategory('')}>All<span>{CREATIVE_PACKAGES.length}</span></button>

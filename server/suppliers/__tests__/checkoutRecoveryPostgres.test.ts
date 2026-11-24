@@ -1,3 +1,4 @@
+import { paymentOrder, historicalStoreOrder } from './paymentFixtures.js';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {randomUUID} from 'node:crypto';
@@ -41,5 +42,20 @@ test('native PostgreSQL checkout uniqueness, recovery and unchanged financial re
    assert.ok(results.some(r=>r.status==='fulfilled'));assert.equal(calls,1);assert.equal((await observer.query("SELECT count(*)::int AS n FROM finance_operations WHERE kind='direct_checkout'")).rows[0].n,1);assert.equal((await observer.query('SELECT count(*)::int AS n FROM finance_ledger')).rows[0].n,0);
    const row=(await observer.query("SELECT * FROM orders WHERE user_id='checkout-fixture'")).rows[0];const recovered=await recoverDirectCheckout('checkout-fixture',{requestId},row.product_id,row.recipient_phone,row.customer_email);assert.equal(recovered?.checkout.accessCode,'synthetic');
   });
+  await t.test('shared merchant authenticates the durable PostgreSQL order and rejects historical store origin',async()=>{
+   PaystackServerService.initializeTransaction=original;
+   const direct=paymentOrder(),store=historicalStoreOrder('synthetic-website');
+   for(const item of [direct,store])await OrdersStore.createOrder(item);
+   const fetch=globalThis.fetch,secret=process.env.PAYSTACK_SECRET_KEY;let calls=0;
+   process.env.PAYSTACK_SECRET_KEY='synthetic-isolated';
+   globalThis.fetch=async(url,request)=>{calls++;assert.equal(url,'https://api.paystack.co/transaction/initialize');assert.equal(JSON.parse(request?.body as string).reference,direct.payment_reference);return Response.json({status:true,data:{reference:direct.payment_reference,access_code:'synthetic'}});};
+   try{
+    const args={email:direct.customer_email,amountPesewas:direct.amount};
+    assert.equal((await PaystackServerService.initializeTransaction({...args,reference:direct.payment_reference})).success,true);
+    assert.equal((await PaystackServerService.initializeTransaction({...args,reference:store.payment_reference,metadata:{service_type:'data'}})).success,false);
+    assert.equal(calls,1);
+   }finally{globalThis.fetch=fetch;if(secret===undefined)delete process.env.PAYSTACK_SECRET_KEY;else process.env.PAYSTACK_SECRET_KEY=secret;}
+  });
+
  }finally{PaystackServerService.initializeTransaction=original;await getPool()?.end();await observer.end();delete process.env.DATABASE_URL;delete process.env.MYSTERY_TEST_DATABASE_OPT_IN;}
 });

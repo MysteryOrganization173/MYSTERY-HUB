@@ -12,7 +12,7 @@ export const QuickServicesBar: React.FC = () => {
     { id: 'airtime', title: 'Airtime Top-Up', desc: 'Top up any Ghana number', icon: Smartphone, action: () => openDataPage('airtime'), tag: 'Available', tone: 'live' },
     { id: 'website', title: 'Website Builder', desc: 'A website for your business', icon: Globe, action: () => setActivePage('website'), tag: 'Free plan', tone: 'free' },
     { id: 'earn', title: 'Mystery Earn', desc: 'Refer friends & earn', icon: Gift, action: () => setActivePage('earn'), tag: 'Available', tone: 'live' },
-    { id: 'afa', title: 'AFA Registration', desc: 'MTN AFA bundles', icon: ShieldCheck, action: () => setActivePage('afa'), tag: 'Check Status', tone: 'neutral' },
+    { id: 'afa', title: 'AFA Registration', desc: 'Existing registrations and support', icon: ShieldCheck, action: () => setActivePage('afa'), tag: 'Check Status', tone: 'neutral' },
     { id: 'marketplace', title: 'Marketplace', desc: 'Tech, by enquiry', icon: Store, action: () => setActivePage('marketplace'), tag: 'Enquiry', tone: 'neutral' },
   ];
   return (

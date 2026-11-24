@@ -40,7 +40,7 @@ test('main reseller activation guidance survives P0 copy integration', () => {
   const pricing = source('src/components/website/WebsiteBundlePricing.tsx');
   assert.match(pricing, /!catalog\.policy\?\.enabled/);
   // Reseller Experience V1 rewrote this guidance in plain words; the same three facts stay on screen.
-  assert.match(pricing, /Mystery Hub has paused online checkout for reseller stores/);
+  assert.match(pricing, /Online checkout is unavailable/);
   assert.match(pricing, /No bundles on sale yet/);
   assert.match(pricing, /minimum price from Mystery Hub that covers the bundle’s cost and payment processing/);
 });

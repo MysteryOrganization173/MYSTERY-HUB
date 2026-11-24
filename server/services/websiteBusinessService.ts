@@ -1,3 +1,4 @@
+import { PAYMENT_UNAVAILABLE, sharedMerchantCheckoutAvailable } from '../../shared/paymentAvailability.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { FinanceStore, FinanceError, type FinanceTx } from '../db/financeStore.js';
 import { FinanceService, operationKey, maskWithdrawal } from './financeService.js';
@@ -87,7 +88,7 @@ export class WebsiteBusinessService {
   static async catalog(siteId:string,userId?:string) {
     const site=userId?await this.owned(siteId,userId):await WebsiteStore.findPublishedSiteById(siteId);
     if(!site||!userId&&site.status!=='published')throw new FinanceError('Store not found.',404);
-    if(site.template_id!=='tmpl-data-reseller')return {version:'empty',products:[],managed:false};
+    if(site.template_id!=='tmpl-data-reseller')return {version:'empty',products:[],managed:false,checkoutAvailable:false};
     const [policy,costs,prices]=await Promise.all([currentPolicy(),wholesale(),priceConfig(site.id)]);
     const commercial=userId?await FinanceStore.readConfig('direct-pricing'):null;
     const products=Object.values(AUTHORITATIVE_PRODUCTS).filter(product=>product.isActive).flatMap(product=>{
@@ -97,7 +98,7 @@ export class WebsiteBusinessService {
       if(!userId&&!eligible)return [];
       return [{id:product.id,network:product.network,networkName:product.networkName,dataAmount:product.dataAmount,validity:product.validity,description:product.description,retailMinor:price?.retailMinor||0,enabled:price?.enabled||false,...(userId?{wholesaleMinor:cost?.wholesaleMinor??null,minimumMinor:floor,recommendedMinor:Math.max(floor??0,commercial?.products?.[product.id]?.recommendedMinor??commercial?.products?.[product.id]?.retailMinor??product.amountPesewas),estimatedMinor:eligible?price.retailMinor-cost.wholesaleMinor-storeReserve(price.retailMinor,policy):null,eligible,configured:!!cost?.enabled}: {})}];
     });
-    return {managed:true,version:prices.version,products,...(userId?{policy}:{})};
+    return {managed:true,version:prices.version,products,checkoutAvailable:sharedMerchantCheckoutAvailable('website_store_order'),...(userId?{policy}:{})};
   }
   static async savePrices(siteId:string,userId:string,input:Record<string,unknown>) {
     exact(input,['expectedVersion','products']);
@@ -158,6 +159,7 @@ export class WebsiteBusinessService {
     return {success:true,orderRef:row.payload.publicRef,reference:row.payload.reference,amountPesewas:row.amount_minor,currency:'GHS',accessCode:row.payload.accessCode,authorizationUrl:row.payload.authorizationUrl,isSimulated:row.payload.isSimulated};
   }
   static async initialize(siteId:string,input:Record<string,unknown>,customerId?:string) {
+    if (!sharedMerchantCheckoutAvailable('website_store_order')) throw new FinanceError(PAYMENT_UNAVAILABLE.error,503);
     if(process.env.NODE_ENV==='production'&&!process.env.PAYSTACK_SECRET_KEY?.trim().startsWith('sk_live_'))throw new FinanceError('Live managed checkout is unavailable.',503);
     exact(input,['productId','recipientPhone','customerEmail','requestId','campaignToken','campaignVisitorId','campaignAttemptId']);
     const phone=validateAndNormalizeGhanaPhone(input.recipientPhone as string);if(!phone.isValid||!phone.normalized!)throw new FinanceError('Enter a valid Ghana recipient number.');

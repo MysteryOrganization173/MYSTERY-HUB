@@ -102,6 +102,7 @@ test('sharing has accessible disabled controls, selectable fallback, and cancels
 });
 test('finance retains authoritative balance, confirmation, idempotency and existing claim contracts', () => {
   const panel = source('src/components/finance/FinancialPanel.tsx');
-  for (const text of ['data.earn.availableMinor', 'data.settings.withdrawalMinimumMinor', 'data.settings.withdrawalFeeBps', 'pending.current', 'crypto.randomUUID()', 'confirmed', 'This transfer is irreversible', 'cannot be withdrawn back to Mobile Money', '/achievements/${encodeURIComponent(row.id)}/claim', 'row.claimed', 'row.progress<row.threshold']) assert.ok(panel.includes(text), text);
+  for (const text of ['data.earn.availableMinor', 'data.settings.withdrawalFeeBps', 'pending.current', 'crypto.randomUUID()', 'confirmed', 'This transfer is irreversible', 'cannot be withdrawn back to Mobile Money', '/achievements/${encodeURIComponent(row.id)}/claim', 'row.claimed', 'row.progress<row.threshold']) assert.ok(panel.includes(text), text);
+  assert.match(source('src/components/earn/EarnBalanceSummary.tsx'), /data.settings.withdrawalMinimumMinor/);
   const page = source('src/components/earn/MysteryEarnPage.tsx'); assert.match(page, /<FinancialPanel mode="earn"/); assert.ok(!page.includes('approvedRewardsMinor +'));
 });

@@ -86,11 +86,11 @@ test('detail sheet and card agree on enquiry-only products', () => {
   const p = product({ productKind: 'service', fulfilmentMode: 'inquiry_only', pickupLocations: [] });
   const detail = html(React.createElement(MarketplaceProductDetailModal, { product: p, onClose: () => {}, onBuyNow: () => {}, onInquire: () => {}, onShare: () => {}, onShareLink: () => {}, formatGhcReward: n => String(n ?? 0) }));
   assert.ok(!detail.includes('Buy Now ('));
-  assert.ok(detail.includes('Order by enquiry'));
-  assert.ok(detail.includes('No payment is taken'));
+  assert.ok(detail.includes('Product enquiries'));
+  assert.ok(detail.includes('Online checkout is unavailable'));
   assert.ok(detail.includes('Share product'));
   assert.ok(!detail.includes('Sourced on Request'));
-  assert.ok(card(p).includes('Enquire to order'));
+  assert.ok(card(p).includes('Product enquiries'));
 });
 
 test('detail sheet shows buy-online guidance and keeps option price authority', () => {
@@ -179,7 +179,7 @@ test('cards communicate the real path, price and reward without fabricated claim
   assert.ok(!/In Stock|rating|reviews|% off/i.test(buy));
   assert.ok(!buy.includes('>Available<'), 'plain availability is not repeated on every card');
   const quote = card(product({ priceType: 'quote', priceMinor: null, priceDisplay: 'Request Quote', availability: 'check_availability', availabilityLabel: 'Check Availability' }));
-  assert.ok(quote.includes('Price on request') && quote.includes('Enquire to order') && quote.includes('Check Availability'));
+  assert.ok(quote.includes('Price on request') && quote.includes('Product enquiries') && quote.includes('Check Availability'));
   const soon = card(product({ availability: 'coming_soon', availabilityLabel: 'Coming Soon', referralRewardGhc: 20 }));
   assert.ok(soon.includes('Coming soon'));
   assert.ok(!soon.includes('Share &amp; earn'), 'coming-soon items advertise no reward');

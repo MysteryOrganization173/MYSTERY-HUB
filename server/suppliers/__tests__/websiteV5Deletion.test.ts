@@ -1,3 +1,4 @@
+import { seedHistoricalStoreOrder, storeVerificationMetadata } from './paymentFixtures.js';
 /** Website Builder V5: deletion as an archive, fresh re-creation, unique identities and template naming. Memory only. */
 import assert from 'node:assert/strict';
 import {test,before,after,beforeEach} from 'node:test';
@@ -37,6 +38,11 @@ beforeEach(async()=>{
   PaystackServerService.initializeTransaction=async params=>{transaction=params;return {success:true,reference:params.reference,accessCode:'fixture-access',authorizationUrl:'https://checkout.paystack.com/fixture'};};
   PaystackServerService.verifyTransaction=async reference=>({isVerified:true,status:'success',reference,amountPesewas:transaction.amountPesewas,currency:'GHS',metadata:transaction.metadata});
 });
+async function historicalPayment(siteId:string) {
+ const order=await seedHistoricalStoreOrder(siteId);
+ transaction={amountPesewas:order.amount,metadata:storeVerificationMetadata(order)};
+ return {reference:order.payment_reference,orderRef:order.public_reference};
+}
 const request=(path:string,method='GET',body?:unknown,token='')=>originals.fetch(base+path,{method,headers:{...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`}:{})},...(body?{body:JSON.stringify(body)}:{})});
 const createB1=(token:string,templateId:string,businessName:string)=>request('/api/websites','POST',{templateId,businessName,starterVersion:WEBSITE_STARTER_VERSION},token);
 /** The founder's case: a website first made from the Kitchen sample, renamed, then switched to the Data design. */
@@ -51,7 +57,7 @@ const checkoutBody=()=>({productId:'mtn-1gb',recipientPhone:'0241111111',custome
 const del=(siteId:string,confirmation:string,token='owner-token')=>request(`/api/websites/${siteId}`,'DELETE',{confirmation},token);
 
 test('owner last-four search covers all pages, stays site-bound, masks numbers and rejects invalid queries',async()=>{
-  const site=await founderSite();await configure(site.id);await Business.initialize(site.id,checkoutBody());
+  const site=await founderSite();await configure(site.id);await historicalPayment(site.id);
   const source=OrdersStore.adminDevOrders()[0];
   for(let i=0;i<29;i++)await OrdersStore.createOrder({...source,id:`ord-search-${i}`,public_reference:`MH-search-${i}`,payment_reference:`search-${i}`,recipient_phone:i===28?'0242229876':'0243331111',created_at:new Date(Date.now()-i*1000).toISOString(),store_context:{...source.store_context!,siteId:i===27?'another-site':site.id}});
   const response=await request(`/api/websites/${site.id}/business?lastFour=9876`,'GET',undefined,'owner-token');assert.equal(response.status,200);
@@ -124,21 +130,21 @@ test('deletion is idempotent and retry-safe, including concurrent requests; one 
 });
 
 test('an order still being delivered blocks deletion and explains why; nothing is changed',async()=>{
-  const site=await founderSite();await configure(site.id);const payment=await Business.initialize(site.id,checkoutBody());await FulfilmentService.processPaidOrder(payment.reference,new Date().toISOString());
+  const site=await founderSite();await configure(site.id);const payment=await historicalPayment(site.id);await FulfilmentService.processPaidOrder(payment.reference,new Date().toISOString());
   const check=await (await request(`/api/websites/${site.id}/deletion-check`,'GET',undefined,'owner-token')).json();assert.equal(check.canDelete,false);assert.ok(check.blockers.some((b:any)=>b.code==='orders_in_progress'));
   const before=financialState();const response=await del(site.id,'MYSTERY TEST hub');assert.equal(response.status,409);const body=await response.json();assert.equal(body.code,'WEBSITE_DELETION_BLOCKED');assert.ok(body.blockers.length);
   assert.equal((await WebsiteStore.findSiteById(site.id))?.status,'published');assert.equal(financialState(),before);
 });
 
 test('an unfinished payment still blocks after 24 hours without provider-confirmed expiry',async()=>{
-  const site=await founderSite();await configure(site.id);await Business.initialize(site.id,checkoutBody());
+  const site=await founderSite();await configure(site.id);await historicalPayment(site.id);
   assert.ok((await WebsiteDeletionService.check(site)).blockers.some(b=>b.code==='payment_pending'));
   await assert.rejects(()=>WebsiteDeletionService.archive(site.id,'owner','MYSTERY TEST hub'),/unfinished payment/);
   const later=Date.now()+DELETION_PENDING_PAYMENT_WINDOW_MS+60_000;assert.ok((await WebsiteDeletionService.check(site,later)).blockers.some(b=>b.code==='payment_pending'));
 });
 
 test('store earnings that are pending or available block deletion, because withdrawal needs the website',async()=>{
-  const site=await founderSite();await configure(site.id);const payment=await Business.initialize(site.id,checkoutBody());await FulfilmentService.processPaidOrder(payment.reference,new Date().toISOString());
+  const site=await founderSite();await configure(site.id);const payment=await historicalPayment(site.id);await FulfilmentService.processPaidOrder(payment.reference,new Date().toISOString());
   const order=(await OrdersStore.findOrder(payment.reference))!;await OrdersStore.updateOrderStatus(order.id,'delivered',undefined,'fixture-supplier');await Business.ownerSummary(site.id,'owner');
   const earnings=await FinanceStore.read('owner',tx=>tx.storeEarnings());assert.ok(earnings.pendingMinor+earnings.availableMinor>0,'fixture produced store earnings');
   const blockers=(await WebsiteDeletionService.check(site)).blockers;assert.ok(blockers.some(b=>['earnings_pending','earnings_available'].includes(b.code)));assert.ok(!blockers.some(b=>b.code==='orders_in_progress'));
@@ -146,13 +152,13 @@ test('store earnings that are pending or available block deletion, because withd
 });
 
 test('after deletion past buyers can still track orders, new purchases are refused and records are untouched',async()=>{
-  const site=await founderSite();await configure(site.id);const payment=await Business.initialize(site.id,checkoutBody());
+  const site=await founderSite();await configure(site.id);const payment=await historicalPayment(site.id);
   const order=(await OrdersStore.findOrder(payment.reference))!;await OrdersStore.updateOrderStatus(order.id,'expired');
   const before=financialState();const ledger=JSON.stringify(await FinanceStore.read('owner',tx=>tx.ledger()));
   await WebsiteDeletionService.archive(site.id,'owner','MYSTERY TEST hub');
   const closed=await (await request(`/api/public/sites/${site.slug}`)).json();assert.equal(closed.orderTracking.siteId,site.id);
   const tracked=await request(`/api/websites/${site.id}/store-orders/${order.public_reference}`);const trackedBody=await tracked.json();assert.equal(tracked.status,200,JSON.stringify(trackedBody));assert.equal(trackedBody.data.status,'expired');
-  const attempt=await request(`/api/websites/${site.id}/store-checkout`,'POST',checkoutBody());assert.ok([404,409].includes(attempt.status));
+  const attempt=await request(`/api/websites/${site.id}/store-checkout`,'POST',checkoutBody());assert.equal(attempt.status,503);
   assert.equal(financialState(),before);assert.equal(JSON.stringify(await FinanceStore.read('owner',tx=>tx.ledger())),ledger);assert.equal(OrdersStore.adminDevOrders().length,1);
 });
 
