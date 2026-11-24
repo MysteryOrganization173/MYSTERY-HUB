@@ -181,7 +181,7 @@ const OrdersHistory: React.FC = () => {
             <SeasonalOrders part="line" />
             <h1 className="mh-or-title">My Orders</h1>
             <p className="mh-or-lede">
-              {user ? 'Purchases from your account and this device, with their live status.'
+              {user ? 'Purchases from your account and this device, with their latest status.'
                 : hasOrders ? 'Purchases made on this device, and any order you track with its reference.'
                 : 'Check payment and delivery for any order with its reference.'}
             </p>

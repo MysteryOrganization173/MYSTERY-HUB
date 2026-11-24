@@ -6,11 +6,11 @@ import { dataOrderPresentation } from './dataPurchasePresentation';
  * Mystery Hub 3.6.2 · what the customer's receipt says about one order.
  *
  * Presentation only, and built on the two existing helpers, never beside them: the status group and its short label
- * come from `customerOrderStatus` (the same answer the Orders list, the member homepage and the card show), and the
- * payment, delivery and resolution wording comes from `dataOrderPresentation`. This file only chooses the
- * service-appropriate words (airtime is not a bundle, an AFA registration is not a delivery), the honest label for the
- * amount, and the stages of the journey. Every stage is complete only when the server has reported it: nothing here
- * advances with time, guesses a percentage or treats a payment popup as a payment.
+ * come from `customerOrderStatus` (the same answer the Orders list card shows), and the payment, delivery and
+ * resolution wording comes from `dataOrderPresentation`. This file only chooses the service-appropriate words (airtime
+ * is not a bundle, an AFA registration is not a delivery, a Marketplace item is not on a network), the honest label
+ * for the amount, and the stages of the journey. Every stage is complete only when the server has reported it:
+ * nothing here advances with time, guesses a percentage or treats a payment popup as a payment.
  */
 
 export type ReceiptService = 'data' | 'airtime' | 'instant' | 'afa' | 'marketplace' | 'results_checker';
@@ -34,8 +34,10 @@ export interface OrderReceiptView {
   amountNote: string;
   /** One line about the payment itself, from server state only. */
   paymentLine: string;
-  /** Whether a payment the customer made is confirmed (assisted orders never claim one). */
+  /** Whether a payment the customer made is confirmed by the server (assisted orders never claim one). */
   paymentConfirmed: boolean;
+  /** True when the server has never answered for this record (an old device record): nothing here is confirmed. */
+  unchecked: boolean;
   /** The word for the finished stage, and whether its date may be shown. */
   doneWord: 'Delivered' | 'Registered' | 'Completed' | 'Ready';
   showDoneDate: boolean;
@@ -43,6 +45,8 @@ export interface OrderReceiptView {
   supplierDelivered: boolean;
   /** Festive decoration is allowed only while things are going well: in progress or delivered. */
   festive: boolean;
+  /** The in-progress caution, in this service's words. */
+  notYetDone: string;
 }
 
 const TONE: Record<CustomerOrderGroup, ReceiptTone> = {
@@ -60,20 +64,24 @@ export function receiptService(order: Pick<OrderRecord, 'serviceType' | 'bundle'
   return 'data';
 }
 
+/** Marketplace stages as the server records them; a paid order keeps `pending_payment` or `paid` until Admin moves it. */
 const MARKETPLACE_NEXT: Record<string, string> = {
+  pending_payment: 'Your payment is confirmed. Follow this order for updates on preparation, pickup or delivery.',
+  paid: 'Your payment is confirmed. Follow this order for updates on preparation, pickup or delivery.',
   awaiting_fulfilment: 'Your item is being prepared. Follow this order for updates.',
   ready_for_pickup: 'Your item is ready for pickup. Keep your order reference with you.',
   out_for_delivery: 'Your item is out for delivery. Keep your order reference with you.',
 };
+const MARKETPLACE_STAGE: Record<string, string> = { awaiting_fulfilment: 'Being prepared', ready_for_pickup: 'Ready for pickup', out_for_delivery: 'Out for delivery' };
 
 /** Stage names per service: what "fulfilment" and "done" mean for this purchase. */
-const STAGES: Record<ReceiptService, { middle: string; done: OrderReceiptView['doneWord'] }> = {
-  data: { middle: 'With the network', done: 'Delivered' },
-  airtime: { middle: 'With the network', done: 'Delivered' },
-  instant: { middle: 'With the network', done: 'Delivered' },
-  afa: { middle: 'Registration', done: 'Registered' },
-  marketplace: { middle: 'Preparing', done: 'Completed' },
-  results_checker: { middle: 'Processing', done: 'Ready' },
+const STAGES: Record<ReceiptService, { middle: string; done: OrderReceiptView['doneWord']; after: string; notYet: string }> = {
+  data: { middle: 'With the network', done: 'Delivered', after: 'Timing depends on the network', notYet: 'Payment confirmation does not mean it has been delivered.' },
+  airtime: { middle: 'With the network', done: 'Delivered', after: 'Timing depends on the network', notYet: 'Payment confirmation does not mean it has been delivered.' },
+  instant: { middle: 'With the network', done: 'Delivered', after: 'Timing depends on the network', notYet: 'Payment confirmation does not mean it has been delivered.' },
+  afa: { middle: 'Registration', done: 'Registered', after: 'After registration', notYet: 'Payment confirmation does not mean the registration is complete.' },
+  marketplace: { middle: 'Preparing', done: 'Completed', after: 'After pickup or delivery', notYet: 'Payment confirmation does not mean your item is ready.' },
+  results_checker: { middle: 'Processing', done: 'Ready', after: 'After processing', notYet: 'Payment confirmation does not mean your checker purchase is ready.' },
 };
 
 export function orderReceiptView(order: OrderRecord): OrderReceiptView {
@@ -82,7 +90,11 @@ export function orderReceiptView(order: OrderRecord): OrderReceiptView {
   const raw = effectiveStatus(order);
   const resolution = order.customerResolution;
   const basis = order.paymentBasis;
-  const dv = dataOrderPresentation(raw, order.manualReview, resolution, basis);
+  const unchecked = !order.serverStatus;
+  // Manual review counts only where the shared card rule counts it (AFA ignores it in some stages), so the title
+  // never contradicts the card.
+  const review = Boolean(order.manualReview) && (service !== 'afa' || status.group === 'attention');
+  const dv = dataOrderPresentation(raw, review, resolution, basis);
   const tone = TONE[status.group];
   const delivered = status.group === 'delivered';
   const stages = STAGES[service];
@@ -95,9 +107,9 @@ export function orderReceiptView(order: OrderRecord): OrderReceiptView {
     if (delivered) { title = 'AFA registration confirmed'; next = 'Your MTN AFA registration is confirmed. MTN packages are purchased separately.'; }
     else if (status.group === 'in_progress') { title = 'Registration in progress'; next = 'Payment and registration are separate stages. Follow this order for registration updates; contact support if it needs attention.'; }
     else if (status.group === 'attention') { title = 'Your registration needs support review'; next = order.statusMessage || 'Registration needs support review. Do not start another registration until support confirms it is safe.'; }
-  } else if (plain && service === 'marketplace' && order.marketplaceStatus) {
-    const stage = order.marketplaceStatus;
-    if (status.group === 'in_progress') { title = 'Payment confirmed'; next = MARKETPLACE_NEXT[stage] || next; }
+  } else if (plain && service === 'marketplace') {
+    const stage = order.marketplaceStatus || '';
+    if (status.group === 'in_progress') { title = 'Payment confirmed'; next = MARKETPLACE_NEXT[stage] || MARKETPLACE_NEXT.paid; }
     else if (delivered) { title = 'Order completed'; next = 'This Marketplace order is complete. Contact support with your reference if you need help.'; }
     else if (stage === 'cancelled') { title = 'Order cancelled'; next = dv.paymentConfirmed ? 'This order was cancelled. Contact support with this reference about your payment before buying again.' : dv.next; }
     else if (stage === 'refund_pending') { title = 'Refund under review'; next = 'Contact support with this reference for the refund review; do not repeat this order.'; }
@@ -114,13 +126,16 @@ export function orderReceiptView(order: OrderRecord): OrderReceiptView {
   } else if (!plain && delivered && service !== 'data' && basis) {
     // Assisted orders are Data today; any other service keeps neutral delivery words.
     title = service === 'afa' ? 'AFA registration confirmed' : 'Your order has been delivered';
+  } else if (resolution === 'review' && service === 'afa') {
+    next = 'Your payment was received, but the registration or a customer refund needs confirmation. Contact support with this reference; do not start another registration.';
   }
 
   // ── Amount: say exactly what is known about the money. ──
-  const paymentConfirmed = dv.paymentConfirmed;
+  const paymentConfirmed = dv.paymentConfirmed && !unchecked;
   let amountLabel = 'Amount paid', amountNote = '';
-  if (basis === 'complimentary') { amountLabel = 'Complimentary'; amountNote = 'Value of the service · no customer payment'; }
+  if (basis === 'complimentary') { amountLabel = 'Complimentary'; amountNote = 'No customer payment'; }
   else if (basis === 'operator_recorded') { amountLabel = 'Recorded payment'; amountNote = 'Collected outside Mystery Hub checkout'; }
+  else if (unchecked) { amountLabel = 'Order total'; amountNote = 'Not yet checked with Mystery Hub'; }
   else if (!paymentConfirmed) { amountLabel = 'Order total'; amountNote = status.group === 'cancelled' ? 'Payment not completed' : 'Payment not confirmed yet'; }
   else if (resolution === 'refund_confirmed') amountNote = 'Refund verified';
   else if (status.group === 'refund_pending') amountNote = 'Refund not confirmed yet';
@@ -128,6 +143,7 @@ export function orderReceiptView(order: OrderRecord): OrderReceiptView {
 
   const paymentLine = basis === 'complimentary' ? 'Complimentary · no payment taken'
     : basis === 'operator_recorded' ? 'Recorded by support · not a Paystack payment'
+    : unchecked ? 'Last known on this device'
     : paymentConfirmed ? 'Confirmed by Mystery Hub'
     : status.group === 'cancelled' ? (raw === 'expired' ? 'Expired before confirmation' : 'Not completed')
     : 'Waiting for confirmation';
@@ -141,23 +157,24 @@ export function orderReceiptView(order: OrderRecord): OrderReceiptView {
   if (journeyKind === 'delivery') {
     const halted = status.group === 'attention' || status.group === 'cancelled';
     const paymentLabel = basis === 'complimentary' ? 'Complimentary' : basis === 'operator_recorded' ? 'Payment recorded' : 'Payment';
-    const payDone = dv.paymentStageComplete;
-    const middleDetail = service === 'marketplace' && order.marketplaceStatus && status.group === 'in_progress' ? status.label
+    const payDone = dv.paymentStageComplete && !unchecked;
+    const middleDetail = service === 'marketplace' && MARKETPLACE_STAGE[order.marketplaceStatus || ''] ? MARKETPLACE_STAGE[order.marketplaceStatus || '']
       : service === 'afa' ? (raw === 'submitted' ? 'Submitted for registration' : raw === 'processing' ? 'Being processed' : 'Queued after payment')
-      : dv.processing ? (basis ? 'With the supplier' : 'Being processed now') : 'Queued after payment';
+      : dv.processing ? (basis ? 'With the supplier' : 'Being processed now') : basis ? 'Queued for the supplier' : 'Queued after payment';
     steps = [
       { key: 'payment', label: paymentLabel, detail: payDone ? paymentLine : 'Waiting for confirmation', state: payDone ? 'done' : 'upcoming' },
       { key: 'fulfilment', label: stages.middle, detail: delivered ? 'Completed' : payDone ? middleDetail : 'After payment', state: delivered ? 'done' : 'upcoming' },
-      { key: 'done', label: stages.done, detail: delivered ? 'Confirmed' : service === 'afa' ? 'After registration' : service === 'marketplace' ? 'After pickup or delivery' : 'Timing depends on the network', state: delivered ? 'done' : 'upcoming' },
+      { key: 'done', label: stages.done, detail: delivered ? 'Confirmed' : stages.after, state: delivered ? 'done' : 'upcoming' },
     ];
     const current = steps.findIndex(s => s.state !== 'done');
     if (current >= 0) steps[current] = { ...steps[current], state: halted ? 'halted' : 'current', detail: halted ? status.label : steps[current].detail };
   } else if (journeyKind === 'resolution') {
     const refundPath = resolution === 'refund_pending' || resolution === 'refund_confirmed' || status.group === 'refund_pending';
     const final = resolution === 'refund_confirmed' || resolution === 'manual_fulfillment' || resolution === 'external_compensation';
+    // The refund stage reads "Refund verified" only once it is; until then it is the confirmation still to come.
     const outcome: ReceiptStep = resolution === 'manual_fulfillment' ? { key: 'outcome', label: 'Completed by support', detail: 'Through another channel', state: 'done' }
       : resolution === 'external_compensation' ? { key: 'outcome', label: 'Remedy recorded', detail: 'Not a Paystack refund', state: 'done' }
-      : refundPath ? { key: 'outcome', label: 'Refund verified', detail: resolution === 'refund_confirmed' ? 'Verified' : 'Not confirmed yet', state: resolution === 'refund_confirmed' ? 'done' : 'upcoming' }
+      : refundPath ? (resolution === 'refund_confirmed' ? { key: 'outcome', label: 'Refund verified', detail: 'Verified', state: 'done' } : { key: 'outcome', label: 'Refund confirmation', detail: 'Not confirmed yet', state: 'upcoming' })
       : { key: 'outcome', label: 'Outcome', detail: 'Support will confirm', state: 'upcoming' };
     steps = [
       { key: 'payment', label: 'Payment received', detail: paymentConfirmed ? 'Confirmed by Mystery Hub' : 'Not confirmed', state: paymentConfirmed ? 'done' : 'upcoming' },
@@ -168,10 +185,12 @@ export function orderReceiptView(order: OrderRecord): OrderReceiptView {
 
   return {
     service, group: status.group, tone, label: status.label, title, next, journeyKind, steps,
-    amountLabel, amountNote, paymentLine, paymentConfirmed,
+    amountLabel, amountNote, paymentLine, paymentConfirmed, unchecked,
     doneWord: stages.done, showDoneDate: delivered || resolution === 'manual_fulfillment',
-    supplierDelivered: raw === 'delivered' && !resolution && delivered,
+    // Only the server's own `delivered`, never a device record's last known state or an operator remedy.
+    supplierDelivered: order.serverStatus === 'delivered' && !resolution && delivered,
     festive: tone === 'progress' || tone === 'success',
+    notYetDone: stages.notYet,
   };
 }
 

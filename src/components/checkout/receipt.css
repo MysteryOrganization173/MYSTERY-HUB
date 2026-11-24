@@ -50,7 +50,7 @@
 @media (min-width: 640px) { .mh-rc-head { padding: 14px 20px 4px; } .mh-rc-body { padding: 0 20px 20px; } }
 
 /* ───────── Status: seal, title, chip, next step ───────── */
-.mh-rc-status { position: relative; display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 4px 14px; align-items: start; padding-top: 4px; animation: mh-rc-swap .32s var(--rc-ease) both; }
+.mh-rc-status { position: relative; display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 4px 14px; align-items: start; padding-top: 4px; animation: mh-rc-swap .32s var(--rc-ease) backwards; }
 .mh-rc-seal { grid-row: span 3; position: relative; width: 52px; height: 52px; border-radius: 99px; display: grid; place-items: center; color: var(--rc-tone); background: radial-gradient(circle at 35% 30%, var(--rc-tone-bg), transparent 70%), #121b22; border: 1.5px solid color-mix(in srgb, var(--rc-tone) 55%, transparent); box-shadow: 0 0 0 5px var(--rc-tone-bg); }
 .mh-rc-seal svg { width: 26px; height: 26px; }
 .mh-rc-seal[data-breathe] { animation: mh-rc-breathe 2.4s ease-in-out 3; }

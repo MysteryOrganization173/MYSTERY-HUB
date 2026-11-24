@@ -35,7 +35,9 @@ test('delivery and support copy avoids guarantees while keeping MTN processing w
   assert.ok(!data.includes('24/7 Support')); assert.ok(!data.includes('immediate resolution'));
   assert.match(data, /Delivered bundles may not be recoverable/);
   const status = source('src/components/checkout/OrderStatusModal.tsx');
-  assert.match(status, /Payment confirmation does not mean it has been delivered/);
+  // 3.6.2: the caution is chosen per service by the receipt helper and shown by the receipt (view.notYetDone).
+  assert.match(source('src/utils/orderReceiptPresentation.ts'), /Payment confirmation does not mean it has been delivered/);
+  assert.match(status, /view\.notYetDone/);
   assert.match(status, /Refund Pending/);
 });
 test('Wallet disclosure remains visible and transfer remains explicitly irreversible', () => {

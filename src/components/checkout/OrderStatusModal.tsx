@@ -61,11 +61,16 @@ export const OrderStatusModal: React.FC = () => {
   useEffect(() => { setLastChecked(null); setCheckFailed(false); setCopied('idle'); }, [lookupReference]);
 
   // Stop checking once nothing more can change for the customer (unchanged rule).
-  const isTerminal = ['manual_fulfillment','external_compensation'].includes(activeOrder?.customerResolution||'') || activeOrder?.status === 'delivered' || activeOrder?.status === 'failed'&&(!activeOrder.customerResolution||activeOrder.customerResolution==='refund_confirmed');
+  // A device record the server has never answered for is always checked at least once.
+  const isTerminal = Boolean(activeOrder?.serverStatus) && (['manual_fulfillment','external_compensation'].includes(activeOrder?.customerResolution||'') || activeOrder?.status === 'delivered' || activeOrder?.status === 'failed'&&(!activeOrder.customerResolution||activeOrder.customerResolution==='refund_confirmed'));
 
   // The loop reads the latest order through a ref, so it starts once per open order instead of again on every render.
   const latest = useRef({ activeOrder, updateOrderStatus });
   latest.current = { activeOrder, updateOrderStatus };
+  // The server said "not delivered yet" for this order while its receipt was open: only then is a later delivery
+  // something the customer saw happen (a saved record that is merely out of date never celebrates).
+  const seenUndelivered = useRef<string | null>(null);
+  if (!isStatusModalOpen) seenUndelivered.current = null; // a reopened receipt starts again: nothing replays
 
   // Poll server for status updates if order is pending or in-progress
   useEffect(() => {
@@ -86,6 +91,7 @@ export const OrderStatusModal: React.FC = () => {
         if (res.success && res.order && shown && (shown.publicReference || shown.id) === lookupReference) {
           if (isSettledForRecovery(res.order.status)) clearPendingCheckout(res.order.public_reference);
           const serverStatus = res.order.status;
+          if (serverStatus !== 'delivered') seenUndelivered.current = lookupReference;
 
           // Status mapping:
           // pending_payment -> verifying
@@ -155,11 +161,8 @@ export const OrderStatusModal: React.FC = () => {
   const dialogRef = useDialogFocus(isStatusModalOpen && !!activeOrder, closeOrderStatus);
   const view = useMemo(() => (activeOrder ? orderReceiptView(activeOrder) : null), [activeOrder]);
 
-  // Remember how each order looked when its receipt opened: only a delivery seen happening here is celebrated.
-  const openedAs = useRef<{ ref: string; delivered: boolean } | null>(null);
-  if (!isStatusModalOpen || !lookupReference) openedAs.current = null;
-  else if (view && openedAs.current?.ref !== lookupReference) openedAs.current = { ref: lookupReference, delivered: view.group === 'delivered' };
-  const justDelivered = Boolean(view?.supplierDelivered && openedAs.current && !openedAs.current.delivered);
+  // Only a supplier delivery the server reported after saying "not yet" while this receipt was open is celebrated.
+  const justDelivered = Boolean(isStatusModalOpen && view?.supplierDelivered && lookupReference && seenUndelivered.current === lookupReference);
 
   if (!isStatusModalOpen || !activeOrder || !view) return null;
 
@@ -184,19 +187,20 @@ export const OrderStatusModal: React.FC = () => {
     : view.service === 'data' ? dataRecipientDisplay(activeOrder.recipientPhone, activeOrder.buyerRecipientVisible)
     : dataRecipientDisplay(activeOrder.recipientPhone, true);
   const network = customerOrderNetwork(activeOrder);
-  const saving = orderSaving(activeOrder, view.group);
+  // The order's own saving, for the buyer's own records only (a reference holder is not necessarily the buyer).
+  const saving = activeOrder.buyerRecipientVisible ? orderSaving(activeOrder, view.group) : 0;
   const delivered = view.group === 'delivered';
   const currentStep = view.steps.find((step) => step.state === 'current' || step.state === 'halted');
 
   // 3.4.1 Smart Buy Again for a signed-in customer's delivered Data, Airtime or Instant order. The server confirms the
   // order is theirs and what it can be bought as today; anything else keeps the plain catalogue link.
-  const repeatable = !activeOrder.serviceType || ['data', 'airtime', 'instant_bundle'].includes(activeOrder.serviceType);
+  const repeatable = view.service === 'data' || view.service === 'airtime' || view.service === 'instant';
   const smartBuyAgain = delivered && Boolean(sessionToken && user && activeOrder.publicReference) && repeatable;
   // One primary action, chosen by the customer's situation: a problem is resolved before anything is sold.
   const needsHelp = view.tone === 'attention' || view.tone === 'refund';
   const primary = activeOrder.serviceType === 'results_checker' ? 'results' : needsHelp ? 'help' : delivered && repeatable ? 'buy' : 'done';
   const supportUrl = BUSINESS_CONFIG.getOrderSupportWhatsAppUrl(displayRef, activeOrder.recipientPhone);
-  const mode = activeOrder.serviceType === 'airtime' ? 'airtime' : activeOrder.serviceType === 'instant_bundle' ? 'instant' : 'data';
+  const mode = view.service === 'airtime' ? 'airtime' : view.service === 'instant' ? 'instant' : 'data';
 
   return (
     <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Order status and receipt" className="mh-sheet-backdrop fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/75 backdrop-blur-sm">
@@ -208,7 +212,7 @@ export const OrderStatusModal: React.FC = () => {
       >
         <div className="mh-rc-head">
           <span aria-hidden="true" className="sm:hidden absolute left-1/2 top-1.5 -translate-x-1/2 h-1 w-10 rounded-full bg-slate-700" />
-          <span className="mh-rc-kicker"><i aria-hidden="true" />Receipt · {SERVICE_LINE[view.service]}</span>
+          <span className="mh-rc-kicker"><i aria-hidden="true" />{view.paymentConfirmed || activeOrder.paymentBasis ? 'Receipt' : 'Order'} · {SERVICE_LINE[view.service]}</span>
           <button onClick={closeOrderStatus} className="mh-rc-close" aria-label="Close status">
             <X className="w-5 h-5" />
           </button>
@@ -219,12 +223,14 @@ export const OrderStatusModal: React.FC = () => {
               server reported while this receipt was open. Never for a payment, a manual remedy or a reopened receipt. */}
           {view.festive && <SeasonalOrders part={view.supplierDelivered && justDelivered ? 'celebrate' : 'flourish'} />}
 
+          {/* One live region that stays mounted, so a change of status (delivered, needs attention, refund) is announced. */}
+          <p role="status" aria-live="polite" className="sr-only">{`${view.title}. Current status: ${view.label}.`}</p>
           <section key={view.group} className="mh-rc-status" aria-labelledby={titleId}>
             <span className={`mh-rc-seal${justDelivered ? ' is-fresh' : ''}`} aria-hidden="true" {...(view.tone === 'progress' ? { 'data-breathe': '' } : {})}>
               <Seal />
             </span>
             <h2 id={titleId} className="mh-rc-title">{view.title}</h2>
-            <p role="status" className="mh-rc-chip"><i aria-hidden="true" /><span className="sr-only">Current status: </span>{view.label}</p>
+            <p className="mh-rc-chip"><i aria-hidden="true" /><span className="sr-only">Current status: </span>{view.label}</p>
             <p className="mh-rc-next">{view.next}</p>
           </section>
 
@@ -260,7 +266,7 @@ export const OrderStatusModal: React.FC = () => {
                   : lastChecked
                   ? `Updates automatically · last checked ${lastChecked.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                   : 'Checking the latest status…'}
-                {view.tone === 'progress' && view.paymentConfirmed && ' Payment confirmation does not mean it has been delivered.'}
+                {view.tone === 'progress' && view.paymentConfirmed && ` ${view.notYetDone}`}
               </span>
             </p>
           )}
@@ -300,7 +306,7 @@ export const OrderStatusModal: React.FC = () => {
             <div className="mh-rc-tear" aria-hidden="true" />
             <div className="mh-rc-total" {...(view.paymentConfirmed || activeOrder.paymentBasis ? {} : { 'data-unpaid': '' })}>
               <span className="mh-rc-total-label">{view.amountLabel}</span>
-              <span className="mh-rc-total-value">GH₵{activeOrder.amountGhc.toFixed(2)}</span>
+              <span className="mh-rc-total-value">{activeOrder.paymentBasis === 'complimentary' && !(activeOrder.amountGhc > 0) ? 'No charge' : `GH₵${activeOrder.amountGhc.toFixed(2)}`}</span>
               {view.amountNote && <span className="mh-rc-total-note">{view.amountNote}</span>}
             </div>
           </article>

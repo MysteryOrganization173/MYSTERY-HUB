@@ -14,7 +14,7 @@ export function ReceiptArt({ className = '' }: { className?: string }) {
         <radialGradient id={`${id}g`} cx="50%" cy="50%" r="50%"><stop offset="0" stopColor="#00c365" stopOpacity=".35" /><stop offset="1" stopColor="#00c365" stopOpacity="0" /></radialGradient>
       </defs>
       <ellipse cx="62" cy="94" rx="40" ry="5" fill="#000" opacity=".35" />
-      <g className="mh-or-art-paper">
+      <g>
         <g transform="rotate(-6 60 50)">
           {/* The slip, with a torn lower edge. */}
           <path d="M30 8 h52 a6 6 0 0 1 6 6 V84 l-5 -4 -5 4 -5 -4 -5 4 -5 -4 -5 4 -5 -4 -5 4 -5 -4 -5 4 -5 -4 -4 4 V14 a6 6 0 0 1 6 -6 z" fill={`url(#${id}p)`} stroke="#2e3e4a" strokeWidth="1.2" />
@@ -32,7 +32,7 @@ export function ReceiptArt({ className = '' }: { className?: string }) {
           <rect x="60" y="63.5" width="20" height="6" rx="2" fill="#f3f6f8" opacity=".9" />
         </g>
       </g>
-      <g className="mh-or-art-seal">
+      <g>
         <circle cx="90" cy="72" r="20" fill={`url(#${id}g)`} />
         <circle cx="90" cy="72" r="12.5" fill={`url(#${id}s)`} stroke="#0b1217" strokeWidth="2.5" />
         <path d="M84.5 72.4 l3.6 3.6 l7.2 -7.6" stroke="#03160c" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />

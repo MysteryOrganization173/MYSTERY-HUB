@@ -92,7 +92,7 @@ test('receipt timeline only advances from server-derived presentation', () => {
   // 3.6.2: the receipt's journey lives in the shared receipt helper; the receipt only draws its steps.
   const helper = source('src/utils/orderReceiptPresentation.ts');
   const journey = helper.slice(helper.indexOf("if (journeyKind === 'delivery')"), helper.indexOf("} else if (journeyKind === 'resolution')"));
-  assert.match(journey, /const payDone = dv\.paymentStageComplete;/);
+  assert.match(journey, /const payDone = dv\.paymentStageComplete && !unchecked;/, 'server state only, and never before the server has answered');
   assert.match(status, /orderReceiptView\(activeOrder\)/);
   assert.equal((status.match(/setInterval\(/g) || []).length, 1, 'one status check timer, unchanged');
   assert.match(status, /setInterval\(fetchServerStatus, 3000\)/);

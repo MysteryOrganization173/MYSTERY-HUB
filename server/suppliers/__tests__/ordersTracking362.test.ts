@@ -70,7 +70,7 @@ test('refunds: pending, legacy refunded and verified stay distinct; only a verif
   const pending = view({ serverStatus: 'refund_pending', status: 'failed', customerResolution: 'refund_pending' });
   assert.equal(pending.tone, 'refund'); assert.equal(pending.title, 'Customer refund awaiting verification');
   assert.equal(pending.amountNote, 'Refund not confirmed yet');
-  assert.deepEqual(pending.steps.at(-1), { key: 'outcome', label: 'Refund verified', detail: 'Not confirmed yet', state: 'upcoming' });
+  assert.deepEqual(pending.steps.at(-1), { key: 'outcome', label: 'Refund confirmation', detail: 'Not confirmed yet', state: 'upcoming' }, 'no visible "Refund verified" until it is');
 
   for (const serviceType of ['data', 'afa', 'airtime'] as const) {
     const legacy = view({ serviceType, serverStatus: 'refunded', status: 'failed' });
@@ -78,6 +78,7 @@ test('refunds: pending, legacy refunded and verified stay distinct; only a verif
     assert.equal(legacy.title, 'Refund confirmation pending', serviceType);
     assert.doesNotMatch(legacy.title + legacy.label, /^Refunded$|Refund verified/, `${serviceType}: a refunded status alone is not a verified refund`);
     assert.equal(legacy.steps.at(-1)!.state, 'upcoming');
+    assert.doesNotMatch(legacy.steps.map(s => s.label).join(' '), /Refund verified/, serviceType);
   }
   const verified = view({ serverStatus: 'refunded', status: 'failed', customerResolution: 'refund_confirmed' });
   assert.equal(verified.title, 'Refund verified'); assert.equal(verified.label, 'Refunded'); assert.equal(verified.tone, 'resolved');
@@ -112,12 +113,19 @@ test('cancelled and expired payments are closed, never confirmed, and still caut
 
 test('assisted orders: complimentary and operator-recorded never claim a customer payment', () => {
   const free = view({ serverStatus: 'delivered', status: 'delivered', paymentBasis: 'complimentary' });
-  assert.equal(free.amountLabel, 'Complimentary'); assert.match(free.amountNote, /no customer payment/);
+  assert.equal(free.amountLabel, 'Complimentary'); assert.match(free.amountNote, /No customer payment/);
   assert.equal(free.paymentConfirmed, false); assert.match(free.paymentLine, /no payment taken/);
   assert.equal(free.steps[0].label, 'Complimentary');
   const recorded = view({ serverStatus: 'queued', paymentBasis: 'operator_recorded' });
   assert.equal(recorded.amountLabel, 'Recorded payment'); assert.match(recorded.paymentLine, /not a Paystack payment/);
   assert.equal(recorded.steps[0].label, 'Payment recorded'); assert.equal(recorded.steps[0].state, 'done');
+  assert.equal(recorded.steps[1].detail, 'Queued for the supplier', 'no "after payment" for an assisted order');
+  // A stopped assisted order is never shown as progressing (refunded, cancelled).
+  assert.equal(customerOrderStatus(order({ serverStatus: 'refunded', status: 'failed', paymentBasis: 'complimentary' })).group, 'attention');
+  assert.deepEqual(customerOrderStatus(order({ serverStatus: 'cancelled', status: 'verifying', paymentBasis: 'operator_recorded' })), { group: 'cancelled', label: 'Cancelled' });
+  assert.equal(view({ serverStatus: 'cancelled', status: 'verifying', paymentBasis: 'complimentary' }).festive, false);
+  // The receipt shows "No charge" rather than a GH₵0.00 price for a complimentary order stored at zero.
+  assert.match(source('src/components/checkout/OrderStatusModal.tsx'), /activeOrder\.paymentBasis === 'complimentary' && !\(activeOrder\.amountGhc > 0\) \? 'No charge'/);
   // Card and receipt agree for a stopped assisted order.
   const stopped = order({ serverStatus: 'failed', status: 'failed', paymentBasis: 'operator_recorded' });
   assert.equal(orderReceiptView(stopped).label, customerOrderStatus(stopped).label);
@@ -138,14 +146,45 @@ test('service wording: airtime is not a bundle, AFA is a registration, Marketpla
   assert.equal(market('completed', 'delivered').title, 'Order completed'); assert.equal(market('completed', 'delivered').doneWord, 'Completed');
   assert.equal(market('refunded', 'processing').title, 'Refund confirmation pending');
   assert.equal(view({ serviceType: 'results_checker', serverStatus: 'delivered' }).title, 'Your checker purchase is ready');
+  // Marketplace keeps its own words in every stage the server records, including a paid order Admin has not moved.
+  for (const marketplaceStatus of ['pending_payment', 'paid', null, 'awaiting_fulfilment']) {
+    const m = view({ serviceType: 'marketplace', serverStatus: 'paid', marketplaceStatus, bundle: { ...order().bundle, id: 'marketplace-x', description: 'Earbuds' } });
+    assert.doesNotMatch(allWords(m) + m.notYetDone, /network|bundle|data|SIM/i, String(marketplaceStatus));
+  }
+  const legacyMarket = view({ serviceType: 'marketplace', serverStatus: 'delivered', status: 'delivered', marketplaceStatus: null, bundle: { ...order().bundle, id: 'marketplace-x' } });
+  assert.equal(legacyMarket.title, 'Order completed');
+  // Results Checker and AFA never mention the network; AFA's caution speaks of registration.
+  for (const serviceType of ['results_checker', 'afa'] as const) assert.doesNotMatch(allWords(view({ serviceType, serverStatus: 'paid' })), /network/i, serviceType);
+  assert.match(view({ serviceType: 'afa', serverStatus: 'paid' }).notYetDone, /registration is complete/);
+  // AFA review wording follows the card's rule: a manual flag on an unpaid or cancelled AFA order is not "support review".
+  for (const serverStatus of ['pending_payment', 'cancelled', 'refund_pending']) {
+    const afaReview = order({ serviceType: 'afa', serverStatus, status: 'verifying', manualReview: true });
+    assert.doesNotMatch(orderReceiptView(afaReview).title, /support review/i, serverStatus);
+    assert.notEqual(customerOrderStatus(afaReview).group, 'attention', serverStatus);
+  }
   assert.equal(receiptService(order({ serviceType: undefined, bundle: { ...order().bundle, id: 'instant-mtn-video-3' } })), 'instant');
   assert.equal(view({ serviceType: 'instant_bundle', serverStatus: 'delivered' }).title, 'Your bundle has been delivered');
+});
+
+test('a device record the server has never answered for claims nothing and is checked at least once', () => {
+  const unchecked = view({ serverStatus: undefined, status: 'delivered' });
+  assert.equal(unchecked.unchecked, true);
+  assert.equal(unchecked.paymentConfirmed, false); assert.equal(unchecked.amountLabel, 'Order total');
+  assert.equal(unchecked.paymentLine, 'Last known on this device');
+  assert.equal(unchecked.supplierDelivered, false, 'never celebrated from a device guess');
+  assert.notEqual(unchecked.steps[0].state, 'done');
+  assert.match(code('src/components/checkout/OrderStatusModal.tsx'), /const isTerminal = Boolean\(activeOrder\?\.serverStatus\) && \(/);
 });
 
 test('no receipt wording invents a percentage, a timer or a delivery estimate', () => {
   const states: Partial<OrderRecord>[] = ['pending_payment', 'paid', 'queued', 'submitted', 'processing', 'delivered', 'failed', 'refund_pending', 'refunded', 'cancelled', 'expired']
     .flatMap(serverStatus => (['data', 'airtime', 'instant_bundle', 'afa', 'marketplace', 'results_checker'] as const).map(serviceType => ({ serverStatus, serviceType })));
   for (const s of states) assert.doesNotMatch(allWords(view(s)), /\d+\s?%|\b\d+\s?(min|minute|hour)s?\b|within|guarantee|instant delivery/i, JSON.stringify(s));
+  // Festive decoration only while things go well.
+  for (const s of states) {
+    const v = view(s);
+    assert.equal(v.festive, ['in_progress', 'delivered'].includes(v.group), JSON.stringify(s));
+  }
 });
 
 /* ───────── The card ───────── */
@@ -191,6 +230,28 @@ test('a live status update reaches the open receipt for every service, carries e
   assert.doesNotMatch(sync, /recipientPhone|amountGhc|buyerRecipientVisible|bundle/, 'a masked lookup never overwrites owner details');
 });
 
+test('status changes are announced by one live region that stays mounted', () => {
+  const modal = code('src/components/checkout/OrderStatusModal.tsx');
+  const live = modal.indexOf('<p role="status" aria-live="polite" className="sr-only">'), keyed = modal.indexOf('<section key={view.group}');
+  assert.ok(live > 0 && live < keyed, 'the live region sits outside the section that remounts on a status change');
+  assert.equal((modal.match(/role="status"/g) || []).length, 2, 'the status line, and the copy-failure note');
+});
+
+test('a celebration needs the server to have said "not yet" while this receipt was open', () => {
+  const modal = code('src/components/checkout/OrderStatusModal.tsx');
+  assert.match(modal, /if \(serverStatus !== 'delivered'\) seenUndelivered\.current = lookupReference;/);
+  assert.match(modal, /if \(!isStatusModalOpen\) seenUndelivered\.current = null;/, 'a reopened receipt never replays it');
+  assert.match(modal, /const justDelivered = Boolean\(isStatusModalOpen && view\?\.supplierDelivered && lookupReference && seenUndelivered\.current === lookupReference\);/);
+  assert.equal(view({ serverStatus: 'delivered', status: 'delivered', customerResolution: 'manual_fulfillment' }).supplierDelivered, false);
+});
+
+test('tracking: only the latest lookup opens a receipt, and never over one the customer opened meanwhile', () => {
+  const panel = code('src/components/orders/TrackOrderPanel.tsx');
+  assert.match(panel, /const mine = \+\+ticket\.current;/);
+  assert.match(panel, /if \(!alive\.current \|\| mine !== ticket\.current\) return;/);
+  assert.match(panel, /if \(receiptOpen\.current\) return;\s*openOrderStatus\(orderRecordFromLookup\(res\.order\)\);/);
+});
+
 test('the receipt drops late answers, never overlaps its checks, and keeps the existing schedule', () => {
   const modal = code('src/components/checkout/OrderStatusModal.tsx');
   assert.match(modal, /let alive = true, inFlight = false;/);
@@ -212,7 +273,8 @@ test('one primary action fits the situation; problems come before selling; block
   const modal = code('src/components/checkout/OrderStatusModal.tsx');
   assert.match(modal, /const needsHelp = view\.tone === 'attention' \|\| view\.tone === 'refund';/);
   assert.match(modal, /const primary = activeOrder\.serviceType === 'results_checker' \? 'results' : needsHelp \? 'help' : delivered && repeatable \? 'buy' : 'done';/);
-  assert.match(modal, /const repeatable = !activeOrder\.serviceType \|\| \['data', 'airtime', 'instant_bundle'\]\.includes\(activeOrder\.serviceType\);/, 'Marketplace, AFA and checkers are never offered again from a receipt');
+  assert.match(modal, /const repeatable = view\.service === 'data' \|\| view\.service === 'airtime' \|\| view\.service === 'instant';/, 'Marketplace, AFA and checkers are never offered again from a receipt');
+  assert.equal(receiptService(order({ serviceType: undefined, bundle: { ...order().bundle, id: 'marketplace-legacy' } })), 'marketplace', 'a legacy Marketplace row without a service type is not repeatable');
   assert.match(modal, /void buyAgain\(reference, \{ beforeOpen: closeOrderStatus, /, 'Smart Buy Again keeps the authoritative reorder contract');
   assert.doesNotMatch(modal, /openCheckout\(|initializePayment|paystack/i, 'the receipt never opens a payment by itself');
   assert.doesNotMatch(modal, /links and tracks every purchase/, 'no claim that past guest purchases join a new account');
@@ -230,7 +292,6 @@ test('the season decorates Orders and receipts that are going well, for guests a
   const modal = code('src/components/checkout/OrderStatusModal.tsx');
   assert.match(modal, /data-rc-mood=\{view\.festive \? 'bright' : 'serious'\}/);
   assert.match(modal, /\{\.\.\.\(view\.festive \? ordersSeasonAttributes\(season\) : \{\}\)\}/, 'serious receipts never carry the season');
-  for (const tone of ['pending', 'attention', 'refund', 'resolved', 'closed']) assert.ok(!['progress', 'success'].includes(tone));
   assert.match(source('src/components/checkout/receipt.css'), /\.mh-rc\[data-rc-mood="serious"\]::after \{ content: none !important; \}/, 'no seasonal sheet bow on a serious receipt');
   const seasonal = source('src/seasonal/Seasonal.tsx');
   assert.match(seasonal, /export function SeasonalOrders[\s\S]*?if \(!season\.shellActive \|\| season\.status\.pack !== 'christmas-2026'\) return <>\{fallback\}<\/>;/);

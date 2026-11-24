@@ -30,13 +30,14 @@ function nudge(el: HTMLElement | null) {
  * - otherwise a compact "Track another order" row that opens on request.
  */
 export const TrackOrderPanel: React.FC<{ open: boolean; onOpenChange: (open: boolean) => void; prefill?: string; primary?: boolean }> = ({ open, onOpenChange, prefill, primary = false }) => {
-  const { openOrderStatus } = useApp();
+  const { openOrderStatus, isStatusModalOpen } = useApp();
   const [value, setValue] = useState('');
   const [state, setState] = useState<LookupState>('idle');
   const inputRef = useRef<HTMLInputElement>(null);
-  const alive = useRef(true);
+  const alive = useRef(true), ticket = useRef(0), receiptOpen = useRef(isStatusModalOpen);
+  receiptOpen.current = isStatusModalOpen;
   const panelId = useId(), hintId = useId(), messageId = useId(), headingId = useId();
-  useEffect(() => () => { alive.current = false; }, []);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   useEffect(() => {
     if (prefill === undefined) return;
@@ -55,14 +56,17 @@ export const TrackOrderPanel: React.FC<{ open: boolean; onOpenChange: (open: boo
       return;
     }
     setState('checking');
+    // Only the latest lookup may open a receipt, and never over a receipt the customer opened meanwhile.
+    const mine = ++ticket.current;
     try {
       const res = await lookupOrderOnServer(input.reference);
       if (!res.success || !res.order) throw new Error('Order not found.');
-      if (!alive.current) return;
+      if (!alive.current || mine !== ticket.current) return;
       setState('idle');
+      if (receiptOpen.current) return;
       openOrderStatus(orderRecordFromLookup(res.order));
     } catch (error) {
-      if (!alive.current) return;
+      if (!alive.current || mine !== ticket.current) return;
       setState((error as Error).message === 'Order not found.' ? 'not_found' : 'unavailable');
     }
   };
