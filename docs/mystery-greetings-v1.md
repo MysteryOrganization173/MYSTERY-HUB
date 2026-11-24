@@ -7,6 +7,14 @@
 
 The backend is PR #104 (integrated dormant by #116); see `docs/mystery-experiences-v1-contract.md`. Launch steps are at the end.
 
+> **Updated by 3.6.1** ([`mystery-greetings-launch-3-6-1.md`](mystery-greetings-launch-3-6-1.md)), which supersedes this document's launch steps:
+> - **Routing:** production routing was verified. `mysterybundlehub.com/g/*` reaches the Node responder.
+> - **Creator advertised only when it works:** gates, secret, installed schema and retention not overdue.
+> - **Admin:** leads with a live verdict.
+> - **Motion:** idle motion is finite.
+> - **Reveal and letters:** refined.
+> - **Activation blocker:** visitor identity behind the proxy.
+
 ## The experience
 
 **Sender:** Choose → Personalize → Preview → Create → Share, at `/greetings` (no account).
@@ -173,7 +181,11 @@ There are three steps, plus a share screen. A progress bar shows "Step 1 of 3".
   - The image is a fixed branded card, `https://mysterybundlehub.com/og/mystery-greetings-v1.jpg` (1200×630 JPEG, 50 KB, `public/og/`). It is rendered from the real gift artwork and the approved logo, and uploads nothing to Cloudinary.
   - The canonical host is always `mysterybundlehub.com`, with `noindex, nofollow` and `no-store`.
 - **`/greetings`:** its own head ("Mystery Greetings — Wrap a Christmas or New Year greeting", the same card), canonical without query, and noindex.
-- **When the creator is offered:** the seasonal homepages, the creator page and the recipient's "Create your own" all follow one server answer: both gates on and the abuse secret configured (without it every create is refused).
+- **When the creator is offered:** the seasonal homepages, the creator page and the recipient's "Create your own" all follow one server answer. Since 3.6.1, that answer is "a new greeting would really be accepted":
+  - both gates on;
+  - the abuse secret configured;
+  - the optional schema installed;
+  - retention clean-up not overdue.
 - **Other routes:** `/sites/*`, `/c/*`, product and app routes are unchanged. `/g` paths mirror the server's own `^/g(/|$)` rule.
 
 ## Admin (System Health → Mystery Greetings)

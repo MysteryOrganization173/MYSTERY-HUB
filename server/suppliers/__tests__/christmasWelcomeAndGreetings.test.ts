@@ -67,8 +67,8 @@ test('greetings entry: only a plain same-site path from the server opens it', ()
 
 test('greetings: both homepages read the same server answer; closed shows Coming soon and no create action', () => {
   // One source: the server's season status, parsed once by SeasonProvider, read by both homepages. The server reports
-  // the creator only while both greeting gates are on and the abuse secret is configured.
-  assert.match(read('server/routes/seasonalApi.ts'), /const greetings = \{ createPath: greetingCreationOffered\(\) \? '\/greetings' : null \};/);
+  // the creator only while a greeting would really be accepted (gates on, abuse secret set, storage ready; 3.6.1).
+  assert.match(read('server/routes/seasonalApi.ts'), /const greetings = \{ createPath: await greetingCreationAvailable\(\)\.catch\(\(\) => false\) \? '\/greetings' : null \};/);
   const provider = read('src/seasonal/SeasonProvider.tsx');
   assert.match(provider, /setGreetings\(greetingsEntry\(data\.greetings\)\);/);
   assert.equal((provider.match(/setGreetings\(/g) || []).length, 1, 'nothing else can open it');

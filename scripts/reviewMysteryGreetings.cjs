@@ -69,7 +69,8 @@ async function createViaUI(page, o) {
   await page.getByRole('button', { name: 'Continue' }).click();
   await waitStep(page, 'Your message');
   await page.getByLabel('Who is it for?').fill(o.to);
-  if (o.message !== undefined) { await page.getByRole('radio', { name: 'Write my own' }).check({ force: true }); await page.getByRole('textbox', { name: 'Write your own message' }).fill(o.message); }
+  // Tap the visible option, as a person does (a forced check on the hidden input can land under the sticky actions at 320 px).
+  if (o.message !== undefined) { await page.getByText('Write my own', { exact: true }).click(); if (!(await page.getByRole('radio', { name: 'Write my own' }).isChecked())) throw new Error('Write my own did not select'); await page.getByRole('textbox', { name: 'Write your own message' }).fill(o.message); }
   else await page.getByRole('radio', { name: new RegExp(o.template || 'Heartwarming') }).first().check({ force: true });
   if (o.from) await page.getByLabel(/Your name/).fill(o.from);
   if (o.hidden) await page.getByRole('checkbox', { name: 'Keep me a mystery' }).check({ force: true });
@@ -508,9 +509,12 @@ async function phaseOpen() {
     await page.locator('button[type="submit"]').first().click(); await page.waitForTimeout(2500);
     await page.getByRole('button', { name: /System Health|^System$/ }).first().click();
     const panel = page.locator('section, div').filter({ has: page.getByRole('heading', { name: 'Mystery Greetings' }) }).last();
-    await page.getByText('Shared links open').waitFor({ timeout: 15000 });
+    await page.getByText('Shared links working now').waitFor({ timeout: 15000 });
     const body = (await page.locator('main').innerText()).replace(/\s+/g, ' ');
-    ok(/Shared links open On/.test(body) && /New greetings can be created On/.test(body) && /Abuse protection secret Configured/.test(body) && /Storage \(optional schema\) Installed/.test(body), body.slice(body.indexOf('Mystery Greetings'), body.indexOf('Mystery Greetings') + 400));
+    // 3.6.1: one verdict from what actually works, then the switches and the working-now checks, separately.
+    ok(/Status: Live/.test(body) && /Links switch \(MYSTERY_GREETING_LINKS_ENABLED\) On/.test(body) && /Creation switch \(MYSTERY_GREETINGS_ENABLED\) On/.test(body)
+      && /Shared links working now Yes/.test(body) && /New greetings accepted now Yes/.test(body)
+      && /Abuse protection secret Configured/.test(body) && /Storage \(optional schema\) Installed/.test(body), body.slice(body.indexOf('Mystery Greetings'), body.indexOf('Mystery Greetings') + 600));
     ok(/Greetings created \d+/.test(body), 'totals');
     ok(!body.includes(g.to), 'no names or messages in Admin');
     await page.getByText(g.shareId).waitFor();

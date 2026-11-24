@@ -9,6 +9,25 @@ export const greetingLinksEnabled=()=>process.env.MYSTERY_GREETING_LINKS_ENABLED
 export const greetingCreationEnabled=()=>greetingLinksEnabled()&&process.env.MYSTERY_GREETINGS_ENABLED==='true';
 /** What the site advertises: both gates on and the abuse secret present (without it every create is refused). */
 export const greetingCreationOffered=()=>greetingCreationEnabled()&&abuseSecretConfigured();
+/**
+ * Whether a new greeting would really be accepted right now: both gates on, the abuse secret valid, the optional schema
+ * installed and retention clean-up not overdue (the store refuses every create while it is). The season status and the
+ * creator advertise only this, so no page offers a creator that would refuse the greeting. Gates off: answered from
+ * the environment alone, with no database access. Gates on: one read-only check per process at most once a minute,
+ * shared by concurrent callers; storage that cannot be checked counts as unavailable (a busy moment keeps the last answer).
+ */
+let creationAvailability:{value:boolean;until:number}|null=null,creationAvailabilityFlight:Promise<boolean>|null=null;
+export const CREATION_AVAILABILITY_TTL_MS=60_000;
+export function resetGreetingCreationAvailability(){creationAvailability=null;creationAvailabilityFlight=null;}
+export async function greetingCreationAvailable(now=Date.now()):Promise<boolean>{
+ if(!greetingCreationOffered())return false;
+ if(creationAvailability&&creationAvailability.until>now)return creationAvailability.value;
+ if(!creationAvailabilityFlight)creationAvailabilityFlight=ExperienceStore.readiness().then(
+  r=>{const value=r.installed&&r.retentionDue===false;creationAvailability={value,until:Date.now()+CREATION_AVAILABILITY_TTL_MS};return value;},
+  e=>{const value=e instanceof ExperienceError&&e.code==='BUSY'&&creationAvailability?creationAvailability.value:false;creationAvailability={value,until:Date.now()+15_000};return value;},
+ ).finally(()=>{creationAvailabilityFlight=null;});
+ return creationAvailabilityFlight;
+}
 export const greetingUrl=(id:string)=>`${PUBLIC_ORIGIN}/g/${id}`;
 export class ExperienceService {
  static async state(now=new Date()){
@@ -24,10 +43,10 @@ export class ExperienceService {
   const config=await ExperienceStore.configuration();if(!config.preview_enabled)throw new ExperienceError('PREVIEW_DISABLED',409);
   return {...seasonalState({...config,lifecycle:'approved',enabled:true,override_phase:v.phase as ExperiencePhase,override_until:new Date(now.getTime()+900000).toISOString()},now,true),preview:true};
  }
- static templates(occasion?:unknown,random=false){
+ static async templates(occasion?:unknown,random=false){
   if(occasion!==undefined&&(typeof occasion!=='string'||!['christmas-2026','new-year-2027'].includes(occasion)))throw new ExperienceError('INVALID_OCCASION');
   const choices=GREETING_TEMPLATES.filter(t=>!occasion||t.occasion===occasion);
-  return {schemaVersion:1,templates:random?[choices[randomInt(choices.length)]]:choices,creationConfigured:greetingCreationOffered()};
+  return {schemaVersion:1,templates:random?[choices[randomInt(choices.length)]]:choices,creationConfigured:await greetingCreationAvailable()};
  }
  static async create(input:unknown,peer:string,analytics:boolean){
   if(!greetingCreationEnabled())throw new ExperienceError('CREATION_DISABLED',503);
@@ -49,7 +68,10 @@ export class ExperienceService {
    ...(!gates.creation?['Greeting creation is off (MYSTERY_GREETINGS_ENABLED, which also needs links on).']:[]),
    ...(retentionDue?['Retention clean-up is due: new greetings are refused until it runs.']:[]),
   ];
-  return {schemaVersion:1,checkedAt:now.toISOString(),gates,abuseSecret,storage,retentionDue,lastMaintenance,blockers};
+  // What is actually working, not just switched on: the environment says what is allowed, the database what can run.
+  const available={links:gates.links&&storage==='installed',creation:gates.creation&&abuseSecret&&storage==='installed'&&retentionDue===false};
+  const status=available.links&&available.creation?'live':available.links?'links-only':!gates.links&&!gates.creation?'off':'not-working';
+  return {schemaVersion:1,checkedAt:now.toISOString(),gates,abuseSecret,storage,retentionDue,lastMaintenance,available,status,blockers};
  }
  static async greeting(id:string){if(!greetingLinksEnabled())throw new ExperienceError('GREETING_UNAVAILABLE',404);return ExperienceStore.greeting(id);}
  static async exists(id:string){if(!greetingLinksEnabled())return false;return ExperienceStore.exists(id);}

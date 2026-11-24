@@ -23,7 +23,8 @@ import { greetingIdFrom } from '../../../src/components/admin/sections/AdminGree
 import { resolvePublicSocialMetadata } from '../../services/publicSocialMetadata.js';
 import { GREETINGS_SHARE_IMAGE } from '../../../src/utils/socialMetadata.js';
 import { seasonalRouter } from '../../routes/seasonalApi.js';
-import { ExperienceService } from '../../services/experienceService.js';
+import { ExperienceService, resetGreetingCreationAvailability } from '../../services/experienceService.js';
+import { ExperienceStore } from '../../db/experienceStore.js';
 import { reportOutcome } from '../../../src/greetings/ReportDialog.js';
 import { removeOutcome } from '../../../src/greetings/CreatorPage.js';
 
@@ -295,22 +296,44 @@ test('the link-preview card is a fixed 1200x630 JPEG served from this site, smal
   assert.deepEqual(size, [1200, 630]);
 });
 
-test('homepage entries: closed until both gates are on and the abuse secret is set, then one creator link on the page occasion', async () => {
+test('homepage entries: closed until both gates are on, the abuse secret is set and storage can take a greeting, then one creator link on the page occasion', async () => {
   const keys = ['MYSTERY_GREETING_LINKS_ENABLED', 'MYSTERY_GREETINGS_ENABLED', 'EXPERIENCES_ABUSE_SECRET'] as const;
   const saved = Object.fromEntries(keys.map(k => [k, process.env[k]]));
   const app = express(); app.use('/api/seasonal', seasonalRouter);
   const server = app.listen(0, '127.0.0.1'); await new Promise<void>(r => server.once('listening', r));
   const status = async () => (await (await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/seasonal/status`)).json()).greetings;
+  // 3.6.1: the creator is advertised only when a greeting would really be accepted. Storage is stubbed here (the native
+  // PostgreSQL suite checks the real schema); every read of it is counted, so the gates-off path is shown to skip it.
+  const originalReadiness = ExperienceStore.readiness;
+  let storage: { installed: boolean; retentionDue: boolean | null } | 'error' = { installed: true, retentionDue: false }, storageReads = 0;
+  (ExperienceStore as any).readiness = async () => { storageReads++; if (storage === 'error') throw new Error('unreachable'); return { ...storage, lastMaintenance: null }; };
   try {
     const secret = 'ab'.repeat(32);
     for (const [links, creation, key, expected] of [[undefined, undefined, secret, null], ['true', undefined, secret, null], [undefined, 'true', secret, null], ['true', 'true', undefined, null], ['true', 'true', 'not-hex', null], ['true', 'true', secret, '/greetings']] as const) {
       if (links) process.env.MYSTERY_GREETING_LINKS_ENABLED = links; else delete process.env.MYSTERY_GREETING_LINKS_ENABLED;
       if (creation) process.env.MYSTERY_GREETINGS_ENABLED = creation; else delete process.env.MYSTERY_GREETINGS_ENABLED;
       if (key) process.env.EXPERIENCES_ABUSE_SECRET = key; else delete process.env.EXPERIENCES_ABUSE_SECRET;
+      resetGreetingCreationAvailability(); const reads = storageReads;
       assert.deepEqual(await status(), { createPath: expected }, `${links}/${creation}/${key}`);
-      assert.equal(ExperienceService.templates().creationConfigured, expected !== null, 'the creator page agrees');
+      assert.equal((await ExperienceService.templates()).creationConfigured, expected !== null, 'the creator page agrees');
+      if (expected === null) assert.equal(storageReads, reads, 'switched off: answered without touching the database');
     }
-  } finally { await new Promise<void>(r => server.close(() => r())); for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } }
+    // Switched on, but storage cannot take a greeting: missing schema, overdue retention (creates are refused), unreadable.
+    for (const [state, label] of [[{ installed: false, retentionDue: null }, 'schema missing'], [{ installed: true, retentionDue: true }, 'retention overdue'], ['error', 'storage unreadable']] as const) {
+      storage = state; resetGreetingCreationAvailability();
+      assert.deepEqual(await status(), { createPath: null }, label);
+      assert.equal((await ExperienceService.templates()).creationConfigured, false, `${label}: the creator page agrees`);
+    }
+    // One check is shared for a minute: repeated homepage loads do not each read the database.
+    storage = { installed: true, retentionDue: false }; resetGreetingCreationAvailability();
+    const before = storageReads;
+    await Promise.all([status(), status(), status(), ExperienceService.templates()]);
+    assert.deepEqual(await status(), { createPath: '/greetings' });
+    assert.equal(storageReads - before, 1, 'one shared storage check');
+  } finally {
+    (ExperienceStore as any).readiness = originalReadiness; resetGreetingCreationAvailability();
+    await new Promise<void>(r => server.close(() => r())); for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+  }
   assert.equal(greetingCreateLink('/greetings', false), '/greetings?occasion=christmas-2026');
   assert.equal(greetingCreateLink('/greetings', true), '/greetings?occasion=new-year-2027');
 });

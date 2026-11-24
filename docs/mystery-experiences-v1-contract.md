@@ -42,7 +42,7 @@ Statuses:400 invalid input/template/phase/override/query/event;401 missing/inval
 | --- | --- | --- |
 | GET `/api/experiences/state` | No inputs; a preview/date query never changes authority | SeasonalState |
 | GET `/api/experiences/countdown` | None | Authoritative target, serverTime, remainingMs, passed |
-| GET `/api/experiences/templates` | Optional scalar occasion=`christmas-2026`/`new-year-2027`, random=`true`/`false` | schemaVersion1, curated templates, creationConfigured (gate presence, not DB-health proof) |
+| GET `/api/experiences/templates` | Optional scalar occasion=`christmas-2026`/`new-year-2027`, random=`true`/`false` | schemaVersion1, curated templates, creationConfigured (since 3.6.1: a greeting would really be accepted, meaning gates, secret, installed schema and retention not overdue; checked at most once a minute per process, and never touching the database while the gates are off) |
 | POST `/api/experiences/greetings` | Creation body below |201 created /200 idempotent replay; shareId, canonical URL, expiresAt, duplicate |
 | GET `/api/experiences/greetings/:shareId` |24-character opaque ID | PublicGreeting;404 invalid/expired/revoked/unknown |
 | POST `/api/experiences/greetings/:shareId/revoke` | `Authorization: Greeting <creatorToken>`; no token in URL | `{revoked:true}`; repeated legitimate revoke is safe |

@@ -58,7 +58,7 @@ export function RecipientPage({ path }: { path: string }) {
 
   return (
     <main className="mg-page" data-occasion={occasion} data-variant={variant} data-ready={greeting ? 'true' : 'false'}>
-      <GreetingsSky />
+      <GreetingsSky key={`${occasion}:${variant}`} />
       <div className="mg-shell">
         <GreetingsTopBar onNavigate={home} />
         {view.state === 'loading' && (

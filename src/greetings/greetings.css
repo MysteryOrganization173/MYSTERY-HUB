@@ -47,7 +47,7 @@
     radial-gradient(11px 11px at 78% 64%, var(--mg-light-a), transparent), radial-gradient(18px 18px at 8% 72%, var(--mg-light-b), transparent),
     radial-gradient(7px 7px at 30% 88%, var(--mg-light-a), transparent), radial-gradient(10px 10px at 92% 90%, var(--mg-light-a), transparent); }
 .mg-sky-stars { display: none; }
-.mg-page[data-variant="gift-starlight-v1"] .mg-sky-stars { display: block; opacity: .85; animation: mg-twinkle 5s ease-in-out infinite;
+.mg-page[data-variant="gift-starlight-v1"] .mg-sky-stars { display: block; opacity: .85; animation: mg-twinkle 5s ease-in-out 4;
   background-image: radial-gradient(1.4px 1.4px at 20px 30px, #fff, transparent), radial-gradient(1px 1px at 90px 80px, #fff8e1, transparent),
     radial-gradient(1.6px 1.6px at 160px 40px, #fff, transparent), radial-gradient(1px 1px at 210px 150px, #fff, transparent),
     radial-gradient(1.2px 1.2px at 60px 170px, #fff3cf, transparent), radial-gradient(1px 1px at 130px 120px, #fff, transparent);
@@ -114,10 +114,11 @@
 .mg-art-lid { transform-origin: 25% 100%; }
 .mg-art-box, .mg-art-shadow { transform-origin: 50% 100%; }
 
-/* Idle: the gift breathes and the halo glows; nothing moves on its own beyond that. */
-.mg-gift[data-state="sealed"] .mg-gift-art { animation: mg-bob 3.8s ease-in-out infinite; }
-.mg-gift[data-state="sealed"] .mg-gift-halo { animation: mg-halo 3.8s ease-in-out infinite; }
-.mg-gift[data-state="sealed"] .mg-art-bow { animation: mg-wiggle 6s ease-in-out 1.4s infinite; }
+/* Idle: the gift breathes, the halo glows and the bow gives two little tugs, then everything rests (about 12 s). Nothing
+   loops forever: a gift left open in a tab or on a budget phone costs no battery once it has settled (3.6.1). */
+.mg-gift[data-state="sealed"] .mg-gift-art { animation: mg-bob 3.8s ease-in-out 3; }
+.mg-gift[data-state="sealed"] .mg-gift-halo { animation: mg-halo 3.8s ease-in-out 3; }
+.mg-gift[data-state="sealed"] .mg-art-bow { animation: mg-wiggle 6s ease-in-out 1.4s 2; }
 
 /* The reveal, about one and a half seconds: the bow unties, the lid lifts away, light and sparks rise, the letter
    comes up out of the box and the box settles away beneath it. */
@@ -130,10 +131,19 @@
 .mg-gift[data-state="opening"] .mg-art-box, .mg-gift[data-state="opening"] .mg-art-shadow { animation: mg-sink .5s ease-in .98s both; }
 .mg-gift-button:disabled .mg-open-pill { animation: mg-fade-out .25s ease both; }
 .mg-sparks { position: absolute; left: 50%; top: 40%; width: 0; height: 0; pointer-events: none; }
-.mg-spark { position: absolute; left: calc(var(--s) / -2); top: calc(var(--s) / -2); width: var(--s); height: var(--s); border-radius: 50%; opacity: 0;
-  background: var(--c); box-shadow: 0 0 8px 1px color-mix(in srgb, var(--c) 55%, transparent); }
+.mg-spark { position: absolute; left: calc(var(--s) * -.65); top: calc(var(--s) * -.65); width: calc(var(--s) * 1.3); height: calc(var(--s) * 1.3); border-radius: 50%; opacity: 0;
+  background: var(--c); box-shadow: 0 0 12px 2px color-mix(in srgb, var(--c) 65%, transparent); }
 .mg-spark-star { border-radius: 0; box-shadow: none; clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); }
-.mg-gift[data-state="opening"] .mg-spark { animation: mg-spark .95s cubic-bezier(.12, .7, .3, 1) var(--d) both; }
+.mg-gift[data-state="opening"] .mg-spark { animation: mg-spark 1.05s cubic-bezier(.12, .7, .3, 1) var(--d) both; }
+/* The moment the lid comes away, a soft bloom of the season's light opens behind the rising letter (once). */
+.mg-bloom { position: absolute; left: 50%; top: var(--mg-from-y, 160px); z-index: 0; width: min(120vw, 620px); aspect-ratio: 1; margin-left: max(-60vw, -310px); margin-top: max(-60vw, -310px);
+  border-radius: 50%; pointer-events: none; opacity: 0;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--mg-accent-2) 75%, transparent), color-mix(in srgb, var(--mg-accent) 28%, transparent) 45%, transparent 72%); }
+.mg-stage[data-state="opening"] .mg-bloom { animation: mg-bloom 1.35s ease-out .42s both; }
+.mg-stage .mg-sealed { position: relative; z-index: 1; }
+.mg-stage .mg-letter { z-index: 2; }
+/* Words always paint above the letter's ribbon and stars. */
+.mg-letter > * { position: relative; }
 
 /* ───────── The letter ───────── */
 .mg-letter { position: relative; margin: 0 auto; width: 100%; max-width: 520px; padding: 30px 22px 20px; border-radius: 20px; color: var(--mg-ink); text-align: left;
@@ -142,9 +152,29 @@
 .mg-stage:not([data-state="open"]) .mg-letter { position: absolute; left: 0; right: 0; top: 10px; opacity: 0; visibility: hidden; pointer-events: none;
   transform: translateY(var(--mg-from-y, 160px)) scale(.4); transform-origin: 50% 0; }
 .mg-stage[data-state="opening"] .mg-letter { visibility: visible; animation: mg-rise .92s var(--mg-ease) .66s both; }
+/* The paper arrives first; then the words appear in reading order, as if written for this moment: ornament, greeting,
+   the message, the signature. All of it has settled before the letter is handed over (1.7 s), so nothing replays. */
+.mg-stage[data-state="opening"] .mg-letter > * { animation: mg-ink .42s var(--mg-ease) both; }
+.mg-stage[data-state="opening"] .mg-letter > :nth-child(1) { animation-delay: .9s; }
+.mg-stage[data-state="opening"] .mg-letter > :nth-child(2) { animation-delay: .98s; }
+.mg-stage[data-state="opening"] .mg-letter > :nth-child(3) { animation-delay: 1.08s; }
+.mg-stage[data-state="opening"] .mg-letter > :nth-child(4) { animation-delay: 1.18s; }
+.mg-stage[data-state="opening"] .mg-letter > :nth-child(5) { animation-delay: 1.22s; }
 .mg-stage[data-state="open"] .mg-sealed { display: none; }
-.mg-page[data-occasion="new-year-2027"] .mg-letter::after { content: '2027'; position: absolute; right: 14px; top: 10px; color: var(--mg-foil); opacity: .14;
-  font: italic 600 2.2rem/1 var(--mg-serif); letter-spacing: -.02em; pointer-events: none; }
+/* New Year: a faint 2027 foil mark, inside the foil border (it no longer touches the corner line). */
+.mg-page[data-occasion="new-year-2027"] .mg-letter::after { content: '2027'; position: absolute; right: 22px; top: 18px; color: var(--mg-foil); opacity: .16;
+  font: italic 600 1.85rem/1 var(--mg-serif); letter-spacing: -.02em; pointer-events: none; }
+/* Classic ribbon: the gift's satin ribbon is still tied across the letter's top corner, so the letter clearly came out of
+   that box. Starlight: a scatter of foil stars in two corners. Both stay in the margins, clear of every word. */
+.mg-letter { overflow: hidden; }
+.mg-page[data-variant="gift-classic-v1"] .mg-letter::before { content: ''; position: absolute; left: -38px; top: 22px; width: 140px; height: 15px; transform: rotate(-45deg); pointer-events: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--mg-accent-2) 92%, #fff), var(--mg-accent) 55%, color-mix(in srgb, var(--mg-accent) 70%, #000));
+  box-shadow: 0 2px 4px -1px #0004, inset 0 1px 0 #ffffff99; }
+.mg-page[data-variant="gift-starlight-v1"] .mg-letter::before { content: ''; position: absolute; inset: 12px; pointer-events: none; opacity: .5; background: var(--mg-foil);
+  -webkit-mask: var(--mg-stars-a) left top / 92px 64px no-repeat, var(--mg-stars-b) right bottom / 92px 64px no-repeat;
+  mask: var(--mg-stars-a) left top / 92px 64px no-repeat, var(--mg-stars-b) right bottom / 92px 64px no-repeat; }
+.mg-page { --mg-stars-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 92 64'%3E%3Cpath d='M14 6l2 6 6 2-6 2-2 6-2-6-6-2 6-2zM38 22l1.2 3.6 3.6 1.2-3.6 1.2L38 31.6l-1.2-3.6-3.6-1.2 3.6-1.2zM9 40l.9 2.6 2.6.9-2.6.9L9 47l-.9-2.6-2.6-.9 2.6-.9z'/%3E%3Ccircle cx='28' cy='9' r='1.3'/%3E%3Ccircle cx='22' cy='34' r='1'/%3E%3Ccircle cx='52' cy='12' r='1'/%3E%3C/svg%3E");
+  --mg-stars-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 92 64'%3E%3Cpath d='M78 42l2 6 6 2-6 2-2 6-2-6-6-2 6-2zM54 34l1.2 3.6 3.6 1.2-3.6 1.2L54 43.6l-1.2-3.6-3.6-1.2 3.6-1.2zM83 18l.9 2.6 2.6.9-2.6.9L83 25l-.9-2.6-2.6-.9 2.6-.9z'/%3E%3Ccircle cx='64' cy='55' r='1.3'/%3E%3Ccircle cx='70' cy='30' r='1'/%3E%3Ccircle cx='40' cy='52' r='1'/%3E%3C/svg%3E"); }
 .mg-letter-ornament { display: flex; justify-content: center; margin: -4px 0 8px; }
 .mg-letter-title { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; font-weight: inherit; outline: none; }
 .mg-letter-title:focus-visible { outline: 2px solid var(--mg-letter-accent); outline-offset: 6px; border-radius: 6px; }
@@ -233,6 +263,8 @@
 @keyframes mg-spark { 0% { opacity: 0; transform: translate(0, 0) scale(.3); } 18% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1) rotate(90deg); } }
 @keyframes mg-rise { 0% { opacity: 0; transform: translateY(var(--mg-from-y, 160px)) scale(.4); } 28% { opacity: 1; } 100% { opacity: 1; transform: none; } }
 @keyframes mg-out-up { to { opacity: 0; transform: translateY(-12px); } }
+@keyframes mg-bloom { 0% { opacity: 0; transform: scale(.2); } 35% { opacity: .9; } 100% { opacity: 0; transform: scale(1.15); } }
+@keyframes mg-ink { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
 @keyframes mg-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes mg-fade-out { to { opacity: 0; } }
 @keyframes mg-twinkle { 0%, 100% { opacity: .85; } 50% { opacity: .5; } }
@@ -243,7 +275,7 @@
   .mg-page *, .mg-page *::before, .mg-page *::after { animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .mg-gift[data-state="sealed"] .mg-gift-art, .mg-gift[data-state="sealed"] .mg-gift-halo, .mg-gift[data-state="sealed"] .mg-art-bow,
   .mg-page[data-variant="gift-starlight-v1"] .mg-sky-stars, .mg-loading-gift span { animation: none !important; }
-  .mg-gift[data-state="opening"] * { animation: none !important; }
+  .mg-gift[data-state="opening"] *, .mg-stage[data-state="opening"] .mg-letter > *, .mg-bloom { animation: none !important; }
   .mg-gift[data-state="opening"] { opacity: 0; transition: opacity .2s ease !important; }
   .mg-stage[data-state="opening"] .mg-sealed-head { animation: mg-fade-out .2s ease both !important; }
   .mg-stage[data-state="opening"] .mg-letter { animation: mg-fade-only .22s ease both !important; transform: none; }
@@ -404,3 +436,25 @@
   .mg-design-detail { font-size: .78rem; }
 }
 @media (prefers-reduced-motion: reduce) { .mg-spinner { animation-duration: 1.6s !important; animation-iteration-count: infinite !important; } }
+
+/* ───────── 3.6.1 micro-interactions (creator and share screen) ─────────
+   Each plays once, on a real change (a new step, a new choice, a confirmed copy), and never on typing or re-render. */
+.mg-sky { animation: mg-sky-in .7s ease both; }
+/* A new step's content rises in; its sticky actions stay anchored at the bottom of the screen, never moving off it. */
+.mg-step > :not(.mg-step-actions):not(form), .mg-step > form > :not(.mg-step-actions) { animation: mg-step-in .38s var(--mg-ease) backwards; }
+.mg-design:has(input:checked) .mg-design-art svg { animation: mg-pick .6s var(--mg-ease); }
+.mg-template:has(input:checked)::after { animation: mg-check-pop .32s var(--mg-ease); }
+.mg-done-art::before { content: ''; position: absolute; inset: -18%; border-radius: 50%; pointer-events: none; opacity: 0;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--mg-accent) 50%, transparent), transparent); animation: mg-glow-once 1.3s ease-out .2s both; }
+.mg-done-art svg { position: relative; animation: mg-done-land .9s var(--mg-ease) .1s backwards; }
+.mg-pop { animation: mg-check-pop .32s var(--mg-ease); }
+@media (max-width: 420px) { .mg-done-actions { grid-template-columns: 1fr; } }
+@keyframes mg-sky-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mg-step-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes mg-pick { 0% { transform: none; } 35% { transform: translateY(-6%) scale(1.05) rotate(-2deg); } 65% { transform: translateY(1%) scale(.99); } 100% { transform: none; } }
+@keyframes mg-check-pop { 0% { transform: scale(.5); } 70% { transform: scale(1.15); } 100% { transform: none; } }
+@keyframes mg-done-land { 0% { opacity: 0; transform: translateY(16px) scale(.82) rotate(-4deg); } 55% { opacity: 1; transform: translateY(-5px) scale(1.04); } 100% { transform: none; } }
+@keyframes mg-glow-once { 0% { opacity: 0; transform: scale(.6); } 40% { opacity: 1; } 100% { opacity: 0; transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce) {
+  .mg-sky, .mg-step > *, .mg-step > form > *, .mg-design-art svg, .mg-template::after, .mg-done-art svg, .mg-done-art::before, .mg-pop { animation: none !important; }
+}
