@@ -56,7 +56,7 @@ export function AdminSeasonalPanel() {
         <DefinitionList items={[
           ['For customers now', status ? <StatusPill tone={live ? 'success' : 'neutral'}>{live ? `On · ${status.pack}` : 'Off'}</StatusPill> : '…'],
           ['Calendar today (Accra)', status ? `${status.date} · ${status.phase.replace(/-/g, ' ')}` : '…'],
-          ['Who it shows to', 'Everyone gets the seasonal header, phone menu and footer. Signed-out visitors get every guest page; signed-in customers get the seasonal homepage, and their other account pages stay as they are.'],
+          ['Who it shows to', 'Everyone gets the seasonal header, phone menu and footer. Signed-out visitors get every guest page; signed-in customers get the seasonal homepage, Data page, Orders and receipts, and their other account pages stay as they are. A receipt that needs attention, a refund or an unconfirmed payment always keeps its ordinary look.'],
           ['Where it never shows', 'Admin, the website editor, My Business and published customer websites.'],
         ]} />
         <AdminNotice tone="info" title="How it is switched on and off">

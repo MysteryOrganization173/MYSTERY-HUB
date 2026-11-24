@@ -376,9 +376,10 @@ export const DataPage: React.FC = () => {
 
   return (
     <div className="mh-ds py-4 sm:py-8 text-slate-100" {...dataStoreSeasonAttributes(season)}>
-      {dataProductMode==='data'&&<WelcomeOfferNotice offer={welcomeOffer}/>}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
         <PendingPaymentBanner />
+        {/* 3.6.2: inside the page margins, after payment recovery and before the title panel. */}
+        {dataProductMode==='data'&&<div className="mh-ds-offer"><WelcomeOfferNotice offer={welcomeOffer}/></div>}
 
         <DataStoreHero mode={dataProductMode} />
 

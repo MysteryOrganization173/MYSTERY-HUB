@@ -29,6 +29,9 @@ const ChristmasMemberHome = lazy(loadMemberHome);
 /** The Data page's seasonal appearance (artwork, line and scoped stylesheet), for guests and members alike. */
 const loadDataStore = retryOnce(() => import('./christmas/data/ChristmasDataStore'));
 const ChristmasDataStore = lazy(loadDataStore);
+/** Orders and the receipt (3.6.2): artwork, a line, a receipt flourish and one celebration, for guests and members. */
+const loadOrders = retryOnce(() => import('./christmas/orders/ChristmasOrders'));
+const ChristmasOrders = lazy(loadOrders);
 
 /** If a seasonal chunk cannot load or render, show the ordinary interface instead of an error. */
 class SeasonalBoundary extends React.Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
@@ -92,6 +95,20 @@ export function SeasonalDataStore({ part, fallback = null }: { part: 'art' | 'li
   return <SeasonalBoundary fallback={fallback}><Suspense fallback={part === 'art' ? <div className="mh-ds-art-wait" aria-hidden="true" /> : null}><ChristmasDataStore part={part} status={season.status} /></Suspense></SeasonalBoundary>;
 }
 
+/**
+ * Orders and the receipt in season (3.6.2), on the shared shell rule (`shellActive`) like the Data page.
+ * - `part="art"`: the illustration beside the Orders title; `fallback` (the ordinary artwork) otherwise or on failure.
+ * - `part="line"`: the seasonal line above the Orders title.
+ * - `part="flourish"`: a small decoration on a receipt that is going well (the receipt decides; never on a problem).
+ * - `part="celebrate"`: one finite celebration, only for a supplier delivery the receipt saw happen.
+ * Nothing at all when no season applies; if the chunk cannot load, the ordinary design shows and nothing breaks.
+ */
+export function SeasonalOrders({ part, fallback = null }: { part: 'art' | 'line' | 'flourish' | 'celebrate'; fallback?: ReactNode }) {
+  const season = useSeason();
+  if (!season.shellActive || season.status.pack !== 'christmas-2026') return <>{fallback}</>;
+  return <SeasonalBoundary fallback={fallback}><Suspense fallback={fallback}><ChristmasOrders part={part} status={season.status} /></Suspense></SeasonalBoundary>;
+}
+
 /** The Data page root's season attributes (a pure helper, kept beside the season so it is tested on real dates). */
 export { dataStoreSeasonAttributes } from './dataStoreSeason';
 
@@ -119,6 +136,8 @@ export function SeasonalShellLayer({ page }: { page?: string }) {
   useEffect(() => { if (season.heldForSignedIn && page === 'home') void loadMemberHome().catch(() => undefined); }, [season.heldForSignedIn, page]);
   // The Data page's seasonal look is for every visitor, so it starts downloading as soon as the page is opened.
   useEffect(() => { if (season.shellActive && page === 'data') void loadDataStore().catch(() => undefined); }, [season.shellActive, page]);
+  // Orders and the receipt share one small chunk: it starts downloading on the Orders page, or when a receipt opens.
+  useEffect(() => { if (season.shellActive && page === 'orders') void loadOrders().catch(() => undefined); }, [season.shellActive, page]);
   useEffect(() => { if (season.active && isAuthModalOpen) void loadMemberHome().catch(() => undefined); }, [season.active, isAuthModalOpen]);
   if (!season.previewing) return null;
   const date = new Date(season.status.date + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
@@ -130,7 +149,7 @@ export function SeasonalShellLayer({ page }: { page?: string }) {
         <strong>{title}</strong>
         <span> · <span className="mh-season-preview-wide">{PHASE_LABEL[season.status.phase] || season.status.phase}, </span>{date}
           <span className="mh-season-preview-wide">{season.memberActive
-            ? ' · Signed in: your homepage, Data page, header and footer show the season; other account pages stay as they are. Only this browser tab sees it.'
+            ? ' · Signed in: your homepage, Data page, Orders, header and footer show the season; other account pages stay as they are. Only this browser tab sees it.'
             : ' · Only this browser tab sees it.'}</span></span>
       </p>
       <button type="button" onClick={season.exitPreview}><X className="w-3.5 h-3.5" aria-hidden />Exit preview</button>

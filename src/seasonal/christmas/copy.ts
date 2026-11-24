@@ -91,3 +91,16 @@ export const DATA_LINE: Record<SeasonPhase, string> = {
   'new-year': 'Stay close in the new year.',
   after: 'Stay close in the new year.',
 };
+
+/** The line above the Orders title (3.6.2): calm, about care and clarity, never a promise about delivery. */
+export const ORDERS_LINE: Record<SeasonPhase, string> = {
+  before: 'Christmas orders, tracked with care.',
+  'christmas-season': 'Christmas orders, tracked with care.',
+  'christmas-day': 'Merry Christmas. Every order in plain view.',
+  'boxing-day': 'Happy Boxing Day. Your orders in plain view.',
+  'year-end': 'Your orders in view as the year turns.',
+  'new-years-eve': 'Tonight we welcome 2027. Your orders in view.',
+  'new-years-day': 'Happy New Year. A clear start to 2027.',
+  'new-year': 'New year orders, tracked with care.',
+  after: 'New year orders, tracked with care.',
+};

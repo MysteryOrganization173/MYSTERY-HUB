@@ -55,6 +55,7 @@ export interface OrderRecord {
   recipientPhone: string;
   buyerRecipientVisible?: boolean; // Presentation only: direct checkout or authenticated account Orders.
   journey?: 'direct_checkout' | 'account'; // Presentation only: first-party origin; reference lookups leave it unset.
+  ownerUserId?: string; // Device records only: the signed-in account that bought it on this device, if any.
   network: NetworkId;
   paymentMethod: PaymentMethod;
   commercialPricing?: {regularMinor:number;discountMinor:number;paidMinor:number;standardMinor?:number};

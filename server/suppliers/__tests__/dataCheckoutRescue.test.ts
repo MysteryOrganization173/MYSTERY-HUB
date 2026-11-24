@@ -97,8 +97,10 @@ test('status progression is server-authoritative without duplicate checkout toas
   assert.equal(dataOrderPresentation('processing').processing,true);
   assert.equal(dataOrderPresentation('delivered').delivered,true);
   const status=source('src/components/checkout/OrderStatusModal.tsx');
-  assert.match(status,/motion-reduce:animate-none/);
-  assert.match(status,/dataView.paymentConfirmed/);
+  // 3.6.2: the receipt's motion is in its stylesheet and stops under reduced motion; payment wording is server-derived.
+  assert.match(source('src/components/checkout/receipt.css'),/@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(status,/view\.paymentConfirmed/);
+  assert.match(source('src/utils/orderReceiptPresentation.ts'),/const paymentConfirmed = dv\.paymentConfirmed;/);
 });
 
 test('customer Data validity hides routing labels without fabricating durations',()=>{

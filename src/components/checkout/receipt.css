@@ -1,0 +1,164 @@
+/* Mystery Hub 3.6.2 · the digital receipt (OrderStatusModal). One shared sheet for checkout, tracking and history.
+   Every rule is scoped to .mh-rc (the sheet). The tone of the status (data-rc-tone) colours the seal, the journey and
+   the chip; nothing here decides a status. A season may re-tone the bright receipts only (data-rc-mood="bright");
+   receipts that need care (attention, refunds, unconfirmed or closed payments) keep this serious, ordinary look.
+   Motion: transform and opacity only, transitions on real changes (no entrance replays on reopening), finite
+   loops, and prefers-reduced-motion holds everything still. */
+
+.mh-rc {
+  --rc-sheet: #0d1419;
+  --rc-paper-a: #121b22;
+  --rc-paper-b: #0e161c;
+  --rc-edge: #22313c;
+  --rc-edge-soft: #1a252e;
+  --rc-ink: #f3f6f8;
+  --rc-soft: #c5cfd9;
+  --rc-muted: #8d9cad;
+  --rc-faint: #7a8995;
+  --rc-accent: #00c365;
+  --rc-accent-text: #5ae6a0;
+  --rc-tone: #8d9cad;
+  --rc-tone-bg: #8d9cad1f;
+  /* A stage the server has confirmed reads as confirmed whatever happened later. */
+  --rc-done: #34e08f;
+  --rc-ease: cubic-bezier(.2, .8, .2, 1);
+  --rc-spring: cubic-bezier(.34, 1.3, .5, 1);
+  --rc-heading: var(--font-heading, 'Outfit', sans-serif);
+  background: var(--rc-sheet);
+  color: var(--rc-ink);
+}
+.mh-rc[data-rc-tone="pending"] { --rc-tone: #f2c46d; --rc-tone-bg: #f2c46d1f; }
+.mh-rc[data-rc-tone="progress"] { --rc-tone: #7cc8ff; --rc-tone-bg: #7cc8ff1f; }
+.mh-rc[data-rc-tone="success"] { --rc-tone: #34e08f; --rc-tone-bg: #34e08f1f; }
+.mh-rc[data-rc-tone="attention"] { --rc-tone: #ff8f9f; --rc-tone-bg: #ff8f9f1f; }
+.mh-rc[data-rc-tone="refund"] { --rc-tone: #f6b26b; --rc-tone-bg: #f6b26b1f; }
+.mh-rc[data-rc-tone="resolved"] { --rc-tone: #a9c7d8; --rc-tone-bg: #a9c7d81f; }
+.mh-rc[data-rc-tone="closed"] { --rc-tone: #9aa7b4; --rc-tone-bg: #9aa7b41a; }
+
+/* A serious receipt never wears seasonal sheet decoration (the shared sheet bow and berry line). */
+.mh-rc[data-rc-mood="serious"]::after { content: none !important; }
+.mh-rc[data-rc-mood="serious"] { box-shadow: 0 25px 50px -12px #000 !important; }
+
+/* ───────── Header ───────── */
+.mh-rc-head { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px 4px; flex-shrink: 0; }
+.mh-rc-kicker { display: inline-flex; align-items: center; gap: 8px; padding-top: 4px; font: 700 .6875rem/1 var(--rc-heading); letter-spacing: .14em; text-transform: uppercase; color: var(--rc-muted); }
+.mh-rc-kicker i { width: 6px; height: 6px; border-radius: 99px; background: var(--rc-tone); box-shadow: 0 0 0 3px var(--rc-tone-bg); }
+.mh-rc-close { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 99px; background: #1b262f; color: var(--rc-soft); transition: background-color .15s, color .15s, transform .15s var(--rc-ease); cursor: pointer; }
+.mh-rc-close:hover { background: #24323d; color: #fff; }
+.mh-rc-close:active { transform: scale(.94); }
+.mh-rc-body { overflow-y: auto; overscroll-behavior: contain; padding: 0 16px max(16px, env(safe-area-inset-bottom)); display: grid; gap: 14px; }
+@media (min-width: 640px) { .mh-rc-head { padding: 14px 20px 4px; } .mh-rc-body { padding: 0 20px 20px; } }
+
+/* ───────── Status: seal, title, chip, next step ───────── */
+.mh-rc-status { position: relative; display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 4px 14px; align-items: start; padding-top: 4px; animation: mh-rc-swap .32s var(--rc-ease) both; }
+.mh-rc-seal { grid-row: span 3; position: relative; width: 52px; height: 52px; border-radius: 99px; display: grid; place-items: center; color: var(--rc-tone); background: radial-gradient(circle at 35% 30%, var(--rc-tone-bg), transparent 70%), #121b22; border: 1.5px solid color-mix(in srgb, var(--rc-tone) 55%, transparent); box-shadow: 0 0 0 5px var(--rc-tone-bg); }
+.mh-rc-seal svg { width: 26px; height: 26px; }
+.mh-rc-seal[data-breathe] { animation: mh-rc-breathe 2.4s ease-in-out 3; }
+/* A delivery the receipt saw happen gets one ring of light; a reopened delivered receipt stays still. */
+.mh-rc-seal.is-fresh::after { content: ''; position: absolute; inset: -6px; border-radius: inherit; border: 2px solid var(--rc-tone); opacity: 0; animation: mh-rc-ring 1s var(--rc-ease) .1s 1; pointer-events: none; }
+.mh-rc-seal.is-fresh svg { animation: mh-rc-pop .5s var(--rc-spring) 1; }
+.mh-rc-title { margin: 0; font: 700 1.25rem/1.25 var(--rc-heading); letter-spacing: -.01em; color: var(--rc-ink); overflow-wrap: anywhere; }
+.mh-rc-chip { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 99px; background: var(--rc-tone-bg); border: 1px solid color-mix(in srgb, var(--rc-tone) 35%, transparent); color: var(--rc-tone); font: 600 .75rem/1.3 var(--rc-heading); }
+.mh-rc-chip i { width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
+.mh-rc-next { margin: 2px 0 0; font-size: .875rem; line-height: 1.55; color: var(--rc-soft); }
+
+/* ───────── Journey: three confirmed stages, never a time-based bar ───────── */
+.mh-rc-journey { border-radius: 18px; border: 1px solid var(--rc-edge-soft); background: linear-gradient(180deg, #111a21, #0d151b); padding: 14px 10px 12px; }
+.mh-rc-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mh-rc-step { position: relative; display: grid; justify-items: center; gap: 6px; text-align: center; min-width: 0; }
+/* The line into each stage; it fills when the server confirms the stage before it. */
+.mh-rc-step + .mh-rc-step::before { content: ''; position: absolute; top: 13px; right: calc(50% + 17px); width: calc(100% - 34px); height: 2px; border-radius: 2px; background: #22303b; }
+.mh-rc-step + .mh-rc-step::after { content: ''; position: absolute; top: 13px; right: calc(50% + 17px); width: calc(100% - 34px); height: 2px; border-radius: 2px; background: var(--rc-tone); transform-origin: left center; transform: scaleX(0); transition: transform .5s var(--rc-ease); }
+.mh-rc-step:is([data-state="done"], [data-state="current"], [data-state="halted"]) + .mh-rc-step:is([data-state="done"], [data-state="current"], [data-state="halted"])::after { transform: scaleX(1); }
+.mh-rc-step[data-state="halted"]::after { background: repeating-linear-gradient(90deg, var(--rc-tone) 0 5px, transparent 5px 9px) !important; }
+.mh-rc-node { position: relative; z-index: 1; width: 28px; height: 28px; border-radius: 99px; display: grid; place-items: center; border: 2px solid #2b3a46; background: #0d151b; color: var(--rc-faint); font: 800 .8125rem/1 var(--rc-heading); transition: background-color .3s, border-color .3s, color .3s, transform .3s var(--rc-spring); }
+.mh-rc-node svg { width: 15px; height: 15px; }
+.mh-rc-step[data-state="done"] .mh-rc-node { border-color: var(--rc-done); background: var(--rc-done); color: #04140c; }
+.mh-rc-step[data-state="done"]::after { background: var(--rc-done) !important; }
+.mh-rc-step[data-state="current"] .mh-rc-node { border-color: var(--rc-tone); color: var(--rc-tone); box-shadow: 0 0 0 4px var(--rc-tone-bg); }
+.mh-rc-step[data-state="current"] .mh-rc-node::before { content: ''; width: 8px; height: 8px; border-radius: 99px; background: currentColor; animation: mh-rc-dot 1.8s ease-in-out 3; }
+.mh-rc-step[data-state="halted"] .mh-rc-node { border-color: var(--rc-tone); color: var(--rc-tone); background: #1a1216; }
+.mh-rc-step-label { font: 600 .75rem/1.25 var(--rc-heading); color: var(--rc-faint); overflow-wrap: anywhere; }
+.mh-rc-step:is([data-state="done"], [data-state="current"], [data-state="halted"]) .mh-rc-step-label { color: var(--rc-ink); }
+.mh-rc-now { margin: 12px 4px 0; padding-top: 10px; border-top: 1px dashed #22303b; display: flex; align-items: flex-start; gap: 8px; font-size: .8125rem; line-height: 1.45; color: var(--rc-soft); }
+.mh-rc-now b { color: var(--rc-tone); font-weight: 600; }
+
+/* Freshness and the in-progress caution */
+.mh-rc-fresh { display: flex; align-items: flex-start; gap: 6px; margin: -4px 2px 0; font-size: .75rem; line-height: 1.45; color: var(--rc-faint); }
+.mh-rc-fresh[data-failed] { color: #f2c46d; }
+.mh-rc-fresh svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; }
+
+/* ───────── The slip: reference, details and total, like paper ───────── */
+.mh-rc-slip { position: relative; border-radius: 18px; border: 1px solid var(--rc-edge); background: linear-gradient(180deg, var(--rc-paper-a), var(--rc-paper-b)); box-shadow: inset 0 1px 0 #ffffff0d, 0 18px 40px -30px #000; }
+.mh-rc-slip::before { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background-image: radial-gradient(#ffffff0a 1px, transparent 1.3px); background-size: 14px 14px; -webkit-mask-image: linear-gradient(180deg, #000, transparent 55%); mask-image: linear-gradient(180deg, #000, transparent 55%); }
+.mh-rc-ref { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding: 14px 8px 12px 16px; }
+.mh-rc-ref-label { grid-column: 1 / -1; font: 700 .6875rem/1 var(--rc-heading); letter-spacing: .12em; text-transform: uppercase; color: var(--rc-muted); }
+.mh-rc-ref-value { font: 600 1.0625rem/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .02em; color: var(--rc-ink); overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
+.mh-rc-copy { position: relative; min-width: 44px; min-height: 44px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 12px; border: 1px solid var(--rc-edge); background: #16212a; color: var(--rc-soft); font: 600 .8125rem/1 var(--rc-heading); cursor: pointer; transition: background-color .15s, border-color .15s, color .15s, transform .15s var(--rc-ease); }
+.mh-rc-copy:hover { background: #1c2a35; color: #fff; }
+.mh-rc-copy:active { transform: scale(.95); }
+.mh-rc-copy svg { width: 16px; height: 16px; }
+.mh-rc-copy[data-copied] { border-color: #00c36566; color: var(--rc-accent-text); background: #00c3651a; }
+.mh-rc-copy[data-copied] svg { animation: mh-rc-pop .4s var(--rc-spring) 1; }
+.mh-rc-copy-note { grid-column: 1 / -1; font-size: .75rem; color: #f2c46d; }
+
+/* The tear line: two notches and a dashed rule, so the slip reads as a receipt. */
+.mh-rc-tear { position: relative; height: 1px; margin: 0 14px; border-top: 1.5px dashed #2a3843; }
+.mh-rc-tear::before, .mh-rc-tear::after { content: ''; position: absolute; top: -9px; width: 16px; height: 16px; border-radius: 99px; background: var(--rc-sheet); border: 1px solid var(--rc-edge); }
+.mh-rc-tear::before { left: -23px; clip-path: inset(0 0 0 50%); }
+.mh-rc-tear::after { right: -23px; clip-path: inset(0 50% 0 0); }
+
+.mh-rc-product { display: flex; align-items: center; gap: 12px; padding: 14px 16px 6px; }
+.mh-rc-mark { flex-shrink: 0; display: grid; place-items: center; }
+.mh-rc-mark-icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: #00c3651a; border: 1px solid #00c3654d; color: var(--rc-accent); }
+.mh-rc-mark-icon svg { width: 20px; height: 20px; }
+.mh-rc-product-name { margin: 0; font: 700 1rem/1.3 var(--rc-heading); color: var(--rc-ink); overflow-wrap: anywhere; }
+.mh-rc-product-sub { margin: 2px 0 0; font-size: .75rem; color: var(--rc-muted); }
+
+.mh-rc-rows { margin: 0; padding: 4px 16px 12px; display: grid; }
+.mh-rc-row { display: flex; align-items: baseline; gap: 8px; min-height: 36px; padding: 8px 0 0; font-size: .875rem; }
+.mh-rc-row dt { color: var(--rc-muted); flex-shrink: 0; }
+/* Dotted leaders between a label and its value. */
+.mh-rc-row::after { content: ''; order: 1; flex: 1 1 12px; min-width: 12px; height: 1px; align-self: center; margin-top: 4px; background-image: radial-gradient(circle, #34444f 1px, transparent 1.3px); background-size: 6px 2px; background-repeat: repeat-x; }
+.mh-rc-row dd { order: 2; margin: 0; min-width: 0; text-align: right; font-weight: 600; color: var(--rc-ink); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.mh-rc-row dd small { display: block; font-weight: 500; font-size: .75rem; color: var(--rc-muted); }
+
+.mh-rc-total { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 2px 12px; padding: 12px 16px 14px; }
+.mh-rc-total-label { font: 700 .6875rem/1.2 var(--rc-heading); letter-spacing: .12em; text-transform: uppercase; color: var(--rc-muted); }
+.mh-rc-total-value { grid-row: span 2; font: 800 1.375rem/1.1 var(--rc-heading); font-variant-numeric: tabular-nums; color: var(--rc-ink); }
+.mh-rc-total-note { font-size: .75rem; color: var(--rc-muted); }
+.mh-rc-total[data-unpaid] .mh-rc-total-value { color: var(--rc-soft); }
+
+/* ───────── Service notes (AFA) ───────── */
+.mh-rc-note { border-radius: 16px; border: 1px solid var(--rc-edge-soft); background: #0b1217; padding: 14px; display: grid; gap: 6px; font-size: .8125rem; line-height: 1.5; color: var(--rc-soft); }
+.mh-rc-note[data-good] { border-color: #00c3654d; }
+.mh-rc-note-kicker { font: 700 .6875rem/1 var(--rc-heading); letter-spacing: .12em; text-transform: uppercase; color: var(--rc-accent-text); }
+.mh-rc-note small { font-size: .75rem; color: var(--rc-muted); }
+.mh-rc-ussd { display: inline-block; padding: 2px 10px; border-radius: 8px; border: 1px solid #00c3654d; background: #0f1a14; font: 800 1rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .06em; color: #fff; }
+
+/* ───────── Actions ───────── */
+.mh-rc-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mh-rc-actions > * { min-width: 0; }
+.mh-rc-help { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border-radius: 12px; font-size: .875rem; color: var(--rc-muted); transition: color .15s; }
+.mh-rc-help:hover { color: #fff; }
+.mh-rc-help svg { width: 16px; height: 16px; color: var(--rc-accent); }
+.mh-rc-invite { border-radius: 16px; border: 1px solid var(--rc-edge-soft); padding: 12px 12px 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: .75rem; }
+.mh-rc-invite p { margin: 0; }
+.mh-rc-invite strong { display: block; font-size: .8125rem; color: var(--rc-ink); }
+.mh-rc-invite span { color: var(--rc-muted); }
+.mh-rc-invite button { flex-shrink: 0; min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #00c36566; color: var(--rc-accent-text); font-weight: 600; transition: background-color .15s; cursor: pointer; }
+.mh-rc-invite button:hover { background: #00c3651a; }
+
+/* Keyboard focus stays visible on the dark paper. */
+.mh-rc :is(button, a, summary):focus-visible { outline: 2px solid var(--rc-accent-text); outline-offset: 2px; }
+
+@keyframes mh-rc-swap { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes mh-rc-pop { 0% { transform: scale(.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+@keyframes mh-rc-ring { 0% { opacity: .9; transform: scale(.85); } 100% { opacity: 0; transform: scale(1.35); } }
+@keyframes mh-rc-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+@keyframes mh-rc-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.7); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mh-rc-status, .mh-rc-seal, .mh-rc-seal svg, .mh-rc-seal::after, .mh-rc-copy svg, .mh-rc-step .mh-rc-node::before { animation: none !important; }
+  .mh-rc-step + .mh-rc-step::after, .mh-rc-node, .mh-rc-copy, .mh-rc-close { transition: none !important; }
+}

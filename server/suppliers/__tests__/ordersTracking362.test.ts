@@ -1,0 +1,287 @@
+// Mystery Hub 3.6.2 · Orders, tracking and the digital receipt. Synthetic fixtures only.
+// Guards what the redesign must never get wrong: what each status means, what the money label claims, which stages are
+// shown as done, what a guest or another account can see, when the season may decorate, and that no new requests run.
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import type { OrderRecord } from '../../../src/types';
+import { orderReceiptView, orderSaving, receiptService } from '../../../src/utils/orderReceiptPresentation';
+import { customerOrderStatus, visibleDeviceOrders } from '../../../src/utils/customerOrderPresentation';
+import { ordersSeasonAttributes, ordersLook } from '../../../src/seasonal/ordersSeason';
+import { previewSeasonStatus } from '../../../shared/seasonal';
+import { CustomerOrderCard } from '../../../src/components/orders/CustomerOrderCard';
+
+const source = (path: string) => readFileSync(path, 'utf8');
+const code = (path: string) => source(path).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const order = (over: Partial<OrderRecord> = {}): OrderRecord => ({
+  id: 'MH-T-1', publicReference: 'MH-T-1', serviceType: 'data', network: 'mtn', paymentMethod: 'paystack', amountGhc: 23.5,
+  bundle: { id: 'server-bundle-MH-T-1', network: 'mtn', dataAmount: '5GB', dataBytesValue: 0, validity: 'Standard', validityCategory: 'Daily', priceGhc: 23.5 },
+  recipientPhone: '0241234567', buyerRecipientVisible: true, status: 'placed', serverStatus: 'queued',
+  createdAt: '2026-11-24T10:00:00Z', updatedAt: '2026-11-24T10:00:00Z', ...over,
+});
+const view = (over: Partial<OrderRecord>) => orderReceiptView(order(over));
+const allWords = (v: ReturnType<typeof orderReceiptView>) => [v.title, v.label, v.next, v.amountLabel, v.amountNote, v.paymentLine, ...v.steps.flatMap(s => [s.label, s.detail])].join(' | ');
+
+/* ───────── Status truth: the nineteen states must not collapse ───────── */
+
+test('payment states: unconfirmed, confirmed, queued, with the supplier, processing, delivered', () => {
+  const pending = view({ serverStatus: 'pending_payment', status: 'verifying' });
+  assert.equal(pending.tone, 'pending');
+  assert.equal(pending.amountLabel, 'Order total', 'an unconfirmed payment is never called an amount paid');
+  assert.equal(pending.amountNote, 'Payment not confirmed yet');
+  assert.equal(pending.paymentConfirmed, false);
+  assert.equal(pending.festive, false, 'an unconfirmed payment gets no festive decoration');
+  assert.deepEqual(pending.steps.map(s => s.state), ['current', 'upcoming', 'upcoming']);
+
+  for (const serverStatus of ['paid', 'queued']) {
+    const v = view({ serverStatus });
+    assert.equal(v.title, 'Payment confirmed'); assert.equal(v.label, 'Queued for delivery'); assert.equal(v.amountLabel, 'Amount paid');
+    assert.deepEqual(v.steps.map(s => s.state), ['done', 'current', 'upcoming']);
+    assert.equal(v.steps[1].detail, 'Queued after payment');
+    assert.equal(v.supplierDelivered, false, 'a confirmed payment is not a delivery');
+  }
+  for (const serverStatus of ['submitted', 'processing']) {
+    const v = view({ serverStatus, status: 'processing' });
+    assert.equal(v.label, 'Processing'); assert.equal(v.steps[1].detail, 'Being processed now'); assert.equal(v.steps[2].state, 'upcoming');
+  }
+  const delivered = view({ serverStatus: 'delivered', status: 'delivered' });
+  assert.equal(delivered.title, 'Your data has been delivered'); assert.equal(delivered.tone, 'success');
+  assert.deepEqual(delivered.steps.map(s => s.state), ['done', 'done', 'done']);
+  assert.equal(delivered.supplierDelivered, true); assert.equal(delivered.festive, true);
+});
+
+test('stopped orders: failed, manual review and resolution review stop the journey where it stopped', () => {
+  const unpaidFailed = view({ serverStatus: 'failed', status: 'failed' });
+  assert.equal(unpaidFailed.tone, 'attention'); assert.equal(unpaidFailed.amountLabel, 'Order total');
+  assert.equal(unpaidFailed.steps[0].state, 'halted', 'a failed attempt without a confirmed payment never shows the payment as done');
+  const review = view({ serverStatus: 'processing', manualReview: true });
+  assert.equal(review.title, 'Your order needs support review'); assert.equal(review.label, 'Manual review');
+  assert.deepEqual(review.steps.map(s => s.state), ['done', 'halted', 'upcoming'], 'manual review does not keep glowing as progress');
+  assert.equal(review.festive, false);
+  const resolution = view({ serverStatus: 'failed', status: 'failed', customerResolution: 'review' });
+  assert.equal(resolution.journeyKind, 'resolution'); assert.equal(resolution.label, 'Resolution review');
+  assert.match(resolution.next, /do not repeat the order/);
+  assert.deepEqual(resolution.steps.map(s => [s.label, s.state]), [['Payment received', 'done'], ['Support review', 'halted'], ['Outcome', 'upcoming']]);
+});
+
+test('refunds: pending, legacy refunded and verified stay distinct; only a verified resolution claims a refund', () => {
+  const pending = view({ serverStatus: 'refund_pending', status: 'failed', customerResolution: 'refund_pending' });
+  assert.equal(pending.tone, 'refund'); assert.equal(pending.title, 'Customer refund awaiting verification');
+  assert.equal(pending.amountNote, 'Refund not confirmed yet');
+  assert.deepEqual(pending.steps.at(-1), { key: 'outcome', label: 'Refund verified', detail: 'Not confirmed yet', state: 'upcoming' });
+
+  for (const serviceType of ['data', 'afa', 'airtime'] as const) {
+    const legacy = view({ serviceType, serverStatus: 'refunded', status: 'failed' });
+    assert.equal(legacy.label, 'Refund review', serviceType);
+    assert.equal(legacy.title, 'Refund confirmation pending', serviceType);
+    assert.doesNotMatch(legacy.title + legacy.label, /^Refunded$|Refund verified/, `${serviceType}: a refunded status alone is not a verified refund`);
+    assert.equal(legacy.steps.at(-1)!.state, 'upcoming');
+  }
+  const verified = view({ serverStatus: 'refunded', status: 'failed', customerResolution: 'refund_confirmed' });
+  assert.equal(verified.title, 'Refund verified'); assert.equal(verified.label, 'Refunded'); assert.equal(verified.tone, 'resolved');
+  assert.equal(verified.amountNote, 'Refund verified'); assert.equal(verified.steps.at(-1)!.state, 'done');
+  assert.equal(verified.festive, false);
+});
+
+test('manual completion and external remedies are operator outcomes, never supplier delivery or a Paystack refund', () => {
+  const manual = view({ serverStatus: 'failed', status: 'failed', customerResolution: 'manual_fulfillment' });
+  assert.equal(manual.title, 'Service completed manually'); assert.match(manual.next, /does not claim delivery by the original supplier/);
+  assert.equal(manual.supplierDelivered, false, 'no celebration for a manual remedy');
+  assert.deepEqual(manual.steps.at(-1), { key: 'outcome', label: 'Completed by support', detail: 'Through another channel', state: 'done' });
+  const external = view({ serverStatus: 'failed', status: 'failed', customerResolution: 'external_compensation' });
+  assert.equal(external.title, 'External remedy recorded'); assert.match(external.next, /not a Paystack-verified refund/);
+  assert.equal(external.amountNote, 'Remedy recorded by support');
+  assert.doesNotMatch(allWords(external), /Refund verified|Refunded/);
+});
+
+test('cancelled and expired payments are closed, never confirmed, and still caution about deducted money', () => {
+  for (const serverStatus of ['cancelled', 'expired']) {
+    for (const serviceType of ['data', 'airtime', 'instant_bundle', 'afa'] as const) {
+      const v = view({ serviceType, serverStatus, status: 'verifying' });
+      assert.equal(v.journeyKind, 'closed', `${serviceType} ${serverStatus}`);
+      assert.equal(v.title, 'Payment was not completed', `${serviceType} ${serverStatus}: never "Confirming your payment"`);
+      assert.equal(v.amountLabel, 'Order total');
+      assert.match(v.next, /If money was deducted, contact support/);
+      assert.doesNotMatch(v.paymentLine, /Confirmed/);
+      assert.equal(v.festive, false);
+    }
+  }
+});
+
+test('assisted orders: complimentary and operator-recorded never claim a customer payment', () => {
+  const free = view({ serverStatus: 'delivered', status: 'delivered', paymentBasis: 'complimentary' });
+  assert.equal(free.amountLabel, 'Complimentary'); assert.match(free.amountNote, /no customer payment/);
+  assert.equal(free.paymentConfirmed, false); assert.match(free.paymentLine, /no payment taken/);
+  assert.equal(free.steps[0].label, 'Complimentary');
+  const recorded = view({ serverStatus: 'queued', paymentBasis: 'operator_recorded' });
+  assert.equal(recorded.amountLabel, 'Recorded payment'); assert.match(recorded.paymentLine, /not a Paystack payment/);
+  assert.equal(recorded.steps[0].label, 'Payment recorded'); assert.equal(recorded.steps[0].state, 'done');
+  // Card and receipt agree for a stopped assisted order.
+  const stopped = order({ serverStatus: 'failed', status: 'failed', paymentBasis: 'operator_recorded' });
+  assert.equal(orderReceiptView(stopped).label, customerOrderStatus(stopped).label);
+  assert.equal(orderReceiptView(stopped).label, 'Support review');
+});
+
+test('service wording: airtime is not a bundle, AFA is a registration, Marketplace and checkers keep their own stages', () => {
+  const airtime = (serverStatus: string) => view({ serviceType: 'airtime', serverStatus, bundle: { ...order().bundle, id: 'airtime-mtn-20', dataAmount: 'GH₵20.00 Airtime' } });
+  assert.equal(airtime('delivered').title, 'Your airtime has been delivered');
+  for (const s of ['paid', 'processing', 'delivered']) assert.doesNotMatch(airtime(s).title + airtime(s).next, /bundle|data has/i, s);
+  const afa = (serverStatus: string, extra = {}) => view({ serviceType: 'afa', serverStatus, ...extra });
+  assert.equal(afa('delivered').title, 'AFA registration confirmed'); assert.equal(afa('delivered').label, 'Registered'); assert.equal(afa('delivered').doneWord, 'Registered');
+  assert.equal(afa('submitted').title, 'Registration in progress'); assert.equal(afa('submitted').steps[1].detail, 'Submitted for registration');
+  assert.equal(afa('processing', { manualReview: true }).title, 'Your registration needs support review');
+  for (const s of ['delivered', 'processing']) assert.doesNotMatch(allWords(afa(s)), /data|bundle/i);
+  const market = (marketplaceStatus: string, serverStatus = 'paid') => view({ serviceType: 'marketplace', serverStatus, marketplaceStatus, bundle: { ...order().bundle, id: 'marketplace-x', description: 'Earbuds' } });
+  assert.equal(market('ready_for_pickup').steps[1].detail, 'Ready for pickup');
+  assert.equal(market('completed', 'delivered').title, 'Order completed'); assert.equal(market('completed', 'delivered').doneWord, 'Completed');
+  assert.equal(market('refunded', 'processing').title, 'Refund confirmation pending');
+  assert.equal(view({ serviceType: 'results_checker', serverStatus: 'delivered' }).title, 'Your checker purchase is ready');
+  assert.equal(receiptService(order({ serviceType: undefined, bundle: { ...order().bundle, id: 'instant-mtn-video-3' } })), 'instant');
+  assert.equal(view({ serviceType: 'instant_bundle', serverStatus: 'delivered' }).title, 'Your bundle has been delivered');
+});
+
+test('no receipt wording invents a percentage, a timer or a delivery estimate', () => {
+  const states: Partial<OrderRecord>[] = ['pending_payment', 'paid', 'queued', 'submitted', 'processing', 'delivered', 'failed', 'refund_pending', 'refunded', 'cancelled', 'expired']
+    .flatMap(serverStatus => (['data', 'airtime', 'instant_bundle', 'afa', 'marketplace', 'results_checker'] as const).map(serviceType => ({ serverStatus, serviceType })));
+  for (const s of states) assert.doesNotMatch(allWords(view(s)), /\d+\s?%|\b\d+\s?(min|minute|hour)s?\b|within|guarantee|instant delivery/i, JSON.stringify(s));
+});
+
+/* ───────── The card ───────── */
+
+test('cards: one control, complimentary is never shown as money, savings only once paid', () => {
+  const html = (o: OrderRecord) => renderToStaticMarkup(React.createElement(CustomerOrderCard, { order: o, status: customerOrderStatus(o), onOpen() {}, now: new Date('2026-11-24T12:00:00Z') }));
+  const free = html(order({ serverStatus: 'delivered', status: 'delivered', paymentBasis: 'complimentary' }));
+  assert.match(free, /Complimentary/); assert.doesNotMatch(free, /GH₵23\.50/);
+  const pricing = { regularMinor: 2450, discountMinor: 100, paidMinor: 2350 };
+  assert.match(html(order({ serverStatus: 'delivered', status: 'delivered', commercialPricing: pricing })), /Saved GH₵1\.00/);
+  assert.doesNotMatch(html(order({ serverStatus: 'cancelled', status: 'verifying', commercialPricing: pricing })), /Saved/, 'a cancelled payment saved nothing');
+  assert.equal(orderSaving(order({ commercialPricing: pricing }), 'awaiting_payment'), 0);
+  const card = source('src/components/orders/CustomerOrderCard.tsx');
+  assert.equal((card.match(/<button/g) || []).length, 1);
+  assert.ok(!card.includes('publicReference') && !card.includes('fetch(') && !card.includes('lookupOrderOnServer'));
+});
+
+/* ───────── Privacy, isolation and synchronisation ───────── */
+
+test('device orders another account made here stay hidden after sign-out or an account switch', () => {
+  const guestBuy = order({ id: 'MH1', publicReference: 'MH-G' });
+  const amaBuy = order({ id: 'MH2', publicReference: 'MH-A', ownerUserId: 'usr_ama' });
+  const kofiBuy = order({ id: 'MH3', publicReference: 'MH-K', ownerUserId: 'usr_kofi' });
+  const all = [guestBuy, amaBuy, kofiBuy];
+  assert.deepEqual(visibleDeviceOrders(all, null).map(o => o.id), ['MH1'], 'a guest sees only signed-out purchases');
+  assert.deepEqual(visibleDeviceOrders(all, 'usr_ama').map(o => o.id), ['MH1', 'MH2']);
+  assert.deepEqual(visibleDeviceOrders(all, 'usr_kofi').map(o => o.id), ['MH1', 'MH3']);
+  const ctx = code('src/context/AppContext.tsx');
+  assert.match(ctx, /ownerUserId: user\?\.id,/);
+  assert.match(ctx, /setIsStatusModalOpen\(false\); setActiveOrder\(null\);/, 'signing out closes and forgets an open receipt');
+  assert.match(code('src/components/orders/OrdersPage.tsx'), /visibleDeviceOrders\(localOrders, user\?\.id\)/);
+});
+
+test('a live status update reaches the open receipt for every service, carries every status field, and only status fields', () => {
+  const ctx = code('src/context/AppContext.tsx');
+  const update = ctx.slice(ctx.indexOf('const updateOrderStatus = ('), ctx.indexOf('const [authContextMessage'));
+  for (const field of ['customerResolution', 'paymentBasis', 'marketplaceStatus', 'manualReview', 'serverStatus', 'statusMessage']) assert.match(update, new RegExp(`${field}:`), field);
+  assert.doesNotMatch(update, /recipientPhone|amountGhc|buyerRecipientVisible|\['afa', 'data'\]/, 'no owner fields, and no service is left out');
+  assert.match(update, /setActiveOrder\(\(current\) => \(current && matches\(current\) \? apply\(current\) : current\)\)/, 'never replaces a different open order');
+  const page = code('src/components/orders/OrdersPage.tsx');
+  const sync = page.slice(page.indexOf('const ref = activeOrder?.publicReference;'), page.indexOf('}, [activeOrder]);'));
+  for (const field of ['customerResolution', 'paymentBasis', 'marketplaceStatus']) assert.match(sync, new RegExp(`${field}: activeOrder\\.${field}`), field);
+  assert.doesNotMatch(sync, /recipientPhone|amountGhc|buyerRecipientVisible|bundle/, 'a masked lookup never overwrites owner details');
+});
+
+test('the receipt drops late answers, never overlaps its checks, and keeps the existing schedule', () => {
+  const modal = code('src/components/checkout/OrderStatusModal.tsx');
+  assert.match(modal, /let alive = true, inFlight = false;/);
+  assert.match(modal, /if \(!alive\) return;/);
+  assert.match(modal, /if \(inFlight\) return;/);
+  assert.match(modal, /\(shown\.publicReference \|\| shown\.id\) === lookupReference/, 'an answer for another order is ignored');
+  assert.match(modal, /return \(\) => \{ alive = false; clearInterval\(interval\); \};/);
+  assert.match(modal, /\}, \[isStatusModalOpen, lookupReference, isTerminal\]\);/, 'the loop no longer restarts on every app render');
+  assert.equal((modal.match(/setInterval\(/g) || []).length, 1); assert.match(modal, /setInterval\(fetchServerStatus, 3000\)/);
+  // Only the public reference is shown or copied; no payment or internal identifiers.
+  assert.match(modal, /navigator\.clipboard\.writeText\(displayRef\)/);
+  for (const internal of ['paymentReference', 'supplier_order_id', 'supplier_response', 'failure_reason', 'admin_note', 'resolution_json', 'customer_email']) assert.ok(!modal.includes(internal), internal);
+  // The page makes no lookups of its own; tracking keeps the reference-only contract.
+  assert.ok(!code('src/components/orders/OrdersPage.tsx').includes('lookupOrderOnServer'));
+  assert.ok(!code('src/components/orders/TrackOrderPanel.tsx').includes('buyerRecipientVisible'));
+});
+
+test('one primary action fits the situation; problems come before selling; blocked services are never repeated', () => {
+  const modal = code('src/components/checkout/OrderStatusModal.tsx');
+  assert.match(modal, /const needsHelp = view\.tone === 'attention' \|\| view\.tone === 'refund';/);
+  assert.match(modal, /const primary = activeOrder\.serviceType === 'results_checker' \? 'results' : needsHelp \? 'help' : delivered && repeatable \? 'buy' : 'done';/);
+  assert.match(modal, /const repeatable = !activeOrder\.serviceType \|\| \['data', 'airtime', 'instant_bundle'\]\.includes\(activeOrder\.serviceType\);/, 'Marketplace, AFA and checkers are never offered again from a receipt');
+  assert.match(modal, /void buyAgain\(reference, \{ beforeOpen: closeOrderStatus, /, 'Smart Buy Again keeps the authoritative reorder contract');
+  assert.doesNotMatch(modal, /openCheckout\(|initializePayment|paystack/i, 'the receipt never opens a payment by itself');
+  assert.doesNotMatch(modal, /links and tracks every purchase/, 'no claim that past guest purchases join a new account');
+});
+
+/* ───────── Season ───────── */
+
+test('the season decorates Orders and receipts that are going well, for guests and members, on the existing calendar', () => {
+  const on = (date: string) => ({ shellActive: true, status: previewSeasonStatus('christmas-2026', date) });
+  assert.deepEqual(ordersSeasonAttributes({ shellActive: false, status: previewSeasonStatus('christmas-2026', '2026-12-10') }), {});
+  assert.equal(ordersSeasonAttributes(on('2026-12-10'))['data-or-look'], 'christmas');
+  assert.equal(ordersSeasonAttributes(on('2026-12-25'))['data-or-look'], 'christmas-day');
+  assert.equal(ordersSeasonAttributes(on('2026-12-31'))['data-or-look'], 'new-year');
+  assert.equal(ordersLook(previewSeasonStatus('christmas-2026', '2027-01-02')), 'new-year');
+  const modal = code('src/components/checkout/OrderStatusModal.tsx');
+  assert.match(modal, /data-rc-mood=\{view\.festive \? 'bright' : 'serious'\}/);
+  assert.match(modal, /\{\.\.\.\(view\.festive \? ordersSeasonAttributes\(season\) : \{\}\)\}/, 'serious receipts never carry the season');
+  for (const tone of ['pending', 'attention', 'refund', 'resolved', 'closed']) assert.ok(!['progress', 'success'].includes(tone));
+  assert.match(source('src/components/checkout/receipt.css'), /\.mh-rc\[data-rc-mood="serious"\]::after \{ content: none !important; \}/, 'no seasonal sheet bow on a serious receipt');
+  const seasonal = source('src/seasonal/Seasonal.tsx');
+  assert.match(seasonal, /export function SeasonalOrders[\s\S]*?if \(!season\.shellActive \|\| season\.status\.pack !== 'christmas-2026'\) return <>\{fallback\}<\/>;/);
+  assert.match(seasonal, /lazy\(loadOrders\)/, 'the seasonal Orders look is its own lazy chunk');
+  assert.ok(!code('src/components/orders/OrdersPage.tsx').includes('<Seasonal slot='), 'no guest-only page accent on Orders');
+});
+
+/** Every selector of every rule in a stylesheet, with keyframes and @media wrappers removed. */
+function selectorsOf(cssText: string): string[] {
+  const css = cssText.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@keyframes[^{]+\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '').replace(/@media[^{]+\{/g, '');
+  const out: string[] = [];
+  for (const rule of css.match(/[^{}]+\{[^{}]*\}/g) || []) {
+    let depth = 0, current = '';
+    for (const ch of rule.slice(0, rule.indexOf('{'))) {
+      if (ch === '(') depth++; if (ch === ')') depth--;
+      if (ch === ',' && depth === 0) { out.push(current.trim()); current = ''; } else current += ch;
+    }
+    out.push(current.trim());
+  }
+  return out.filter(Boolean);
+}
+
+test('every style is scoped: ordinary Orders and receipt, and the seasonal re-tone', () => {
+  for (const s of selectorsOf(source('src/components/orders/orders.css'))) assert.match(s, /^\.mh-or\b/, s);
+  for (const s of selectorsOf(source('src/components/checkout/receipt.css'))) assert.match(s, /^\.mh-rc\b/, s);
+  for (const s of selectorsOf(source('src/seasonal/christmas/orders/orders.css'))) assert.match(s, /^\.mh-(or|rc)\[data-or-season="christmas"\]/, s);
+});
+
+test('motion is finite, transform and opacity only, and reduced motion holds it still', () => {
+  const files = ['src/components/orders/orders.css', 'src/components/checkout/receipt.css', 'src/seasonal/christmas/orders/orders.css'];
+  for (const file of files) {
+    const css = source(file);
+    assert.match(css, /@media \(prefers-reduced-motion: reduce\)/, file);
+    for (const block of css.match(/@keyframes[^{]+\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g) || []) {
+      const props = [...block.matchAll(/([a-z-]+)\s*:/g)].map(m => m[1]);
+      for (const prop of props) assert.ok(['opacity', 'transform', 'background-position'].includes(prop), `${file}: ${block.slice(0, 40)} animates ${prop}`);
+    }
+    // The only endless loops are the loading shimmer and the refresh spinner, which exist only while a request runs.
+    const infinite = (css.match(/animation:[^;]*infinite[^;]*;/g) || []);
+    for (const rule of infinite) assert.match(rule, /mh-or-shimmer|mh-or-spin/, `${file}: ${rule}`);
+  }
+  assert.match(source('src/components/orders/orders.css'), /\.mh-or \.mh-or-refresh\[aria-busy="true"\] svg \{ animation: mh-or-spin/);
+});
+
+/* ───────── The Data page's Welcome Offer, inside the page margins ───────── */
+
+test('the Welcome Offer notice sits inside the Data page container, after payment recovery and before the title panel', () => {
+  const page = source('src/components/data/DataPage.tsx');
+  const root = page.indexOf('<div className="mh-ds py-4'), container = page.indexOf('<div className="max-w-7xl mx-auto', root);
+  const banner = page.indexOf('<PendingPaymentBanner />', container), notice = page.indexOf('<WelcomeOfferNotice offer={welcomeOffer}/>', container), hero = page.indexOf('<DataStoreHero', container);
+  assert.ok(root > 0 && container > root && banner > container && notice > banner && hero > notice, 'container > recovery > offer > title');
+  assert.equal((page.match(/<WelcomeOfferNotice /g) || []).length, 1);
+  assert.match(source('src/components/data/dataStore.css'), /\.mh-ds \.mh-ds-offer:empty \{ display: none; \}/, 'no empty gap when no offer applies');
+});
