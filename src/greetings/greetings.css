@@ -139,11 +139,15 @@
 .mg-bloom { position: absolute; left: 50%; top: var(--mg-from-y, 160px); z-index: 0; width: min(120vw, 620px); aspect-ratio: 1; margin-left: max(-60vw, -310px); margin-top: max(-60vw, -310px);
   border-radius: 50%; pointer-events: none; opacity: 0;
   background: radial-gradient(closest-side, color-mix(in srgb, var(--mg-accent-2) 75%, transparent), color-mix(in srgb, var(--mg-accent) 28%, transparent) 45%, transparent 72%); }
-.mg-stage[data-state="opening"] .mg-bloom { animation: mg-bloom 1.35s ease-out .42s both; }
+.mg-stage[data-state="opening"] .mg-bloom { animation: mg-bloom 1.2s ease-out .42s both; }
+/* The stage keeps its light to itself: the bloom (and any flying part) never paints over the top bar or the creator's
+   own heading and badge. Its edge is fully transparent, so the clip is invisible. */
+.mg-stage { overflow: clip; }
 .mg-stage .mg-sealed { position: relative; z-index: 1; }
 .mg-stage .mg-letter { z-index: 2; }
-/* Words always paint above the letter's ribbon and stars. */
-.mg-letter > * { position: relative; }
+/* Words always paint above the letter's ribbon, stars and 2027 mark. */
+.mg-letter > * { position: relative; z-index: 1; }
+.mg-letter::before, .mg-letter::after { z-index: 0; }
 
 /* ───────── The letter ───────── */
 .mg-letter { position: relative; margin: 0 auto; width: 100%; max-width: 520px; padding: 30px 22px 20px; border-radius: 20px; color: var(--mg-ink); text-align: left;
@@ -449,7 +453,7 @@
 .mg-done-art svg { position: relative; animation: mg-done-land .9s var(--mg-ease) .1s backwards; }
 .mg-pop { animation: mg-check-pop .32s var(--mg-ease); }
 @media (max-width: 420px) { .mg-done-actions { grid-template-columns: 1fr; } }
-@keyframes mg-sky-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mg-sky-in { from { opacity: .55; } to { opacity: 1; } }
 @keyframes mg-step-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes mg-pick { 0% { transform: none; } 35% { transform: translateY(-6%) scale(1.05) rotate(-2deg); } 65% { transform: translateY(1%) scale(.99); } 100% { transform: none; } }
 @keyframes mg-check-pop { 0% { transform: scale(.5); } 70% { transform: scale(1.15); } 100% { transform: none; } }

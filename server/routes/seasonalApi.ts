@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { serverSeasonStatus } from '../../shared/seasonal.js';
-import { greetingCreationAvailable } from '../services/experienceService.js';
+import { greetingCreationAvailable, greetingCreationOffered } from '../services/experienceService.js';
 
 /**
  * Seasonal Experience status. Public and read-only: it says whether the seasonal presentation is switched on for
@@ -11,12 +11,17 @@ import { greetingCreationAvailable } from '../services/experienceService.js';
 export const seasonalRouter = Router();
 
 seasonalRouter.get('/status', async (_req, res) => {
+  try {
   // Short public caching: a change of the setting reaches visitors within minutes, and every visitor sees the same answer.
-  res.setHeader('Cache-Control', 'public, max-age=300');
+  // While greetings are switched on, within about a minute, so a storage change (or a brief hiccup) never lingers.
+  res.setHeader('Cache-Control', greetingCreationOffered() ? 'public, max-age=60' : 'public, max-age=300');
   const { active, pack, phase, date, daysToChristmas, daysToNewYear, source } = serverSeasonStatus(process.env.SEASONAL_EXPERIENCE);
   // Mystery Greetings creator: reported only while a new greeting would really be accepted: both greeting gates on
   // (MYSTERY_GREETING_LINKS_ENABLED and MYSTERY_GREETINGS_ENABLED), the abuse secret configured, the optional schema
   // installed and retention clean-up not overdue. Until then both seasonal homepages say "Coming soon". Never throws.
   const greetings = { createPath: await greetingCreationAvailable().catch(() => false) ? '/greetings' : null };
   res.json({ active, pack, phase, date, daysToChristmas, daysToNewYear, source, greetings });
+  } catch {
+    res.status(503).set('Cache-Control', 'no-store').json({ error: 'Seasonal status is unavailable.' });
+  }
 });

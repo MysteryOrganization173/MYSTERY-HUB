@@ -3,7 +3,7 @@ import {requireAdmin} from '../middleware/authMiddleware.js';
 import {createRateLimiter} from '../middleware/rateLimiter.js';
 import {campaignRequestEligible} from '../db/campaignStore.js';
 import {ExperienceStore,abuseIdentity} from '../db/experienceStore.js';
-import {ExperienceService,greetingCreationEnabled,greetingLinksEnabled} from '../services/experienceService.js';
+import {ExperienceService,greetingCreationEnabled,greetingLinksEnabled,resetGreetingCreationAvailability} from '../services/experienceService.js';
 import {ExperienceError,objectInput} from '../services/experienceValidation.js';
 import {countdownState} from '../../shared/mysteryExperiences.js';
 const peer=(req:Request)=>req.socket.remoteAddress||'unknown';
@@ -46,4 +46,4 @@ adminExperienceRouter.post('/greetings/:shareId/revoke',handle(req=>{
  const v=objectInput(req.body,['confirmed']);if(v.confirmed!==true)throw new ExperienceError('CONFIRM_REQUIRED');return ExperienceStore.moderate(req.user!.id,req.params.shareId);
 }));
 adminExperienceRouter.get('/metrics',handle(req=>{if(Object.keys(req.query).some(k=>k!=='days')||req.query.days!==undefined&&!['7','30','90'].includes(String(req.query.days)))throw new ExperienceError('INVALID_RANGE');return ExperienceStore.metrics(Number(req.query.days||30));}));
-adminExperienceRouter.post('/maintenance',handle(req=>{const v=objectInput(req.body,['confirmed']);if(v.confirmed!==true)throw new ExperienceError('CONFIRM_REQUIRED');return ExperienceStore.maintenance(req.user!.id);}));
+adminExperienceRouter.post('/maintenance',handle(req=>{const v=objectInput(req.body,['confirmed']);if(v.confirmed!==true)throw new ExperienceError('CONFIRM_REQUIRED');return ExperienceStore.maintenance(req.user!.id).then(counts=>{resetGreetingCreationAvailability();return counts;});}));

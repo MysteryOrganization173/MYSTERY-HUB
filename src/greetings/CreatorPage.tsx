@@ -166,7 +166,7 @@ export function CreatorPage({ search }: { search: string }) {
             <div className="mg-actions"><button type="button" className="mg-btn mg-btn-primary" onClick={() => void loadSetup()}>Try again</button><a className="mg-btn mg-btn-quiet" href="/">Back to Mystery Hub</a></div>
           </section>
         )}
-        {setup.state === 'closed' && <ClosedNotice store={store} />}
+        {setup.state === 'closed' && <ClosedNotice store={store} onRetry={() => void loadSetup()} />}
         {setup.state === 'open' && created && <Done created={created} store={store} onAnother={() => startAnother()} />}
         {setup.state === 'open' && !created && (
           <>
@@ -285,8 +285,12 @@ function MessageStep({ draft, templates, errors, splitNotice, update, onBack, on
     const others = choices.filter(t => t.id !== draft.templateId); const pick = others[Math.floor(Math.random() * others.length)];
     if (!pick) return;
     update({ mode: 'template', templateId: pick.id });
-    requestAnimationFrame(() => document.querySelector(`input[name="mg-template"][value="${CSS.escape(pick.id)}"]`)?.closest('label')
-      ?.scrollIntoView({ block: 'center', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
+    // Focus follows the pick, so it is announced and keyboard users land on it.
+    requestAnimationFrame(() => {
+      const input = document.querySelector<HTMLInputElement>(`input[name="mg-template"][value="${CSS.escape(pick.id)}"]`);
+      input?.closest('label')?.scrollIntoView({ block: 'center', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      input?.focus({ preventScroll: true });
+    });
   };
   return (
     <section className="mg-step" aria-labelledby="mg-step-title">
@@ -463,13 +467,13 @@ function SentList({ store, exclude }: { store: GreetingsStore; exclude?: string 
   );
 }
 
-function ClosedNotice({ store }: { store: GreetingsStore }) {
+function ClosedNotice({ store, onRetry }: { store: GreetingsStore; onRetry: () => void }) {
   return (
     <section className="mg-state mg-closed" aria-labelledby="mg-closed-title">
       <span className="mg-closed-art" aria-hidden="true"><GiftArt occasion="christmas-2026" variant="gift-classic-v1" /></span>
       <h1 id="mg-closed-title">Mystery Greetings isn’t open right now</h1>
       <p>When it’s open, you can wrap a personal Christmas or New Year greeting as a digital gift and share the link. Please check back soon.</p>
-      <div className="mg-actions"><a className="mg-btn mg-btn-primary" href="/">Back to Mystery Hub</a></div>
+      <div className="mg-actions"><a className="mg-btn mg-btn-primary" href="/">Back to Mystery Hub</a><button type="button" className="mg-btn mg-btn-quiet" onClick={onRetry}>Check again</button></div>
       <SentList store={store} />
     </section>
   );

@@ -60,20 +60,28 @@ const freshQuota = () => db.query("DELETE FROM mysteryhub_experiences.budgets WH
 /** The server also allows 15 creation requests a minute per address (in memory): the review paces itself under that. */
 const recent = [];
 async function pace() { while (recent.length >= 7 && Date.now() - recent[0] < 61000) await sleep(61000 - (Date.now() - recent[0])); recent.push(Date.now()); while (recent.length > 7) recent.shift(); }
+/** Taps the visible option (its label), as a person does, and asserts it is selected. Hidden inputs are never force-checked:
+ *  that can land under the sticky actions or race a step's entrance and is not what a customer does. */
+async function tapOption(page, radio) {
+  const label = radio.locator('xpath=ancestor::label[1]');
+  await label.waitFor(); await page.waitForTimeout(450); // let a step entrance settle
+  await label.click();
+  if (!(await radio.isChecked())) throw new Error('option did not select');
+}
 async function createViaUI(page, o) {
   if (!o.keepQuota) await freshQuota();
   await pace();
   await page.goto(`${BASE}/greetings?occasion=${o.occasion || 'christmas-2026'}`);
   await waitStep(page, 'Wrap a little surprise');
-  if (o.variant === 'gift-starlight-v1') await page.getByRole('radio', { name: /Starlight/ }).check({ force: true });
+  if (o.variant === 'gift-starlight-v1') await tapOption(page, page.getByRole('radio', { name: /Starlight/ }));
   await page.getByRole('button', { name: 'Continue' }).click();
   await waitStep(page, 'Your message');
   await page.getByLabel('Who is it for?').fill(o.to);
   // Tap the visible option, as a person does (a forced check on the hidden input can land under the sticky actions at 320 px).
   if (o.message !== undefined) { await page.getByText('Write my own', { exact: true }).click(); if (!(await page.getByRole('radio', { name: 'Write my own' }).isChecked())) throw new Error('Write my own did not select'); await page.getByRole('textbox', { name: 'Write your own message' }).fill(o.message); }
-  else await page.getByRole('radio', { name: new RegExp(o.template || 'Heartwarming') }).first().check({ force: true });
+  else await tapOption(page, page.getByRole('radio', { name: new RegExp(o.template || 'Heartwarming') }).first());
   if (o.from) await page.getByLabel(/Your name/).fill(o.from);
-  if (o.hidden) await page.getByRole('checkbox', { name: 'Keep me a mystery' }).check({ force: true });
+  if (o.hidden) await tapOption(page, page.getByRole('checkbox', { name: 'Keep me a mystery' }));
   await page.getByRole('button', { name: /^Preview/ }).click();
   await waitStep(page, 'Preview');
   if (o.beforeCreate) await o.beforeCreate(page);
@@ -154,7 +162,7 @@ async function phaseOpen() {
     ok(!r.page.url().includes(created.first.shareId), r.page.url());
     await r.page.getByRole('button', { name: 'Continue' }).click();
     await r.page.getByLabel('Who is it for?').fill(`Yaa ${tag()}`);
-    await r.page.getByRole('radio', { name: /Family/ }).check({ force: true });
+    await tapOption(r.page, r.page.getByRole('radio', { name: /Family/ }));
     await r.page.getByRole('button', { name: /^Preview/ }).click();
     await r.page.getByRole('button', { name: 'Wrap my greeting' }).click();
     await r.page.locator('#mg-done-title').waitFor();
@@ -210,7 +218,7 @@ async function phaseOpen() {
     ok(await page.getByText('Add the name of the person this greeting is for.').isVisible(), 'empty name');
     ok(await page.waitForFunction(() => document.activeElement?.id === 'mg-field-recipient', null, { timeout: 2000 }).then(() => true, () => false), 'focus on the name');
     await page.getByLabel('Who is it for?').fill('<b>Ama</b>');
-    await page.getByRole('radio', { name: 'Write my own' }).check({ force: true });
+    await tapOption(page, page.getByRole('radio', { name: 'Write my own' }));
     await page.getByRole('textbox', { name: 'Write your own message' }).fill('Visit www.example.com for more');
     await page.getByRole('button', { name: /^Preview/ }).click();
     ok(await page.getByText(/Remove the < and > signs from their name/).isVisible(), 'markup');
@@ -232,7 +240,7 @@ async function phaseOpen() {
     await page.goto(`${BASE}/greetings`); await waitStep(page, 'Wrap a little surprise');
     await page.getByRole('button', { name: 'Continue' }).click();
     await page.getByLabel('Who is it for?').fill('The Mensahs 👨‍👩‍👧');
-    await page.getByRole('radio', { name: /Family/ }).check({ force: true });
+    await tapOption(page, page.getByRole('radio', { name: /Family/ }));
     await page.getByRole('button', { name: /^Preview/ }).click(); await waitStep(page, 'Preview');
     ok((await page.locator('.mg-name').first().innerText()).includes('👨👩👧'), 'split in preview');
     await page.getByRole('button', { name: 'Back' }).click(); await waitStep(page, 'Your message');
@@ -243,10 +251,10 @@ async function phaseOpen() {
   await check('browser Back and on-screen Back move between steps and keep the draft; refresh keeps it too', async () => {
     const ctx = await context(); const page = await ctx.newPage();
     await page.goto(`${BASE}/greetings?occasion=new-year-2027`); await waitStep(page, 'Wrap a little surprise');
-    await page.getByRole('radio', { name: /Starlight/ }).check({ force: true });
+    await tapOption(page, page.getByRole('radio', { name: /Starlight/ }));
     await page.getByRole('button', { name: 'Continue' }).click(); await waitStep(page, 'Your message');
     await page.getByLabel('Who is it for?').fill('Esi');
-    await page.getByRole('radio', { name: 'Write my own' }).check({ force: true });
+    await tapOption(page, page.getByRole('radio', { name: 'Write my own' }));
     await page.getByRole('textbox', { name: 'Write your own message' }).fill('Line one\nLine two');
     await page.getByLabel(/Your name/).fill('Kwame');
     await page.getByRole('button', { name: /^Preview/ }).click(); await waitStep(page, 'Preview');
@@ -269,7 +277,7 @@ async function phaseOpen() {
     await page.goto(`${BASE}/greetings?occasion=christmas-2026`); await waitStep(page, 'Wrap a little surprise');
     await page.getByRole('button', { name: 'Continue' }).click(); await waitStep(page, 'Your message');
     await page.getByLabel('Who is it for?').fill('Kojo');
-    await page.getByRole('radio', { name: /Family/ }).check({ force: true });
+    await tapOption(page, page.getByRole('radio', { name: /Family/ }));
     await page.goto(`${BASE}/greetings?occasion=new-year-2027`); await waitStep(page, 'Wrap a little surprise');
     ok(await page.getByRole('radio', { name: /New Year/ }).isChecked(), 'the link’s occasion wins');
     await page.getByRole('button', { name: 'Continue' }).click(); await waitStep(page, 'Your message');
@@ -308,7 +316,7 @@ async function phaseOpen() {
     await page.goto(`${BASE}/greetings`); await waitStep(page, 'Wrap a little surprise');
     await page.getByRole('button', { name: 'Continue' }).click();
     await page.getByLabel('Who is it for?').fill(to);
-    await page.getByRole('radio', { name: /Funny/ }).check({ force: true });
+    await tapOption(page, page.getByRole('radio', { name: /Funny/ }));
     await page.getByRole('button', { name: /^Preview/ }).click(); await waitStep(page, 'Preview');
     await page.getByRole('button', { name: 'Wrap my greeting' }).click();
     await page.getByText(/We couldn’t confirm your greeting/).waitFor();
@@ -341,7 +349,7 @@ async function phaseOpen() {
     await page.getByRole('button', { name: 'Continue' }).click();
     ok(await page.getByLabel(/Your name/).inputValue() === 'Kofi', 'sender name kept for the next greeting');
     await page.getByLabel('Who is it for?').fill(to);
-    await page.getByRole('radio', { name: /Family/ }).check({ force: true });
+    await tapOption(page, page.getByRole('radio', { name: /Family/ }));
     await page.getByRole('button', { name: /^Preview/ }).click(); await waitStep(page, 'Preview');
     await page.getByRole('button', { name: 'Wrap my greeting' }).click();
     await page.getByText(/You just made this exact greeting/).waitFor();
@@ -512,7 +520,7 @@ async function phaseOpen() {
     await page.getByText('Shared links working now').waitFor({ timeout: 15000 });
     const body = (await page.locator('main').innerText()).replace(/\s+/g, ' ');
     // 3.6.1: one verdict from what actually works, then the switches and the working-now checks, separately.
-    ok(/Status: Live/.test(body) && /Links switch \(MYSTERY_GREETING_LINKS_ENABLED\) On/.test(body) && /Creation switch \(MYSTERY_GREETINGS_ENABLED\) On/.test(body)
+    ok(/Status: Live/.test(body) && /Links switch \(MYSTERY_GREETING_LINKS_ENABLED\) On/.test(body) && /Creation switch \(MYSTERY_GREETINGS_ENABLED; needs links on\) On/.test(body)
       && /Shared links working now Yes/.test(body) && /New greetings accepted now Yes/.test(body)
       && /Abuse protection secret Configured/.test(body) && /Storage \(optional schema\) Installed/.test(body), body.slice(body.indexOf('Mystery Greetings'), body.indexOf('Mystery Greetings') + 600));
     ok(/Greetings created \d+/.test(body), 'totals');
@@ -661,7 +669,7 @@ async function phaseOpen() {
       await shot('creator-design');
       await page.getByRole('button', { name: 'Continue' }).click(); await waitStep(page, 'Your message');
       await page.getByLabel('Who is it for?').fill('Nana Akosua Serwaa'); await page.getByLabel('Who is it for?').blur();
-      await page.getByRole('radio', { name: /Ghanaian/ }).check({ force: true });
+      await tapOption(page, page.getByRole('radio', { name: /Ghanaian/ }));
       if (await overflow(page)) problems.push(`${w} message overflow`);
       if (!(await inView(page.getByRole('button', { name: /^Preview/ })))) problems.push(`${w} Preview not visible`);
       await shot('creator-message');

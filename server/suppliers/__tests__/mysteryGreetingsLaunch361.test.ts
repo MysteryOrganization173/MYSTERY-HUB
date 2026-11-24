@@ -4,6 +4,9 @@ import { readFileSync } from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { GreetingStage, OPEN_MS } from '../../../src/greetings/GreetingStage.js';
+import { CREATION_AVAILABILITY_TTL_MS, CREATION_AVAILABILITY_WAIT_MS, greetingCreationAvailable, resetGreetingCreationAvailability } from '../../services/experienceService.js';
+import { ExperienceStore } from '../../db/experienceStore.js';
+import { ExperienceError } from '../../services/experienceValidation.js';
 
 /**
  * Mystery Hub 3.6.1 · Mystery Greetings launch readiness. These guard the refinements of this release: motion that
@@ -57,7 +60,7 @@ test('one top-level heading: once opened, the letter greeting becomes the page h
 });
 
 test('letter decoration (ribbon, stars, 2027 mark) is decorative only and never paints over words', () => {
-  assert.match(clean, /\.mg-letter > \* \{ position: relative; \}/, 'words paint above positioned decoration');
+  assert.match(clean, /\.mg-letter > \* \{ position: relative; z-index: 1; \}\n\.mg-letter::before, \.mg-letter::after \{ z-index: 0; \}/, 'words paint above positioned decoration, the 2027 mark included');
   for (const rule of [/\.mg-page\[data-variant="gift-classic-v1"\] \.mg-letter::before \{[^}]*pointer-events: none;/, /\.mg-page\[data-variant="gift-starlight-v1"\] \.mg-letter::before \{[^}]*pointer-events: none;/, /\.mg-page\[data-occasion="new-year-2027"\] \.mg-letter::after \{[^}]*pointer-events: none;/])
     assert.match(clean, rule);
   // The message keeps its line breaks and wraps any long word: nothing is clipped by the letter's rounded edge.
@@ -82,4 +85,51 @@ test('Admin leads with one verdict from what actually works, separate from the s
   assert.match(service, /const available=\{links:gates\.links&&storage==='installed',creation:gates\.creation&&abuseSecret&&storage==='installed'&&retentionDue===false\};/);
   // Readiness and the public signal never expose secret values.
   assert.doesNotMatch(service, /EXPERIENCES_ABUSE_SECRET\s*[,}]/);
+});
+
+test('availability never makes visitors wait on the database, and a busy moment is never remembered as closed', async () => {
+  const keys = ['MYSTERY_GREETING_LINKS_ENABLED', 'MYSTERY_GREETINGS_ENABLED', 'EXPERIENCES_ABUSE_SECRET'] as const;
+  const saved = Object.fromEntries(keys.map(k => [k, process.env[k]]));
+  Object.assign(process.env, { MYSTERY_GREETING_LINKS_ENABLED: 'true', MYSTERY_GREETINGS_ENABLED: 'true', EXPERIENCES_ABUSE_SECRET: 'ab'.repeat(32) });
+  const original = ExperienceStore.creationReadiness;
+  let answer: () => Promise<boolean> = async () => true, reads = 0;
+  (ExperienceStore as any).creationReadiness = () => { reads++; return answer(); };
+  try {
+    // BUSY (the two-transaction cap) with no earlier answer: closed for this request only; the next request asks again.
+    resetGreetingCreationAvailability(); answer = async () => { throw new ExperienceError('BUSY', 429); };
+    assert.equal(await greetingCreationAvailable(), false);
+    answer = async () => true;
+    assert.equal(await greetingCreationAvailable(), true, 'a busy moment was not cached as closed');
+    // BUSY with an earlier answer keeps it.
+    const later = Date.now() + CREATION_AVAILABILITY_TTL_MS + 1;
+    answer = async () => { throw new ExperienceError('BUSY', 429); };
+    assert.equal(await greetingCreationAvailable(later), true, 'stale answer served');
+    await new Promise(r => setTimeout(r, 5));
+    assert.equal(await greetingCreationAvailable(later), true, 'busy refresh kept the last answer');
+    // A slow database: the first answer in a process waits at most the wait limit, then the result lands for later calls.
+    resetGreetingCreationAvailability(); let release!: (v: boolean) => void;
+    answer = () => new Promise<boolean>(r => { release = r; });
+    const started = Date.now();
+    assert.equal(await greetingCreationAvailable(), false, 'not yet known: not advertised');
+    assert.ok(Date.now() - started < CREATION_AVAILABILITY_WAIT_MS + 400, 'waited no longer than the limit');
+    release(true); await new Promise(r => setTimeout(r, 5));
+    assert.equal(await greetingCreationAvailable(), true, 'the slow answer is used once it arrives');
+    // Stale-while-revalidate: an expired answer is returned at once while one refresh runs.
+    const before = reads; answer = () => new Promise<boolean>(() => {});
+    const t0 = Date.now();
+    assert.equal(await greetingCreationAvailable(Date.now() + CREATION_AVAILABILITY_TTL_MS + 1), true);
+    assert.ok(Date.now() - t0 < 50, 'no waiting on a refresh');
+    assert.equal(reads - before, 1, 'one refresh');
+  } finally {
+    (ExperienceStore as any).creationReadiness = original; resetGreetingCreationAvailability();
+    for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+  }
+  // The public check reads no audit or personal data; maintenance refreshes the cached answer at once.
+  const store = read('server/db/experienceStore.ts');
+  const check = store.slice(store.indexOf('static async creationReadiness'), store.indexOf('static async maintenance'));
+  assert.doesNotMatch(check, /admin_audit_log|recipient_name|message/);
+  assert.match(read('server/routes/experienceApi.ts'), /ExperienceStore\.maintenance\(req\.user!\.id\)\.then\(counts=>\{resetGreetingCreationAvailability\(\);return counts;\}\)/);
+  // Anything switched on that does not work is "not working", never a calm "links only"; short caching while it matters.
+  assert.match(read('server/services/experienceService.ts'), /\(gates\.links&&!available\.links\)\|\|\(gates\.creationSwitch&&!available\.creation\)\?'not-working'/);
+  assert.match(read('server/routes/seasonalApi.ts'), /greetingCreationOffered\(\) \? 'public, max-age=60' : 'public, max-age=300'/);
 });

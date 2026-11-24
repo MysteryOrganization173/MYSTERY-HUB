@@ -304,9 +304,9 @@ test('homepage entries: closed until both gates are on, the abuse secret is set 
   const status = async () => (await (await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/seasonal/status`)).json()).greetings;
   // 3.6.1: the creator is advertised only when a greeting would really be accepted. Storage is stubbed here (the native
   // PostgreSQL suite checks the real schema); every read of it is counted, so the gates-off path is shown to skip it.
-  const originalReadiness = ExperienceStore.readiness;
+  const originalReadiness = ExperienceStore.creationReadiness;
   let storage: { installed: boolean; retentionDue: boolean | null } | 'error' = { installed: true, retentionDue: false }, storageReads = 0;
-  (ExperienceStore as any).readiness = async () => { storageReads++; if (storage === 'error') throw new Error('unreachable'); return { ...storage, lastMaintenance: null }; };
+  (ExperienceStore as any).creationReadiness = async () => { storageReads++; if (storage === 'error') throw new Error('unreachable'); return storage.installed && storage.retentionDue === false; };
   try {
     const secret = 'ab'.repeat(32);
     for (const [links, creation, key, expected] of [[undefined, undefined, secret, null], ['true', undefined, secret, null], [undefined, 'true', secret, null], ['true', 'true', undefined, null], ['true', 'true', 'not-hex', null], ['true', 'true', secret, '/greetings']] as const) {
@@ -331,7 +331,7 @@ test('homepage entries: closed until both gates are on, the abuse secret is set 
     assert.deepEqual(await status(), { createPath: '/greetings' });
     assert.equal(storageReads - before, 1, 'one shared storage check');
   } finally {
-    (ExperienceStore as any).readiness = originalReadiness; resetGreetingCreationAvailability();
+    (ExperienceStore as any).creationReadiness = originalReadiness; resetGreetingCreationAvailability();
     await new Promise<void>(r => server.close(() => r())); for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
   }
   assert.equal(greetingCreateLink('/greetings', false), '/greetings?occasion=christmas-2026');

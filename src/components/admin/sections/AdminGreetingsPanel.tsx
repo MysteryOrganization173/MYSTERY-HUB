@@ -6,7 +6,7 @@ import { GREETING_SHARE_ID } from '../../../../shared/mysteryExperiences';
 import { AdminButton, AdminEmpty, AdminNotice, AdminPanel, AdminStat, ConfirmAction, DefinitionList, RefreshButton, StatusPill, adminField, adminLabel } from '../ui/AdminUi';
 
 interface Readiness {
-  gates: { links: boolean; creation: boolean; seasonal: boolean }; abuseSecret: boolean; storage: 'installed' | 'not_installed' | 'unavailable';
+  gates: { links: boolean; creation: boolean; creationSwitch?: boolean; seasonal: boolean }; abuseSecret: boolean; storage: 'installed' | 'not_installed' | 'unavailable';
   retentionDue: boolean | null; lastMaintenance: { at: string; counts: unknown } | null; blockers: string[]; checkedAt: string;
   /** What actually works (switches plus the database), from the server; absent from an older server. */
   available?: { links: boolean; creation: boolean }; status?: 'live' | 'links-only' | 'off' | 'not-working';
@@ -14,10 +14,10 @@ interface Readiness {
 
 /** One plain verdict at the top, so "switched on" is never mistaken for "working". */
 const VERDICT: Record<NonNullable<Readiness['status']>, { tone: 'success' | 'info' | 'warning'; title: string; body: string }> = {
-  live: { tone: 'success', title: 'Live', body: 'Shared links open and new greetings are being accepted (checked against the database just now).' },
+  live: { tone: 'success', title: 'Live', body: 'Shared links open and new greetings can be created: both switches are on, the secret is set, storage is installed and readable, and clean-up is up to date (checked just now). The daily limits still apply.' },
   'links-only': { tone: 'info', title: 'Links only', body: 'Greetings already shared still open, but new greetings cannot be created right now. The homepages and /greetings say so.' },
   off: { tone: 'info', title: 'Off', body: 'Greeting links and creation are both switched off. Nothing is offered to customers.' },
-  'not-working': { tone: 'warning', title: 'Switched on, but not working', body: 'A greetings switch is on, but the checks below are not all passing, so customers are not offered what is switched on. Fix the items listed below.' },
+  'not-working': { tone: 'warning', title: 'Switched on, but not working', body: 'A greetings switch is on, but the checks below are not all passing, so customers are not offered what is switched on (and new greetings would be refused). Fix the items listed below.' },
 };
 interface Metrics { days: number; created: number; remix_context: number; valid: number; events: { event_name: string; observations: number; estimated_browsers: number }[]; limitations: string[] }
 interface Report { share_id: string; reports: number; first_report: string; last_report: string }
@@ -69,7 +69,7 @@ export function AdminGreetingsPanel({ sessionToken }: { sessionToken: string }) 
       if (r.storage === 'installed') {
         setMetrics(await call(`/metrics?days=${range}`)); setReports(await call('/reports'));
       } else { setMetrics(null); setReports(null); }
-    } catch (e) { setError(e instanceof Error ? e.message : 'Could not read Mystery Greetings.'); }
+    } catch (e) { setReady(null); setMetrics(null); setReports(null); setError(e instanceof Error ? e.message : 'Could not read Mystery Greetings.'); }
     finally { setBusy(false); }
   }, [call, days]);
   useEffect(() => { void load(); }, [load]);
@@ -99,7 +99,7 @@ export function AdminGreetingsPanel({ sessionToken }: { sessionToken: string }) 
         {ready && (
           <DefinitionList items={[
             ['Links switch (MYSTERY_GREETING_LINKS_ENABLED)', pill(ready.gates.links)],
-            ['Creation switch (MYSTERY_GREETINGS_ENABLED)', pill(ready.gates.creation)],
+            ['Creation switch (MYSTERY_GREETINGS_ENABLED; needs links on)', pill(ready.gates.creationSwitch ?? ready.gates.creation)],
             ...(ready.available ? [
               ['Shared links working now', pill(ready.available.links, 'Yes', 'No')],
               ['New greetings accepted now', pill(ready.available.creation, 'Yes', 'No')],

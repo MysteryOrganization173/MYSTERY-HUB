@@ -160,8 +160,9 @@ test('Experiences native PostgreSQL, HTTP and raw HTML — isolated only',{skip:
    await assert.rejects(create(),(e:any)=>e.code==='RETENTION_REQUIRED');
    // Readiness shows the clean-up that new greetings are waiting for, then that it ran. Admin only; the secret never appears.
    const due=await ExperienceService.readiness();assert.equal(due.storage,'installed');assert.equal(due.retentionDue,true);assert.ok(due.blockers.some(b=>/Retention clean-up is due/.test(b)));
-   // Creates are refused while clean-up is due, so the creator is not advertised; existing links still open.
-   assert.deepEqual(due.available,{links:true,creation:false});assert.equal(due.status,'links-only');
+   // Creates are refused while clean-up is due, so the creator is not advertised; existing links still open. The
+   // creation switch is on but not working, so Admin says so (never a calm "links only").
+   assert.deepEqual(due.available,{links:true,creation:false});assert.equal(due.status,'not-working');
    resetGreetingCreationAvailability();assert.equal(await greetingCreationAvailable(),false);
    assert.equal((await fetch(base+'/api/admin/experiences/readiness')).status,401);
    const viaHttp=await fetch(base+'/api/admin/experiences/readiness',{headers:{Authorization:'Bearer synthetic-admin'}});assert.equal(viaHttp.status,200);const body=await viaHttp.text();assert.doesNotMatch(body,/cccccccc/);assert.equal(JSON.parse(body).abuseSecret,true);

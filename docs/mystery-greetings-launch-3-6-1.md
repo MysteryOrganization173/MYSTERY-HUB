@@ -122,12 +122,19 @@ Unchanged, and re-verified by the harness:
 - **`greetingCreationAvailable()`** (`server/services/experienceService.ts`) answers whether a greeting would really be accepted. That means both gates on, the abuse secret valid, the schema installed and retention not overdue.
   - `/api/seasonal/status` (homepages) and `/api/experiences/templates` (creator, recipient's "Create your own") now advertise only this.
   - **Gates off:** answered from the environment alone, with no database access, so the current production state costs nothing.
-  - **Gates on:** one read-only check per process per minute at most, shared by concurrent callers.
-  - **Failures:** unreadable storage counts as unavailable; a momentary `BUSY` keeps the last answer.
+  - **Gates on:** one small read-only check per process per minute at most (schema present, nothing overdue, no audit query), shared by concurrent callers.
+  - **No waiting:** visitors never wait on the database. An earlier answer is served at once while the check refreshes (stale-while-revalidate), and the first answer in a process waits at most 1.5 s.
+  - **Failures:** a momentary `BUSY` is never remembered as "closed". Storage that answers with an error counts as unavailable for 15 s.
+  - **Caching:** while the greetings switches are on, `/api/seasonal/status` is browser-cacheable for 60 s instead of 300 s, so a change reaches visitors within about two minutes. Admin clean-up refreshes the answer at once.
+  - **Creator:** the closed creator page has "Check again".
   - The two-transaction concurrency cap is unchanged.
 - **Admin readiness** adds two fields:
   - `available` (links and creation actually working);
-  - `status` (`live`, `links-only`, `off`, `not-working`).
+  - `status`:
+    - `live`;
+    - `links-only` (links work and the creation switch is off);
+    - `off`;
+    - `not-working` (anything switched on that does not actually work, for example creation switched on while retention is overdue).
   The panel leads with that verdict, then shows the environment switches, then the working-now checks. It never shows a secret value, a message or a name.
 
 ## G. Privacy, safety and performance
@@ -138,10 +145,10 @@ Unchanged, and re-verified by the harness:
   - The browser check measured 0 running animations on a sealed gift after about 14 s, on the Starlight sky after its sequence, and after the reveal.
 - **Bundle (gzip):**
   - recipient JS 3.70 → 3.71 KB;
-  - greetings CSS 7.59 → 8.51 KB;
-  - creator JS 8.22 → 8.36 KB;
-  - in total, a recipient on mobile data downloads **+0.93 KB**;
-  - the app entry is unchanged in size (74.65 KB).
+  - greetings CSS 7.59 → 8.53 KB;
+  - creator JS 8.22 → 8.40 KB;
+  - in total, a recipient on mobile data downloads **+0.95 KB**;
+  - the app entry is 74.66 KB, against 74.65 KB.
 - **Accessibility:** axe found no serious or critical issues on the recipient or creator. The pre-existing moderate `page-has-heading-one` is fixed.
 
 ## H. Verification
@@ -150,7 +157,11 @@ Unchanged, and re-verified by the harness:
 - **Native PostgreSQL** (`mysteryExperiencesPostgres.test.ts`):
   - **19/19** against a disposable local PostgreSQL 16, with a non-superuser `NOBYPASSRLS` owner and synthetic `anon`/`authenticated`/`service_role` roles.
   - It is now 19 tests rather than 18 because this release adds real-schema availability checks: missing schema, live, retention overdue, and live again after clean-up.
-- **Focused unit suites:** `mysteryGreetingsV1`, `mysteryExperiences`, `christmasWelcomeAndGreetings`, `seasonalExperience`, `christmasFinalQa`, `socialSharing` and `clientRouting` all pass. The new `mysteryGreetingsLaunch361.test.ts` has 7 tests.
+- **Focused unit suites:** `mysteryGreetingsV1`, `mysteryExperiences`, `christmasWelcomeAndGreetings`, `seasonalExperience`, `christmasFinalQa`, `socialSharing` and `clientRouting` all pass. The new `mysteryGreetingsLaunch361.test.ts` has 8 tests, including the availability timing cases from the independent review:
+  - a busy moment is never cached as closed;
+  - the first answer waits at most 1.5 s;
+  - stale-while-revalidate;
+  - the public check reads no audit or personal data.
 - **Updated tests, same or stronger intent:**
   - The homepage-entry test keeps every original case. It adds: storage missing, retention overdue and storage unreadable each close the creator; the gates-off path never reads the database; and repeated status calls share one check.
   - Two source pins now name `greetingCreationAvailable`.
@@ -164,11 +175,29 @@ Unchanged, and re-verified by the harness:
   - The Admin check now also requires "Status: Live" and both "working now" rows.
 - **Supplementary browser QA: 30/30.**
   - Motion: idle motion stops; the Starlight sky stops; nothing keeps running after the reveal.
-  - Retention overdue: the creator is closed on the homepages, `/greetings` and the recipient's "Create your own"; links keep opening; Admin says "Links only". After the audited clean-up, Admin says "Live" again.
+  - Retention overdue: the creator is closed on the homepages, `/greetings` and the recipient's "Create your own"; links keep opening; Admin says "Switched on, but not working" with the reason. After the audited clean-up, Admin says "Live" again.
   - Homepages, guest and member, on 10, 25 and 31 December and 1 January: "Create a greeting" opens the creator on the right occasion.
   - Emulated Pixel 7, Galaxy S9+, iPhone 13 and iPhone SE. This is Chromium device emulation, not physical devices.
-- **Full regression suite:** see the PR for the final numbers.
-- **Independent review:** see the PR.
+- **Full regression suite** (after merging PR #143): **3627 tests, 3566 pass, 0 fail, 61 skipped**.
+  - `main` alone: 3619 / 3558 / 0 / 61. The difference is the 8 new tests.
+  - The 61 skips are the opt-in native PostgreSQL suites, which need a database URL. The greetings one ran separately (19/19).
+- **Harness hardening:** it never force-checks a hidden input. It taps the visible option, as a customer does, and asserts the option was selected.
+- **Independent review** (a separate review agent):
+  - No critical findings.
+  - **Fixed, important:**
+    - a switched-on but failing creator now reads "not working", not "links only";
+    - the availability check can no longer make visitors wait, or cache a busy moment as closed;
+    - the runbook's expected statuses now match the code.
+  - **Fixed, minor:**
+    - the bloom ends before the hand-over and stays inside the stage;
+    - the 2027 mark sits behind the words;
+    - "Surprise me" moves focus to its pick;
+    - stale Admin readiness is cleared when a refresh fails;
+    - the raw creation switch is shown;
+    - clean-up refreshes availability at once;
+    - the closed creator has "Check again";
+    - the status route never throws.
+  - **Confirmed and strengthened:** the proxy-identity analysis (reporting could be silenced; Cloudflare validation must check Render's appended hop) and the decision to document it as an activation blocker rather than change it unasked.
 
 ## I. Release
 
@@ -184,11 +213,13 @@ See the PR (branch `claude/elegant-lamport-q2binq`).
      - Repository evidence (`server/routes/creativeStudioApi.ts`) says the API runs behind Render's proxy without `trust proxy`, so that address is the proxy, not the visitor. Every visitor would then share one identity.
      - Successful creates are limited to **20 per hour per identity**. That would mean about 20 greetings an hour for everyone together.
      - Reports (10 a day), management (60 an hour) and the per-process limits (240 requests a minute, 15 creates a minute) would also be shared.
-   - **It fails safe** (too strict, never too loose), so merging is fine. Launching is not.
-   - **Fix (backend workstream, with your approval):** derive the identity from a trusted header that cannot be spoofed.
-     - With Cloudflare in front, that means restricting the origin to Cloudflare (or validating Render's appended `X-Forwarded-For` hop) and then hashing the client IP exactly as `abuseIdentity` does today.
-     - Re-tune the initial limits.
-     - Do not trust raw visitor headers.
+   - **Reporting could be silenced.** Reports are keyed per identity (`PRIMARY KEY(greeting_id, reporter_hash)`) with 10 a day per identity. Behind a shared proxy identity, that means one report per greeting per day for everyone, and one person could use up reporting for the whole site.
+   - **It does not make anything looser:** greetings cannot be over-created. That is why merging this release (gates off) is fine. Launching is not.
+   - **Fix (backend workstream, with your approval):** derive the identity from a client address you can trust, then hash it exactly as `abuseIdentity` does today.
+     - The origin cannot simply be restricted to Cloudflare on Render: `*.onrender.com` stays reachable and bypasses Cloudflare.
+     - So trust `CF-Connecting-IP` only after checking that the **rightmost** `X-Forwarded-For` hop (the one Render appends) is inside Cloudflare's published IP ranges. Otherwise use that rightmost hop.
+     - Never trust headers the visitor sends.
+     - Then re-tune the initial limits.
 2. **Verified backup** of production, and confirmation of the actual backend owner role that will own the schema.
 3. **Capacity:**
    - Each process serves at most two greeting transactions at once, by design.
@@ -210,21 +241,24 @@ See the PR (branch `claude/elegant-lamport-q2binq`).
 ### 2. Configure the abuse secret
 
 - **Set:** `EXPERIENCES_ABUSE_SECRET` (64 hex characters, freshly generated, never shared in chat) on the **Node web service that answers `mysterybundlehub.com`**. That is the service verified above, not the static site.
-- **Expected:** Admin readiness shows "Abuse protection secret: Configured" and "Status: Off".
+- **Expected:** Admin readiness shows "Abuse protection secret: Configured" and "Status: Off" (both switches still off).
 
 ### 3. Turn on links only
 
 - **Set:** `MYSTERY_GREETING_LINKS_ENABLED=true`.
 - **Expected:**
-  - Admin shows "Status: Off", because creation is still off, with "Shared links working now: Yes".
+  - Admin shows "Status: Links only", with "Shared links working now: Yes" and "New greetings accepted now: No".
+  - If it says "Switched on, but not working", the schema is missing or unreadable. Turn links off and fix that first.
   - `/g/<unknown>` stays 404.
 
 ### 4. Controlled real-domain test greeting (creation is still not public)
 
 The create API needs both gates, and there is no fixture or back door (by design). So:
 
-1. With the **season presentation still off** (`SEASONAL_EXPERIENCE` unset), nothing on the site links to `/greetings`. Briefly set `MYSTERY_GREETINGS_ENABLED=true`. The creator is then reachable only by typing its URL.
-2. Within about 6 minutes (status cache 5 minutes, availability check 1 minute), open `https://mysterybundlehub.com/greetings` and create one synthetic greeting (for example "Test" → "Founder QA").
+1. With the **season presentation still off** (`SEASONAL_EXPERIENCE` unset), nothing on the site links to `/greetings`. Briefly set `MYSTERY_GREETINGS_ENABLED=true`.
+   - The creator is then **unadvertised, not private**. Anyone who types `/greetings` or calls the API can create during this window, within the server's limits.
+   - Do this only after J.0.1 is fixed, and keep the window short.
+2. Within about 2 minutes (browser status cache 1 minute, availability check 1 minute), open `https://mysterybundlehub.com/greetings` and create one synthetic greeting (for example "Test" → "Founder QA").
 3. Set `MYSTERY_GREETINGS_ENABLED=false` again. Links keep working.
 4. Check:
    - `curl -I https://mysterybundlehub.com/g/<id>` returns 200, `no-store`, `noindex`;
@@ -256,7 +290,7 @@ On a budget Android phone (Chrome), an iPhone (Safari) and WhatsApp's in-app bro
 
 ### Rollback (fast, keeps shared links)
 
-- **Stop new greetings:** `MYSTERY_GREETINGS_ENABLED=false`. Within about 6 minutes nothing advertises the creator, and existing links keep opening.
+- **Stop new greetings:** `MYSTERY_GREETINGS_ENABLED=false`. The server refuses new greetings at once. Pages stop advertising the creator as soon as their cached status expires (at most 5 minutes once the switch is off, because the browser cache returns to 300 s). Existing links keep opening.
 - **Emergency hide-everything:** `MYSTERY_GREETING_LINKS_ENABLED=false`. Every greeting answers 404.
 - **Season off on 6 January:** this never revokes greetings. They expire 365 days after creation.
 
