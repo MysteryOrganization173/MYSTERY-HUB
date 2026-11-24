@@ -134,6 +134,13 @@ export class ExperienceStore {
   const last=(await c.query("SELECT created_at,metadata_safe_json FROM admin_audit_log WHERE entity_type='experience' AND action='experience_retention' ORDER BY created_at DESC LIMIT 1")).rows[0];
   return {installed,retentionDue,lastMaintenance:last?{at:iso(last.created_at),counts:last.metadata_safe_json??null}:null};
  },true);}
+ /** The public availability check: is the schema there and is nothing overdue for clean-up (creates are refused while it
+  *  is)? One small read-only transaction; no audit or personal data. */
+ static async creationReadiness(){return experienceTransaction(async c=>{
+  const installed=(await c.query("SELECT to_regclass('mysteryhub_experiences.configuration') IS NOT NULL AND to_regclass('mysteryhub_experiences.greetings') IS NOT NULL AND to_regclass('mysteryhub_experiences.budgets') IS NOT NULL AND to_regclass('mysteryhub_experiences.reports') IS NOT NULL AS ok")).rows[0]?.ok===true;
+  if(!installed)return false;
+  return (await c.query(`SELECT NOT EXISTS(SELECT 1 FROM mysteryhub_experiences.greetings WHERE ${RETENTION_DUE}) AS ok`)).rows[0]?.ok===true;
+ },true);}
  static async maintenance(actor:string){return experienceTransaction(async c=>{
   const greetings=await c.query(`DELETE FROM mysteryhub_experiences.greetings WHERE id IN (SELECT id FROM mysteryhub_experiences.greetings WHERE ${RETENTION_DUE} LIMIT 500)`);
   const budgets=await c.query("DELETE FROM mysteryhub_experiences.budgets WHERE ctid IN (SELECT ctid FROM mysteryhub_experiences.budgets WHERE bucket<now()-interval '48 hours' LIMIT 5000)");

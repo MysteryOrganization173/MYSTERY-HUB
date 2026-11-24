@@ -6,9 +6,19 @@ import { GREETING_SHARE_ID } from '../../../../shared/mysteryExperiences';
 import { AdminButton, AdminEmpty, AdminNotice, AdminPanel, AdminStat, ConfirmAction, DefinitionList, RefreshButton, StatusPill, adminField, adminLabel } from '../ui/AdminUi';
 
 interface Readiness {
-  gates: { links: boolean; creation: boolean; seasonal: boolean }; abuseSecret: boolean; storage: 'installed' | 'not_installed' | 'unavailable';
+  gates: { links: boolean; creation: boolean; creationSwitch?: boolean; seasonal: boolean }; abuseSecret: boolean; storage: 'installed' | 'not_installed' | 'unavailable';
   retentionDue: boolean | null; lastMaintenance: { at: string; counts: unknown } | null; blockers: string[]; checkedAt: string;
+  /** What actually works (switches plus the database), from the server; absent from an older server. */
+  available?: { links: boolean; creation: boolean }; status?: 'live' | 'links-only' | 'off' | 'not-working';
 }
+
+/** One plain verdict at the top, so "switched on" is never mistaken for "working". */
+const VERDICT: Record<NonNullable<Readiness['status']>, { tone: 'success' | 'info' | 'warning'; title: string; body: string }> = {
+  live: { tone: 'success', title: 'Live', body: 'Shared links open and new greetings can be created: both switches are on, the secret is set, storage is installed and readable, and clean-up is up to date (checked just now). The daily limits still apply.' },
+  'links-only': { tone: 'info', title: 'Links only', body: 'Greetings already shared still open, but new greetings cannot be created right now. The homepages and /greetings say so.' },
+  off: { tone: 'info', title: 'Off', body: 'Greeting links and creation are both switched off. Nothing is offered to customers.' },
+  'not-working': { tone: 'warning', title: 'Switched on, but not working', body: 'A greetings switch is on, but the checks below are not all passing, so customers are not offered what is switched on (and new greetings would be refused). Fix the items listed below.' },
+};
 interface Metrics { days: number; created: number; remix_context: number; valid: number; events: { event_name: string; observations: number; estimated_browsers: number }[]; limitations: string[] }
 interface Report { share_id: string; reports: number; first_report: string; last_report: string }
 
@@ -59,7 +69,7 @@ export function AdminGreetingsPanel({ sessionToken }: { sessionToken: string }) 
       if (r.storage === 'installed') {
         setMetrics(await call(`/metrics?days=${range}`)); setReports(await call('/reports'));
       } else { setMetrics(null); setReports(null); }
-    } catch (e) { setError(e instanceof Error ? e.message : 'Could not read Mystery Greetings.'); }
+    } catch (e) { setReady(null); setMetrics(null); setReports(null); setError(e instanceof Error ? e.message : 'Could not read Mystery Greetings.'); }
     finally { setBusy(false); }
   }, [call, days]);
   useEffect(() => { void load(); }, [load]);
@@ -85,10 +95,15 @@ export function AdminGreetingsPanel({ sessionToken }: { sessionToken: string }) 
       <div className="space-y-4">
         {error && <AdminNotice tone="warning" title="Status not available">{error}</AdminNotice>}
         {notice && <AdminNotice tone="success">{notice}</AdminNotice>}
+        {ready?.status && <AdminNotice tone={VERDICT[ready.status].tone} title={`Status: ${VERDICT[ready.status].title}`}>{VERDICT[ready.status].body}</AdminNotice>}
         {ready && (
           <DefinitionList items={[
-            ['Shared links open', pill(ready.gates.links)],
-            ['New greetings can be created', pill(ready.gates.creation)],
+            ['Links switch (MYSTERY_GREETING_LINKS_ENABLED)', pill(ready.gates.links)],
+            ['Creation switch (MYSTERY_GREETINGS_ENABLED; needs links on)', pill(ready.gates.creationSwitch ?? ready.gates.creation)],
+            ...(ready.available ? [
+              ['Shared links working now', pill(ready.available.links, 'Yes', 'No')],
+              ['New greetings accepted now', pill(ready.available.creation, 'Yes', 'No')],
+            ] as [string, React.ReactNode][] : []),
             ['Abuse protection secret', pill(ready.abuseSecret, 'Configured', 'Missing')],
             ['Storage (optional schema)', <StatusPill tone={installed ? 'success' : ready.storage === 'unavailable' ? 'warning' : 'neutral'}>{installed ? 'Installed' : ready.storage === 'unavailable' ? 'Could not check' : 'Not installed'}</StatusPill>],
             ['Retention clean-up', !installed ? '—' : <span className="inline-flex flex-wrap items-center gap-2">{ready.retentionDue ? <StatusPill tone="danger">Due now</StatusPill> : <StatusPill tone="success">Up to date</StatusPill>}<span className="text-xs text-slate-400">{ready.lastMaintenance ? `Last run ${when(ready.lastMaintenance.at)}` : 'Never run'}</span></span>],

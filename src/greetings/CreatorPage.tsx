@@ -155,7 +155,7 @@ export function CreatorPage({ search }: { search: string }) {
   const shown: Stage = stage === 'preview' && setup.state === 'open' && Object.keys(draftProblems(draft, templates)).length ? 'message' : stage;
   return (
     <main className="mg-page mg-creator" data-occasion={occasion} data-variant={variant} ref={main}>
-      <GreetingsSky />
+      <GreetingsSky key={`${occasion}:${variant}`} />
       <div className="mg-shell mg-creator-shell">
         <GreetingsTopBar />
         {setup.state === 'loading' && <div className="mg-state mg-loading" role="status"><span className="mg-loading-gift" aria-hidden="true"><span /><span /></span><p>Getting the wrapping paper ready…</p></div>}
@@ -166,7 +166,7 @@ export function CreatorPage({ search }: { search: string }) {
             <div className="mg-actions"><button type="button" className="mg-btn mg-btn-primary" onClick={() => void loadSetup()}>Try again</button><a className="mg-btn mg-btn-quiet" href="/">Back to Mystery Hub</a></div>
           </section>
         )}
-        {setup.state === 'closed' && <ClosedNotice store={store} />}
+        {setup.state === 'closed' && <ClosedNotice store={store} onRetry={() => void loadSetup()} />}
         {setup.state === 'open' && created && <Done created={created} store={store} onAnother={() => startAnother()} />}
         {setup.state === 'open' && !created && (
           <>
@@ -280,7 +280,18 @@ function MessageStep({ draft, templates, errors, splitNotice, update, onBack, on
 }) {
   const choices = templates.filter(t => t.occasion === draft.occasion);
   const count = checkText(draft.message, LIMITS.message, LIMITS.messageMin).length;
-  const surprise = () => { const others = choices.filter(t => t.id !== draft.templateId); const pick = others[Math.floor(Math.random() * others.length)]; if (pick) update({ mode: 'template', templateId: pick.id }); };
+  // Surprise me picks another message and brings it into view (it may be further down the list), so the choice is seen.
+  const surprise = () => {
+    const others = choices.filter(t => t.id !== draft.templateId); const pick = others[Math.floor(Math.random() * others.length)];
+    if (!pick) return;
+    update({ mode: 'template', templateId: pick.id });
+    // Focus follows the pick, so it is announced and keyboard users land on it.
+    requestAnimationFrame(() => {
+      const input = document.querySelector<HTMLInputElement>(`input[name="mg-template"][value="${CSS.escape(pick.id)}"]`);
+      input?.closest('label')?.scrollIntoView({ block: 'center', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      input?.focus({ preventScroll: true });
+    });
+  };
   return (
     <section className="mg-step" aria-labelledby="mg-step-title">
       <h1 id="mg-step-title" className="mg-step-title" tabIndex={-1} data-stage-heading>Your message</h1>
@@ -370,7 +381,7 @@ function Done({ created, store, onAnother }: { created: LastCreated; store: Gree
         <a className="mg-btn mg-btn-whatsapp" href={whatsappHref(created.occasion, created.url)} target="_blank" rel="noopener noreferrer">
           <WhatsAppMark />Share on WhatsApp
         </a>
-        <button type="button" className="mg-btn mg-btn-ghost" onClick={() => void copy()}>{copied === 'copied' ? <Check className="mg-icon" aria-hidden="true" /> : <Copy className="mg-icon" aria-hidden="true" />}{copied === 'copied' ? 'Copied' : 'Copy link'}</button>
+        <button type="button" className="mg-btn mg-btn-ghost" onClick={() => void copy()}>{copied === 'copied' ? <Check className="mg-icon mg-pop" aria-hidden="true" /> : <Copy className="mg-icon" aria-hidden="true" />}{copied === 'copied' ? 'Copied' : 'Copy link'}</button>
         {native && <button type="button" className="mg-btn mg-btn-ghost" onClick={() => void share()}><Share2 className="mg-icon" aria-hidden="true" />More ways to share</button>}
       </div>
       {shareNote && <p className="mg-note" role="status">{shareNote}</p>}
@@ -456,13 +467,13 @@ function SentList({ store, exclude }: { store: GreetingsStore; exclude?: string 
   );
 }
 
-function ClosedNotice({ store }: { store: GreetingsStore }) {
+function ClosedNotice({ store, onRetry }: { store: GreetingsStore; onRetry: () => void }) {
   return (
     <section className="mg-state mg-closed" aria-labelledby="mg-closed-title">
       <span className="mg-closed-art" aria-hidden="true"><GiftArt occasion="christmas-2026" variant="gift-classic-v1" /></span>
       <h1 id="mg-closed-title">Mystery Greetings isn’t open right now</h1>
       <p>When it’s open, you can wrap a personal Christmas or New Year greeting as a digital gift and share the link. Please check back soon.</p>
-      <div className="mg-actions"><a className="mg-btn mg-btn-primary" href="/">Back to Mystery Hub</a></div>
+      <div className="mg-actions"><a className="mg-btn mg-btn-primary" href="/">Back to Mystery Hub</a><button type="button" className="mg-btn mg-btn-quiet" onClick={onRetry}>Check again</button></div>
       <SentList store={store} />
     </section>
   );

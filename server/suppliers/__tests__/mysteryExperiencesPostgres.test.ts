@@ -10,7 +10,7 @@ import pg from 'pg';
 import {assertSafeTestDatabase} from '../../utils/environment.js';
 import {initDatabase,getPool} from '../../db/connection.js';
 import {ExperienceStore,abuseIdentity} from '../../db/experienceStore.js';
-import {ExperienceService} from '../../services/experienceService.js';
+import {ExperienceService,greetingCreationAvailable,resetGreetingCreationAvailability} from '../../services/experienceService.js';
 import {greetingInput} from '../../services/experienceValidation.js';
 import {AuthStore} from '../../db/authStore.js';
 import {AdminAuditStore} from '../../db/adminAuditStore.js';
@@ -37,6 +37,10 @@ test('Experiences native PostgreSQL, HTTP and raw HTML — isolated only',{skip:
    const response=await fetch(base+'/api/experiences/greetings',json(payload()));assert.equal(response.status,503);assert.doesNotMatch(JSON.stringify(await response.json()),/postgres|password|SQL/i);
    // Admin readiness reports the missing schema instead of failing.
    const ready=await ExperienceService.readiness();assert.equal(ready.storage,'not_installed');assert.equal(ready.retentionDue,null);assert.ok(ready.blockers.some(b=>/schema/.test(b)));
+   // 3.6.1: switched on is not the same as working. Gates and secret are set, but there is nowhere to keep a greeting,
+   // so nothing advertises the creator and readiness says it is not working (not merely "on").
+   assert.deepEqual(ready.available,{links:false,creation:false});assert.equal(ready.status,'not-working');
+   resetGreetingCreationAvailability();assert.equal(await greetingCreationAvailable(),false);assert.equal((await ExperienceService.templates()).creationConfigured,false);
   });
   const schema=readFileSync('server/db/mysteryExperiences.sql','utf8');
   await t.test('failed schema installation rolls back the entire optional namespace',async()=>{
@@ -74,6 +78,10 @@ test('Experiences native PostgreSQL, HTTP and raw HTML — isolated only',{skip:
    assert.equal((await ExperienceService.state(new Date('2026-12-25'))).active,false,'deployment gate is independent');
    process.env.MYSTERY_EXPERIENCES_ENABLED='true';assert.equal((await ExperienceService.state(new Date('2026-12-25'))).phase,'christmas_day');
    const reads=await Promise.all(Array.from({length:10},()=>ExperienceStore.configuration()));assert.ok(reads.every(c=>c.revision===config.revision));
+  });
+  await t.test('once the schema is installed, the creator is advertised and readiness says live',async()=>{
+   resetGreetingCreationAvailability();assert.equal(await greetingCreationAvailable(),true);
+   const ready=await ExperienceService.readiness();assert.deepEqual(ready.available,{links:true,creation:true});assert.equal(ready.status,'live');assert.deepEqual(ready.blockers,[]);
   });
   await t.test('anonymous creation commits before success; another client opens a real link without any local state',async()=>{
    const response=await fetch(base+'/api/experiences/greetings',json(firstInput));assert.equal(response.status,201);first=await response.json();assert.match(first.url,/^https:\/\/mysterybundlehub.com\/g\/[A-Za-z0-9_-]{24}$/);
@@ -152,10 +160,15 @@ test('Experiences native PostgreSQL, HTTP and raw HTML — isolated only',{skip:
    await assert.rejects(create(),(e:any)=>e.code==='RETENTION_REQUIRED');
    // Readiness shows the clean-up that new greetings are waiting for, then that it ran. Admin only; the secret never appears.
    const due=await ExperienceService.readiness();assert.equal(due.storage,'installed');assert.equal(due.retentionDue,true);assert.ok(due.blockers.some(b=>/Retention clean-up is due/.test(b)));
+   // Creates are refused while clean-up is due, so the creator is not advertised; existing links still open. The
+   // creation switch is on but not working, so Admin says so (never a calm "links only").
+   assert.deepEqual(due.available,{links:true,creation:false});assert.equal(due.status,'not-working');
+   resetGreetingCreationAvailability();assert.equal(await greetingCreationAvailable(),false);
    assert.equal((await fetch(base+'/api/admin/experiences/readiness')).status,401);
    const viaHttp=await fetch(base+'/api/admin/experiences/readiness',{headers:{Authorization:'Bearer synthetic-admin'}});assert.equal(viaHttp.status,200);const body=await viaHttp.text();assert.doesNotMatch(body,/cccccccc/);assert.equal(JSON.parse(body).abuseSecret,true);
    const cleanup=await ExperienceStore.maintenance('exp-admin');
-   const after=await ExperienceService.readiness();assert.equal(after.retentionDue,false);assert.ok(after.lastMaintenance&&Date.parse(after.lastMaintenance.at)>0);assert.deepEqual(after.blockers,[]);assert.ok(cleanup.greetings!>=1);assert.equal((await db.query('SELECT count(*)::int n FROM orders')).rows[0].n,0);assert.equal((await db.query('SELECT count(*)::int n FROM finance_ledger')).rows[0].n,0);
+   resetGreetingCreationAvailability();assert.equal(await greetingCreationAvailable(),true,'advertised again after clean-up');
+   const after=await ExperienceService.readiness();assert.equal(after.retentionDue,false);assert.equal(after.status,'live');assert.ok(after.lastMaintenance&&Date.parse(after.lastMaintenance.at)>0);assert.deepEqual(after.blockers,[]);assert.ok(cleanup.greetings!>=1);assert.equal((await db.query('SELECT count(*)::int n FROM orders')).rows[0].n,0);assert.equal((await db.query('SELECT count(*)::int n FROM finance_ledger')).rows[0].n,0);
    const plan=(await db.query("EXPLAIN SELECT share_id FROM mysteryhub_experiences.greetings WHERE share_id=$1",[first.shareId])).rows.map(r=>r['QUERY PLAN']).join(' ');assert.ok(plan);
   });
  }finally{mock.restoreAll();await new Promise<void>(r=>server.close(()=>r()));rmSync(dir,{recursive:true});await db.end();await getPool()?.end();}

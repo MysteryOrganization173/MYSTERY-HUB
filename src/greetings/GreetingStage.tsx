@@ -41,7 +41,9 @@ export function GreetingStage({ greeting, preview = false, headingLevel = 1, onR
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const focusAfter = useRef<'letter' | 'gift' | null>(null);
   const copy = OCCASION_COPY[greeting.occasion];
-  const Heading = headingLevel === 1 ? 'h1' : 'h2', LetterHeading = headingLevel === 1 ? 'h2' : 'h3';
+  // Once opened, the sealed heading is gone, so the letter's greeting takes over as the page's top heading (one h1).
+  const Heading = headingLevel === 1 ? 'h1' : 'h2';
+  const LetterHeading = state === 'open' ? Heading : headingLevel === 1 ? 'h2' : 'h3';
   useEffect(() => () => clearTimeout(timer.current), []);
   useEffect(() => { onStateChange?.(state); }, [state, onStateChange]);
   useLayoutEffect(() => {
@@ -92,6 +94,7 @@ export function GreetingStage({ greeting, preview = false, headingLevel = 1, onR
         </button>
         {preview && <p className="mg-preview-hint">This is a preview. Nothing is saved yet.</p>}
       </div>
+      <span className="mg-bloom" aria-hidden="true" />
       <article className="mg-letter" aria-hidden={state !== 'open' || undefined}>
         <span className="mg-letter-ornament" aria-hidden="true">{greeting.occasion === 'new-year-2027' ? <NewYearOrnament /> : <HollyOrnament />}</span>
         <LetterHeading ref={letterHeading} tabIndex={-1} className="mg-letter-title">

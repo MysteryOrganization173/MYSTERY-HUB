@@ -272,7 +272,7 @@ test('the Christmas homepage keeps the real catalogue, prices, checkout, templat
   assert.match(page, /\{createHref && <a className="mh-button xh-btn-primary" href=\{createHref\}>Create a greeting/);
   // The only creator route is the server's (shared with the member homepage), reported only with both greeting gates on.
   assert.match(page, /<Greetings christmas=\{christmas\} entry=\{greetings\} \/>/);
-  assert.match(read('server/routes/seasonalApi.ts'), /const greetings = \{ createPath: greetingCreationOffered\(\) \? '\/greetings' : null \};/, 'the creator opens only with its gates');
+  assert.match(read('server/routes/seasonalApi.ts'), /const greetings = \{ createPath: await greetingCreationAvailable\(\)\.catch\(\(\) => false\) \? '\/greetings' : null \};/, 'the creator opens only with its gates and working storage');
   assert.match(page, /Share the Mystery Hub website on WhatsApp/);
   assert.match(page, /Not open yet\. We’ll show it here when it is ready\./);
   assert.doesNotMatch(words, /\/api\/experiences|\/g\/|greetings\/|shareId|fetch\(/, 'no greeting API or link is invented');
