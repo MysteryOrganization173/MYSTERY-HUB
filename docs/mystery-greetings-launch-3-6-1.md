@@ -2,6 +2,8 @@
 
 **Status:** code release. Mystery Greetings stays **off in production**. Nothing in this release turns on a gate, installs the schema, sets a secret or creates a production greeting. Activation is a separate founder decision; the runbook is at the end.
 
+The [backend qualification and activation runbook](./mystery-greetings-backend-qualification.md) supersedes the historical proxy, database and activation notes below.
+
 **Baseline:** `origin/main` at `189dc3a` (PR #142 merge). Open PRs at the start: only the stale draft #69 (backend), which this release does not touch.
 
 **Screenshots:** [`docs/screenshots/mystery-greetings-3-6-1/`](screenshots/mystery-greetings-3-6-1/). They use synthetic names and messages only, from a local server and a disposable database.

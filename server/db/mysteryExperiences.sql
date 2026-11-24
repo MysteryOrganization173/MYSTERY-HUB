@@ -48,6 +48,32 @@ CREATE INDEX IF NOT EXISTS experience_reports_created ON mysteryhub_experiences.
 CREATE INDEX IF NOT EXISTS experience_events_period ON public.analytics_events(created_at,event_name) WHERE entity_type='experience';
 CREATE UNIQUE INDEX IF NOT EXISTS experience_event_once ON public.analytics_events(event_name,visitor_id,session_id,entity_id) WHERE event_name IN ('experience_greeting_open','experience_greeting_reveal','experience_greeting_remix_started','experience_countdown_open','experience_discovery_open','experience_platform_navigation');
 CREATE UNIQUE INDEX IF NOT EXISTS experience_created_once ON public.analytics_events(entity_id) WHERE event_name='experience_greeting_created';
+-- IF NOT EXISTS alone would accept a conflicting, invalid or nonunique index under the same name.
+DO $verify$
+BEGIN
+ IF EXISTS (
+  SELECT 1
+  FROM (VALUES
+   ('experience_events_period', false, ARRAY['created_at','event_name'],
+    $def$((entity_type)::text = 'experience'::text)$def$),
+   ('experience_event_once', true, ARRAY['event_name','visitor_id','session_id','entity_id'],
+    $def$((event_name)::text = ANY ((ARRAY['experience_greeting_open'::character varying, 'experience_greeting_reveal'::character varying, 'experience_greeting_remix_started'::character varying, 'experience_countdown_open'::character varying, 'experience_discovery_open'::character varying, 'experience_platform_navigation'::character varying])::text[]))$def$),
+   ('experience_created_once', true, ARRAY['entity_id'],
+    $def$((event_name)::text = 'experience_greeting_created'::text)$def$)
+  ) AS expected(name, unique_index, keys, predicate)
+  LEFT JOIN pg_class idx ON idx.relnamespace='public'::regnamespace AND idx.relname=expected.name
+  LEFT JOIN pg_index i ON i.indexrelid=idx.oid
+  LEFT JOIN pg_am am ON am.oid=idx.relam
+  WHERE i.indrelid IS DISTINCT FROM 'public.analytics_events'::regclass::oid
+     OR am.amname IS DISTINCT FROM 'btree'
+     OR NOT i.indisvalid OR NOT i.indisready OR NOT i.indislive
+     OR i.indisunique IS DISTINCT FROM expected.unique_index OR i.indnullsnotdistinct
+     OR i.indnatts<>i.indnkeyatts
+     OR ARRAY(SELECT pg_get_indexdef(i.indexrelid,k,false) FROM generate_series(1,i.indnkeyatts) k)<>expected.keys
+     OR pg_get_expr(i.indpred,i.indrelid) IS DISTINCT FROM expected.predicate
+ ) THEN RAISE EXCEPTION 'Conflicting Experiences analytics index definition'; END IF;
+END
+$verify$;
 DO $$ DECLARE t text; r text; BEGIN
  FOREACH t IN ARRAY ARRAY['configuration','greetings','budgets','reports'] LOOP
   EXECUTE format('ALTER TABLE mysteryhub_experiences.%I ENABLE ROW LEVEL SECURITY',t);
@@ -59,5 +85,20 @@ DO $$ DECLARE t text; r text; BEGIN
    EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA mysteryhub_experiences FROM %I',r);
   END IF;
  END LOOP;
+ IF EXISTS (
+  SELECT 1 FROM pg_namespace n
+  WHERE n.oid='mysteryhub_experiences'::regnamespace
+    AND (n.nspowner<>current_user::regrole OR EXISTS (
+      SELECT 1 FROM aclexplode(n.nspacl) a WHERE a.grantee<>n.nspowner
+    ))
+ ) OR EXISTS (
+  SELECT 1 FROM pg_class c
+  WHERE c.relnamespace='mysteryhub_experiences'::regnamespace AND c.relkind='r'
+    AND (c.relowner<>current_user::regrole OR NOT c.relrowsecurity OR c.relforcerowsecurity
+      OR EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid=c.oid)
+      OR EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee<>c.relowner)
+      OR EXISTS (SELECT 1 FROM pg_attribute col CROSS JOIN LATERAL aclexplode(col.attacl) a
+                 WHERE col.attrelid=c.oid AND a.grantee<>c.relowner))
+ ) THEN RAISE EXCEPTION 'Unexpected Experiences ownership, grants or RLS policy'; END IF;
 END $$;
 COMMIT;

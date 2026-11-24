@@ -1,3 +1,6 @@
+import { randomUUID } from 'node:crypto';
+import { ExperienceStore } from '../../db/experienceStore.js';
+import { greetingInput } from '../../services/experienceValidation.js';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -225,11 +228,27 @@ test('PostgreSQL 17 archive restores and reverses the complete app, and rejects 
       assert.match(check.stderr,/Destination locale differs/);
     });
 
+    await t.test('an optional schema may be absent, but a partial inventory blocks the clone',async()=>{
+      await src.query('CREATE SCHEMA mysteryhub_experiences');
+      try {
+        const incomplete=await runMigration('db-standby-preflight',source!,target,dir);
+        assert.equal(incomplete.code,2,incomplete.stderr);
+        assert.match(incomplete.stdout,/mysteryhub_experiences\.budgets/);
+      } finally { await src.query('DROP SCHEMA mysteryhub_experiences'); }
+    });
+    await src.query(readFileSync(new URL('../../db/mysteryExperiences.sql',import.meta.url),'utf8'));
+    const greeting = greetingInput({
+      occasion:'christmas-2026',recipientName:'Synthetic recipient',showSender:false,
+      message:'Festive synthetic migration fixture.',variant:'gift-classic-v1',
+      creatorToken:Buffer.alloc(32,1).toString('base64url'),idempotencyKey:randomUUID(),
+    });
+    const savedGreeting=await ExperienceStore.create(greeting.value,greeting.creatorToken,greeting.idempotencyKey,'a'.repeat(64),true);
+    await ExperienceStore.report(savedGreeting.greeting.shareId,'b'.repeat(64),'privacy');
     await t.test('atomic full restore preserves authentication, payment namespace, Wallet and sequences',async()=>{
       const result=await runMigration('db-standby-clone',source!,target,dir);
       assert.equal(result.code,0,result.stdout+'\n'+result.stderr);
       assert.match(result.stdout,/PARITY_VERIFIED_CUTOVER_REQUIRES_APPROVAL/);
-      assert.match(result.stdout,/"tables": 69/);
+      assert.match(result.stdout,/"tables": 73/);
       const row=(await dest.query('SELECT password_hash FROM users WHERE id=$1',[id])).rows[0];
       assert.ok(await verifyPassword(password,row.password_hash));
       assert.equal((await dest.query('SELECT user_id FROM sessions WHERE token_hash=$1 AND expires_at>now()',[hashSessionToken(session)])).rows[0].user_id,id);
@@ -240,6 +259,12 @@ test('PostgreSQL 17 archive restores and reverses the complete app, and rejects 
       assert.equal((await dest.query('SELECT wallet_minor FROM finance_accounts WHERE user_id=$1',[id])).rows[0].wallet_minor,'700');
       assert.equal((await dest.query('SELECT last_value,is_called FROM mysteryhub_sms.consents_id_seq')).rows[0].is_called,true);
       await assert.rejects(()=>dest.query("UPDATE finance_ledger SET delta_minor=1 WHERE user_id=$1",[id]),/immutable/);
+      const restoredGreeting=(await dest.query('SELECT creator_hash,idempotency_key FROM mysteryhub_experiences.greetings WHERE share_id=$1',[savedGreeting.greeting.shareId])).rows[0];
+      assert.match(restoredGreeting.creator_hash,/^[a-f0-9]{64}$/);
+      assert.equal(restoredGreeting.idempotency_key,greeting.idempotencyKey);
+      assert.equal((await dest.query('SELECT count(*)::int n FROM mysteryhub_experiences.reports')).rows[0].n,1);
+      assert.equal((await dest.query('SELECT enabled FROM mysteryhub_experiences.configuration')).rows[0].enabled,false);
+      assert.equal((await dest.query("SELECT count(*)::int n FROM public.analytics_events WHERE event_name='experience_greeting_created'")).rows[0].n,1);
       await dest.query('GRANT SELECT(password_hash) ON public.users TO anon');
       const unsafe=await runMigration('db-standby-preflight',source!,target,dir);
       assert.equal(unsafe.code,1);
@@ -249,6 +274,7 @@ test('PostgreSQL 17 archive restores and reverses the complete app, and rejects 
       try {
         await assert.rejects(()=>dest.query('SELECT 1 FROM public.orders'),error=>(error as {code:string}).code==='42501');
         await assert.rejects(()=>dest.query('SELECT 1 FROM mysteryhub_sms.messages'),error=>(error as {code:string}).code==='42501');
+        await assert.rejects(()=>dest.query('SELECT 1 FROM mysteryhub_experiences.greetings'),error=>(error as {code:string}).code==='42501');
       } finally { await dest.query('RESET ROLE'); }
       const folders=readdirSync(dir).filter(name=>readdirSync(join(dir,name)).length>0);
       assert.equal(folders.length,1);
