@@ -51,7 +51,7 @@ export const HomeMarketplaceSection: React.FC = () => {
         <div className="home-marketplace-intro">
           <p className="home-eyebrow">Tech & Digital Marketplace</p>
           <h2 id="marketplace-heading">Find your next <span>work companion.</span></h2>
-          <p>Browse technology and digital tools. Buy online where an item says so, or send an enquiry to confirm price, availability and delivery.</p>
+          <p>Browse technology and digital tools. Send an enquiry about price, availability or delivery.</p>
           <a href="/marketplace" onClick={(e) => { e.preventDefault(); setActivePage('marketplace'); }} className="mh-button-secondary">Browse Marketplace<ArrowRight className="w-4 h-4" /></a>
         </div>
       </div>

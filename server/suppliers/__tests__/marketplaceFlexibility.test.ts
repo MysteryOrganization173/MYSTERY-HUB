@@ -1,3 +1,4 @@
+import { paymentOrder } from './paymentFixtures.js';
 import assert from 'node:assert/strict';
 import { test,before,after,beforeEach,mock } from 'node:test';
 import express from 'express';
@@ -33,8 +34,8 @@ for (const [kind,mode] of [['physical','delivery'],['digital','digital_delivery'
   await AuthStore.createUser({id:'referrer',name:'Referrer',email:'referrer@example.com',phone:null,passwordHash:'synthetic-unused',role:'customer'});
   await ReferralStore.getOrCreateProfile('referrer');
   const p=await create({productKind:kind,fulfilmentMode:mode,published:true,confirmWarnings:true,referralRewardMinor:150});
-  assert.equal((await checkout(p,kind==='physical'?{deliveryCity:'Accra',deliveryArea:'Central'}:{})).status,200);
-  const order=OrdersStore.adminDevOrders()[0];order.referrer_user_id='referrer';order.user_id='customer';
+  const order=paymentOrder({service_type:'marketplace',product_id:p.id,amount:19900,referrer_user_id:'referrer',user_id:'customer',marketplace_status:'pending_payment',marketplace_context:{referralRewardMinor:150}});
+  await OrdersStore.createOrder(order);
   assert.equal(ReferralStore.adminDevSnapshot().ledger.length,0);
   await OrdersStore.markOrderPaid(order.payment_reference,new Date().toISOString());
   assert.equal(ReferralStore.adminDevSnapshot().ledger.length,0);
@@ -79,18 +80,19 @@ test('publishing draft missing category is blocked even when warnings confirmed'
 test('published PATCH cannot bypass readiness and category checks',async()=>{const p=await create({published:true,confirmWarnings:true});assert.equal((await request(`/admin/marketplace/products/${p.id}`,'PATCH',{priceMinor:0,confirmWarnings:true})).status,400);assert.equal((await MarketplaceStore.getProductById(p.id))!.price_minor,19900);});
 test('sort control persists; renaming preserves existing URL',async()=>{const p=await create({published:true,confirmWarnings:true});await request(`/admin/marketplace/products/${p.id}`,'PATCH',{sortOrder:5,name:'Renamed Subscription',confirmWarnings:true});const raw=await MarketplaceStore.getProductById(p.id);assert.equal(raw!.sort_order,5);assert.equal(raw!.slug,p.slug);assert.ok(await MarketplaceStore.getPublicProductBySlug(p.slug));});
 test('feature, unfeature, archive, publish, unpublish all retain expected public filtering',async()=>{const p=await create();await action(p.id,'publish',{confirmWarnings:true});await action(p.id,'feature');assert.equal((await MarketplaceStore.getPublicProducts({featured:true})).length,1);await action(p.id,'unfeature');assert.equal((await MarketplaceStore.getPublicProducts({featured:true})).length,0);await action(p.id,'unpublish');assert.equal((await MarketplaceStore.getPublicProducts()).length,0);await action(p.id,'publish',{confirmWarnings:true});await action(p.id,'archive');assert.equal((await MarketplaceStore.getPublicProducts()).length,0);});
-test('digital checkout requires neither pickup nor delivery address',async()=>{const p=await create({published:true,confirmWarnings:true});const response=await checkout(p);assert.equal(response.status,200);const orders=await OrdersStore.adminDevOrders();assert.equal(orders[0].fulfilment_method,'digital_delivery');assert.equal(orders[0].delivery_city,null);assert.equal(orders[0].pickup_location_id,null);assert.equal(orders[0].supplier_provider,'manual_supplier');assert.equal(orders[0].status,'pending_payment');});
-test('service manual activation supports payment and remains manual',async()=>{const p=await create({productKind:'service',fulfilmentMode:'manual_activation',published:true,confirmWarnings:true});assert.equal((await checkout(p)).status,200);assert.equal((await OrdersStore.adminDevOrders())[0].supplier_order_id,null);});
-test('inquiry-only service cannot create a payment order',async()=>{const p=await create({productKind:'service',fulfilmentMode:'inquiry_only',published:true,confirmWarnings:true});assert.equal(p.purchaseEnabled,false);assert.equal((await checkout(p)).status,400);assert.equal((await OrdersStore.adminDevOrders()).length,0);});
-test('digital identifier is required server-side and length limited',async()=>{const p=await create({fulfilmentIdentifierLabel:'Account email',fulfilmentIdentifierRequired:true,published:true,confirmWarnings:true});assert.equal((await checkout(p)).status,400);assert.equal((await checkout(p,{fulfilmentIdentifier:'a'.repeat(201)})).status,400);assert.equal((await checkout(p,{fulfilmentIdentifier:'account@example.com'})).status,200);});
 for(const label of ['Account password','One-time code','Security PIN','Account pass.word'])test(`credential collection configuration rejected: ${label}`,async()=>{assert.equal((await request('/admin/marketplace/products','POST',input({fulfilmentIdentifierLabel:label}))).status,400);});
-test('external password field rejected at checkout',async()=>{const p=await create({published:true,confirmWarnings:true});assert.equal((await checkout(p,{password:'do-not-store'})).status,400);assert.equal((await OrdersStore.adminDevOrders()).length,0);});
-test('digital checkout rejects forged physical method',async()=>{const p=await create({published:true,confirmWarnings:true});assert.equal((await checkout(p,{fulfilmentMethod:'delivery',deliveryCity:'Accra',deliveryArea:'Central'})).status,400);});
-test('physical pickup payment stores configured location snapshot',async()=>{const p=await create({productKind:'physical',fulfilmentMode:'pickup',pickupLocations:pickup,published:true,confirmWarnings:true});assert.equal((await checkout(p,{fulfilmentMethod:'pickup',pickupLocationId:'loc_fixture'})).status,200);assert.match((await OrdersStore.adminDevOrders())[0].pickup_location_snapshot!,/Fixture Hub/);});
-test('physical delivery payment still requires city and area',async()=>{const p=await create({productKind:'physical',fulfilmentMode:'delivery',published:true,confirmWarnings:true});assert.equal((await checkout(p,{fulfilmentMethod:'delivery'})).status,400);assert.equal((await checkout(p,{fulfilmentMethod:'delivery',deliveryCity:'Accra',deliveryArea:'Central'})).status,200);});
 test('inactive pickup location rejected',async()=>{const p=await raw({productKind:'physical',fulfilmentMode:'pickup',pickupLocations:pickup.map(l=>({...l,active:false}))});assert.throws(()=>marketplaceFulfilment(p,{fulfilmentMethod:'pickup',pickupLocationId:'loc_fixture'}));});
-test('variant controls authoritatively price Paystack, ignoring client amount',async()=>{const p=await create({published:true,confirmWarnings:true,variants:[{id:'three_months',name:'3 months',priceMinor:19900,active:true}]});assert.equal((await checkout(p,{variantId:'bad',amount:1})).status,400);assert.equal((await checkout(p,{variantId:'three_months',amount:1})).status,200);const orders=await OrdersStore.adminDevOrders();assert.equal(orders[0].amount,19900);assert.equal(orders[0].variant_snapshot,'3 months');assert.equal((PaystackServerService.initializeTransaction as any).mock.calls[0].arguments[0].amountPesewas,19900);});
-test('order snapshot remains immutable after product changes and identifiers are admin-only',async()=>{const p=await create({published:true,confirmWarnings:true,fulfilmentIdentifierLabel:'Account email',fulfilmentIdentifierRequired:true,purchaseNote:'Original terms'});await checkout(p,{fulfilmentIdentifier:'account@example.com'});await request(`/admin/marketplace/products/${p.id}`,'PATCH',{purchaseNote:'New terms',fulfilmentIdentifierLabel:'Username',confirmWarnings:true});const order=(await OrdersStore.adminDevOrders())[0];assert.equal(order.marketplace_context!.purchaseNote,'Original terms');assert.equal(order.marketplace_context!.identifierLabel,'Account email');assert.equal(toAdminOrderDetails(order).marketplace_context!.identifierValue,'account@example.com');assert.ok(!JSON.stringify(toSafePublicOrder(order)).includes('account@example.com'));});
+test('order snapshot remains immutable after product changes and identifiers are admin-only',async()=>{const p=await create({published:true,confirmWarnings:true,fulfilmentIdentifierLabel:'Account email',fulfilmentIdentifierRequired:true,purchaseNote:'Original terms'});await OrdersStore.createOrder(paymentOrder({service_type:'marketplace',product_id:p.id,marketplace_context:{purchaseNote:'Original terms',identifierLabel:'Account email',identifierValue:'account@example.com'}}));await request(`/admin/marketplace/products/${p.id}`,'PATCH',{purchaseNote:'New terms',fulfilmentIdentifierLabel:'Username',confirmWarnings:true});const order=(await OrdersStore.adminDevOrders())[0];assert.equal(order.marketplace_context!.purchaseNote,'Original terms');assert.equal(order.marketplace_context!.identifierLabel,'Account email');assert.equal(toAdminOrderDetails(order).marketplace_context!.identifierValue,'account@example.com');assert.ok(!JSON.stringify(toSafePublicOrder(order)).includes('account@example.com'));});
+for(const [kind,mode] of [['physical','delivery'],['digital','digital_delivery'],['service','manual_activation']] as const)test(`${kind} Marketplace can be browsed or enquired about with online payment disabled`,async()=>{
+ const p=await create({productKind:kind,fulfilmentMode:mode,published:true,confirmWarnings:true});
+ const details=await request(`/marketplace/products/${p.slug}`,'GET',undefined,null);
+ assert.equal(details.status,200);assert.equal((await details.json()).product.purchaseEnabled,false);
+ for(const input of [{amount:1,variantId:'foreign'},{serviceType:'data'},{purchaseEnabled:true,fulfilmentMethod:mode}]){
+  const response=await checkout(p,input);assert.equal(response.status,503);assert.equal((await response.json()).code,'PAYMENT_UNAVAILABLE');
+ }
+ const enquiry=await request('/marketplace/inquiries','POST',{productId:p.id,productName:p.name,message:'Is it available?'},null);
+ assert.equal(enquiry.status,200);assert.equal(OrdersStore.adminDevOrders().length,0);assert.equal((PaystackServerService.initializeTransaction as any).mock.callCount(),0);
+});
 async function inquiry(name='Inquiry Fixture'){return MarketplaceStore.createInquiry({productName:name,customerName:'Fixture Customer',customerPhone:'0241234567',message:'Need a subscription',budget:'GH₵199'});}
 test('customer inquiry appears in admin inbox',async()=>{const res=await request('/marketplace/inquiries','POST',{productName:'Fixture Cloud',customerName:'Fixture Customer',customerPhone:'0241234567',message:'Availability?'},null);assert.equal(res.status,200);const list=await (await request('/admin/marketplace/inquiries')).json();assert.equal(list.total,1);assert.equal(list.inquiries[0].product_name,'Fixture Cloud');});
 test('inquiry status filters, contact timestamp and resolved status work',async()=>{const row=await inquiry();await request('/admin/marketplace/inquiries/'+row.id,'PATCH',{expectedVersion:0,status:'contacted'});const contacted=await MarketplaceControlStore.listInquiries({status:'contacted'});assert.equal(contacted.total,1);assert.ok(contacted.inquiries[0].contacted_at);await request('/admin/marketplace/inquiries/'+row.id,'PATCH',{expectedVersion:1,status:'resolved'});assert.equal((await MarketplaceControlStore.listInquiries({status:'resolved'})).total,1);assert.equal((await MarketplaceControlStore.listInquiries({status:'new'})).total,0);});
@@ -109,30 +111,18 @@ test('repeatable schema is additive, preserves seed edits and historical orders'
 import { MARKETPLACE_LIMITS } from '../../../shared/marketplaceLimits.js';
 const hardeningVariants=[{id:'entry',name:'8GB / 256GB',priceMinor:360000,active:true},{id:'middle',name:'16GB / 512GB',priceMinor:410000,active:true},{id:'premium',name:'32GB / 1TB',priceMinor:490000,active:true}];
 test('hardening: public From price uses cheapest valid active option while admin retains base',async()=>{const p=await raw({priceGhc:9999,variants:[...hardeningVariants,{id:'inactive',name:'Unavailable',priceMinor:100,active:false}]});const pub=toPublicMarketplaceProduct(p);assert.equal(pub.priceType,'starting_at');assert.equal(pub.priceMinor,360000);assert.match(pub.priceDisplay,/From.*3,600/);assert.equal(toAdminMarketplaceProduct(p).priceMinor,999900);});
-test('hardening: stale or foreign variant fails before order or payment initialization',async()=>{const p=await create({published:true,confirmWarnings:true,variants:hardeningVariants});for(const variantId of ['deleted','other_product_option'])assert.equal((await checkout(p,{variantId})).status,400);assert.equal((await OrdersStore.adminDevOrders()).length,0);assert.equal((PaystackServerService.initializeTransaction as any).mock.calls.length,0);});
-test('hardening: inactive variant cannot be purchased',async()=>{const p=await create({published:true,confirmWarnings:true,variants:hardeningVariants.map(v=>({...v,active:v.id!=='middle'}))});assert.equal((await checkout(p,{variantId:'middle'})).status,400);assert.equal((await OrdersStore.adminDevOrders()).length,0);});
-test('hardening: no active option never falls back to base price',async()=>{const p=await create({published:true,confirmWarnings:true,variants:hardeningVariants.map(v=>({...v,active:false}))});assert.equal((await checkout(p)).status,400);assert.equal(toPublicMarketplaceProduct((await MarketplaceStore.getProductById(p.id))!).purchaseEnabled,false);assert.equal((await OrdersStore.adminDevOrders()).length,0);});
-test('hardening: physical selection snapshots product, option and authoritative price',async()=>{const p=await create({productKind:'physical',fulfilmentMode:'delivery',published:true,confirmWarnings:true,variants:hardeningVariants});assert.equal((await checkout(p,{fulfilmentMethod:'delivery',deliveryCity:'Accra',deliveryArea:'Central',variantId:'middle',priceMinor:1,amount:1})).status,200);const o=(await OrdersStore.adminDevOrders())[0];assert.equal(o.product_id,p.id);assert.equal(o.variant_id,'middle');assert.equal(o.variant_snapshot,'16GB / 512GB');assert.equal(o.amount,410000);assert.equal((PaystackServerService.initializeTransaction as any).mock.calls[0].arguments[0].amountPesewas,410000);});
-test('hardening: digital duration option stores no physical fulfilment columns',async()=>{const p=await create({published:true,confirmWarnings:true,variants:[{id:'annual',name:'12 months',priceMinor:29900}]});assert.equal((await checkout(p,{variantId:'annual'})).status,200);const o=(await OrdersStore.adminDevOrders())[0];assert.equal(o.variant_snapshot,'12 months');assert.equal(o.amount,29900);assert.equal(o.delivery_area,null);assert.equal(o.pickup_location_id,null);});
 test('hardening: inquiry-only save and update turn direct purchase off in storage',async()=>{const p=await create({productKind:'service',fulfilmentMode:'inquiry_only',purchaseEnabled:true});assert.equal((await MarketplaceStore.getProductById(p.id))!.purchase_enabled,false);await request('/admin/marketplace/products/'+p.id,'PATCH',{purchaseEnabled:true});assert.equal((await MarketplaceStore.getProductById(p.id))!.purchase_enabled,false);});
 for(const [field,limit] of [['name',MARKETPLACE_LIMITS.productName],['badge',MARKETPLACE_LIMITS.badge],['availabilityLabel',MARKETPLACE_LIMITS.availabilityLabel]] as const){
  test(`hardening: ${field} at PostgreSQL boundary persists`,async()=>{const p=await create({[field]:'x'.repeat(limit)});const saved=(await MarketplaceStore.getProductById(p.id))!;assert.equal((saved as any)[field==='availabilityLabel'?'availability_label':field].length,limit);});
  test(`hardening: ${field} one over boundary returns safe 400`,async()=>{const res=await request('/admin/marketplace/products','POST',input({[field]:'x'.repeat(limit+1)}));assert.equal(res.status,400);assert.equal((await MarketplaceStore.getAdminProducts()).length,0);});
 }
-for(const [field,limit] of [['variantId',MARKETPLACE_LIMITS.variantId],['pickupId',MARKETPLACE_LIMITS.pickupId]] as const){
- test(`hardening: ${field} exact boundary persists through checkout`,async()=>{const id='x'.repeat(limit);const p=await create({productKind:'physical',fulfilmentMode:'pickup',published:true,confirmWarnings:true,pickupLocations:[{...pickup[0],id:field==='pickupId'?id:'hub'}],variants:[{id:field==='variantId'?id:'option',name:'Option',priceMinor:10000}]});assert.equal((await checkout(p,{fulfilmentMethod:'pickup',pickupLocationId:field==='pickupId'?id:'hub',variantId:field==='variantId'?id:'option'})).status,200);const o=(await OrdersStore.adminDevOrders())[0];assert.equal((o as any)[field==='variantId'?'variant_id':'pickup_location_id'],id);});
- test(`hardening: ${field} one over boundary rejected before persistence`,async()=>{const extra=field==='variantId'?{variants:[{id:'x'.repeat(limit+1),name:'Option',priceMinor:10000}]}:{pickupLocations:[{...pickup[0],id:'x'.repeat(limit+1)}]};assert.equal((await request('/admin/marketplace/products','POST',input(extra))).status,400);});
-}
-test('hardening: delivery area 128 persists; 129 rejected without order',async()=>{const p=await create({productKind:'physical',fulfilmentMode:'delivery',published:true,confirmWarnings:true});assert.equal((await checkout(p,{fulfilmentMethod:'delivery',deliveryCity:'Accra',deliveryArea:'x'.repeat(129)})).status,400);assert.equal((await OrdersStore.adminDevOrders()).length,0);assert.equal((await checkout(p,{fulfilmentMethod:'delivery',deliveryCity:'Accra',deliveryArea:'x'.repeat(128)})).status,200);assert.equal((await OrdersStore.adminDevOrders())[0].delivery_area!.length,128);});
 test('hardening: inquiry name 255 persists; 256 rejects cleanly',async()=>{await MarketplaceStore.createInquiry({productName:'x'.repeat(255)});await assert.rejects(MarketplaceStore.createInquiry({productName:'x'.repeat(256)}),/255/);assert.equal((await MarketplaceControlStore.listInquiries()).total,1);});
 test('hardening: maximum name duplicate and repeated duplication remain bounded with unique slugs',async()=>{const p=await create({name:'x'.repeat(256),priceGhc:9999,variants:hardeningVariants});const first=(await (await action(p.id,'duplicate')).json()).product;const second=(await (await action(first.id,'duplicate')).json()).product;assert.equal(first.name.length,256);assert.equal(second.name.length,256);assert.match(first.name,/^Copy of /);assert.match(second.name,/^Copy of Copy of /);assert.notEqual(first.slug,p.slug);assert.notEqual(second.slug,first.slug);assert.equal(first.priceMinor,999900);assert.equal(first.published,false);});
 test('hardening: AI draft text also respects storage label and badge boundaries',()=>{const draft=sanitizeExtractionResult({name:'x'.repeat(300),badge:'b'.repeat(100),availabilityLabel:'a'.repeat(150)});assert.equal(draft.name.length,256);assert.equal(draft.badge!.length,64);assert.equal(draft.availabilityLabel!.length,64);});
-test('hardening: malformed stored options do not turn into a base-price purchase',async()=>{const p=await create({published:true,confirmWarnings:true});const original=(await MarketplaceStore.getProductById(p.id))!;for(const variants of ['[{"id":"broken","name":"Broken","priceMinor":"19900"}]','not-json']){const record={...original,variants};assert.equal(toPublicMarketplaceProduct(record).purchaseEnabled,false);assert.equal(toPublicMarketplaceProduct(record).priceMinor,null);mock.method(MarketplaceStore,'getProductById',async()=>record);assert.equal((await checkout(p)).status,400);mock.restoreAll();}assert.equal((await OrdersStore.adminDevOrders()).length,0);});
-test('hardening: long valid product and option names fit legacy order columns without losing full context',async()=>{const p=await create({name:'n'.repeat(256),published:true,confirmWarnings:true,variants:[{id:'long_option',name:'v'.repeat(150),priceMinor:19900}]});assert.equal((await checkout(p,{variantId:'long_option'})).status,200);const order=(await OrdersStore.adminDevOrders())[0];assert.equal(order.product_name_snapshot.length,MARKETPLACE_LIMITS.orderProductName);assert.equal(order.bundle_size_snapshot.length,MARKETPLACE_LIMITS.orderOptionLabel);assert.equal(order.variant_snapshot!.length,150);assert.equal(order.marketplace_context!.productName,'n'.repeat(256));});
 import {initializePaymentOnServer,InitializeMarketplacePaymentRequest} from '../../../src/services/apiClient.js';
 for (const [kind,mode] of [['physical','delivery'],['digital','digital_delivery'],['service','manual_activation']] as const) {
   for (const authenticated of [false,true]) {
-    test(`integration cleanup: ${authenticated?'authenticated':'guest'} ${kind} checkout carries canonical receipt email end to end`,async()=>{
+    test(`integration cleanup: ${authenticated?'authenticated':'guest'} ${kind} uses the canonical client contract and rejects direct payment`,async()=>{
       const p=await create({productKind:kind,fulfilmentMode:mode,published:true,confirmWarnings:true});
       const originalFetch=globalThis.fetch;
       let submitted:any,headers:any;
@@ -146,52 +136,17 @@ for (const [kind,mode] of [['physical','delivery'],['digital','digital_delivery'
         return originalFetch(url,options);
       });
       const payload:InitializeMarketplacePaymentRequest={serviceType:'marketplace',productId:p.id,phone:'0241234567',customerName:'Synthetic Customer',customerEmail:'buyer@example.com',fulfilmentMethod:mode,...(kind==='physical'?{deliveryCity:'Accra',deliveryArea:'Central'}:{})};
-      const result=await initializePaymentOnServer(payload,authenticated?'customer-token':null);
-      assert.equal(result.success,true);
+      await assert.rejects(initializePaymentOnServer(payload,authenticated?'customer-token':null),(error:any)=>error.code==='PAYMENT_UNAVAILABLE');
       assert.equal(submitted.customerEmail,'buyer@example.com');
       assert.equal(Object.hasOwn(submitted,'email'),false);
       assert.equal(headers.Authorization,authenticated?'Bearer customer-token':undefined);
-      const order=(await OrdersStore.adminDevOrders())[0];
-      assert.equal(order.customer_email,'buyer@example.com');
-      assert.equal(order.user_id,authenticated?'customer':null);
-      assert.equal((order.marketplace_context!.customerContact as any).email,'buyer@example.com');
-      assert.equal(toAdminOrderDetails(order).customer_email,'buyer@example.com');
-      const payment=(PaystackServerService.initializeTransaction as any).mock.calls[0].arguments[0];
-      assert.equal(payment.email,'buyer@example.com');
-      assert.equal(payment.metadata.service_type,'marketplace');
-      assert.ok(!order.customer_email.endsWith('@customer.mysteryhub.site'));
+      assert.equal(OrdersStore.adminDevOrders().length,0);
+      assert.equal((PaystackServerService.initializeTransaction as any).mock.callCount(),0);
     });
   }
 }
-test('integration cleanup: deployed Marketplace email alias is normalized and trimmed',async()=>{
-  const p=await create({published:true,confirmWarnings:true});
-  assert.equal((await checkout(p,{email:'  legacy@example.com  '})).status,200);
-  assert.equal((await OrdersStore.adminDevOrders())[0].customer_email,'legacy@example.com');
-  assert.equal((PaystackServerService.initializeTransaction as any).mock.calls[0].arguments[0].email,'legacy@example.com');
-});
-test('integration cleanup: canonical customerEmail takes precedence over legacy alias',async()=>{
-  const p=await create({published:true,confirmWarnings:true});
-  assert.equal((await checkout(p,{customerEmail:'canonical@example.com',email:'legacy@example.com'})).status,200);
-  assert.equal((await OrdersStore.adminDevOrders())[0].customer_email,'canonical@example.com');
-  assert.equal((PaystackServerService.initializeTransaction as any).mock.calls[0].arguments[0].email,'canonical@example.com');
-});
-test('integration cleanup: Paystack adapter forwards customer email in actual gateway request body',async()=>{
-  mock.restoreAll();
-  const previousKey=process.env.PAYSTACK_SECRET_KEY;
-  process.env.PAYSTACK_SECRET_KEY='isolated-test-key-not-a-credential';
-  let outgoing:any;
-  mock.method(globalThis,'fetch',async(url:any,options:any)=>{
-    assert.equal(url,'https://api.paystack.co/transaction/initialize');
-    outgoing=JSON.parse(options.body);
-    return new Response(JSON.stringify({status:true,data:{authorization_url:'https://checkout.paystack.com/isolated',access_code:'isolated',reference:'isolated-reference'}}),{status:200,headers:{'Content-Type':'application/json'}});
-  });
-  try {
-    const result=await PaystackServerService.initializeTransaction({email:'buyer@example.com',amountPesewas:19900,reference:'isolated-reference',metadata:{service_type:'marketplace'}});
-    assert.equal(result.success,true);
-    assert.equal(outgoing.email,'buyer@example.com');
-    assert.equal(outgoing.metadata.service_type,'marketplace');
-    assert.equal(Object.hasOwn(outgoing,'customerEmail'),false);
-  } finally {
-    if(previousKey===undefined)delete process.env.PAYSTACK_SECRET_KEY;else process.env.PAYSTACK_SECRET_KEY=previousKey;
-  }
+test('deployed Marketplace email aliases cannot reopen checkout',async()=>{
+const p=await create({published:true,confirmWarnings:true});
+for(const details of [{email:'legacy@example.com'},{customerEmail:'buyer@example.com',email:'legacy@example.com'}])assert.equal((await checkout(p,details)).status,503);
+assert.equal(OrdersStore.adminDevOrders().length,0);
 });

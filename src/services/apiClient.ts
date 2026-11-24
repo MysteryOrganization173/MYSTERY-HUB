@@ -1,3 +1,4 @@
+import { sharedMerchantCheckoutAvailable } from '../../shared/paymentAvailability';
 import {campaignCheckoutFields} from '../utils/campaignTracking';
 /**
  * Frontend API Client Service
@@ -897,6 +898,10 @@ export async function getInstantBundlesOnServer(timeoutMs = 15000): Promise<Inst
 // PUBLIC MARKETPLACE CATALOG CLIENT METHODS
 // ==========================================
 
+function publicMarketplaceAvailability(product: MarketplaceProduct): MarketplaceProduct {
+  return sharedMerchantCheckoutAvailable('marketplace') ? product : { ...product, purchaseEnabled:false, referralRewardGhc:0 };
+}
+
 export async function getPublicMarketplaceProducts(params?: {
   category?: string;
   search?: string;
@@ -912,7 +917,7 @@ export async function getPublicMarketplaceProducts(params?: {
     const res = await fetch(url, { headers: { Accept: 'application/json' } });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to fetch marketplace products');
-    return data;
+    return { ...data, products: (data.products || []).map(publicMarketplaceAvailability) };
   } catch (err) {
     console.error('getPublicMarketplaceProducts error:', err);
     return {
@@ -933,7 +938,7 @@ export async function getPublicMarketplaceProductBySlug(slug: string): Promise<{
     const res = await fetch(url, { headers: { Accept: 'application/json' } });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to fetch product');
-    return data;
+    return { ...data, product: data.product ? publicMarketplaceAvailability(data.product) : undefined };
   } catch (err) {
     return {
       success: false,

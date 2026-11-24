@@ -1,3 +1,4 @@
+import {isDirectDataCheckout} from './paymentScope.js';
 import {createHash} from 'node:crypto';
 import {FinanceError,FinanceStore} from '../db/financeStore.js';
 import {getPool} from '../db/connection.js';
@@ -11,7 +12,7 @@ export function guestCheckoutId(requestId:unknown):string|null{
  return 'ord_guest_'+createHash('sha256').update(requestId.toLowerCase()).digest('base64url');
 }
 function sameOrder(order:OrderRecord,productId:string,recipient:string,email:string,userId:string|null){
- return order.user_id===userId&&!order.store_context&&(order.service_type===null||order.service_type==='data')&&order.payment_provider==='paystack'&&order.product_id===productId&&order.recipient_phone===recipient&&order.customer_email===email;
+ return order.user_id===userId&&isDirectDataCheckout(order)&&order.product_id===productId&&order.recipient_phone===recipient&&order.customer_email===email;
 }
 /** Read-only recovery before (and after rejected) preflight; an existing attempt must not be called a new denial. */
 export async function recoverDirectCheckout(userId:string|undefined,input:Record<string,unknown>,productId:string,recipient:string,email:string):Promise<(OrderRecord&{checkout:any})|null>{
@@ -19,6 +20,7 @@ export async function recoverDirectCheckout(userId:string|undefined,input:Record
  if(userId){
   if(typeof input.requestId!=='string'||!/^[-a-zA-Z0-9_]{16,80}$/.test(input.requestId))throw new FinanceError('A stable request ID is required.');
   const row=await FinanceStore.read(userId,tx=>tx.find(`direct:${input.requestId}`));if(!row)return null;
+  if(row.kind!=='direct_checkout')throw requireCheckoutRecovery();
   const order=await OrdersStore.findOrder(row.payload.orderId);
   if(!order||!sameOrder(order,productId,recipient,email,userId))throw requireCheckoutRecovery();
   if(order.payment_status==='success'||order.paid_at||order.supplier_order_id||row.state!=='pending'||!row.payload.checkout)throw requireCheckoutRecovery(order.public_reference);

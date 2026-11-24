@@ -30,7 +30,7 @@ interface MarketplaceProductDetailModalProps {
   onClose: () => void;
   initialVariantId?: string;
   onVariantChange?: (id: string) => void;
-  onBuyNow: (product: MarketplaceProduct, variantId?: string) => void;
+  onBuyNow?: (product: MarketplaceProduct, variantId?: string) => void;
   onInquire: (product: MarketplaceProduct) => void;
   onShare: (product: MarketplaceProduct) => void;
   /** Plain product link sharing (no referral), offered for every product. */
@@ -120,13 +120,13 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
   const hasDelivery =
     allowedFulfilment !== 'pickup' && product.deliveryAvailable !== false;
 
-  const isPurchaseSupported = isDirectPurchaseSupported(product);
+  const isPurchaseSupported = Boolean(onBuyNow) && isDirectPurchaseSupported(product);
   const path = productPath(product);
-  const nextStep = path === 'buy'
+  const nextStep = isPurchaseSupported
     ? { tone: 'border-[#00c365]/30 bg-[#00c365]/8 text-emerald-100', title: 'Available to buy online', body: needsOption ? 'Choose an option, then continue to checkout. You will see the final total before paying.' : 'Continue to checkout to enter your details. You will see the final total before paying.' }
     : path === 'coming_soon'
     ? { tone: 'border-slate-700 bg-slate-900/70 text-slate-200', title: 'Not available to order yet', body: 'You can still ask us about this item. Sending an enquiry does not place an order or take payment.' }
-    : { tone: 'border-sky-500/30 bg-sky-500/8 text-sky-100', title: 'Order by enquiry', body: 'Send your question and we will confirm price, availability and delivery with you on WhatsApp. No payment is taken.' };
+    : { tone: 'border-sky-500/30 bg-sky-500/8 text-sky-100', title: 'Product enquiries', body: 'Send a question about price, availability or delivery. Online checkout is unavailable for this item.' };
 
   const isLongDescription = (product.description || '').length > 320;
   const displayedDescription =
@@ -463,7 +463,7 @@ export const MarketplaceProductDetailModal: React.FC<MarketplaceProductDetailMod
                   type="button"
                   disabled={needsOption}
                   data-marketplace-primary
-                  onClick={() => onBuyNow(product,selectedVariant?.id)}
+                  onClick={() => onBuyNow?.(product,selectedVariant?.id)}
                   className="flex-1 py-3 px-3 sm:px-4 rounded-xl bg-[#00c365] hover:bg-[#00e575] text-black font-extrabold text-xs sm:text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 sm:gap-2 shadow-[0_0_20px_rgba(0,195,101,0.3)] active:scale-[0.98] cursor-pointer min-w-0"
                 >
                   <ShoppingBag className="w-4 h-4 shrink-0" />

@@ -1,3 +1,4 @@
+import { PAYMENT_UNAVAILABLE, sharedMerchantCheckoutAvailable } from '../../shared/paymentAvailability.js';
 import {campaignStoreOrderContext} from '../services/campaignContext.js';
 import { Router } from 'express';
 import {observeSalesRequest} from '../services/salesReliability.js';
@@ -31,7 +32,10 @@ websiteBusinessRouter.put('/:id/bundles',requireAuth,sensitive,handler(req=>Busi
 websiteBusinessRouter.post('/:id/store-withdrawals',requireAuth,sensitive,handler(req=>Business.withdraw(req.params.id,req.user.id,req.body)));
 websiteBusinessRouter.get('/:id/store-orders/:reference',publicWrite,handler(req=>Business.publicOrder(req.params.id,req.params.reference)));
 websiteBusinessRouter.get('/:id/storefront',handler(req=>Business.catalog(req.params.id)));
-websiteBusinessRouter.post('/:id/store-checkout',optionalAuth,campaignStoreOrderContext,publicWrite,observeSalesRequest('data'),handler(req=>{
+websiteBusinessRouter.post('/:id/store-checkout',optionalAuth,publicWrite,(_req,res,next)=>{
+  if (!sharedMerchantCheckoutAvailable('website_store_order')) { res.status(503).json(PAYMENT_UNAVAILABLE); return; }
+  next();
+},campaignStoreOrderContext,observeSalesRequest('data'),handler(req=>{
   if(req.headers.authorization&&!req.user)throw new FinanceError('Invalid session.',401);
   return Business.initialize(req.params.id,req.body,req.user?.id);
 }));

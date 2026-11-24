@@ -1,3 +1,4 @@
+import { sharedMerchantCheckoutAvailable } from "../../shared/paymentAvailability.js";
 import {FulfilmentService} from '../services/fulfilmentService.js';
 import { Router } from 'express';
 import { optionalAuth,requireAdmin } from '../middleware/authMiddleware.js';
@@ -12,7 +13,10 @@ const handle=(fn:(req:any)=>Promise<unknown>)=>async(req:any,res:any)=>{
 };
 export const commercialRouter=Router();
 // The headline adds AFA's saving only while its promotional price applies and AFA can be bought.
-commercialRouter.get('/products',handle(async()=>CommercialService.withAfaHeadline(await CommercialService.catalog())));
+commercialRouter.get('/products',handle(async()=>{
+  const catalog = await CommercialService.catalog();
+  return sharedMerchantCheckoutAvailable('afa') ? CommercialService.withAfaHeadline(catalog) : catalog;
+}));
 commercialRouter.get('/quote/:productId',optionalAuth,handle(async req=>{
   const {buyerPhone,...safe}=await CommercialService.quote(req.params.productId,req.user?.id);return safe;
 }));

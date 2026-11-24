@@ -41,7 +41,7 @@ test('the gallery demo shows the starter wording and no sample address or phone 
   assert.equal(data.demoHeroTagline,websiteStarterWording('tmpl-data-reseller')?.tagline);assert.equal(data.demoSubtext,websiteStarterWording('tmpl-data-reseller')?.aboutText);
   assert.equal(data.location,'');assert.equal(data.hoursOrContact,'');
   const html=renderToStaticMarkup(renderTemplateLayout(data));
-  assert.ok(!html.includes('Spintex'));assert.ok(!html.includes('555 7788'));assert.ok(html.includes('Shop Bundles'));
+  assert.ok(!html.includes('Spintex'));assert.ok(!html.includes('555 7788'));assert.ok(html.includes('Browse bundles'));
   // Labelled, non-transactional examples only.
   assert.ok(PRICE.test(html));assert.ok(html.includes('Example bundles and prices'));assert.ok(!html.includes('data-store-setup'));
 });
@@ -61,18 +61,18 @@ test('a new store without bundles shows the owner setup area: networks, example 
   assert.ok(html.includes('data-store-setup'));assert.ok(html.includes('Your bundles appear here'));assert.ok(html.includes('Only you can see this'));
   for(const n of ['MTN','Telecel','AirtelTigo'])assert.ok(html.includes(n),n);
   assert.ok(html.includes('Your price'));assert.ok(!PRICE.test(html),'no fabricated purchasable prices');
-  assert.ok(html.includes('Kwame Data Hub'));assert.ok(html.includes('Buy data in a few taps.'));assert.ok(html.includes('Shop Bundles'));
+  assert.ok(html.includes('Kwame Data Hub'));assert.ok(html.includes('Browse data bundles'));assert.ok(html.includes('View catalogue setup'));
   assert.ok(!html.includes('Spintex'));assert.ok(!html.includes('View Availability'));
 });
 
 test('draft preview with nothing on sale is the setup state; a published empty store is not',()=>{
   const site=starterSite(),checkout=React.createElement('div',{id:'managed-fixture'});
   const setup=renderToStaticMarkup(renderTemplateLayout(site,{managedCheckout:checkout,managedAvailability:'setup'}));
-  assert.ok(setup.includes('data-store-setup'));assert.ok(setup.includes('managed-fixture'));assert.ok(setup.includes('Shop Bundles'));
+  assert.ok(setup.includes('data-store-setup'));assert.ok(setup.includes('managed-fixture'));assert.ok(setup.includes('View catalogue setup'));
   const empty=renderToStaticMarkup(renderTemplateLayout(site,{managedCheckout:checkout,managedAvailability:'empty'}));
-  assert.ok(!empty.includes('data-store-setup'),'customers never see the owner setup area');assert.ok(empty.includes('View Availability'));
+  assert.ok(!empty.includes('data-store-setup'),'customers never see the owner setup area');assert.ok(empty.includes('Browse bundles'));
   const live=renderToStaticMarkup(renderTemplateLayout(site,{managedCheckout:checkout,managedAvailability:'available',managedSummary:{networks:['mtn'],fromMinor:520,count:1}}));
-  assert.ok(!live.includes('data-store-setup'));assert.ok(live.includes('Shop Bundles'));
+  assert.ok(!live.includes('data-store-setup'));assert.ok(live.includes('Browse bundles'));
   const src=readFileSync('src/components/website/ManagedDataStorefront.tsx','utf8');
   assert.match(src,/preview\?'setup':'empty'/);assert.ok(!src.includes('No saved eligible bundles'),'the owner no longer sees a bare grey card with a Contact Business button');
 });

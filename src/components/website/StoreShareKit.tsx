@@ -9,8 +9,8 @@ import {Check, Copy, Image as ImageIcon, MessageCircle, Share2} from 'lucide-rea
 export function storeShareMessages(name: string, url: string) {
   const store = name.trim() || 'my store';
   return [
-    {id: 'friendly', label: 'Friendly', text: `Hi! I now sell data bundles. You can choose a bundle and pay securely on my store any time: ${url}`},
-    {id: 'status', label: 'For your Status', text: `Need data? Buy your bundle from ${store} in a few taps: ${url}`},
+    {id: 'friendly', label: 'Friendly', text: `Hi! You can browse my data bundle catalogue here: ${url}`},
+    {id: 'status', label: 'For your Status', text: `Browse data bundles from ${store}: ${url}`},
     {id: 'short', label: 'Short', text: `${store} · data bundles: ${url}`},
   ];
 }
@@ -26,7 +26,7 @@ export function StoreShareKit({name, url, onPromote}: {name: string; url: string
   return <section className="bw-share-kit" aria-labelledby="bw-share-kit-title" data-share-kit>
     <div>
       <h2 id="bw-share-kit-title">Get your first customers</h2>
-      <p>Your store is open. Send your link to people who already buy data from you.</p>
+      <p>Your store catalogue is published. Send your link to people who already buy data from you.</p>
     </div>
     <div className="bw-share-pick" role="radiogroup" aria-label="Message">
       {messages.map(m => <button key={m.id} type="button" role="radio" aria-checked={m.id === pick} onClick={() => {setPick(m.id); setCopied('');}}>{m.label}</button>)}
@@ -42,7 +42,7 @@ export function StoreShareKit({name, url, onPromote}: {name: string; url: string
     <ul className="bw-share-tips" aria-label="Selling tips">
       <li><strong>Post it on your WhatsApp Status.</strong> Friends see it without you messaging each one.</li>
       <li><strong>Put the link in your profile.</strong> Your WhatsApp Business, Instagram or TikTok bio is where people look.</li>
-      <li><strong>Mention order tracking.</strong> Buyers get an order reference after paying and can check it on your store.</li>
+      <li><strong>Mention order tracking.</strong> Customers can use their existing order reference to check a previous purchase.</li>
     </ul>
   </section>;
 }

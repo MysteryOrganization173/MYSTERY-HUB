@@ -140,7 +140,7 @@ export function drawPromo(ctx: Ctx, choice: PromoChoice, facts: PromoFacts, logo
   ctx.save();
   ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, W, H);
   const pillY = H - P - 150;
-  const securely = 'Pay securely on my store with Paystack';
+  const securely = 'Browse the catalogue on my store';
 
   if (choice.design === 'launch') {
     glow(ctx, W * 0.92, H * 0.08, W * 0.9, pal.accent, 0.35);
@@ -245,7 +245,7 @@ export function drawPromo(ctx: Ctx, choice: PromoChoice, facts: PromoFacts, logo
     let y = P + (story ? 40 : 0);
     const head = fitText(ctx, choice.headline, inner, 3, story ? 140 : 96, 64, 800);
     y += drawText(ctx, head, P, y, pal.ink, 800) + (story ? 80 : 36);
-    const steps = ['Open my store link', 'Choose your bundle', 'Pay securely with Paystack'];
+    const steps = ['Open my store link', 'Choose your bundle', 'See listed bundle prices'];
     const stepH = story ? 136 : 92;
     steps.forEach((step, i) => {
       const cy = y + i * stepH, r = story ? 40 : 30;

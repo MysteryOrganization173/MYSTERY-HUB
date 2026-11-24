@@ -172,7 +172,7 @@ test('page wiring: departments/brands push history, reveal the brand gallery fir
   assert.ok(page.includes('navigateBrowse(selectDepartment(browse, slug, products))'));
   assert.ok(page.includes("reveal(brandRowRef.current, 'gallery')"), 'a branded department scrolls to its brands, not past them');
   assert.ok(page.includes('Math.min(rect.bottom - bottom, rect.top - header)'), 'never scrolls the gallery under the sticky header');
-  assert.ok(page.includes("setBrowse(parseBrowseState(window.location.search))"), 'Back/forward restore department and brand');
+  assert.ok(page.includes("setBrowse({ ...parseBrowseState(window.location.search), buyOnline:false })"), 'Back/forward restore department and brand');
   assert.ok(page.includes("updateBrowse({ brand: '' })"), 'stale brand links fall back to the department');
   assert.ok(page.includes("onChange={(e) => updateBrowse({ q: e.target.value.slice(0, 80) })}"), 'typing never floods history');
   const tiles = source('src/components/marketplace/MarketplaceCategoryTiles.tsx');

@@ -1,3 +1,4 @@
+import { sharedMerchantCheckoutAvailable } from '../../../shared/paymentAvailability';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { defaultReceiptEmail } from '../../utils/receiptEmail';
 import './resultsCheckers.css';
@@ -83,7 +84,7 @@ export const ResultsCheckersPage: React.FC = () => {
 };
 
 const CheckerSession: React.FC = () => {
-  const { user, sessionToken, openAuth } = useApp();
+  const { user, sessionToken, openAuth, setActivePage } = useApp();
   const [config, setConfig] = useState<CheckerConfig | null>(null);
   const [configFailed, setConfigFailed] = useState(false);
   const [selected, setSelected] = useState<CheckerProductKey | null>(null);
@@ -99,7 +100,7 @@ const CheckerSession: React.FC = () => {
   const polls = useRef(0), alive = useRef(true), receiptRequest = useRef(0), receiptAbort = useRef<AbortController | null>(null), submitting = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; receiptAbort.current?.abort(); }; }, []);
 
-  useEffect(() => { let on = true; getCheckerConfig().then(c => { if (on) setConfig(c); }).catch(() => { if (on) setConfigFailed(true); }); return () => { on = false; }; }, []);
+  useEffect(() => { if (!sharedMerchantCheckoutAvailable('results_checker')) return; let on = true; getCheckerConfig().then(c => { if (on) setConfig(c); }).catch(() => { if (on) setConfigFailed(true); }); return () => { on = false; }; }, []);
   useEffect(() => { if (user) { setEmail(e => e || defaultReceiptEmail(user)); setPhone(p => p || user.phone || ''); } }, [user]);
 
   const loadReceipt = useCallback(async (reference: string) => {
@@ -167,7 +168,8 @@ const CheckerSession: React.FC = () => {
     }
   };
 
-  const open = Boolean(config?.available);
+  const checkoutAvailable = sharedMerchantCheckoutAvailable('results_checker');
+  const open = checkoutAvailable && Boolean(config?.available);
 
   return (
     <div className="rc-page">
@@ -176,14 +178,14 @@ const CheckerSession: React.FC = () => {
         <header className="rc-hero">
           <span className="rc-mark" aria-hidden="true"><GraduationCap size={26} /></span>
           <h1>WASSCE and BECE results checkers</h1>
-          <p>Buy a checker voucher, pay securely, and get your PIN on a private receipt you can open again from your account.</p>
+          <p>{checkoutAvailable ? 'Buy a checker voucher and open your PIN on a private receipt.' : 'New checker purchases are currently unavailable. You can still open receipts for previous purchases from My Orders.'}</p>
         </header>
 
         {(checking && !receipt) && <p className="rc-loading" role="status"><Loader2 size={18} className="rc-spin" aria-hidden />Checking your order…</p>}
         {receiptError && <div className="rc-alert" role="alert"><AlertCircle size={18} aria-hidden /><span>{receiptError}</span></div>}
         {receipt && <Receipt receipt={receipt} refreshing={checking} onRefresh={() => { if (receiptRef) void loadReceipt(receiptRef); }} />}
 
-        {!receipt && (<>
+        {!receipt && checkoutAvailable && (<>
           {configFailed && <div className="rc-alert" role="status"><AlertCircle size={18} aria-hidden /><span>We can't show availability just now. Please try again shortly.</span></div>}
           {!config && !configFailed && <p className="rc-loading" role="status"><Loader2 size={18} className="rc-spin" aria-hidden />Checking availability…</p>}
           {config && !open && <div className="rc-closed" role="status"><Clock3 size={20} aria-hidden /><div><strong>{config.message}</strong><span>{/not on sale/.test(config.message) ? "Nothing can be bought here yet. We'll open sales when supply is confirmed." : 'Please try again shortly.'}</span></div></div>}
@@ -235,7 +237,11 @@ const CheckerSession: React.FC = () => {
           )}
         </>)}
 
-        <section className="rc-info" aria-labelledby="rc-how">
+        {!checkoutAvailable && !receipt && <div className="rc-receipt-actions">
+          <button type="button" className="mh-button" onClick={() => setActivePage('orders')}>My Orders</button>
+          <a className="mh-button-secondary" href={SUPPORT} target="_blank" rel="noopener noreferrer">Contact support</a>
+        </div>}
+        {open && <section className="rc-info" aria-labelledby="rc-how">
           <h2 id="rc-how">How it works</h2>
           <ol className="rc-steps">
             <li><ReceiptText size={20} aria-hidden /><div><strong>Choose and pay</strong><span>Pick your checker and pay on Paystack.</span></div></li>
@@ -243,7 +249,7 @@ const CheckerSession: React.FC = () => {
             <li><KeyRound size={20} aria-hidden /><div><strong>Open your PIN</strong><span>It stays on your receipt, so a refresh won't lose it. Find it again under Orders.</span></div></li>
           </ol>
           <p className="rc-disclaimer">Mystery Hub sells checker vouchers. We don't issue or look up results, and we aren't affiliated with or endorsed by WAEC. Use your voucher on the official results website.</p>
-        </section>
+        </section>}
       </div>
     </div>
   );

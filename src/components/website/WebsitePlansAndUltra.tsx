@@ -24,7 +24,7 @@ const FREE_FEATURES = [
   'Your logo, colours, photos and contact details',
   'WhatsApp and call buttons',
   'Your own address on mysterybundlehub.com',
-  'Data Business stores with managed checkout',
+  'Data Business catalogue and order tracking',
   'Publish and update whenever you like',
 ];
 // Proposed prices for plans that do not exist yet; listed so owners know what is coming, never sold.

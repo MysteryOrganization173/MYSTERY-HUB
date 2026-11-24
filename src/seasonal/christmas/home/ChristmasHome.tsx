@@ -143,7 +143,7 @@ function Services({ christmas }: { christmas: boolean }) {
     { id: 'airtime', title: 'Airtime Top-Up', desc: 'Top up any Ghana number', tag: 'Available', tone: 'live', wrap: 'berry', tie: 'satin-ivory', art: <AirtimeArt />, action: () => openDataPage('airtime') },
     { id: 'website', title: 'Website Builder', desc: 'A website for your business', tag: 'Free plan', tone: 'free', wrap: 'cream', tie: 'tag', art: <WebArt />, action: () => setActivePage('website') },
     { id: 'earn', title: 'Mystery Earn', desc: 'Refer friends & earn', tag: 'Available', tone: 'live', wrap: 'gold', tie: 'none', art: <EarnArt />, action: () => setActivePage('earn') },
-    { id: 'afa', title: 'AFA Registration', desc: 'MTN AFA bundles', tag: 'Check Status', tone: 'neutral', wrap: 'midnight', tie: 'pinstripe', art: <AfaArt />, action: () => setActivePage('afa') },
+    { id: 'afa', title: 'AFA Registration', desc: 'Existing registrations and support', tag: 'Check Status', tone: 'neutral', wrap: 'midnight', tie: 'pinstripe', art: <AfaArt />, action: () => setActivePage('afa') },
     { id: 'marketplace', title: 'Marketplace', desc: 'Tech, by enquiry', tag: 'Enquiry', tone: 'neutral', wrap: 'kraft', tie: 'twine', art: <MarketArt />, action: () => setActivePage('marketplace') },
   ];
   return (
@@ -418,7 +418,7 @@ function Marketplace({ christmas }: { christmas: boolean }) {
           <p className="xh-kicker">Tech & digital Marketplace</p>
           <h2 id="xh-market-title">Find your next <em>work companion.</em></h2>
           <div className="xh-market-art" data-xh-reveal="parcels" onPointerDown={press} onAnimationEnd={pressEnd} aria-hidden="true"><ParcelStack label={christmas ? 'Merry Christmas' : 'Happy New Year'} /></div>
-          <p className="xh-market-text">Browse technology and digital tools. Buy online where an item says so, or send an enquiry to confirm price, availability and delivery.</p>
+          <p className="xh-market-text">Browse technology and digital tools. Send an enquiry about price, availability or delivery.</p>
           <a href="/marketplace" onClick={e => { if (!plain(e)) return; e.preventDefault(); setActivePage('marketplace'); }} className="mh-button-secondary xh-btn-quiet xh-market-cta">Browse Marketplace<ArrowRight className="w-4 h-4" aria-hidden /></a>
         </div>
         {shortcuts.length > 0 && (

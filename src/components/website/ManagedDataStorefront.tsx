@@ -1,3 +1,4 @@
+import { sharedMerchantCheckoutAvailable } from '../../../shared/paymentAvailability';
 import { readCheckoutFailure, checkoutFailurePresentation, type CheckoutFailureDetails } from '../../../shared/checkoutFailure';
 import { WEBSITE_TEMPLATES } from '../../data/templates';
 import { detectGhanaNetwork } from '../../data/bundles';
@@ -20,6 +21,8 @@ export function ManagedDataStorefront({siteId,template,preview=false,previewProd
   return <StorefrontCheckout key={`${siteId}:${preview?'preview':'published'}`} siteId={siteId} template={template} preview={preview} previewProducts={previewProducts}/>;
 }
 function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:string;template:WebsiteTemplate;preview:boolean;previewProducts?:WebsitePreviewProduct[]}) {
+  const [serverCheckoutAvailable,setServerCheckoutAvailable]=useState(false);
+  const checkoutAvailable=!preview && sharedMerchantCheckoutAvailable('website_store_order') && serverCheckoutAvailable;
   const [products,setProducts]=useState<any[]>([]),[network,setNetwork]=useState(''),[selected,setSelected]=useState<DataBundle|null>(null),[phone,setPhone]=useState(''),[email,setEmail]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(true),[order,setOrder]=useState<any>(null),[reference,setReference]=useState(''),[busy,setBusy]=useState(false);
   const [failure,setFailure]=useState<CheckoutFailureDetails|null>(null);
   const failurePanel=useRef<HTMLDivElement>(null);
@@ -53,7 +56,7 @@ function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:st
   useEffect(()=>{
     // Drafts are not public stores. Only the authenticated parent supplies a safe read-only projection.
     if(preview){setProducts(websitePreviewCatalog(previewProducts));setError('');setLoading(false);return;}
-    let active=true;setLoading(true);websiteBusinessRequest(`websites/${encodeURIComponent(siteId)}/storefront`).then(data=>{if(active)setProducts(data.products);}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};
+    let active=true;setLoading(true);websiteBusinessRequest(`websites/${encodeURIComponent(siteId)}/storefront`).then(data=>{if(active){setProducts(data.products);setServerCheckoutAvailable(data.checkoutAvailable===true);}}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};
   },[siteId,preview,previewProducts]);
   useEffect(()=>{
     if(preview||!selected||busy||!dialog.current||dialog.current.open)return;
@@ -74,13 +77,13 @@ function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:st
   };
   // Live status while an order is open; settled outcomes stop polling (Track this order still refreshes on demand).
   useEffect(()=>{if(!reference)return;void refresh();const timer=setInterval(()=>{if(!['delivered','refunded','cancelled','expired'].includes(lastStatus.current))void refresh();},10000);return()=>clearInterval(timer);},[reference]);
-  const choose=(bundle:DataBundle,recipient?:string)=>{if(preview){setError('Preview only. Customer checkout is available on the published store.');return;}if(guard.current)return;if(started.current){setError('Finish or track your existing order before choosing another bundle.');(orderHeading.current||trackingInput.current)?.focus();return;}restoreFocus.current=false;paymentReference.current="";setSelected(bundle);if(recipient)setPhone(recipient);requestId.current=crypto.randomUUID();setError('');setFailure(null);setHint('');trackPublicWebsite(siteId,'product_view');trackPublicWebsite(siteId,'checkout_started');};
+  const choose=(bundle:DataBundle,recipient?:string)=>{if(!checkoutAvailable)return;if(guard.current)return;if(started.current){setError('Finish or track your existing order before choosing another bundle.');(orderHeading.current||trackingInput.current)?.focus();return;}restoreFocus.current=false;paymentReference.current="";setSelected(bundle);if(recipient)setPhone(recipient);requestId.current=crypto.randomUUID();setError('');setFailure(null);setHint('');trackPublicWebsite(siteId,'product_view');trackPublicWebsite(siteId,'checkout_started');};
   const digits=phone.replace(/\D/g,'');
   const validNumber=isValidGhanaPhoneNumber(phone);
   const confirmKey=selected?`${digits}:${selected.network}`:'';
   const networkConfirmed=!!selected&&validNumber&&confirmedFor===confirmKey;
   const checkout=async()=>{
-    if(preview||!selected||guard.current)return;
+    if(!checkoutAvailable||!selected||guard.current)return;
     if(recoveryOnly)return;
     if(!isValidGhanaPhoneNumber(phone)){setHint('Enter a valid Ghana number to receive the data, like 024 123 4567.');numberInput.current?.focus();return;}
     if(!networkConfirmed){setHint(`Confirm that this number is on ${storeNetworkName(selected.network as StoreNetwork)}.`);return;}
@@ -157,7 +160,8 @@ function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:st
     <p role="status" className="store-note" style={{color:colors.surfaceMutedText}}>{copied==='manual'?'Copying is blocked in this browser. Press and hold the reference above to copy it.':`${checkedAt?`Last checked ${checkedAt}. `:''}${own?'Save this reference: it is how you find this order again after you close this page or on another phone.':''}`}</p>
   </div>:null;
   const storefront=<div className="space-y-4" style={{color:colors.text, '--website-focus':colors.focus, '--website-placeholder':colors.mutedText} as React.CSSProperties}>
-    {preview&&<p role="status" className="store-card store-note" style={card}><strong>Draft preview.</strong> Checkout and order tracking are turned off. Bundles shown use your saved settings; live checkout also depends on publication and current availability.</p>}
+    {preview&&<p role="status" className="store-card store-note" style={card}><strong>Draft preview.</strong> Checkout and order tracking are turned off. Bundles shown use your saved settings.</p>}
+    {!preview&&!checkoutAvailable&&<p role="status" className="store-card store-note" style={card}><strong>Online checkout is unavailable.</strong> Browse this store’s bundles or check the status of an existing order below.</p>}
     <p className="sr-only">Data bundles from {template.demoBusinessName}</p>
     {sessionOrder&&<section className="store-card" style={card} aria-label="Your order">{orderCard(true)}</section>}
     {loading&&<p role="status" className="store-note" style={muted}>Loading available bundles…</p>}{loading&&<div className="store-skeleton" aria-hidden="true">{[0,1,2,3].map(i=><span key={i} className="store-skeleton-row" style={{backgroundColor:colors.surface,borderColor:colors.border}}/>)}</div>}{error&&!selected&&<div role="alert" className="store-card store-note break-words" style={card}><p>{error}</p>{recoveryOnly&&!reference&&businessContact&&<a href={businessContact} className="store-secondary mt-3" style={quiet}>Contact the business</a>}</div>}
@@ -165,13 +169,13 @@ function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:st
     {bundles.length>0&&<section className="store-buy" aria-label={`${storeNetworkName(shown)} bundles`}>
       {networks.length>1?<NetworkTabs networks={networks} value={shown} onChange={switchNetwork} bundles={bundles} theme={colors}/>:<p className="store-one-network" style={muted}><i aria-hidden="true" style={{backgroundColor:storeNetworkColor(shown)}}/>{storeNetworkName(shown)} bundles</p>}
       {filters.length>1&&<div className="store-chips" role="group" aria-label="Filter bundles">{filters.map(f=><button key={f.id} type="button" aria-pressed={activeFilter===f.id} onClick={()=>setFilter(f.id)} style={activeFilter===f.id?{...primary}:{...neutral,backgroundColor:'transparent',color:colors.text}}>{f.label}{f.id==='all'?` ${f.count}`:''}</button>)}</div>}
-      {listed.length>0&&<div className="store-rows">{listed.map(b=><BundleRow key={b.id} bundle={b} theme={colors} selected={selected?.id===b.id} featured={pinned.includes(b.id)} action="Buy" onChoose={pick}/>)}</div>}
+      {listed.length>0&&<div className="store-rows">{listed.map(b=><BundleRow key={b.id} bundle={b} theme={colors} selected={selected?.id===b.id} featured={pinned.includes(b.id)} action={checkoutAvailable?'Buy':undefined} onChoose={checkoutAvailable?pick:undefined}/>)}</div>}
       {collapsed&&<button type="button" className="store-secondary w-full" style={{...neutral,backgroundColor:'transparent',color:colors.text}} onClick={()=>setExpanded(true)}>Show all {matching.length} {storeNetworkName(shown)} bundles</button>}
-      {onNetwork.length>0&&<p className="store-note" style={muted}>{storeNetworkName(shown)}: {sentence(dataDeliveryNote(shown))} The price shown is the total you pay.</p>}
+      {checkoutAvailable&&onNetwork.length>0&&<p className="store-note" style={muted}>{storeNetworkName(shown)}: {sentence(dataDeliveryNote(shown))} The price shown is the total you pay.</p>}
     </section>}
     <section id="store-track" className="store-card scroll-mt-20" style={card} aria-label="Track store order"><h3 className="text-lg font-bold site-display">Track your order</h3><p className="store-note mt-1" style={{color:colors.surfaceMutedText}}>Paste or type the order reference (it starts with MH-) you received after paying.</p><form className="store-track-form" onSubmit={event=>{event.preventDefault();const ref=trackInput.replace(/\s+/g,'').replace(/^mh-/i,'MH-');if(!/^MH-[a-zA-Z0-9-]{1,60}$/.test(ref)){setTrackingError('Order references start with MH-. Check the reference and try again.');return;}setTrackingError('');if(ref===reference)void refresh(ref);else{++trackingGeneration.current;setOrder(null);setCheckedAt('');lastStatus.current='';setReference(ref);}}}><input ref={trackingInput} aria-label="Order reference" value={trackInput} onChange={event=>{setTrackInput(event.target.value);setTrackingError('');}} maxLength={64} autoCapitalize="characters" autoComplete="off" spellCheck={false} enterKeyHint="search" placeholder="MH-… order reference" style={neutral} className="store-field flex-1 placeholder:text-[var(--website-placeholder)]"/><button className="store-secondary" style={card}>Check status</button></form>{trackingError&&!reference&&<p role="alert" className="store-note mt-2 break-words">{trackingError}</p>}{orderCard(false)}</section>
     {busy&&<p role="status" aria-live="polite" className="store-note">{payment.loadingPhase==='opening'?'Complete payment in the secure payment window.':'Connecting to secure payment…'}</p>}
-    {selected&&<dialog style={card} ref={dialog} aria-labelledby="store-checkout-title" onCancel={event=>{event.preventDefault();closeSheet();}} onClick={event=>{if(event.target===dialog.current)closeSheet();}} className="store-sheet">
+    {checkoutAvailable&&selected&&<dialog style={card} ref={dialog} aria-labelledby="store-checkout-title" onCancel={event=>{event.preventDefault();closeSheet();}} onClick={event=>{if(event.target===dialog.current)closeSheet();}} className="store-sheet">
       <div className="flex justify-between items-center gap-3"><h2 id="store-checkout-title" className="font-bold text-xl site-display">Buy {selected.dataAmount} {storeNetworkName(selectedNetwork)}</h2><button type="button" disabled={busy} className="store-secondary" style={{...card,minHeight:44}} onClick={closeSheet}>Close</button></div>
       <div className="store-summary" style={{borderColor:colors.border,'--store-network':storeNetworkColor(selectedNetwork)} as React.CSSProperties}><div className="pl-2 min-w-0"><p className="text-2xl font-bold site-display leading-none">{selected.dataAmount}</p><p className="text-sm mt-1" style={{color:colors.surfaceMutedText}}>{storeNetworkName(selectedNetwork)}{selected.validity?` · ${selected.validity}`:''} · {template.demoBusinessName}</p></div><p className="text-xl font-bold text-right" style={{color:colors.surfaceAccentText}}>{formatGhs(Math.round(selected.priceGhc*100))}<span className="block text-xs font-medium" style={{color:colors.surfaceMutedText}}>total</span></p></div>
       <label className="block text-sm font-semibold mt-4">Number to receive the data<input ref={numberInput} type="tel" inputMode="tel" autoComplete="tel-national" enterKeyHint="next" maxLength={16} disabled={busy||locked} value={phone} placeholder="024 123 4567" onChange={event=>{if(started.current||guard.current)return;setPhone(event.target.value);setFailure(null);setError('');requestId.current=crypto.randomUUID();setHint('');}} style={neutral} className="store-field store-number mt-1.5 placeholder:text-[var(--website-placeholder)]"/></label>

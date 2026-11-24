@@ -1,3 +1,4 @@
+import { PAYMENT_UNAVAILABLE, sharedMerchantCheckoutAvailable } from '../../shared/paymentAvailability.js';
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { campaignOrderContext } from '../services/campaignContext.js';
@@ -19,12 +20,16 @@ export const resultsCheckerRouter = Router();
 resultsCheckerRouter.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store, private'); res.setHeader('Pragma', 'no-cache'); next(); });
 
 resultsCheckerRouter.get('/config', async (_req, res) => {
+  if (!sharedMerchantCheckoutAvailable('results_checker')) { res.json({ available:false, message:PAYMENT_UNAVAILABLE.error, maxQty:CHECKER_MAX_QTY, products:[] }); return; }
   try { res.json(await ResultsCheckerService.publicConfig()); }
   catch { res.status(503).json({ available: false, message: 'Results checkers are temporarily unavailable.', maxQty: CHECKER_MAX_QTY, products: [] }); }
 });
 
 /** The server decides product, price and quantity limits. Any amount sent by the browser is ignored. */
-resultsCheckerRouter.post('/payments/initialize', requireAuth, campaignOrderContext, createRateLimiter({ windowMs: 600_000, max: 10 }), async (req, res) => {
+resultsCheckerRouter.post('/payments/initialize', requireAuth, (_req,res,next)=>{
+  if (!sharedMerchantCheckoutAvailable('results_checker')) { res.status(503).json(PAYMENT_UNAVAILABLE); return; }
+  next();
+}, campaignOrderContext, createRateLimiter({ windowMs: 600_000, max: 10 }), async (req, res) => {
   let orderId: string | undefined;
   try {
     const product = checkerProduct(req.body?.product);
