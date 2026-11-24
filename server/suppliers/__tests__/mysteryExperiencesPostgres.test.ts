@@ -9,7 +9,7 @@ import express from 'express';
 import pg from 'pg';
 import {assertSafeTestDatabase} from '../../utils/environment.js';
 import {initDatabase,getPool} from '../../db/connection.js';
-import {ExperienceStore,abuseIdentity} from '../../db/experienceStore.js';
+import {ExperienceStore,abuseIdentity,experienceTransaction} from '../../db/experienceStore.js';
 import {ExperienceService,greetingCreationAvailable,resetGreetingCreationAvailability} from '../../services/experienceService.js';
 import {greetingInput} from '../../services/experienceValidation.js';
 import {AuthStore} from '../../db/authStore.js';
@@ -47,6 +47,27 @@ test('Experiences native PostgreSQL, HTTP and raw HTML — isolated only',{skip:
    await assert.rejects(db.query(schema.replace('COMMIT;','SELECT 1/0; COMMIT;')));await db.query('ROLLBACK');
    assert.equal((await db.query("SELECT to_regclass('mysteryhub_experiences.configuration') value")).rows[0].value,null);
   });
+  await t.test('analytics duplicates and conflicting named indexes abort the install atomically',async()=>{
+   const absent=async()=>assert.equal((await db.query("SELECT to_regnamespace('mysteryhub_experiences') name")).rows[0].name,null);
+   await db.query("INSERT INTO public.analytics_events(id,event_name,entity_type,entity_id) VALUES ('exp-fixture-a','experience_greeting_created','experience','same'),('exp-fixture-b','experience_greeting_created','experience','same')");
+   await assert.rejects(db.query(schema),(e:any)=>e.code==='23505');await db.query('ROLLBACK');
+   await absent();
+   assert.equal((await db.query("SELECT count(*)::int n FROM public.analytics_events WHERE id IN ('exp-fixture-a','exp-fixture-b')")).rows[0].n,2);
+   await db.query("DELETE FROM public.analytics_events WHERE id IN ('exp-fixture-a','exp-fixture-b')");
+   await db.query('CREATE INDEX experience_event_once ON public.analytics_events(id)');
+   await assert.rejects(db.query(schema),/Conflicting Experiences analytics index/);await db.query('ROLLBACK');
+   await absent();
+   assert.equal((await db.query("SELECT to_regclass('public.experience_events_period') name")).rows[0].name,null);
+   await db.query('DROP INDEX public.experience_event_once');
+  });
+  await t.test('a busy analytics writer yields lock timeout and the installation rolls back',async()=>{
+   const writer=await db.connect();
+   try{
+    await writer.query('BEGIN');await writer.query('LOCK TABLE public.analytics_events IN ROW EXCLUSIVE MODE');
+    await assert.rejects(db.query(schema),(e:any)=>e.code==='55P03');await db.query('ROLLBACK');
+    assert.equal((await db.query("SELECT to_regnamespace('mysteryhub_experiences') name")).rows[0].name,null);
+   }finally{await writer.query('ROLLBACK');writer.release();}
+  });
   await db.query(schema);await db.query(schema);
   await AuthStore.createUser({id:'exp-admin',name:'Synthetic Admin',email:null,phone:null,passwordHash:'fixture',role:'admin'});await AuthStore.createSession('exp-admin','synthetic-admin');
   await AuthStore.createUser({id:'exp-customer',name:'Synthetic Customer',email:null,phone:null,passwordHash:'fixture',role:'customer'});await AuthStore.createSession('exp-customer','synthetic-customer');
@@ -79,6 +100,21 @@ test('Experiences native PostgreSQL, HTTP and raw HTML — isolated only',{skip:
    process.env.MYSTERY_EXPERIENCES_ENABLED='true';assert.equal((await ExperienceService.state(new Date('2026-12-25'))).phase,'christmas_day');
    const reads=await Promise.all(Array.from({length:10},()=>ExperienceStore.configuration()));assert.ok(reads.every(c=>c.revision===config.revision));
   });
+  await t.test('two optional transactions are admitted while core queries can still use the shared pool',async()=>{
+   let reserve!:()=>void, finish!:()=>void;
+   const ready=new Promise<void>(done=>{reserve=done;});
+   const hold=new Promise<void>(done=>{finish=done;});
+   let entered=0;
+   const use=()=>experienceTransaction(async()=>{if(++entered===2)reserve();await hold;},true);
+   const a=use(),b=use();
+   try {
+    await ready;
+    const denied=await Promise.allSettled(Array.from({length:12},()=>experienceTransaction(async()=>assert.fail('optional slot exceeded'))));
+    assert.ok(denied.every(r=>r.status==='rejected'&&r.reason.code==='BUSY'));
+    assert.equal((await getPool()!.query('SELECT 1 AS commerce_fixture')).rows[0].commerce_fixture,1);
+   }finally{finish();await Promise.all([a,b]);}
+   assert.equal(await experienceTransaction(async()=>true,true),true);
+  });
   await t.test('once the schema is installed, the creator is advertised and readiness says live',async()=>{
    resetGreetingCreationAvailability();assert.equal(await greetingCreationAvailable(),true);
    const ready=await ExperienceService.readiness();assert.deepEqual(ready.available,{links:true,creation:true});assert.equal(ready.status,'live');assert.deepEqual(ready.blockers,[]);
@@ -87,6 +123,17 @@ test('Experiences native PostgreSQL, HTTP and raw HTML — isolated only',{skip:
    const response=await fetch(base+'/api/experiences/greetings',json(firstInput));assert.equal(response.status,201);first=await response.json();assert.match(first.url,/^https:\/\/mysterybundlehub.com\/g\/[A-Za-z0-9_-]{24}$/);
    const secondClient=await fetch(base+'/api/experiences/greetings/'+first.shareId);assert.equal(secondClient.status,200);const body=await secondClient.json();assert.equal(body.message,firstInput.message);assert.equal(body.senderName,null);assert.doesNotMatch(JSON.stringify(body),/creator|HIDDEN|payload_hash|idempotency|reporter/);
    const stored=(await db.query('SELECT creator_hash,sender_name FROM mysteryhub_experiences.greetings WHERE share_id=$1',[first.shareId])).rows[0];assert.notEqual(stored.creator_hash,firstInput.creatorToken);assert.equal(stored.sender_name,null);
+  });
+  await t.test('bounded workload records local latency and response size without personal data',async t=>{
+   const samples:number[]=[],sizes:number[]=[];
+   for(let i=0;i<8;i++){
+    const start=performance.now();
+    const result=await create(payload(),'capacity-peer');
+    samples.push(performance.now()-start);
+    sizes.push(Buffer.byteLength(JSON.stringify(await ExperienceStore.greeting(result.greeting.shareId))));
+   }
+   samples.sort((a,b)=>a-b);
+   t.diagnostic(JSON.stringify({samples:samples.length,p50CreateMs:Math.round(samples[3]*100)/100,p95CreateMs:Math.round(samples[7]*100)/100,largestGreetingJsonBytes:Math.max(...sizes)}));
   });
   await t.test('lost-response retries, conflicting content and concurrent retries cannot duplicate greetings',async()=>{
    const replay=await fetch(base+'/api/experiences/greetings',json(firstInput));assert.equal(replay.status,200);assert.equal((await replay.json()).shareId,first.shareId);

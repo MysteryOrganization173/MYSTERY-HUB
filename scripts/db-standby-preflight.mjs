@@ -25,6 +25,8 @@ export const SCOPE = {
   mysteryhub_sms: 'attempts campaigns consents consumed_events delivery_events guest_events messages permission_records previews settings template_versions templates',
 };
 
+const OPTIONAL_SCOPE = { mysteryhub_experiences: 'configuration greetings budgets reports' };
+
 export class StandbyError extends Error {}
 const fail = message => { throw new StandbyError(message); };
 export const ident = name => '"' + name.replaceAll('"', '""') + '"';
@@ -244,7 +246,8 @@ $check$;
 export async function inspectSnapshot(client, target = false) {
   const meta = await databaseMetadata(client);
   const {rows:[scope]} = await client.query(unsupported);
-  if (scope.schemas.some(s=>!(s in SCOPE)) || Object.entries(scope).some(([key,value])=>key!=='schemas' && value)) {
+  const expected = {...SCOPE,...Object.fromEntries(Object.entries(OPTIONAL_SCOPE).filter(([name])=>scope.schemas.includes(name)))};
+  if (scope.schemas.some(s=>!Object.hasOwn(expected,s)) || Object.entries(scope).some(([key,value])=>key!=='schemas' && value)) {
     fail('Application inventory contains an unreviewed schema, dependency, privilege policy, or object type.');
   }
   const {rows} = await client.query(shapes);
@@ -260,7 +263,7 @@ export async function inspectSnapshot(client, target = false) {
     if (kind==='sequence') sequences.set(schema+'.'+name,(await client.query(`SELECT last_value::text,is_called FROM ${qualified(schema,name)}`)).rows[0]);
     if (kind==='constraint' && !shape[1] || kind==='index' && (!shape[1] || !shape[2])) fail('A database constraint or index is invalid.');
   }
-  const missing = Object.entries(SCOPE).flatMap(([schema,names])=>
+  const missing = Object.entries(expected).flatMap(([schema,names])=>
     names.trim().split(/\s+/).map(name=>schema+'.'+name).filter(key=>!tables.has(key)));
   if (target && tables.size) {
     try { await client.query(permissionsCheck); }

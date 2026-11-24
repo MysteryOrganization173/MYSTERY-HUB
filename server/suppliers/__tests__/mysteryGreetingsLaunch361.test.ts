@@ -82,9 +82,42 @@ test('Admin leads with one verdict from what actually works, separate from the s
   assert.match(panel, /\['Shared links working now', pill\(ready\.available\.links, 'Yes', 'No'\)\]/);
   assert.match(panel, /\['New greetings accepted now', pill\(ready\.available\.creation, 'Yes', 'No'\)\]/);
   const service = read('server/services/experienceService.ts');
-  assert.match(service, /const available=\{links:gates\.links&&storage==='installed',creation:gates\.creation&&abuseSecret&&storage==='installed'&&retentionDue===false\};/);
+  assert.match(service, /const available=\{links:gates\.links&&storage==='installed',creation:gates\.creation&&abuseSecret&&trustedVisitor&&storage==='installed'&&retentionDue===false\};/);
   // Readiness and the public signal never expose secret values.
   assert.doesNotMatch(service, /EXPERIENCES_ABUSE_SECRET\s*[,}]/);
+});
+
+test('production does no availability reads when a gate, secret or trusted ingress mode is absent', async t => {
+  const keys = ['RENDER', 'MYSTERY_GREETING_LINKS_ENABLED', 'MYSTERY_GREETINGS_ENABLED', 'EXPERIENCES_ABUSE_SECRET', 'EXPERIENCES_TRUSTED_PROXY_CIDRS'] as const;
+  const saved = Object.fromEntries(keys.map(k => [k, process.env[k]]));
+  const lookup = t.mock.method(ExperienceStore, 'creationReadiness', async () => true);
+  try {
+    Object.assign(process.env, {
+      RENDER: 'true',
+      MYSTERY_GREETING_LINKS_ENABLED: 'true',
+      MYSTERY_GREETINGS_ENABLED: 'true',
+      EXPERIENCES_ABUSE_SECRET: 'ab'.repeat(32),
+    });
+    delete process.env.EXPERIENCES_TRUSTED_PROXY_CIDRS;
+    assert.equal(await greetingCreationAvailable(), false);
+    process.env.EXPERIENCES_TRUSTED_PROXY_CIDRS = 'malformed';
+    assert.equal(await greetingCreationAvailable(), false);
+    process.env.EXPERIENCES_TRUSTED_PROXY_CIDRS = '192.0.2.2/32';
+    delete process.env.EXPERIENCES_ABUSE_SECRET;
+    assert.equal(await greetingCreationAvailable(), false);
+    process.env.EXPERIENCES_ABUSE_SECRET = 'invalid';
+    assert.equal(await greetingCreationAvailable(), false);
+    process.env.EXPERIENCES_ABUSE_SECRET = 'ab'.repeat(32);
+    process.env.MYSTERY_GREETING_LINKS_ENABLED = 'false';
+    assert.equal(await greetingCreationAvailable(), false);
+    assert.equal(lookup.mock.callCount(), 0);
+    process.env.MYSTERY_GREETING_LINKS_ENABLED = 'true';
+    assert.deepEqual(await Promise.all([greetingCreationAvailable(), greetingCreationAvailable()]), [true, true]);
+    assert.equal(lookup.mock.callCount(), 1);
+  } finally {
+    resetGreetingCreationAvailability();
+    for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+  }
 });
 
 test('availability never makes visitors wait on the database, and a busy moment is never remembered as closed', async () => {
@@ -115,11 +148,17 @@ test('availability never makes visitors wait on the database, and a busy moment 
     release(true); await new Promise(r => setTimeout(r, 5));
     assert.equal(await greetingCreationAvailable(), true, 'the slow answer is used once it arrives');
     // Stale-while-revalidate: an expired answer is returned at once while one refresh runs.
-    const before = reads; answer = () => new Promise<boolean>(() => {});
+    const before = reads; answer = () => new Promise<boolean>(r => { release = r; });
     const t0 = Date.now();
     assert.equal(await greetingCreationAvailable(Date.now() + CREATION_AVAILABILITY_TTL_MS + 1), true);
     assert.ok(Date.now() - t0 < 50, 'no waiting on a refresh');
     assert.equal(reads - before, 1, 'one refresh');
+    resetGreetingCreationAvailability();
+    release(true);
+    await new Promise(r => setTimeout(r, 5));
+    answer = async () => false;
+    assert.equal(await greetingCreationAvailable(), false, 'an invalidated lookup cannot repopulate the cache');
+    assert.equal(reads - before, 2, 'the next request performs a fresh check');
   } finally {
     (ExperienceStore as any).creationReadiness = original; resetGreetingCreationAvailability();
     for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
