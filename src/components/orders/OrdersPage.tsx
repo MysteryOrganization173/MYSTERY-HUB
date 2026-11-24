@@ -1,3 +1,4 @@
+import './orders.css';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getAccountOrdersOnServer } from '../../services/apiClient';
@@ -5,8 +6,11 @@ import { OrderRecord } from '../../types';
 import { PendingPaymentBanner } from '../checkout/PendingPaymentBanner';
 import { CustomerOrderCard } from './CustomerOrderCard';
 import { TrackOrderPanel } from './TrackOrderPanel';
+import { ReceiptArt } from './OrdersArt';
 import {
   CustomerOrderFilter,
+  CustomerOrderGroup,
+  CustomerOrderStatus,
   ORDER_FILTERS,
   accountOrderRecord,
   classifyTrackInput,
@@ -14,13 +18,24 @@ import {
   mergeCustomerOrders,
   orderMatchesFilter,
   orderMatchesQuery,
+  visibleDeviceOrders,
 } from '../../utils/customerOrderPresentation';
-import { RefreshCw, Search, X } from 'lucide-react';
-import { Seasonal } from '../../seasonal/Seasonal';
+import { AlertTriangle, RefreshCw, Search, Smartphone, X, Wifi } from 'lucide-react';
+import { SeasonalOrders } from '../../seasonal/Seasonal';
+import { useSeason } from '../../seasonal/SeasonProvider';
+import { ordersSeasonAttributes } from '../../seasonal/ordersSeason';
 
 /** The account orders API returns at most this many recent orders and has no paging yet. */
 const ACCOUNT_ORDER_LIMIT = 50;
 const VIEW_KEY = 'mh_orders_view';
+
+/** With no search or filter, the list reads in the order a customer cares about: problems, then what is moving. */
+const SECTIONS: { id: string; title: string; groups: CustomerOrderGroup[] }[] = [
+  { id: 'attention', title: 'Needs attention', groups: ['attention'] },
+  { id: 'active', title: 'In progress', groups: ['awaiting_payment', 'in_progress'] },
+  { id: 'refund', title: 'Refund under review', groups: ['refund_pending'] },
+  { id: 'earlier', title: 'Earlier orders', groups: ['delivered', 'refunded', 'resolved', 'cancelled'] },
+];
 
 function readView(key: string): { query: string; filter: CustomerOrderFilter } {
   try {
@@ -36,8 +51,11 @@ export const OrdersPage: React.FC = () => {
   return <OrdersHistory key={`${user?.id || 'guest'}:${sessionToken || ''}`} />;
 };
 
+type Row = { order: OrderRecord; status: CustomerOrderStatus };
+
 const OrdersHistory: React.FC = () => {
   const { orders: localOrders, openOrderStatus, activeOrder, setActivePage, openAuth, user, sessionToken } = useApp();
+  const season = useSeason();
   const viewKey = `${VIEW_KEY}:${user?.id || 'guest'}`;
   const [searchQuery, setSearchQuery] = useState(() => readView(viewKey).query);
   const [filter, setFilter] = useState<CustomerOrderFilter>(() => readView(viewKey).filter);
@@ -75,17 +93,31 @@ const OrdersHistory: React.FC = () => {
     // Keyed on the account id so a refreshed profile object does not refetch the list.
   }, [user?.id, sessionToken, refresh]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // The receipt already checks the server while open; carry what it learned back to this list
-  // so a card never contradicts the receipt the customer just saw. No extra requests are made.
+  // The receipt already checks the server while open; carry what it learned back to this list so a card never
+  // contradicts the receipt the customer just saw. Status fields only: a public lookup arrives masked, so the owner's
+  // recipient, amounts and other details here are never overwritten. No extra requests are made.
   useEffect(() => {
     const ref = activeOrder?.publicReference;
     if (!ref) return;
     setServerOrders((prev) => {
       const index = prev.findIndex((o) => o.publicReference === ref);
       const current = prev[index];
-      if (index < 0 || (current.status === activeOrder.status && current.serverStatus === activeOrder.serverStatus && current.manualReview === activeOrder.manualReview)) return prev;
+      if (index < 0) return prev;
+      const same = current.status === activeOrder.status && current.serverStatus === activeOrder.serverStatus && current.manualReview === activeOrder.manualReview
+        && current.customerResolution === activeOrder.customerResolution && current.paymentBasis === activeOrder.paymentBasis
+        && (current.marketplaceStatus ?? null) === (activeOrder.marketplaceStatus ?? null);
+      if (same) return prev;
       const next = [...prev];
-      next[index] = { ...current, status: activeOrder.status, serverStatus: activeOrder.serverStatus, manualReview: activeOrder.manualReview, statusMessage: activeOrder.statusMessage };
+      next[index] = {
+        ...current,
+        status: activeOrder.status,
+        serverStatus: activeOrder.serverStatus,
+        manualReview: activeOrder.manualReview,
+        statusMessage: activeOrder.statusMessage,
+        customerResolution: activeOrder.customerResolution,
+        paymentBasis: activeOrder.paymentBasis,
+        marketplaceStatus: activeOrder.marketplaceStatus,
+      };
       return next;
     });
   }, [activeOrder]);
@@ -94,8 +126,9 @@ const OrdersHistory: React.FC = () => {
     try { sessionStorage.setItem(viewKey, JSON.stringify({ query: searchQuery, filter })); } catch { /* ignore */ }
   }, [searchQuery, filter, viewKey]);
 
-  // Combine server orders with local orders without duplicates
-  const allOrders = React.useMemo(() => mergeCustomerOrders(serverOrders, localOrders).map((order) => ({ order, status: customerOrderStatus(order) })), [serverOrders, localOrders]);
+  // Combine server orders with the device orders this viewer may see, without duplicates.
+  const deviceOrders = React.useMemo(() => visibleDeviceOrders(localOrders, user?.id), [localOrders, user?.id]);
+  const allOrders: Row[] = React.useMemo(() => mergeCustomerOrders(serverOrders, deviceOrders).map((order) => ({ order, status: customerOrderStatus(order) })), [serverOrders, deviceOrders]);
   const groupCounts = React.useMemo(() => {
     const counts = new Map<CustomerOrderFilter, number>();
     for (const f of ORDER_FILTERS) counts.set(f.id, allOrders.filter(({ status }) => orderMatchesFilter(status.group, f.id)).length);
@@ -111,6 +144,12 @@ const OrdersHistory: React.FC = () => {
   const reachedLimit = serverOrders.length >= ACCOUNT_ORDER_LIMIT;
   const awaitingAccount = accountLoading || (Boolean(user) && !accountLoaded && !accountError);
   const filterLabel = ORDER_FILTERS.find((f) => f.id === activeFilter)!.label;
+  const narrowed = Boolean(query) || activeFilter !== 'all';
+
+  // Sections only when the whole list is shown and more than one kind of order is in it.
+  const sections = narrowed ? [] : SECTIONS.map((s) => ({ ...s, rows: visibleOrders.filter(({ status }) => s.groups.includes(status.group)) })).filter((s) => s.rows.length > 0);
+  const sectioned = sections.length > 1;
+  const inProgress = groupCounts.get('active') || 0, attention = groupCounts.get('attention') || 0;
 
   const openTracking = (prefill?: string) => {
     setTrackPrefill(prefill);
@@ -118,91 +157,113 @@ const OrdersHistory: React.FC = () => {
     requestAnimationFrame(() => document.getElementById('mh-track-order')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
   };
 
-  // A guest with nothing saved here most likely came to track an order.
-  const trackExpanded = trackOpen || (!user && !hasOrders);
+  // A guest with nothing saved here most likely came to track an order: tracking is the page's main action.
+  const trackPrimary = !user && !hasOrders;
+  const open = (order: OrderRecord) => { if (order.serviceType === 'results_checker') window.location.assign(`/results-checkers?order=${encodeURIComponent(order.publicReference || order.id)}`); else openOrderStatus(order); };
+  const list = (rows: Row[]) => (
+    <ul className="mh-or-list">
+      {rows.map(({ order, status }, i) => (
+        <li key={order.id} style={{ '--i': i } as React.CSSProperties}>
+          <CustomerOrderCard order={order} status={status} now={now} onOpen={() => open(order)} />
+        </li>
+      ))}
+    </ul>
+  );
 
   return (
-    <div className="py-6 sm:py-10 text-slate-100">
+    <div className="mh-or py-5 sm:py-9 text-slate-100" {...ordersSeasonAttributes(season)}>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 space-y-4 sm:space-y-5">
-        <header className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <Seasonal slot="page" page="orders" />
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">My Orders</h1>
-            <p className="text-sm text-slate-400 mt-1">Find a purchase or check its delivery.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setActivePage('data')}
-            className="shrink-0 min-h-11 px-3.5 rounded-xl border border-[#00c365]/40 text-[#44df95] hover:bg-[#00c365]/10 text-sm font-semibold transition-colors cursor-pointer"
-          >
-            Buy data
-          </button>
-        </header>
-
+        {/* Recovery first: a payment that may have gone through is never pushed below artwork or history. */}
         <PendingPaymentBanner />
 
-        <div id="mh-track-order" className="scroll-mt-20">
-          <TrackOrderPanel open={trackExpanded} onOpenChange={setTrackOpen} prefill={trackPrefill} />
+        <header className="mh-or-hero mh-or-in">
+          <div className="mh-or-hero-copy">
+            <SeasonalOrders part="line" />
+            <h1 className="mh-or-title">My Orders</h1>
+            <p className="mh-or-lede">
+              {user ? 'Purchases from your account and this device, with their latest status.'
+                : hasOrders ? 'Purchases made on this device, and any order you track with its reference.'
+                : 'Check payment and delivery for any order with its reference.'}
+            </p>
+          </div>
+          <div className="mh-or-hero-side">
+            <SeasonalOrders part="art" fallback={<span className="mh-or-art" aria-hidden="true"><ReceiptArt /></span>} />
+            <button type="button" onClick={() => setActivePage('data')} className="mh-or-buy">
+              <Wifi aria-hidden="true" className="w-4 h-4" />Buy data
+            </button>
+          </div>
+        </header>
+
+        <div id="mh-track-order" className="scroll-mt-20 mh-or-in" style={{ '--i': 1 } as React.CSSProperties}>
+          <TrackOrderPanel primary={trackPrimary} open={trackOpen} onOpenChange={setTrackOpen} prefill={trackPrefill} />
         </div>
 
-        <section aria-labelledby="mh-orders-heading" aria-busy={accountLoading} className="space-y-3">
+        <section aria-labelledby="mh-orders-heading" aria-busy={accountLoading} className="space-y-3 mh-or-in" style={{ '--i': 2 } as React.CSSProperties}>
           <h2 id="mh-orders-heading" className="sr-only">{user ? 'Your account and device orders' : 'Orders saved on this device'}</h2>
 
-          {accountError && (
-            <div role="alert" className="flex items-center justify-between gap-3 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] px-3.5 py-2.5">
-              <p className="text-xs text-amber-100 leading-relaxed">{accountError}{hasOrders ? ' Orders saved on this device are still shown.' : ''}</p>
-              <button type="button" onClick={() => setRefresh((x) => x + 1)} disabled={accountLoading} className="shrink-0 min-h-11 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-sm font-semibold cursor-pointer disabled:opacity-70">
+          {accountError && hasOrders && (
+            <div role="alert" className="mh-or-alert" data-kind="warn">
+              <AlertTriangle aria-hidden="true" />
+              <p>{accountLoaded ? 'We couldn’t refresh your account orders. The list shows what loaded earlier.' : accountError}{!accountLoaded && hasOrders ? ' Orders saved on this device are still shown.' : ''}</p>
+              <button type="button" onClick={() => setRefresh((x) => x + 1)} disabled={accountLoading}>
                 Try again
               </button>
             </div>
           )}
 
+          {!user && hasOrders && (
+            <div className="mh-or-device">
+              <Smartphone aria-hidden="true" />
+              <p>These orders are saved on this device. <button type="button" onClick={() => openAuth('login')}>Sign in</button> to see orders linked to your account.</p>
+            </div>
+          )}
+
           {hasOrders && (
             <>
-              <div className="relative">
-                <Search aria-hidden="true" className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <div className="mh-or-search">
+                <Search aria-hidden="true" />
                 <input
                   type="search"
                   aria-label="Search my orders"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search my orders"
+                  placeholder="Search by product, number or reference"
                   enterKeyHint="search"
-                  className="mh-field pl-10 pr-11 text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#00c365] [&::-webkit-search-cancel-button]:hidden"
                 />
                 {searchQuery && (
-                  <button type="button" onClick={() => setSearchQuery('')} aria-label="Clear search" className="absolute right-0 top-0 h-full min-w-11 flex items-center justify-center text-slate-400 hover:text-white cursor-pointer">
+                  <button type="button" onClick={() => setSearchQuery('')} aria-label="Clear search" className="mh-or-search-clear">
                     <X className="w-4 h-4" />
                   </button>
                 )}
               </div>
 
               {showFilters && (
-                <div role="group" aria-label="Filter orders by status" className="mh-tabbar -mx-4 px-4 sm:mx-0 sm:px-0 py-0">
+                <div role="group" aria-label="Filter orders by status" className="mh-or-filters">
                   {availableFilters.map((f) => (
                     <button
                       key={f.id}
                       type="button"
                       aria-pressed={activeFilter === f.id}
                       onClick={() => setFilter(f.id)}
-                      className={`px-3.5 rounded-full border text-sm font-semibold transition-colors cursor-pointer ${activeFilter === f.id ? 'bg-[#00c365] border-[#00c365] text-[#05140c]' : 'border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white'}`}
+                      className="mh-or-filter"
+                      {...(f.groups.length ? { 'data-group': f.groups[0] } : {})}
                     >
-                      {f.label}{f.id !== 'all' && <span className={activeFilter === f.id ? 'text-[#05140c]/70' : 'text-slate-500'}> {groupCounts.get(f.id)}</span>}
+                      {f.label}{f.id !== 'all' && <b>{groupCounts.get(f.id)}</b>}
                     </button>
                   ))}
                 </div>
               )}
 
-              <div className="flex items-center justify-between gap-3 text-xs text-slate-400 min-h-6">
+              <div className="mh-or-summary">
                 <p aria-live="polite">
-                  {query || activeFilter !== 'all'
-                    ? `${visibleOrders.length} of ${allOrders.length} ${allOrders.length === 1 ? 'order' : 'orders'}`
-                    : `${allOrders.length} ${allOrders.length === 1 ? 'order' : 'orders'}`}
+                  {narrowed
+                    ? <><strong>{visibleOrders.length}</strong> of {allOrders.length} {allOrders.length === 1 ? 'order' : 'orders'}</>
+                    : <><strong>{allOrders.length}</strong> {allOrders.length === 1 ? 'order' : 'orders'}{inProgress > 0 && <> · {inProgress} in progress</>}{attention > 0 && <> · {attention} {attention === 1 ? 'needs' : 'need'} attention</>}</>}
                   {accountLoading && <span> · Updating…</span>}
                 </p>
                 {user && (
-                  <button type="button" onClick={() => setRefresh((x) => x + 1)} disabled={accountLoading} className="min-h-11 -my-2.5 px-2 inline-flex items-center gap-1.5 text-slate-400 hover:text-white cursor-pointer disabled:opacity-60">
-                    <RefreshCw aria-hidden="true" className={`w-3.5 h-3.5 ${accountLoading ? 'animate-spin' : ''}`} />
+                  <button type="button" onClick={() => setRefresh((x) => x + 1)} disabled={accountLoading} aria-busy={accountLoading} className="mh-or-refresh">
+                    <RefreshCw aria-hidden="true" />
                     Refresh
                   </button>
                 )}
@@ -211,21 +272,24 @@ const OrdersHistory: React.FC = () => {
           )}
 
           {visibleOrders.length > 0 ? (
-            <ul className="space-y-2.5">
-              {visibleOrders.map(({ order, status }) => (
-                <li key={order.id}>
-                  <CustomerOrderCard order={order} status={status} now={now} onOpen={() => { if (order.serviceType === 'results_checker') window.location.assign(`/results-checkers?order=${encodeURIComponent(order.publicReference || order.id)}`); else openOrderStatus(order); }} />
-                </li>
-              ))}
-            </ul>
+            sectioned ? (
+              <div className="space-y-4">
+                {sections.map((s) => (
+                  <section key={s.id} className="mh-or-section" aria-labelledby={`mh-or-${s.id}`}>
+                    <div className="mh-or-section-head"><h3 id={`mh-or-${s.id}`}>{s.title}</h3><span>{s.rows.length}</span></div>
+                    {list(s.rows)}
+                  </section>
+                ))}
+              </div>
+            ) : list(visibleOrders)
           ) : hasOrders ? (
-            <div className="text-center py-10 px-4 rounded-2xl border border-slate-800 bg-[#0f151b] space-y-3">
-              <p className="text-base font-bold text-white">{query ? 'No orders match your search' : `No ${filterLabel.toLowerCase()} orders`}</p>
-              <p className="text-sm text-slate-400 max-w-sm mx-auto">
+            <div className="mh-or-empty">
+              <h3>{query ? 'No orders match your search' : `No ${filterLabel.toLowerCase()} orders`}</h3>
+              <p>
                 {query ? 'This search only covers the orders listed here.' : 'Try another status.'}
                 {query && classifyTrackInput(query).kind === 'reference' ? ' If you have an order reference, you can track it directly.' : ''}
               </p>
-              <div className="flex flex-wrap justify-center gap-2 pt-1">
+              <div className="mh-or-empty-actions">
                 {query && classifyTrackInput(query).kind === 'reference' && (
                   <button type="button" onClick={() => openTracking(query)} className="mh-button">Track this reference</button>
                 )}
@@ -233,31 +297,32 @@ const OrdersHistory: React.FC = () => {
               </div>
             </div>
           ) : awaitingAccount ? (
-            <ul aria-hidden="true" className="space-y-2.5">
-              {[0, 1, 2].map((i) => (
-                <li key={i} className="h-[92px] rounded-2xl border border-slate-800 bg-[#0f151b] motion-safe:animate-pulse" />
-              ))}
+            <ul aria-hidden="true" className="mh-or-list">
+              {[0, 1, 2].map((i) => <li key={i} className="mh-or-skeleton" />)}
             </ul>
-          ) : (
-            <div className="text-center py-10 px-4 rounded-2xl border border-slate-800 bg-[#0f151b] space-y-3">
-              <p className="text-base font-bold text-white">{user ? (accountError ? 'Your orders couldn’t load' : 'No orders yet') : 'No orders on this device yet'}</p>
-              <p className="text-sm text-slate-400 max-w-sm mx-auto leading-relaxed">
-                {user
-                  ? accountError ? 'Try again in a moment, or track an order with its reference.' : 'Data, airtime and other purchases linked to your account will appear here.'
-                  : 'Orders you buy on this device appear here. Sign in to see orders linked to your account.'}
+          ) : user ? (
+            <div className="mh-or-empty">
+              <ReceiptArt className="mh-or-empty-art" />
+              <h3 role={accountError ? 'alert' : undefined}>{accountError ? 'Your orders couldn’t load' : 'No orders yet'}</h3>
+              <p>
+                {accountError ? 'This doesn’t mean you have no orders. Try again in a moment, or track an order with its reference.' : 'Data, airtime and other purchases linked to your account will appear here.'}
               </p>
-              <div className="flex flex-wrap justify-center gap-2 pt-1">
-                {!user && <button type="button" onClick={() => openAuth('login')} className="mh-button-secondary">Sign in</button>}
-                <button type="button" onClick={() => setActivePage('data')} className="mh-button">Buy data</button>
+              <div className="mh-or-empty-actions">
+                {accountError
+                  ? <button type="button" onClick={() => setRefresh((x) => x + 1)} disabled={accountLoading} className="mh-button">Try again</button>
+                  : <button type="button" onClick={() => setActivePage('data')} className="mh-button">Buy data</button>}
               </div>
+            </div>
+          ) : (
+            <div className="mh-or-device">
+              <Smartphone aria-hidden="true" />
+              <p>Orders you buy on this device will appear here. <button type="button" onClick={() => openAuth('login')}>Sign in</button> to see orders linked to your account.</p>
             </div>
           )}
 
-          {hasOrders && (reachedLimit || !user) && (
-            <p className="text-xs text-slate-500 leading-relaxed pt-1">
-              {reachedLimit
-                ? `Showing your ${ACCOUNT_ORDER_LIMIT} most recent account orders. To check an older order, track it with its reference.`
-                : <>These orders are saved on this device. <button type="button" onClick={() => openAuth('login')} className="text-[#44df95] hover:underline font-semibold cursor-pointer">Sign in</button> to see orders linked to your account.</>}
+          {hasOrders && reachedLimit && (
+            <p className="mh-or-foot">
+              Showing your {ACCOUNT_ORDER_LIMIT} most recent account orders. To check an older order, track it with its reference.
             </p>
           )}
         </section>

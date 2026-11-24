@@ -45,6 +45,19 @@ interface ToastMessage {
 /** Sections My Account can open at. */
 export type AccountSection = 'notifications';
 
+/**
+ * What a live status check learned about one order. Only server status fields: never recipient, amount or other
+ * owner details, so a masked public lookup can update an account order without overwriting what the owner may see.
+ */
+export interface OrderStatusUpdate {
+  serverStatus?: string;
+  statusMessage?: string;
+  manualReview?: boolean;
+  customerResolution?: import('../../server/types/orderResolution').CustomerResolution;
+  paymentBasis?: 'complimentary' | 'operator_recorded';
+  marketplaceStatus?: string | null;
+}
+
 interface AppContextType {
   activePage: ActivePage;
   /** pushHistory false: the caller already set the address (e.g. /website-builder/designs). */
@@ -74,7 +87,7 @@ interface AppContextType {
   updateOrderStatus: (
     orderId: string,
     status: OrderRecord['status'],
-    extra?: { serverStatus?: string; statusMessage?: string; manualReview?: boolean;customerResolution?:import('../../server/types/orderResolution').CustomerResolution;paymentBasis?:'complimentary'|'operator_recorded' }
+    extra?: OrderStatusUpdate
   ) => void;
   isAuthModalOpen: boolean;
   authMode: 'login' | 'signup';
@@ -334,6 +347,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       serviceFeeGhc: bundle.serviceFeeGhc,
       status: paymentReference ? 'verifying' : 'placed',
       paymentReference,
+      // Device records remember which signed-in account made them, so another person signing in here never sees them.
+      ownerUserId: user?.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -349,31 +364,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateOrderStatus = (
     orderId: string,
     status: OrderRecord['status'],
-    extra?: { serverStatus?: string; statusMessage?: string; manualReview?: boolean;customerResolution?:import('../../server/types/orderResolution').CustomerResolution;paymentBasis?:'complimentary'|'operator_recorded' }
+    extra?: OrderStatusUpdate
   ) => {
-    // Server-loaded Data and AFA orders may not be in the legacy local list.
-    if (activeOrder && ['afa', 'data'].includes(activeOrder.serviceType || '') && (activeOrder.id === orderId || activeOrder.publicReference === orderId)) {
-      setActiveOrder({...activeOrder,status,manualReview:extra?.manualReview ?? activeOrder.manualReview,serverStatus:extra?.serverStatus || activeOrder.serverStatus,statusMessage:extra?.statusMessage,updatedAt:new Date().toISOString()});
-    }
-    setOrders((prev) =>
-      prev.map((order) => {
-        if (order.id === orderId || (order.publicReference && order.publicReference === orderId)) {
-          const updated: OrderRecord = {
-            ...order,
-            status,
-            serverStatus: extra?.serverStatus || order.serverStatus,
-            statusMessage: extra?.statusMessage !== undefined ? extra.statusMessage : order.statusMessage,
-            manualReview: extra?.manualReview ?? order.manualReview,
-            updatedAt: new Date().toISOString(),
-          };
-          if (activeOrder?.id === order.id || (activeOrder?.publicReference && activeOrder.publicReference === orderId)) {
-            setActiveOrder(updated);
-          }
-          return updated;
-        }
-        return order;
-      })
-    );
+    const matches = (order: OrderRecord) => order.id === orderId || Boolean(order.publicReference && order.publicReference === orderId);
+    // Status fields only; `undefined` in a live answer means the server no longer reports it (a resolution can clear).
+    const apply = (order: OrderRecord): OrderRecord => ({
+      ...order,
+      status,
+      serverStatus: extra?.serverStatus || order.serverStatus,
+      statusMessage: extra && 'statusMessage' in extra ? extra.statusMessage : order.statusMessage,
+      manualReview: extra?.manualReview ?? order.manualReview,
+      customerResolution: extra && 'customerResolution' in extra ? extra.customerResolution : order.customerResolution,
+      paymentBasis: extra && 'paymentBasis' in extra ? extra.paymentBasis : order.paymentBasis,
+      marketplaceStatus: extra && 'marketplaceStatus' in extra ? extra.marketplaceStatus : order.marketplaceStatus,
+      updatedAt: new Date().toISOString(),
+    });
+    // The receipt shows any order (account, device or tracked by reference), so it updates whatever is open, of any
+    // service, and only if that is still the same order: an answer for another order never replaces it.
+    setActiveOrder((current) => (current && matches(current) ? apply(current) : current));
+    setOrders((prev) => (prev.some(matches) ? prev.map((order) => (matches(order) ? apply(order) : order)) : prev));
   };
 
   const [authContextMessage, setAuthContextMessage] = useState<string | null>(null);
@@ -505,6 +514,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const clearLocalAuth = () => {
     feedbackToken.current = null;
     setUser(null); setSessionToken(null); setAccountOpen(false); setPendingAuthAction(null); setIsCheckoutOpen(false);
+    // An open receipt may show the previous account's order details: close it and forget it.
+    setIsStatusModalOpen(false); setActiveOrder(null);
     // A signed-out device never keeps the previous owner's website open in the editor.
     setActiveEditorSite(null); setEditorAiContext(null); setEditorLaunch(null);
     try { for (const storage of [localStorage, sessionStorage]) { storage.removeItem('mystery_hub_user'); storage.removeItem('mystery_hub_session_token'); } } catch { /* Ignore unavailable storage. */ }

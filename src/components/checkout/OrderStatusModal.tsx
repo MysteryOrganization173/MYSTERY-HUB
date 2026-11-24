@@ -1,37 +1,52 @@
+import './receipt.css';
 import { OrderShield } from './OrderShield';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { dataOrderPresentation, dataRecipientDisplay } from '../../utils/dataPurchasePresentation';
-import { afaStatusLabel } from '../../../shared/afa';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { GHANA_NETWORKS } from '../../data/bundles';
 import { BUSINESS_CONFIG } from '../../config/business';
 import { lookupOrderOnServer } from '../../services/apiClient';
 import { clearPendingCheckout, isSettledForRecovery } from '../../utils/checkoutRecovery';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
-import { getInstantBundlePresentation } from '../../utils/instantBundleUtils';
-import { customerOrderStatus, orderDateLabel } from '../../utils/customerOrderPresentation';
+import { customerOrderNetwork, customerOrderTitle, orderDateLabel } from '../../utils/customerOrderPresentation';
+import { orderReceiptView, orderSaving, type ReceiptService } from '../../utils/orderReceiptPresentation';
 import { OrderRecord } from '../../types';
 import { PostPurchaseInvite } from './PostPurchaseInvite';
-import { CheckCircle2, Clock, AlertTriangle, ArrowRight, MessageSquare, Copy, Check, RefreshCw, X, ShieldAlert, Phone as PhoneIcon } from 'lucide-react';
-import { Seasonal } from '../../seasonal/Seasonal';
+import { AlertTriangle, Check, CheckCircle2, Clock, Copy, GraduationCap, MessageSquare, RefreshCw, RotateCcw, ShieldCheck, ShoppingBag, X, XCircle } from 'lucide-react';
+import { SeasonalOrders } from '../../seasonal/Seasonal';
+import { useSeason } from '../../seasonal/SeasonProvider';
+import { ordersSeasonAttributes } from '../../seasonal/ordersSeason';
 import { useBuyAgain } from '../../hooks/useBuyAgain';
 
+const SERVICE_LINE: Record<ReceiptService, string> = {
+  data: 'Data bundle', airtime: 'Airtime', instant: 'Instant Bundle', afa: 'AFA registration', marketplace: 'Marketplace', results_checker: 'Results Checker',
+};
+const SEAL = { pending: Clock, progress: RefreshCw, success: CheckCircle2, attention: AlertTriangle, refund: RotateCcw, resolved: ShieldCheck, closed: XCircle } as const;
+
+/**
+ * Mystery Hub 3.6.2 · the digital receipt. One sheet for every way an order is opened (after checkout, from Orders, by
+ * reference). What it says comes from `orderReceiptView` (server status, manual review, customer resolution, payment
+ * basis and Marketplace stage); while it is open it checks the server on the existing schedule and carries what it
+ * learns into the shared order state, so the Orders list never contradicts it.
+ */
 export const OrderStatusModal: React.FC = () => {
   const {
     isStatusModalOpen,
     closeOrderStatus,
     activeOrder,
     setActivePage,
+    openDataPage,
     updateOrderStatus,
     showToast,
     user,
     sessionToken,
     openAuth,
   } = useApp();
+  const season = useSeason();
   const { buyAgain, pending: buyAgainPending, cancel: cancelBuyAgain } = useBuyAgain();
+  const titleId = useId();
 
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'idle' | 'copied' | 'failed'>('idle');
   // Shown so customers on weak connections know whether the status they see is current.
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [checkFailed, setCheckFailed] = useState(false);
@@ -43,24 +58,40 @@ export const OrderStatusModal: React.FC = () => {
   shownReference.current = isStatusModalOpen ? lookupReference ?? null : null;
   useEffect(() => () => cancelBuyAgain(), [isStatusModalOpen, lookupReference, cancelBuyAgain]);
 
+  useEffect(() => { setLastChecked(null); setCheckFailed(false); setCopied('idle'); }, [lookupReference]);
+
+  // Stop checking once nothing more can change for the customer (unchanged rule).
+  // A device record the server has never answered for is always checked at least once.
+  const isTerminal = Boolean(activeOrder?.serverStatus) && (['manual_fulfillment','external_compensation'].includes(activeOrder?.customerResolution||'') || activeOrder?.status === 'delivered' || activeOrder?.status === 'failed'&&(!activeOrder.customerResolution||activeOrder.customerResolution==='refund_confirmed'));
+
+  // The loop reads the latest order through a ref, so it starts once per open order instead of again on every render.
+  const latest = useRef({ activeOrder, updateOrderStatus });
+  latest.current = { activeOrder, updateOrderStatus };
+  // The server said "not delivered yet" for this order while its receipt was open: only then is a later delivery
+  // something the customer saw happen (a saved record that is merely out of date never celebrates).
+  const seenUndelivered = useRef<string | null>(null);
+  if (!isStatusModalOpen) seenUndelivered.current = null; // a reopened receipt starts again: nothing replays
+
   // Poll server for status updates if order is pending or in-progress
-  useEffect(() => { setLastChecked(null); setCheckFailed(false); }, [lookupReference]);
-
   useEffect(() => {
-    if (!isStatusModalOpen || !lookupReference) return;
-
-    // Stop aggressive polling when terminal status is reached
-    const isTerminal = ['manual_fulfillment','external_compensation'].includes(activeOrder?.customerResolution||'') || activeOrder?.status === 'delivered' || activeOrder?.status === 'failed'&&(!activeOrder.customerResolution||activeOrder.customerResolution==='refund_confirmed');
-    if (isTerminal) return;
+    if (!isStatusModalOpen || !lookupReference || isTerminal) return;
+    // `alive` ends with this order: an answer that arrives after the sheet closed, or after another order opened,
+    // is dropped instead of being written into whatever is showing now. One request at a time on slow networks.
+    let alive = true, inFlight = false;
 
     const fetchServerStatus = async () => {
+      if (inFlight) return;
+      inFlight = true;
       try {
         const res = await lookupOrderOnServer(lookupReference);
+        if (!alive) return;
         setCheckFailed(false);
         setLastChecked(new Date());
-        if (res.success && res.order) {
+        const shown = latest.current.activeOrder;
+        if (res.success && res.order && shown && (shown.publicReference || shown.id) === lookupReference) {
           if (isSettledForRecovery(res.order.status)) clearPendingCheckout(res.order.public_reference);
           const serverStatus = res.order.status;
+          if (serverStatus !== 'delivered') seenUndelivered.current = lookupReference;
 
           // Status mapping:
           // pending_payment -> verifying
@@ -92,387 +123,213 @@ export const OrderStatusModal: React.FC = () => {
           }
 
           if(res.order.customer_resolution)statusMessage=dataOrderPresentation(serverStatus,res.order.manual_review,res.order.customer_resolution,res.order.payment_basis).next;
+          const marketplaceStatus = res.order.marketplace_status ?? null;
           if (
-            mappedStatus !== activeOrder?.status ||
-            serverStatus !== activeOrder?.serverStatus ||
-            res.order.manual_review !== activeOrder?.manualReview ||
-            res.order.customer_resolution !== activeOrder?.customerResolution ||
-            res.order.payment_basis !== activeOrder?.paymentBasis ||
-            statusMessage !== activeOrder?.statusMessage
+            mappedStatus !== shown.status ||
+            serverStatus !== shown.serverStatus ||
+            res.order.manual_review !== shown.manualReview ||
+            res.order.customer_resolution !== shown.customerResolution ||
+            res.order.payment_basis !== shown.paymentBasis ||
+            marketplaceStatus !== (shown.marketplaceStatus ?? null) ||
+            statusMessage !== shown.statusMessage
           ) {
-            updateOrderStatus(activeOrder!.id, mappedStatus, {
+            latest.current.updateOrderStatus(shown.id, mappedStatus, {
               serverStatus,
               manualReview: res.order.manual_review,
               customerResolution:res.order.customer_resolution,
               paymentBasis:res.order.payment_basis,
+              marketplaceStatus,
               statusMessage,
             });
           }
         }
       } catch (err) {
-        setCheckFailed(true);
+        if (alive) setCheckFailed(true);
         if (import.meta.env.DEV) {
           console.warn('[OrderStatusModal] Polling error for reference:', lookupReference, err);
         }
+      } finally {
+        inFlight = false;
       }
     };
 
     fetchServerStatus();
     const interval = setInterval(fetchServerStatus, 3000);
-    return () => clearInterval(interval);
-  }, [
-    isStatusModalOpen,
-    lookupReference,
-    activeOrder?.status,
-    activeOrder?.serverStatus,
-    activeOrder?.manualReview,
-    activeOrder?.statusMessage,
-    updateOrderStatus,
-  ]);
+    return () => { alive = false; clearInterval(interval); };
+  }, [isStatusModalOpen, lookupReference, isTerminal]);
 
   const dialogRef = useDialogFocus(isStatusModalOpen && !!activeOrder, closeOrderStatus);
+  const view = useMemo(() => (activeOrder ? orderReceiptView(activeOrder) : null), [activeOrder]);
 
-  if (!isStatusModalOpen || !activeOrder) return null;
+  // Only a supplier delivery the server reported after saying "not yet" while this receipt was open is celebrated.
+  const justDelivered = Boolean(isStatusModalOpen && view?.supplierDelivered && lookupReference && seenUndelivered.current === lookupReference);
 
-  const currentNetwork = GHANA_NETWORKS[activeOrder.network];
+  if (!isStatusModalOpen || !activeOrder || !view) return null;
+
   const displayRef = activeOrder.publicReference || activeOrder.id;
-  const isDataOrder = Boolean(activeOrder.customerResolution) || activeOrder.serviceType === 'data' || (!activeOrder.serviceType && !/^(airtime|instant|marketplace)/.test(activeOrder.bundle.id));
-  const dataView = dataOrderPresentation(activeOrder.serverStatus, activeOrder.manualReview,activeOrder.customerResolution,activeOrder.paymentBasis);
-  const isRefundIssue = activeOrder.serverStatus === 'refund_pending' || activeOrder.serverStatus === 'refunded';
 
   // Copies the public order reference only, never recipient or account details.
   const handleCopyOrderId = async () => {
     try {
       await navigator.clipboard.writeText(displayRef);
-      setCopied(true);
+      setCopied('copied');
       showToast('Order reference copied');
-      setTimeout(() => setCopied(false), 2000);
+      window.setTimeout(() => setCopied((state) => (state === 'copied' ? 'idle' : state)), 2000);
     } catch {
       showToast('Couldn’t copy. Press and hold the reference to copy it.', 'warning');
+      setCopied('failed');
     }
   };
 
-  const statusConfig = {
-    verifying: {
-      label: 'Verifying Payment',
-      badgeClass: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
-      description: 'Checking your payment with Paystack…',
-      icon: RefreshCw,
-      step: 1,
-    },
-    placed: {
-      label: 'Order Placed',
-      badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-      description: 'Your order is queued for delivery. Payment confirmation does not mean it has been delivered.',
-      icon: Clock,
-      step: 1,
-    },
-    processing: {
-      label: 'Processing',
-      badgeClass: 'bg-sky-500/10 text-sky-400 border-sky-500/30',
-      description: 'The mobile network is processing your bundle. Track this order for updates; delivery times vary.',
-      icon: RefreshCw,
-      step: 2,
-    },
-    delivered: {
-      label: 'Delivered',
-      badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-      description: 'Data has been loaded directly onto your SIM card. Enjoy browsing!',
-      icon: CheckCircle2,
-      step: 3,
-    },
-    failed: {
-      label: isRefundIssue ? 'Refund Pending' : 'Failed',
-      badgeClass: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
-      description:
-        activeOrder.statusMessage ||
-        (isRefundIssue
-          ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
-          : 'This order could not be completed. Contact support with your order reference before placing the same order again.'),
-      icon: AlertTriangle,
-      step: 0,
-    },
-  }[activeOrder.status];
+  const isAfa = view.service === 'afa';
+  const Seal = SEAL[view.tone];
+  const recipient = view.service === 'marketplace' || !activeOrder.recipientPhone ? ''
+    : view.service === 'data' ? dataRecipientDisplay(activeOrder.recipientPhone, activeOrder.buyerRecipientVisible)
+    : dataRecipientDisplay(activeOrder.recipientPhone, true);
+  const network = customerOrderNetwork(activeOrder);
+  // The order's own saving, for the buyer's own records only (a reference holder is not necessarily the buyer).
+  const saving = activeOrder.buyerRecipientVisible ? orderSaving(activeOrder, view.group) : 0;
+  const delivered = view.group === 'delivered';
+  const currentStep = view.steps.find((step) => step.state === 'current' || step.state === 'halted');
 
-  const isAfa = activeOrder.serviceType === 'afa';
-  if (isAfa) statusConfig.label = afaStatusLabel(activeOrder.serverStatus, activeOrder.manualReview);
-  if(activeOrder.customerResolution)statusConfig.label=dataView.label;
-  else if (activeOrder.serviceType === 'marketplace' && activeOrder.marketplaceStatus) statusConfig.label = customerOrderStatus(activeOrder).label;
-
-  const headingText = isDataOrder ? dataView.title : isAfa
-    ? afaStatusLabel(activeOrder.serverStatus, activeOrder.manualReview)
-    : activeOrder.status === 'delivered'
-    ? 'Order delivered successfully'
-    : activeOrder.status === 'verifying'
-    ? 'Confirming your payment'
-    : activeOrder.status === 'processing'
-    ? 'Your order is being processed'
-    : activeOrder.status === 'placed'
-    ? 'Order placed successfully'
-    : isRefundIssue
-    ? 'Refund in progress'
-    : activeOrder.status === 'failed'
-    ? 'Delivery issue'
-    : 'Order placed successfully';
-
-  const descriptionText = isDataOrder ? dataView.next : isAfa
-    ? activeOrder.serverStatus === 'delivered'
-      ? 'Your MTN AFA registration is confirmed. MTN packages are purchased separately.'
-      : activeOrder.status === 'failed'
-      ? activeOrder.statusMessage || 'Registration could not be completed. Please contact support.'
-      : "Payment and registration are separate stages. Follow this order for registration updates; contact support if it needs attention."
-    : activeOrder.statusMessage ||
-      (isRefundIssue
-        ? 'Delivery could not be completed. Your payment is being reviewed for refund.'
-        : statusConfig.description);
-
-  const productName = (() => {
-    const isInst =
-      activeOrder.serviceType === 'instant_bundle' ||
-      (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('instant-'));
-    if (isInst) {
-      const info = getInstantBundlePresentation({
-        category: activeOrder.bundle.category,
-        name: activeOrder.bundle.description || activeOrder.bundle.dataAmount,
-        dataAmount: activeOrder.bundle.dataAmount,
-        isFlexi: activeOrder.bundle.isFlexi,
-      });
-      return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${info.formattedAmount} ${info.categoryLabel} ⚡`;
-    }
-    if (isAfa) {
-      return 'MTN AFA Registration';
-    }
-    if (activeOrder.serviceType === 'marketplace' || (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('marketplace-'))) {
-      return activeOrder.bundle.description || activeOrder.bundle.dataAmount || 'Marketplace Item';
-    }
-    if (
-      activeOrder.serviceType === 'airtime' ||
-      (activeOrder.bundle.id && activeOrder.bundle.id.startsWith('airtime-'))
-    ) {
-      return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount}`;
-    }
-    return `${currentNetwork?.name || activeOrder.network.toUpperCase()} ${activeOrder.bundle.dataAmount} Data`;
-  })();
-
-  // Data journey steps come only from verified server state; a stopped order marks where it stopped.
-  const stopped = Boolean(activeOrder.manualReview) || ['failed', 'refund_pending', 'refunded', 'cancelled', 'expired'].includes(activeOrder.serverStatus || '') || Boolean(activeOrder.customerResolution && !dataView.delivered);
-  const journey: { label: string; detail: string; complete: boolean }[] = [
-    { label: dataView.paymentLabel, detail: activeOrder.paymentBasis === 'complimentary' ? 'No customer payment required' : activeOrder.paymentBasis === 'operator_recorded' ? 'Collection recorded by support' : dataView.paymentConfirmed ? 'Verified by Mystery Hub' : 'Waiting for Paystack to confirm', complete: dataView.paymentStageComplete },
-    { label: 'Processing', detail: dataView.processing || dataView.delivered ? 'Sent to the network' : 'Queued after payment', complete: dataView.delivered },
-    { label: 'Delivered', detail: dataView.delivered ? 'Check the recipient’s balance' : 'Timing depends on the network', complete: dataView.delivered },
-  ];
-  const currentStep = journey.findIndex(step => !step.complete);
-  const tone = activeOrder.status === 'delivered' || dataView.delivered ? 'success' : stopped || activeOrder.status === 'failed' ? 'attention' : 'progress';
   // 3.4.1 Smart Buy Again for a signed-in customer's delivered Data, Airtime or Instant order. The server confirms the
   // order is theirs and what it can be bought as today; anything else keeps the plain catalogue link.
-  const smartBuyAgain = tone === 'success' && Boolean(sessionToken && user && activeOrder.publicReference)
-    && (!activeOrder.serviceType || ['data', 'airtime', 'instant_bundle'].includes(activeOrder.serviceType));
+  const repeatable = view.service === 'data' || view.service === 'airtime' || view.service === 'instant';
+  const smartBuyAgain = delivered && Boolean(sessionToken && user && activeOrder.publicReference) && repeatable;
+  // One primary action, chosen by the customer's situation: a problem is resolved before anything is sold.
+  const needsHelp = view.tone === 'attention' || view.tone === 'refund';
+  const primary = activeOrder.serviceType === 'results_checker' ? 'results' : needsHelp ? 'help' : delivered && repeatable ? 'buy' : 'done';
+  const supportUrl = BUSINESS_CONFIG.getOrderSupportWhatsAppUrl(displayRef, activeOrder.recipientPhone);
+  const mode = view.service === 'airtime' ? 'airtime' : view.service === 'instant' ? 'instant' : 'data';
 
   return (
     <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Order status and receipt" className="mh-sheet-backdrop fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/75 backdrop-blur-sm">
-      <div className="mh-sheet relative w-full max-w-[calc(100vw-1rem)] mx-auto sm:max-w-md bg-[#0f151b] border border-slate-700/70 border-b-0 sm:border-b rounded-t-[1.5rem] sm:rounded-[1.5rem] shadow-2xl overflow-hidden text-slate-100 max-h-[calc(100dvh-0.75rem)] sm:max-h-[92dvh] flex flex-col">
-        {/* Header with Close */}
-        <div className="relative flex items-center justify-between gap-3 px-4 sm:px-5 pt-3 pb-1 shrink-0">
+      <div
+        className="mh-sheet mh-rc relative w-full max-w-[calc(100vw-1rem)] mx-auto sm:max-w-md border border-slate-700/70 border-b-0 sm:border-b rounded-t-[1.5rem] sm:rounded-[1.5rem] shadow-2xl overflow-hidden max-h-[calc(100dvh-0.75rem)] sm:max-h-[92dvh] flex flex-col"
+        data-rc-tone={view.tone}
+        data-rc-mood={view.festive ? 'bright' : 'serious'}
+        {...(view.festive ? ordersSeasonAttributes(season) : {})}
+      >
+        <div className="mh-rc-head">
           <span aria-hidden="true" className="sm:hidden absolute left-1/2 top-1.5 -translate-x-1/2 h-1 w-10 rounded-full bg-slate-700" />
-          <span className="pt-1 text-xs font-semibold uppercase tracking-wider text-slate-400">Order status</span>
-          <button
-            onClick={closeOrderStatus}
-            className="w-11 h-11 flex items-center justify-center rounded-full bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
-            aria-label="Close status"
-          >
+          <span className="mh-rc-kicker"><i aria-hidden="true" />{view.paymentConfirmed || activeOrder.paymentBasis ? 'Receipt' : 'Order'} · {SERVICE_LINE[view.service]}</span>
+          <button onClick={closeOrderStatus} className="mh-rc-close" aria-label="Close status">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="overflow-y-auto px-4 sm:px-5 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-4 overscroll-contain">
-          {/* Seasonal celebration only when the server itself reports the order delivered; never for a payment that is
-              pending, paid, queued or processing, and never for a locally assumed state. */}
-          {activeOrder.serverStatus === 'delivered' && <Seasonal slot="celebrate" />}
-          {/* Status hero */}
-          <div className="flex items-start gap-3.5 pt-1">
-            {activeOrder.status === 'delivered' || isDataOrder && dataView.paymentConfirmed && !activeOrder.manualReview && ['paid','queued'].includes(activeOrder.serverStatus || '') ? (
-              <div className="w-12 h-12 shrink-0 rounded-full bg-[#00c365]/15 border border-[#00c365]/60 flex items-center justify-center text-[#00c365] motion-safe:animate-[checkout-success_240ms_ease-out] motion-reduce:animate-none">
-                <CheckCircle2 className="w-7 h-7" />
-              </div>
-            ) : activeOrder.status === 'processing' ? (
-              <div className="w-12 h-12 shrink-0 rounded-full bg-sky-500/15 border border-sky-400/60 flex items-center justify-center text-sky-300">
-                <RefreshCw className="w-6 h-6 motion-safe:animate-spin [animation-duration:2.4s]" />
-              </div>
-            ) : activeOrder.status === 'failed' ? (
-              <div className="w-12 h-12 shrink-0 rounded-full bg-rose-500/15 border border-rose-500/60 flex items-center justify-center text-rose-300">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-            ) : (
-              <div className="w-12 h-12 shrink-0 rounded-full bg-amber-500/15 border border-amber-400/60 flex items-center justify-center text-amber-300">
-                <Clock className="w-6 h-6" />
-              </div>
-            )}
-            <div className="min-w-0">
-              <h3 className="text-xl font-bold text-white tracking-tight leading-snug">
-                {headingText}
-              </h3>
-              <p className="text-sm text-slate-300 mt-1 leading-relaxed">
-                {descriptionText}
-              </p>
-            </div>
-          </div>
+        <div className="mh-rc-body">
+          {/* Seasonal flourish only while the order is going well; a celebration only for a supplier delivery the
+              server reported while this receipt was open. Never for a payment, a manual remedy or a reopened receipt. */}
+          {view.festive && <SeasonalOrders part={view.supplierDelivered && justDelivered ? 'celebrate' : 'flourish'} />}
 
-          {/* Only verified server states advance the Data journey; no percentage estimates. */}
-          {isDataOrder ? <div className="rounded-2xl border border-slate-800 bg-[#0a0f14] p-4 space-y-3" aria-label="Order journey">
-            <p role="status" className="text-sm font-semibold text-white">Current status: <span className={tone === 'success' ? 'text-[#44df95]' : tone === 'attention' ? 'text-rose-300' : 'text-amber-200'}>{dataView.label}</span></p>
-            <ol className="space-y-0">
-              {journey.map((step, index) => {
-                const isCurrent = index === currentStep;
-                const halted = isCurrent && stopped;
-                return <li key={step.label} className="relative flex gap-3 pb-4 last:pb-0">
-                  {index < journey.length - 1 && <span aria-hidden="true" className={`absolute left-[11px] top-6 bottom-0 w-0.5 ${step.complete ? 'bg-[#00c365]/70' : 'bg-slate-800'}`} />}
-                  <span aria-hidden="true" className={`relative z-10 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold ${step.complete ? 'border-[#00c365] bg-[#00c365] text-[#03160c]' : halted ? 'border-rose-400 bg-rose-500/15 text-rose-300' : isCurrent ? 'border-amber-300 bg-amber-400/10 text-amber-200' : 'border-slate-700 bg-[#0a0f14] text-slate-600'}`}>
-                    {step.complete ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : halted ? '!' : isCurrent ? <span className="h-2 w-2 rounded-full bg-amber-300 motion-safe:animate-pulse" /> : ''}
-                  </span>
-                  <div className="min-w-0">
-                    <p className={`text-sm font-semibold ${step.complete ? 'text-white' : isCurrent ? halted ? 'text-rose-200' : 'text-amber-100' : 'text-slate-500'}`}>{step.label}<span className="sr-only">{step.complete?' — confirmed':' — not confirmed'}</span></p>
-                    <p className={`text-xs ${step.complete || isCurrent ? 'text-slate-400' : 'text-slate-600'}`}>{halted ? dataView.label : step.detail}</p>
-                  </div>
-                </li>;
-              })}
-            </ol>
-          </div> : <div className="bg-[#0a0f14] p-4 rounded-2xl border border-slate-800 space-y-2">
-            <div className="flex justify-between text-xs text-slate-400 font-medium">
-              <span>Order Received</span>
-              <span>{isAfa ? 'Registration Progress' : 'Delivery Progress'}</span>
-              <span>{isAfa ? 'Registered' : 'Delivered'}</span>
-            </div>
-            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden flex">
-              <div
-                className={`h-full transition-all duration-700 ${
-                  activeOrder.status === 'failed'
-                    ? 'w-full bg-rose-500'
-                    : activeOrder.status === 'delivered'
-                    ? 'w-full bg-[#00c365]'
-                    : activeOrder.status === 'processing'
-                    ? 'w-2/3 bg-sky-400'
-                    : 'w-1/3 bg-amber-400'
-                }`}
-              />
-            </div>
-            <p className="text-xs text-slate-400">{statusConfig.label}</p>
-          </div>
+          {/* One live region that stays mounted, so a change of status (delivered, needs attention, refund) is announced. */}
+          <p role="status" aria-live="polite" className="sr-only">{`${view.title}. Current status: ${view.label}.`}</p>
+          <section key={view.group} className="mh-rc-status" aria-labelledby={titleId}>
+            <span className={`mh-rc-seal${justDelivered ? ' is-fresh' : ''}`} aria-hidden="true" {...(view.tone === 'progress' ? { 'data-breathe': '' } : {})}>
+              <Seal />
+            </span>
+            <h2 id={titleId} className="mh-rc-title">{view.title}</h2>
+            <p className="mh-rc-chip"><i aria-hidden="true" /><span className="sr-only">Current status: </span>{view.label}</p>
+            <p className="mh-rc-next">{view.next}</p>
+          </section>
 
-          }
+          {/* Only verified server states advance the journey; no percentage, timer or estimate. */}
+          {view.journeyKind !== 'closed' && (
+            <div className="mh-rc-journey" aria-label={view.journeyKind === 'resolution' ? 'Resolution steps' : 'Order journey'} role="group">
+              <ol className="mh-rc-steps">
+                {view.steps.map((step, index) => (
+                  <li key={step.key} className="mh-rc-step" data-state={step.state}>
+                    <span className="mh-rc-node" aria-hidden="true">
+                      {step.state === 'done' ? <Check strokeWidth={3} /> : step.state === 'halted' ? '!' : step.state === 'current' ? null : index + 1}
+                    </span>
+                    <span className="mh-rc-step-label">
+                      {step.label}
+                      <span className="sr-only">{step.state === 'done' ? ' — confirmed' : step.state === 'halted' ? ` — stopped: ${step.detail}` : step.state === 'current' ? ` — now: ${step.detail}` : ' — not confirmed'}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              {currentStep && (
+                <p className="mh-rc-now" aria-hidden="true"><b>{currentStep.label}:</b> {currentStep.detail}</p>
+              )}
+            </div>
+          )}
 
           {/* Freshness: customers on weak connections see whether this is live. */}
-          {!(activeOrder.status === 'delivered') && (
-            <p aria-live="polite" className={`flex items-center gap-1.5 text-xs ${checkFailed ? 'text-amber-300' : 'text-slate-500'}`}>
-              {checkFailed ? <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> : <RefreshCw className="w-3.5 h-3.5 shrink-0" />}
-              {checkFailed
-                ? 'Can’t reach Mystery Hub right now. Your order is safe; we’ll keep checking when you’re back online.'
-                : lastChecked
-                ? `Updates automatically · last checked ${lastChecked.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                : 'Checking the latest status…'}
+          {!delivered && !isTerminal && (
+            <p aria-live="polite" className="mh-rc-fresh" {...(checkFailed ? { 'data-failed': '' } : {})}>
+              {checkFailed ? <AlertTriangle aria-hidden="true" /> : <RefreshCw aria-hidden="true" />}
+              <span>
+                {checkFailed
+                  ? 'Can’t reach Mystery Hub right now. Your order is safe; we’ll keep checking when you’re back online.'
+                  : lastChecked
+                  ? `Updates automatically · last checked ${lastChecked.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                  : 'Checking the latest status…'}
+                {view.tone === 'progress' && view.paymentConfirmed && ` ${view.notYetDone}`}
+              </span>
             </p>
           )}
 
-          {/* Receipt */}
-          <div className="rounded-2xl border border-slate-800 bg-[#0a0f14] divide-y divide-slate-800/80 text-sm">
-            <div className="flex items-center gap-3 p-3.5">
-              {!isAfa && activeOrder.serviceType !== 'marketplace' && <NetworkBrandBadge network={activeOrder.network} size="md" />}
-              <div className="min-w-0 flex-1">
-                <div className="text-xs text-slate-400">Product</div>
-                <div className="font-semibold text-white break-words">{productName}</div>
-              </div>
-              <div className="text-right shrink-0">
-                <div className="text-xs text-slate-400">{activeOrder.paymentBasis==='complimentary'?'Complimentary':activeOrder.paymentBasis==='operator_recorded'?'Recorded amount':isDataOrder&&!dataView.paymentConfirmed?'Order Total':'Amount Paid'}</div>
-                <div className="font-bold text-white tabular-nums">GH₵{activeOrder.amountGhc.toFixed(2)}</div>
-              </div>
+          {/* The receipt itself: reference first, then what was bought, for whom, and the money as it really stands. */}
+          <article className="mh-rc-slip" aria-label="Receipt details">
+            <div className="mh-rc-ref">
+              <span className="mh-rc-ref-label">Order reference</span>
+              <span className="mh-rc-ref-value" translate="no">{displayRef}</span>
+              <button type="button" onClick={handleCopyOrderId} className="mh-rc-copy" aria-label={copied === 'copied' ? 'Order reference copied' : 'Copy order reference'} {...(copied === 'copied' ? { 'data-copied': '' } : {})}>
+                {copied === 'copied' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                <span aria-hidden="true">{copied === 'copied' ? 'Copied' : 'Copy'}</span>
+              </button>
+              {copied === 'failed' && <span className="mh-rc-copy-note" role="status">Press and hold the reference to copy it.</span>}
             </div>
-            <div className="flex items-center justify-between gap-3 px-3.5 py-3">
-              <span className="text-slate-400">Recipient Phone</span>
-              <span className="font-semibold text-white tabular-nums">{isDataOrder ? dataRecipientDisplay(activeOrder.recipientPhone, activeOrder.buyerRecipientVisible) : activeOrder.recipientPhone}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3 px-3.5 py-3">
-              <span className="text-slate-400">Ordered</span>
-              <span className="font-semibold text-white text-right">{orderDateLabel(activeOrder.createdAt)}</span>
-            </div>
-            {activeOrder.deliveredAt && (dataView.delivered || activeOrder.status === 'delivered') && (
-              <div className="flex items-center justify-between gap-3 px-3.5 py-3">
-                <span className="text-slate-400">{isAfa ? 'Registered' : activeOrder.serviceType === 'marketplace' ? 'Completed' : 'Delivered'}</span>
-                <span className="font-semibold text-white text-right">{orderDateLabel(activeOrder.deliveredAt)}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-between gap-2 pl-3.5 pr-1 py-1">
-              <span className="text-slate-400 shrink-0">Order Reference</span>
-              <span className="flex items-center min-w-0">
-                <span className="font-mono text-xs sm:text-sm font-semibold text-white break-all text-right">{displayRef}</span>
-                <button
-                  onClick={handleCopyOrderId}
-                  aria-label="Copy order reference"
-                  className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-white shrink-0 cursor-pointer"
-                  title="Copy Reference"
-                >
-                  {copied ? <Check className="w-4 h-4 text-[#00c365]" /> : <Copy className="w-4 h-4" />}
-                </button>
+            <div className="mh-rc-tear" aria-hidden="true" />
+            <div className="mh-rc-product">
+              <span className="mh-rc-mark" aria-hidden="true">
+                {view.service === 'marketplace' ? <span className="mh-rc-mark-icon"><ShoppingBag /></span>
+                  : view.service === 'results_checker' ? <span className="mh-rc-mark-icon"><GraduationCap /></span>
+                  : <NetworkBrandBadge network={activeOrder.network} size="md" />}
               </span>
+              <div className="min-w-0">
+                <p className="mh-rc-product-name">{customerOrderTitle(activeOrder)}</p>
+                <p className="mh-rc-product-sub">{view.service === 'marketplace' || view.service === 'results_checker' ? SERVICE_LINE[view.service] : `${network} · ${SERVICE_LINE[view.service]}`}</p>
+              </div>
             </div>
-            {activeOrder.paymentReference && (
-              <details className="px-3.5 text-left">
-                <summary className="cursor-pointer min-h-11 flex items-center text-sm text-slate-400">View payment details</summary>
-                <div className="flex items-center justify-between gap-2 pb-3">
-                  <div className="font-mono text-[11px] text-slate-400 min-w-0 break-all" title={`Paystack Reference: ${activeOrder.paymentReference}`}>
-                    {activeOrder.paymentMethod==='wallet'?'Wallet':'Payment'} Ref: {activeOrder.paymentReference}
-                  </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded font-medium shrink-0 border ${isDataOrder&&!dataView.paymentConfirmed?'text-amber-300 bg-amber-500/10 border-amber-500/20':'text-emerald-400/90 bg-emerald-500/10 border-emerald-500/20'}`}>
-                    {activeOrder.paymentBasis ? dataView.paymentLabel : isDataOrder ? dataView.paymentConfirmed?'Confirmed':'Awaiting confirmation' : 'Verified'}
-                  </span>
-                </div>
-              </details>
-            )}
-          </div>
+            <dl className="mh-rc-rows">
+              {recipient && <div className="mh-rc-row"><dt>{isAfa ? 'Number' : 'Recipient'}</dt><dd className="tabular-nums">{recipient}</dd></div>}
+              <div className="mh-rc-row"><dt>Ordered</dt><dd>{orderDateLabel(activeOrder.createdAt)}</dd></div>
+              {activeOrder.deliveredAt && view.showDoneDate && (
+                <div className="mh-rc-row"><dt>{activeOrder.customerResolution === 'manual_fulfillment' ? 'Completed' : view.doneWord}</dt><dd>{orderDateLabel(activeOrder.deliveredAt)}</dd></div>
+              )}
+              <div className="mh-rc-row"><dt>Payment</dt><dd>{view.paymentLine}</dd></div>
+              {saving > 0 && <div className="mh-rc-row"><dt>Saving</dt><dd className="text-emerald-300">GH₵{saving.toFixed(2)}</dd></div>}
+            </dl>
+            <div className="mh-rc-tear" aria-hidden="true" />
+            <div className="mh-rc-total" {...(view.paymentConfirmed || activeOrder.paymentBasis ? {} : { 'data-unpaid': '' })}>
+              <span className="mh-rc-total-label">{view.amountLabel}</span>
+              <span className="mh-rc-total-value">{activeOrder.paymentBasis === 'complimentary' && !(activeOrder.amountGhc > 0) ? 'No charge' : `GH₵${activeOrder.amountGhc.toFixed(2)}`}</span>
+              {view.amountNote && <span className="mh-rc-total-note">{view.amountNote}</span>}
+            </div>
+          </article>
 
           {/* AFA USSD Card when Registered (Requirement 7 & 4) */}
           {isAfa && activeOrder.serverStatus === 'delivered' && (
-            <div className="bg-[#090d10] p-4 rounded-xl border border-emerald-500/30 text-left space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-                  AFTER REGISTRATION
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono">MTN USSD</span>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-xs text-slate-300">Dial:</span>
-                <span className="font-mono text-base font-extrabold text-white bg-slate-900 border border-emerald-500/30 px-2.5 py-0.5 rounded tracking-wider">
-                  *1848#
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                Then follow the MTN AFA menu to view or purchase the offers available to your registered number.
-              </p>
-              <p className="text-[10px] text-slate-400 leading-normal border-t border-slate-800/80 pt-1.5">
-                The registration fee paid to Mystery Hub covers AFA registration only. Future AFA voice/data packages are purchased directly through MTN.
-              </p>
+            <div className="mh-rc-note" data-good="">
+              <span className="mh-rc-note-kicker">After registration · MTN USSD</span>
+              <p className="m-0">Dial <span className="mh-rc-ussd">*1848#</span> then follow the MTN AFA menu to view or purchase the offers available to your registered number.</p>
+              <small>The registration fee paid to Mystery Hub covers AFA registration only. Future AFA voice/data packages are purchased directly through MTN.</small>
             </div>
           )}
 
           {/* AFA Guidance when still in progress (Requirement 8 & 6) */}
-          {isAfa && activeOrder.status !== 'delivered' && activeOrder.status !== 'failed' && (
-            <div className="bg-[#090d10] p-3.5 sm:p-4 rounded-xl border border-slate-800 text-left space-y-1.5">
-              <div className="flex items-center gap-1.5 text-amber-400 text-xs font-semibold">
-                <Clock className="w-3.5 h-3.5" />
-                <span>Registration Status: In Progress</span>
-              </div>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                Your registration is still being processed. We&apos;ll update this order when registration is confirmed.
-              </p>
-              <p className="text-[10px] text-slate-400 leading-normal">
-                Wait until your order shows Registered before accessing MTN AFA packages.
-              </p>
-              <p className="text-[10px] text-slate-500 pt-1 border-t border-slate-800/80">
-                The registration fee paid to Mystery Hub covers AFA registration only. Future AFA voice/data packages are purchased directly through MTN.
-              </p>
+          {isAfa && view.group === 'in_progress' && (
+            <div className="mh-rc-note">
+              <p className="m-0">Wait until your order shows Registered before accessing MTN AFA packages.</p>
+              <small>The registration fee paid to Mystery Hub covers AFA registration only. Future AFA voice/data packages are purchased directly through MTN.</small>
             </div>
           )}
 
           {/* Buttons */}
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="mh-rc-actions">
             <button
               onClick={() => {
                 closeOrderStatus();
@@ -482,102 +339,77 @@ export const OrderStatusModal: React.FC = () => {
             >
               All orders
             </button>
-            <button
-              onClick={() => {
-                if (smartBuyAgain) {
-                  const reference = activeOrder.publicReference!;
-                  const mode = activeOrder.serviceType === 'airtime' ? 'airtime' : activeOrder.serviceType === 'instant_bundle' ? 'instant' : 'data';
-                  void buyAgain(reference, { beforeOpen: closeOrderStatus, stillWanted: () => shownReference.current === reference, notMine: { mode, network: activeOrder.network } });
-                  return;
-                }
-                closeOrderStatus();
-                if (activeOrder.serviceType === 'results_checker') { window.location.assign(`/results-checkers?order=${encodeURIComponent(activeOrder.publicReference || activeOrder.id)}`); return; }
-                setActivePage(isAfa ? 'home' : 'data');
-              }}
-              className="mh-button"
-              aria-disabled={smartBuyAgain && buyAgainPending ? true : undefined}
-              aria-busy={smartBuyAgain && buyAgainPending ? true : undefined}
-            >
-              <span>{activeOrder.serviceType === 'results_checker' ? 'Open your receipt' : isAfa ? 'Back to Home' : tone === 'success' ? (smartBuyAgain && buyAgainPending ? 'Checking…' : 'Buy again') : 'Done'}</span>
-            </button>
+            {primary === 'help' ? (
+              <a href={supportUrl} target="_blank" rel="noreferrer" className="mh-button">
+                <MessageSquare aria-hidden="true" className="w-4 h-4" />
+                <span>Get help</span>
+              </a>
+            ) : (
+              <button
+                onClick={() => {
+                  if (primary === 'buy' && smartBuyAgain) {
+                    const reference = activeOrder.publicReference!;
+                    void buyAgain(reference, { beforeOpen: closeOrderStatus, stillWanted: () => shownReference.current === reference, notMine: { mode, network: activeOrder.network } });
+                    return;
+                  }
+                  closeOrderStatus();
+                  if (primary === 'results') { window.location.assign(`/results-checkers?order=${encodeURIComponent(activeOrder.publicReference || activeOrder.id)}`); return; }
+                  // A guest (or an order this account cannot repeat) chooses again from today's catalogue and prices.
+                  if (primary === 'buy') openDataPage(mode, activeOrder.network);
+                }}
+                className="mh-button"
+                aria-disabled={smartBuyAgain && buyAgainPending ? true : undefined}
+                aria-busy={smartBuyAgain && buyAgainPending ? true : undefined}
+              >
+                <span>{primary === 'results' ? 'Open your receipt' : primary === 'buy' ? (smartBuyAgain && buyAgainPending ? 'Checking…' : 'Buy again') : 'Done'}</span>
+              </button>
+            )}
           </div>
 
           {/* Optional referral discovery: only after a confirmed first-party delivery, below tracking actions. */}
-          {sessionToken && user?.role === 'customer' && activeOrder.network === 'mtn' && isDataOrder && lookupReference && (
+          {sessionToken && user?.role === 'customer' && activeOrder.network === 'mtn' && view.service === 'data' && lookupReference && (
             <OrderShield key={sessionToken + lookupReference} token={sessionToken} reference={lookupReference} />
           )}
           <PostPurchaseInvite order={activeOrder} onExplore={() => { closeOrderStatus(); setActivePage('earn'); }} />
 
-          {/* WhatsApp Support Assistance */}
-          <a
-            href={BUSINESS_CONFIG.getOrderSupportWhatsAppUrl(displayRef, activeOrder.recipientPhone)}
-            target="_blank"
-            rel="noreferrer"
-            className={`flex items-center justify-center gap-2 min-h-11 rounded-xl text-sm transition-colors ${tone === 'attention' ? 'border border-[#00c365]/40 text-white bg-[#00c365]/10 hover:bg-[#00c365]/15' : 'text-slate-400 hover:text-white'}`}
-          >
-            <MessageSquare className="w-4 h-4 text-[#00c365]" />
-            <span>{tone === 'attention' ? 'Get help on WhatsApp with this reference' : 'Need help with this order? Contact us on WhatsApp'}</span>
-          </a>
+          {/* WhatsApp Support Assistance (the main action already, when the order needs help) */}
+          {primary !== 'help' && (
+            <a href={supportUrl} target="_blank" rel="noreferrer" className="mh-rc-help">
+              <MessageSquare aria-hidden="true" />
+              <span>Need help with this order? Contact us on WhatsApp</span>
+            </a>
+          )}
 
           {/* Development Status Simulator (only visible in dev mode) */}
           {import.meta.env.DEV && (
             <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
               <span className="text-[10px] text-slate-500 uppercase tracking-wider">Dev preview:</span>
+              <button onClick={() => updateOrderStatus(activeOrder.id, 'placed', { serverStatus: 'queued' })} className="text-[10px] px-2 py-0.5 rounded border border-slate-800 text-slate-400 cursor-pointer">Placed</button>
+              <button onClick={() => updateOrderStatus(activeOrder.id, 'processing', { serverStatus: 'processing' })} className="text-[10px] px-2 py-0.5 rounded border border-slate-800 text-slate-400 cursor-pointer">Processing</button>
+              <button onClick={() => updateOrderStatus(activeOrder.id, 'delivered', { serverStatus: 'delivered' })} className="text-[10px] px-2 py-0.5 rounded border border-slate-800 text-slate-400 cursor-pointer">Delivered</button>
               <button
-                onClick={() => updateOrderStatus(activeOrder.id, 'placed')}
-                className={`text-[10px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                  activeOrder.status === 'placed' ? 'border-amber-400 text-amber-400 bg-amber-400/10' : 'border-slate-800 text-slate-400'
-                }`}
-              >
-                Placed
-              </button>
-              <button
-                onClick={() => updateOrderStatus(activeOrder.id, 'processing')}
-                className={`text-[10px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                  activeOrder.status === 'processing' ? 'border-sky-400 text-sky-400 bg-sky-400/10' : 'border-slate-800 text-slate-400'
-                }`}
-              >
-                Processing
-              </button>
-              <button
-                onClick={() => updateOrderStatus(activeOrder.id, 'delivered')}
-                className={`text-[10px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                  activeOrder.status === 'delivered' ? 'border-[#00c365] text-[#00c365] bg-[#00c365]/10' : 'border-slate-800 text-slate-400'
-                }`}
-              >
-                Delivered
-              </button>
-              <button
-                onClick={() =>
-                  updateOrderStatus(activeOrder.id, 'failed', {
-                    serverStatus: 'refund_pending',
-                    statusMessage: 'Delivery could not be completed. Your payment is being reviewed for refund.',
-                  })
-                }
-                className={`text-[10px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                  activeOrder.serverStatus === 'refund_pending' ? 'border-rose-400 text-rose-400 bg-rose-400/10' : 'border-slate-800 text-slate-400'
-                }`}
+                onClick={() => updateOrderStatus(activeOrder.id, 'failed', { serverStatus: 'refund_pending', statusMessage: 'Delivery could not be completed. Your payment is being reviewed for refund.' })}
+                className="text-[10px] px-2 py-0.5 rounded border border-slate-800 text-slate-400 cursor-pointer"
               >
                 Refund Pending
               </button>
             </div>
           )}
 
-          {/* Guest Account Conversion Banner */}
+          {/* Guest account invitation, after everything the customer needs about this order. */}
           {!user && (
-            <div className="p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between gap-3 text-xs">
-              <div className="space-y-0.5 min-w-0">
-                <p className="font-semibold text-slate-200">Keep your orders across devices</p>
-                <p className="text-slate-400 text-[11px]">A free Mystery Hub account links and tracks every purchase.</p>
-              </div>
+            <div className="mh-rc-invite">
+              <p>
+                <strong>Keep your orders across devices</strong>
+                <span>With a free account, purchases you make while signed in are saved to it and can be tracked on any device.</span>
+              </p>
               <button
                 onClick={() => {
                   closeOrderStatus();
                   openAuth('signup');
                 }}
-                className="min-h-11 px-3 rounded-xl border border-[#00c365]/40 text-[#44df95] hover:bg-[#00c365]/10 font-semibold shrink-0 transition-colors cursor-pointer"
               >
-                Create Account
+                Create account
               </button>
             </div>
           )}

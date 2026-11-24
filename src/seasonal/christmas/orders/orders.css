@@ -1,0 +1,83 @@
+/* Mystery Hub 3.6.2 · Orders and the receipt for Christmas and New Year, for guests and signed-in customers alike.
+   Every rule starts with .mh-or[data-or-season="christmas"] (the Orders page root) or .mh-rc[data-or-season="christmas"]
+   (a receipt that is going well: the receipt sets the attribute only then). Removing the attribute, the season ending
+   on 6 January, or this file never loading restores the ordinary design exactly. Status colours, amounts, warnings
+   and actions keep their ordinary colours; Mystery Green stays the colour of every action.
+   Motion: transform and opacity only; each piece settles once; reduced motion holds everything still. */
+
+.mh-or[data-or-season="christmas"] {
+  --or-surface: #0c1a15; --or-surface-hi: #10241c; --or-surface-lo: #08130f;
+  --or-line: #e9b94921; --or-line-hi: #e9b94947;
+  --or-hero-a: #133d2d; --or-hero-b: #0a1712; --or-hero-line: #e8c46f45; --or-hero-glow: #e9b94933;
+  --or-chip-on: #f7e7c0; --or-chip-on-ink: #1d1406;
+  --orx-gold: #e9b949; --orx-gold-soft: #f3d79a; --orx-berry: #b3263f;
+  --orx-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --orx-ease: cubic-bezier(.2, .7, .2, 1);
+}
+.mh-or[data-or-season="christmas"][data-or-look="christmas-day"] { --or-hero-glow: #f7d27a4d; --or-hero-a: #164a35; }
+.mh-or[data-or-season="christmas"][data-or-look="new-year"] {
+  --or-surface: #0d1329; --or-surface-hi: #131b38; --or-surface-lo: #090e1f;
+  --or-line: #c9d1e024; --or-line-hi: #e7d9b04a;
+  --or-hero-a: #1d2758; --or-hero-b: #0a0e21; --or-hero-line: #e7d9b04d; --or-hero-glow: #8a5bb042;
+  --or-chip-on: #f4f1e8; --or-chip-on-ink: #141a33;
+  --orx-gold: #e7d9b0; --orx-gold-soft: #efe4c4; --orx-berry: #6b3f8f;
+}
+
+/* Title panel: velvet light from the corner, a warm rim, and the seasonal line above the title. */
+.mh-or[data-or-season="christmas"] .mh-or-hero {
+  background:
+    radial-gradient(70% 90% at 100% 0%, var(--or-hero-glow), transparent 64%),
+    radial-gradient(60% 80% at 0% 100%, #b3263f26, transparent 70%),
+    linear-gradient(160deg, var(--or-hero-a) 0%, var(--or-hero-b) 72%);
+  box-shadow: inset 0 1px 0 #ffffff12, 0 0 0 1px #00000040, 0 28px 60px -40px #000, 0 0 70px -46px var(--orx-gold);
+}
+.mh-or[data-or-season="christmas"][data-or-look="new-year"] .mh-or-hero {
+  background:
+    radial-gradient(70% 90% at 100% 0%, var(--or-hero-glow), transparent 64%),
+    radial-gradient(60% 80% at 0% 100%, #e7d9b01f, transparent 70%),
+    linear-gradient(160deg, var(--or-hero-a) 0%, var(--or-hero-b) 72%);
+}
+.mh-or[data-or-season="christmas"] .mh-or-hero::before { background-image: radial-gradient(#f3d79a1f 1px, transparent 1.3px); }
+.mh-or[data-or-season="christmas"] .mh-or-title { font-family: var(--orx-serif); font-weight: 600; letter-spacing: -.01em; }
+.mh-or[data-or-season="christmas"] .mh-orx-line { margin: 0 0 6px; display: inline-flex; align-items: center; gap: 6px; font: italic 600 .8125rem/1.3 var(--orx-serif); color: var(--orx-gold-soft); animation: mh-orx-rise .5s var(--orx-ease) .1s backwards; }
+.mh-or[data-or-season="christmas"] .mh-orx-line svg { color: var(--orx-gold); flex-shrink: 0; }
+.mh-or[data-or-season="christmas"] .mh-or-track[data-primary] { border-color: #e9b94945; box-shadow: 0 0 0 1px #e9b94914, 0 30px 60px -44px #e9b94955; }
+.mh-or[data-or-season="christmas"] .mh-or-section-head h3 { color: var(--orx-gold-soft); }
+
+/* Artwork: the wrapped receipt settles once; the charm sways twice; sparks glint a few times and rest. */
+.mh-or[data-or-season="christmas"] .mh-orx-art { display: block; }
+.mh-or[data-or-season="christmas"] .mh-orx-slip { animation: mh-orx-slip .8s var(--orx-ease) .1s backwards; transform-box: fill-box; transform-origin: 50% 100%; }
+.mh-or[data-or-season="christmas"] .mh-orx-bow { animation: mh-orx-bow .6s cubic-bezier(.34, 1.4, .5, 1) .7s backwards; transform-box: fill-box; transform-origin: center; }
+.mh-or[data-or-season="christmas"] .mh-orx-charm { animation: mh-orx-sway 2.6s ease-in-out 1s 2; transform-box: view-box; transform-origin: 96px 2px; }
+.mh-or[data-or-season="christmas"] .mh-orx-halo { animation: mh-orx-fade 1.2s ease-out backwards; }
+.mh-or[data-or-season="christmas"] .mh-orx-spark { animation: mh-orx-glint 2.2s ease-in-out calc(1.2s + var(--i, 0) * .5s) 3; transform-box: fill-box; transform-origin: center; }
+
+/* A receipt that is going well: a fine gold rim on the slip and a small ornament rule. Problems never get this. */
+.mh-rc[data-or-season="christmas"] { --rc-paper-a: #13241c; --rc-paper-b: #0d1813; --rc-edge: #e9b94938; }
+.mh-rc[data-or-season="christmas"][data-or-look="new-year"] { --rc-paper-a: #141c37; --rc-paper-b: #0d1328; --rc-edge: #e7d9b03d; }
+.mh-rc[data-or-season="christmas"] .mh-rc-slip::before { background-image: radial-gradient(#f3d79a1c 1px, transparent 1.3px); }
+.mh-rc[data-or-season="christmas"] .mh-rc-kicker i { background: #e9b949; box-shadow: 0 0 0 3px #e9b94926; }
+.mh-rc[data-or-season="christmas"] .mh-orx-flourish { display: flex; align-items: center; gap: 10px; margin: -2px 0 -6px; animation: mh-orx-rise .5s var(--orx-ease, ease) backwards; }
+.mh-rc[data-or-season="christmas"] .mh-orx-flourish::before, .mh-rc[data-or-season="christmas"] .mh-orx-flourish::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #e9b94966, transparent); }
+.mh-rc[data-or-season="christmas"][data-or-look="new-year"] .mh-orx-flourish::before, .mh-rc[data-or-season="christmas"][data-or-look="new-year"] .mh-orx-flourish::after { background: linear-gradient(90deg, transparent, #e7d9b066, transparent); }
+
+/* The one celebration: sparks burst once and fade; one line rises. */
+.mh-rc[data-or-season="christmas"] .mh-orx-celebrate { display: grid; justify-items: center; gap: 0; margin: -4px 0 -8px; }
+.mh-rc[data-or-season="christmas"] .mh-orx-celebrate .mh-orx-spark { animation: mh-orx-burst 1.3s var(--orx-ease, ease) calc(var(--i, 0) * .07s) 1 both; transform-box: fill-box; transform-origin: center; }
+.mh-rc[data-or-season="christmas"] .mh-orx-celebrate-line { margin-top: -6px; padding: 4px 14px; border-radius: 999px; background: #3a141c; border: 1px solid #e9b94955; color: #fbe7c4; font: italic 600 .875rem/1.3 'Fraunces', Georgia, serif; animation: mh-orx-rise .5s cubic-bezier(.2, .7, .2, 1) .35s backwards; }
+.mh-rc[data-or-season="christmas"][data-or-look="new-year"] .mh-orx-celebrate-line { background: #1b1f3d; border-color: #e7d9b055; color: #f4f1e8; }
+
+@keyframes mh-orx-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes mh-orx-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mh-orx-slip { from { opacity: 0; transform: translateY(10px) rotate(-3deg); } to { opacity: 1; transform: none; } }
+@keyframes mh-orx-bow { from { opacity: 0; transform: scale(.3) rotate(-25deg); } to { opacity: 1; transform: none; } }
+@keyframes mh-orx-sway { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(6deg); } 70% { transform: rotate(-4deg); } }
+@keyframes mh-orx-glint { 0%, 100% { opacity: .55; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes mh-orx-burst { 0% { opacity: 0; transform: scale(.2); } 35% { opacity: 1; transform: scale(1.25); } 100% { opacity: 0; transform: scale(.6); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mh-or[data-or-season="christmas"] :is(.mh-orx-line, .mh-orx-slip, .mh-orx-bow, .mh-orx-charm, .mh-orx-halo, .mh-orx-spark),
+  .mh-rc[data-or-season="christmas"] :is(.mh-orx-flourish, .mh-orx-spark, .mh-orx-celebrate-line) { animation: none !important; }
+  /* With motion held still, the celebration shows its sparks at rest rather than hiding them. */
+  .mh-rc[data-or-season="christmas"] .mh-orx-celebrate .mh-orx-spark { opacity: .9; }
+}

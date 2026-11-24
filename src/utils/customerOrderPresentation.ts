@@ -35,7 +35,7 @@ const MARKETPLACE_STAGE_LABELS: Record<string, string> = {
 };
 
 /** Raw server status; a device record without one falls back to its last known local stage. */
-function effectiveStatus(order: StatusInput): string {
+export function effectiveStatus(order: Pick<OrderRecord, 'serverStatus' | 'status'>): string {
   if (order.serverStatus) return order.serverStatus;
   return ({ delivered: 'delivered', processing: 'processing', placed: 'queued', verifying: 'pending_payment', failed: 'failed' } as Record<string, string>)[order.status] || 'pending_payment';
 }
@@ -52,7 +52,9 @@ export function customerOrderStatus(order: StatusInput): CustomerOrderStatus {
   if (order.paymentBasis) {
     const view = dataOrderPresentation(status, order.manualReview, resolution, order.paymentBasis);
     if (view.delivered) return { group: 'delivered', label: view.label };
-    if (order.manualReview || ['failed', 'refund_pending'].includes(status)) return { group: 'attention', label: 'Support review' };
+    // 3.6.2: a stopped assisted order (refunded, or closed before the supplier) is never shown as progressing.
+    if (order.manualReview || ['failed', 'refund_pending', 'refunded'].includes(status)) return { group: 'attention', label: 'Support review' };
+    if (status === 'cancelled' || status === 'expired') return { group: 'cancelled', label: 'Cancelled' };
     return { group: 'in_progress', label: view.label };
   }
 
@@ -222,4 +224,13 @@ export function classifyTrackInput(raw: string): TrackInput {
   if (!/[a-z]/i.test(value) && /^\+?\d{9,13}$/.test(value.replace(/[\s()-]/g, ''))) return { kind: 'phone' };
   if (!/^[a-zA-Z0-9_-]{1,128}$/.test(value)) return { kind: 'invalid' };
   return { kind: 'reference', reference: value };
+}
+
+/**
+ * Device-saved orders this viewer may see: purchases made here while signed out, and purchases the signed-in viewer
+ * made here. A record another account made on this device stays hidden after that person signs out or someone else
+ * signs in (records saved before 3.6.2 carry no owner and stay visible as before).
+ */
+export function visibleDeviceOrders(local: OrderRecord[], userId?: string | null): OrderRecord[] {
+  return local.filter((order) => !order.ownerUserId || order.ownerUserId === userId);
 }

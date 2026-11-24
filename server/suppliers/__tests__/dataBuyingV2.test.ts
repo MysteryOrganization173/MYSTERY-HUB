@@ -10,6 +10,7 @@ import {
 import {CompactBundleRow} from '../../../src/components/data/CompactBundleRow';
 import {DATA_BUNDLES} from '../../../src/data/bundles';
 import {dataOrderPresentation} from '../../../src/utils/dataPurchasePresentation';
+import {orderReceiptView} from '../../../src/utils/orderReceiptPresentation';
 
 const source = (path: string) => readFileSync(path, 'utf8');
 const checkout = source('src/components/checkout/CheckoutModal.tsx');
@@ -88,8 +89,13 @@ test('checkout keeps the pay action pinned and server pricing authoritative', ()
 });
 
 test('receipt timeline only advances from server-derived presentation', () => {
-  const journey = status.slice(status.indexOf('const journey'), status.indexOf('const currentStep'));
-  assert.match(journey, /complete: dataView.paymentStageComplete/);
+  // 3.6.2: the receipt's journey lives in the shared receipt helper; the receipt only draws its steps.
+  const helper = source('src/utils/orderReceiptPresentation.ts');
+  const journey = helper.slice(helper.indexOf("if (journeyKind === 'delivery')"), helper.indexOf("} else if (journeyKind === 'resolution')"));
+  assert.match(journey, /const payDone = dv\.paymentStageComplete && !unchecked;/, 'server state only, and never before the server has answered');
+  assert.match(status, /orderReceiptView\(activeOrder\)/);
+  assert.equal((status.match(/setInterval\(/g) || []).length, 1, 'one status check timer, unchanged');
+  assert.match(status, /setInterval\(fetchServerStatus, 3000\)/);
   // Ordinary receipts still wait for server payment state. Assisted receipts
   // complete a differently labelled source step, never a Paystack payment.
   for (const state of ['pending_payment', 'failed', 'cancelled', 'expired']) {
@@ -102,8 +108,20 @@ test('receipt timeline only advances from server-derived presentation', () => {
     assert.equal(view.paymentStageComplete, true);
     assert.notEqual(view.paymentLabel, 'Payment confirmed');
   }
-  assert.equal((journey.match(/complete: dataView.delivered/g) || []).length, 2);
-  assert.doesNotMatch(journey, /activeOrder.status ===/);
+  assert.equal((journey.match(/state: delivered \? 'done'/g) || []).length, 2);
+  assert.doesNotMatch(journey, /order\.status ===|Date\.now|createdAt/);
+  // Behaviour: stages complete only from the server's state, never from a local or elapsed-time guess.
+  const base = {id: 'MH-J', publicReference: 'MH-J', serviceType: 'data' as const, network: 'mtn' as const, paymentMethod: 'paystack' as const, amountGhc: 5,
+    bundle: {id: 'server-bundle-MH-J', network: 'mtn' as const, dataAmount: '2GB', dataBytesValue: 0, validity: '', validityCategory: 'Daily' as const, priceGhc: 5},
+    recipientPhone: '0241234567', status: 'processing' as const, createdAt: '2020-01-01T00:00:00Z', updatedAt: '2020-01-01T00:00:00Z'};
+  const steps = (serverStatus: string, extra = {}) => orderReceiptView({...base, serverStatus, ...extra}).steps.map(step => step.state);
+  assert.deepEqual(steps('pending_payment'), ['current', 'upcoming', 'upcoming']);
+  assert.deepEqual(steps('paid'), ['done', 'current', 'upcoming']);
+  assert.deepEqual(steps('processing'), ['done', 'current', 'upcoming'], 'an old processing order is not delivered by time passing');
+  assert.deepEqual(steps('delivered'), ['done', 'done', 'done']);
+  assert.deepEqual(steps('processing', {manualReview: true}), ['done', 'halted', 'upcoming']);
+  assert.deepEqual(steps('failed'), ['halted', 'upcoming', 'upcoming'], 'an unpaid failed attempt never shows a confirmed payment');
+  assert.equal(orderReceiptView({...base, serverStatus: 'expired'}).journeyKind, 'closed');
   assert.match(status, /last checked/);
   assert.match(status, /setCheckFailed\(true\)/);
 });

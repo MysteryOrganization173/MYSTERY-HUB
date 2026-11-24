@@ -156,8 +156,13 @@ test('checkout stays untouched: decoration only, and celebration only for an ord
   const checkout = read('src/components/checkout/CheckoutModal.tsx');
   const status = read('src/components/checkout/OrderStatusModal.tsx');
   assert.doesNotMatch(checkout, /seasonal|Seasonal/, 'the payment component is not modified at all; its ribbon is drawn in CSS');
-  assert.match(status, /\{activeOrder\.serverStatus === 'delivered' && <Seasonal slot="celebrate" \/>\}/);
-  assert.equal((status.match(/<Seasonal /g) || []).length, 1, 'no celebration for paid, queued, processing or pending payments');
+  // 3.6.2: the receipt's season is one slot (SeasonalOrders): a flourish only while the order is going well, and the one
+  // celebration only for a supplier delivery the server reported while this receipt was open (never on reopening).
+  assert.match(status, /\{view\.festive && <SeasonalOrders part=\{view\.supplierDelivered && justDelivered \? 'celebrate' : 'flourish'\} \/>\}/);
+  assert.equal((status.match(/<Seasonal(Orders)? /g) || []).length, 1, 'no celebration for paid, queued, processing or pending payments');
+  assert.match(status, /const justDelivered = Boolean\(isStatusModalOpen && view\?\.supplierDelivered && lookupReference && seenUndelivered\.current === lookupReference\);/);
+  // Delivered means the server's own status, never a device record's last known state or an operator remedy.
+  assert.match(read('src/utils/orderReceiptPresentation.ts'), /supplierDelivered: order\.serverStatus === 'delivered' && !resolution && delivered,/);
   const css = read('src/seasonal/christmas/christmas.css');
   assert.match(css, /\.mh-app\[data-season="christmas"\] \.mh-sheet::after \{[^}]*pointer-events: none/);
   const pack = read('src/seasonal/christmas/ChristmasPack.tsx');
