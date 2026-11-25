@@ -17,6 +17,8 @@ import { PendingPaymentBanner } from '../checkout/PendingPaymentBanner';
 import { InstantBundlesCatalog } from './InstantBundlesCatalog';
 import { smoothScrollToElement, revealPressedChip, revealFocusedChip } from '../../utils/scroll';
 import { serviceNotices } from '../../config/serviceNotices';
+import { activeServiceIncidents, dataPurchasePaused, purchaseIncident } from '../../../shared/serviceIncidents';
+import { ServiceInlineNotice, ServiceMaintenanceState } from '../service/ServiceUpdate';
 import {
   Smartphone,
   Search,
@@ -371,6 +373,10 @@ export const DataPage: React.FC = () => {
   };
 
   const mtnNotice = serviceNotices.mtn;
+  // 3.6.3: a network whose Data purchases are paused (shared/serviceIncidents) shows a maintenance state, not bundles.
+  const pausedDataNetworks = Object.fromEntries(activeServiceIncidents().filter(i => i.service === 'data').map(i => [i.network, true])) as Partial<Record<NetworkId, boolean>>;
+  const activeIncident = activeNetwork === 'all' ? null : purchaseIncident('data', activeNetwork);
+  const allNetworkIncidents = activeNetwork === 'all' ? activeServiceIncidents().filter(i => i.service === 'data') : [];
   const atNotice = serviceNotices.airteltigo;
   const modeButton = 'mh-ds-mode';
 
@@ -438,7 +444,7 @@ export const DataPage: React.FC = () => {
           </div>
 
           {/* One network selector, backed by the existing AppContext state. */}
-          {dataProductMode === 'data' && <DataNetworkSelector value={activeNetwork} onChange={setActiveNetwork} counts={networkCounts} />}
+          {dataProductMode === 'data' && <DataNetworkSelector value={activeNetwork} onChange={setActiveNetwork} counts={networkCounts} paused={pausedDataNetworks} />}
         </div>
 
         {/* Dynamic Mode: Instant Bundles vs Airtime vs Standard Data */}
@@ -631,7 +637,7 @@ export const DataPage: React.FC = () => {
             </div>
 
             {/* MTN Network Service Notice (Tasteful, Customer-Friendly, Config-Driven) */}
-            {mtnNotice.enabled && (activeNetwork === 'mtn' || activeNetwork === 'all') && (
+            {mtnNotice.enabled && !dataPurchasePaused('mtn') && (activeNetwork === 'mtn' || activeNetwork === 'all') && (
               <div className="mh-ds-notice rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3.5 text-xs text-slate-300">
                 <details>
                   <summary className="cursor-pointer min-h-11 flex flex-wrap items-center gap-x-2 py-2 list-none [&::-webkit-details-marker]:hidden">
@@ -652,8 +658,13 @@ export const DataPage: React.FC = () => {
               </p>
             )}
 
+            {/* A paused network (all networks view): one line above the other networks' bundles. */}
+            {allNetworkIncidents.map(incident => <ServiceInlineNotice key={incident.id} incident={incident}> Other networks are available below.</ServiceInlineNotice>)}
+
             {/* Bundles: tiles grouped by network; the whole tile opens checkout */}
-            {filteredBundles.length > 0 ? (
+            {activeIncident ? (
+              <ServiceMaintenanceState incident={activeIncident} onNetwork={setActiveNetwork} onInstant={() => setDataProductMode('instant')} />
+            ) : filteredBundles.length > 0 ? (
               <>
                 <p className="mh-ds-count-line" aria-live="polite">
                   <span><strong>{filteredBundles.length} {filteredBundles.length === 1 ? 'bundle' : 'bundles'}</strong>

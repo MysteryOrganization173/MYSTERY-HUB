@@ -19,6 +19,7 @@ import { FinanceService, operationKey } from './financeService.js';
 import { FulfilmentService } from './fulfilmentService.js';
 import { normalizeCampaign, campaignPriceFor, campaignState, campaignHeadlinePercent, isCampaignDate, DECEMBER_2026_APPROVED_PLAN, campaignPlanDifferences, campaignEndsAt, campaignValueWarnings, type DirectCampaignConfig } from '../../shared/directCampaign.js';
 import { accraDate } from '../../shared/seasonal.js';
+import { dataPurchasePaused } from '../../shared/serviceIncidents.js';
 import { AfaService } from './afaService.js';
 import { normalizeAfaPricing, afaPriceFor, afaPromotionBlockers, afaCampaignState, savingPercent, AFA_APPROVED, AFA_CAMPAIGN_ACTIVATION, AFA_COST_CONFIRMATION, AFA_COST_MAX_AGE_DAYS, type AfaPricingConfig } from '../../shared/afaPricing.js';
 import { DECEMBER_2026_CAMPAIGN_ID as CAMPAIGN_ID } from '../../shared/directCampaign.js';
@@ -52,7 +53,9 @@ export class CommercialService {
       // A campaign price applies only while the campaign is enabled and today (Accra) is inside its dates; otherwise
       // the product is exactly as before, with no extra fields.
       const campaignMinor=campaignPriceFor(campaign,p.id,standardMinor,now),amountPesewas=campaignMinor??standardMinor;
-      return {...p,amountPesewas,priceGhc:amountPesewas/100,isActive:p.isActive&&(setting?.enabled??true),
+      // 3.6.3: a paused service (shared/serviceIncidents) leaves the catalogue exactly like a product switched off in
+      // Admin, so quotes, payment starts, reorders and the assistant refuse it; existing orders are untouched.
+      return {...p,amountPesewas,priceGhc:amountPesewas/100,isActive:p.isActive&&(setting?.enabled??true)&&!dataPurchasePaused(p.network),
         ...(campaignMinor!==null?{standardPesewas:standardMinor,campaign:{id:campaign.id,label:campaign.label,endDate:campaign.endDate,stacksWithWelcome:campaign.stacksWithWelcome,revision:campaign.version}}:{})};
     }).filter(p=>p.isActive);
     const applied=products.some(p=>p.standardPesewas!==undefined);

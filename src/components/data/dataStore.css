@@ -328,3 +328,6 @@
    quiet note in the page's own style (it renders nothing when no offer applies, and then takes no space). */
 .mh-ds .mh-ds-offer:empty { display: none; }
 .mh-ds .mh-ds-offer > div { border-radius: 14px; border-color: color-mix(in srgb, var(--ds-accent) 28%, var(--ds-line)); background: linear-gradient(90deg, color-mix(in srgb, var(--ds-accent) 9%, var(--ds-surface)), var(--ds-surface) 70%); padding: 6px 8px 6px 14px; font-size: .8125rem; line-height: 1.5; }
+
+/* 3.6.3 · a network under maintenance: a small amber marker on its chip (the chip stays selectable and explains itself). */
+.mh-ds .mh-ds-net-paused { display: inline-block; flex-shrink: 0; width: 7px; height: 7px; margin-left: 4px; border-radius: 99px; background: #f2c46d; box-shadow: 0 0 0 2px #f2c46d33; }

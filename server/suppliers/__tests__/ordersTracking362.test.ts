@@ -272,7 +272,7 @@ test('the receipt drops late answers, never overlaps its checks, and keeps the e
 test('one primary action fits the situation; problems come before selling; blocked services are never repeated', () => {
   const modal = code('src/components/checkout/OrderStatusModal.tsx');
   assert.match(modal, /const needsHelp = view\.tone === 'attention' \|\| view\.tone === 'refund';/);
-  assert.match(modal, /const primary = activeOrder\.serviceType === 'results_checker' \? 'results' : needsHelp \? 'help' : delivered && repeatable \? 'buy' : 'done';/);
+  assert.match(modal, /const primary = activeOrder\.serviceType === 'results_checker' \? 'results' : needsHelp \? 'help' : delivered && repeatable && !pausedIncident \? 'buy' : 'done';/, '3.6.3: never Buy again for a paused service');
   assert.match(modal, /const repeatable = view\.service === 'data' \|\| view\.service === 'airtime' \|\| view\.service === 'instant';/, 'Marketplace, AFA and checkers are never offered again from a receipt');
   assert.equal(receiptService(order({ serviceType: undefined, bundle: { ...order().bundle, id: 'marketplace-legacy' } })), 'marketplace', 'a legacy Marketplace row without a service type is not repeatable');
   assert.match(modal, /void buyAgain\(reference, \{ beforeOpen: closeOrderStatus, /, 'Smart Buy Again keeps the authoritative reorder contract');

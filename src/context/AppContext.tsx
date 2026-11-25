@@ -12,6 +12,7 @@ import {
   SafeEditorAiContext,
 } from '../types';
 import { DATA_BUNDLES } from '../data/bundles';
+import { dataPurchasePaused } from '../../shared/serviceIncidents';
 import { SafeUserProfile } from '../../server/types/auth';
 import { getMeOnServer, logoutOnServer } from '../services/apiClient';
 import { appendFeedback, shouldNotifyAuthTransition } from '../utils/authFeedback';
@@ -160,7 +161,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [dataProductMode, setDataProductMode] = useState<'data' | 'instant' | 'airtime'>('data');
-  const [dataNetwork, setDataNetwork] = useState<NetworkId | 'all'>('mtn');
+  // 3.6.3: while MTN Data is paused the Data page opens on every network (MTN still explains itself when chosen).
+  const [dataNetwork, setDataNetwork] = useState<NetworkId | 'all'>(() => (dataPurchasePaused('mtn') ? 'all' : 'mtn'));
 
   const openDataPage = (
     mode: 'data' | 'instant' | 'airtime' = 'data',

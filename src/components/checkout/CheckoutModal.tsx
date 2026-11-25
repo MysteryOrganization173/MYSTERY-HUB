@@ -1,4 +1,5 @@
 import { checkoutFailurePresentation, readCheckoutFailure } from '../../../shared/checkoutFailure';
+import { purchaseIncident, restorationLine } from '../../../shared/serviceIncidents';
 import { directAttemptKey, readDirectAttempt, saveDirectAttempt, clearDirectAttempt } from '../../utils/directCheckoutAttempt';
 import {useDialogFocus} from '../../hooks/useDialogFocus';
 import {useVisualViewport} from '../../hooks/useVisualViewport';
@@ -89,7 +90,7 @@ export const CheckoutModal: React.FC = () => {
   const attemptGeneration=useRef(0),knownReference=useRef<string|null>(null),recoveryLocked=useRef(false);
   const [recoveryOnly,setRecoveryOnly]=useState(false);
   useEffect(()=>{++attemptGeneration.current;return()=>{++attemptGeneration.current;};},[sessionToken,isCheckoutOpen,checkoutBundle?.id]);
-  useEffect(()=>{if(!isCheckoutOpen||!checkoutBundle||checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data'||checkoutBundle.id.startsWith('instant-')||checkoutBundle.id.startsWith('airtime-')){setCommercial(null);return;}let active=true;setCommercial(null);setQuoteError('');commercialRequest('commercial/quote/'+encodeURIComponent(checkoutBundle.id),sessionToken).then(r=>{if(active)setCommercial(r);}).catch(e=>{if(active)setQuoteError(e.message);});return()=>{active=false;};},[isCheckoutOpen,checkoutBundle?.id,sessionToken,quoteRefresh,user?.phone]);
+  useEffect(()=>{if(!isCheckoutOpen||!checkoutBundle||checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data'||checkoutBundle.id.startsWith('instant-')||checkoutBundle.id.startsWith('airtime-')||purchaseIncident('data',checkoutBundle.network)){setCommercial(null);return;}let active=true;setCommercial(null);setQuoteError('');commercialRequest('commercial/quote/'+encodeURIComponent(checkoutBundle.id),sessionToken).then(r=>{if(active)setCommercial(r);}).catch(e=>{if(active)setQuoteError(e.message);});return()=>{active=false;};},[isCheckoutOpen,checkoutBundle?.id,sessionToken,quoteRefresh,user?.phone]);
   // A typed Flexi amount has no catalogue price, so checkout asks the server before Pay is offered.
   const needsFlexiQuote = Boolean(isCheckoutOpen && checkoutBundle?.isFlexi && checkoutBundle.serviceFeeGhc === undefined
     && (checkoutBundle.serviceType === 'instant_bundle' || checkoutBundle.id.startsWith('instant-')));
@@ -269,6 +270,47 @@ export const CheckoutModal: React.FC = () => {
   const busy = walletBusy || isInitializing;
   // Paystack's window is open: the customer approves on their phone or in the window.
   const awaitingPayment = isInitializing && loadingPhase === 'opening';
+  // 3.6.3: a paused service (shared/serviceIncidents) never starts a new payment here, whatever opened checkout (a
+  // stale page, an old shortcut, the assistant). The server refuses it too. A payment window already opened, or a
+  // payment this checkout already knows about, keeps its own recovery path below.
+  const pausedIncident = isRegularData ? purchaseIncident('data', checkoutBundle.network) : null;
+  if (pausedIncident && !awaitingPayment && !busy && !paymentClosed && !knownReference.current) {
+    const restoration = restorationLine(pausedIncident);
+    return (
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Purchases paused"
+        style={{ top: viewport.top, height: viewport.height || undefined }}
+        className="mh-sheet-backdrop fixed inset-x-0 top-0 h-dvh z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/75 backdrop-blur-sm">
+        <div className="mh-sheet relative w-full max-w-[calc(100vw-1rem)] mx-auto sm:max-w-md bg-[#0f151b] border border-slate-700/70 border-b-0 sm:border-b rounded-t-[1.5rem] sm:rounded-[1.5rem] shadow-2xl overflow-hidden text-slate-100 max-h-[calc(100%-0.75rem)] sm:max-h-[92dvh] flex flex-col">
+          <div className="relative flex items-center justify-between gap-3 px-4 sm:px-5 pt-3 pb-2 shrink-0">
+            <span aria-hidden="true" className="sm:hidden absolute left-1/2 top-1.5 -translate-x-1/2 h-1 w-10 rounded-full bg-slate-700" />
+            <h3 className="pt-1 font-semibold text-base text-white">{pausedIncident.title}</h3>
+            <button type="button" onClick={closeCheckout} className="w-11 h-11 flex items-center justify-center rounded-full bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0" aria-label="Close checkout">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="overflow-y-auto px-4 sm:px-5 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3">
+            <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center gap-3">
+              <NetworkBrandBadge network={checkoutBundle.network} size="lg" />
+              <div className="min-w-0">
+                <p className="font-bold text-white leading-tight">{checkoutBundle.dataAmount} Data Bundle</p>
+                <p className="text-xs text-amber-200 mt-0.5">Not available for purchase right now</p>
+              </div>
+            </div>
+            <div role="status" className="rounded-2xl border border-amber-400/30 bg-amber-400/[0.07] p-3.5 space-y-2 text-sm leading-relaxed text-slate-200">
+              <p>{pausedIncident.message}</p>
+              <p className="font-semibold text-amber-100">{restoration.label}</p>
+              <p>No payment was started. {pausedIncident.existingOrders}</p>
+              <p className="text-slate-400">{pausedIncident.apology} {pausedIncident.followUp}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <button type="button" className="mh-button-secondary" onClick={() => { closeCheckout(); openDataPage('data', 'all'); }}>Other bundles</button>
+              <button type="button" className="mh-button" onClick={closeCheckout}>Done</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
