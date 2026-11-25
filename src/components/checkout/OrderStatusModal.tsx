@@ -16,6 +16,8 @@ import { AlertTriangle, Check, CheckCircle2, Clock, Copy, GraduationCap, Message
 import { SeasonalOrders } from '../../seasonal/Seasonal';
 import { useSeason } from '../../seasonal/SeasonProvider';
 import { ordersSeasonAttributes } from '../../seasonal/ordersSeason';
+import { purchaseIncident } from '../../../shared/serviceIncidents';
+import { ServiceInlineNotice } from '../service/ServiceUpdate';
 import { useBuyAgain } from '../../hooks/useBuyAgain';
 
 const SERVICE_LINE: Record<ReceiptService, string> = {
@@ -195,10 +197,12 @@ export const OrderStatusModal: React.FC = () => {
   // 3.4.1 Smart Buy Again for a signed-in customer's delivered Data, Airtime or Instant order. The server confirms the
   // order is theirs and what it can be bought as today; anything else keeps the plain catalogue link.
   const repeatable = view.service === 'data' || view.service === 'airtime' || view.service === 'instant';
-  const smartBuyAgain = delivered && Boolean(sessionToken && user && activeOrder.publicReference) && repeatable;
+  // 3.6.3: while this service is paused for new purchases, the receipt explains it and offers no Buy again.
+  const pausedIncident = view.service === 'data' ? purchaseIncident('data', activeOrder.network) : null;
+  const smartBuyAgain = delivered && Boolean(sessionToken && user && activeOrder.publicReference) && repeatable && !pausedIncident;
   // One primary action, chosen by the customer's situation: a problem is resolved before anything is sold.
   const needsHelp = view.tone === 'attention' || view.tone === 'refund';
-  const primary = activeOrder.serviceType === 'results_checker' ? 'results' : needsHelp ? 'help' : delivered && repeatable ? 'buy' : 'done';
+  const primary = activeOrder.serviceType === 'results_checker' ? 'results' : needsHelp ? 'help' : delivered && repeatable && !pausedIncident ? 'buy' : 'done';
   const supportUrl = BUSINESS_CONFIG.getOrderSupportWhatsAppUrl(displayRef, activeOrder.recipientPhone);
   const mode = view.service === 'airtime' ? 'airtime' : view.service === 'instant' ? 'instant' : 'data';
 
@@ -254,6 +258,11 @@ export const OrderStatusModal: React.FC = () => {
                 <p className="mh-rc-now" aria-hidden="true"><b>{currentStep.label}:</b> {currentStep.detail}</p>
               )}
             </div>
+          )}
+
+          {/* A paused service: context only. The order's own status above is unchanged by it. */}
+          {pausedIncident && (
+            <ServiceInlineNotice incident={pausedIncident}>{['awaiting_payment', 'in_progress', 'attention', 'refund_pending'].includes(view.group) ? ' If this order is affected, it will be reviewed. Please don’t place it again.' : ''}</ServiceInlineNotice>
           )}
 
           {/* Freshness: customers on weak connections see whether this is live. */}

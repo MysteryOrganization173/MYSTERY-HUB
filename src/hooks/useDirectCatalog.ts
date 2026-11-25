@@ -2,7 +2,11 @@ import {useEffect,useSyncExternalStore} from 'react';
 import {DATA_BUNDLES} from '../data/bundles';
 import {commercialRequest} from '../services/commercialApi';
 import type {DataBundle} from '../types';
-let current=DATA_BUNDLES.slice();const listeners=new Set<()=>void>();
+import {dataPurchasePaused} from '../../shared/serviceIncidents';
+// 3.6.3: a paused service (shared/serviceIncidents) is never offered, before or after the server answers; the server
+// leaves the same products out of its own catalogue, so a stale page cannot buy them either.
+const offered=(b:DataBundle)=>!dataPurchasePaused(b.network);
+let current=DATA_BUNDLES.filter(offered);const listeners=new Set<()=>void>();
 let request:Promise<void>|null=null;
 // True once this page has the server's own catalogue (until then `current` is the bundled fallback list).
 let confirmed=false;
@@ -29,7 +33,7 @@ export async function refreshDirectCatalog(){
  if(request)return request;
  request=commercialRequest('commercial/products').then(result=>{
   // Rebuilt from the static fields only: campaign fields come from this response alone, so none outlives the campaign.
-  current=result.products.map((p:any)=>{const {standardPriceGhc:_s,priceCampaign:_c,...base}=(DATA_BUNDLES.find(b=>b.id===p.id)||{}) as DataBundle;return {...base,id:p.id,network:p.network,dataAmount:p.dataAmount,priceGhc:p.priceGhc,...campaignFields(p)};});
+  current=result.products.map((p:any)=>{const {standardPriceGhc:_s,priceCampaign:_c,...base}=(DATA_BUNDLES.find(b=>b.id===p.id)||{}) as DataBundle;return {...base,id:p.id,network:p.network,dataAmount:p.dataAmount,priceGhc:p.priceGhc,...campaignFields(p)};}).filter(offered);
   const c=result.campaign;campaign=c&&typeof c.label==='string'&&typeof c.title==='string'?{id:String(c.id),label:c.label,title:c.title,endDate:typeof c.endDate==='string'?c.endDate:null,maxSavingPercent:Number.isSafeInteger(c.maxSavingPercent)&&c.maxSavingPercent>0?c.maxSavingPercent:null}:null;
   confirmed=true;
   if(boundary){clearTimeout(boundary);boundary=null;}

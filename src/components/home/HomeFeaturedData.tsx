@@ -8,6 +8,8 @@ import { NetworkId } from '../../types';
 import { CompactBundleRow } from '../data/CompactBundleRow';
 import { getInstantBundlesOnServer } from '../../services/apiClient';
 import { ArrowRight, Wifi, Zap, ReceiptText, ShieldCheck, PackageSearch } from 'lucide-react';
+import { purchaseIncident } from '../../../shared/serviceIncidents';
+import { ServiceInlineNotice } from '../service/ServiceUpdate';
 
 const NETWORKS: { id: NetworkId; label: string }[] = [
   { id: 'mtn', label: 'MTN' },
@@ -26,7 +28,9 @@ export const HomeFeaturedData: React.FC = () => {
   const DATA_BUNDLES=useDirectCatalog();
   const welcomeOffer=useWelcomeOffer(DATA_BUNDLES);
   const { openCheckout, openDataPage, setActivePage } = useApp();
-  const [selectedNetwork, setSelectedNetwork] = useState<NetworkId>('mtn');
+  // 3.6.3: the first network open for purchases is shown first; a paused network stays in the switch and explains itself.
+  const [selectedNetwork, setSelectedNetwork] = useState<NetworkId>(() => NETWORKS.find(n => !purchaseIncident('data', n.id))?.id ?? 'mtn');
+  const incident = purchaseIncident('data', selectedNetwork);
   const [instantAvailable, setInstantAvailable] = useState(false);
 
   useEffect(() => {
@@ -74,6 +78,7 @@ export const HomeFeaturedData: React.FC = () => {
                 >
                   <span className="home-network-dot" style={{ backgroundColor: GHANA_NETWORKS[id].brandColor }} aria-hidden="true" />
                   {label}
+                  {purchaseIncident('data', id) && <span className="sr-only">, under maintenance</span>}
                 </button>
               ))}
             </div>
@@ -89,7 +94,8 @@ export const HomeFeaturedData: React.FC = () => {
                   onBuy={(bundle) => openCheckout(bundle)}
                 />
               ))}
-              {popularBundles.length === 0 && <p className="home-empty-state" role="status">No popular bundles to show for this network. Browse all bundles to check availability.</p>}
+              {incident ? <ServiceInlineNotice incident={incident}> Other networks are available.</ServiceInlineNotice>
+                : popularBundles.length === 0 && <p className="home-empty-state" role="status">No popular bundles to show for this network. Browse all bundles to check availability.</p>}
             </div>
 
             <div className="home-buy-footer">

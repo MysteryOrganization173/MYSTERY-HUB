@@ -1,0 +1,71 @@
+/* Mystery Hub 3.6.3 · customer service updates (maintenance bar, maintenance state, inline notice).
+   An operational accent (amber) on the ordinary charcoal surfaces, so the same notice reads correctly in the ordinary,
+   Christmas and New Year appearances. Every rule is scoped to .mh-svc-*. Motion: one short entrance (transform and
+   opacity), never a loop; reduced motion holds it still. */
+
+.mh-svc-bar, .mh-svc-state, .mh-svc-inline {
+  --svc-accent: #f2c46d;
+  --svc-accent-soft: #f2c46d1f;
+  --svc-line: #f2c46d40;
+  --svc-ink: #f3f6f8;
+  --svc-soft: #d3dbe3;
+  --svc-muted: #9aa8b6;
+  --svc-surface: #12171c;
+  --svc-heading: var(--font-heading, 'Outfit', sans-serif);
+}
+
+/* ───────── The bar under the header ───────── */
+.mh-svc-bar { border-bottom: 1px solid var(--svc-line); background: linear-gradient(90deg, #2a2110, #14171a 55%, #121619); color: var(--svc-ink); animation: mh-svc-in .35s cubic-bezier(.2, .8, .2, 1) backwards; }
+.mh-svc-bar-inner { max-width: 80rem; margin: 0 auto; padding: 10px 16px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+@media (min-width: 640px) { .mh-svc-bar-inner { padding: 10px 24px; } }
+@media (min-width: 1024px) { .mh-svc-bar-inner { padding: 10px 32px; } }
+.mh-svc-bar-icon { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: var(--svc-accent-soft); color: var(--svc-accent); border: 1px solid var(--svc-line); }
+.mh-svc-bar-icon svg { width: 16px; height: 16px; }
+.mh-svc-bar-copy { min-width: 0; }
+.mh-svc-bar-title { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font: 700 .875rem/1.3 var(--svc-heading); }
+.mh-svc-bar-line { margin: 2px 0 0; font-size: .8125rem; line-height: 1.45; color: var(--svc-soft); }
+.mh-svc-bar-details { margin-top: 6px; display: grid; gap: 4px; font-size: .8125rem; line-height: 1.5; color: var(--svc-soft); }
+.mh-svc-bar-details p { margin: 0; }
+.mh-svc-bar-actions { display: flex; align-items: center; gap: 2px; margin: -6px -8px -6px 0; }
+.mh-svc-more, .mh-svc-close { min-height: 44px; display: inline-flex; align-items: center; gap: 4px; border-radius: 10px; color: var(--svc-soft); cursor: pointer; transition: background-color .15s, color .15s; }
+.mh-svc-more { padding: 0 8px; font: 600 .8125rem/1 var(--svc-heading); }
+.mh-svc-more svg { width: 15px; height: 15px; transition: transform .2s; }
+.mh-svc-more[aria-expanded="true"] svg { transform: rotate(180deg); }
+.mh-svc-close { min-width: 44px; justify-content: center; }
+.mh-svc-close svg { width: 16px; height: 16px; }
+.mh-svc-more:hover, .mh-svc-close:hover { color: #fff; background: #ffffff0d; }
+.mh-svc-link { justify-self: start; min-height: 40px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; margin-top: 2px; border-radius: 10px; border: 1px solid var(--svc-line); color: #fbe3ad; font: 600 .8125rem/1 var(--svc-heading); cursor: pointer; }
+.mh-svc-link svg { width: 15px; height: 15px; }
+.mh-svc-link:hover { background: var(--svc-accent-soft); }
+.mh-svc-chip { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 99px; background: var(--svc-accent-soft); border: 1px solid var(--svc-line); color: var(--svc-accent); font: 700 .6875rem/1.3 var(--svc-heading); letter-spacing: .04em; text-transform: uppercase; }
+
+/* ───────── The maintenance state on the Data page ───────── */
+.mh-svc-state { position: relative; overflow: hidden; display: grid; justify-items: center; text-align: center; gap: 8px; padding: 26px 18px 20px; border-radius: 22px; border: 1px solid var(--svc-line); background: radial-gradient(80% 90% at 50% 0%, #f2c46d14, transparent 70%), linear-gradient(180deg, #151b21, #0e1419); color: var(--svc-ink); animation: mh-svc-in .4s cubic-bezier(.2, .8, .2, 1) backwards; }
+.mh-svc-state-art { position: relative; margin-bottom: 4px; }
+.mh-svc-state-badge { position: absolute; right: -10px; bottom: -8px; width: 28px; height: 28px; border-radius: 99px; display: grid; place-items: center; background: #2a2110; color: var(--svc-accent); border: 1.5px solid var(--svc-accent); }
+.mh-svc-state-badge svg { width: 14px; height: 14px; }
+.mh-svc-kicker { margin: 0; display: inline-flex; align-items: center; gap: 8px; font: 600 .8125rem/1.3 var(--svc-heading); color: var(--svc-soft); }
+.mh-svc-state-title { margin: 0; font: 700 1.25rem/1.25 var(--svc-heading); color: var(--svc-ink); }
+.mh-svc-state-text { margin: 0; max-width: 30rem; font-size: .875rem; line-height: 1.55; color: var(--svc-soft); }
+.mh-svc-state-when { margin: 2px 0; padding: 6px 12px; border-radius: 12px; background: var(--svc-accent-soft); border: 1px solid var(--svc-line); font: 600 .875rem/1.4 var(--svc-heading); color: #fbe3ad; max-width: 30rem; }
+.mh-svc-state-muted { margin: 0; font-size: .8125rem; color: var(--svc-muted); }
+.mh-svc-state-actions { margin-top: 8px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.mh-svc-alt { min-height: 44px; padding: 0 14px 0 10px; display: inline-flex; align-items: center; gap: 8px; border-radius: 14px; border: 1px solid #2b3a46; background: #121c24; color: var(--svc-ink); font: 600 .875rem/1 var(--svc-heading); cursor: pointer; transition: border-color .15s, transform .15s; }
+.mh-svc-alt:hover { border-color: #3b4c59; }
+.mh-svc-alt:active { transform: scale(.97); }
+.mh-svc-alt-icon { width: 16px; height: 16px; color: #5ae6a0; }
+
+/* ───────── One line beside lists and in checkout ───────── */
+.mh-svc-inline { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--svc-line); background: linear-gradient(90deg, #f2c46d12, transparent 85%); color: var(--svc-soft); font-size: .8125rem; line-height: 1.5; }
+.mh-svc-inline p { margin: 0; min-width: 0; }
+.mh-svc-inline strong { color: var(--svc-ink); font-weight: 600; }
+.mh-svc-inline-icon { flex-shrink: 0; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--svc-accent-soft); color: var(--svc-accent); }
+.mh-svc-inline-icon svg { width: 14px; height: 14px; }
+
+:is(.mh-svc-bar, .mh-svc-state, .mh-svc-inline) :is(button):focus-visible { outline: 2px solid #fbe3ad; outline-offset: 2px; }
+
+@keyframes mh-svc-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .mh-svc-bar, .mh-svc-state { animation: none; }
+  .mh-svc-more svg, .mh-svc-alt { transition: none; }
+}

@@ -13,6 +13,8 @@ import { AfaArt, AirtimeArt, Bow, DataArt, EarnArt, EnvelopeBack, EnvelopeFront,
 import { markSeen, prefersReducedMotion, press, pressEnd, seenThisVisit, swing, useMedia, useReveal } from '../kit/motion';
 import { WelcomeCard } from '../kit/WelcomeCard';
 // Real business logic, shared with the ordinary homepage: catalogue, offers, checkout, templates, Marketplace, FAQs.
+import { purchaseIncident } from '../../../../shared/serviceIncidents';
+import { ServiceInlineNotice } from '../../../components/service/ServiceUpdate';
 import { directCampaign, directCatalogConfirmed, useDirectCatalog } from '../../../hooks/useDirectCatalog';
 import { useWelcomeOffer } from '../../../hooks/useWelcomeOffer';
 import { CompactBundleRow } from '../../../components/data/CompactBundleRow';
@@ -191,7 +193,9 @@ function FeaturedData() {
   const bundles = useDirectCatalog();
   const welcomeOffer = useWelcomeOffer(bundles);
   const { openCheckout, openDataPage, setActivePage, openAuth } = useApp();
-  const [network, setNetwork] = useState<NetworkId>('mtn');
+  // 3.6.3: the first network open for purchases is shown first; a paused network stays and explains itself.
+  const [network, setNetwork] = useState<NetworkId>(() => NETWORKS.find(n => !purchaseIncident('data', n.id))?.id ?? 'mtn');
+  const incident = purchaseIncident('data', network);
   const [instantAvailable, setInstantAvailable] = useState(false);
   useEffect(() => {
     let on = true;
@@ -222,12 +226,14 @@ function FeaturedData() {
               {NETWORKS.map(({ id, label }) => (
                 <button key={id} type="button" aria-pressed={network === id} onClick={() => setNetwork(id)} style={{ '--network-color': GHANA_NETWORKS[id].brandColor } as React.CSSProperties}>
                   <span className="xh-net-dot" style={{ backgroundColor: GHANA_NETWORKS[id].brandColor }} aria-hidden="true" />{label}
+                  {purchaseIncident('data', id) && <span className="sr-only">, under maintenance</span>}
                 </button>
               ))}
             </div>
             <div className="xh-bundles" key={network}>
               {popular.map(b => <CompactBundleRow key={b.id} bundle={b} directWelcomeOffer={welcomeOffer} onBuy={bundle => openCheckout(bundle)} />)}
-              {popular.length === 0 && <p className="xh-empty" role="status">No popular bundles to show for this network. Browse all bundles to check availability.</p>}
+              {incident ? <ServiceInlineNotice incident={incident}> Other networks are available.</ServiceInlineNotice>
+                : popular.length === 0 && <p className="xh-empty" role="status">No popular bundles to show for this network. Browse all bundles to check availability.</p>}
             </div>
             <div className="xh-tray-foot">
               <button type="button" onClick={() => openDataPage('data', network)} className="xh-link">View all {GHANA_NETWORKS[network].name} bundles<ArrowRight className="w-4 h-4" aria-hidden /></button>

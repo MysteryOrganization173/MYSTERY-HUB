@@ -12,6 +12,7 @@ import { ToastContainer } from './components/common/Toast';
 import { SEOHead } from './components/common/SEOHead';
 import { HomePage } from './components/home/HomePage';
 import { CheckoutModal } from './components/checkout/CheckoutModal';
+import { ServiceUpdateBar } from './components/service/ServiceUpdate';
 import { OrderStatusModal } from './components/checkout/OrderStatusModal';
 import { WaitlistModal } from './components/common/WaitlistModal';
 import { AccountControls } from './components/auth/AccountControls';
@@ -130,6 +131,8 @@ const AppContent: React.FC = () => {
       <GrowthTracker />
       <a href="#main-content" className="fixed -top-20 left-4 focus:top-3 z-[120] mh-button">Skip to content</a>
       <Navbar />
+      {/* 3.6.3: a service update (e.g. a paused network) under the header on the homepage, Orders and Help. */}
+      <ServiceUpdateBar page={activePage} />
 
       {/* Main Content Area */}
       <main id="main-content" tabIndex={-1} className="flex-1 min-w-0">
