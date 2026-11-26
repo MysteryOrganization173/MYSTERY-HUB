@@ -1,4 +1,3 @@
-import { sharedMerchantCheckoutAvailable } from '../../../shared/paymentAvailability';
 import { readCheckoutFailure, checkoutFailurePresentation, type CheckoutFailureDetails } from '../../../shared/checkoutFailure';
 import { WEBSITE_TEMPLATES } from '../../data/templates';
 import { detectGhanaNetwork } from '../../data/bundles';
@@ -22,7 +21,7 @@ export function ManagedDataStorefront({siteId,template,preview=false,previewProd
 }
 function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:string;template:WebsiteTemplate;preview:boolean;previewProducts?:WebsitePreviewProduct[]}) {
   const [serverCheckoutAvailable,setServerCheckoutAvailable]=useState(false);
-  const checkoutAvailable=!preview && sharedMerchantCheckoutAvailable('website_store_order') && serverCheckoutAvailable;
+  const checkoutAvailable=!preview && serverCheckoutAvailable;
   const [products,setProducts]=useState<any[]>([]),[network,setNetwork]=useState(''),[selected,setSelected]=useState<DataBundle|null>(null),[phone,setPhone]=useState(''),[email,setEmail]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(true),[order,setOrder]=useState<any>(null),[reference,setReference]=useState(''),[busy,setBusy]=useState(false);
   const [failure,setFailure]=useState<CheckoutFailureDetails|null>(null);
   const failurePanel=useRef<HTMLDivElement>(null);
@@ -101,7 +100,7 @@ function StorefrontCheckout({siteId,template,preview,previewProducts}:{siteId:st
     // Keep the form and request ID mounted so cancellation can safely resume it.
     dialog.current?.close();
     const remember=(ref:string)=>{paymentReference.current=ref;checkpoint(ref);try{sessionStorage.setItem(lastOrderKey,ref);}catch{/* The reference stays on screen for this visit. */}if(mounted.current){setOwnReference(ref);setReference(ref);}};
-    await payment.initializeServerPayment({isActive:()=>lifecycle.current.current(currentAttempt),store:{siteId,requestId:requestId.current!,expectedMinor:Math.round(selected.priceGhc*100)},productId:selected.id,recipientPhone:phone,customerEmail:email,onOrderCreated:remember,onPaymentReceived:(ref)=>{if(!finish())return;remember(ref);setSelected(null);setRecoveryOnly(true);void refresh(ref);requestAnimationFrame(()=>{orderHeading.current?.scrollIntoView({block:'center'});orderHeading.current?.focus();});},onCancel:(ref)=>{if(!finish())return;if(ref){remember(ref);void refresh(ref);}},onError:e=>{if(!finish())return;const details=readCheckoutFailure(e.checkout);if(details?.paymentState!=='not_started'&&e.existingOrderReference){remember(e.existingOrderReference);void refresh(e.existingOrderReference);}
+    await payment.initializeServerPayment({isActive:()=>lifecycle.current.current(currentAttempt),store:{siteId,requestId:requestId.current!,expectedMinor:Math.round(selected.priceGhc*100)},productId:selected.id,recipientPhone:phone,customerEmail:email,onOrderCreated:remember,onPaymentReceived:(ref)=>{if(!finish())return;remember(ref);setSelected(null);setRecoveryOnly(true);void refresh(ref);requestAnimationFrame(()=>{orderHeading.current?.scrollIntoView({block:'center'});orderHeading.current?.focus();});},onCancel:(ref)=>{if(!finish())return;if(ref){remember(ref);void refresh(ref);}},onError:e=>{if(!finish())return;if(e.code==='PAYMENT_UNAVAILABLE')setServerCheckoutAvailable(false);const details=readCheckoutFailure(e.checkout);if(details?.paymentState!=='not_started'&&e.existingOrderReference){remember(e.existingOrderReference);void refresh(e.existingOrderReference);}
       if(details?.paymentState==='not_started'&&details.retryAllowed&&!paymentReference.current){
         // Only an authoritative rejection of this attempt can unlock its unchanged form.
         started.current=false;setLocked(false);setRecoveryOnly(false);setFailure(details);

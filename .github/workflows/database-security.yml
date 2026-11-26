@@ -152,6 +152,14 @@ jobs:
           MYSTERY_EFFICIENCY_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_efficiency_test
         run: NODE_ENV=test node --import tsx --test server/suppliers/__tests__/databaseEfficiencyPostgres.test.ts
 
+      - name: Verify managed data checkout isolation and PostgreSQL concurrency
+        env:
+          PGPASSWORD: local-test-only
+          MYSTERY_V51_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_managed_store_test
+        run: |
+          createdb -h 127.0.0.1 -U postgres -O app_owner mystery_managed_store_test
+          node --import tsx scripts/runTests.ts server/suppliers/__tests__/{paymentIsolation,websiteBusinessV1,websiteV51Postgres}.test.ts
+
       - name: Rehearse the full standby restore and reverse migration with PostgreSQL 17
         env:
           MYSTERY_PORTABILITY_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mh_source_test

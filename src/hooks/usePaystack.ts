@@ -120,7 +120,7 @@ export function usePaystack(scope?:string) {
     try {
       // 1. Call Backend to create pending order & initialize Paystack transaction authoritatively
       const sessionToken = getActiveSessionToken();
-      const initRes = options.store ? await waitForStoreInitialization(initializeStorePayment(options.store.siteId,options.store.requestId,options.productId,options.recipientPhone,options.customerEmail||'',sessionToken||undefined),ref=>options.onOrderCreated?.(ref)) : await initializePaymentOnServer(
+      const initRes = options.store ? await waitForStoreInitialization(initializeStorePayment(options.store.siteId,options.store.requestId,options.productId,options.recipientPhone,options.customerEmail||'',options.store.expectedMinor,sessionToken||undefined),ref=>options.onOrderCreated?.(ref)) : await initializePaymentOnServer(
         {
           ...options.commercial,
           productId: options.productId,

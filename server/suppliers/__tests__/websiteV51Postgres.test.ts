@@ -2,11 +2,14 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
+import {randomUUID} from 'node:crypto';
 import {getPool,initDatabase} from '../../db/connection.js';
 import {assertSafeTestDatabase} from '../../utils/environment.js';
 import {AuthStore} from '../../db/authStore.js';
 import {WebsiteStore} from '../../db/websiteStore.js';
 import {WebsiteBusinessService as Business} from '../../services/websiteBusinessService.js';
+import {FulfilmentService} from '../../services/fulfilmentService.js';
+import {PaystackServerService} from '../../services/paystackService.js';
 import {FinanceStore} from '../../db/financeStore.js';
 import {AUTHORITATIVE_PRODUCTS} from '../../data/productCatalog.js';
 import {STORE_POLICY_DEFAULTS} from '../../../shared/storeEconomics.js';
@@ -38,6 +41,43 @@ test('V5.1 native pricing/publication integrity with five application connection
   await t.test('audit failure rolls back otherwise-valid config update on the same transaction',async()=>{
    const before=await Business.catalog(site.id,'owner');await observer.query("CREATE FUNCTION reject_v51_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='store_prices_changed' THEN RAISE EXCEPTION 'Synthetic audit failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER v51_audit_failure BEFORE INSERT ON admin_audit_log FOR EACH ROW EXECUTE FUNCTION reject_v51_audit()");
    try{await assert.rejects(Business.savePrices(site.id,'owner',{expectedVersion:before.version,products:[{productId:products[0].id,retailMinor:600,enabled:false}]}),/Synthetic audit failure/);assert.deepEqual(await Business.catalog(site.id,'owner'),before);}finally{await observer.query('DROP TRIGGER v51_audit_failure ON admin_audit_log; DROP FUNCTION reject_v51_audit()');}
+  });
+  await t.test('five approved storefronts initialize with five connections and durable intent locks',{timeout:10000},async sub=>{
+   const fixtureIds=['buyer-owner-1','buyer-owner-2','buyer-owner-3','buyer-owner-4','buyer-owner-5'];
+   const product=products[0];
+   const live=await Promise.all(fixtureIds.map(async owner=>{
+    await AuthStore.createUser({id:owner,name:owner,email:`${owner}@fixture.test`,phone:null,passwordHash:'fixture',role:'customer'});
+    const draft=(await WebsiteStore.createSite(owner,{template_id:'tmpl-data-reseller',name:owner,content:{whatsapp:'0241234567'}})).site;
+    await Business.savePrices(draft.id,owner,{expectedVersion:'empty',products:[{productId:product.id,retailMinor:500,enabled:true}]});
+    const published=await WebsiteStore.publishSite(draft.id,owner);
+    assert.ok(published);
+    return published;
+   }));
+   await FinanceStore.transaction('owner',async tx=>{
+    const costs=await tx.config('store-wholesale');
+    await tx.saveConfig('store-wholesale',{...costs,[product.id]:{...costs[product.id],version:'fixture'}});
+   });
+   const previousFlag=process.env.MANAGED_DATA_STOREFRONT_CHECKOUT_ENABLED;
+   process.env.MANAGED_DATA_STOREFRONT_CHECKOUT_ENABLED='true';
+   const previousKey=process.env.PAYSTACK_SECRET_KEY;
+   delete process.env.PAYSTACK_SECRET_KEY;
+   sub.after(()=>{
+    if(previousFlag===undefined)delete process.env.MANAGED_DATA_STOREFRONT_CHECKOUT_ENABLED;else process.env.MANAGED_DATA_STOREFRONT_CHECKOUT_ENABLED=previousFlag;
+    if(previousKey===undefined)delete process.env.PAYSTACK_SECRET_KEY;else process.env.PAYSTACK_SECRET_KEY=previousKey;
+   });
+   sub.mock.method(globalThis,'fetch',async()=>assert.fail('network forbidden in PostgreSQL fixture'));
+   sub.mock.method(FulfilmentService,'preflightCheck',async()=>({allowed:true,supplierCostMinor:200,supplierOfferRef:'fixture'}));
+   const adapter=sub.mock.method(PaystackServerService,'initializeManagedDataStoreTransaction');
+   const input=()=>({productId:product.id,recipientPhone:'0241111111',customerEmail:'receipt@fixture.test',requestId:randomUUID(),expectedMinor:500});
+   const attempts=live.map(website=>({website,details:input()}));
+   const receipts=await Promise.all(attempts.map(({website,details})=>Business.initialize(website.id,details)));
+   assert.equal(adapter.mock.callCount(),5);
+   assert.equal(new Set(receipts.map(receipt=>receipt.reference)).size,5);
+   assert.ok(receipts.every(receipt=>receipt.amountPesewas===500&&receipt.isSimulated));
+   assert.equal((await Business.initialize(attempts[0].website.id,attempts[0].details)).reference,receipts[0].reference);
+   assert.equal(adapter.mock.callCount(),5);
+   assert.equal(Number((await observer.query("SELECT count(*) FROM finance_operations WHERE kind='store_checkout' AND state='pending'")).rows[0].count),5);
+   assert.equal(pool!.waitingCount,0);
   });
   await t.test('paid order snapshot and financial records survive pricing changes',async()=>{
    const order=opsOrder({id:'v51-paid',user_id:'other',payment_reference:'v51-paid',public_reference:'MH-v51-paid',payment_status:'success',status:'delivered',store_context:{channel:'website_store',siteId:site.id,ownerId:'owner',retailMinor:500,wholesaleMinor:300,reserveMinor:25,earningMinor:175} as any});await OrdersStore.createOrder(order);

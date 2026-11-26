@@ -6,7 +6,7 @@
 
 import crypto from 'node:crypto';
 import { PAYMENT_UNAVAILABLE } from '../../shared/paymentAvailability.js';
-import { isSharedMerchantOrder } from './paymentScope.js';
+import { isManagedDataStoreOrder, isSharedMerchantOrder, managedDataStoreCheckoutEnabled, managedStoreIntentMatches } from './paymentScope.js';
 
 export interface PaystackInitializeParams {
   email: string;
@@ -64,6 +64,34 @@ export class PaystackServerService {
         params.metadata?.purpose !== undefined) {
       return { success: false, reference: params.reference, definitiveFailure: true, error: PAYMENT_UNAVAILABLE.error };
     }
+    return this.sendInitialization(params);
+  }
+
+  /** Only the managed checkout service can initialize its newly committed intent on this path. */
+  static async initializeManagedDataStoreTransaction(reference: string, key: string): Promise<PaystackInitializeResult> {
+    const unavailable = { success: false, reference, definitiveFailure: true, error: PAYMENT_UNAVAILABLE.error };
+    if (!managedDataStoreCheckoutEnabled()) return unavailable;
+    const { OrdersStore } = await import('../db/ordersStore.js');
+    const order = await OrdersStore.findOrder(reference);
+    if (!order || order.payment_reference !== reference || !isManagedDataStoreOrder(order) ||
+        order.status !== 'pending_payment' || order.payment_status !== 'pending' || order.paid_at ||
+        order.supplier_order_id || !order.customer_email) return unavailable;
+
+    const store = order.store_context!;
+    const { WebsiteStore } = await import('../db/websiteStore.js');
+    const { FinanceStore } = await import('../db/financeStore.js');
+    const site = await WebsiteStore.findPublishedSiteById(store.siteId);
+    if (site?.template_id !== 'tmpl-data-reseller' || site.user_id !== store.ownerId) return unavailable;
+    const intent = await FinanceStore.read(store.ownerId, tx => tx.find(key));
+    if (!intent || intent.state !== 'initializing' || !managedStoreIntentMatches(order,intent)) return unavailable;
+
+    return this.sendInitialization({
+      reference, email: order.customer_email, amountPesewas: order.amount,
+      metadata: { purpose: 'website_store_order', store_id: site.id, order_id: order.id, product_id: order.product_id },
+    });
+  }
+
+  private static async sendInitialization(params: PaystackInitializeParams): Promise<PaystackInitializeResult> {
     const secretKey = this.getSecretKey();
     const isProd = process.env.NODE_ENV === 'production';
 

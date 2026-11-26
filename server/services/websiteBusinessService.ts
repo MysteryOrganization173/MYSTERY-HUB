@@ -1,7 +1,8 @@
-import { PAYMENT_UNAVAILABLE, sharedMerchantCheckoutAvailable } from '../../shared/paymentAvailability.js';
+import { PAYMENT_UNAVAILABLE } from '../../shared/paymentAvailability.js';
+import { isManagedDataStoreOrder, managedDataStoreCheckoutEnabled, managedStoreIntentMatches } from './paymentScope.js';
 import { ServiceControlService } from './serviceControlService.js';
 import { randomUUID, createHash } from 'node:crypto';
-import { FinanceStore, FinanceError, type FinanceTx } from '../db/financeStore.js';
+import { FinanceStore, FinanceError, type FinanceOperation, type FinanceTx } from '../db/financeStore.js';
 import { FinanceService, operationKey, maskWithdrawal } from './financeService.js';
 import { WebsiteStore } from '../db/websiteStore.js';
 import { WebsiteAssetStore } from '../db/websiteAssetStore.js';
@@ -29,6 +30,12 @@ const priceConfig=async(id:string,tx?:FinanceTx):Promise<Prices>=>await(tx?tx.co
 async function configLock(tx:FinanceTx,exclusive=false){if(tx.client)await tx.client.query(`SELECT pg_advisory_xact_lock${exclusive?'':'_shared'}(hashtextextended($1,0))`,['store-config']);}
 
 export class WebsiteBusinessService {
+  static checkoutEnabled(): boolean {
+    if (!managedDataStoreCheckoutEnabled()) return false;
+    const supplier = FulfilmentService.getProvider().client;
+    return process.env.NODE_ENV !== 'production' || (supplier.isFulfillmentEnabled() && supplier.isConfigured());
+  }
+
   /** Read-only preview and apply share the same calculation; client prices are never accepted. */
   static async resellerBulkPreview(adminId:string,input:Record<string,unknown>,tx?:FinanceTx) {
     exact(input,['productIds','perGbMinor','discountFromGb','discountBps','activation']);
@@ -99,7 +106,7 @@ export class WebsiteBusinessService {
       if(!userId&&!eligible)return [];
       return [{id:product.id,network:product.network,networkName:product.networkName,dataAmount:product.dataAmount,validity:product.validity,description:product.description,retailMinor:price?.retailMinor||0,enabled:price?.enabled||false,...(userId?{wholesaleMinor:cost?.wholesaleMinor??null,minimumMinor:floor,recommendedMinor:Math.max(floor??0,commercial?.products?.[product.id]?.recommendedMinor??commercial?.products?.[product.id]?.retailMinor??product.amountPesewas),estimatedMinor:eligible?price.retailMinor-cost.wholesaleMinor-storeReserve(price.retailMinor,policy):null,eligible,configured:!!cost?.enabled}: {})}];
     });
-    return {managed:true,version:prices.version,products,checkoutAvailable:sharedMerchantCheckoutAvailable('website_store_order'),...(userId?{policy}:{})};
+    return {managed:true,version:prices.version,products,checkoutAvailable:policy.enabled&&this.checkoutEnabled()&&(!!userId||products.length>0),...(userId?{policy}:{})};
   }
   static async savePrices(siteId:string,userId:string,input:Record<string,unknown>) {
     exact(input,['expectedVersion','products']);
@@ -154,22 +161,23 @@ export class WebsiteBusinessService {
     if(row.payload.siteId!==siteId||row.payload.productId!==input.productId||row.payload.recipient!==recipient||row.payload.email!==input.customerEmail||row.payload.customerId!==(customerId||null))throw requireCheckoutRecovery();
     return this.checkoutResponse(row);
   }
-  private static async checkoutResponse(row:{state:string;amount_minor:number;payload:Record<string,any>}){
+  private static async checkoutResponse(row:FinanceOperation){
     const order=await OrdersStore.findOrder(row.payload.orderId);
-    if(!order||order.payment_status==='success'||order.paid_at||order.supplier_order_id||row.state!=='pending')throw requireCheckoutRecovery(row.payload.publicRef);
+    if(!order||!isManagedDataStoreOrder(order)||order.status!=='pending_payment'||order.payment_status!=='pending'||
+       order.paid_at||order.supplier_order_id||row.state!=='pending'||!managedStoreIntentMatches(order,row)||
+       typeof row.payload.accessCode!=='string'||!row.payload.accessCode)throw requireCheckoutRecovery(row.payload.publicRef);
     return {success:true,orderRef:row.payload.publicRef,reference:row.payload.reference,amountPesewas:row.amount_minor,currency:'GHS',accessCode:row.payload.accessCode,authorizationUrl:row.payload.authorizationUrl,isSimulated:row.payload.isSimulated};
   }
   static async initialize(siteId:string,input:Record<string,unknown>,customerId?:string) {
-    if (!sharedMerchantCheckoutAvailable('website_store_order')) throw new FinanceError(PAYMENT_UNAVAILABLE.error,503);
-    if(process.env.NODE_ENV==='production'&&!process.env.PAYSTACK_SECRET_KEY?.trim().startsWith('sk_live_'))throw new FinanceError('Live managed checkout is unavailable.',503);
-    exact(input,['productId','recipientPhone','customerEmail','requestId','campaignToken','campaignVisitorId','campaignAttemptId']);
+    if (!this.checkoutEnabled()) throw new FinanceError(PAYMENT_UNAVAILABLE.error,503);
+    exact(input,['productId','recipientPhone','customerEmail','requestId','expectedMinor','campaignToken','campaignVisitorId','campaignAttemptId']);
     const phone=validateAndNormalizeGhanaPhone(input.recipientPhone as string);if(!phone.isValid||!phone.normalized!)throw new FinanceError('Enter a valid Ghana recipient number.');
     if(typeof input.customerEmail!=='string'||input.customerEmail.length>254||!/^\S+@\S+\.\S+$/.test(input.customerEmail))throw new FinanceError('Enter a valid receipt email.');
     const initialSite=await WebsiteStore.findPublishedSiteById(siteId);if(!initialSite||initialSite.status!=='published'||initialSite.template_id!=='tmpl-data-reseller')throw new FinanceError('Store not found.',404);
     const key=`store-checkout:${operationKey(input.requestId)}`;
     const previous=await this.existingCheckout(initialSite.user_id,siteId,key,input,phone.normalized!,customerId);
     const reject=async(code:import('../../shared/checkoutFailure.js').PreflightCode):Promise<never>=>{const concurrent=await this.existingCheckout(initialSite.user_id,siteId,key,input,phone.normalized!,customerId);if(concurrent||previous)throw requireCheckoutRecovery((concurrent||previous)!.orderRef);throw rejectPreflight(code);};
-    const product=getAuthoritativeProduct(String(input.productId));if(!product||product.id!==input.productId){return reject('PACKAGE_UNAVAILABLE');}
+    const product=getAuthoritativeProduct(String(input.productId));if(!product?.isActive||product.id!==input.productId){return reject('PACKAGE_UNAVAILABLE');}
     // 3.6.3: a network whose Data is paused in the Service Control Center refuses new store purchases too (an existing
     // checkout still goes to recovery through reject()).
     if(await ServiceControlService.purchaseBlock('data',product.network))return reject('SERVICE_TEMPORARILY_UNAVAILABLE');
@@ -177,16 +185,36 @@ export class WebsiteBusinessService {
     try {supplierRoute=FulfilmentService.resolveRoute({service:'data',network:product.network,productId:product.id});}
     catch {return reject('SERVICE_TEMPORARILY_UNAVAILABLE');}
     const preflight=await FulfilmentService.preflightCheck(product.network,product.dataAmount,phone.normalized!);
-    if(!preflight.allowed||!Number.isSafeInteger(preflight.supplierCostMinor)||Number(preflight.supplierCostMinor)<=0){
+    if(!preflight.allowed||!Number.isSafeInteger(preflight.supplierCostMinor)||Number(preflight.supplierCostMinor)<=0||!preflight.supplierOfferRef){
       return reject(!preflight.allowed&&isPreflightCode(preflight.code)?preflight.code:'PACKAGE_UNAVAILABLE');
     }
-    if(previous){const current=await this.existingCheckout(initialSite.user_id,siteId,key,input,phone.normalized!,customerId);if(!current)throw requireCheckoutRecovery(previous.orderRef);return current;}
     const created=await FinanceStore.transaction(initialSite.user_id,async tx=>{
-      await configLock(tx);const old=await tx.find(key);if(old){if(old.payload.siteId!==siteId||old.payload.productId!==product.id||old.payload.recipient!==phone.normalized!||old.payload.email!==input.customerEmail||old.payload.customerId!==(customerId||null))throw requireCheckoutRecovery();return {row:old,fresh:false};}
-      if(tx.client)await tx.client.query('SELECT id FROM website_sites WHERE id=$1 FOR UPDATE',[siteId]);
-      const site=await WebsiteStore.findPublishedSiteById(siteId);if(!site||site.status!=='published'||site.template_id!=='tmpl-data-reseller')throw rejectPreflight('SERVICE_TEMPORARILY_UNAVAILABLE');
+      await configLock(tx);
+      const old=await tx.find(key);
+      if(old&&(old.kind!=='store_checkout'||old.payload.siteId!==siteId||old.payload.productId!==product.id||
+        old.payload.recipient!==phone.normalized!||old.payload.email!==input.customerEmail||
+        old.payload.customerId!==(customerId||null)))throw requireCheckoutRecovery();
+      const block=(code:import('../../shared/checkoutFailure.js').PreflightCode):never=>{
+        if(old||previous)throw requireCheckoutRecovery(old?.payload.publicRef||previous?.orderRef);
+        throw rejectPreflight(code);
+      };
+      const site=await WebsiteStore.findPublishedSiteById(siteId,tx.client);
+      if(!site||site.user_id!==initialSite.user_id||site.template_id!=='tmpl-data-reseller'||
+        (await ServiceControlService.blockedNetworks('data',tx)).has(product.network))return block('SERVICE_TEMPORARILY_UNAVAILABLE');
       const policy=await currentPolicy(tx),costs=await wholesale(tx),prices=await priceConfig(siteId,tx),cost=costs[product.id],price=prices.products[product.id];
-      if(!policy.enabled||!cost?.enabled||!price?.enabled||cost.wholesaleMinor<Number(preflight.supplierCostMinor)||price.retailMinor<minimumStorePrice(cost.wholesaleMinor,policy))throw rejectPreflight('PACKAGE_UNAVAILABLE');
+      if(!policy.enabled||!cost?.enabled||!price?.enabled||cost.wholesaleMinor<Number(preflight.supplierCostMinor)||
+        price.retailMinor<minimumStorePrice(cost.wholesaleMinor,policy))return block('PACKAGE_UNAVAILABLE');
+      if(input.expectedMinor!==price.retailMinor)return block('CHECKOUT_REVIEW_REQUIRED');
+      if(old){
+        const order=await OrdersStore.findOrder(old.payload.orderId,tx.client);
+        if(old.amount_minor!==price.retailMinor||order?.store_context?.ownerId!==site.user_id||
+          order.supplier_provider!==supplierRoute.providerId||order.supplier_offer_ref!==preflight.supplierOfferRef||
+          order.supplier_cost_minor!==preflight.supplierCostMinor||order.store_context.policyVersion!==policy.version||
+          order.store_context.wholesaleVersion!==cost.version||order.store_context.priceVersion!==prices.version)
+          return block('CHECKOUT_REVIEW_REQUIRED');
+        return {row:old,fresh:false};
+      }
+      if(previous)throw requireCheckoutRecovery(previous.orderRef);
       const snapshot:StoreSnapshot={channel:'website_store',siteId,ownerId:site.user_id,productId:product.id,retailMinor:price.retailMinor,wholesaleMinor:cost.wholesaleMinor,reserveMinor:storeReserve(price.retailMinor,policy),earningMinor:price.retailMinor-cost.wholesaleMinor-storeReserve(price.retailMinor,policy),supplierCostMinor:preflight.supplierCostMinor!,currency:'GHS',policyVersion:policy.version,wholesaleVersion:cost.version,priceVersion:prices.version};
       if(product.network==='mtn') {
         if(tx.client){await tx.client.query("SELECT pg_advisory_xact_lock(hashtext('mtn_' || $1))",[canonicalGhanaPhone(phone.normalized!)]);const active=await tx.client.query("SELECT id FROM orders WHERE network='mtn' AND recipient_phone=ANY($1::text[]) AND status IN ('paid','queued','submitted','processing','refund_pending') LIMIT 1",[getGhanaPhoneLookupVariants(phone.normalized!)]);if(active.rows.length)throw rejectPreflight('ACTIVE_MTN_ORDER');}
@@ -195,13 +223,14 @@ export class WebsiteBusinessService {
       const id=`ord_${randomUUID()}`,reference=`MH_STORE_${randomUUID()}`,publicRef=`MH-${randomUUID()}`,now=new Date().toISOString();
       const order:OrderRecord={id,user_id:customerId||null,public_reference:publicRef,customer_name:null,customer_email:input.customerEmail as string,customer_phone:phone.normalized!,recipient_phone:phone.normalized!,network:product.network,service_type:'data',product_id:product.id,product_name_snapshot:`${product.networkName} ${product.dataAmount}`,bundle_size_snapshot:product.dataAmount,amount:snapshot.retailMinor,currency:'GHS',status:'pending_payment',payment_provider:'paystack',payment_reference:reference,payment_status:'pending',supplier_provider:supplierRoute.providerId,supplier_order_id:null,supplier_response:null,supplier_cost_minor:snapshot.supplierCostMinor,supplier_offer_ref:preflight.supplierOfferRef??null,supplier_last_checked_at:null,failure_reason:null,created_at:now,updated_at:now,paid_at:null,submitted_at:null,delivered_at:null,referrer_user_id:null,referral_attribution_id:null,referral_code:null,store_context:snapshot};
       await OrdersStore.createOrder(order,tx.client);
-      const row=await tx.create('store_checkout',key,order.amount,{siteId,productId:product.id,recipient:phone.normalized!,email:input.customerEmail,customerId:customerId||null,orderId:id,reference,publicRef},'initializing');return {row,fresh:true};
+      const row=await tx.create('store_checkout',key,order.amount,{siteId,productId:product.id,recipient:phone.normalized!,email:input.customerEmail,customerId:customerId||null,orderId:id,reference,publicRef,managedPaymentVersion:1},'initializing');return {row,fresh:true};
     });
     let row=created.row;
     try{
     if(created.fresh) {
-      const payment=await PaystackServerService.initializeTransaction({email:input.customerEmail as string,amountPesewas:row.amount_minor,reference:row.payload.reference,metadata:{purpose:'website_store_order',store_id:siteId,order_id:row.payload.orderId,product_id:product.id}});
-      row=await FinanceStore.transaction(initialSite.user_id,async tx=>{const current=(await tx.find(key))!;return tx.update(current,payment.success?'pending':'initialization_uncertain',{...current.payload,...(payment.success?{accessCode:payment.accessCode,authorizationUrl:payment.authorizationUrl,isSimulated:payment.isSimulated===true}:{})});});
+      const payment=await PaystackServerService.initializeManagedDataStoreTransaction(row.payload.reference,key);
+      const ready=payment.success&&payment.reference===row.payload.reference&&typeof payment.accessCode==='string'&&!!payment.accessCode;
+      row=await FinanceStore.transaction(initialSite.user_id,async tx=>{const current=(await tx.find(key))!;return tx.update(current,ready?'pending':'initialization_uncertain',{...current.payload,...(ready?{accessCode:payment.accessCode,authorizationUrl:payment.authorizationUrl,isSimulated:payment.isSimulated===true}:{})});});
     }
     return await this.checkoutResponse(row);
     }catch(error){if(error instanceof CheckoutFailure)throw error;throw requireCheckoutRecovery(row.payload.publicRef);}
