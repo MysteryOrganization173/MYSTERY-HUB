@@ -124,7 +124,7 @@ test('managed approval still refuses client amount, context, unsupported plans, 
  const paused=t.mock.method(ServiceControlService,'purchaseBlock',async()=>({state:'paused'} as any));
  assert.equal((await checkout(body())).status,503);
  paused.mock.restore();
- preflight.mock.mockImplementation(async()=>({allowed:false,code:'SUPPLIER_WALLET_LOW'}));
+ preflight.mock.mockImplementation(async()=>({allowed:false,code:'SUPPLIER_WALLET_LOW' as const}));
  const low=await checkout(body());
  assert.equal(low.status,503);
  assert.equal((await low.json()).code,'SUPPLIER_WALLET_LOW');

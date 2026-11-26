@@ -49,7 +49,9 @@ test('V5.1 native pricing/publication integrity with five application connection
     await AuthStore.createUser({id:owner,name:owner,email:`${owner}@fixture.test`,phone:null,passwordHash:'fixture',role:'customer'});
     const draft=(await WebsiteStore.createSite(owner,{template_id:'tmpl-data-reseller',name:owner,content:{whatsapp:'0241234567'}})).site;
     await Business.savePrices(draft.id,owner,{expectedVersion:'empty',products:[{productId:product.id,retailMinor:500,enabled:true}]});
-    return WebsiteStore.publishSite(draft.id,owner);
+    const published=await WebsiteStore.publishSite(draft.id,owner);
+    assert.ok(published);
+    return published;
    }));
    await FinanceStore.transaction('owner',async tx=>{
     const costs=await tx.config('store-wholesale');

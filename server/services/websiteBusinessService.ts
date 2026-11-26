@@ -106,7 +106,7 @@ export class WebsiteBusinessService {
       if(!userId&&!eligible)return [];
       return [{id:product.id,network:product.network,networkName:product.networkName,dataAmount:product.dataAmount,validity:product.validity,description:product.description,retailMinor:price?.retailMinor||0,enabled:price?.enabled||false,...(userId?{wholesaleMinor:cost?.wholesaleMinor??null,minimumMinor:floor,recommendedMinor:Math.max(floor??0,commercial?.products?.[product.id]?.recommendedMinor??commercial?.products?.[product.id]?.retailMinor??product.amountPesewas),estimatedMinor:eligible?price.retailMinor-cost.wholesaleMinor-storeReserve(price.retailMinor,policy):null,eligible,configured:!!cost?.enabled}: {})}];
     });
-    return {managed:true,version:prices.version,products,checkoutAvailable:products.length>0&&this.checkoutEnabled(),...(userId?{policy}:{})};
+    return {managed:true,version:prices.version,products,checkoutAvailable:policy.enabled&&this.checkoutEnabled()&&(!!userId||products.length>0),...(userId?{policy}:{})};
   }
   static async savePrices(siteId:string,userId:string,input:Record<string,unknown>) {
     exact(input,['expectedVersion','products']);

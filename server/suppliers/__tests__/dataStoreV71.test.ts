@@ -139,7 +139,7 @@ test('money boundaries unchanged: server products and prices, the same payment c
   assert.match(store,/priceMinor:p\.retailMinor/,'only server retail prices');
   assert.match(store,/const pick=\(b:StoreBundle\)=>choose\(toBundle\(b\)\)/);
   assert.match(store,/store:\{siteId,requestId:requestId\.current!,expectedMinor:Math\.round\(selected\.priceGhc\*100\)\}/);
-  assert.match(store,/const checkoutAvailable=!preview && sharedMerchantCheckoutAvailable/,'drafts never start checkout');
+  assert.match(store,/const checkoutAvailable=!preview && serverCheckoutAvailable/,'drafts never start checkout');
   for(const file of ['src/components/website/storefront/storeStyles.ts','src/config/websiteStyleVariants.ts','src/components/website/editor/WebsiteStoreLook.tsx','src/components/website/StoreShareKit.tsx'])
     assert.doesNotMatch(source(file),/js\.paystack|usePaystack|initializeServerPayment|store-checkout|wholesale|retailMinor|reserveBps/i,file);
 });

@@ -80,17 +80,17 @@ export interface ResellerCatalogueSummary {
   ownerOnSale: number;
   /** Bundles Mystery Hub can supply to reseller stores right now (server `configured`). */
   available: number;
-  /** Mystery Hub's store checkout switch (server `policy.enabled`). */
+  /** Mystery Hub's effective store checkout switch. */
   checkoutEnabled: boolean;
 }
-export function resellerCatalogueSummary(response: {products?: Array<{eligible?: boolean; configured?: boolean; enabled?: boolean; retailMinor?: number}>; policy?: {enabled?: boolean}} | null | undefined): ResellerCatalogueSummary | null {
+export function resellerCatalogueSummary(response: {products?: Array<{eligible?: boolean; configured?: boolean; enabled?: boolean; retailMinor?: number}>; policy?: {enabled?: boolean}; checkoutAvailable?: boolean} | null | undefined): ResellerCatalogueSummary | null {
   if (!response || !Array.isArray(response.products)) return null;
   const products = response.products;
   return {
     sellable: products.filter(p => p.eligible).length,
     ownerOnSale: products.filter(p => p.enabled && Number(p.retailMinor) > 0).length,
     available: products.filter(p => p.configured).length,
-    checkoutEnabled: response.policy?.enabled === true,
+    checkoutEnabled: response.checkoutAvailable === true,
   };
 }
 

@@ -12,13 +12,13 @@ const summary=(patch:Partial<ResellerCatalogueSummary>={}):ResellerCatalogueSumm
 test('catalogue summary reads only server fields from the owner bundle catalogue',()=>{
   assert.equal(resellerCatalogueSummary(null),null);
   assert.equal(resellerCatalogueSummary({} as any),null,'never guesses before products load');
-  assert.deepEqual(resellerCatalogueSummary({policy:{enabled:true},products:[
+  assert.deepEqual(resellerCatalogueSummary({policy:{enabled:true},checkoutAvailable:true,products:[
     {eligible:true,configured:true,enabled:true,retailMinor:700},
     {eligible:false,configured:true,enabled:true,retailMinor:100},
     {eligible:false,configured:false,enabled:true,retailMinor:900},
     {eligible:false,configured:true,enabled:false,retailMinor:0},
   ]}),{sellable:1,ownerOnSale:3,available:3,checkoutEnabled:true});
-  assert.equal(resellerCatalogueSummary({products:[]})!.checkoutEnabled,false,'a missing policy is treated as checkout off');
+  assert.equal(resellerCatalogueSummary({products:[]})!.checkoutEnabled,false,'a missing availability signal is treated as checkout off');
 });
 
 test('store status never says open unless checkout is on, bundles are eligible and the store is published',()=>{
