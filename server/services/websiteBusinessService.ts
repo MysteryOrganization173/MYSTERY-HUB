@@ -1,4 +1,5 @@
 import { PAYMENT_UNAVAILABLE, sharedMerchantCheckoutAvailable } from '../../shared/paymentAvailability.js';
+import { ServiceControlService } from './serviceControlService.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { FinanceStore, FinanceError, type FinanceTx } from '../db/financeStore.js';
 import { FinanceService, operationKey, maskWithdrawal } from './financeService.js';
@@ -169,6 +170,9 @@ export class WebsiteBusinessService {
     const previous=await this.existingCheckout(initialSite.user_id,siteId,key,input,phone.normalized!,customerId);
     const reject=async(code:import('../../shared/checkoutFailure.js').PreflightCode):Promise<never>=>{const concurrent=await this.existingCheckout(initialSite.user_id,siteId,key,input,phone.normalized!,customerId);if(concurrent||previous)throw requireCheckoutRecovery((concurrent||previous)!.orderRef);throw rejectPreflight(code);};
     const product=getAuthoritativeProduct(String(input.productId));if(!product||product.id!==input.productId){return reject('PACKAGE_UNAVAILABLE');}
+    // 3.6.3: a network whose Data is paused in the Service Control Center refuses new store purchases too (an existing
+    // checkout still goes to recovery through reject()).
+    if(await ServiceControlService.purchaseBlock('data',product.network))return reject('SERVICE_TEMPORARILY_UNAVAILABLE');
     let supplierRoute:ReturnType<typeof FulfilmentService.resolveRoute>;
     try {supplierRoute=FulfilmentService.resolveRoute({service:'data',network:product.network,productId:product.id});}
     catch {return reject('SERVICE_TEMPORARILY_UNAVAILABLE');}

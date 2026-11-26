@@ -1,3 +1,4 @@
+import {serviceControl} from '../hooks/useServiceStatus';
 import {validateAndNormalizeGhanaPhone} from '../../server/utils/phone';
 import {aiActions} from '../../shared/mysteryAiIntent';
 import {DATA_BUNDLES} from '../data/bundles';
@@ -70,6 +71,9 @@ export async function aiDataChoices(draft:DataRequest,signal:AbortSignal){
  if(draft.ambiguousSize)return {reply:'Which one bundle size would you like?',choices:[]};
  if(!draft.network)return {reply:'Which network would you like: MTN, Telecel or AirtelTigo?',choices:[]};
  if(!draft.size&&!draft.browse)return {reply:'What bundle size would you like?',choices:[]};
+ // 3.6.3: a network paused in the Service Control Center gets its own explanation, not "try another size".
+ const paused=serviceControl('data',draft.network);
+ if(paused?.blocksPurchases)return {reply:`${paused.title}: ${paused.message||'new purchases are paused for now.'} Other networks are available on the Data page.`,choices:[]};
  const catalogue=await readAiDirectCatalog(AbortSignal.any([signal,AbortSignal.timeout(6000)]));
  const choices=catalogue.filter(b=>b.network===draft.network&&(!draft.size||b.dataAmount.toUpperCase()===draft.size))
    .sort((a,b)=>a.priceGhc-b.priceGhc).slice(0,3).map(({id,network,dataAmount,priceGhc})=>({id,network,dataAmount,priceGhc}));

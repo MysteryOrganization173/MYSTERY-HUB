@@ -54,6 +54,7 @@ jobs:
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_admin_alerts_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_campaign_test
           createdb -h 127.0.0.1 -U postgres -O app_owner mystery_afa_pricing_test
+          createdb -h 127.0.0.1 -U postgres -O app_owner mystery_service_control_test
       - name: Verify RLS, client denial and backend compatibility
         env:
           MYSTERY_RLS_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_rls_test
@@ -105,6 +106,11 @@ jobs:
         env:
           MYSTERY_CAMPAIGN_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_campaign_test
         run: node --import tsx --test server/suppliers/__tests__/decemberCampaignPostgres.test.ts
+
+      - name: Verify Service Control Center concurrent saves and atomic audit in PostgreSQL
+        env:
+          MYSTERY_SERVICE_CONTROL_POSTGRES_URL: postgresql://app_owner:local-owner-only@127.0.0.1:5432/mystery_service_control_test
+        run: node --import tsx --test --test-force-exit server/suppliers/__tests__/serviceControlPostgres.test.ts
 
       - name: Verify AFA pricing quote, Wallet debit and snapshot in PostgreSQL
         env:

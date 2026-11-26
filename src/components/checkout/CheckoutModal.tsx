@@ -1,5 +1,6 @@
 import { checkoutFailurePresentation, readCheckoutFailure } from '../../../shared/checkoutFailure';
-import { purchaseIncident, restorationLine } from '../../../shared/serviceIncidents';
+import { restorationLine } from '../../../shared/serviceControls';
+import { purchasePaused, refreshServiceStatus, serviceControl, useServiceStatus } from '../../hooks/useServiceStatus';
 import { directAttemptKey, readDirectAttempt, saveDirectAttempt, clearDirectAttempt } from '../../utils/directCheckoutAttempt';
 import {useDialogFocus} from '../../hooks/useDialogFocus';
 import {useVisualViewport} from '../../hooks/useVisualViewport';
@@ -61,6 +62,7 @@ export const CheckoutModal: React.FC = () => {
     updateUserProfile,
     showToast,
   } = useApp();
+  const serviceStatus = useServiceStatus();
   const { initializeServerPayment, isInitializing, loadingPhase } = usePaystack(`${sessionToken||'guest'}:${isCheckoutOpen}:${checkoutBundle?.id||''}`);
 
   const [phone, setPhone] = useState('');
@@ -90,7 +92,7 @@ export const CheckoutModal: React.FC = () => {
   const attemptGeneration=useRef(0),knownReference=useRef<string|null>(null),recoveryLocked=useRef(false);
   const [recoveryOnly,setRecoveryOnly]=useState(false);
   useEffect(()=>{++attemptGeneration.current;return()=>{++attemptGeneration.current;};},[sessionToken,isCheckoutOpen,checkoutBundle?.id]);
-  useEffect(()=>{if(!isCheckoutOpen||!checkoutBundle||checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data'||checkoutBundle.id.startsWith('instant-')||checkoutBundle.id.startsWith('airtime-')||purchaseIncident('data',checkoutBundle.network)){setCommercial(null);return;}let active=true;setCommercial(null);setQuoteError('');commercialRequest('commercial/quote/'+encodeURIComponent(checkoutBundle.id),sessionToken).then(r=>{if(active)setCommercial(r);}).catch(e=>{if(active)setQuoteError(e.message);});return()=>{active=false;};},[isCheckoutOpen,checkoutBundle?.id,sessionToken,quoteRefresh,user?.phone]);
+  useEffect(()=>{if(!isCheckoutOpen||!checkoutBundle||checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data'||checkoutBundle.id.startsWith('instant-')||checkoutBundle.id.startsWith('airtime-')||purchasePaused('data',checkoutBundle.network)){setCommercial(null);return;}let active=true;setCommercial(null);setQuoteError('');commercialRequest('commercial/quote/'+encodeURIComponent(checkoutBundle.id),sessionToken).then(r=>{if(active)setCommercial(r);}).catch(e=>{if(active)setQuoteError(e.message);});return()=>{active=false;};},[isCheckoutOpen,checkoutBundle?.id,sessionToken,quoteRefresh,user?.phone,serviceStatus.version]);
   // A typed Flexi amount has no catalogue price, so checkout asks the server before Pay is offered.
   const needsFlexiQuote = Boolean(isCheckoutOpen && checkoutBundle?.isFlexi && checkoutBundle.serviceFeeGhc === undefined
     && (checkoutBundle.serviceType === 'instant_bundle' || checkoutBundle.id.startsWith('instant-')));
@@ -270,12 +272,13 @@ export const CheckoutModal: React.FC = () => {
   const busy = walletBusy || isInitializing;
   // Paystack's window is open: the customer approves on their phone or in the window.
   const awaitingPayment = isInitializing && loadingPhase === 'opening';
-  // 3.6.3: a paused service (shared/serviceIncidents) never starts a new payment here, whatever opened checkout (a
-  // stale page, an old shortcut, the assistant). The server refuses it too. A payment window already opened, or a
-  // payment this checkout already knows about, keeps its own recovery path below.
-  const pausedIncident = isRegularData ? purchaseIncident('data', checkoutBundle.network) : null;
-  if (pausedIncident && !awaitingPayment && !busy && !paymentClosed && !knownReference.current) {
-    const restoration = restorationLine(pausedIncident);
+  // 3.6.3: a service paused in the Service Control Center never starts a new payment here, whatever opened checkout
+  // (a stale page, an old shortcut, the assistant). The server refuses it too. A payment window already opened, a
+  // payment this checkout already knows about, or a saved attempt it must recover keeps its own recovery path below.
+  const pausedControl = serviceControl(isAirtime ? 'airtime' : isInstantBundle ? 'instant_bundle' : 'data', checkoutBundle.network, serviceStatus);
+  const pausedIncident = pausedControl?.blocksPurchases ? pausedControl : null;
+  if (pausedIncident && !awaitingPayment && !busy && !paymentClosed && !knownReference.current && !recoveryLocked.current) {
+    const restoration = restorationLine(pausedIncident.expectedRestoration, serviceStatus.serverDate);
     return (
       <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Purchases paused"
         style={{ top: viewport.top, height: viewport.height || undefined }}
@@ -292,15 +295,14 @@ export const CheckoutModal: React.FC = () => {
             <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center gap-3">
               <NetworkBrandBadge network={checkoutBundle.network} size="lg" />
               <div className="min-w-0">
-                <p className="font-bold text-white leading-tight">{checkoutBundle.dataAmount} Data Bundle</p>
+                <p className="font-bold text-white leading-tight">{productLabel}</p>
                 <p className="text-xs text-amber-200 mt-0.5">Not available for purchase right now</p>
               </div>
             </div>
             <div role="status" className="rounded-2xl border border-amber-400/30 bg-amber-400/[0.07] p-3.5 space-y-2 text-sm leading-relaxed text-slate-200">
-              <p>{pausedIncident.message}</p>
-              <p className="font-semibold text-amber-100">{restoration.label}</p>
+              {pausedIncident.message && <p>{pausedIncident.message}</p>}
+              {restoration && <p className="font-semibold text-amber-100">{restoration.label}</p>}
               <p>No payment was started. {pausedIncident.existingOrders}</p>
-              <p className="text-slate-400">{pausedIncident.apology} {pausedIncident.followUp}</p>
             </div>
             <div className="grid grid-cols-2 gap-2.5 pt-1">
               <button type="button" className="mh-button-secondary" onClick={() => { closeCheckout(); openDataPage('data', 'all'); }}>Other bundles</button>
@@ -439,6 +441,8 @@ export const CheckoutModal: React.FC = () => {
       onError: (err) => {
         if(!active())return;
         const details=readCheckoutFailure(err.checkout);
+        // 3.6.3: the server refused this service; fetch the current status so the page explains a new pause at once.
+        if(['SERVICE_TEMPORARILY_UNAVAILABLE','PACKAGE_UNAVAILABLE'].includes(details?.code??(err as any)?.code))void refreshServiceStatus(true);
         if(details?.code==='ACTIVE_MTN_ORDER'&&details.paymentState==='not_started'&&!knownReference.current){recoveryLocked.current=false;setRecoveryOnly(false);clearDirectAttempt(sessionStorage,key,requestId);setActiveMtnConflict({orderRef:err.existingOrderReference,status:err.existingOrderStatus});return;}
         if(err.existingOrderReference){knownReference.current=err.existingOrderReference;setAttemptRef(err.existingOrderReference);checkpoint(err.existingOrderReference);}
         if(!isRegularData){if(err.code==='ACTIVE_MTN_ORDER'||err.code==='ACTIVE_MTN_ORDER_EXISTS'){setActiveMtnConflict({orderRef:err.existingOrderReference,status:err.existingOrderStatus});return;}setServerError(err.message||'We could not confirm this payment. Check the existing order before trying again.');return;}
@@ -520,6 +524,7 @@ export const CheckoutModal: React.FC = () => {
     }catch(error){
       if(generation!==attemptGeneration.current)return;
       const details=readCheckoutFailure((error as any).checkout);
+      if(['SERVICE_TEMPORARILY_UNAVAILABLE','PACKAGE_UNAVAILABLE'].includes(details?.code??(error as any)?.code))void refreshServiceStatus(true);
       if(isRegularData&&details?.paymentState==='not_started'&&!knownReference.current&&!recoveryLocked.current){
         const view=checkoutFailurePresentation(details.code);
         setPreflightIssue({code:details.code,title:view.title,message:view.message,supportingNote:'This recipient check was rejected. If you have an earlier Wallet attempt, check My Orders before starting another purchase.'});return;

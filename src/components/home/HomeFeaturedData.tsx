@@ -8,7 +8,7 @@ import { NetworkId } from '../../types';
 import { CompactBundleRow } from '../data/CompactBundleRow';
 import { getInstantBundlesOnServer } from '../../services/apiClient';
 import { ArrowRight, Wifi, Zap, ReceiptText, ShieldCheck, PackageSearch } from 'lucide-react';
-import { purchaseIncident } from '../../../shared/serviceIncidents';
+import { useServiceStatus, serviceControl, useOpenNetworkChoice } from '../../hooks/useServiceStatus';
 import { ServiceInlineNotice } from '../service/ServiceUpdate';
 
 const NETWORKS: { id: NetworkId; label: string }[] = [
@@ -16,6 +16,7 @@ const NETWORKS: { id: NetworkId; label: string }[] = [
   { id: 'airteltigo', label: 'AirtelTigo' },
   { id: 'telecel', label: 'Telecel' },
 ];
+const NETWORK_IDS = NETWORKS.map((n) => n.id);
 
 // What happens after Buy; timing depends on the network, so no delivery promises.
 const STEPS = [
@@ -29,8 +30,9 @@ export const HomeFeaturedData: React.FC = () => {
   const welcomeOffer=useWelcomeOffer(DATA_BUNDLES);
   const { openCheckout, openDataPage, setActivePage } = useApp();
   // 3.6.3: the first network open for purchases is shown first; a paused network stays in the switch and explains itself.
-  const [selectedNetwork, setSelectedNetwork] = useState<NetworkId>(() => NETWORKS.find(n => !purchaseIncident('data', n.id))?.id ?? 'mtn');
-  const incident = purchaseIncident('data', selectedNetwork);
+  const serviceStatus = useServiceStatus();
+  const [selectedNetwork, setSelectedNetwork] = useOpenNetworkChoice<NetworkId>('data', NETWORK_IDS, serviceStatus);
+  const incident = serviceControl('data', selectedNetwork, serviceStatus);
   const [instantAvailable, setInstantAvailable] = useState(false);
 
   useEffect(() => {
@@ -78,7 +80,7 @@ export const HomeFeaturedData: React.FC = () => {
                 >
                   <span className="home-network-dot" style={{ backgroundColor: GHANA_NETWORKS[id].brandColor }} aria-hidden="true" />
                   {label}
-                  {purchaseIncident('data', id) && <span className="sr-only">, under maintenance</span>}
+                  {serviceControl('data', id, serviceStatus)?.blocksPurchases && <span className="sr-only">, under maintenance</span>}
                 </button>
               ))}
             </div>
@@ -94,7 +96,7 @@ export const HomeFeaturedData: React.FC = () => {
                   onBuy={(bundle) => openCheckout(bundle)}
                 />
               ))}
-              {incident ? <ServiceInlineNotice incident={incident}> Other networks are available.</ServiceInlineNotice>
+              {incident?.blocksPurchases ? <ServiceInlineNotice control={incident}> Other networks are available.</ServiceInlineNotice>
                 : popularBundles.length === 0 && <p className="home-empty-state" role="status">No popular bundles to show for this network. Browse all bundles to check availability.</p>}
             </div>
 

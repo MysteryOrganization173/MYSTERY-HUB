@@ -331,3 +331,4 @@
 
 /* 3.6.3 · a network under maintenance: a small amber marker on its chip (the chip stays selectable and explains itself). */
 .mh-ds .mh-ds-net-paused { display: inline-block; flex-shrink: 0; width: 7px; height: 7px; margin-left: 4px; border-radius: 99px; background: #f2c46d; box-shadow: 0 0 0 2px #f2c46d33; }
+.mh-ds .mh-ds-net-paused.is-delayed { background: #7cc8ff; box-shadow: 0 0 0 2px #7cc8ff33; }
