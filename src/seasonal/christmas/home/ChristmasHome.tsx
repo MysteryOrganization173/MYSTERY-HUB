@@ -13,7 +13,7 @@ import { AfaArt, AirtimeArt, Bow, DataArt, EarnArt, EnvelopeBack, EnvelopeFront,
 import { markSeen, prefersReducedMotion, press, pressEnd, seenThisVisit, swing, useMedia, useReveal } from '../kit/motion';
 import { WelcomeCard } from '../kit/WelcomeCard';
 // Real business logic, shared with the ordinary homepage: catalogue, offers, checkout, templates, Marketplace, FAQs.
-import { purchaseIncident } from '../../../../shared/serviceIncidents';
+import { useServiceStatus, serviceControl, useOpenNetworkChoice } from '../../../hooks/useServiceStatus';
 import { ServiceInlineNotice } from '../../../components/service/ServiceUpdate';
 import { directCampaign, directCatalogConfirmed, useDirectCatalog } from '../../../hooks/useDirectCatalog';
 import { useWelcomeOffer } from '../../../hooks/useWelcomeOffer';
@@ -182,6 +182,7 @@ function Services({ christmas }: { christmas: boolean }) {
 /* ───────────────────────── Featured data: the velvet tray, the welcome invitation and the receipt ───────────────────────── */
 
 const NETWORKS: { id: NetworkId; label: string }[] = [{ id: 'mtn', label: 'MTN' }, { id: 'airteltigo', label: 'AirtelTigo' }, { id: 'telecel', label: 'Telecel' }];
+const NETWORK_IDS = NETWORKS.map((n) => n.id);
 // The same buying facts as the ordinary homepage: no delivery promise, timing depends on the network.
 const STEPS = [
   { icon: ReceiptText, title: 'Check the total and number', desc: 'Checkout shows the bundle price, any fee and the recipient before you pay.' },
@@ -194,8 +195,9 @@ function FeaturedData() {
   const welcomeOffer = useWelcomeOffer(bundles);
   const { openCheckout, openDataPage, setActivePage, openAuth } = useApp();
   // 3.6.3: the first network open for purchases is shown first; a paused network stays and explains itself.
-  const [network, setNetwork] = useState<NetworkId>(() => NETWORKS.find(n => !purchaseIncident('data', n.id))?.id ?? 'mtn');
-  const incident = purchaseIncident('data', network);
+  const serviceStatus = useServiceStatus();
+  const [network, setNetwork] = useOpenNetworkChoice<NetworkId>('data', NETWORK_IDS, serviceStatus);
+  const incident = serviceControl('data', network, serviceStatus);
   const [instantAvailable, setInstantAvailable] = useState(false);
   useEffect(() => {
     let on = true;
@@ -226,13 +228,13 @@ function FeaturedData() {
               {NETWORKS.map(({ id, label }) => (
                 <button key={id} type="button" aria-pressed={network === id} onClick={() => setNetwork(id)} style={{ '--network-color': GHANA_NETWORKS[id].brandColor } as React.CSSProperties}>
                   <span className="xh-net-dot" style={{ backgroundColor: GHANA_NETWORKS[id].brandColor }} aria-hidden="true" />{label}
-                  {purchaseIncident('data', id) && <span className="sr-only">, under maintenance</span>}
+                  {serviceControl('data', id, serviceStatus)?.blocksPurchases && <span className="sr-only">, under maintenance</span>}
                 </button>
               ))}
             </div>
             <div className="xh-bundles" key={network}>
               {popular.map(b => <CompactBundleRow key={b.id} bundle={b} directWelcomeOffer={welcomeOffer} onBuy={bundle => openCheckout(bundle)} />)}
-              {incident ? <ServiceInlineNotice incident={incident}> Other networks are available.</ServiceInlineNotice>
+              {incident?.blocksPurchases ? <ServiceInlineNotice control={incident}> Other networks are available.</ServiceInlineNotice>
                 : popular.length === 0 && <p className="xh-empty" role="status">No popular bundles to show for this network. Browse all bundles to check availability.</p>}
             </div>
             <div className="xh-tray-foot">

@@ -3,7 +3,7 @@ import type {OrderRecord} from '../types';
 import {afaStatusLabel} from '../../shared/afa';
 import {dataOrderPresentation} from './dataPurchasePresentation';
 import {customerOrderStatus} from './customerOrderPresentation';
-import {dataPurchasePaused} from '../../shared/serviceIncidents';
+import {purchasePaused} from '../hooks/useServiceStatus';
 import {historicalOrderClass,type HistoricalOrderClassifier} from '../services/orderHistoryClassification';
 export function memberGreeting(hour:number) {return hour>=5&&hour<12?'Good morning':hour>=12&&hour<17?'Good afternoon':'Good evening';}
 export function memberOrderLabel(order:SafePublicOrderDetails,classify:HistoricalOrderClassifier=historicalOrderClass) {
@@ -60,6 +60,6 @@ export function memberOrderNext(o:SafePublicOrderDetails,classify:HistoricalOrde
 export function memberReorder(o:SafePublicOrderDetails):{mode:'data'|'airtime';network:SafePublicOrderDetails['network']}|null {
   if(memberOrderTone(o)!=='done'||!isDataLike(o)||!['mtn','telecel','airteltigo'].includes(o.network))return null;
   // 3.6.3: no Buy again while this service is paused for new purchases (the service update explains why).
-  if((!o.service_type||o.service_type==='data')&&dataPurchasePaused(o.network))return null;
+  if(purchasePaused(o.service_type==='airtime'?'airtime':o.service_type==='instant_bundle'?'instant_bundle':'data',o.network))return null;
   return {mode:o.service_type==='airtime'?'airtime':'data',network:o.network};
 }

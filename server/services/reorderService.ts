@@ -1,3 +1,4 @@
+import { ServiceControlService } from './serviceControlService.js';
 /**
  * 3.4.1 Smart Buy Again. From one of the signed-in customer's own delivered orders, finds the product that order was
  * for, by the product id stored on the order (never by its name or historical price), and checks that the product is
@@ -94,6 +95,8 @@ export async function resolveReorder(order: OrderRecord, deps: ReorderDependenci
     const network = base.network;
     const face = typeof order.face_value_minor === 'number' && Number.isSafeInteger(order.face_value_minor) ? order.face_value_minor / 100 : NaN;
     if (!network || !validateAirtimeAmount(face).isValid) return no('unidentifiable');
+    // 3.6.3: a network whose Airtime is paused in the Service Control Center cannot be bought again for now.
+    if (await ServiceControlService.purchaseBlock('airtime', network)) return no('unavailable');
     const today = calculateAirtimeOrder(face);
     return { ...base, network, available: true, kind, airtime: { faceValueGhc: today.faceValueGhc, serviceFeeGhc: today.serviceFeeGhc, totalGhc: today.totalGhc } };
   }
@@ -108,6 +111,8 @@ export async function resolveReorder(order: OrderRecord, deps: ReorderDependenci
   if (pkg.enabled === false) return no('unavailable');
   const product = toPublicInstantBundle(pkg);
   if (!product || product.availability !== 'in_stock') return no('unavailable', asNetwork(product?.network) ?? base.network);
+  // 3.6.3: a network whose Instant Bundles are paused in the Service Control Center cannot be bought again for now.
+  if (await ServiceControlService.purchaseBlock('instant_bundle', product.network)) return no('unavailable', product.network);
   if (product.isFlexi) return no('choose_amount', product.network);
   const { recipientAlternative: _evidence, ...publicProduct } = product;
   return { ...base, network: product.network, available: true, kind, product: publicProduct };

@@ -17,7 +17,7 @@ import { PendingPaymentBanner } from '../checkout/PendingPaymentBanner';
 import { InstantBundlesCatalog } from './InstantBundlesCatalog';
 import { smoothScrollToElement, revealPressedChip, revealFocusedChip } from '../../utils/scroll';
 import { serviceNotices } from '../../config/serviceNotices';
-import { activeServiceIncidents, dataPurchasePaused, purchaseIncident } from '../../../shared/serviceIncidents';
+import { useServiceStatus, serviceControl } from '../../hooks/useServiceStatus';
 import { ServiceInlineNotice, ServiceMaintenanceState } from '../service/ServiceUpdate';
 import {
   Smartphone,
@@ -71,6 +71,7 @@ const followPointer = (e: React.PointerEvent<HTMLElement>) => {
 
 export const DataPage: React.FC = () => {
   const DATA_BUNDLES=useDirectCatalog();
+  const serviceStatus = useServiceStatus();
   const welcomeOffer=useWelcomeOffer(DATA_BUNDLES);
   const {
     openCheckout,
@@ -341,6 +342,8 @@ export const DataPage: React.FC = () => {
 
   const handleAirtimeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // 3.6.3: a network whose Airtime is paused in the Service Control Center never opens checkout.
+    if (serviceControl('airtime', airtimeNet, serviceStatus)?.blocksPurchases) return;
     const faceValue = airtimeFaceValueNum;
     const errors: { phone?: string; amount?: string } = {};
     if (isNaN(faceValue) || faceValue < 1) errors.amount = 'Minimum airtime is GH₵1.00.';
@@ -373,10 +376,13 @@ export const DataPage: React.FC = () => {
   };
 
   const mtnNotice = serviceNotices.mtn;
-  // 3.6.3: a network whose Data purchases are paused (shared/serviceIncidents) shows a maintenance state, not bundles.
-  const pausedDataNetworks = Object.fromEntries(activeServiceIncidents().filter(i => i.service === 'data').map(i => [i.network, true])) as Partial<Record<NetworkId, boolean>>;
-  const activeIncident = activeNetwork === 'all' ? null : purchaseIncident('data', activeNetwork);
-  const allNetworkIncidents = activeNetwork === 'all' ? activeServiceIncidents().filter(i => i.service === 'data') : [];
+  // 3.6.3: a network whose Data purchases are paused in the Service Control Center shows a maintenance state, not bundles.
+  const dataControls = serviceStatus.controls.filter(c => c.service === 'data');
+  const pausedDataNetworks = Object.fromEntries(dataControls.filter(c => c.blocksPurchases).map(c => [c.network, true])) as Partial<Record<NetworkId, boolean>>;
+  const delayedDataNetworks = Object.fromEntries(dataControls.filter(c => !c.blocksPurchases).map(c => [c.network, true])) as Partial<Record<NetworkId, boolean>>;
+  const activeControl = activeNetwork === 'all' ? null : serviceControl('data', activeNetwork, serviceStatus);
+  const activeIncident = activeControl?.blocksPurchases ? activeControl : null;
+  const listNotices = activeNetwork === 'all' ? dataControls : activeControl && !activeControl.blocksPurchases ? [activeControl] : [];
   const atNotice = serviceNotices.airteltigo;
   const modeButton = 'mh-ds-mode';
 
@@ -444,7 +450,7 @@ export const DataPage: React.FC = () => {
           </div>
 
           {/* One network selector, backed by the existing AppContext state. */}
-          {dataProductMode === 'data' && <DataNetworkSelector value={activeNetwork} onChange={setActiveNetwork} counts={networkCounts} paused={pausedDataNetworks} />}
+          {dataProductMode === 'data' && <DataNetworkSelector value={activeNetwork} onChange={setActiveNetwork} counts={networkCounts} paused={pausedDataNetworks} delayed={delayedDataNetworks} />}
         </div>
 
         {/* Dynamic Mode: Instant Bundles vs Airtime vs Standard Data */}
@@ -529,6 +535,8 @@ export const DataPage: React.FC = () => {
               </div>
             </fieldset>
 
+            {(() => { const control = serviceControl('airtime', airtimeNet, serviceStatus); return control ? <ServiceInlineNotice control={control}>{control.blocksPurchases ? ' Choose another network, or check back later.' : ''}</ServiceInlineNotice> : null; })()}
+
             {/* Amount */}
             <fieldset className="space-y-2">
               <legend className="text-sm font-semibold text-slate-200 mb-1.5">Amount</legend>
@@ -574,7 +582,7 @@ export const DataPage: React.FC = () => {
               </div>
             </div>
 
-            <button type="submit" data-tapped={airtimeTap[0]}
+            <button type="submit" data-tapped={airtimeTap[0]} disabled={Boolean(serviceControl('airtime', airtimeNet, serviceStatus)?.blocksPurchases)}
               className="mh-buy w-full min-h-12 px-4 rounded-xl bg-[#00c365] hover:bg-[#00e070] text-[#03160c] font-bold text-base flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
               Continue · GH₵{airtimeCalculation.total.toFixed(2)}
               <ArrowRight className="w-4 h-4 shrink-0" />
@@ -637,7 +645,7 @@ export const DataPage: React.FC = () => {
             </div>
 
             {/* MTN Network Service Notice (Tasteful, Customer-Friendly, Config-Driven) */}
-            {mtnNotice.enabled && !dataPurchasePaused('mtn') && (activeNetwork === 'mtn' || activeNetwork === 'all') && (
+            {mtnNotice.enabled && !serviceControl('data', 'mtn', serviceStatus) && (activeNetwork === 'mtn' || activeNetwork === 'all') && (
               <div className="mh-ds-notice rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3.5 text-xs text-slate-300">
                 <details>
                   <summary className="cursor-pointer min-h-11 flex flex-wrap items-center gap-x-2 py-2 list-none [&::-webkit-details-marker]:hidden">
@@ -659,11 +667,11 @@ export const DataPage: React.FC = () => {
             )}
 
             {/* A paused network (all networks view): one line above the other networks' bundles. */}
-            {allNetworkIncidents.map(incident => <ServiceInlineNotice key={incident.id} incident={incident}> Other networks are available below.</ServiceInlineNotice>)}
+            {listNotices.map(control => <ServiceInlineNotice key={control.scope} control={control}>{control.blocksPurchases ? ' Other networks are available below.' : ''}</ServiceInlineNotice>)}
 
             {/* Bundles: tiles grouped by network; the whole tile opens checkout */}
             {activeIncident ? (
-              <ServiceMaintenanceState incident={activeIncident} onNetwork={setActiveNetwork} onInstant={() => setDataProductMode('instant')} />
+              <ServiceMaintenanceState control={activeIncident} onNetwork={setActiveNetwork} onInstant={() => setDataProductMode('instant')} />
             ) : filteredBundles.length > 0 ? (
               <>
                 <p className="mh-ds-count-line" aria-live="polite">

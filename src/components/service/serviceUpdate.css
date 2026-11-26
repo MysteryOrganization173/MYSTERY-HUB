@@ -69,3 +69,18 @@
   .mh-svc-bar, .mh-svc-state { animation: none; }
   .mh-svc-more svg, .mh-svc-alt { transition: none; }
 }
+
+/* ───────── Release B: severities, delays, more updates, the exceptional modal ───────── */
+.mh-svc-bar[data-svc-severity="info"], .mh-svc-inline[data-svc-state="delayed"], .mh-svc-modal[data-svc-severity="info"] { --svc-accent: #7cc8ff; --svc-accent-soft: #7cc8ff1f; --svc-line: #7cc8ff40; }
+.mh-svc-bar[data-svc-severity="info"] { background: linear-gradient(90deg, #10202c, #14171a 55%, #121619); }
+.mh-svc-bar[data-svc-severity="critical"], .mh-svc-modal[data-svc-severity="critical"] { --svc-accent: #ff8f9f; --svc-accent-soft: #ff8f9f1f; --svc-line: #ff8f9f45; }
+.mh-svc-bar[data-svc-severity="critical"] { background: linear-gradient(90deg, #2a1218, #14171a 55%, #121619); }
+.mh-svc-more-updates { margin-top: 4px; min-height: 32px; padding: 0; font: 600 .75rem/1 var(--svc-heading); color: var(--svc-accent); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.mh-svc-modal-backdrop { position: fixed; inset: 0; z-index: 70; display: grid; place-items: end center; padding: 0 8px; background: #000b; animation: mh-svc-fade .2s ease-out backwards; }
+@media (min-width: 640px) { .mh-svc-modal-backdrop { place-items: center; padding: 16px; } }
+.mh-svc-modal { --svc-accent: #f2c46d; --svc-accent-soft: #f2c46d1f; --svc-line: #f2c46d40; --svc-ink: #f3f6f8; --svc-soft: #d3dbe3; --svc-heading: var(--font-heading, 'Outfit', sans-serif);
+  width: min(100%, 28rem); display: grid; justify-items: center; text-align: center; gap: 10px; padding: 24px 18px max(18px, env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; border: 1px solid var(--svc-line); background: linear-gradient(180deg, #151b21, #0e1419); color: var(--svc-ink); animation: mh-svc-in .3s cubic-bezier(.2, .8, .2, 1) backwards; }
+@media (min-width: 640px) { .mh-svc-modal { border-radius: 22px; } }
+.mh-svc-state-when.is-overdue { color: #fde7b5; }
+@keyframes mh-svc-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mh-svc-modal, .mh-svc-modal-backdrop { animation: none; } }

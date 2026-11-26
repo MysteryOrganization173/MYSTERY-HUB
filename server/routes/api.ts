@@ -59,6 +59,8 @@ import {
 import { afaRouter } from './afaApi.js';
 import { creativeStudioRouter } from './creativeStudioApi.js';
 import { seasonalRouter } from './seasonalApi.js';
+import { serviceStatusRouter } from './serviceControlApi.js';
+import { ServiceControlService } from '../services/serviceControlService.js';
 import { resultsCheckerRouter } from './resultsCheckerApi.js';
 import { CREATIVE_INQUIRY_TYPE } from '../../shared/creativeStudio.js';
 import { accountRouter } from './accountApi.js';
@@ -76,6 +78,7 @@ apiRouter.use('/commercial',commercialRouter);
 apiRouter.use('/afa', afaRouter);
 apiRouter.use('/creative-studio', creativeStudioRouter);
 apiRouter.use('/seasonal', seasonalRouter);
+apiRouter.use('/service-status', serviceStatusRouter);
 apiRouter.use('/results-checkers', resultsCheckerRouter);
 
 // Mount Website Builder endpoints
@@ -184,9 +187,12 @@ apiRouter.get('/instant-bundles', async (_req: Request, res: Response) => {
     }
 
     const publicProducts: PublicInstantBundle[] = [];
+    const pausedInstantNetworks = await ServiceControlService.blockedNetworks('instant_bundle');
     for (const pkg of rawList) {
       if (pkg.enabled === false) continue;
       const mapped = toPublicInstantBundle(pkg);
+      // 3.6.3: a network paused in the Service Control Center is not offered.
+      if (mapped && pausedInstantNetworks.has(mapped.network)) continue;
       if (mapped) {
         mapped.recipientAlternative = (catalogRes as {success?:unknown}).success===true && pkg.available===true && ['mtn','telecel','airteltigo'].includes(String(pkg.network).toLowerCase());
         publicProducts.push(mapped);
@@ -529,6 +535,15 @@ apiRouter.post('/payments/initialize', restrictSharedMerchantCheckout, optionalA
       if (rawNet.includes('telecel') || rawNet === 't') network = 'telecel';
       else if (rawNet.includes('airtel') || rawNet.includes('tigo') || rawNet === 'at') network = 'airteltigo';
 
+      // 3.6.3: a network whose Instant Bundles are paused in the Service Control Center refuses new purchases here,
+      // before any order, supplier or payment step. Existing orders and their payments are not affected.
+      const pausedInstant = await ServiceControlService.purchaseBlock('instant_bundle', network);
+      if (pausedInstant) {
+        const message = `${pausedInstant.title || 'Instant Bundles are paused'}. New purchases are paused for now. No payment has been taken.`;
+        res.status(503).json({ code: 'SERVICE_TEMPORARILY_UNAVAILABLE', message, error: message });
+        return;
+      }
+
       const supplierRoute = FulfilmentService.resolveRoute({service:'instant_bundle',network,productId:`instant-${pkg.id}`});
 
       // 3. Fast MTN duplicate check
@@ -673,6 +688,14 @@ apiRouter.post('/payments/initialize', restrictSharedMerchantCheckout, optionalA
 
       if (!['mtn', 'airteltigo', 'telecel'].includes(airtimeNet)) {
         res.status(400).json({ error: 'Please select a valid network (MTN, AirtelTigo, or Telecel).' });
+        return;
+      }
+      // 3.6.3: a network whose Airtime is paused in the Service Control Center refuses new purchases here, before any
+      // order, supplier or payment step. Existing orders and their payments are not affected.
+      const pausedAirtime = await ServiceControlService.purchaseBlock('airtime', airtimeNet);
+      if (pausedAirtime) {
+        const message = `${pausedAirtime.title || 'Airtime is paused'}. New purchases are paused for now. No payment has been taken.`;
+        res.status(503).json({ code: 'SERVICE_TEMPORARILY_UNAVAILABLE', message, error: message });
         return;
       }
 

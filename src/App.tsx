@@ -12,7 +12,7 @@ import { ToastContainer } from './components/common/Toast';
 import { SEOHead } from './components/common/SEOHead';
 import { HomePage } from './components/home/HomePage';
 import { CheckoutModal } from './components/checkout/CheckoutModal';
-import { ServiceUpdateBar } from './components/service/ServiceUpdate';
+import { AnnouncementBar, AnnouncementModal } from './components/service/ServiceUpdate';
 import { OrderStatusModal } from './components/checkout/OrderStatusModal';
 import { WaitlistModal } from './components/common/WaitlistModal';
 import { AccountControls } from './components/auth/AccountControls';
@@ -61,7 +61,7 @@ function useOnceTrue(condition: boolean) {
 }
 
 const AppContent: React.FC = () => {
-  const { activePage, selectedTemplatePreview, isMysteryAiOpen } = useApp();
+  const { activePage, selectedTemplatePreview, isMysteryAiOpen, isCheckoutOpen, isStatusModalOpen, isAuthModalOpen } = useApp();
   const templatePreviewNeeded = useOnceTrue(Boolean(selectedTemplatePreview));
   const assistantNeeded = useOnceTrue(isMysteryAiOpen);
   // Seasonal Experience: only the customer shell below carries the season. The editor, Admin and My Business
@@ -131,8 +131,8 @@ const AppContent: React.FC = () => {
       <GrowthTracker />
       <a href="#main-content" className="fixed -top-20 left-4 focus:top-3 z-[120] mh-button">Skip to content</a>
       <Navbar />
-      {/* 3.6.3: a service update (e.g. a paused network) under the header on the homepage, Orders and Help. */}
-      <ServiceUpdateBar page={activePage} />
+      {/* 3.6.3: announcements from the Service Control Center, under the header on the pages each one names. */}
+      <AnnouncementBar page={activePage} />
 
       {/* Main Content Area */}
       <main id="main-content" tabIndex={-1} className="flex-1 min-w-0">
@@ -161,6 +161,7 @@ const AppContent: React.FC = () => {
       {/* Global Interactive Overlays */}
       <CheckoutModal />
       <OrderStatusModal />
+      <AnnouncementModal page={activePage} blocked={isCheckoutOpen || isStatusModalOpen || isAuthModalOpen} />
       {templatePreviewNeeded && <TemplatePreviewModal />}
       <WaitlistModal />
       <AuthModal />

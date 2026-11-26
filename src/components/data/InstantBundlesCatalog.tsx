@@ -1,4 +1,6 @@
 import { DataNetworkSelector } from './DataNetworkSelector';
+import { serviceControl, useServiceStatus } from '../../hooks/useServiceStatus';
+import { ServiceMaintenanceState } from '../service/ServiceUpdate';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getInstantBundlesOnServer, PublicInstantBundle } from '../../services/apiClient';
@@ -25,6 +27,7 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
   onSelectNetwork: controlledOnSelectNetwork,
 }) => {
   const { openCheckout } = useApp();
+  const serviceStatus = useServiceStatus();
 
   const [products, setProducts] = useState<PublicInstantBundle[]>([]);
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
@@ -78,15 +81,21 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
     const foundSet = new Set<InstantBundleCategoryType>();
     
     products.forEach((p) => {
+      // 3.6.3: only types a customer can actually buy now (a paused network's packages are not offered).
+      if (serviceControl('instant_bundle', p.network, serviceStatus)?.blocksPurchases) return;
       const info = getInstantBundlePresentation(p);
       foundSet.add(info.categoryKey);
     });
 
     return categoryOrder.filter((cat) => foundSet.has(cat));
-  }, [products]);
+  }, [products, serviceStatus]);
+  const instantPaused = useMemo(() => Object.fromEntries((['mtn', 'airteltigo', 'telecel'] as NetworkId[]).map((n) => [n, Boolean(serviceControl('instant_bundle', n, serviceStatus)?.blocksPurchases)])), [serviceStatus]);
+  const instantDelayed = useMemo(() => Object.fromEntries((['mtn', 'airteltigo', 'telecel'] as NetworkId[]).map((n) => [n, serviceControl('instant_bundle', n, serviceStatus)?.state === 'delayed'])), [serviceStatus]);
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
+      // 3.6.3: a network whose Instant Bundles are paused in the Service Control Center is not offered.
+      if (serviceControl('instant_bundle', p.network, serviceStatus)?.blocksPurchases) return false;
       // 1. Network filter
       if (selectedNetwork !== 'all' && p.network !== selectedNetwork) {
         return false;
@@ -110,7 +119,7 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
       }
       return true;
     });
-  }, [products, selectedNetwork, selectedCategory, searchQuery]);
+  }, [products, selectedNetwork, selectedCategory, searchQuery, serviceStatus]);
 
   const handleBuy = (
     product: PublicInstantBundle,
@@ -150,7 +159,7 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
             Video, social, midnight and standard network packages. Each one shows its conditions, and a small checkout fee is added and shown before you pay.
           </p>
         </div>
-        <DataNetworkSelector value={selectedNetwork} onChange={setSelectedNetwork} />
+        <DataNetworkSelector value={selectedNetwork} onChange={setSelectedNetwork} paused={instantPaused} delayed={instantDelayed} />
       </div>
 
       {/* Category chips, with search one tap away (the same pattern as Data). */}
@@ -215,7 +224,9 @@ export const InstantBundlesCatalog: React.FC<InstantBundlesCatalogProps> = ({
         </div>
       )}
 
-      {!isLoading && !error && isAvailable && filteredProducts.length === 0 && (
+      {selectedNetwork !== 'all' && serviceControl('instant_bundle', selectedNetwork, serviceStatus)?.blocksPurchases ? (
+        <ServiceMaintenanceState control={serviceControl('instant_bundle', selectedNetwork, serviceStatus)!} onNetwork={setSelectedNetwork} />
+      ) : !isLoading && !error && isAvailable && filteredProducts.length === 0 && (
         <div className={stateCard}>
           <PackageX className="w-8 h-8 text-slate-500 mx-auto" />
           <h3 className="text-base font-bold text-white">No packages match</h3>
