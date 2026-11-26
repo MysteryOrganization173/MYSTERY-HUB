@@ -53,6 +53,7 @@ const announce = async (body: Record<string, unknown>) => {
 const instantCatalogue = [
   { id: 'mtn-video', name: 'MTN Video 2GB', network: 'mtn', priceMinor: 500, enabled: true, available: true },
   { id: 'tc-video', name: 'Telecel Video 2GB', network: 'telecel', priceMinor: 500, enabled: true, available: true },
+  { id: 'mtn-flexi', name: 'MTN Flexi', network: 'mtn', isFlexi: true, mode: 'flexi', minAmountMajor: 1, maxAmountMajor: 500, payableRatio: 1, enabled: true, available: true },
 ];
 
 before(async () => {
@@ -233,7 +234,6 @@ test('payment start, reorder and the assistant refuse Data through the catalogue
   assert.match(init, /const existingCheckout=await recoverData\(\);[\s\S]*const product = \(await CommercialService\.catalog\(\)\)\.products\.find\(/, 'an existing checkout is recovered before the catalogue is consulted');
   assert.match(init, /if\(concurrent\|\|existingCheckout\)throw requireCheckoutRecovery/, 'a customer who already started paying is sent to recovery, never charged again');
   assert.match(code('server/services/reorderService.ts'), /dataCatalogue: \(\) => CommercialService\.catalog\(\)/);
-  assert.match(code('server/services/commercialService.ts'), /paused=await ServiceControlService\.blockedNetworks\('data'\);/);
   assert.match(code('server/services/commercialService.ts'), /isActive:p\.isActive&&\(setting\?\.enabled\?\?true\)&&!paused\.has\(p\.network\),/);
   // The Instant guard sits before route resolution; the Airtime guard after network validation.
   const instantStart = api.indexOf("const pausedInstant = await ServiceControlService.purchaseBlock('instant_bundle', network);");
@@ -244,7 +244,7 @@ test('payment start, reorder and the assistant refuse Data through the catalogue
   for (const file of ['server/services/paystackService.ts', 'server/services/fulfilmentService.ts', 'server/services/financeService.ts']) assert.doesNotMatch(source(file), /ServiceControlService|serviceControls|announcements/, file);
   // In the router, every use sits before payment starts: verification, cancel and the webhooks never read it.
   const uses = [...api.matchAll(/ServiceControlService\./g)].map((m) => m.index!);
-  assert.equal(uses.length, 3);
+  assert.equal(uses.length, 4, 'Instant list, Instant Flexi quote, Instant start, Airtime start');
   assert.ok(uses.every((i) => i < api.indexOf("apiRouter.get('/payments/verify/:reference'")));
 });
 
@@ -399,7 +399,7 @@ test('an error never reopens a service: the last good snapshot applies, and with
     FinanceStore.readConfig = async () => { throw new Error('database unavailable'); };
     Date.now = () => realNow() + 60_000; // past the 15 s cache
     assert.ok(await S.purchaseBlock('data', 'mtn'), 'the last good snapshot keeps the pause');
-    S.invalidate();
+    S.useShippedDefaultsForTests(true); // forget every snapshot: a cold process whose first read fails
     await assert.rejects(S.blockedNetworks('data'), /database unavailable/);
     await assert.rejects(CommercialService.catalog(), 'no catalogue, so no quote or payment start');
     const status = await request('service-status', undefined, null);
@@ -421,7 +421,7 @@ test('one shared snapshot: cached for 15 s, single-flight, refreshed by a save',
     assert.equal((await saveControl({ scope: 'data:airteltigo', state: 'suspended' })).status, 200);
     const afterSave = reads;
     assert.ok(await S.purchaseBlock('data', 'airteltigo'), 'a save in this process is visible at once');
-    assert.equal(reads, afterSave + 2);
+    assert.equal(reads, afterSave, 'served from what was just committed, without a cold read');
   } finally { FinanceStore.readConfig = read; S.invalidate(); }
   // The browser: one store, one endpoint, refreshed on focus (throttled) and every 5 minutes; never per card.
   const hook = code('src/hooks/useServiceStatus.ts');
@@ -439,7 +439,7 @@ test('outside the test runner the browser starts from the shipped record, and th
   assert.match(hook, /: \{ version: 'shipped', serverDate: accraDate\(\), controls: publicControls\(normalizeControls\(undefined\)\), announcements: publicAnnouncements\(normalizeAnnouncements\(undefined\)\), confirmed: false \};/);
   assert.match(hook, /if \(!underNodeTest\) throw new Error\('Only tests can replace the service status\.'\);/);
   assert.match(code('server/services/serviceControlService.ts'), /if \(!underNodeTest\) throw new Error\('Only tests can change service control defaults\.'\);/);
-  assert.match(code('shared/testRuntime.ts'), /process\.env\?\.NODE_TEST_CONTEXT \|\| process\.env\?\.NODE_ENV === 'test'/);
+  assert.match(code('shared/testRuntime.ts'), /export const underNodeTest = typeof process !== 'undefined' && Boolean\(process\.env\?\.NODE_TEST_CONTEXT\);/, 'NODE_ENV=test alone never drops the shipped pause');
   // Under tests the store starts empty; a test can opt in.
   assert.equal(getServiceStatus().controls.length, 0);
   setServiceStatusForTests({ version: 't', serverDate: '2026-11-25', controls: publicControls(normalizeControls(undefined)), announcements: [], confirmed: true });
@@ -507,10 +507,120 @@ test('the Admin screen sends the reviewed version, confirms the effect first, an
   const admin = code('src/components/admin/sections/AdminServiceControlCenter.tsx');
   assert.match(admin, /commercialRequest\(`admin\/service-control\/\$\{path\}`, token, \{ \.\.\.body, confirmed: true \}\)/);
   assert.match(admin, /expectedVersion: version/);
-  assert.match(admin, /disabled=\{!ack \|\| needWords \|\| busy\}/, 'a control change needs the effect acknowledged');
-  assert.match(admin, /if \(result\?\.view\) setView\(result\.view\);\s*setNotice\(done\);/, 'the notice follows the server response');
+  assert.match(admin, /disabled=\{!ack \|\| needWords \|\| supplierNamed \|\| busy\}/, 'a control change needs the effect acknowledged');
+  assert.match(admin, /if \(result\?\.view\) setView\(result\.view\); else void refresh\(\);\s*setNotice\(result\?\.view \? done : `\$\{done\} Refreshing to show the latest state\.`\);/, 'the notice follows the server response');
   assert.match(admin, /e\?\.status === 409/);
   assert.match(admin, /useEffect\(\(\) => \{ setView\(null\); setSheet\(null\); setNotice\(''\); void refresh\(\); return \(\) => \{ generation\.current\+\+; \}; \}, \[refresh\]\);/, 'a different session never sees the previous view');
   assert.match(code('src/components/admin/sections/AdminCommercialSection.tsx'), /<AdminServiceControlCenter token=\{token\}\/><AdminSupplierRouting token=\{token\}\/><AdminServiceReadiness token=\{token\}\/>/);
   { const adminApi = code('server/routes/adminApi.ts'); const mount = adminApi.indexOf("adminRouter.use('/service-control',adminServiceControlRouter);"); assert.ok(mount > adminApi.indexOf('adminRouter.use(requireAdmin);') && adminApi.indexOf('adminRouter.use(requireAdmin);') > 0, 'mounted after the administrator check'); }
+});
+
+// ───────────────────────── Findings from the independent review ─────────────────────────
+
+test('inside a transaction the catalogue reads the controls through that transaction, never a second pool connection', async () => {
+  const read = FinanceStore.readConfig;
+  const id = (await CommercialService.catalog()).products[0].id;
+  try {
+    // Any read of the controls outside the open transaction (the shared snapshot uses the pool) now fails loudly.
+    FinanceStore.readConfig = async (key: string) => { if (key.startsWith('service-')) throw new Error('a pool read happened inside a transaction'); return read(key); };
+    S.invalidate();
+    const quote = await CommercialService.quote(id, 'buyer'); // signed in: runs inside FinanceStore.transaction
+    assert.ok(quote.totalMinor > 0);
+  } finally { FinanceStore.readConfig = read; S.invalidate(); }
+  assert.match(code('server/services/commercialService.ts'), /paused=await ServiceControlService\.blockedNetworks\('data',tx\);/);
+});
+
+test('a malformed saved record fails closed; an unknown state refuses purchases; Admin can repair it', async () => {
+  await FinanceStore.transaction('admin', (tx) => tx.saveConfig('service-controls', { controls: 'not-a-list' }));
+  S.invalidate();
+  for (const scope of SERVICE_SCOPES) assert.ok(await S.purchaseBlock(scope.service, scope.network), `${scope.id} refuses while the record is unreadable`);
+  const view = await adminView();
+  assert.equal(view.controls.unreadable, true);
+  assert.equal((await saveControl({ scope: 'data:telecel', state: 'operational' })).status, 200, 'saving replaces the unreadable record');
+  assert.equal(await S.purchaseBlock('data', 'telecel'), null);
+  assert.ok(await S.purchaseBlock('data', 'mtn'), 'every other scope stays refused until reviewed');
+  await FinanceStore.transaction('admin', (tx) => tx.saveConfig('service-controls', { version: 'future', controls: [{ scope: 'data:telecel', state: 'paused-by-a-future-version', title: 'x', message: 'y' }] }));
+  S.invalidate();
+  assert.equal((await S.purchaseBlock('data', 'telecel'))?.state, 'suspended', 'an unknown state never reopens');
+  assert.equal(normalizeControls(null).source, 'shipped-default');
+  assert.equal(normalizeControls('garbage').unreadable, true);
+  assert.equal(normalizeAnnouncements({ items: 'x' }).items.length, 0, 'an unreadable announcement list shows nothing (and never touches a pause)');
+});
+
+test('a committed save is never reported as "nothing changed", even if re-reading the view fails', async () => {
+  const admin = S.admin;
+  try {
+    const version = (await S.admin()).controls.version;
+    (S as any).admin = async () => { throw new Error('view unavailable'); };
+    const result = await S.saveControl('admin', { scope: 'data:airteltigo', state: 'suspended', title: 'AirtelTigo Data', message: 'Paused for now.', existingOrders: '', expectedRestoration: null, expectedVersion: version, confirmed: true });
+    assert.equal(result.view, null);
+    assert.equal(typeof result.saved, 'string');
+  } finally { (S as any).admin = admin; }
+  assert.ok(await S.purchaseBlock('data', 'airteltigo'), 'the change is in force');
+});
+
+test('a read that started before a save can never put the older record back in the cache', async () => {
+  const read = FinanceStore.readConfig;
+  S.invalidate();
+  let release!: () => void; const gate = new Promise<void>((r) => { release = r; });
+  try {
+    FinanceStore.readConfig = async (id: string) => { const value = await read(id); if (id.startsWith('service-')) await gate; return value; };
+    const early = S.purchaseBlock('data', 'airteltigo'); // reads the pre-save state, then waits
+    await new Promise((r) => setTimeout(r, 10));
+    const version = (await read('service-controls'))?.version ?? 'test-empty';
+    FinanceStore.readConfig = read;
+    await S.saveControl('admin', { scope: 'data:airteltigo', state: 'suspended', title: 'AirtelTigo Data', message: 'Paused for now.', existingOrders: '', expectedRestoration: null, expectedVersion: version, confirmed: true });
+    release();
+    assert.equal(await early, null, 'the early caller sees the state it started with');
+    assert.ok(await S.purchaseBlock('data', 'airteltigo'), 'but the cache holds the saved record');
+  } finally { FinanceStore.readConfig = read; release(); S.invalidate(); }
+});
+
+test('validation: no supplier names in customer words, and only real CTA destinations', async () => {
+  const r = await saveControl({ scope: 'data:mtn', state: 'maintenance', message: 'Our supplier Success Biz Hub is down.' });
+  assert.equal(r.status, 400);
+  assert.match((await r.json()).error, /must not name a supplier/);
+  assert.equal((await announce({ action: 'create', announcement: { ...draft, summary: 'Brainiac Mart is restocking.' } })).status, 400);
+  for (const cta of ['toString', 'constructor', '__proto__', 'hasOwnProperty']) assert.ok(announcementProblems({ ...draft, cta } as any).includes('Choose a supported action.'), cta);
+  assert.equal((await announce({ action: 'create', announcement: { ...draft, cta: 'toString' } })).status, 400);
+  const parsed = parseServiceStatus({ version: 'v', serverDate: '2026-11-26', controls: [], announcements: [{ id: 'a', revision: 1, title: 't', summary: 's', placement: 'bar', pages: ['home'], cta: 'constructor' }] })!;
+  assert.equal(parsed.announcements[0].cta, null, 'the browser drops an unknown destination');
+});
+
+test('the public status is not rate-limited per address (every visitor shares the proxy address)', async () => {
+  const statuses = new Set<number>();
+  for (let i = 0; i < 130; i++) statuses.add((await request('service-status', undefined, null)).status);
+  assert.deepEqual([...statuses], [200]);
+});
+
+test('the Instant Flexi quote refuses a paused network; a card Data start for a paused network is refused but an existing checkout is recovered', async () => {
+  assert.equal((await request('instant-bundles/instant-mtn-flexi/quote?amount=5', undefined, null)).status, 200);
+  assert.equal((await saveControl({ scope: 'instant_bundle:mtn', state: 'maintenance' })).status, 200);
+  assert.equal((await request('instant-bundles/instant-mtn-flexi/quote?amount=5', undefined, null)).status, 503);
+
+  const q = await CommercialService.quote('mtn-1gb');
+  const body = { productId: 'mtn-1gb', recipientPhone: '0271234567', customerEmail: 'receipt@fixture.test', requestId: randomUUID(), expectedTotalMinor: q.totalMinor, expectedRegularMinor: q.regularMinor, expectedStandardMinor: q.standardMinor, pricingRevision: q.pricingRevision, promotionRevision: q.promotionRevision };
+  const first = await request('payments/initialize', body, null);
+  assert.equal(first.status, 200, await first.clone().text());
+  const started = await first.json();
+  assert.equal(paystackCalls, 1);
+  assert.equal((await saveControl({ scope: 'data:mtn', state: 'suspended' })).status, 200);
+  const again = await request('payments/initialize', body, null);
+  const againBody = await again.json();
+  assert.notEqual(againBody.checkout?.code, 'PACKAGE_UNAVAILABLE', 'the customer who already started paying is not told the bundle is unavailable');
+  assert.ok(again.status === 200 ? againBody.orderRef === started.orderRef : JSON.stringify(againBody).includes(started.orderRef), JSON.stringify(againBody));
+  const fresh = await request('payments/initialize', { ...body, requestId: randomUUID() }, null);
+  assert.equal((await fresh.json()).checkout?.code, 'PACKAGE_UNAVAILABLE');
+  assert.equal(paystackCalls, 1, 'no second payment was started');
+});
+
+test('review follow-ups in the browser and the latent store checkout', () => {
+  const ui = code('src/components/service/ServiceUpdate.tsx');
+  assert.match(ui, /restorationLine\(a\.expectedRestoration \?\? control\?\.expectedRestoration \?\? null, serverDate, Boolean\(control\?\.blocksPurchases\)\)/, 'no "purchases stay paused" from an announcement alone');
+  assert.match(ui, /<dialog ref=\{dialogRef\} className="mh-svc-modal-dialog"/, 'the exceptional pop-up is a native modal dialog');
+  assert.match(ui, /aria-controls=\{open \? detailsId : undefined\}/);
+  const checkout = code('src/components/checkout/CheckoutModal.tsx');
+  assert.match(checkout, /quoteRefresh,user\?\.phone,serviceStatus\.version\]\);/);
+  assert.equal((checkout.match(/void refreshServiceStatus\(true\)/g) || []).length, 2, 'a refused start refreshes the status (card and Wallet)');
+  assert.match(code('server/services/websiteBusinessService.ts'), /if\(await ServiceControlService\.purchaseBlock\('data',product\.network\)\)return reject\('SERVICE_TEMPORARILY_UNAVAILABLE'\);/);
 });

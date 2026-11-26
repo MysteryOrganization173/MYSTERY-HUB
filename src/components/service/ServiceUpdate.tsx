@@ -35,10 +35,13 @@ const NETWORK_NAME: Record<string, string> = { mtn: 'MTN', telecel: 'Telecel', a
 const SERVICE_NAME: Record<string, string> = { data: 'Data', instant_bundle: 'Instant Bundles', airtime: 'Airtime' };
 export const stateChip = (state: PublicServiceControl['state']) => state === 'delayed' ? 'Delays' : state === 'suspended' ? 'Paused' : 'Maintenance';
 
-/** The restoration line for an announcement: its own date, else its service's, against the server's date. */
+/**
+ * The restoration line for an announcement: its own date, else its service's, against the server's date. It speaks of
+ * purchases staying paused only while a pause is actually in force, never from an announcement alone.
+ */
 function restorationFor(a: Pick<PublicAnnouncement, 'expectedRestoration' | 'scope'>, controls: PublicServiceControl[], serverDate: string) {
   const control = a.scope === 'global' ? null : controls.find((c) => c.scope === a.scope) ?? null;
-  return restorationLine(a.expectedRestoration ?? control?.expectedRestoration ?? null, serverDate, control ? control.blocksPurchases : true);
+  return restorationLine(a.expectedRestoration ?? control?.expectedRestoration ?? null, serverDate, Boolean(control?.blocksPurchases));
 }
 
 /** The bar itself, also used by the Admin preview with a draft. */
@@ -68,7 +71,7 @@ export function AnnouncementBarView({ announcement, controls, serverDate, more =
         </div>
         <div className="mh-svc-bar-actions">
           {(announcement.details || cta) && (
-            <button type="button" className="mh-svc-more" aria-expanded={open} aria-controls={detailsId} onClick={() => setOpen((v) => !v)}>
+            <button type="button" className="mh-svc-more" aria-expanded={open} aria-controls={open ? detailsId : undefined} onClick={() => setOpen((v) => !v)}>
               <span>{open ? 'Less' : 'Details'}</span><ChevronDown aria-hidden="true" />
             </button>
           )}
@@ -101,22 +104,34 @@ export function AnnouncementBar({ page }: { page: string }) {
     more={list.length - 1} onMore={() => setIndex((i) => i + 1)} onDismiss={() => { setDismissed(addKey(DISMISS_KEY, keyOf(shown))); setIndex(0); }} onCta={() => go(shown)} />;
 }
 
-/** An exceptional announcement: once per revision on this device, never on top of checkout or a receipt. */
+/**
+ * An exceptional announcement: once per revision on this device, never on top of checkout, a receipt or sign-in.
+ * A native modal dialog, so focus stays inside, the page behind is inert, Escape closes it from anywhere and focus
+ * returns to where it was.
+ */
 export function AnnouncementModal({ page, blocked }: { page: string; blocked: boolean }) {
   const { user } = useApp();
   const status = useServiceStatus();
   const [seen, setSeen] = useState<string[]>(() => readKeys(MODAL_KEY));
   const go = useCtaNavigation();
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const shown = announcementsFor(status.announcements, page, Boolean(user), 'modal').find((a) => !seen.includes(keyOf(a)));
-  useEffect(() => { if (shown && !blocked) closeRef.current?.focus(); }, [shown?.id, shown?.revision, blocked]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!shown || blocked) return null;
+  const shown = blocked ? undefined : announcementsFor(status.announcements, page, Boolean(user), 'modal').find((a) => !seen.includes(keyOf(a)));
+  const shownKey = shown ? keyOf(shown) : null;
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog || !shownKey) return;
+    if (!dialog.open) { try { dialog.showModal(); } catch { dialog.setAttribute('open', ''); } }
+    closeRef.current?.focus();
+    return () => { if (dialog.open) dialog.close(); };
+  }, [shownKey]);
+  if (!shown) return null;
   const close = () => setSeen(addKey(MODAL_KEY, keyOf(shown)));
   const restoration = restorationFor(shown, status.controls, status.serverDate);
   const cta = shown.cta ? ANNOUNCEMENT_CTAS[shown.cta] : null;
   return (
-    <div className="mh-svc-modal-backdrop" role="presentation" onKeyDown={(e) => { if (e.key === 'Escape') close(); }}>
-      <div className="mh-svc-modal" role="dialog" aria-modal="true" aria-labelledby="mh-svc-modal-title" data-svc-severity={shown.severity}>
+    <dialog ref={dialogRef} className="mh-svc-modal-dialog" aria-labelledby="mh-svc-modal-title" onCancel={(e) => { e.preventDefault(); close(); }}>
+      <div className="mh-svc-modal" data-svc-severity={shown.severity}>
         <span className="mh-svc-bar-icon" aria-hidden="true">{shown.severity === 'info' ? <Info /> : <AlertTriangle />}</span>
         <h2 id="mh-svc-modal-title" className="mh-svc-state-title">{shown.title}</h2>
         <p className="mh-svc-state-text">{shown.summary}</p>
@@ -127,7 +142,7 @@ export function AnnouncementModal({ page, blocked }: { page: string; blocked: bo
           <button ref={closeRef} type="button" className="mh-button" onClick={close}>OK</button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 

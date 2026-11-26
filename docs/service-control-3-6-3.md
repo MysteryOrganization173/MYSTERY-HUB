@@ -76,9 +76,10 @@ No production setting, table or supplier changes. **Production keeps pausing MTN
   - A Wallet retry with the same request is recovered, never refused or charged twice (tested).
 
 **Reads.**
-- One snapshot per server process, cached 15 s, single-flight.
-- A save takes effect immediately on the server that handled it. Other instances see it within 15 s.
+- One snapshot per server process, cached 15 s, single-flight. Inside a database transaction (a signed-in quote, a payment start) the controls are read through that transaction's own connection, never a second pool connection.
+- A save takes effect immediately on the server that handled it (it serves what it just committed). Other instances see it within 15 s. A read that started before a save can never put the older record back.
 - If a read fails, the last good snapshot keeps applying. With no snapshot at all, the catalogue fails closed: an error never reopens anything.
+- A saved record that cannot be read, or a state this version does not know, refuses purchases: the Admin screen says every service is paused until it is saved again.
 
 **Customers.**
 - Every page shares one request (`/api/service-status`, customer words only, cacheable 30 s).
@@ -112,13 +113,40 @@ No production setting, table or supplier changes. **Production keeps pausing MTN
 |---|---|
 | Type-check (`tsc --noEmit`) | Clean |
 | Production build | Succeeds; the browser bundle always uses the real shipped default |
-| New suite `serviceControlCenter363.test.ts` | 22/22 |
-| Full suite | 3,613 pass, 0 fail (61 opt-in database tests skipped) |
-| Native Postgres: new `serviceControlPostgres.test.ts` (concurrent saves from two admins, atomic audit, shipped default) | 5/5, added to CI |
+| New suite `serviceControlCenter363.test.ts` | 30/30 |
+| Full suite | 3,623 pass, 0 fail (62 opt-in database tests skipped) |
+| Native Postgres: new `serviceControlPostgres.test.ts` (12 concurrent signed-in quotes on a cold cache, concurrent saves from two admins, atomic audit, shipped default) | 6/6, added to CI; fails as expected with the pool fix reverted |
 | Native Postgres: December campaign, AFA commercial, sales reliability | 7/7, 6/6, 7/7 |
 | Release A browser acceptance, rerun on Release B | 107/107 |
 | Customer browser QA (all states, 320–1280, Christmas, New Year, axe) | 111/111 |
 | Admin browser QA (real server and database: auth, suspend, conflict, failed save, restore, announcement lifecycle, audit, account switch, 320–1280, axe) | 53/53 |
+
+## Independent review
+
+An independent reviewer read the full diff, ran the suites and reproduced issues against a disposable Postgres database. Verdict: **ship after fixes**. The safety core held: no paused scope could start a new purchase, Operational never overrode another restriction, and every hard constraint held. All defects it found are fixed, each with a test:
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 | **High.** The catalogue read the controls through a second pool connection while a transaction held one; 5 concurrent signed-in quotes on a cold cache exhausted the pool (10 s timeouts, which would also delay verification, webhooks and recovery). | Read through the open transaction. A Postgres test with 12 concurrent quotes passes, and fails with the old code. |
+| 2 | The public status rate limit was keyed on the proxy's address, so effectively site-wide. | Removed; the endpoint is served from the 15 s snapshot. |
+| 3 | A malformed saved record fell back to the shipped default (reopening saved pauses); an unknown state became Operational. | Both now refuse purchases; Admin shows a repair notice. |
+| 4 | A committed save could be reported as "Nothing was changed" if re-reading the view failed. | The server returns success with no view; the screen refreshes. |
+| 5 | An announcement could say "purchases stay paused" after the service reopened. | That wording appears only while a pause is in force. Lifting a pause in Admin lists the live announcements to unpublish. |
+| 6 | The CTA check accepted names such as `toString`. | Own keys only, on the server and in the browser. |
+| 7 | A read started before a save could put the older record back in the cache. | Generation-checked cache. |
+| 8 | Website store checkout (switched off today) had no guard. | Guarded before it can ever be switched on. |
+
+Smaller follow-ups also done:
+- The checkout re-quotes when the status changes, and refreshes the status when a start is refused.
+- The Instant Flexi quote is guarded.
+- The exceptional pop-up is a native modal dialog (focus kept inside, background inert, Escape anywhere, focus returned).
+- The server refuses supplier or reseller names in customer words.
+- `NODE_ENV=test` alone can no longer drop the shipped pause.
+
+Left as they are, by design or as pre-existing:
+- An Instant package without its own network takes the network from the request. This is pre-existing order logic, and 3.5's to tighten.
+- The Welcome discount floor check ignores paused products. Harmless: nothing paused can be bought.
+- Rolling back to Release A would ignore saved controls and pause MTN Data only.
 
 ## Dependencies on Mystery Hub 3.5 (Codex)
 

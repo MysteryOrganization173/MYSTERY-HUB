@@ -8,7 +8,7 @@
  *
  * Until the founder saves the first change, the shipped default applies: the Release A MTN Data announcement.
  */
-import { SERVICE_SCOPES, isAccraDate, isPlainText, type ScopeId } from './serviceControls.js';
+import { SERVICE_SCOPES, isAccraDate, isPlainText, namesSupplier, type ScopeId } from './serviceControls.js';
 
 export const ANNOUNCEMENT_SEVERITIES = ['info', 'warning', 'critical'] as const;
 export type AnnouncementSeverity = typeof ANNOUNCEMENT_SEVERITIES[number];
@@ -29,6 +29,8 @@ export const ANNOUNCEMENT_CTAS = {
   help: { label: 'Get help', page: 'help' },
 } as const;
 export type AnnouncementCta = keyof typeof ANNOUNCEMENT_CTAS;
+/** Own keys only: names such as "toString" or "__proto__" are not destinations. */
+export const isAnnouncementCta = (value: unknown): value is AnnouncementCta => typeof value === 'string' && Object.prototype.hasOwnProperty.call(ANNOUNCEMENT_CTAS, value);
 
 export interface Announcement {
   id: string;
@@ -98,15 +100,18 @@ export function announcementProblems(a: Partial<Announcement>): string[] {
   if (a.endsAt !== null && a.endsAt !== undefined && !iso(a.endsAt)) out.push('The end time is not valid.');
   if (iso(a.startsAt) && iso(a.endsAt) && Date.parse(a.endsAt) <= Date.parse(a.startsAt)) out.push('The end time must be after the start time.');
   if (a.expectedRestoration !== null && a.expectedRestoration !== undefined && !isAccraDate(a.expectedRestoration)) out.push('The expected restoration date is not valid.');
-  if (a.cta !== null && a.cta !== undefined && !(a.cta in ANNOUNCEMENT_CTAS)) out.push('Choose a supported action.');
+  if (a.cta !== null && a.cta !== undefined && !isAnnouncementCta(a.cta)) out.push('Choose a supported action.');
+  if ([a.title, a.summary, a.details].some(namesSupplier)) out.push('Customer words must not name a supplier or reseller arrangement.');
   return out;
 }
 
 export function normalizeAnnouncements(stored: unknown): AnnouncementsDoc {
   const doc = stored as Partial<AnnouncementsDoc> | null | undefined;
-  if (!doc || typeof doc.version !== 'string' || !Array.isArray(doc.items)) return { version: SHIPPED_ANNOUNCEMENTS_VERSION, source: 'shipped-default', items: SHIPPED_ANNOUNCEMENTS.map((a) => ({ ...a, pages: [...a.pages] })) };
+  // A saved list that cannot be read shows nothing (announcements never change what can be bought); saving replaces it.
+  if (doc !== null && doc !== undefined && (typeof doc !== 'object' || typeof doc.version !== 'string' || !Array.isArray(doc.items))) return { version: 'unreadable-saved-record', source: 'saved', items: [] };
+  if (!doc) return { version: SHIPPED_ANNOUNCEMENTS_VERSION, source: 'shipped-default', items: SHIPPED_ANNOUNCEMENTS.map((a) => ({ ...a, pages: [...a.pages] })) };
   const items = (doc.items as Announcement[]).filter((a) => a && typeof a.id === 'string' && ANNOUNCEMENT_STATUSES.includes(a.status) && announcementProblems(a).length === 0).slice(0, ANNOUNCEMENT_LIMITS.items);
-  return { version: doc.version, source: 'saved', items };
+  return { version: doc.version as string, source: 'saved', items };
 }
 
 /** Published and inside its window right now. An ended announcement simply stops showing; it never touches a pause. */

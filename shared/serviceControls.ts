@@ -50,7 +50,7 @@ export interface ServiceControl {
   updatedAt: string | null;
   actorId: string | null;
 }
-export interface ServiceControlsDoc { version: string; source: 'saved' | 'shipped-default'; controls: ServiceControl[] }
+export interface ServiceControlsDoc { version: string; source: 'saved' | 'shipped-default'; controls: ServiceControl[]; unreadable?: boolean }
 
 export const SHIPPED_CONTROLS_VERSION = 'release-a-mtn-data-2026-11';
 /** The Release A emergency record, word for word. */
@@ -70,18 +70,30 @@ export const CONTROL_LIMITS = { title: 80, message: 400, existingOrders: 240 } a
 const PLAIN = /^[^<>\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]*$/;
 export const isPlainText = (value: unknown, max: number, required = true): value is string =>
   typeof value === 'string' && value.length <= max && PLAIN.test(value) && (!required || value.trim().length > 0);
+/** Customer words never name a supplier or a reseller arrangement. Checked on the server, not only in the editor. */
+export const namesSupplier = (text: unknown) => typeof text === 'string' && /success\s*biz|brainiac|supplier|reseller|wholesale|upstream/i.test(text);
 export const isAccraDate = (value: unknown): value is string =>
   typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().startsWith(value);
 
 /** Stored document (or nothing) → a valid document. A malformed stored record is ignored, never trusted. */
+export const UNREADABLE_CONTROLS_VERSION = 'unreadable-saved-record';
 export function normalizeControls(stored: unknown): ServiceControlsDoc {
-  const doc = stored as Partial<ServiceControlsDoc> | null | undefined;
-  if (!doc || typeof doc.version !== 'string' || !Array.isArray(doc.controls)) return { version: SHIPPED_CONTROLS_VERSION, source: 'shipped-default', controls: SHIPPED_CONTROLS.map((c) => ({ ...c })) };
+  // Only "nothing saved" means the shipped default.
+  if (stored === null || stored === undefined) return { version: SHIPPED_CONTROLS_VERSION, source: 'shipped-default', controls: SHIPPED_CONTROLS.map((c) => ({ ...c })) };
+  const doc = stored as Partial<ServiceControlsDoc>;
+  if (typeof doc !== 'object' || typeof doc.version !== 'string' || !Array.isArray(doc.controls)) {
+    // A saved record that cannot be read never reopens anything: every service refuses new purchases until an Admin
+    // saves again (the Admin screen says so).
+    return { version: UNREADABLE_CONTROLS_VERSION, source: 'saved', unreadable: true, controls: SERVICE_SCOPES.map((s) => ({
+      scope: s.id, state: 'suspended' as OperatingState, title: `${s.label} service update`, message: 'New purchases are paused for now while we check this service.',
+      existingOrders: 'Existing orders remain trackable.', expectedRestoration: null, revision: 1, updatedAt: null, actorId: null })) };
+  }
   const controls: ServiceControl[] = [];
   for (const raw of doc.controls as Partial<ServiceControl>[]) {
-    if (!raw || !SERVICE_SCOPES.some((s) => s.id === raw.scope) || !OPERATING_STATES.includes(raw.state as OperatingState) || controls.some((c) => c.scope === raw.scope)) continue;
+    if (!raw || !SERVICE_SCOPES.some((s) => s.id === raw.scope) || controls.some((c) => c.scope === raw.scope)) continue;
     controls.push({
-      scope: raw.scope as ScopeId, state: raw.state as OperatingState,
+      // A state this version does not know (a rollback, a manual edit) refuses purchases rather than reopening them.
+      scope: raw.scope as ScopeId, state: OPERATING_STATES.includes(raw.state as OperatingState) ? raw.state as OperatingState : 'suspended',
       title: isPlainText(raw.title, CONTROL_LIMITS.title, false) ? raw.title : '',
       message: isPlainText(raw.message, CONTROL_LIMITS.message, false) ? raw.message : '',
       existingOrders: isPlainText(raw.existingOrders, CONTROL_LIMITS.existingOrders, false) ? raw.existingOrders : '',

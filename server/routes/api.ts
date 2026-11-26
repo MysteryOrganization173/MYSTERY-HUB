@@ -129,6 +129,12 @@ apiRouter.get('/instant-bundles/:productKey/quote', async (req: Request, res: Re
       res.status(400).json({ success: false, error: 'This package has a fixed price.' });
       return;
     }
+    // 3.6.3: no price for a network whose Instant Bundles are paused (payment start refuses it too).
+    const quoteNetwork = toPublicInstantBundle(pkg)?.network;
+    if (quoteNetwork && await ServiceControlService.purchaseBlock('instant_bundle', quoteNetwork)) {
+      res.status(503).json({ success: false, code: 'SERVICE_TEMPORARILY_UNAVAILABLE', error: 'New purchases of these Instant Bundles are paused for now. No payment has been taken.' });
+      return;
+    }
     // Same parsing as the initialize route, so the quote and the charge cannot drift apart.
     const minVal = typeof pkg.minAmountMajor === 'number' ? pkg.minAmountMajor : parseFloat(String(pkg.minAmountMajor || '1')) || 1;
     const maxVal = typeof pkg.maxAmountMajor === 'number' ? pkg.maxAmountMajor : parseFloat(String(pkg.maxAmountMajor || '500')) || 500;

@@ -11,7 +11,9 @@ import { ServiceControlService } from '../services/serviceControlService.js';
  * the browser is never trusted for any of it.
  */
 export const serviceStatusRouter = Router();
-serviceStatusRouter.get('/', createRateLimiter({ windowMs: 60_000, max: 120 }), async (_req, res) => {
+// No per-IP limiter here: behind the hosting proxy every visitor shares one address, so a limit would throttle the
+// whole site. The answer comes from a 15 s in-process snapshot (at most two small reads per 15 s per instance).
+serviceStatusRouter.get('/', async (_req, res) => {
   try {
     res.setHeader('Cache-Control', 'public, max-age=30');
     res.json(await ServiceControlService.publicStatus());

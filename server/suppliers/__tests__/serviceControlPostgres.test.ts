@@ -36,6 +36,17 @@ test('native PostgreSQL Service Control Center: shipped default, concurrent save
       assert.equal((await CommercialService.catalog()).products.some((p) => p.network === 'mtn'), false);
     });
 
+    await t.test('concurrent signed-in quotes on a cold cache never wait for a second pool connection', async () => {
+      // Each signed-in quote holds a transaction; the controls must be read through it (the pool has 5 connections).
+      await AuthStore.createUser({ id: 'svc-buyer', name: 'Synthetic buyer', email: 'svc-buyer@example.test', phone: '+233241239999', passwordHash: 'SYNTHETIC', role: 'customer' });
+      const id = (await CommercialService.catalog()).products[0].id;
+      S.invalidate();
+      const started = Date.now();
+      const quotes = await Promise.all(Array.from({ length: 12 }, () => CommercialService.quote(id, 'svc-buyer')));
+      assert.ok(quotes.every((q) => q.totalMinor > 0));
+      assert.ok(Date.now() - started < 5000, `took ${Date.now() - started} ms`);
+    });
+
     await t.test('two administrators saving at once from the same reviewed version: exactly one commits', async () => {
       const version = (await S.admin()).controls.version;
       const results = await Promise.allSettled([

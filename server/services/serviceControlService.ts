@@ -6,7 +6,7 @@ import { FulfilmentService } from './fulfilmentService.js';
 import { sharedMerchantCheckoutAvailable } from '../../shared/paymentAvailability.js';
 import { underNodeTest } from '../../shared/testRuntime.js';
 import {
-  CONTROL_LIMITS, OPERATING_STATES, SERVICE_SCOPES, accraDate, blocksPurchases, controlFor, isAccraDate, isPlainText,
+  CONTROL_LIMITS, OPERATING_STATES, SERVICE_SCOPES, accraDate, blocksPurchases, controlFor, isAccraDate, isPlainText, namesSupplier,
   normalizeControls, publicControls, type ControlService, type OperatingState, type ServiceControl, type ServiceControlsDoc,
 } from '../../shared/serviceControls.js';
 import {
@@ -27,7 +27,9 @@ import {
 const CONTROLS_KEY = 'service-controls', ANNOUNCEMENTS_KEY = 'service-announcements';
 const CACHE_MS = 15_000;
 interface Snapshot { at: number; controls: ServiceControlsDoc; announcements: AnnouncementsDoc }
-let cache: Snapshot | null = null, flight: Promise<Snapshot> | null = null;
+// generation: bumped by every save in this process, so a read that started before the save can never put the older
+// record back in the cache. lastGood: the newest successful read, used only when a refresh fails.
+let cache: Snapshot | null = null, flight: Promise<Snapshot> | null = null, lastGood: Snapshot | null = null, generation = 0;
 // Under the test runner only: the regression suite starts with nothing paused unless a test opts in.
 let shippedInTests = false;
 
@@ -42,19 +44,30 @@ export class ServiceControlService {
   /** Tests only: use the shipped defaults (the Release A record) when nothing is saved, and drop the cache. */
   static useShippedDefaultsForTests(on: boolean) {
     if (!underNodeTest) throw new Error('Only tests can change service control defaults.');
-    shippedInTests = on; cache = null; flight = null;
+    shippedInTests = on; cache = null; flight = null; lastGood = null; generation++;
   }
-  static invalidate() { cache = null; }
+  static invalidate() { cache = null; flight = null; generation++; }
+  /** After a save in this process: serve what was just committed at once, without a cold read for every request. */
+  private static remember(part: Partial<Pick<Snapshot, 'controls' | 'announcements'>>) {
+    generation++; flight = null;
+    cache = cache ? { ...cache, ...part, at: Date.now() } : null;
+    if (cache) lastGood = cache;
+  }
 
   static async snapshot(): Promise<Snapshot> {
     const now = Date.now();
     if (cache && now - cache.at < CACHE_MS) return cache;
     if (!flight) {
-      const previous = cache;
-      flight = Promise.all([FinanceStore.readConfig(CONTROLS_KEY), FinanceStore.readConfig(ANNOUNCEMENTS_KEY)])
-        .then(([c, a]) => (cache = { at: Date.now(), controls: readControls(c), announcements: readAnnouncements(a) }))
-        .catch((error) => { if (previous) return previous; throw error; })
-        .finally(() => { flight = null; });
+      const mine = generation;
+      const current: Promise<Snapshot> = Promise.all([FinanceStore.readConfig(CONTROLS_KEY), FinanceStore.readConfig(ANNOUNCEMENTS_KEY)])
+        .then(([c, a]) => {
+          const snap = { at: Date.now(), controls: readControls(c), announcements: readAnnouncements(a) };
+          if (mine === generation) { cache = snap; lastGood = snap; }
+          return snap;
+        })
+        .catch((error) => { if (lastGood) return lastGood; throw error; })
+        .finally(() => { if (flight === current) flight = null; });
+      flight = current;
     }
     return flight;
   }
@@ -64,9 +77,12 @@ export class ServiceControlService {
     const control = controlFor((await this.snapshot()).controls, service, network);
     return control && blocksPurchases(control.state) ? control : null;
   }
-  /** Networks whose purchases of this service are refused right now. */
-  static async blockedNetworks(service: ControlService): Promise<Set<string>> {
-    const { controls } = await this.snapshot();
+  /**
+   * Networks whose purchases of this service are refused right now. Inside a database transaction it reads through
+   * that transaction's own connection: a second pool connection per transaction could exhaust the pool under load.
+   */
+  static async blockedNetworks(service: ControlService, tx?: FinanceTx): Promise<Set<string>> {
+    const controls = tx ? readControls(await tx.config(CONTROLS_KEY)) : (await this.snapshot()).controls;
     return new Set(controls.controls.filter((c) => blocksPurchases(c.state) && c.scope.startsWith(`${service}:`)).map((c) => c.scope.split(':')[1]));
   }
 
@@ -90,8 +106,11 @@ export class ServiceControlService {
       return { ...scope, control, blocksPurchases: blocksPurchases(control.state), products: dataProducts ? { enabled, total: dataProducts.length } : null, paymentPermitted: sharedMerchantCheckoutAvailable(scope.service), route };
     });
     const audit = (await AdminAuditStore.findRecent(300)).filter((a) => a.action.startsWith('service_control_') || a.action.startsWith('service_announcement_')).slice(0, 30);
-    return { serverDate: accraDate(this.now()), controls: { version: controls.version, source: controls.source }, announcements: { version: announcements.version, source: announcements.source, items: announcements.items }, scopes, audit };
+    return { serverDate: accraDate(this.now()), controls: { version: controls.version, source: controls.source, unreadable: Boolean(controls.unreadable) }, announcements: { version: announcements.version, source: announcements.source, items: announcements.items }, scopes, audit };
   }
+
+  /** The change is already committed: a failure to re-read the view must not be reported as "nothing changed". */
+  private static async viewAfterSave() { try { return await this.admin(); } catch { return null; } }
 
   static async saveControl(adminId: string, input: any) {
     if (input?.confirmed !== true) throw new FinanceError('Confirm this change.');
@@ -102,6 +121,7 @@ export class ServiceControlService {
     const title = typeof input.title === 'string' ? input.title.trim() : '', message = typeof input.message === 'string' ? input.message.trim() : '', existingOrders = typeof input.existingOrders === 'string' ? input.existingOrders.trim() : '';
     if (!isPlainText(title, CONTROL_LIMITS.title, false) || !isPlainText(message, CONTROL_LIMITS.message, false) || !isPlainText(existingOrders, CONTROL_LIMITS.existingOrders, false)) throw new FinanceError('Customer words must be plain text within the length limits.');
     if (state !== 'operational' && (!title || !message)) throw new FinanceError('Write the customer title and message for this state.');
+    if ([title, message, existingOrders].some(namesSupplier)) throw new FinanceError('Customer words must not name a supplier or reseller arrangement.');
     // An operational service has nothing to restore: any date sent with it is dropped, so no stale expectation lingers.
     const expectedRestoration = state === 'operational' || input.expectedRestoration === null || input.expectedRestoration === '' || input.expectedRestoration === undefined ? null : input.expectedRestoration;
     if (expectedRestoration !== null && !isAccraDate(expectedRestoration)) throw new FinanceError('The expected restoration date is not valid.');
@@ -121,8 +141,8 @@ export class ServiceControlService {
       });
       return doc;
     });
-    this.invalidate();
-    return { saved: result.version, view: await this.admin() };
+    this.remember({ controls: normalizeControls(result) });
+    return { saved: result.version, view: await this.viewAfterSave() };
   }
 
   /** create | update | publish | unpublish | archive one announcement. */
@@ -174,7 +194,7 @@ export class ServiceControlService {
       await tx.audit(adminId, `service_announcement_${action}`, target.id, { title: target.title, status: target.status, scope: target.scope, placement: target.placement, revision: target.revision });
       return { doc, id: target.id };
     });
-    this.invalidate();
-    return { saved: result.doc.version, id: result.id, view: await this.admin() };
+    this.remember({ announcements: normalizeAnnouncements(result.doc) });
+    return { saved: result.doc.version, id: result.id, view: await this.viewAfterSave() };
   }
 }

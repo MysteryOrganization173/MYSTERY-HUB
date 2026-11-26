@@ -4,7 +4,7 @@ import { AdminPanel, AdminButton, AdminNotice, AdminSheet, StatusPill, RefreshBu
 import { NetworkBrandBadge } from '../../common/NetworkBrandBadge';
 import { AnnouncementBarView, ServiceInlineNotice, ServiceMaintenanceState, stateChip } from '../../service/ServiceUpdate';
 import {
-  CONTROL_LIMITS, CONTROL_NETWORKS, OPERATING_STATES, blocksPurchases, restorationLine,
+  CONTROL_LIMITS, CONTROL_NETWORKS, OPERATING_STATES, blocksPurchases, namesSupplier, restorationLine,
   type OperatingState, type PublicServiceControl, type ScopeId, type ServiceControl, type ServiceScope,
 } from '../../../../shared/serviceControls';
 import {
@@ -21,7 +21,7 @@ import type { NetworkId } from '../../../types';
  * are never affected. "Operational" here never claims a supplier is working: all other checks still apply.
  */
 interface ScopeView extends ServiceScope { control: ServiceControl; blocksPurchases: boolean; products: { enabled: number; total: number } | null; paymentPermitted: boolean; route: 'configured' | 'unavailable' }
-interface AdminView { serverDate: string; controls: { version: string; source: 'saved' | 'shipped-default' }; announcements: { version: string; source: 'saved' | 'shipped-default'; items: Announcement[] }; scopes: ScopeView[]; audit: { id: string; admin_user_id: string; action: string; entity_id: string; metadata_safe_json: string | null; created_at: string }[] }
+interface AdminView { serverDate: string; controls: { version: string; source: 'saved' | 'shipped-default'; unreadable?: boolean }; announcements: { version: string; source: 'saved' | 'shipped-default'; items: Announcement[] }; scopes: ScopeView[]; audit: { id: string; admin_user_id: string; action: string; entity_id: string; metadata_safe_json: string | null; created_at: string }[] }
 
 const NETWORK_NAME: Record<string, string> = { mtn: 'MTN', telecel: 'Telecel', airteltigo: 'AirtelTigo' };
 const SERVICE_NAME: Record<string, string> = { data: 'Data', instant_bundle: 'Instant Bundles', airtime: 'Airtime' };
@@ -63,8 +63,9 @@ export function AdminServiceControlCenter({ token }: { token: string }) {
 
   const save = async (path: 'control' | 'announcement', body: Record<string, unknown>, done: string) => {
     const result = await commercialRequest(`admin/service-control/${path}`, token, { ...body, confirmed: true });
-    if (result?.view) setView(result.view);
-    setNotice(done);
+    // The server committed the change; if it could not also send the new view, load it rather than guess.
+    if (result?.view) setView(result.view); else void refresh();
+    setNotice(result?.view ? done : `${done} Refreshing to show the latest state.`);
     return result;
   };
 
@@ -76,6 +77,9 @@ export function AdminServiceControlCenter({ token }: { token: string }) {
         {notice && <p role="status" className="rounded-xl border border-emerald-800 bg-emerald-950/30 p-3 text-sm text-emerald-200">{notice}</p>}
         {loading && !view && <p role="status" className="text-sm text-slate-300">Loading service controls…</p>}
         {view && <>
+          {view.controls.unreadable && (
+            <AdminNotice tone="danger" title="The saved service controls could not be read">Every service is refusing new purchases until this is fixed. Nothing has been reopened. Review each service below and save the states you want; saving replaces the unreadable record.</AdminNotice>
+          )}
           {view.controls.source === 'shipped-default' && (
             <AdminNotice tone="info" title="Running on the emergency record">The MTN Data maintenance pause from the emergency release is in force. Your first saved change here makes these settings yours; nothing changes until then.</AdminNotice>
           )}
@@ -97,7 +101,7 @@ export function AdminServiceControlCenter({ token }: { token: string }) {
                         <li>Supplier route: {scope.route === 'configured' ? 'configured (readiness is checked on demand below)' : 'unavailable, so purchases are refused anyway'}</li>
                         <li>Online payment: {scope.paymentPermitted ? 'permitted' : 'restricted'}</li>
                         {restoration && <li className={restoration.overdue ? 'text-amber-200' : ''}>{restoration.label}</li>}
-                        <li>Live announcements: {linked}</li>
+                        <li className={linked && scope.control.state === 'operational' ? 'text-amber-200' : ''}>Live announcements: {linked}{linked && scope.control.state === 'operational' ? ' (check they no longer say it is paused)' : ''}</li>
                         {scope.control.updatedAt && <li>Changed {new Date(scope.control.updatedAt).toLocaleString()}{scope.control.actorId ? ` by ${scope.control.actorId}` : ' (emergency release)'}</li>}
                       </ul>
                       <AdminButton onClick={() => { setNotice(''); setSheet({ kind: 'control', scope }); }}>Manage {NETWORK_NAME[network]} {SERVICE_NAME[scope.service]}</AdminButton>
@@ -139,7 +143,7 @@ export function AdminServiceControlCenter({ token }: { token: string }) {
           </details>
         </>}
       </div>
-      {view && sheet?.kind === 'control' && <ControlSheet scope={sheet.scope} version={view.controls.version} serverDate={view.serverDate} onClose={() => setSheet(null)} onSave={(body, done) => save('control', body, done).then(() => setSheet(null))} />}
+      {view && sheet?.kind === 'control' && <ControlSheet scope={sheet.scope} liveAnnouncements={view.announcements.items.filter((a) => a.scope === sheet.scope.id && isLiveAnnouncement(a)).map((a) => a.name)} version={view.controls.version} serverDate={view.serverDate} onClose={() => setSheet(null)} onSave={(body, done) => save('control', body, done).then(() => setSheet(null))} />}
       {view && sheet?.kind === 'announcement' && <AnnouncementSheet item={sheet.item} version={view.announcements.version} serverDate={view.serverDate} scopes={view.scopes} onClose={() => setSheet(null)} onSave={(body, done) => save('announcement', body, done).then(() => setSheet(null))} />}
     </AdminPanel>
   );
@@ -168,7 +172,7 @@ function AnnouncementAction({ label, confirmText, onConfirm }: { label: string; 
   );
 }
 
-function ControlSheet({ scope, version, serverDate, onClose, onSave }: { scope: ScopeView; version: string; serverDate: string; onClose: () => void; onSave: (body: Record<string, unknown>, done: string) => Promise<unknown> }) {
+function ControlSheet({ scope, liveAnnouncements, version, serverDate, onClose, onSave }: { scope: ScopeView; liveAnnouncements: string[]; version: string; serverDate: string; onClose: () => void; onSave: (body: Record<string, unknown>, done: string) => Promise<unknown> }) {
   const c = scope.control;
   const name = `${NETWORK_NAME[scope.network]} ${SERVICE_NAME[scope.service]}`;
   const [state, setState] = useState<OperatingState>(c.state);
@@ -178,16 +182,19 @@ function ControlSheet({ scope, version, serverDate, onClose, onSave }: { scope: 
   const pausing = blocksPurchases(state), wasPaused = blocksPurchases(c.state);
   const draft = toPublic({ scope: scope.id, state, title, message, existingOrders, expectedRestoration: expected || null, revision: c.revision + 1 });
   const needWords = state !== 'operational' && (!title.trim() || !message.trim());
-  const effect = pausing && !wasPaused ? `New ${name} purchases will be refused as soon as this is saved. Existing orders, payments, recovery and refunds are not affected.`
+  const supplierNamed = state !== 'operational' && [title, message, existingOrders].some(namesSupplier);
+  const effect = pausing && !wasPaused ? `New ${name} purchases will be refused as soon as this is saved${scope.service === 'data' ? ', including admin-assisted Data orders' : ''}. Existing orders, payments, recovery and refunds are not affected.`
     : !pausing && wasPaused ? `This lifts the manual pause. Customers may buy ${name} again only if every other check passes: supplier preflight, product availability, payment rules and eligibility still apply. It does not prove the supplier is working.`
-    : pausing ? `${name} stays paused; this updates what customers are told.` : state === 'delayed' ? `${name} stays open for purchases, with a delay notice.` : `${name} stays open for purchases, subject to every other check.`;
+    : pausing ? `${name} stays paused; this updates what customers are told.${scope.service === 'data' ? ' Admin-assisted Data orders on this network are refused too.' : ''}` : state === 'delayed' ? `${name} stays open for purchases, with a delay notice.` : `${name} stays open for purchases, subject to every other check.`;
   return (
     <AdminSheet title={`Manage ${name}`} subtitle="Changes apply to new purchases only." onClose={onClose} busy={busy} wide
       footer={<div className="space-y-2">
         <label className="flex min-h-11 items-start gap-3 text-sm text-slate-300"><input type="checkbox" className="mt-1 h-4 w-4 accent-[#00c365]" checked={ack} disabled={busy} onChange={(e) => setAck(e.target.checked)} /><span>{effect}</span></label>
+        {!pausing && wasPaused && liveAnnouncements.length > 0 && <p className="text-sm text-amber-200">Still live for customers: {liveAnnouncements.join(', ')}. After saving, unpublish or update {liveAnnouncements.length === 1 ? 'it' : 'them'} in Announcements so nobody is told {name} is still paused.</p>}
+        {supplierNamed && <p className="text-sm text-amber-200">Customer words must not name a supplier or reseller arrangement.</p>}
         {error && <p role="alert" className="break-words text-sm text-rose-300">{error}</p>}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><AdminButton onClick={onClose} disabled={busy}>Cancel</AdminButton>
-          <AdminButton variant={pausing && !wasPaused ? 'danger' : 'primary'} busy={busy} disabled={!ack || needWords || busy} onClick={async () => {
+          <AdminButton variant={pausing && !wasPaused ? 'danger' : 'primary'} busy={busy} disabled={!ack || needWords || supplierNamed || busy} onClick={async () => {
             setBusy(true); setError('');
             try { await onSave({ scope: scope.id, state, title, message, existingOrders, expectedRestoration: state === 'operational' ? null : expected || null, expectedVersion: version }, `${name}: ${STATE_TEXT[state].label}. Saved and confirmed by the server.`); }
             catch (e) { setError(errorText(e)); } finally { setBusy(false); }

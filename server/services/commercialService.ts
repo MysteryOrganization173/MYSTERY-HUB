@@ -47,7 +47,7 @@ export class CommercialService {
   /** Server clock for dated pricing. Tests replace it; nothing from a request can. */
   static now=()=>new Date();
   static async catalog(tx?:FinanceTx) {
-    const prices=await config('direct-pricing',tx),campaign=await campaignConfig(tx),now=CommercialService.now(),paused=await ServiceControlService.blockedNetworks('data');
+    const prices=await config('direct-pricing',tx),campaign=await campaignConfig(tx),now=CommercialService.now(),paused=await ServiceControlService.blockedNetworks('data',tx);
     const products=Object.values(AUTHORITATIVE_PRODUCTS).map(p=>{
       const setting=prices.products[p.id],standardMinor=setting?.retailMinor??p.amountPesewas;
       // A campaign price applies only while the campaign is enabled and today (Accra) is inside its dates; otherwise

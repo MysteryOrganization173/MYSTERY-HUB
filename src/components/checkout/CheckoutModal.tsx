@@ -1,6 +1,6 @@
 import { checkoutFailurePresentation, readCheckoutFailure } from '../../../shared/checkoutFailure';
 import { restorationLine } from '../../../shared/serviceControls';
-import { purchasePaused, serviceControl, useServiceStatus } from '../../hooks/useServiceStatus';
+import { purchasePaused, refreshServiceStatus, serviceControl, useServiceStatus } from '../../hooks/useServiceStatus';
 import { directAttemptKey, readDirectAttempt, saveDirectAttempt, clearDirectAttempt } from '../../utils/directCheckoutAttempt';
 import {useDialogFocus} from '../../hooks/useDialogFocus';
 import {useVisualViewport} from '../../hooks/useVisualViewport';
@@ -92,7 +92,7 @@ export const CheckoutModal: React.FC = () => {
   const attemptGeneration=useRef(0),knownReference=useRef<string|null>(null),recoveryLocked=useRef(false);
   const [recoveryOnly,setRecoveryOnly]=useState(false);
   useEffect(()=>{++attemptGeneration.current;return()=>{++attemptGeneration.current;};},[sessionToken,isCheckoutOpen,checkoutBundle?.id]);
-  useEffect(()=>{if(!isCheckoutOpen||!checkoutBundle||checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data'||checkoutBundle.id.startsWith('instant-')||checkoutBundle.id.startsWith('airtime-')||purchasePaused('data',checkoutBundle.network)){setCommercial(null);return;}let active=true;setCommercial(null);setQuoteError('');commercialRequest('commercial/quote/'+encodeURIComponent(checkoutBundle.id),sessionToken).then(r=>{if(active)setCommercial(r);}).catch(e=>{if(active)setQuoteError(e.message);});return()=>{active=false;};},[isCheckoutOpen,checkoutBundle?.id,sessionToken,quoteRefresh,user?.phone]);
+  useEffect(()=>{if(!isCheckoutOpen||!checkoutBundle||checkoutBundle.serviceType&&checkoutBundle.serviceType!=='data'||checkoutBundle.id.startsWith('instant-')||checkoutBundle.id.startsWith('airtime-')||purchasePaused('data',checkoutBundle.network)){setCommercial(null);return;}let active=true;setCommercial(null);setQuoteError('');commercialRequest('commercial/quote/'+encodeURIComponent(checkoutBundle.id),sessionToken).then(r=>{if(active)setCommercial(r);}).catch(e=>{if(active)setQuoteError(e.message);});return()=>{active=false;};},[isCheckoutOpen,checkoutBundle?.id,sessionToken,quoteRefresh,user?.phone,serviceStatus.version]);
   // A typed Flexi amount has no catalogue price, so checkout asks the server before Pay is offered.
   const needsFlexiQuote = Boolean(isCheckoutOpen && checkoutBundle?.isFlexi && checkoutBundle.serviceFeeGhc === undefined
     && (checkoutBundle.serviceType === 'instant_bundle' || checkoutBundle.id.startsWith('instant-')));
@@ -441,6 +441,8 @@ export const CheckoutModal: React.FC = () => {
       onError: (err) => {
         if(!active())return;
         const details=readCheckoutFailure(err.checkout);
+        // 3.6.3: the server refused this service; fetch the current status so the page explains a new pause at once.
+        if(['SERVICE_TEMPORARILY_UNAVAILABLE','PACKAGE_UNAVAILABLE'].includes(details?.code??(err as any)?.code))void refreshServiceStatus(true);
         if(details?.code==='ACTIVE_MTN_ORDER'&&details.paymentState==='not_started'&&!knownReference.current){recoveryLocked.current=false;setRecoveryOnly(false);clearDirectAttempt(sessionStorage,key,requestId);setActiveMtnConflict({orderRef:err.existingOrderReference,status:err.existingOrderStatus});return;}
         if(err.existingOrderReference){knownReference.current=err.existingOrderReference;setAttemptRef(err.existingOrderReference);checkpoint(err.existingOrderReference);}
         if(!isRegularData){if(err.code==='ACTIVE_MTN_ORDER'||err.code==='ACTIVE_MTN_ORDER_EXISTS'){setActiveMtnConflict({orderRef:err.existingOrderReference,status:err.existingOrderStatus});return;}setServerError(err.message||'We could not confirm this payment. Check the existing order before trying again.');return;}
@@ -522,6 +524,7 @@ export const CheckoutModal: React.FC = () => {
     }catch(error){
       if(generation!==attemptGeneration.current)return;
       const details=readCheckoutFailure((error as any).checkout);
+      if(['SERVICE_TEMPORARILY_UNAVAILABLE','PACKAGE_UNAVAILABLE'].includes(details?.code??(error as any)?.code))void refreshServiceStatus(true);
       if(isRegularData&&details?.paymentState==='not_started'&&!knownReference.current&&!recoveryLocked.current){
         const view=checkoutFailurePresentation(details.code);
         setPreflightIssue({code:details.code,title:view.title,message:view.message,supportingNote:'This recipient check was rejected. If you have an earlier Wallet attempt, check My Orders before starting another purchase.'});return;

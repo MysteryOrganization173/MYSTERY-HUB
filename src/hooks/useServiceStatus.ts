@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { API_BASE_URL } from '../services/apiClient';
 import { CONTROL_SERVICES, OPERATING_STATES, SERVICE_SCOPES, accraDate, normalizeControls, publicControls, type PublicServiceControl } from '../../shared/serviceControls';
-import { ANNOUNCEMENT_PAGES, ANNOUNCEMENT_PLACEMENTS, normalizeAnnouncements, publicAnnouncements, type PublicAnnouncement } from '../../shared/announcements';
+import { ANNOUNCEMENT_PAGES, ANNOUNCEMENT_PLACEMENTS, isAnnouncementCta, normalizeAnnouncements, publicAnnouncements, type PublicAnnouncement } from '../../shared/announcements';
 import { underNodeTest } from '../../shared/testRuntime';
 
 /**
@@ -24,7 +24,8 @@ const shipped = (): ServiceStatus => underNodeTest
 export function parseServiceStatus(raw: any): ServiceStatus | null {
   if (!raw || typeof raw.version !== 'string' || !Array.isArray(raw.controls) || !Array.isArray(raw.announcements)) return null;
   const controls = raw.controls.filter((c: any) => c && SERVICE_SCOPES.some((s) => s.id === c.scope) && CONTROL_SERVICES.includes(c.service) && OPERATING_STATES.includes(c.state) && c.state !== 'operational' && typeof c.blocksPurchases === 'boolean' && typeof c.title === 'string' && typeof c.message === 'string');
-  const announcements = raw.announcements.filter((a: any) => a && typeof a.id === 'string' && Number.isSafeInteger(a.revision) && typeof a.title === 'string' && typeof a.summary === 'string' && ANNOUNCEMENT_PLACEMENTS.includes(a.placement) && Array.isArray(a.pages) && a.pages.every((p: any) => ANNOUNCEMENT_PAGES.includes(p)));
+  const announcements = raw.announcements.filter((a: any) => a && typeof a.id === 'string' && Number.isSafeInteger(a.revision) && typeof a.title === 'string' && typeof a.summary === 'string' && ANNOUNCEMENT_PLACEMENTS.includes(a.placement) && Array.isArray(a.pages) && a.pages.every((p: any) => ANNOUNCEMENT_PAGES.includes(p)))
+    .map((a: any) => ({ ...a, cta: isAnnouncementCta(a.cta) ? a.cta : null }));
   return { version: raw.version, serverDate: /^\d{4}-\d{2}-\d{2}$/.test(raw.serverDate) ? raw.serverDate : accraDate(), controls, announcements, confirmed: true };
 }
 function readStored(): ServiceStatus | null {
