@@ -7,10 +7,12 @@
 import assert from 'node:assert/strict';
 import { test, before, after, beforeEach } from 'node:test';
 import { readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import express from 'express';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { FinanceStore } from '../../db/financeStore.js';
+import { FinanceService } from '../../services/financeService.js';
 import { AuthStore } from '../../db/authStore.js';
 import { OrdersStore } from '../../db/ordersStore.js';
 import { AdminAuditStore } from '../../db/adminAuditStore.js';
@@ -21,6 +23,7 @@ import { ServiceControlService as S } from '../../services/serviceControlService
 import { apiRouter } from '../../routes/api.js';
 import { adminRouter } from '../../routes/adminApi.js';
 import { SHIPPED_CONTROLS, SHIPPED_CONTROLS_VERSION, SERVICE_SCOPES, controlFor, normalizeControls, publicControls, restorationDateLabel, restorationLine, blocksPurchases } from '../../../shared/serviceControls.js';
+import { DIRECT_CAMPAIGN_DEFAULT } from '../../../shared/directCampaign.js';
 import { SHIPPED_ANNOUNCEMENTS, announcementProblems, announcementsFor, isLiveAnnouncement, normalizeAnnouncements, publicAnnouncements } from '../../../shared/announcements.js';
 import { getServiceStatus, parseServiceStatus, purchasePaused, setServiceStatusForTests } from '../../../src/hooks/useServiceStatus.js';
 
@@ -29,7 +32,7 @@ const code = (path: string) => source(path).replace(/\/\*[\s\S]*?\*\//g, '').rep
 const SUPPLIER_WORDS = /success\s*biz|brainiac|supplier|reseller|vendor|wholesale|upstream/i;
 const PROMISES = /refunded|will be refunded|refund(s)? (has|have) been|guarantee|nationwide|MTN Ghana (has )?confirm/i;
 
-const originalFetch = globalThis.fetch, init = P.initializeTransaction, airtimePreflight = F.preflightCheckAirtime, preflight = F.preflightCheck, clock = S.now;
+const originalFetch = globalThis.fetch, init = P.initializeTransaction, airtimePreflight = F.preflightCheckAirtime, preflight = F.preflightCheck, dispatch = F.processPaidOrder, clock = S.now;
 const client = F.getProvider().client as any, instantCheck = client.checkInstantBundlesService, instantList = client.getInstantBundles;
 let server: Server, base: string, paystackCalls = 0;
 const request = (path: string, body?: unknown, token: string | null = 'admin-token') => originalFetch(base + '/api/' + path, {
@@ -59,7 +62,7 @@ before(async () => {
 });
 after(async () => {
   await new Promise<void>((r) => server.close(() => r()));
-  globalThis.fetch = originalFetch; P.initializeTransaction = init; F.preflightCheckAirtime = airtimePreflight; F.preflightCheck = preflight; S.now = clock;
+  globalThis.fetch = originalFetch; P.initializeTransaction = init; F.preflightCheckAirtime = airtimePreflight; F.preflightCheck = preflight; F.processPaidOrder = dispatch; S.now = clock;
   client.checkInstantBundlesService = instantCheck; client.getInstantBundles = instantList;
   S.useShippedDefaultsForTests(false);
 });
@@ -75,6 +78,7 @@ beforeEach(async () => {
   paystackCalls = 0;
   P.initializeTransaction = async (p: any) => { paystackCalls++; return { success: true, reference: p.reference, accessCode: 'fixture', authorizationUrl: 'https://checkout.paystack.com/fixture' }; };
   F.preflightCheckAirtime = async () => ({ allowed: true } as any); F.preflightCheck = async () => ({ allowed: true, supplierCostMinor: 400 } as any);
+  F.processPaidOrder = async (ref: string) => ({ order: (await OrdersStore.findOrder(ref))!, alreadyHandled: false }) as any;
   client.checkInstantBundlesService = async () => ({ permitted: true, available: true });
   client.getInstantBundles = async () => ({ success: true, data: instantCatalogue });
 });
@@ -160,6 +164,21 @@ test('Operational never overrides another restriction: a product switched off in
   assert.equal(await S.purchaseBlock('data', 'mtn'), null);
 });
 
+test('promotional headlines never advertise a paused network (isolated store; the shipped campaign is not activated)', async () => {
+  const commercialClock = CommercialService.now;
+  try {
+    CommercialService.now = () => new Date('2026-12-10T12:00:00Z');
+    await FinanceStore.transaction('admin', (tx) => tx.saveConfig('direct-campaign', { ...DIRECT_CAMPAIGN_DEFAULT, enabled: true, version: 'fixture-enabled' }));
+    const open = await CommercialService.catalog();
+    assert.ok(open.campaign && (open.campaign.maxSavingPercent ?? 0) > 0, 'with MTN Data selling, the MTN-only campaign is advertised');
+    assert.equal((await saveControl({ scope: 'data:mtn', state: 'maintenance' })).status, 200);
+    const paused = await CommercialService.catalog();
+    assert.equal(paused.campaign, undefined, 'no campaign headline while every campaign product is paused');
+    assert.equal(paused.products.some((p: any) => p.standardPesewas !== undefined), false);
+    assert.equal(DIRECT_CAMPAIGN_DEFAULT.enabled, false, 'the shipped campaign stays switched off');
+  } finally { CommercialService.now = commercialClock; }
+});
+
 test('Instant Bundles and Airtime refuse a paused network at payment start, before any payment or order', async () => {
   assert.equal((await saveControl({ scope: 'instant_bundle:mtn', state: 'maintenance', title: 'MTN Instant Bundles update' })).status, 200);
   assert.equal((await saveControl({ scope: 'airtime:mtn', state: 'suspended', title: 'MTN Airtime update' })).status, 200);
@@ -185,6 +204,27 @@ test('Instant Bundles and Airtime refuse a paused network at payment start, befo
   const src = code('server/services/reorderService.ts');
   assert.match(src, /if \(await ServiceControlService\.purchaseBlock\('airtime', network\)\) return no\('unavailable'\);/);
   assert.match(src, /if \(await ServiceControlService\.purchaseBlock\('instant_bundle', product\.network\)\) return no\('unavailable', product\.network\);/);
+});
+
+test('a Wallet purchase accepted before a pause is recovered on retry: never refused, never charged twice', async () => {
+  await FinanceService.adjustment('admin', 'buyer', { amountMinor: 10000, confirmed: true, requestId: randomUUID(), direction: 'credit', reason: 'Synthetic fixture' });
+  const body = { productId: 'airtime-mtn-10', serviceType: 'airtime', network: 'mtn', recipientPhone: '0241234567', amount: 10, paymentMethod: 'wallet', requestId: randomUUID() };
+  const first = await request('payments/initialize', body, 'buyer-token');
+  assert.equal(first.status, 200, await first.clone().text());
+  const paid = await first.json();
+  const balance = async () => (await FinanceStore.read('buyer', (tx) => tx.account())).wallet_minor;
+  const afterFirst = await balance();
+  assert.equal(afterFirst, 10000 - paid.amountPesewas);
+  // The founder pauses MTN Airtime; the customer's app retries the same request (its answer was lost).
+  assert.equal((await saveControl({ scope: 'airtime:mtn', state: 'suspended' })).status, 200);
+  const retry = await request('payments/initialize', body, 'buyer-token');
+  assert.equal(retry.status, 200, 'the existing purchase is recovered, not refused');
+  assert.equal((await retry.json()).orderRef, paid.orderRef);
+  assert.equal(await balance(), afterFirst, 'charged once');
+  // A genuinely new purchase is refused.
+  const fresh = await request('payments/initialize', { ...body, requestId: randomUUID() }, 'buyer-token');
+  assert.equal(fresh.status, 503);
+  assert.equal(await balance(), afterFirst);
 });
 
 test('payment start, reorder and the assistant refuse Data through the catalogue; recovery is checked first; nothing after payment reads the controls', () => {
