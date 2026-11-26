@@ -6,6 +6,8 @@ Marketplace and Creative Studio retain enquiry workflows. The free Website Build
 
 The server blocks direct requests and saved checkout-link replays for disconnected services. The shared adapter independently looks up the persisted order and requires the main telecom service, exact reference namespace, product evidence, pending Paystack status, exact integer-pesewa amount and receipt email. It rejects storefront and Marketplace context before making a request to Paystack. Payment verification, the signed callback, existing refund and reconciliation paths, history and entitlements remain available. A checkout URL already issued by Paystack before the release may still be usable on Paystack’s site. Existing obligations remain supported if one of those payments succeeds.
 
+The [managed data storefront runbook](./managed-data-storefront-checkout.md) covers the separately gated, default-off data-storefront path. The shared main-telecom authorization still excludes storefront orders.
+
 ## Historical transaction evidence
 
 Use an authorized local copy of the verified application database and the founder’s original Paystack transaction CSV. This procedure requires no production writes. Keep both files on an access-controlled encrypted machine. Never attach row-level files, credentials, references, or receipt details to a PR or email. The preliminary 657 transactions and reported GH₵8,261.03 gross, GH₵163.99 fees and GH₵8,097.04 net await exact reconciliation.

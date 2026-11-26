@@ -18,6 +18,7 @@ import {OrdersStore} from '../../db/ordersStore.js';
 import {ReferralStore} from '../../db/referralStore.js';
 import {ReferralService} from '../../services/referralService.js';
 import {PaystackServerService} from '../../services/paystackService.js';
+import {ServiceControlService} from '../../services/serviceControlService.js';
 import {FulfilmentService} from '../../services/fulfilmentService.js';
 import {validateOrderPayment} from '../../services/paymentValidation.js';
 import {minimumStorePrice,storeReserve,STORE_POLICY_DEFAULTS} from '../../../shared/storeEconomics.js';
@@ -38,7 +39,7 @@ beforeEach(async()=>{
   site=(await WebsiteStore.createSite('owner',{template_id:'tmpl-data-reseller',name:'Fixture Store',content:{whatsapp:'0241234567'}})).site;site=await WebsiteStore.publishSite(site.id,'owner');
 });
 const request=(path:string,method='GET',body?:unknown,token='')=>originals.fetch(base+path,{method,headers:{...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:`Bearer ${token}`}:{})},...(body?{body:JSON.stringify(body)}:{})});
-const body=()=>({productId:'mtn-1gb',recipientPhone:'0241111111',customerEmail:'receipt@fixture.test',requestId:randomUUID()});
+const body=()=>({expectedMinor:500,productId:'mtn-1gb',recipientPhone:'0241111111',customerEmail:'receipt@fixture.test',requestId:randomUUID()});
 async function configure(){await Business.savePolicy('admin',{confirmed:true,expectedVersion:'unconfigured',enabled:true,reserveBps:300,reserveFixedMinor:10,withdrawalMinimumMinor:500,withdrawalFeeBps:300});await Business.saveWholesale('admin',{confirmed:true,expectedVersion:'empty',productId:'mtn-1gb',wholesaleMinor:300,enabled:true});await Business.savePrices(site.id,'owner',{expectedVersion:'empty',products:[{productId:'mtn-1gb',retailMinor:500,enabled:true}]});}
 async function historicalCheckout(siteId:string,details=body()) {
  const order=await seedHistoricalStoreOrder(siteId,{customer_email:details.customerEmail,customer_phone:'+233241111111',recipient_phone:'+233241111111'});
@@ -58,6 +59,99 @@ test('even a fully configured storefront cannot initialize or replay payment',as
  assert.equal((await Business.publicOrder(site.id,first.orderRef)).status,'pending_payment');
  assert.equal((await Business.catalog(site.id)).checkoutAvailable,false);
 });
+test('approved managed checkout uses a committed order, exact amount and metadata, then delivers and credits once',async t=>{
+ await configure();
+ t.mock.method(FulfilmentService,'preflightCheck',async()=>({allowed:true,supplierCostMinor:200,supplierOfferRef:'fixture'}));
+ process.env.MANAGED_DATA_STOREFRONT_CHECKOUT_ENABLED='true';
+ t.after(()=>{delete process.env.MANAGED_DATA_STOREFRONT_CHECKOUT_ENABLED;});
+ globalThis.fetch=async(url,options)=>{
+  assert.equal(url,'https://api.paystack.co/transaction/initialize');
+  assert.equal(options?.method,'POST');
+  const payload=JSON.parse(String(options?.body));
+  const order=(await OrdersStore.findOrder(payload.reference))!;
+  transaction={amountPesewas:payload.amount,metadata:payload.metadata};
+  assert.equal(payload.email,order.customer_email);
+  assert.equal(payload.amount,500);
+  assert.equal(payload.currency,'GHS');
+  assert.deepEqual(payload.metadata,storeVerificationMetadata(order));
+  assert.equal(order.store_context?.ownerId,'owner');
+  initCount++;
+  return Response.json({status:true,data:{reference:payload.reference,access_code:'fixture-access'}});
+ };
+ assert.equal((await Business.catalog(site.id)).checkoutAvailable,true);
+ const fields=body();
+ const checkout=()=>request(`/api/websites/${site.id}/store-checkout`,'POST',fields);
+ const results=await Promise.all([checkout(),checkout()]);
+ assert.ok(results.every(r=>r.status===200||r.status===409));
+ assert.equal(initCount,1);
+ assert.equal(OrdersStore.adminDevOrders().length,1);
+ const retry=await checkout();
+ assert.equal(retry.status,200);
+ const {data:started}=await retry.json();
+ assert.equal(started.amountPesewas,500);
+ assert.equal(started.accessCode,'fixture-access');
+ assert.equal(initCount,1);
+ const raw=JSON.stringify({event:'charge.success',data:{reference:started.reference,status:'success',amount:500,currency:'GHS',metadata:transaction.metadata}});
+ const signature=createHmac('sha512','sk_test_fixture').update(raw).digest('hex');
+ const webhook=()=>originals.fetch(base+'/api/webhooks/paystack',{method:'POST',headers:{'Content-Type':'application/json','x-paystack-signature':signature},body:raw});
+ await withSupplier({success:true,data:{publicId:'fixture-managed-delivered',status:'completed'}},async calls=>{
+  await Promise.all([webhook(),webhook(),request(`/api/payments/verify/${started.reference}`)]);
+  assert.equal(calls(),1);
+  assert.equal((await Business.publicOrder(site.id,started.orderRef)).status,'delivered');
+  const summary=await Business.ownerSummary(site.id,'owner');
+  assert.equal(summary.earnings.availableMinor,175);
+  assert.equal(summary.ledger.length,1);
+ });
+ assert.equal((await request(`/api/websites/other-site/store-orders/${started.orderRef}`)).status,404);
+ assert.equal((await checkout()).status,409);
+});
+
+test('managed approval still refuses client amount, context, unsupported plans, inactive service and insufficient float',async t=>{
+ await configure();
+ process.env.MANAGED_DATA_STOREFRONT_CHECKOUT_ENABLED='true';
+ t.after(()=>{delete process.env.MANAGED_DATA_STOREFRONT_CHECKOUT_ENABLED;});
+ const preflight=t.mock.method(FulfilmentService,'preflightCheck',async():ReturnType<typeof FulfilmentService.preflightCheck>=>({allowed:true,supplierCostMinor:200,supplierOfferRef:'fixture'}));
+ const transport=t.mock.method(globalThis,'fetch',async()=>assert.fail('unexpected external submission'));
+ const checkout=(input:object,id=site.id)=>request(`/api/websites/${id}/store-checkout`,'POST',input);
+ for(const extra of [{store_context:{ownerId:'other'}},{siteId:'other'},{amount:1},{reference:'MH_STORE_forged'},{serviceType:'data'},{recipientPhone:'02401'}]){
+  assert.equal((await checkout({...body(),...extra})).status,400);
+ }
+ assert.equal((await checkout(body(),'other-site')).status,404);
+ assert.equal((await checkout({...body(),productId:'airtime-mtn-1'})).status,400);
+ assert.equal((await checkout({...body(),expectedMinor:1})).status,409);
+ assert.equal((await checkout({...body(),productId:'mtn-2gb'})).status,400);
+ assert.equal(OrdersStore.adminDevOrders().length,0);
+ const paused=t.mock.method(ServiceControlService,'purchaseBlock',async()=>({state:'paused'} as any));
+ assert.equal((await checkout(body())).status,503);
+ paused.mock.restore();
+ preflight.mock.mockImplementation(async()=>({allowed:false,code:'SUPPLIER_WALLET_LOW'}));
+ const low=await checkout(body());
+ assert.equal(low.status,503);
+ assert.equal((await low.json()).code,'SUPPLIER_WALLET_LOW');
+ assert.equal(transport.mock.callCount(),0);
+ assert.equal(OrdersStore.adminDevOrders().length,0);
+ assert.equal((await FinanceStore.read('owner',tx=>tx.operations())).length,0);
+});
+
+test('managed Paystack path requires the exact published store and newly committed intent',async t=>{
+ await configure();
+ process.env.MANAGED_DATA_STOREFRONT_CHECKOUT_ENABLED='true';
+ t.after(()=>{delete process.env.MANAGED_DATA_STOREFRONT_CHECKOUT_ENABLED;});
+ const historical=await seedHistoricalStoreOrder(site.id);
+ const transport=t.mock.method(globalThis,'fetch',async()=>assert.fail('unexpected external submission'));
+ const key=`store-checkout:${randomUUID()}`;
+ const send=(ref=historical.payment_reference)=>PaystackServerService.initializeManagedDataStoreTransaction(ref,key);
+ assert.equal((await send()).success,false);
+ assert.equal(await PaystackServerService.initializeManagedDataStoreTransaction('MH_STORE_forged',key).then(r=>r.success),false);
+ const intent={managedPaymentVersion:1,reference:historical.payment_reference,siteId:site.id,orderId:historical.id,productId:historical.product_id,publicRef:historical.public_reference,recipient:historical.recipient_phone,email:historical.customer_email,customerId:historical.user_id};
+ await FinanceStore.transaction('owner',tx=>tx.create('store_checkout',key,501,intent,'initializing'));
+ assert.equal((await send()).success,false,'wrong persisted intent amount');
+ assert.equal((await send(historical.public_reference)).success,false);
+ await WebsiteStore.unpublishSite(site.id,'owner');
+ assert.equal((await send()).success,false);
+ assert.equal(transport.mock.callCount(),0);
+});
+
 test('default policy does not invent wholesale or publish unconfigured bundles',async()=>{assert.equal((await Business.catalog(site.id)).products.length,0);});
 test('explicit configured reserve required for activation',async()=>{await assert.rejects(()=>Business.savePolicy('admin',{confirmed:true,expectedVersion:'unconfigured',enabled:true,reserveBps:0,reserveFixedMinor:0,withdrawalMinimumMinor:500,withdrawalFeeBps:300}),/reserve/);});
 for(const amount of [0,1,199])test(`unsafe wholesale ${amount} rejected`,async()=>{await assert.rejects(()=>Business.saveWholesale('admin',{confirmed:true,expectedVersion:'empty',productId:'mtn-1gb',wholesaleMinor:amount,enabled:true}));});

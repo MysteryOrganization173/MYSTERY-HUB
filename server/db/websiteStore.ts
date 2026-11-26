@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import { createPublishedSnapshot, legacyPublishedSnapshot, publishedWebsiteRecord, publicWebsiteContent } from '../services/websitePublication.js';
 import {randomUUID} from 'node:crypto';
 import { validateWebsiteComposition, validateWebsiteContentPatch } from '../services/websiteValidation.js';
@@ -121,7 +122,13 @@ export class WebsiteStore {
   }
 
   /** Public operational reads use the same immutable presentation state as the public URL. */
-  static async findPublishedSiteById(id:string):Promise<WebsiteSiteRecord|null> {
+  static async findPublishedSiteById(id:string, lockClient?:PoolClient):Promise<WebsiteSiteRecord|null> {
+    if (lockClient) {
+      const row = (await lockClient.query<WebsiteSiteRecord>(
+        "SELECT * FROM website_sites WHERE id=$1 AND status='published' FOR UPDATE",[id]
+      )).rows[0];
+      return row ? publishedWebsiteRecord(this.normalizeRecord(row)) : null;
+    }
     const site=await this.findSiteById(id);
     return site?.status==='published'?publishedWebsiteRecord(site):null;
   }
