@@ -35,7 +35,7 @@ In the authorized Render backend shell, use the existing backend's configured SB
 node --import tsx scripts/sbh-data-catalogue-readonly.ts
 ```
 
-The cloud runner had no authorized supplier credential or Render shell. Treat ambiguous offers, repeated normalized sizes, disabled packages, missing selectors, absent validity, conflicting flags and an unclear iShare family as a review requirement. Record the exact account-specific offer identifier (slug or ID), every exact package identification, its priceMinor and availability, and authoritative validity before making a claim. If the supplier does not provide validity in the API, obtain explicit confirmation for that same offer, including how pack expiry works for sizes 1–5 GB. Portal wording alone is insufficient.
+The cloud runner had no authorized supplier credential or Render shell. Treat ambiguous offers, repeated normalized sizes, disabled packages, missing selectors, absent validity, conflicting flags and an unclear iShare family as a review requirement. Record the exact account-specific offer identifier (slug or ID), every exact package identification, its priceMinor and availability, and authoritative validity before making a claim. If the supplier does not provide validity in the API, obtain explicit confirmation for that same offer, including how pack expiry works for sizes 1–5 GB. Portal wording alone is insufficient. A nonzero exit means at least one defined AirtelTigo size needs review, or the diagnostic could not confirm account or catalogue access. Even an exact match is only API evidence and requires founder approval.
 
 ## Dependencies and rollout
 

@@ -41,13 +41,23 @@ export async function readSbhDataCatalogue(client = new SuccessBizHubClient()) {
       if (!r) return { size, productId: product?.id ?? null, retailActive: product?.isActive ?? false, resolution: 'missing_or_ambiguous' };
       const duplicate = r.offer.packages.filter(p => normalizeSizeLabel(p.sizeLabel) === size).length !== 1;
       const offerSelector = selector(r.offerSlug) || selector(r.offerId);
+      const packageValidity = validity(r.package.validity), offerValidity = validity(r.offer.validity);
+      const offerAvailability = availability(r.offer), packageAvailability = availability(r.package);
+      const familyMentioned = network !== 'airteltigo' || /ishare/i.test((r.offer.name || '') + ' ' + (r.offerSlug || ''));
+      const reviewReasons = [
+        duplicate && 'duplicate_size',
+        !offerSelector && 'missing_offer_selector',
+        r.supplierCostMinor <= 0 && 'invalid_cost',
+        !familyMentioned && 'family_unconfirmed',
+        !packageValidity && !offerValidity && 'validity_unconfirmed',
+        packageValidity && offerValidity && packageValidity.toLowerCase() !== offerValidity.toLowerCase() && 'validity_conflict',
+        offerAvailability === 'unavailable' || packageAvailability === 'unavailable' ? 'unavailable' :
+          offerAvailability === 'not_reported' && packageAvailability === 'not_reported' && 'availability_unconfirmed',
+      ].filter(Boolean);
       return { size, productId: product?.id ?? null, retailActive: product?.isActive ?? false, offerSelector,
-        packageId: selector(r.package.id), supplierMinor: r.supplierCostMinor,
-        packageValidity: validity(r.package.validity), offerValidity: validity(r.offer.validity),
-        offerAvailability: availability(r.offer), packageAvailability: availability(r.package),
-        familyMentioned: network !== 'airteltigo' || /ishare/i.test((r.offer.name || '') + ' ' + (r.offerSlug || '')),
-        resolution: duplicate || !offerSelector || r.supplierCostMinor <= 0 || availability(r.offer) === 'unavailable' ||
-          availability(r.package) === 'unavailable' ? 'requires_review' : 'exact_match' };
+        packageId: selector(r.package.id), supplierMinor: r.supplierCostMinor, packageValidity, offerValidity,
+        offerAvailability, packageAvailability, familyMentioned, reviewReasons,
+        resolution: reviewReasons.length ? 'requires_review' : 'exact_match' };
     }) };
   });
   return { observedAt: new Date().toISOString(), granted, available: true, networks };
@@ -56,7 +66,9 @@ export async function readSbhDataCatalogue(client = new SuccessBizHubClient()) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   readSbhDataCatalogue().then(result => {
     console.log(JSON.stringify(result, null, 2));
-    if (!result.granted || !result.available || !result.networks.length) process.exitCode = 1;
+    const airteltigo = result.networks.find(n => n.network === 'airteltigo')?.packages.filter(p => p.productId);
+    if (!result.granted || !result.available || !airteltigo?.length ||
+      airteltigo.some(p => p.resolution !== 'exact_match')) process.exitCode = 1;
   }).catch(() => {
     console.error('SBH standard-data catalogue could not be verified. Check credentials, permissions and response format in the approved operator environment.');
     process.exitCode = 1;

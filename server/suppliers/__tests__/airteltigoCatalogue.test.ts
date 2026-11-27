@@ -60,6 +60,17 @@ test('the read-only operator probe checks scope then resolves exact packages and
   assert.ok(!JSON.stringify(result).includes('<private>'));
 });
 
+test('an exact size alone cannot qualify an unverified iShare offer', async t=>{
+  const c=new SuccessBizHubClient();
+  t.mock.method(c,'getReadinessResource',async (endpoint:Parameters<SuccessBizHubClient['getReadinessResource']>[0])=>endpoint==='/services'?
+    {data:{keyPermissions:{orders:true},services:[{id:'orders',keyGranted:true,available:true}]}}:
+    {data:[{kind:'data',network:'AT',name:'Unqualified AT data',slug:'fixture-at',packages:[{sizeLabel:'6GB',priceMinor:2000}]}]});
+  const at=(await readSbhDataCatalogue(c)).networks.find(row=>row.network==='airteltigo')!;
+  const row=at.packages.find(p=>p.size==='6GB');
+  assert.equal(row?.resolution,'requires_review');
+  assert.deepEqual(row?.reviewReasons,['family_unconfirmed','validity_unconfirmed','availability_unconfirmed']);
+});
+
 test('permission mismatch stops the operator probe before reading catalogue',async t=>{
   const c=new SuccessBizHubClient();
   const read=t.mock.method(c,'getReadinessResource',async()=>({data:{keyPermissions:{orders:true},services:[{id:'orders',keyGranted:false,available:true}]}}));
