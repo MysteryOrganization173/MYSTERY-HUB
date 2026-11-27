@@ -173,7 +173,8 @@ test('one season for both audiences: the Data page follows the shared shell rule
   assert.ok(selectors.length > 60);
   for (const selector of selectors) assert.match(selector, /^\.mh-ds\[data-ds-season="christmas"\]/, selector);
   // The member checkout sheet gains the guest pack's bow through the shared shell, scoped to members.
-  assert.match(read('src/seasonal/christmas/shell/shell.css'), /\.mh-app\[data-season-shell="christmas"\]\[data-season-audience="member"\] \.mh-sheet::after/);
+  // 3.6.4: never on a serious sheet (paused, refused, closed or recovering checkout; a receipt needing help).
+  assert.match(read('src/seasonal/christmas/shell/shell.css'), /\.mh-app\[data-season-shell="christmas"\]\[data-season-audience="member"\] \.mh-sheet:not\(\[data-rc-mood="serious"\], \[data-sheet-mood="serious"\]\)::after/);
 });
 
 test('the Data look follows the approved calendar and is off outside it', () => {

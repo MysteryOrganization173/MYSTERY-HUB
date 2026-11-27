@@ -176,10 +176,15 @@ test('members get only the accent rules; guest-only parts stay guest-only; nothi
 });
 
 test('a serious sheet is never dressed: paused, refused, closed or recovering checkout, and receipts that need help', () => {
-  const css = read('src/seasonal/christmas/christmas.css');
-  assert.match(css, /\.mh-sheet:not\(\[data-rc-mood="serious"\], \[data-sheet-mood="serious"\]\) \{ box-shadow:/);
-  assert.match(css, /\.mh-sheet:not\(\[data-rc-mood="serious"\], \[data-sheet-mood="serious"\]\)::after \{/);
-  assert.doesNotMatch(css, /\.mh-sheet \{|\.mh-sheet::after/, 'no unconditional sheet decoration');
+  // Guests (pack) and members (shared shell): one rule each, both with the same exception.
+  for (const file of ['src/seasonal/christmas/christmas.css', 'src/seasonal/christmas/shell/shell.css']) {
+    const css = read(file);
+    assert.match(css, /\.mh-sheet:not\(\[data-rc-mood="serious"\], \[data-sheet-mood="serious"\]\) \{ box-shadow:/, file);
+    assert.match(css, /\.mh-sheet:not\(\[data-rc-mood="serious"\], \[data-sheet-mood="serious"\]\)::after \{/, file);
+    assert.doesNotMatch(css, /\.mh-sheet \{|\.mh-sheet::after/, `${file}: no unconditional sheet decoration`);
+  }
+  assert.match(read('src/seasonal/christmas/shell/shell.css'), /\[data-season-audience="member"\] \.mh-sheet:not/);
+  assert.match(read('src/seasonal/christmas/christmas.css'), /^\.mh-app\[data-season="christmas"\] \.mh-sheet:not/m);
   const checkout = code('src/components/checkout/CheckoutModal.tsx');
   assert.match(checkout, /aria-label="Purchases paused"[\s\S]{0,400}<div data-sheet-mood="serious" className="mh-sheet/);
   assert.match(checkout, /data-sheet-mood=\{preflightIssue \|\| serverError \|\| paymentClosed \|\| recoveryOnly \|\| activeMtnConflict \? 'serious' : undefined\}/);
@@ -243,4 +248,21 @@ test('the Admin panel tells "set and waiting for 1 December" from "off", and lis
   assert.match(panel, /does not restore MTN Data, open Mystery Greetings, start the December campaign or turn on storefront\s+payments/);
   assert.match(panel, /ends by itself on 6 January 2027/);
   assert.equal(CHRISTMAS_2026.end, '2027-01-05', 'the approved calendar is unchanged');
+});
+
+test('one overlay system: the exceptional pop-up holds the page and makes invitations wait; idle stagger stays short', () => {
+  const ui = code('src/components/service/ServiceUpdate.tsx');
+  assert.match(ui, /useOverlayLock\(Boolean\(shownKey\), dialogRef\);/);
+  assert.match(code('src/components/pwa/InvitationLayer.tsx'), /const busy = overlays > 0 \|\| isAuthChecking \|\| appBusy\(app\);/, 'invitations already wait for any registered overlay');
+  // The guest hero's idle twinkle and float start within about two seconds of each other, so the whole moment ends
+  // within about five seconds (the per-element stagger used to reach nine).
+  const hero = read('src/seasonal/christmas/home/heroArt.tsx');
+  assert.match(hero, /animationDelay: `\$\{0\.25 \+ i \* 0\.045\}s, \$\{0\.9 \+ i \* 0\.08\}s`/);
+  assert.match(hero, /animationDelay: `\$\{0\.75 \+ i \* 0\.12\}s, \$\{1\.4 \+ i \* 0\.15\}s`/);
+  // Accessibility fixes found in the seasonal sweep (they apply all year): readable Wallet activity details, and a
+  // disabled Earn share row that wraps rather than scrolling with nothing focusable.
+  assert.doesNotMatch(read('src/components/finance/FinancialPanel.tsx'), /text-xs text-slate-500/);
+  assert.match(readdirSync('src/components/earn').filter(f => f.endsWith('.css')).map(f => read(path.join('src/components/earn', f))).join('\n'), /\.earn-topics:disabled > div \{ flex-wrap: wrap; overflow: visible; \}/);
+  // Phones: one ornament beside each seasonal line, so its words are never cut off.
+  assert.match(read('src/seasonal/christmas/christmas.css'), /@media \(max-width: 480px\) \{\s*\.mh-app:is\(\[data-season="christmas"\], \[data-season-audience="member"\]\) \.xmas-page-art > :nth-child\(n\+2\) \{ display: none; \}/);
 });

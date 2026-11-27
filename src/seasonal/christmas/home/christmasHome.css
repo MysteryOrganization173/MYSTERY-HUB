@@ -164,10 +164,10 @@
 /* Idle life, only on desktop screens that hover, the first time the hero is on screen: one gentle float and two
    twinkles that settle (3.6.4: finite, under five seconds after the entrance; nothing loops). */
 @media (min-width: 900px) and (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .xh-hero[data-xh-visible]:not([data-xh-settled]) .xh-scene .xh-sc-tokens .xh-token { animation: xh-token-in 1s var(--xh-ease) both, xh-bob 3.6s 1s ease-in-out 1; }
-  .xh-hero[data-xh-visible][data-xh-settled] .xh-scene .xh-sc-tokens .xh-token { animation: xh-bob 3.6s ease-in-out 1; }
-  .xh-hero[data-xh-visible]:not([data-xh-settled]) .xh-scene .xh-sc-bulb-twinkle { animation: xh-on .5s ease-out both, xh-twinkle 2.2s .8s ease-in-out 2; }
-  .xh-hero[data-xh-visible][data-xh-settled] .xh-scene .xh-sc-bulb-twinkle { animation: xh-twinkle 2.2s ease-in-out 2; }
+  .xh-hero[data-xh-visible]:not([data-xh-settled]) .xh-scene .xh-sc-tokens .xh-token { animation: xh-token-in 1s var(--xh-ease) both, xh-bob 3s 1s ease-in-out 1; }
+  .xh-hero[data-xh-visible][data-xh-settled] .xh-scene .xh-sc-tokens .xh-token { animation: xh-bob 3s ease-in-out 1; }
+  .xh-hero[data-xh-visible]:not([data-xh-settled]) .xh-scene .xh-sc-bulb-twinkle { animation: xh-on .5s ease-out both, xh-twinkle 2.4s .8s ease-in-out 1; }
+  .xh-hero[data-xh-visible][data-xh-settled] .xh-scene .xh-sc-bulb-twinkle { animation: xh-twinkle 2.4s ease-in-out 1; }
 }
 
 /* ───────────────────────── Services, gift-wrapped ───────────────────────── */
